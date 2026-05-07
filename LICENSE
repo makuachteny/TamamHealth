@@ -1,21 +1,59 @@
-MIT License
+TamamHealth Health Technologies — Proprietary Software License
 
-Copyright (c) 2026 Makuach Teny Gatluak
+Copyright (c) 2026 TamamHealth Health Technologies. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software and associated documentation files (the "Software") are the
+exclusive property of TamamHealth Health Technologies. The Software is licensed,
+not sold.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. GRANT OF LICENSE
+   Subject to the terms of this agreement and a valid license key, TamamHealth
+   Health Technologies grants you a non-exclusive, non-transferable,
+   revocable license to install and use the Software for your organization's
+   internal healthcare operations.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. RESTRICTIONS
+   You may NOT:
+   (a) Copy, modify, or distribute the Software or any portion of it;
+   (b) Reverse engineer, decompile, or disassemble the Software;
+   (c) Sublicense, rent, lease, or lend the Software to third parties;
+   (d) Remove or alter any proprietary notices, labels, or marks;
+   (e) Use the Software to build a competing product or service;
+   (f) Share your license key with unauthorized parties;
+   (g) Make the Software publicly accessible (e.g., public repositories,
+       public servers without authentication).
+
+3. LICENSE KEY
+   A valid license key issued by TamamHealth Health Technologies is required to
+   install and operate the Software. Each license key is tied to a single
+   organization and may not be reused or shared.
+
+4. DATA OWNERSHIP
+   All patient data, health records, and operational data entered into the
+   Software remain the property of the licensee organization. TamamHealth Health
+   Technologies does not claim ownership of your data.
+
+5. SUPPORT & UPDATES
+   License holders receive software updates and technical support as defined
+   in their service agreement. Updates are delivered through the TamamHealth
+   distribution channel.
+
+6. TERMINATION
+   This license is effective until terminated. It terminates automatically
+   if you fail to comply with any term. Upon termination, you must destroy
+   all copies of the Software in your possession.
+
+7. WARRANTY DISCLAIMER
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED. TAMAMHEALTH HEALTH TECHNOLOGIES DISCLAIMS ALL WARRANTIES INCLUDING
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+8. LIMITATION OF LIABILITY
+   IN NO EVENT SHALL TAMAMHEALTH HEALTH TECHNOLOGIES BE LIABLE FOR ANY INDIRECT,
+   INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OF
+   THE SOFTWARE.
+
+9. GOVERNING LAW
+   This agreement is governed by the laws of the Republic of South Sudan.
+
+For licensing inquiries: hello@tamamhealth.org

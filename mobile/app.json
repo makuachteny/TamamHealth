@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "TamamHealth Patient",
+    "slug": "tamamhealth-patient",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "tamamhealth-patient",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#1A3A3A",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "health.tamamhealth.patient"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1A3A3A"
+      },
+      "package": "health.tamamhealth.patient"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-asset",
+      "expo-sqlite"
+    ]
+  }
+}

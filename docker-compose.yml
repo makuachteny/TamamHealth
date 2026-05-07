@@ -1,0 +1,140 @@
+# Production docker-compose stack for TamamHealth / SafeguardJunub.
+#
+# Required files before `docker compose up`:
+#   ./.env                         — compose-level vars (CouchDB/Postgres credentials, ports)
+#   ./platform/.env.production     — platform runtime env (JWT_SECRET, DATABASE_URL, etc.)
+#   ./website/.env.production      — website runtime env (email keys, etc.)
+#
+# Copy the .example files and fill them in.
+#
+# NOTE on NEXT_PUBLIC_* vars: Next.js bakes these into the client bundle at
+# BUILD time, so they must be present in ./platform/.env.production BEFORE
+# `docker compose build`. Runtime `environment:` entries will not affect
+# already-built bundles.
+
+services:
+  platform:
+    build:
+      context: ./platform
+      dockerfile: Dockerfile
+    env_file:
+      - ./platform/.env.production
+    environment:
+      NODE_ENV: production
+      # Server-side CouchDB access for /api/* routes. This is the internal
+      # compose-network URL, not the public https URL the browser hits.
+      COUCHDB_URL: http://couchdb:5984
+      COUCHDB_ADMIN_USER: ${COUCHDB_USER:?COUCHDB_USER must be set in .env}
+      COUCHDB_ADMIN_PASSWORD: ${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set in .env}
+    ports:
+      - "${PLATFORM_PORT:-3000}:3000"
+    depends_on:
+      couchdb:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  website:
+    build:
+      context: ./website
+      dockerfile: Dockerfile
+    env_file:
+      - ./website/.env.production
+    environment:
+      NODE_ENV: production
+    ports:
+      - "${WEBSITE_PORT:-3001}:3001"
+    restart: unless-stopped
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nightly CouchDB backup — dumps every tamamhealth_* database to a local
+  # volume at 02:15 UTC. Rotate the volume offsite via your cloud snapshotter
+  # or an additional rclone/rsync sidecar for full DR.
+  couchdb-backup:
+    image: alpine:3.19
+    depends_on:
+      couchdb:
+        condition: service_healthy
+    environment:
+      COUCHDB_USER: ${COUCHDB_USER:?COUCHDB_USER must be set in .env}
+      COUCHDB_PASSWORD: ${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set in .env}
+      COUCHDB_HOST: couchdb
+      COUCHDB_PORT: "5984"
+      BACKUP_RETAIN_DAYS: "14"
+    volumes:
+      - couchdb_backups:/backups
+      - ./scripts/backup-couchdb.sh:/usr/local/bin/backup-couchdb.sh:ro
+    command: >
+      sh -c "apk add --no-cache curl jq &&
+             echo '15 2 * * * /usr/local/bin/backup-couchdb.sh >> /backups/backup.log 2>&1' > /etc/crontabs/root &&
+             crond -f -l 2"
+    restart: unless-stopped
+    networks:
+      - app-net
+
+  couchdb:
+    image: couchdb:3
+    environment:
+      COUCHDB_USER: ${COUCHDB_USER:?COUCHDB_USER must be set in .env}
+      COUCHDB_PASSWORD: ${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set in .env}
+    # Bind CouchDB only to the loopback interface on the host.
+    # Reverse-proxy it via nginx/Caddy with TLS if external access is needed.
+    ports:
+      - "127.0.0.1:${COUCHDB_PORT:-5984}:5984"
+    volumes:
+      - couchdb_data:/opt/couchdb/data
+    restart: unless-stopped
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5984/_up || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # Postgres is optional — the platform works fully via PouchDB alone.
+  # Start with:  docker compose --profile analytics up -d
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["analytics"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-safeguard_junub}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  couchdb_data:
+  postgres_data:
+  couchdb_backups:
+
+networks:
+  app-net:
+    driver: bridge

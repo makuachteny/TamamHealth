@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- Background circle with South Sudan blue -->
+  <circle cx="60" cy="60" r="58" fill="#0F4C81"/>
+  <circle cx="60" cy="60" r="54" fill="#0A3D6B"/>
+
+  <!-- Inner gradient ring -->
+  <circle cx="60" cy="60" r="50" fill="none" stroke="url(#ring)" stroke-width="3"/>
+
+  <!-- South Sudan star (gold) -->
+  <polygon points="60,18 65,38 86,38 69,49 75,68 60,56 45,68 51,49 34,38 55,38" fill="#FCD34D" opacity="0.15"/>
+
+  <!-- Medical cross -->
+  <rect x="48" y="30" width="24" height="60" rx="4" fill="white"/>
+  <rect x="30" y="48" width="60" height="24" rx="4" fill="white"/>
+
+  <!-- Inner cross detail with South Sudan green -->
+  <rect x="52" y="34" width="16" height="52" rx="2" fill="#10B944"/>
+  <rect x="34" y="52" width="52" height="16" rx="2" fill="#10B944"/>
+
+  <!-- Center circle - South Sudan star -->
+  <circle cx="60" cy="60" r="10" fill="#FCD34D"/>
+  <polygon points="60,52 62.2,57.6 68,57.6 63.4,61.2 65.2,67 60,63.6 54.8,67 56.6,61.2 52,57.6 57.8,57.6" fill="#0A3D6B"/>
+
+  <!-- South Sudan flag stripe accents at bottom -->
+  <path d="M30,88 Q60,96 90,88" stroke="#111" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M32,92 Q60,100 88,92" stroke="#E52E42" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M35,96 Q60,103 85,96" stroke="#10B944" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <defs>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCD34D"/>
+      <stop offset="50%" stop-color="#10B944"/>
+      <stop offset="100%" stop-color="#2B6FE0"/>
+    </linearGradient>
+  </defs>
+</svg>

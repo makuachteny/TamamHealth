@@ -1,0 +1,58 @@
+# OS / editor artefacts
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Node
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js (platform + website)
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# SWC cache
+.swc/
+
+# Expo / React Native (mobile)
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Env files — only *.example should be committed
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+!.env.example
+!.env.production.example
+
+# Vercel
+.vercel/
+
+# Logs
+*.log
+
+# Temp / backup
+*.bak
+*.old
+*.tmp
