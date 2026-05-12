@@ -1,0 +1,182 @@
+name: deploy-production
+
+# Manual-only. Pin the `production` GitHub environment to a required-reviewer
+# list in the repo settings; GitHub will block the job until an approver
+# clicks "Approve and deploy". The workflow re-tags the staging image to
+# `production` so prod always ships a digest that has already been smoke-
+# tested on staging — no fresh build right before a prod cutover.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Short git SHA to promote (must already be tagged on the staging image). Leave blank to use the current main HEAD.'
+        required: false
+        type: string
+      target:
+        description: 'Deploy target. "vps" = legacy SSH path; "aws" = CloudFormation deploy to af-south-1.'
+        required: true
+        type: choice
+        default: vps
+        options:
+          - vps
+          - aws
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  promote-image:
+    name: re-tag staging image as production
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Resolve target SHA
+        id: resolve
+        env:
+          INPUT_SHA: ${{ github.event.inputs.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ -n "$INPUT_SHA" ]; then
+            SHORT="${INPUT_SHA:0:7}"
+          else
+            SHORT="${HEAD_SHA:0:7}"
+          fi
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          {
+            echo "sha=$SHORT"
+            echo "platform_image=ghcr.io/$OWNER/tamamhealth-platform"
+            echo "website_image=ghcr.io/$OWNER/tamamhealth-website"
+            echo "sync_worker_image=ghcr.io/$OWNER/tamamhealth-sync-worker"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Re-tag platform ${{ steps.resolve.outputs.sha }} as production
+        run: |
+          SRC="${{ steps.resolve.outputs.platform_image }}:${{ steps.resolve.outputs.sha }}"
+          DST="${{ steps.resolve.outputs.platform_image }}:production"
+          docker buildx imagetools create -t "$DST" "$SRC"
+
+      - name: Re-tag website ${{ steps.resolve.outputs.sha }} as production
+        run: |
+          SRC="${{ steps.resolve.outputs.website_image }}:${{ steps.resolve.outputs.sha }}"
+          DST="${{ steps.resolve.outputs.website_image }}:production"
+          docker buildx imagetools create -t "$DST" "$SRC"
+
+      - name: Re-tag sync-worker ${{ steps.resolve.outputs.sha }} as production
+        run: |
+          SRC="${{ steps.resolve.outputs.sync_worker_image }}:${{ steps.resolve.outputs.sha }}"
+          DST="${{ steps.resolve.outputs.sync_worker_image }}:production"
+          docker buildx imagetools create -t "$DST" "$SRC"
+
+  ssh-deploy:
+    name: ssh deploy to production host (vps target)
+    if: ${{ (github.event.inputs.target || 'vps') == 'vps' }}
+    needs: promote-image
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check whether SSH secrets are configured
+        id: gate
+        env:
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+        run: |
+          if [ -n "$PROD_SSH_HOST" ] && [ -n "$PROD_SSH_USER" ] && [ -n "$PROD_SSH_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Production SSH not configured::Image was re-tagged as :production but no host was deployed. Set PROD_SSH_HOST/USER/KEY in the production environment to enable."
+          fi
+
+      - name: Set up SSH agent
+        if: steps.gate.outputs.ready == 'true'
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Pull + restart stack
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          HOST: ${{ secrets.PROD_SSH_HOST }}
+          USER: ${{ secrets.PROD_SSH_USER }}
+          APP_DIR: ${{ secrets.PROD_APP_DIR || '/opt/tamamhealth' }}
+          SHA: ${{ needs.promote-image.outputs.sha }}
+        run: |
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+          ssh "$USER@$HOST" \
+            "cd $APP_DIR && \
+             docker compose pull && \
+             docker compose up -d && \
+             docker image prune -f && \
+             echo 'Deployed sha=$SHA'"
+
+  aws-deploy:
+    name: cloudformation deploy to af-south-1 (aws target)
+    if: ${{ github.event.inputs.target == 'aws' }}
+    needs: promote-image
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check AWS deploy prerequisites
+        id: gate
+        env:
+          AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SEC: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          ACM_ARN: ${{ secrets.PROD_ACM_CERT_ARN }}
+          DOMAIN:  ${{ secrets.PROD_DOMAIN }}
+          KEYPAIR: ${{ secrets.PROD_EC2_KEYPAIR }}
+        run: |
+          missing=""
+          [ -n "$AWS_KEY" ] || missing="$missing AWS_ACCESS_KEY_ID"
+          [ -n "$AWS_SEC" ] || missing="$missing AWS_SECRET_ACCESS_KEY"
+          [ -n "$ACM_ARN" ] || missing="$missing PROD_ACM_CERT_ARN"
+          [ -n "$DOMAIN" ]  || missing="$missing PROD_DOMAIN"
+          [ -n "$KEYPAIR" ] || missing="$missing PROD_EC2_KEYPAIR"
+          if [ -n "$missing" ]; then
+            echo "::error title=AWS deploy not configured::Missing production-environment secrets:$missing"
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        if: steps.gate.outputs.ready == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'af-south-1' }}
+
+      - name: Run cloudformation deploy
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          TAMAM_DB_PASSWORD: ${{ secrets.PROD_DB_MASTER_PASSWORD }}
+          GH_OWNER: ${{ github.repository_owner }}
+        run: |
+          chmod +x ./infra/aws/scripts/deploy.sh
+          ./infra/aws/scripts/deploy.sh \
+              --env production \
+              --domain "${{ secrets.PROD_DOMAIN }}" \
+              --acm-cert "${{ secrets.PROD_ACM_CERT_ARN }}" \
+              --instance-type "${{ vars.PROD_INSTANCE_TYPE || 't3.large' }}" \
+              --image-tag production \
+              --keypair "${{ secrets.PROD_EC2_KEYPAIR }}" \
+              --region "${{ secrets.AWS_REGION || 'af-south-1' }}"

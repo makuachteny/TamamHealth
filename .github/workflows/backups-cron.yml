@@ -1,0 +1,94 @@
+name: backups-restore-drill
+
+# Quarterly restore drill — proves the latest CouchDB + Postgres backups
+# decrypt and pass structural checks. Runs the FIRST day of each quarter at
+# 03:00 UTC (chosen to dodge the 02:15 UTC nightly backup window — we don't
+# want the drill colliding with a fresh upload).
+#
+# Manual trigger is also exposed (workflow_dispatch) so the operator can run
+# an out-of-band drill before any DR exercise.
+#
+# This workflow only runs the structural drill — it does NOT mutate any
+# database. The actual backup uploads run on the host via the systemd timer
+# documented in docs/operations/backups.md.
+#
+# Required GitHub secrets (production environment):
+#   AWS_ACCESS_KEY_ID
+#   AWS_SECRET_ACCESS_KEY
+#   AWS_REGION                  (default af-south-1)
+#   BACKUP_BUCKET
+#   BACKUP_PRIVKEY_GPG          armored GPG private key (paste full block)
+#   BACKUP_PRIVKEY_PASSPHRASE   passphrase for the above (recommended)
+#
+# Optional:
+#   AWS_ENDPOINT_URL            for Backblaze B2 / MinIO
+#   DRILL_SKIP_POSTGRES         set to "1" if Postgres analytics not yet wired
+#
+# Alerting: GitHub Actions surfaces failures via the workflow notification
+# channel set on the repo. Wire that to PagerDuty/Slack/email per
+# docs/operations/backups.md (operator-side wiring; this workflow only emits
+# the failing exit code).
+
+on:
+  schedule:
+    # 03:00 UTC on the first day of January, April, July, October.
+    - cron: '0 3 1 1,4,7,10 *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backups-restore-drill
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    name: restore drill (latest snapshots)
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install drill prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq awscli gnupg postgresql-client
+          aws --version
+          gpg --version | head -1
+          pg_restore --version
+
+      - name: Materialize the GPG private key
+        env:
+          PRIVKEY: ${{ secrets.BACKUP_PRIVKEY_GPG }}
+        run: |
+          if [ -z "$PRIVKEY" ]; then
+            echo "::error::BACKUP_PRIVKEY_GPG secret is not set on the production environment"
+            exit 1
+          fi
+          install -d -m 0700 "$RUNNER_TEMP/keys"
+          umask 077
+          printf '%s\n' "$PRIVKEY" > "$RUNNER_TEMP/keys/backup-privkey.asc"
+          echo "BACKUP_PRIVKEY_PATH=$RUNNER_TEMP/keys/backup-privkey.asc" >> "$GITHUB_ENV"
+
+      - name: Run the drill
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'af-south-1' }}
+          BACKUP_BUCKET: ${{ secrets.BACKUP_BUCKET }}
+          BACKUP_PRIVKEY_PASSPHRASE: ${{ secrets.BACKUP_PRIVKEY_PASSPHRASE }}
+          AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
+          DRILL_SKIP_POSTGRES: ${{ vars.DRILL_SKIP_POSTGRES }}
+        run: |
+          if [ -z "${BACKUP_BUCKET:-}" ]; then
+            echo "::error::BACKUP_BUCKET secret is not set"
+            exit 1
+          fi
+          ./scripts/backup-restore-drill.sh
+
+      - name: Annotate failure
+        if: failure()
+        run: |
+          echo "::error title=Backup restore drill failed::Investigate immediately. See docs/operations/backups.md for the runbook."

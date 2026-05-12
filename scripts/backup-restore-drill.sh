@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# =============================================================================
+# backup-restore-drill.sh — quarterly DR verification.
+#
+# Pulls the most-recent CouchDB and Postgres snapshots from S3, decrypts them
+# locally, and runs structural checks. Designed to fail loudly so the GH
+# Action wrapping it pages on a regression.
+#
+# This is NOT a real restore — it does not touch any live database. It only
+# proves that:
+#
+#   1. the latest snapshot exists,
+#   2. it decrypts with the operator's private key,
+#   3. its structure is what we expect:
+#        - couchdb tarball: contains tamamhealth_*.json.gz members,
+#        - postgres dump:   pg_restore --list returns at least one entry.
+#
+# Usage:
+#   ./scripts/backup-restore-drill.sh
+#
+# Environment:
+#   BACKUP_BUCKET           required.
+#   AWS_REGION              optional, default af-south-1.
+#                           PHI residency: must remain af-south-1.
+#   BACKUP_PRIVKEY_PATH     required. Path to the GPG private key able to
+#                           decrypt the snapshots. Operator must place this on
+#                           the drill host out-of-band; never store the
+#                           private key in the same bucket.
+#   BACKUP_PRIVKEY_PASSPHRASE
+#                           optional. Set if the private key is passphrase-
+#                           protected (recommended). Provided via env so it
+#                           never appears in the process list.
+#   AWS_ENDPOINT_URL        optional, for B2/MinIO/etc.
+#   DRILL_SKIP_POSTGRES     optional. Set to "1" if the deployment does not
+#                           use the analytics Postgres yet.
+#
+# Exit codes:
+#   0 — drill PASS
+#   1 — drill FAIL (any check failed)
+# =============================================================================
+set -euo pipefail
+
+usage() {
+  sed -n '3,32p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage; exit 0
+fi
+
+LOG_TAG="tamamhealth-backup-drill"
+log()  { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; logger -t "$LOG_TAG" "$*" || true; }
+fail() { log "FAIL: $*"; FAILED=1; }
+
+: "${BACKUP_BUCKET:?BACKUP_BUCKET required}"
+: "${AWS_REGION:=af-south-1}"
+: "${BACKUP_PRIVKEY_PATH:?BACKUP_PRIVKEY_PATH required}"
+
+[ -r "$BACKUP_PRIVKEY_PATH" ] || { log "FAIL: privkey not readable at $BACKUP_PRIVKEY_PATH"; exit 1; }
+
+command -v aws        >/dev/null 2>&1 || { log "FAIL: aws CLI required for drill"; exit 1; }
+command -v gpg        >/dev/null 2>&1 || { log "FAIL: gpg required"; exit 1; }
+command -v tar        >/dev/null 2>&1 || { log "FAIL: tar required"; exit 1; }
+command -v pg_restore >/dev/null 2>&1 || [ "${DRILL_SKIP_POSTGRES:-}" = "1" ] \
+  || { log "FAIL: pg_restore required (or set DRILL_SKIP_POSTGRES=1)"; exit 1; }
+
+WORK=$(mktemp -d -t backup-drill.XXXXXX)
+trap 'rm -rf "$WORK"' EXIT
+
+# Throwaway GNUPGHOME so we don't pollute the host keyring.
+export GNUPGHOME="${WORK}/gnupg"
+mkdir -p "$GNUPGHOME"
+chmod 700 "$GNUPGHOME"
+gpg --batch --quiet --import "$BACKUP_PRIVKEY_PATH" \
+  || { log "FAIL: privkey import failed"; exit 1; }
+
+GPG_DECRYPT=(gpg --batch --quiet --yes --decrypt)
+if [ -n "${BACKUP_PRIVKEY_PASSPHRASE:-}" ]; then
+  GPG_DECRYPT+=(--pinentry-mode loopback --passphrase "$BACKUP_PRIVKEY_PASSPHRASE")
+fi
+
+AWS_ARGS=(--region "$AWS_REGION")
+if [ -n "${AWS_ENDPOINT_URL:-}" ]; then
+  AWS_ARGS+=(--endpoint-url "$AWS_ENDPOINT_URL")
+fi
+
+FAILED=0
+
+# ------- locate latest CouchDB snapshot --------------------------------------
+log "scanning bucket for latest couchdb snapshot"
+COUCH_KEY=$(aws "${AWS_ARGS[@]}" s3api list-objects-v2 \
+              --bucket "$BACKUP_BUCKET" \
+              --prefix "" \
+              --query 'reverse(sort_by(Contents,&LastModified))[?contains(Key,`couchdb-`)].Key | [0]' \
+              --output text 2>/dev/null \
+              | tr -d '\r')
+if [ -z "$COUCH_KEY" ] || [ "$COUCH_KEY" = "None" ]; then
+  fail "no couchdb-*.tar.gz.gpg objects found in bucket $BACKUP_BUCKET"
+else
+  log "couchdb snapshot: s3://$BACKUP_BUCKET/$COUCH_KEY"
+  COUCH_LOCAL="${WORK}/couchdb.tar.gz.gpg"
+  if aws "${AWS_ARGS[@]}" s3 cp "s3://${BACKUP_BUCKET}/${COUCH_KEY}" "$COUCH_LOCAL" --only-show-errors; then
+    if "${GPG_DECRYPT[@]}" --output "${WORK}/couchdb.tar.gz" "$COUCH_LOCAL" 2>/dev/null; then
+      MEMBERS=$(tar tzf "${WORK}/couchdb.tar.gz" 2>/dev/null | wc -l | tr -d ' ')
+      TAMAM_MEMBERS=$(tar tzf "${WORK}/couchdb.tar.gz" 2>/dev/null | grep -c 'tamamhealth_.*json.gz' || true)
+      log "  members: $MEMBERS total, $TAMAM_MEMBERS tamamhealth_*.json.gz"
+      if [ "$TAMAM_MEMBERS" -lt 1 ]; then
+        fail "couchdb snapshot has no tamamhealth_*.json.gz members"
+      else
+        log "  couchdb structural check PASS"
+      fi
+    else
+      fail "couchdb snapshot decrypt failed"
+    fi
+  else
+    fail "couchdb snapshot download failed"
+  fi
+fi
+
+# ------- locate latest Postgres snapshot ------------------------------------
+if [ "${DRILL_SKIP_POSTGRES:-}" = "1" ]; then
+  log "skipping postgres drill (DRILL_SKIP_POSTGRES=1)"
+else
+  log "scanning bucket for latest postgres snapshot"
+  PG_KEY=$(aws "${AWS_ARGS[@]}" s3api list-objects-v2 \
+              --bucket "$BACKUP_BUCKET" \
+              --prefix "" \
+              --query 'reverse(sort_by(Contents,&LastModified))[?contains(Key,`postgres-`)].Key | [0]' \
+              --output text 2>/dev/null \
+              | tr -d '\r')
+  if [ -z "$PG_KEY" ] || [ "$PG_KEY" = "None" ]; then
+    fail "no postgres-*.dump.gpg objects found in bucket $BACKUP_BUCKET"
+  else
+    log "postgres snapshot: s3://$BACKUP_BUCKET/$PG_KEY"
+    PG_LOCAL="${WORK}/postgres.dump.gpg"
+    if aws "${AWS_ARGS[@]}" s3 cp "s3://${BACKUP_BUCKET}/${PG_KEY}" "$PG_LOCAL" --only-show-errors; then
+      if "${GPG_DECRYPT[@]}" --output "${WORK}/postgres.dump" "$PG_LOCAL" 2>/dev/null; then
+        ENTRIES=$(pg_restore --list "${WORK}/postgres.dump" 2>/dev/null | grep -cE '^[0-9]+;' || true)
+        log "  pg_restore --list entries: $ENTRIES"
+        if [ "$ENTRIES" -lt 1 ]; then
+          fail "postgres dump has no restorable entries"
+        else
+          log "  postgres structural check PASS"
+        fi
+      else
+        fail "postgres snapshot decrypt failed"
+      fi
+    else
+      fail "postgres snapshot download failed"
+    fi
+  fi
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+  log "DRILL FAIL"
+  exit 1
+fi
+
+log "DRILL PASS"
+exit 0

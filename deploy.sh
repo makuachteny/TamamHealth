@@ -51,6 +51,12 @@ if ! command -v caddy >/dev/null; then
 fi
 
 # ===== 2. REPO + ENV FILES =================================================
+# REPO_URL has a YOUR-ORG placeholder. If the operator didn't override it,
+# `git clone` will fail with an unhelpful 404. Refuse before the network call.
+if echo "$REPO_URL" | grep -q 'YOUR-ORG'; then
+  die "REPO_URL still points at the YOUR-ORG placeholder. Re-run with REPO_URL=https://github.com/<your-org>/tamamhealth.git ./deploy.sh"
+fi
+
 if [ ! -d "$APP_DIR/.git" ]; then
   say "Cloning repo to $APP_DIR"
   git clone "$REPO_URL" "$APP_DIR"
@@ -66,9 +72,30 @@ for f in ".env" "platform/.env.production" "website/.env.production"; do
   [ -f "$f" ] || die "Missing $APP_DIR/$f — upload it first: scp $f root@<VPS>:$APP_DIR/$f"
 done
 
-# Sanity-check: no placeholders should have survived
-if grep -q "REPLACE\|PLACEHOLDER\|ChangeMe" platform/.env.production; then
-  die "platform/.env.production still has placeholders. Fill in real values and re-run."
+# Sanity-check: no placeholders should have survived in any of the env files.
+# Previously we only scanned platform/.env.production, but a fresh deploy can
+# also break on a placeholder COUCHDB_PASSWORD or POSTGRES_PASSWORD in the
+# root .env. Scan all three.
+for f in ".env" "platform/.env.production" "website/.env.production"; do
+  if grep -q "REPLACE\|PLACEHOLDER\|ChangeMe" "$f"; then
+    die "$f still has placeholders. Fill in real values and re-run."
+  fi
+done
+
+# docker-compose.yml requires these keys in the root .env when the analytics
+# profile is enabled (sync-worker references ${COUCHDB_WEBHOOK_SECRET:?...},
+# which makes compose abort on `up` if the variable is missing). Catch it
+# here with a clearer message before the docker-compose error.
+if grep -qE '^[[:space:]]*profiles:[[:space:]]*\["analytics"\]' docker-compose.yml; then
+  for required in COUCHDB_USER COUCHDB_PASSWORD; do
+    if ! grep -qE "^${required}=" .env; then
+      die ".env is missing $required (required by docker-compose.yml). See README."
+    fi
+  done
+  if ! grep -qE '^COUCHDB_WEBHOOK_SECRET=' .env; then
+    warn_missing="COUCHDB_WEBHOOK_SECRET not set in .env — sync-worker will refuse to start under --profile analytics."
+    echo -e "\033[1;33m[warn]\033[0m $warn_missing"
+  fi
 fi
 
 # ===== 3. CADDY CONFIG =====================================================
@@ -138,8 +165,13 @@ cat <<EOF
 • Patient portal:  https://${DOMAIN_APP}/patient-portal
 • CouchDB admin:   https://${DOMAIN_COUCH}/_utils (log in with COUCHDB_USER)
 
-First login: use \$NEXT_PUBLIC_ADMIN_NAME + \$NEXT_PUBLIC_ADMIN_PASSWORD
-from platform/.env.production. Change the password immediately after first login.
+First login:
+  Username: admin (or \$NEXT_PUBLIC_ADMIN_NAME from platform/.env.production)
+  Password: read from \$ADMIN_INITIAL_PASSWORD in platform/.env.production
+           — or from /opt/tamamhealth/platform/.seed-credentials.json if you
+             left ADMIN_INITIAL_PASSWORD unset (the platform auto-generated
+             one on first boot).
+Change the password immediately after first login.
 
 Ops:
   docker compose logs -f platform     # tail platform logs

@@ -50,6 +50,15 @@ const VALID_TABLES = new Set([
 const DB_NAME = 'tamamhealth_patient.db';
 let _db: any = null;
 
+/**
+ * Demo seed gate. We only seed the local SQLite cache with the example
+ * `pat-00001` Deng Mabior records when EXPO_PUBLIC_DEMO_MODE is anything
+ * other than 'false'. In production the seed is suppressed so a freshly
+ * installed app starts empty and waits for a real sync from the platform —
+ * no patient ever sees somebody else's records by default.
+ */
+const SEED_DEMO_DATA = process.env.EXPO_PUBLIC_DEMO_MODE !== 'false';
+
 export async function getDatabase(): Promise<any> {
   if (!IS_NATIVE || !SQLite) return null; // web fallback
   if (_db) return _db;
@@ -57,7 +66,9 @@ export async function getDatabase(): Promise<any> {
   await _db.execAsync('PRAGMA journal_mode = WAL;');
   await _db.execAsync('PRAGMA foreign_keys = ON;');
   await createTables(_db);
-  await seedIfEmpty(_db);
+  if (SEED_DEMO_DATA) {
+    await seedIfEmpty(_db);
+  }
   return _db;
 }
 
@@ -432,42 +443,42 @@ function rowToCharge(r: any): Charge {
 
 export async function getMedicalRecords(): Promise<MedicalRecord[]> {
   const db = await getDatabase();
-  if (!db) return seedRecords;
+  if (!db) return SEED_DEMO_DATA ? seedRecords : [];
   const rows = await db.getAllAsync('SELECT * FROM medical_records ORDER BY created_at DESC');
   return rows.map(rowToMedicalRecord);
 }
 
 export async function getLabResults(): Promise<LabResult[]> {
   const db = await getDatabase();
-  if (!db) return seedLabs;
+  if (!db) return SEED_DEMO_DATA ? seedLabs : [];
   const rows = await db.getAllAsync('SELECT * FROM lab_results ORDER BY ordered_at DESC');
   return rows.map(rowToLabResult);
 }
 
 export async function getPrescriptions(): Promise<Prescription[]> {
   const db = await getDatabase();
-  if (!db) return seedRx;
+  if (!db) return SEED_DEMO_DATA ? seedRx : [];
   const rows = await db.getAllAsync('SELECT * FROM prescriptions ORDER BY created_at DESC');
   return rows.map(rowToPrescription);
 }
 
 export async function getAppointments(): Promise<Appointment[]> {
   const db = await getDatabase();
-  if (!db) return seedApts;
+  if (!db) return SEED_DEMO_DATA ? seedApts : [];
   const rows = await db.getAllAsync('SELECT * FROM appointments ORDER BY appointment_date DESC');
   return rows.map(rowToAppointment);
 }
 
 export async function getImmunizations(): Promise<Immunization[]> {
   const db = await getDatabase();
-  if (!db) return seedImms;
+  if (!db) return SEED_DEMO_DATA ? seedImms : [];
   const rows = await db.getAllAsync('SELECT * FROM immunizations ORDER BY date_given DESC');
   return rows.map(rowToImmunization);
 }
 
 export async function getMessages(): Promise<Message[]> {
   const db = await getDatabase();
-  if (!db) return seedMsgs;
+  if (!db) return SEED_DEMO_DATA ? seedMsgs : [];
   const rows = await db.getAllAsync('SELECT * FROM messages ORDER BY sent_at DESC');
   return rows.map(rowToMessage);
 }
@@ -476,10 +487,10 @@ export async function getBilling(): Promise<BillingSummary> {
   const db = await getDatabase();
   const pays: Payment[] = db
     ? (await db.getAllAsync('SELECT * FROM payments ORDER BY processed_at DESC')).map(rowToPayment)
-    : seedPays;
+    : (SEED_DEMO_DATA ? seedPays : []);
   const chgs: Charge[] = db
     ? (await db.getAllAsync('SELECT * FROM charges ORDER BY service_date DESC')).map(rowToCharge)
-    : seedCharges;
+    : (SEED_DEMO_DATA ? seedCharges : []);
 
   const totalBilled = chgs.reduce((s: number, c: Charge) => s + c.billedAmount, 0);
   const totalPaid = pays.reduce((s: number, p: Payment) => s + p.amount, 0);

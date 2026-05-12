@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, Platform,
   TouchableOpacity, Modal, TextInput, Alert,
 } from 'react-native';
 import { Icon } from '@/components/icons';
 import { colors, spacing, fontSize, radius } from '../lib/theme';
-import Badge from '../components/Badge';
+import { useAuth } from '../lib/auth';
 import { useStore } from '../lib/store';
-import * as api from '../lib/api';
+import { useCachedFetch } from '../lib/use-cached-fetch';
+import SyncBadge from '../components/SyncBadge';
 import type { BillingSummary, Payment } from '../lib/types';
 
 function ssp(amount: number) { return `SSP ${amount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`; }
@@ -21,14 +22,24 @@ const PAYMENT_METHODS = [
 ];
 
 export default function BillingScreen() {
-  const [data, setData] = useState<BillingSummary | null>(null);
+  const { patient } = useAuth();
   const { newPayments, addPayment } = useStore();
-  const [refreshing, setRefreshing] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
 
-  const load = async () => { setData(await api.getBilling()); };
-  useEffect(() => { load(); }, []);
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  // Real billing summary from the platform. Cache namespace is per-patient
+  // (sign-out clears it via clearAllCachedPhi), so the previous person on
+  // this device can't see the next person's ledger.
+  const cacheKey = patient ? `billing.${patient.id}` : 'billing.anon';
+  const path = patient
+    ? `/api/patient-portal/billing?patientId=${encodeURIComponent(patient.id)}`
+    : null;
+
+  const { data, refreshing, error, lastSyncedAt, isStale, refresh } =
+    useCachedFetch<BillingSummary, BillingSummary>({
+      cacheKey,
+      path,
+      select: (raw) => raw,
+    });
 
   const allPayments = [...newPayments, ...(data?.payments || [])];
   const totalPaid = allPayments.reduce((s, p) => s + p.amount, 0);
@@ -41,9 +52,18 @@ export default function BillingScreen() {
         style={styles.container}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.green} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.green} />}
       >
         <Text style={styles.heading}>Billing & Payments</Text>
+
+        <SyncBadge lastSyncedAt={lastSyncedAt} isStale={isStale} />
+
+        {error && (
+          <View style={styles.errorBanner}>
+            <Icon name="alert-circle" size={16} color={colors.red} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
 
         {/* Balance banner */}
         <View style={styles.balanceBanner}>
@@ -269,6 +289,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   content: { padding: spacing.md, paddingBottom: 100 },
   heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.navy, marginBottom: spacing.md },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: colors.redLight,
+    borderRadius: radius.sm,
+    marginBottom: spacing.md,
+  },
+  errorText: { fontSize: fontSize.sm, color: colors.red, flex: 1 },
   balanceBanner: {
     backgroundColor: colors.navy, borderRadius: radius.lg, padding: spacing.lg, alignItems: 'center', marginBottom: spacing.md,
     ...Platform.select({ ios: { shadowColor: colors.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12 }, android: { elevation: 6 } }),

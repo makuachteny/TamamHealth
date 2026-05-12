@@ -1,14 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Icon } from '@/components/icons';
 import { useRouter } from 'expo-router';
 import { colors, spacing, fontSize, radius } from '../lib/theme';
 import { useAuth } from '../lib/auth';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
-import * as api from '../lib/api';
+import { apiFetch } from '../lib/api-client';
+import { cacheGetWithMeta, cacheSet, TTL_24H } from '../lib/offline-cache';
 import type { MedicalRecord, LabResult, Appointment, Prescription } from '../lib/types';
 
 const QUICK_ACTIONS = [
@@ -20,6 +22,21 @@ const QUICK_ACTIONS = [
   { key: 'messages', icon: 'chatbubbles', label: 'Messages', color: '#06B6D4', route: '/(tabs)/messages' },
 ];
 
+// Helper to fetch + JSON-decode + tolerate failures so the dashboard renders
+// from cache when one endpoint is flaky. Returns null on any non-OK, throw,
+// or shape mismatch — the caller substitutes its cached value.
+async function fetchList<T>(path: string, key: string): Promise<T[] | null> {
+  try {
+    const res = await apiFetch(path);
+    if (!res.ok) return null;
+    const json = (await res.json()) as Record<string, unknown>;
+    const list = json[key];
+    return Array.isArray(list) ? (list as T[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function HomeScreen() {
   const { patient } = useAuth();
   const router = useRouter();
@@ -29,22 +46,92 @@ export default function HomeScreen() {
   const [meds, setMeds] = useState<Prescription[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = async () => {
+  // Per-patient cache keys so two patients on the same device don't see
+  // each other's data even on first paint while the network call is in
+  // flight. clearAllCachedPhi() (called from signOut) drops these.
+  // Memoized so `load`'s useCallback identity is stable across renders.
+  const keys = useMemo(() => {
+    if (!patient) return null;
+    return {
+      records: `records.${patient.id}`,
+      labs: `labs.${patient.id}`,
+      appointments: `appointments.${patient.id}`,
+      prescriptions: `prescriptions.${patient.id}`,
+    };
+  }, [patient]);
+
+  const load = useCallback(async () => {
+    if (!patient || !keys) return;
+    const qs = `?patientId=${encodeURIComponent(patient.id)}`;
     const [r, l, a, m] = await Promise.all([
-      api.getMedicalRecords(),
-      api.getLabResults(),
-      api.getAppointments(),
-      api.getPrescriptions(),
+      fetchList<MedicalRecord>(`/api/patient-portal/records${qs}`, 'records'),
+      fetchList<LabResult>(`/api/patient-portal/labs${qs}`, 'results'),
+      fetchList<Appointment>(`/api/patient-portal/appointments${qs}`, 'appointments'),
+      fetchList<Prescription>(`/api/patient-portal/prescriptions${qs}`, 'prescriptions'),
     ]);
-    setRecords(r);
-    setLabs(l);
-    setAppointments(a);
-    setMeds(m);
+
+    // For each endpoint: server response wins; on failure fall back to the
+    // cached snapshot so the dashboard isn't blank on a flaky network.
+    const applyOrCache = async <T,>(
+      fresh: T[] | null,
+      cacheKey: string,
+      setter: (v: T[]) => void
+    ): Promise<void> => {
+      if (fresh !== null) {
+        setter(fresh);
+        void cacheSet(cacheKey, fresh, TTL_24H);
+      } else {
+        const cached = await cacheGetWithMeta<T[]>(cacheKey);
+        if (cached) setter(cached.data);
+      }
+    };
+
+    await Promise.all([
+      applyOrCache(r, keys.records, setRecords),
+      applyOrCache(l, keys.labs, setLabs),
+      applyOrCache(a, keys.appointments, setAppointments),
+      applyOrCache(m, keys.prescriptions, setMeds),
+    ]);
+  }, [patient, keys]);
+
+  // Hydrate from cache immediately so we never flash empty tiles to a
+  // returning user. The freshly-loaded network response overwrites this
+  // a moment later (or stays put if the network is unreachable).
+  useEffect(() => {
+    if (!keys) return;
+    let cancelled = false;
+    (async () => {
+      const [r, l, a, m] = await Promise.all([
+        cacheGetWithMeta<MedicalRecord[]>(keys.records),
+        cacheGetWithMeta<LabResult[]>(keys.labs),
+        cacheGetWithMeta<Appointment[]>(keys.appointments),
+        cacheGetWithMeta<Prescription[]>(keys.prescriptions),
+      ]);
+      if (cancelled) return;
+      if (r) setRecords(r.data);
+      if (l) setLabs(l.data);
+      if (a) setAppointments(a.data);
+      if (m) setMeds(m.data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Re-run only when the patient identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patient?.id]);
+
+  // Re-fetch on every focus (matches the per-screen useCachedFetch behavior).
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
   };
-
-  useEffect(() => { load(); }, []);
-
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';

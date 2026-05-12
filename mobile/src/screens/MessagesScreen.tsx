@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, Platform,
   TouchableOpacity, Modal, TextInput, Alert,
@@ -7,8 +7,12 @@ import { Icon } from '@/components/icons';
 import { colors, spacing, fontSize, radius } from '../lib/theme';
 import { useAuth } from '../lib/auth';
 import { useStore } from '../lib/store';
-import * as api from '../lib/api';
+import { useCachedFetch } from '../lib/use-cached-fetch';
+import SyncBadge from '../components/SyncBadge';
+import { SkeletonList } from '../components/Skeleton';
 import type { Message } from '../lib/types';
+
+type MessagesResponse = { messages: Message[] };
 
 const DEPARTMENTS = [
   { key: 'opd', label: 'General / OPD', icon: 'medical-outline' },
@@ -25,15 +29,29 @@ const DEPARTMENTS = [
 export default function MessagesScreen() {
   const { patient } = useAuth();
   const { newMessages, addMessage } = useStore();
-  const [seedMessages, setSeedMessages] = useState<Message[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
 
-  const load = async () => { setSeedMessages(await api.getMessages()); };
-  useEffect(() => { load(); }, []);
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  // Real messages from the platform. Falls back to the offline cache on
+  // network failure. `useCachedFetch` namespaces by `patient.id`, so a
+  // sign-out cleared the cache and the previous patient's threads can't
+  // leak to a new sign-in on the same device.
+  const cacheKey = patient ? `messages.${patient.id}` : 'messages.anon';
+  const path = patient
+    ? `/api/patient-portal/messages?patientId=${encodeURIComponent(patient.id)}`
+    : null;
 
-  const allMessages = [...seedMessages, ...newMessages];
+  const { data, loading, refreshing, error, lastSyncedAt, isStale, refresh } =
+    useCachedFetch<MessagesResponse, Message[]>({
+      cacheKey,
+      path,
+      select: (raw) => raw.messages ?? [],
+    });
+
+  // Server-side history first, then any locally-composed messages still
+  // pending sync via the sync engine.
+  const serverMessages = data ?? [];
+  const allMessages = [...serverMessages, ...newMessages];
+  const isInitialLoading = loading && data === null;
 
   return (
     <>
@@ -41,7 +59,7 @@ export default function MessagesScreen() {
         style={styles.container}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.green} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.green} />}
       >
         <View style={styles.headerRow}>
           <View>
@@ -54,7 +72,18 @@ export default function MessagesScreen() {
           </TouchableOpacity>
         </View>
 
-        {allMessages.length === 0 && (
+        <SyncBadge lastSyncedAt={lastSyncedAt} isStale={isStale} />
+
+        {error && (
+          <View style={styles.errorBanner}>
+            <Icon name="alert-circle" size={16} color={colors.red} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        {isInitialLoading && <SkeletonList count={3} />}
+
+        {!isInitialLoading && allMessages.length === 0 && !error && (
           <View style={styles.emptyState}>
             <View style={styles.emptyCircle}>
               <Icon name="chatbubbles-outline" size={40} color={colors.cream300} />
@@ -133,7 +162,7 @@ function ComposeModal({ visible, onClose, onSend, patient }: {
   visible: boolean;
   onClose: () => void;
   onSend: (msg: Message) => void;
-  patient: { firstName: string; surname: string } | null;
+  patient: { id: string; firstName: string; surname: string; registrationHospital: string } | null;
 }) {
   const [dept, setDept] = useState('');
   const [subject, setSubject] = useState('');
@@ -145,13 +174,14 @@ function ComposeModal({ visible, onClose, onSend, patient }: {
     if (!dept) { Alert.alert('Select Department', 'Choose which department to message.'); return; }
     if (!subject.trim()) { Alert.alert('Subject Required', 'Enter a subject for your message.'); return; }
     if (!body.trim()) { Alert.alert('Message Required', 'Write your message.'); return; }
+    if (!patient) { Alert.alert('Not signed in', 'Please sign in again to send a message.'); return; }
 
     const deptLabel = DEPARTMENTS.find((d) => d.key === dept)?.label || dept;
     const msg: Message = {
       _id: `msg-new-${Date.now()}`,
-      patientId: 'pat-00001',
-      fromDoctorName: `${patient?.firstName} ${patient?.surname}`,
-      fromHospitalName: 'Juba Teaching Hospital',
+      patientId: patient.id,
+      fromDoctorName: `${patient.firstName} ${patient.surname}`,
+      fromHospitalName: patient.registrationHospital,
       subject: `[${deptLabel}] ${subject.trim()}`,
       body: body.trim(),
       sentAt: new Date().toISOString(),
@@ -198,7 +228,7 @@ function ComposeModal({ visible, onClose, onSend, patient }: {
           {/* Facility (read only) */}
           <View style={cm.facilityRow}>
             <Icon name="business-outline" size={14} color={colors.textTertiary} />
-            <Text style={cm.facilityText}>Juba Teaching Hospital</Text>
+            <Text style={cm.facilityText}>{patient?.registrationHospital ?? 'Your registered facility'}</Text>
           </View>
 
           {/* Subject */}
@@ -254,6 +284,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.teal, paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full,
   },
   composeBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: colors.redLight,
+    borderRadius: radius.sm,
+    marginBottom: spacing.md,
+  },
+  errorText: { fontSize: fontSize.sm, color: colors.red, flex: 1 },
 
   emptyState: { alignItems: 'center', paddingVertical: 50 },
   emptyCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.cream100, alignItems: 'center', justifyContent: 'center' },

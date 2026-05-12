@@ -142,19 +142,35 @@ async function sendWithSendGrid(msg: EmailMessage): Promise<void> {
   }
 }
 
-async function sendEmail(msg: EmailMessage): Promise<void> {
+/**
+ * Returns `true` if the email was sent, `false` if no provider is wired up.
+ * Provider-level failures still throw so the route can fall back to 500.
+ *
+ * This used to throw on missing provider, but the requirement is that the
+ * form still works (and returns a request id) when email is disabled —
+ * the demo team can pick up the request from logs / future persistence,
+ * and the user isn't blocked from submitting.
+ */
+async function sendEmail(msg: EmailMessage): Promise<boolean> {
   if (process.env.RESEND_API_KEY) {
     await sendWithResend(msg);
-    return;
+    return true;
   }
   if (process.env.SENDGRID_API_KEY) {
     await sendWithSendGrid(msg);
-    return;
+    return true;
   }
-  throw new Error('No email provider configured (RESEND_API_KEY or SENDGRID_API_KEY)');
+  console.warn('[demo-request] No email provider configured (RESEND_API_KEY / SENDGRID_API_KEY); skipping email to', msg.to);
+  return false;
 }
 
-function buildNotifyEmail(req: DemoRequest, requestId: string, scheduleUrl?: string): EmailMessage {
+function buildNotifyEmail(req: DemoRequest, requestId: string, scheduleUrl?: string): EmailMessage | null {
+  // DEMO_NOTIFY_EMAIL must be configured by the operator — never fall back
+  // to a hardcoded personal address. If unset we skip the notification entirely
+  // (the requester still gets their confirmation email below).
+  const to = (process.env.DEMO_NOTIFY_EMAIL || '').trim();
+  if (!to) return null;
+
   const subject = `New Demo Request — ${req.name} (${req.org})`;
   const lines = [
     `Request ID: ${requestId}`,
@@ -168,7 +184,7 @@ function buildNotifyEmail(req: DemoRequest, requestId: string, scheduleUrl?: str
   ].filter(Boolean) as string[];
 
   return {
-    to: process.env.DEMO_NOTIFY_EMAIL || 'tenymakuach@gmail.com',
+    to,
     subject,
     text: lines.join('\n'),
     replyTo: req.email,
@@ -253,7 +269,11 @@ export async function POST(req: NextRequest) {
     const notifyEmail = buildNotifyEmail(demo, requestId, scheduleUrl);
     const requesterEmail = buildRequesterEmail(demo, scheduleUrl);
 
-    await sendEmail(notifyEmail);
+    if (notifyEmail) {
+      await sendEmail(notifyEmail);
+    } else {
+      console.warn('[demo-request] DEMO_NOTIFY_EMAIL not set — admin notification skipped for', demo.email);
+    }
     await sendEmail(requesterEmail);
 
     return NextResponse.json({

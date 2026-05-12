@@ -1,3 +1,18 @@
+/**
+ * Patient login screen.
+ *
+ * Authenticates the user against /api/patient-portal/login on the platform.
+ * Two lookup modes are exposed: hospital number + phone, or
+ * first/last name + DOB + phone. Either resolves to the same JWT.
+ *
+ * Demo accounts are rendered only when EXPO_PUBLIC_DEMO_MODE !== 'false'
+ * so production builds can ship without the seed-data hint.
+ *
+ * TODO (v2): wire `expo-local-authentication` for biometric unlock once
+ * the package is added to mobile/package.json. The scaffold is in
+ * `triggerBiometricUnlock` below.
+ */
+
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
@@ -7,55 +22,88 @@ import { colors, spacing, radius, fontSize } from '../lib/theme';
 import { useAuth } from '../lib/auth';
 import TamamHealthLogo from '../components/TamamHealthLogo';
 
+const DEMO_MODE_ENABLED = process.env.EXPO_PUBLIC_DEMO_MODE !== 'false';
+
+const DEMO_ACCOUNTS = [
+  { id: 'JTH-000001', phone: '0912345678', name: 'Deng Mabior Garang' },
+  { id: 'JTH-000002', phone: '0916111222', name: 'Nyabol Gatdet Koang' },
+  { id: 'JTH-000003', phone: '0921333444', name: 'Achol Mayen Deng' },
+];
+
+/**
+ * Stub for biometric unlock. Returns true if biometric auth succeeded.
+ * Currently a no-op because expo-local-authentication is not installed —
+ * see TODO at top of file.
+ */
+async function triggerBiometricUnlock(): Promise<boolean> {
+  // Intentionally false: feature gated until the package lands.
+  return false;
+}
+
 export default function LoginScreen() {
-  const { setBypass } = useAuth();
+  const { signIn, isLoading } = useAuth();
   const [tab, setTab] = useState<'id' | 'name'>('id');
   const [hospitalNumber, setHospitalNumber] = useState('');
   const [phone, setPhone] = useState('');
   const [firstName, setFirstName] = useState('');
   const [surname, setSurname] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const busy = submitting || isLoading;
 
   const handleLogin = async () => {
-    if (!phone.trim()) {
+    const phoneClean = phone.trim();
+    if (!phoneClean) {
       Alert.alert('Required', 'Please enter your phone number.');
       return;
     }
-    setLoading(true);
-
-    // Simulate a brief delay then bypass auth with demo patient
-    await new Promise((r) => setTimeout(r, 400));
-
-    // Validate against demo accounts
-    const demos = [
-      { id: 'JTH-000001', phone: '0912345678' },
-      { id: 'JTH-000002', phone: '0916111222' },
-      { id: 'JTH-000003', phone: '0921333444' },
-    ];
-
-    const phoneClean = phone.trim().replace(/\s/g, '');
 
     if (tab === 'id') {
-      const match = demos.find(
-        (d) => d.id === hospitalNumber.trim().toUpperCase() && d.phone === phoneClean
-      );
-      if (!match) {
-        Alert.alert('Login Failed', 'No matching patient found. Check your Hospital ID and phone number.');
-        setLoading(false);
+      if (!hospitalNumber.trim()) {
+        Alert.alert('Required', 'Please enter your Hospital ID.');
         return;
       }
     } else {
-      // For name lookup, accept any combo in demo mode
       if (!firstName.trim() || !surname.trim() || !dateOfBirth.trim()) {
         Alert.alert('Required', 'Please fill in all fields.');
-        setLoading(false);
         return;
       }
     }
 
-    setBypass(true);
-    setLoading(false);
+    setSubmitting(true);
+    try {
+      if (tab === 'id') {
+        await signIn({
+          hospitalNumber: hospitalNumber.trim().toUpperCase(),
+          phone: phoneClean,
+        });
+      } else {
+        await signIn({
+          firstName: firstName.trim(),
+          surname: surname.trim(),
+          dateOfBirth: dateOfBirth.trim(),
+          phone: phoneClean,
+        });
+      }
+      // On success, the AuthProvider flips isAuthenticated and the root
+      // navigator routes us into the tab stack. Nothing to do here.
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Unable to sign in right now. Please try again.';
+      Alert.alert('Login Failed', message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleBiometric = async () => {
+    const ok = await triggerBiometricUnlock();
+    if (!ok) {
+      Alert.alert('Unavailable', 'Biometric unlock is not enabled on this build.');
+    }
   };
 
   const fillDemo = (id: string, demoPhone: string) => {
@@ -82,12 +130,14 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={[styles.tab, tab === 'id' && styles.tabActive]}
             onPress={() => setTab('id')}
+            disabled={busy}
           >
             <Text style={[styles.tabText, tab === 'id' && styles.tabTextActive]}>Hospital ID</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, tab === 'name' && styles.tabActive]}
             onPress={() => setTab('name')}
+            disabled={busy}
           >
             <Text style={[styles.tabText, tab === 'name' && styles.tabTextActive]}>Name Lookup</Text>
           </TouchableOpacity>
@@ -105,6 +155,7 @@ export default function LoginScreen() {
                 value={hospitalNumber}
                 onChangeText={setHospitalNumber}
                 autoCapitalize="characters"
+                editable={!busy}
               />
             </>
           ) : (
@@ -116,6 +167,7 @@ export default function LoginScreen() {
                 placeholderTextColor={colors.textTertiary}
                 value={firstName}
                 onChangeText={setFirstName}
+                editable={!busy}
               />
               <Text style={styles.label}>Surname</Text>
               <TextInput
@@ -124,6 +176,7 @@ export default function LoginScreen() {
                 placeholderTextColor={colors.textTertiary}
                 value={surname}
                 onChangeText={setSurname}
+                editable={!busy}
               />
               <Text style={styles.label}>Date of Birth</Text>
               <TextInput
@@ -132,6 +185,7 @@ export default function LoginScreen() {
                 placeholderTextColor={colors.textTertiary}
                 value={dateOfBirth}
                 onChangeText={setDateOfBirth}
+                editable={!busy}
               />
             </>
           )}
@@ -144,39 +198,47 @@ export default function LoginScreen() {
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
+            editable={!busy}
           />
 
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+            style={[styles.button, busy && styles.buttonDisabled]}
             onPress={handleLogin}
-            disabled={loading}
+            disabled={busy}
           >
-            {loading ? (
+            {busy ? (
               <ActivityIndicator color={colors.white} />
             ) : (
               <Text style={styles.buttonText}>Sign In</Text>
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.biometricButton}
+            onPress={handleBiometric}
+            disabled={busy}
+          >
+            <Text style={styles.biometricText}>Use Biometric Unlock</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Demo accounts */}
-        <View style={styles.demoSection}>
-          <Text style={styles.demoTitle}>DEMO ACCOUNTS</Text>
-          {[
-            { id: 'JTH-000001', phone: '0912345678', name: 'Deng Mabior Garang' },
-            { id: 'JTH-000002', phone: '0916111222', name: 'Nyabol Gatdet Koang' },
-            { id: 'JTH-000003', phone: '0921333444', name: 'Achol Mayen Deng' },
-          ].map((demo) => (
-            <TouchableOpacity
-              key={demo.id}
-              style={styles.demoButton}
-              onPress={() => fillDemo(demo.id, demo.phone)}
-            >
-              <Text style={styles.demoName}>{demo.name}</Text>
-              <Text style={styles.demoId}>{demo.id}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Demo accounts — gated on EXPO_PUBLIC_DEMO_MODE */}
+        {DEMO_MODE_ENABLED && (
+          <View style={styles.demoSection}>
+            <Text style={styles.demoTitle}>DEMO ACCOUNTS</Text>
+            {DEMO_ACCOUNTS.map((demo) => (
+              <TouchableOpacity
+                key={demo.id}
+                style={styles.demoButton}
+                onPress={() => fillDemo(demo.id, demo.phone)}
+                disabled={busy}
+              >
+                <Text style={styles.demoName}>{demo.name}</Text>
+                <Text style={styles.demoId}>{demo.id}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -225,6 +287,12 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: colors.white, fontSize: fontSize.lg, fontWeight: '700' },
+  biometricButton: {
+    alignItems: 'center', paddingVertical: spacing.sm, marginTop: spacing.sm,
+  },
+  biometricText: {
+    fontSize: fontSize.sm, color: colors.teal, fontWeight: '600',
+  },
   demoSection: {
     marginTop: spacing.xl, paddingTop: spacing.md,
     borderTopWidth: 1, borderTopColor: colors.cream300,

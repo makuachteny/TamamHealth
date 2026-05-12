@@ -9,6 +9,15 @@ export type Patient = {
   dateOfBirth: string;
   gender: 'Male' | 'Female';
   registrationHospital: string;
+  /**
+   * Patient-portal login does not currently return this field; declared as
+   * optional so the profile screen can render it once the endpoint exposes it.
+   */
+  registrationDate?: string;
+  /** Optional contact address — surfaced on the profile screen if present. */
+  address?: string;
+  /** Optional email — surfaced on the profile screen if present. */
+  email?: string;
 };
 
 export type VitalSigns = {

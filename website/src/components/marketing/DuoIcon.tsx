@@ -50,7 +50,6 @@ const RED = "#C44536";
 const AMBER = "#E4A84B";
 const PURPLE = "#8B5CF6";
 const GREEN = "#1F9D6F";
-const BRONZE = "#B8741C";
 const DARK = "#1A3A3A";
 const GRAY = "#5A7370";
 

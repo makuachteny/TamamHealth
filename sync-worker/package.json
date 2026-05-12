@@ -1,0 +1,17 @@
+{
+  "name": "tamamhealth-sync-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Long-running bridge that polls CouchDB _changes feeds and posts batches to the platform's /api/sync webhook for PostgreSQL analytics ingestion.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs",
+    "test": "node --test index.test.mjs",
+    "check": "node --check index.mjs"
+  },
+  "license": "UNLICENSED"
+}

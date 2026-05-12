@@ -9,6 +9,9 @@ import { Icon } from "@iconify/react";
    Brand column + 3 link columns + newsletter + bottom bar
    ═══════════════════════════════════════════════════════════════════ */
 
+// Fundraising entry points are locked off for now. Flip to true to re-enable.
+const SHOW_FUNDRAISING = false;
+
 export default function MarketingFooter() {
   const [nlEmail, setNlEmail] = useState("");
   const [nlStatus, setNlStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -96,7 +99,9 @@ export default function MarketingFooter() {
               <Link href="/about/team">Team</Link>
               <Link href="/about/careers">Careers</Link>
               <Link href="/about/contact">Contact</Link>
-              <Link href="/donate" style={{ color: "var(--tb-gold)", fontWeight: 600 }}>Fund Our Pilot</Link>
+              {SHOW_FUNDRAISING && (
+                <Link href="/donate" style={{ color: "var(--tb-gold)", fontWeight: 600 }}>Fund Our Pilot</Link>
+              )}
               <Link href="/resources/blog">Blog</Link>
               <Link href="/resources/case-studies">Case Studies</Link>
             </nav>

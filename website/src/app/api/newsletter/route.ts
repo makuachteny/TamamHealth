@@ -30,7 +30,13 @@ function escapeHtml(input: string): string {
     .replace(/'/g, '&#39;');
 }
 
-async function sendEmail(to: string, subject: string, text: string, html?: string) {
+/**
+ * Returns `true` if the email was sent, `false` if no email provider is
+ * configured (graceful degrade — the subscriber is still recorded in
+ * server logs, we just skip the welcome email). Provider-level failures
+ * still throw so the caller decides whether to surface a 500.
+ */
+async function sendEmail(to: string, subject: string, text: string, html?: string): Promise<boolean> {
   if (process.env.RESEND_API_KEY) {
     const fromEmail = process.env.DEMO_FROM_EMAIL || 'noreply@tamamhealth.org';
     const fromName = process.env.DEMO_FROM_NAME || 'TamamHealth Health';
@@ -52,7 +58,7 @@ async function sendEmail(to: string, subject: string, text: string, html?: strin
       const detail = await res.text();
       throw new Error(`Resend error ${res.status}: ${detail}`);
     }
-    return;
+    return true;
   }
   if (process.env.SENDGRID_API_KEY) {
     const fromEmail = process.env.DEMO_FROM_EMAIL || 'noreply@tamamhealth.org';
@@ -77,10 +83,10 @@ async function sendEmail(to: string, subject: string, text: string, html?: strin
       const detail = await res.text();
       throw new Error(`SendGrid error ${res.status}: ${detail}`);
     }
-    return;
+    return true;
   }
-  console.warn('[newsletter] No email provider configured (set RESEND_API_KEY or SENDGRID_API_KEY). Subscriber:', to);
-  throw new Error('Email service not configured. Please contact support.');
+  console.warn('[newsletter] No email provider configured (RESEND_API_KEY / SENDGRID_API_KEY); skipping email to', to);
+  return false;
 }
 
 export async function POST(req: NextRequest) {
@@ -105,14 +111,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 });
     }
 
-    // Notify admin of new subscriber
-    const notifyTo = process.env.DEMO_NOTIFY_EMAIL || 'tenymakuach@gmail.com';
-    await sendEmail(
-      notifyTo,
-      `New Newsletter Subscriber: ${email}`,
-      `New newsletter subscriber: ${email}\n\nTimestamp: ${new Date().toISOString()}`,
-      `<p><strong>New newsletter subscriber:</strong> ${escapeHtml(email)}</p><p>Timestamp: ${new Date().toISOString()}</p>`,
-    );
+    // Notify admin of new subscriber. DEMO_NOTIFY_EMAIL must be configured by
+    // the operator — never fall back to a hardcoded personal address.
+    const notifyTo = (process.env.DEMO_NOTIFY_EMAIL || '').trim();
+    if (notifyTo) {
+      await sendEmail(
+        notifyTo,
+        `New Newsletter Subscriber: ${email}`,
+        `New newsletter subscriber: ${email}\n\nTimestamp: ${new Date().toISOString()}`,
+        `<p><strong>New newsletter subscriber:</strong> ${escapeHtml(email)}</p><p>Timestamp: ${new Date().toISOString()}</p>`,
+      );
+    } else {
+      console.warn('[newsletter] DEMO_NOTIFY_EMAIL not set — admin notification skipped for', email);
+    }
 
     // Send welcome email to subscriber
     const welcomeText = [

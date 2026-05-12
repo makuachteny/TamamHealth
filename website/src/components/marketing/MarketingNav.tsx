@@ -11,6 +11,9 @@ import { DuoIcon } from "./DuoIcon";
    Smooth scroll, shadow on scroll
    ═══════════════════════════════════════════════════════════════════ */
 
+// Fundraising entry points are locked off for now. Flip to true to re-enable.
+const SHOW_FUNDRAISING = false;
+
 export default function MarketingNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -63,28 +66,32 @@ export default function MarketingNav() {
               <DuoIcon name="phone" size={14} />
               +1 (973) 566-4336
             </span>
-            <div style={{ width: 1, height: 20, background: "var(--tb-cream-300)" }} />
-            <Link
-              href="/donate"
-              className="mk-nav-donate-link"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 13,
-                fontWeight: 700,
-                color: "var(--tb-gold-dark)",
-                textDecoration: "none",
-                padding: "7px 14px",
-                borderRadius: 8,
-                background: "var(--tb-tint-gold)",
-                border: "1px solid var(--tb-gold)",
-                transition: "all 0.2s ease",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <DuoIcon name="heart" size={14} /> Fund Our Pilot
-            </Link>
+            {SHOW_FUNDRAISING && (
+              <>
+                <div style={{ width: 1, height: 20, background: "var(--tb-cream-300)" }} />
+                <Link
+                  href="/donate"
+                  className="mk-nav-donate-link"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "var(--tb-gold-dark)",
+                    textDecoration: "none",
+                    padding: "7px 14px",
+                    borderRadius: 8,
+                    background: "var(--tb-tint-gold)",
+                    border: "1px solid var(--tb-gold)",
+                    transition: "all 0.2s ease",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <DuoIcon name="heart" size={14} /> Fund Our Pilot
+                </Link>
+              </>
+            )}
             <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-sm">
               Request a Demo
             </Link>
@@ -133,19 +140,21 @@ export default function MarketingNav() {
 
             <div style={{ height: 1, background: "var(--tb-cream-300)", margin: "8px 0" }} />
 
-            <Link
-              href="/donate"
-              onClick={() => setMobileOpen(false)}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                fontSize: 15, fontWeight: 700, color: "var(--tb-gold-dark)",
-                textDecoration: "none", padding: "12px 0",
-                background: "var(--tb-tint-gold)", borderRadius: 10,
-                border: "1px solid var(--tb-gold)", textAlign: "center",
-              }}
-            >
-              <DuoIcon name="heart" size={16} /> Fund Our Pilot
-            </Link>
+            {SHOW_FUNDRAISING && (
+              <Link
+                href="/donate"
+                onClick={() => setMobileOpen(false)}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  fontSize: 15, fontWeight: 700, color: "var(--tb-gold-dark)",
+                  textDecoration: "none", padding: "12px 0",
+                  background: "var(--tb-tint-gold)", borderRadius: 10,
+                  border: "1px solid var(--tb-gold)", textAlign: "center",
+                }}
+              >
+                <DuoIcon name="heart" size={16} /> Fund Our Pilot
+              </Link>
+            )}
 
             <Link href="/about/contact" className="mk-btn mk-btn-green" onClick={() => setMobileOpen(false)}>
               Request a Demo

@@ -1,0 +1,119 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel an in-flight run if a new commit lands on the same ref. Saves
+# minutes and avoids a stale run reporting failure after a fix has merged.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  platform:
+    name: platform · lint + type-check + test + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: platform/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        # `next lint` reports warnings but only exits non-zero on errors. This
+        # is intentional for now — there is a backlog of react-hooks/exhaustive-deps
+        # warnings we don't want CI to gate on. Tighten to --max-warnings=0
+        # once those are cleaned up.
+        run: npm run lint
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm run test:ci
+
+      - name: Build
+        # Builds the Next.js production bundle. Catches problems that only
+        # surface at build time (server/client boundary issues, env-bundling
+        # regressions like the seed-credentials change).
+        run: npm run build
+        env:
+          # Build needs a JWT_SECRET to satisfy the production guard in
+          # instrumentation.ts. CI is not deploying anything, so a throwaway
+          # value is fine — production deploys inject the real one.
+          JWT_SECRET: ci-build-non-secret-do-not-use-anywhere-real
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-coverage
+          path: platform/coverage
+          if-no-files-found: ignore
+          retention-days: 14
+
+  website:
+    name: website · lint + type-check + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+  mobile:
+    name: mobile · lint + type-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npx tsc --noEmit

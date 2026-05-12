@@ -44,7 +44,13 @@ function isValidEmail(value: string): boolean {
   return /\S+@\S+\.\S+/.test(value);
 }
 
-async function sendEmail(to: string, subject: string, text: string, html?: string, replyTo?: string) {
+/**
+ * Returns `true` if the email was actually sent, `false` if no email
+ * provider is configured (gracefully degrades — the request is still
+ * accepted, we just skip the email). Throws only on a provider-level
+ * error so the route can decide whether to return 500.
+ */
+async function sendEmail(to: string, subject: string, text: string, html?: string, replyTo?: string): Promise<boolean> {
   if (process.env.RESEND_API_KEY) {
     const fromEmail = process.env.DEMO_FROM_EMAIL || 'noreply@tamamhealth.org';
     const fromName = process.env.DEMO_FROM_NAME || 'TamamHealth Health';
@@ -67,7 +73,7 @@ async function sendEmail(to: string, subject: string, text: string, html?: strin
       const detail = await res.text();
       throw new Error(`Resend error ${res.status}: ${detail}`);
     }
-    return;
+    return true;
   }
   if (process.env.SENDGRID_API_KEY) {
     const fromEmail = process.env.DEMO_FROM_EMAIL || 'noreply@tamamhealth.org';
@@ -92,10 +98,13 @@ async function sendEmail(to: string, subject: string, text: string, html?: strin
       const detail = await res.text();
       throw new Error(`SendGrid error ${res.status}: ${detail}`);
     }
-    return;
+    return true;
   }
-  console.warn('[contact] No email provider configured (set RESEND_API_KEY or SENDGRID_API_KEY). Message:', { to, subject });
-  throw new Error('Email service not configured. Please contact support.');
+  // No provider configured — log so the operator can wire one up, but
+  // don't reject the user-submitted form. The request is still useful
+  // (it shows up in logs) and the user-visible flow stays unbroken.
+  console.warn('[contact] No email provider configured (RESEND_API_KEY / SENDGRID_API_KEY); skipping email to', to);
+  return false;
 }
 
 export async function POST(req: NextRequest) {
@@ -134,7 +143,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
-    const notifyTo = process.env.DEMO_NOTIFY_EMAIL || 'tenymakuach@gmail.com';
+    // DEMO_NOTIFY_EMAIL must be configured by the operator — never fall back
+    // to a hardcoded personal address. If unset, we still confirm to the
+    // requester but log a warning rather than emailing nobody.
+    const notifyTo = (process.env.DEMO_NOTIFY_EMAIL || '').trim();
     const notifySubject = `Contact Form: ${contact.subject} — ${contact.name}`;
     const notifyText = [
       `Name: ${contact.name}`,
@@ -161,8 +173,12 @@ export async function POST(req: NextRequest) {
       <p>${safeMessage.replace(/\n/g, '<br/>')}</p>
     `;
 
-    // Send notification email
-    await sendEmail(notifyTo, notifySubject, notifyText, notifyHtml, contact.email);
+    // Send notification email (skip if no notify recipient is configured).
+    if (notifyTo) {
+      await sendEmail(notifyTo, notifySubject, notifyText, notifyHtml, contact.email);
+    } else {
+      console.warn('[contact] DEMO_NOTIFY_EMAIL not set — admin notification skipped for', contact.email);
+    }
 
     // Send confirmation to requester
     const confirmText = [

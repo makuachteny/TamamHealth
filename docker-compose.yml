@@ -17,6 +17,10 @@ services:
     build:
       context: ./platform
       dockerfile: Dockerfile
+    # Legacy env_file path — kept as the default so deploys without a
+    # DOPPLER_TOKEN keep working unchanged. Doppler-mode (below) overrides
+    # individual keys at runtime; the file still seeds non-secret defaults
+    # (NODE_ENV-flag-style toggles operators rarely rotate).
     env_file:
       - ./platform/.env.production
     environment:
@@ -26,14 +30,54 @@ services:
       COUCHDB_URL: http://couchdb:5984
       COUCHDB_ADMIN_USER: ${COUCHDB_USER:?COUCHDB_USER must be set in .env}
       COUCHDB_ADMIN_PASSWORD: ${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set in .env}
+      # If set in the host shell, the entrypoint below will fetch secrets via
+      # the Doppler CLI at boot. Unset = legacy .env_file path. See
+      # docs/operations/secrets.md.
+      DOPPLER_TOKEN: ${DOPPLER_TOKEN:-}
     ports:
       - "${PLATFORM_PORT:-3000}:3000"
     depends_on:
       couchdb:
         condition: service_healthy
+      # Postgres is gated behind the `analytics` profile. When the operator
+      # opts in (docker compose --profile analytics up), the platform must
+      # wait for Postgres to be healthy before booting because
+      # instrumentation.ts runs migrations during register(). When the
+      # profile is NOT enabled, this depends_on entry is silently ignored
+      # by compose (postgres isn't part of the active profile), so the
+      # legacy CouchDB-only deploy path remains unchanged.
+      postgres:
+        condition: service_healthy
+        required: false
     restart: unless-stopped
     networks:
       - app-net
+    # If DOPPLER_TOKEN is present at boot, install the doppler CLI and exec
+    # `doppler run -- npm start`, which fetches secrets and exports them into
+    # the process env. If not, fall through to plain `npm start` and the
+    # env_file values are the only source of truth (unchanged legacy path).
+    #
+    # The doppler CLI install is one-time per container start (~3s). For
+    # operators who restart frequently, bake doppler into a custom image
+    # downstream of platform/Dockerfile to skip this.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        if [ -n "$${DOPPLER_TOKEN:-}" ]; then
+          if ! command -v doppler >/dev/null 2>&1; then
+            echo "[entrypoint] DOPPLER_TOKEN set; installing doppler CLI"
+            apk add --no-cache curl gnupg >/dev/null 2>&1 || true
+            curl -Ls --tlsv1.2 --proto "=https" --retry 3 \
+              https://cli.doppler.com/install.sh \
+              | sh -s -- --no-package-manager >/dev/null 2>&1 \
+              || { echo "[entrypoint] doppler install failed"; exit 1; }
+          fi
+          echo "[entrypoint] starting under 'doppler run'"
+          exec doppler run -- npm run start
+        fi
+        echo "[entrypoint] DOPPLER_TOKEN unset; legacy env_file path"
+        exec npm run start
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -77,10 +121,10 @@ services:
       BACKUP_RETAIN_DAYS: "14"
     volumes:
       - couchdb_backups:/backups
-      - ./scripts/backup-couchdb.sh:/usr/local/bin/backup-couchdb.sh:ro
+      - ./scripts/dump-couchdb.sh:/usr/local/bin/dump-couchdb.sh:ro
     command: >
       sh -c "apk add --no-cache curl jq &&
-             echo '15 2 * * * /usr/local/bin/backup-couchdb.sh >> /backups/backup.log 2>&1' > /etc/crontabs/root &&
+             echo '15 2 * * * /usr/local/bin/dump-couchdb.sh >> /backups/backup.log 2>&1' > /etc/crontabs/root &&
              crond -f -l 2"
     restart: unless-stopped
     networks:
@@ -106,6 +150,39 @@ services:
       timeout: 10s
       retries: 5
       start_period: 20s
+
+  # CouchDB → Postgres bridge. Polls every tamamhealth_* DB's _changes feed
+  # and POSTs HMAC-signed batches to /api/sync. Start with the analytics
+  # profile so installs that don't run Postgres skip this:
+  #   docker compose --profile analytics up -d
+  sync-worker:
+    image: ghcr.io/${GH_OWNER:-tamamhealth}/tamamhealth-sync-worker:latest
+    profiles: ["analytics"]
+    build:
+      context: ./sync-worker
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    environment:
+      # Compose-network URLs. The COUCHDB_URL embeds admin creds because
+      # CouchDB's _changes feed for non-_users databases requires auth and
+      # the worker uses no other auth mechanism.
+      COUCHDB_URL: http://${COUCHDB_USER:?COUCHDB_USER must be set in .env}:${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set in .env}@couchdb:5984
+      COUCHDB_WEBHOOK_SECRET: ${COUCHDB_WEBHOOK_SECRET:?COUCHDB_WEBHOOK_SECRET must be set in .env}
+      PLATFORM_SYNC_URL: http://platform:3000/api/sync
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      BATCH_SIZE: ${BATCH_SIZE:-100}
+      STATE_FILE: /var/lib/sync-worker/state.json
+    volumes:
+      - sync_worker_state:/var/lib/sync-worker
+    depends_on:
+      couchdb:
+        condition: service_healthy
+      platform:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - app-net
 
   # Postgres is optional — the platform works fully via PouchDB alone.
   # Start with:  docker compose --profile analytics up -d
@@ -134,6 +211,7 @@ volumes:
   couchdb_data:
   postgres_data:
   couchdb_backups:
+  sync_worker_state:
 
 networks:
   app-net:

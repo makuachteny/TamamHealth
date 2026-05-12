@@ -1,41 +1,95 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Platform } from 'react-native';
+/**
+ * Lab Results — real data from /api/patient-portal/labs.
+ *
+ * Critical and abnormal flags are visually surfaced (left border + colored
+ * status pill). Pending tests are grouped above completed ones so the
+ * patient sees what's still outstanding first.
+ */
+
+import React, { useMemo } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, RefreshControl, Platform,
+} from 'react-native';
 import { Icon } from '@/components/icons';
 import { colors, spacing, fontSize, radius } from '../lib/theme';
 import Badge from '../components/Badge';
-import * as api from '../lib/api';
+import SyncBadge from '../components/SyncBadge';
+import { SkeletonList } from '../components/Skeleton';
+import { useAuth } from '../lib/auth';
+import { useCachedFetch } from '../lib/use-cached-fetch';
 import type { LabResult } from '../lib/types';
 
+type LabsResponse = { results: LabResult[] };
+
 export default function LabsScreen() {
-  const [results, setResults] = useState<LabResult[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
+  const { patient } = useAuth();
 
-  const load = async () => { setResults(await api.getLabResults()); };
-  useEffect(() => { load(); }, []);
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  const cacheKey = patient ? `labs.${patient.id}` : 'labs.anon';
+  const path = patient ? `/api/patient-portal/labs?patientId=${encodeURIComponent(patient.id)}` : null;
 
-  const pending = results.filter((r) => r.status !== 'completed');
-  const completed = results.filter((r) => r.status === 'completed');
+  const { data, loading, refreshing, error, lastSyncedAt, isStale, refresh } =
+    useCachedFetch<LabsResponse, LabResult[]>({
+      cacheKey,
+      path,
+      select: (raw) => raw.results ?? [],
+    });
+
+  const { pending, completed, criticalCount } = useMemo(() => {
+    const all = data ?? [];
+    return {
+      pending: all.filter((r) => r.status !== 'completed'),
+      completed: all.filter((r) => r.status === 'completed'),
+      criticalCount: all.filter((r) => r.critical).length,
+    };
+  }, [data]);
+
+  const isInitialLoading = loading && data === null;
+  const total = data?.length ?? 0;
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.green} />}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.green} />
+      }
     >
       <Text style={styles.heading}>Lab Results</Text>
-      <Text style={styles.sub}>{results.length} test{results.length !== 1 ? 's' : ''} — {pending.length} pending</Text>
+      <Text style={styles.sub}>
+        {total} test{total !== 1 ? 's' : ''} — {pending.length} pending
+      </Text>
 
-      {/* Pending banner */}
-      {pending.length > 0 && (
-        <View style={styles.pendingBanner}>
-          <Icon name="hourglass-outline" size={18} color={colors.goldDark} />
-          <Text style={styles.pendingText}>{pending.length} result{pending.length !== 1 ? 's' : ''} pending</Text>
+      <SyncBadge lastSyncedAt={lastSyncedAt} isStale={isStale} />
+
+      {error && (
+        <View style={styles.errorBanner}>
+          <Icon name="alert-circle" size={16} color={colors.red} />
+          <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
 
-      {/* Pending results */}
+      {/* Critical banner — most urgent thing on the screen if present. */}
+      {criticalCount > 0 && (
+        <View style={styles.criticalBanner}>
+          <Icon name="alert-circle" size={18} color={colors.red} />
+          <Text style={styles.criticalText}>
+            {criticalCount} critical result{criticalCount !== 1 ? 's' : ''} — contact your provider
+          </Text>
+        </View>
+      )}
+
+      {pending.length > 0 && (
+        <View style={styles.pendingBanner}>
+          <Icon name="hourglass-outline" size={18} color={colors.goldDark} />
+          <Text style={styles.pendingText}>
+            {pending.length} result{pending.length !== 1 ? 's' : ''} pending
+          </Text>
+        </View>
+      )}
+
+      {isInitialLoading && <SkeletonList count={3} />}
+
       {pending.map((r) => (
         <View key={r._id} style={styles.card}>
           <View style={styles.cardRow}>
@@ -48,7 +102,9 @@ export default function LabsScreen() {
               </View>
               <View style={styles.detailRow}>
                 <Icon name="time-outline" size={11} color={colors.textTertiary} />
-                <Text style={styles.detailText}>Ordered: {new Date(r.orderedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                <Text style={styles.detailText}>
+                  Ordered: {new Date(r.orderedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </Text>
               </View>
             </View>
             <Badge label={r.status === 'in_progress' ? 'Processing' : 'Pending'} variant="warning" />
@@ -56,24 +112,37 @@ export default function LabsScreen() {
         </View>
       ))}
 
-      {/* Completed results */}
-      {completed.length > 0 && (
-        <Text style={styles.sectionTitle}>COMPLETED</Text>
-      )}
+      {completed.length > 0 && <Text style={styles.sectionTitle}>COMPLETED</Text>}
       {completed.map((r) => (
-        <View key={r._id} style={styles.card}>
+        <View
+          key={r._id}
+          style={[
+            styles.card,
+            r.critical && styles.criticalCard,
+            !r.critical && r.abnormal && styles.abnormalCard,
+          ]}
+        >
           <View style={styles.cardRow}>
-            <View style={[styles.statusDot, { backgroundColor: r.abnormal ? colors.red : colors.green }]} />
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: r.critical ? colors.red : r.abnormal ? colors.gold : colors.green },
+              ]}
+            />
             <View style={{ flex: 1 }}>
               <Text style={styles.testName}>{r.testName}</Text>
-              {/* Result value — highlighted */}
               <View style={styles.resultBox}>
-                <Text style={[styles.resultValue, r.abnormal && { color: colors.red }]}>
+                <Text
+                  style={[
+                    styles.resultValue,
+                    r.critical && { color: colors.red },
+                    !r.critical && r.abnormal && { color: colors.goldDark },
+                  ]}
+                >
                   {r.result}
                 </Text>
                 {r.unit ? <Text style={styles.resultUnit}>{r.unit}</Text> : null}
               </View>
-              {/* Reference range */}
               {r.referenceRange ? (
                 <View style={styles.detailRow}>
                   <Icon name="analytics-outline" size={11} color={colors.textTertiary} />
@@ -95,11 +164,13 @@ export default function LabsScreen() {
         </View>
       ))}
 
-      {results.length === 0 && (
+      {!isInitialLoading && total === 0 && !error && (
         <View style={styles.emptyState}>
           <Icon name="flask-outline" size={48} color={colors.cream300} />
           <Text style={styles.emptyTitle}>No lab results</Text>
-          <Text style={styles.emptySub}>Lab results ordered by your doctor will appear here</Text>
+          <Text style={styles.emptySub}>
+            Lab results ordered by your doctor will appear here
+          </Text>
         </View>
       )}
     </ScrollView>
@@ -110,28 +181,68 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   content: { padding: spacing.md, paddingBottom: 100 },
   heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.navy },
-  sub: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.md },
+  sub: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.sm },
+
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: colors.redLight,
+    borderRadius: radius.sm,
+    marginBottom: spacing.md,
+  },
+  errorText: { fontSize: fontSize.sm, color: colors.red, flex: 1 },
+
+  criticalBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.redLight,
+    borderRadius: radius.sm,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#F5C2C0',
+  },
+  criticalText: { fontSize: fontSize.sm, fontWeight: '700', color: colors.red, flex: 1 },
 
   pendingBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: '#FBF2E0', borderRadius: radius.sm, padding: spacing.sm,
-    marginBottom: spacing.md, borderWidth: 1, borderColor: '#F0E6CC',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: '#FBF2E0',
+    borderRadius: radius.sm,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: '#F0E6CC',
   },
   pendingText: { fontSize: fontSize.sm, fontWeight: '600', color: colors.goldDark },
 
   sectionTitle: {
-    fontSize: fontSize.xs, fontWeight: '700', color: colors.textTertiary,
-    letterSpacing: 1, marginTop: spacing.md, marginBottom: spacing.sm,
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    letterSpacing: 1,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
 
   card: {
-    backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.md,
-    marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.cream200,
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.cream200,
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4 },
       android: { elevation: 1 },
     }),
   },
+  criticalCard: { borderLeftWidth: 4, borderLeftColor: colors.red },
+  abnormalCard: { borderLeftWidth: 4, borderLeftColor: colors.gold },
   cardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   statusDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
   testName: { fontSize: fontSize.md, fontWeight: '700', color: colors.textPrimary },
@@ -144,6 +255,16 @@ const styles = StyleSheet.create({
   detailText: { fontSize: 11, color: colors.textTertiary },
 
   emptyState: { alignItems: 'center', paddingVertical: 60 },
-  emptyTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.md },
-  emptySub: { fontSize: fontSize.sm, color: colors.textTertiary, marginTop: spacing.xs, textAlign: 'center' },
+  emptyTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+  },
+  emptySub: {
+    fontSize: fontSize.sm,
+    color: colors.textTertiary,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
 });

@@ -1,28 +1,42 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Platform } from 'react-native';
 import { Icon } from '@/components/icons';
 import { colors, spacing, fontSize, radius } from '../lib/theme';
 import Badge from '../components/Badge';
-import * as api from '../lib/api';
+import SyncBadge from '../components/SyncBadge';
+import { SkeletonList } from '../components/Skeleton';
+import { useAuth } from '../lib/auth';
+import { useCachedFetch } from '../lib/use-cached-fetch';
 import type { Immunization } from '../lib/types';
 
+type ImmunizationsResponse = { immunizations: Immunization[] };
+
 export default function ImmunizationsScreen() {
-  const [records, setRecords] = useState<Immunization[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
+  const { patient } = useAuth();
 
-  const load = async () => { setRecords(await api.getImmunizations()); };
-  useEffect(() => { load(); }, []);
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  const cacheKey = patient ? `immunizations.${patient.id}` : 'immunizations.anon';
+  const path = patient
+    ? `/api/patient-portal/immunizations?patientId=${encodeURIComponent(patient.id)}`
+    : null;
 
+  const { data, loading, refreshing, error, lastSyncedAt, isStale, refresh } =
+    useCachedFetch<ImmunizationsResponse, Immunization[]>({
+      cacheKey,
+      path,
+      select: (raw) => raw.immunizations ?? [],
+    });
+
+  const records = data ?? [];
   const completed = records.filter((r) => r.status === 'completed');
   const upcoming = records.filter((r) => r.status !== 'completed');
+  const isInitialLoading = loading && data === null;
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.green} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.green} />}
     >
       <View style={styles.headerRow}>
         <View>
@@ -33,6 +47,17 @@ export default function ImmunizationsScreen() {
           <Icon name="shield-checkmark" size={24} color={colors.green} />
         </View>
       </View>
+
+      <SyncBadge lastSyncedAt={lastSyncedAt} isStale={isStale} />
+
+      {error && (
+        <View style={styles.errorBanner}>
+          <Icon name="alert-circle" size={16} color={colors.red} />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {isInitialLoading && <SkeletonList count={3} />}
 
       {/* Progress summary */}
       <View style={styles.summaryCard}>
@@ -72,7 +97,7 @@ export default function ImmunizationsScreen() {
         <VaccineCard key={r._id} record={r} />
       ))}
 
-      {records.length === 0 && (
+      {!isInitialLoading && records.length === 0 && !error && (
         <View style={styles.emptyState}>
           <Icon name="shield-checkmark-outline" size={48} color={colors.cream300} />
           <Text style={styles.emptyTitle}>No immunization records</Text>
@@ -158,6 +183,17 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs, fontWeight: '700', color: colors.textTertiary,
     letterSpacing: 1, marginBottom: spacing.sm, marginTop: spacing.xs,
   },
+
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: colors.redLight,
+    borderRadius: radius.sm,
+    marginBottom: spacing.md,
+  },
+  errorText: { fontSize: fontSize.sm, color: colors.red, flex: 1 },
 
   card: {
     backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.md,
