@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0A3D6B"/>
+
+  <!-- Subtle radial glow -->
+  <circle cx="256" cy="256" r="180" fill="url(#glow)" opacity="0.08"/>
+
+  <!-- Medical cross -->
+  <rect x="184" y="112" width="144" height="288" rx="20" fill="white"/>
+  <rect x="112" y="184" width="288" height="144" rx="20" fill="white"/>
+
+  <!-- Inner cross with South Sudan green -->
+  <rect x="208" y="136" width="96" height="240" rx="14" fill="#10B944"/>
+  <rect x="136" y="208" width="240" height="96" rx="14" fill="#10B944"/>
+
+  <!-- Center star -->
+  <circle cx="256" cy="256" r="56" fill="#FCD34D"/>
+  <polygon points="256,211 269,240 301,240 275,258 285,288 256,270 227,288 237,258 211,240 243,240" fill="#0A3D6B"/>
+
+  <!-- South Sudan flag stripes at bottom -->
+  <rect x="80" y="420" width="84" height="12" rx="6" fill="#111"/>
+  <rect x="170" y="420" width="84" height="12" rx="6" fill="#E52E42"/>
+  <rect x="260" y="420" width="84" height="12" rx="6" fill="#10B944"/>
+  <rect x="350" y="420" width="82" height="12" rx="6" fill="#FCD34D"/>
+
+  <!-- Bottom accent -->
+  <rect x="80" y="438" width="352" height="4" rx="2" fill="rgba(255,255,255,0.1)"/>
+
+  <defs>
+    <radialGradient id="glow">
+      <stop offset="0%" stop-color="white"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>

@@ -1,0 +1,47 @@
+/**
+ * FHIR R4: GET /fhir/Encounter?patient=<id>
+ * Returns a searchset Bundle of Encounter resources backed by medical_record docs.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  getAuthPayload, unauthorized, forbidden, hasRole, serverError, logApiError,
+} from '@/lib/api-auth';
+import type { UserRole } from '@/lib/db-types';
+
+const READ_ROLES: UserRole[] = [
+  'super_admin', 'org_admin', 'government', 'doctor', 'clinical_officer',
+  'nurse', 'medical_superintendent', 'hrio',
+];
+
+export async function GET(request: NextRequest) {
+  try {
+    const auth = await getAuthPayload(request);
+    if (!auth) return unauthorized();
+    if (!hasRole(auth, READ_ROLES)) return forbidden();
+
+    const url = new URL(request.url);
+    const patientRef = url.searchParams.get('patient') || url.searchParams.get('subject');
+    if (!patientRef) {
+      return NextResponse.json(
+        { resourceType: 'OperationOutcome', issue: [{ severity: 'error', code: 'invalid', diagnostics: 'patient query parameter required' }] },
+        { status: 400, headers: { 'Content-Type': 'application/fhir+json' } }
+      );
+    }
+    const patientId = patientRef.replace(/^Patient\//, '');
+
+    const { getRecordsByPatient } = await import('@/lib/services/medical-record-service');
+    const { buildScopeFromAuth } = await import('@/lib/services/data-scope');
+    const { toFhirEncounter } = await import('@/lib/fhir');
+    const records = await getRecordsByPatient(patientId, buildScopeFromAuth(auth));
+
+    return NextResponse.json({
+      resourceType: 'Bundle',
+      type: 'searchset',
+      total: records.length,
+      entry: records.map((r) => ({ fullUrl: `Encounter/${r._id}`, resource: toFhirEncounter(r) })),
+    }, { headers: { 'Content-Type': 'application/fhir+json' } });
+  } catch (err) {
+    logApiError('[FHIR Encounter GET]', err);
+    return serverError();
+  }
+}

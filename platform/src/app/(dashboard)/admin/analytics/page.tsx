@@ -1,0 +1,364 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import TopBar from '@/components/TopBar';
+import { useApp } from '@/lib/context';
+import { useOrganizations } from '@/lib/hooks/useOrganizations';
+import {
+  BarChart3, PieChart as PieChartIcon, TrendingUp, Users, HeartPulse, Building2
+} from '@/components/icons/lucide';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend
+} from 'recharts';
+
+interface OrgDataPoint {
+  name: string;
+  patients: number;
+  users: number;
+  color: string;
+}
+
+export default function AdminAnalyticsPage() {
+  const router = useRouter();
+  const { currentUser } = useApp();
+  const { organizations, loading: orgsLoading, getStats } = useOrganizations();
+
+  const [orgData, setOrgData] = useState<OrgDataPoint[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // Access control
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'super_admin') {
+      router.push('/dashboard');
+    }
+  }, [currentUser, router]);
+
+  // Load per-org stats
+  useEffect(() => {
+    if (organizations.length === 0) return;
+    const load = async () => {
+      setDataLoading(true);
+      const dataPoints: OrgDataPoint[] = [];
+      for (const org of organizations) {
+        try {
+          const stats = await getStats(org._id);
+          dataPoints.push({
+            name: org.name.length > 18 ? org.name.slice(0, 16) + '...' : org.name,
+            patients: stats.patientCount,
+            users: stats.userCount,
+            color: org.primaryColor || 'var(--color-success)',
+          });
+        } catch {
+          dataPoints.push({
+            name: org.name.length > 18 ? org.name.slice(0, 16) + '...' : org.name,
+            patients: 0,
+            users: 0,
+            color: org.primaryColor || 'var(--color-success)',
+          });
+        }
+      }
+      setOrgData(dataPoints);
+      setDataLoading(false);
+    };
+    load();
+  }, [organizations, getStats]);
+
+  if (!currentUser || currentUser.role !== 'super_admin') return null;
+
+  // Plan distribution data for pie chart
+  const planDistribution = [
+    { name: 'Basic', value: organizations.filter(o => o.subscriptionPlan === 'basic').length, color: '#6B7280' },
+    { name: 'Professional', value: organizations.filter(o => o.subscriptionPlan === 'professional').length, color: '#2563EB' },
+    { name: 'Enterprise', value: organizations.filter(o => o.subscriptionPlan === 'enterprise').length, color: '#7C3AED' },
+  ].filter(d => d.value > 0);
+
+  // Status distribution for pie chart
+  const statusDistribution = [
+    { name: 'Active', value: organizations.filter(o => o.subscriptionStatus === 'active').length, color: 'var(--color-success)' },
+    { name: 'Trial', value: organizations.filter(o => o.subscriptionStatus === 'trial').length, color: 'var(--color-warning)' },
+    { name: 'Suspended', value: organizations.filter(o => o.subscriptionStatus === 'suspended').length, color: 'var(--color-danger)' },
+    { name: 'Cancelled', value: organizations.filter(o => o.subscriptionStatus === 'cancelled').length, color: 'var(--text-muted)' },
+  ].filter(d => d.value > 0);
+
+  // Growth chart. There is no historical timeseries source yet, so in demo
+  // mode we synthesize a smoothly-rising curve from the current totals so the
+  // chart is not empty. In production this collapses to a flat zero line —
+  // an empty chart is far less harmful than fabricated growth statistics
+  // shown to operators making trend decisions.
+  const months = ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'];
+  const totalUsers = orgData.reduce((sum, d) => sum + d.users, 0);
+  const totalPatients = orgData.reduce((sum, d) => sum + d.patients, 0);
+  const showSyntheticGrowth = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
+  const growthData = months.map((month, i) => {
+    if (!showSyntheticGrowth) {
+      return { month, users: 0, patients: 0, organizations: 0 };
+    }
+    const factor = 0.5 + (i * 0.1);
+    return {
+      month,
+      users: Math.round(totalUsers * factor) || Math.round((i + 1) * 5),
+      patients: Math.round(totalPatients * factor) || Math.round((i + 1) * 20),
+      organizations: Math.round(organizations.length * (0.6 + i * 0.08)) || (i + 1),
+    };
+  });
+
+  const totalPatientsAll = orgData.reduce((s, d) => s + d.patients, 0);
+  const totalUsersAll = orgData.reduce((s, d) => s + d.users, 0);
+
+  // Custom tooltip style
+  const tooltipStyle = {
+    backgroundColor: 'var(--bg-card)',
+    border: '1px solid var(--border-light)',
+    borderRadius: '8px',
+    fontSize: '12px',
+  };
+
+  return (
+    <>
+      <TopBar title="Platform Analytics" />
+      <main className="page-container page-enter">
+
+        {/* Summary Cards */}
+        <div className="kpi-grid mb-6">
+          {[
+            { label: 'Total Organizations', value: organizations.length, icon: Building2, color: 'var(--color-danger)', bg: '#DC262615' },
+            { label: 'Total Users', value: totalUsersAll, icon: Users, color: '#2563EB', bg: '#2563EB15' },
+            { label: 'Total Patients', value: totalPatientsAll, icon: HeartPulse, color: 'var(--color-success)', bg: '#05966915' },
+            { label: 'Avg Patients/Org', value: organizations.length > 0 ? Math.round(totalPatientsAll / organizations.length) : 0, icon: TrendingUp, color: 'var(--color-warning)', bg: '#D9770615' },
+          ].map(stat => (
+            <div key={stat.label} className="kpi">
+              <div className="icon-box-sm" style={{ background: stat.bg }}>
+                <stat.icon size={16} style={{ color: stat.color }} />
+              </div>
+              <div className="kpi__body">
+                <div className="kpi__value">{stat.value.toLocaleString()}</div>
+                <div className="kpi__label">{stat.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Charts Row 1: Bar Chart + Pie Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+          {/* Patients per Org Bar Chart */}
+          <div className="lg:col-span-2 rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="icon-box-sm" style={{ background: '#2563EB15' }}>
+                <BarChart3 size={14} style={{ color: '#2563EB' }} />
+              </div>
+              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Patients per Organization</span>
+            </div>
+            <hr className="section-divider" />
+            {dataLoading || orgsLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading chart data...</p>
+              </div>
+            ) : orgData.length === 0 ? (
+              <div className="flex items-center justify-center h-64">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No data available</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={orgData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Bar dataKey="patients" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Pie Charts */}
+          <div className="space-y-4">
+            {/* Plan Distribution */}
+            <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="icon-box-sm" style={{ background: '#7C3AED15' }}>
+                  <PieChartIcon size={14} style={{ color: '#7C3AED' }} />
+                </div>
+                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Plans</span>
+              </div>
+              {planDistribution.length === 0 ? (
+                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>No data</p>
+              ) : (
+                <>
+                <hr className="section-divider" />
+                <div className="flex items-center gap-4">
+                  <ResponsiveContainer width={120} height={120}>
+                    <PieChart>
+                      <Pie data={planDistribution} dataKey="value" cx="50%" cy="50%" outerRadius={50} innerRadius={30}>
+                        {planDistribution.map((entry, index) => (
+                          <Cell key={index} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="data-row-divider-sm">
+                    {planDistribution.map(d => (
+                      <div key={d.name} className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
+                        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{d.name}</span>
+                        <span className="text-xs font-bold" style={{ color: d.color }}>{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                </>
+              )}
+            </div>
+
+            {/* Status Distribution */}
+            <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="icon-box-sm" style={{ background: '#05966915' }}>
+                  <PieChartIcon size={14} style={{ color: 'var(--color-success)' }} />
+                </div>
+                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Status</span>
+              </div>
+              {statusDistribution.length === 0 ? (
+                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>No data</p>
+              ) : (
+                <>
+                <hr className="section-divider" />
+                <div className="flex items-center gap-4">
+                  <ResponsiveContainer width={120} height={120}>
+                    <PieChart>
+                      <Pie data={statusDistribution} dataKey="value" cx="50%" cy="50%" outerRadius={50} innerRadius={30}>
+                        {statusDistribution.map((entry, index) => (
+                          <Cell key={index} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="data-row-divider-sm">
+                    {statusDistribution.map(d => (
+                      <div key={d.name} className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
+                        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{d.name}</span>
+                        <span className="text-xs font-bold" style={{ color: d.color }}>{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Row 2: Growth Line Chart + Users per Org */}
+        <div className="grid grid-cols-2 gap-6">
+
+          {/* Growth Over Time */}
+          <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="icon-box-sm" style={{ background: '#05966915' }}>
+                <TrendingUp size={14} style={{ color: 'var(--color-success)' }} />
+              </div>
+              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Growth Trend (Simulated)</span>
+            </div>
+            <hr className="section-divider" />
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={growthData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
+                <Line type="monotone" dataKey="users" stroke="#2563EB" strokeWidth={2} dot={{ r: 3 }} name="Users" />
+                <Line type="monotone" dataKey="patients" stroke="#059669" strokeWidth={2} dot={{ r: 3 }} name="Patients" />
+                <Line type="monotone" dataKey="organizations" stroke="#7C3AED" strokeWidth={2} dot={{ r: 3 }} name="Organizations" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Users per Org Bar Chart */}
+          <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="icon-box-sm" style={{ background: '#D9770615' }}>
+                <Users size={14} style={{ color: 'var(--color-warning)' }} />
+              </div>
+              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Users per Organization</span>
+            </div>
+            <hr className="section-divider" />
+            {dataLoading || orgsLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</p>
+              </div>
+            ) : orgData.length === 0 ? (
+              <div className="flex items-center justify-center h-64">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No data available</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={orgData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Bar dataKey="users" fill="#D97706" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Per-Org Data Table */}
+        <div className="mt-6 rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Organization Metrics</span>
+          </div>
+          <table className="w-full">
+            <thead>
+              <tr>
+                {['Organization', 'Patients', 'Users', 'Plan', 'Status'].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {organizations.map((org, i) => {
+                const data = orgData[i];
+                return (
+                  <tr key={org._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold text-white" style={{ background: org.primaryColor }}>
+                          {org.name.charAt(0)}
+                        </div>
+                        <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{org.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold" style={{ color: 'var(--color-success)' }}>{data?.patients ?? '...'}</td>
+                    <td className="px-4 py-3 text-sm font-bold" style={{ color: '#2563EB' }}>{data?.users ?? '...'}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
+                        background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(37,99,235,0.12)' : 'rgba(107,114,128,0.12)',
+                        color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#2563EB' : '#6B7280',
+                      }}>{org.subscriptionPlan}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold">
+                        <span className="w-2 h-2 rounded-full" style={{
+                          background: org.subscriptionStatus === 'active' ? 'var(--color-success)' : org.subscriptionStatus === 'trial' ? 'var(--color-warning)' : 'var(--color-danger)',
+                        }} />
+                        <span style={{
+                          color: org.subscriptionStatus === 'active' ? 'var(--color-success)' : org.subscriptionStatus === 'trial' ? 'var(--color-warning)' : 'var(--color-danger)',
+                        }}>{org.subscriptionStatus}</span>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </>
+  );
+}

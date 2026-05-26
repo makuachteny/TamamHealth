@@ -1,0 +1,54 @@
+/**
+ * FHIR R4: GET /fhir/Patient/:id
+ * Returns a Patient resource serialized from the PouchDB patient doc.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  getAuthPayload, unauthorized, forbidden, hasRole, serverError, logApiError,
+} from '@/lib/api-auth';
+import type { UserRole } from '@/lib/db-types';
+
+const READ_ROLES: UserRole[] = [
+  'super_admin', 'org_admin', 'government', 'doctor', 'clinical_officer',
+  'nurse', 'medical_superintendent', 'hrio', 'data_entry_clerk', 'front_desk',
+  'radiologist', 'nutritionist',
+];
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const auth = await getAuthPayload(request);
+    if (!auth) return unauthorized();
+    if (!hasRole(auth, READ_ROLES)) return forbidden();
+
+    const { getPatientById } = await import('@/lib/services/patient-service');
+    const { filterByScope, buildScopeFromAuth } = await import('@/lib/services/data-scope');
+    const { toFhirPatient } = await import('@/lib/fhir');
+    const patient = await getPatientById(params.id);
+    if (!patient) {
+      return NextResponse.json(
+        { resourceType: 'OperationOutcome', issue: [{ severity: 'error', code: 'not-found', diagnostics: 'Patient not found' }] },
+        { status: 404, headers: { 'Content-Type': 'application/fhir+json' } }
+      );
+    }
+
+    // Reuse the central scope filter so org + hospital rules stay in lockstep
+    // with all other read paths. A non-admin caller from org A asking for a
+    // patient in org B (or for a patient that has no orgId at all) gets
+    // filtered out and we surface a 403 — never a cross-tenant leak.
+    const scope = buildScopeFromAuth(auth);
+    const allowed = filterByScope([patient], scope);
+    if (allowed.length === 0) {
+      return forbidden('Access denied to this patient record');
+    }
+
+    return NextResponse.json(toFhirPatient(patient), {
+      headers: { 'Content-Type': 'application/fhir+json' },
+    });
+  } catch (err) {
+    logApiError('[FHIR Patient/:id GET]', err);
+    return serverError();
+  }
+}

@@ -1,0 +1,291 @@
+'use client';
+
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { PaymentDoc, InsurancePolicyDoc, ClaimDoc, PaymentPlanDoc, LedgerEntryDoc, PatientFinancialSummary } from '../db-types-payments';
+import { paymentsDB, insurancePoliciesDB, claimsDB, paymentPlansDB, ledgerDB } from '../db';
+import { useApp } from '../context';
+
+export function usePayments() {
+  const [payments, setPayments] = useState<PaymentDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { currentUser } = useApp();
+  const scope = useMemo(() => (
+    currentUser ? { orgId: currentUser.orgId, hospitalId: currentUser.hospitalId, role: currentUser.role } : undefined
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [currentUser?.orgId, currentUser?.hospitalId, currentUser?.role]);
+
+  const loadPayments = useCallback(async () => {
+    try {
+      const { getAllPayments } = await import('../services/payment-service');
+      const data = await getAllPayments(scope);
+      setPayments(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load payments');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [scope]);
+
+  useEffect(() => {
+    loadPayments();
+  }, [loadPayments]);
+
+  // Live PouchDB subscription: re-load whenever a payment is created,
+  // updated, or deleted anywhere in the app.
+  useEffect(() => {
+    let cancelled = false;
+    const changes = paymentsDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => { if (!cancelled) loadPayments(); })
+      .on('error', () => { /* swallow */ });
+    return () => {
+      cancelled = true;
+      try { changes.cancel(); } catch { /* noop */ }
+    };
+  }, [loadPayments]);
+
+  return { payments, loading, error, reload: loadPayments };
+}
+
+export function usePatientPayments(patientId?: string) {
+  const [payments, setPayments] = useState<PaymentDoc[]>([]);
+  const [policies, setPolicies] = useState<InsurancePolicyDoc[]>([]);
+  const [balance, setBalance] = useState<number>(0);
+  const [summary, setSummary] = useState<PatientFinancialSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadPatientPayments = useCallback(async () => {
+    if (!patientId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const { getPaymentsByPatient, getPatientInsurancePolicies, getPatientFinancialSummary } = await import('../services/payment-service');
+      const { getPatientBalance } = await import('../services/ledger-service');
+
+      const [paymentsData, policiesData, balanceData, summaryData] = await Promise.all([
+        getPaymentsByPatient(patientId),
+        getPatientInsurancePolicies(patientId),
+        getPatientBalance(patientId),
+        getPatientFinancialSummary(patientId)
+      ]);
+
+      setPayments(paymentsData);
+      setPolicies(policiesData);
+      setBalance(balanceData);
+      setSummary(summaryData);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load patient payments');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [patientId]);
+
+  useEffect(() => {
+    loadPatientPayments();
+  }, [loadPatientPayments]);
+
+  // Live PouchDB subscriptions for payments and policies
+  useEffect(() => {
+    if (!patientId) return;
+    let cancelled = false;
+    const changesPayments = paymentsDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => { if (!cancelled) loadPatientPayments(); })
+      .on('error', () => { /* swallow */ });
+    return () => {
+      cancelled = true;
+      try { changesPayments.cancel(); } catch { /* noop */ }
+    };
+  }, [loadPatientPayments, patientId]);
+
+  useEffect(() => {
+    if (!patientId) return;
+    let cancelled = false;
+    const changesPolicies = insurancePoliciesDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => { if (!cancelled) loadPatientPayments(); })
+      .on('error', () => { /* swallow */ });
+    return () => {
+      cancelled = true;
+      try { changesPolicies.cancel(); } catch { /* noop */ }
+    };
+  }, [loadPatientPayments, patientId]);
+
+  return { payments, policies, balance, summary, loading, error, reload: loadPatientPayments };
+}
+
+export function useInsurancePolicies(patientId?: string) {
+  const [policies, setPolicies] = useState<InsurancePolicyDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadInsurancePolicies = useCallback(async () => {
+    if (!patientId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const { getPatientInsurancePolicies } = await import('../services/payment-service');
+      const data = await getPatientInsurancePolicies(patientId);
+      setPolicies(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load insurance policies');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [patientId]);
+
+  useEffect(() => {
+    loadInsurancePolicies();
+  }, [loadInsurancePolicies]);
+
+  // Live PouchDB subscription
+  useEffect(() => {
+    if (!patientId) return;
+    let cancelled = false;
+    const changes = insurancePoliciesDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => { if (!cancelled) loadInsurancePolicies(); })
+      .on('error', () => { /* swallow */ });
+    return () => {
+      cancelled = true;
+      try { changes.cancel(); } catch { /* noop */ }
+    };
+  }, [loadInsurancePolicies, patientId]);
+
+  return { policies, loading, error, reload: loadInsurancePolicies };
+}
+
+export function useClaims() {
+  const [claims, setClaims] = useState<ClaimDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { currentUser } = useApp();
+  const scope = useMemo(() => (
+    currentUser ? { orgId: currentUser.orgId, hospitalId: currentUser.hospitalId, role: currentUser.role } : undefined
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [currentUser?.orgId, currentUser?.hospitalId, currentUser?.role]);
+
+  const loadClaims = useCallback(async () => {
+    try {
+      const { getAllClaims } = await import('../services/payment-service');
+      const data = await getAllClaims(scope);
+      setClaims(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load claims');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [scope]);
+
+  useEffect(() => {
+    loadClaims();
+  }, [loadClaims]);
+
+  // Live PouchDB subscription
+  useEffect(() => {
+    let cancelled = false;
+    const changes = claimsDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => { if (!cancelled) loadClaims(); })
+      .on('error', () => { /* swallow */ });
+    return () => {
+      cancelled = true;
+      try { changes.cancel(); } catch { /* noop */ }
+    };
+  }, [loadClaims]);
+
+  return { claims, loading, error, reload: loadClaims };
+}
+
+export function usePaymentPlans() {
+  const [paymentPlans, setPaymentPlans] = useState<PaymentPlanDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { currentUser } = useApp();
+  const scope = useMemo(() => (
+    currentUser ? { orgId: currentUser.orgId, hospitalId: currentUser.hospitalId, role: currentUser.role } : undefined
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [currentUser?.orgId, currentUser?.hospitalId, currentUser?.role]);
+
+  const loadPaymentPlans = useCallback(async () => {
+    try {
+      const { getAllPaymentPlans } = await import('../services/payment-service');
+      const data = await getAllPaymentPlans(scope);
+      setPaymentPlans(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load payment plans');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [scope]);
+
+  useEffect(() => {
+    loadPaymentPlans();
+  }, [loadPaymentPlans]);
+
+  // Live PouchDB subscription
+  useEffect(() => {
+    let cancelled = false;
+    const changes = paymentPlansDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => { if (!cancelled) loadPaymentPlans(); })
+      .on('error', () => { /* swallow */ });
+    return () => {
+      cancelled = true;
+      try { changes.cancel(); } catch { /* noop */ }
+    };
+  }, [loadPaymentPlans]);
+
+  return { paymentPlans, loading, error, reload: loadPaymentPlans };
+}
+
+export function useLedger(patientId?: string) {
+  const [ledger, setLedger] = useState<LedgerEntryDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { currentUser } = useApp();
+  const scope = useMemo(() => (
+    currentUser ? { orgId: currentUser.orgId, hospitalId: currentUser.hospitalId, role: currentUser.role } : undefined
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [currentUser?.orgId, currentUser?.hospitalId, currentUser?.role]);
+
+  const loadLedger = useCallback(async () => {
+    try {
+      const { getPatientLedger, getAllLedgerEntries } = await import('../services/ledger-service');
+      const data = patientId ? await getPatientLedger(patientId) : await getAllLedgerEntries(scope);
+      setLedger(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load ledger');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [patientId, scope]);
+
+  useEffect(() => {
+    loadLedger();
+  }, [loadLedger]);
+
+  // Live PouchDB subscription
+  useEffect(() => {
+    let cancelled = false;
+    const changes = ledgerDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => { if (!cancelled) loadLedger(); })
+      .on('error', () => { /* swallow */ });
+    return () => {
+      cancelled = true;
+      try { changes.cancel(); } catch { /* noop */ }
+    };
+  }, [loadLedger]);
+
+  return { ledger, loading, error, reload: loadLedger };
+}

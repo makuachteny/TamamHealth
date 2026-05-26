@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <!-- Background -->
+  <rect width="192" height="192" rx="40" fill="#0A3D6B"/>
+
+  <!-- Medical cross -->
+  <rect x="69" y="42" width="54" height="108" rx="8" fill="white"/>
+  <rect x="42" y="69" width="108" height="54" rx="8" fill="white"/>
+
+  <!-- Inner cross with South Sudan green -->
+  <rect x="78" y="51" width="36" height="90" rx="6" fill="#10B944"/>
+  <rect x="51" y="78" width="90" height="36" rx="6" fill="#10B944"/>
+
+  <!-- Center star -->
+  <circle cx="96" cy="96" r="21" fill="#FCD34D"/>
+  <polygon points="96,79 101,90 113,90 103,97 107,108 96,101 85,108 89,97 79,90 91,90" fill="#0A3D6B"/>
+
+  <!-- South Sudan flag stripes at bottom -->
+  <rect x="30" y="156" width="32" height="5" rx="2.5" fill="#111"/>
+  <rect x="64" y="156" width="32" height="5" rx="2.5" fill="#E52E42"/>
+  <rect x="98" y="156" width="32" height="5" rx="2.5" fill="#10B944"/>
+  <rect x="132" y="156" width="30" height="5" rx="2.5" fill="#FCD34D"/>
+
+  <!-- Bottom accent line -->
+  <rect x="30" y="163" width="132" height="2" rx="1" fill="rgba(255,255,255,0.15)"/>
+</svg>

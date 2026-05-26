@@ -1,0 +1,73 @@
+/**
+ * API: /api/medical-records/[id]
+ * GET   — Retrieve a single medical record
+ * PATCH — Update a medical record
+ * DELETE — Delete a medical record (soft-delete via status, or hard delete)
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  getAuthPayload, unauthorized, forbidden, hasRole, serverError, logApiError,
+} from '@/lib/api-auth';
+import { withAuditLog } from '@/lib/audit/with-audit';
+import type { UserRole } from '@/lib/db-types';
+const WRITE_ROLES: UserRole[] = [
+  'super_admin', 'doctor', 'clinical_officer', 'medical_superintendent',
+];
+async function patchHandler(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await getAuthPayload(request);
+    if (!auth) return unauthorized();
+    if (!hasRole(auth, WRITE_ROLES)) return forbidden();
+    const { id } = await params;
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    // Prevent changing immutable fields
+    const immutable = ['_id', '_rev', 'type', 'createdAt'];
+    for (const key of immutable) {
+      delete body[key];
+    }
+    const { sanitizePayload } = await import('@/lib/validation');
+    const sanitized = sanitizePayload(body);
+    const { updateMedicalRecord } = await import('@/lib/services/medical-record-service');
+    const updated = await updateMedicalRecord(id, sanitized as Parameters<typeof updateMedicalRecord>[1]);
+    if (!updated) {
+      return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+    }
+    return NextResponse.json({ record: updated });
+  } catch (err) {
+    logApiError('[API /medical-records/[id] PATCH]', err);
+    return serverError();
+  }
+}
+async function deleteHandler(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { checkRateLimit } = await import('@/lib/api-security');
+    const rateLimitResponse = checkRateLimit(request, 'medical-records:delete', 10);
+    if (rateLimitResponse) return rateLimitResponse;
+    const auth = await getAuthPayload(request);
+    if (!auth) return unauthorized();
+    if (!hasRole(auth, ['super_admin', 'medical_superintendent'])) return forbidden();
+    const { id } = await params;
+    const { deleteMedicalRecord } = await import('@/lib/services/medical-record-service');
+    const deleted = await deleteMedicalRecord(id);
+    if (!deleted) {
+      return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+    }
+    return NextResponse.json({ deleted: true });
+  } catch (err) {
+    logApiError('[API /medical-records/[id] DELETE]', err);
+    return serverError();
+  }
+}
+export const PATCH = withAuditLog(patchHandler, { action: 'medicalrecord.update' });
+export const DELETE = withAuditLog(deleteHandler, { action: 'medicalrecord.delete' });

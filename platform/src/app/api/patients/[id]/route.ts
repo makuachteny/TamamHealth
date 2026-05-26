@@ -1,0 +1,81 @@
+/**
+ * API: /api/patients/:id
+ * GET   — Retrieve a single patient
+ * PATCH — Update patient fields
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  getAuthPayload, unauthorized, forbidden, hasRole, validationError, serverError, logApiError,
+} from '@/lib/api-auth';
+import { withAuditLog } from '@/lib/audit/with-audit';
+import type { UserRole } from '@/lib/db-types';
+const READ_ROLES: UserRole[] = [
+  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
+  'front_desk', 'boma_health_worker', 'medical_superintendent', 'hrio',
+  'payam_supervisor', 'data_entry_clerk', 'community_health_volunteer',
+  'nutritionist', 'radiologist',
+];
+const WRITE_ROLES: UserRole[] = [
+  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
+  'front_desk', 'medical_superintendent', 'hrio', 'data_entry_clerk',
+];
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const auth = await getAuthPayload(request);
+    if (!auth) return unauthorized();
+    if (!hasRole(auth, READ_ROLES)) return forbidden();
+    const { getPatientById } = await import('@/lib/services/patient-service');
+    const patient = await getPatientById(params.id);
+    if (!patient) {
+      return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+    }
+    // Data scope check: non-admin users can only see patients in their org
+    if (auth.role !== 'super_admin' && auth.role !== 'government' && auth.orgId && patient.orgId && patient.orgId !== auth.orgId) {
+      return forbidden('Access denied to this patient record');
+    }
+    return NextResponse.json({ patient });
+  } catch (err) {
+    logApiError('[API /patients/:id GET]', err);
+    return serverError();
+  }
+}
+async function patchHandler(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const auth = await getAuthPayload(request);
+    if (!auth) return unauthorized();
+    if (!hasRole(auth, WRITE_ROLES)) return forbidden();
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    // Prevent changing immutable fields
+    delete body._id;
+    delete body._rev;
+    delete body.type;
+    delete body.createdAt;
+    const { sanitizePayload } = await import('@/lib/validation');
+    const sanitized = sanitizePayload(body);
+    const { updatePatient } = await import('@/lib/services/patient-service');
+    const updated = await updatePatient(params.id, sanitized);
+    if (!updated) {
+      return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+    }
+    return NextResponse.json({ patient: updated });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'ValidationError') {
+      const ve = err as Error & { fields: Record<string, string> };
+      return validationError(ve.fields);
+    }
+    logApiError('[API /patients/:id PATCH]', err);
+    return serverError();
+  }
+}
+export const PATCH = withAuditLog(patchHandler, { action: 'patient.update' });

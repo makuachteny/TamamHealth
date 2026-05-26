@@ -1,0 +1,46 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files — only .env.example / .env.production.example may be committed
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# auto-generated seed credentials — never commit (lib/seed-credentials.ts)
+.seed-credentials.json
+
+# persisted JWT revocation list — never commit (lib/token-blacklist.ts)
+.token-blacklist.json
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
