@@ -94,6 +94,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDemoAccounts, setShowDemoAccounts] = useState(false);
@@ -288,8 +289,16 @@ export default function LoginPage() {
                   <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
                   <span>Remember for 30 days</span>
                 </label>
-                <a href="#" className="tl-forgot" onClick={(e) => e.preventDefault()}>Forgot password</a>
+                <button type="button" className="tl-forgot" onClick={() => setForgotOpen(o => !o)}>Forgot password</button>
               </div>
+
+              {forgotOpen && (
+                <div className="tl-forgot-note" role="status">
+                  Password resets are handled by your administrator. Contact your facility
+                  administrator (or the Ministry of Health IT support desk) to have your
+                  password reset — you’ll be asked to set a new one at your next sign-in.
+                </div>
+              )}
 
               <button type="submit" disabled={loading || !dbReady} className="tl-submit">
                 {loading ? (<span className="tl-submit-loading"><span className="tl-spin tl-spin-light" /> Signing in…</span>)
@@ -339,8 +348,8 @@ export default function LoginPage() {
             )}
 
             <p className="tl-terms">
-              By signing in you agree to the <a href="#" onClick={(e) => e.preventDefault()}>Terms of Use</a> and{' '}
-              <a href="#" onClick={(e) => e.preventDefault()}>Privacy Policy</a>.
+              By signing in you agree to the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a> and{' '}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
             </p>
           </div>
         </section>
@@ -404,8 +413,9 @@ export default function LoginPage() {
         .tl-row { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
         .tl-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; cursor: pointer; }
         .tl-check input { width: 15px; height: 15px; accent-color: ${ACCENT}; margin: 0; }
-        .tl-forgot { font-size: 13px; color: ${ACCENT}; font-weight: 600; text-decoration: none; }
+        .tl-forgot { font-size: 13px; color: ${ACCENT}; font-weight: 600; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; }
         .tl-forgot:hover { text-decoration: underline; }
+        .tl-forgot-note { margin-top: 10px; padding: 10px 12px; font-size: 12.5px; line-height: 1.5; color: ${ACCENT_DEEP}; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.20); border-radius: 8px; }
 
         .tl-submit { width: 100%; padding: 13px 24px; margin-top: 6px; font-size: 15px; font-weight: 700; color: #fff; background: linear-gradient(135deg, ${ACCENT} 0%, ${ACCENT_DEEP} 100%); border: none; border-radius: 10px; cursor: pointer; transition: transform .12s, box-shadow .15s, opacity .15s; box-shadow: 0 8px 20px rgba(59, 130, 246,0.28); }
         .tl-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(59, 130, 246,0.34); }

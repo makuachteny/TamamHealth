@@ -4,13 +4,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Untitled Sans @font-face — disabled until a real, complete WOFF2 URL is
+   supplied. The pasted URL was truncated (contained a literal "…"), which makes
+   the browser fire a failed font request + "failed to decode font" console
+   error on every page. Body/headings fall back to Arial (the intended look)
+   while this is commented out. To re-enable, paste the full Webflow CDN URL.
 @font-face {
-    font-family: Untitled Sans;
-    src: url(https://cdn.prod.website-files.com/6668a68…/66cca75…_UntitledSansWeb-Light.woff2) format("woff2");
+    font-family: 'Untitled Sans';
+    src: url(https://cdn.prod.website-files.com/<FULL_HASH>/<FULL_HASH>_UntitledSansWeb-Light.woff2) format("woff2");
     font-weight: 300;
     font-style: normal;
     font-display: swap;
 }
+*/
 
 /* ============ LAYOUT SYSTEM ============ */
 :root {

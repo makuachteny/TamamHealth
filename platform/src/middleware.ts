@@ -207,12 +207,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Public pages — product, public-stats, patient-portal
+  // Public pages — product, public-stats, patient-portal, legal pages
   if (
     pathname === '/' ||
     pathname === '/product' ||
     pathname === '/public-stats' ||
-    pathname === '/patient-portal'
+    pathname === '/patient-portal' ||
+    pathname === '/terms' ||
+    pathname === '/privacy'
   ) {
     return NextResponse.next();
   }
