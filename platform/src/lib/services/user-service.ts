@@ -3,7 +3,7 @@ import type { UserDoc, UserRole } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 
-const VALID_ROLES: UserRole[] = ['super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse', 'lab_tech', 'pharmacist', 'front_desk', 'government', 'boma_health_worker', 'payam_supervisor', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'community_health_volunteer', 'nutritionist', 'radiologist'];
+const VALID_ROLES: UserRole[] = ['super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife', 'lab_tech', 'pharmacist', 'front_desk', 'cashier', 'government', 'county_health_director', 'boma_health_worker', 'payam_supervisor', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'community_health_volunteer', 'nutritionist', 'radiologist', 'hospital_manager', 'medical_biller'];
 
 export async function getAllUsers(scope?: DataScope): Promise<UserDoc[]> {
   const db = usersDB();
@@ -54,7 +54,7 @@ export async function createUser(
     throw new Error(`Invalid role. Must be one of: ${VALID_ROLES.join(', ')}`);
   }
 
-  const ROLES_WITHOUT_HOSPITAL: UserRole[] = ['super_admin', 'org_admin', 'government'];
+  const ROLES_WITHOUT_HOSPITAL: UserRole[] = ['super_admin', 'org_admin', 'government', 'county_health_director'];
   if (!ROLES_WITHOUT_HOSPITAL.includes(data.role) && (!data.hospitalId || !data.hospitalName)) {
     throw new Error('Clinical users must be assigned to a hospital');
   }
@@ -76,7 +76,7 @@ export async function createUser(
   const { hashPassword } = await import('../auth');
   const passwordHash = await hashPassword(data.password);
 
-  const needsHospital = !(['super_admin', 'org_admin', 'government'] as UserRole[]).includes(data.role);
+  const needsHospital = !(['super_admin', 'org_admin', 'government', 'county_health_director'] as UserRole[]).includes(data.role);
   const doc: UserDoc = {
     _id: `user-${username}`,
     type: 'user',
@@ -88,6 +88,10 @@ export async function createUser(
     hospitalName: needsHospital ? data.hospitalName : undefined,
     orgId: data.orgId,
     isActive: true,
+    // The admin-set password is temporary — force a change at first login so
+    // it never becomes the user's permanent credential.
+    mustChangePassword: true,
+    passwordUpdatedAt: now,
     createdAt: now,
     updatedAt: now,
     createdBy: actorId,
@@ -147,16 +151,53 @@ export async function resetPassword(
 
   const { hashPassword } = await import('../auth');
   const passwordHash = await hashPassword(newPassword);
+  const now = new Date().toISOString();
   const updated: UserDoc = {
     ...existing,
     passwordHash,
-    updatedAt: new Date().toISOString(),
+    // An admin reset is a temporary credential — force the user to choose
+    // their own password the next time they sign in.
+    mustChangePassword: true,
+    passwordUpdatedAt: now,
+    updatedAt: now,
   };
 
   const resp2 = await db.put(updated);
   updated._rev = resp2.rev;
   const { logAudit } = await import('./audit-service');
   await logAudit('password_reset', actorId, actorUsername, `Reset password for user "${existing.username}"`, true);
+}
+
+/**
+ * Self-service password change. Verifies the user's current password, sets the
+ * new one, and clears the forced-change flag. Used by POST /api/auth/change-password
+ * (both for the first-login forced change and ordinary "change my password").
+ */
+export async function changeOwnPassword(
+  id: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const db = usersDB();
+  const existing = await db.get(id) as UserDoc;
+
+  const { verifyPassword, hashPassword } = await import('../auth');
+  const ok = await verifyPassword(currentPassword, existing.passwordHash);
+  if (!ok) throw new Error('Current password is incorrect');
+
+  const now = new Date().toISOString();
+  const updated: UserDoc = {
+    ...existing,
+    passwordHash: await hashPassword(newPassword),
+    mustChangePassword: false,
+    passwordUpdatedAt: now,
+    updatedAt: now,
+  };
+
+  const resp = await db.put(updated);
+  updated._rev = resp.rev;
+  const { logAudit } = await import('./audit-service');
+  await logAudit('password_changed', existing._id, existing.username, `User "${existing.username}" changed their own password`, true);
 }
 
 export async function deactivateUser(

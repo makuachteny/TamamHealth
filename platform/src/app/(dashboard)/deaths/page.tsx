@@ -9,10 +9,12 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
 import { Plus, Search, X, AlertTriangle, FileText, ChevronDown, ChevronUp, UserCheck, Skull, Baby, Hash, ClipboardCheck } from '@/components/icons/lucide';
 
 export default function DeathsPage() {
+  const { t } = useTranslation();
   const { deaths, stats, register } = useDeaths();
   const { hospitals } = useHospitals();
   const { patients } = usePatients();
@@ -79,12 +81,12 @@ export default function DeathsPage() {
         certifiedBy: form.certifiedBy || currentUser?.name || '',
         certificateNumber: form.certificateNumber || `SS-D-${Date.now().toString(36).toUpperCase()}`,
       });
-      showToast('Death registered successfully!', 'success');
+      showToast(t('deaths.registeredSuccess'), 'success');
       setShowForm(false);
       setLinkedPatientId(undefined);
       setPatientLookup('');
     } catch {
-      showToast('Failed to register death. Please try again.', 'error');
+      showToast(t('deaths.registerFailed'), 'error');
     }
   };
 
@@ -112,7 +114,7 @@ export default function DeathsPage() {
     <div>
       <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{label}</label>
       <select value={value} onChange={e => onChange(e.target.value)} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
-        <option value="">Select ICD-11 code...</option>
+        <option value="">{t('deaths.selectIcd11')}</option>
         {COMMON_ICD11_CODES.map(c => <option key={c.code} value={c.code}>{c.code} — {c.title}</option>)}
       </select>
     </div>
@@ -120,15 +122,15 @@ export default function DeathsPage() {
 
   return (
     <>
-      <TopBar title="Death Registration" />
+      <TopBar title={t('deaths.title')} />
       <main className="page-container page-enter">
         <PageHeader
           icon={FileText}
-          title="Death Registration"
-          subtitle="WHO Medical Certificate of Cause of Death with ICD-11 Coding"
+          title={t('deaths.title')}
+          subtitle={t('deaths.subtitle')}
           actions={canRecordVitalEvents && (
             <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Register Death
+              <Plus className="w-4 h-4" /> {t('deaths.registerDeath')}
             </button>
           )}
         />
@@ -139,35 +141,35 @@ export default function DeathsPage() {
             <div className="card-elevated p-4">
               <div className="flex items-center gap-2 mb-1">
                 <div className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}><Skull className="w-3.5 h-3.5" /></div>
-                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Total Deaths</p>
+                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('deaths.statTotalDeaths')}</p>
               </div>
               <p className="text-2xl font-bold" style={{ color: 'var(--color-danger)' }}>{stats.total}</p>
             </div>
             <div className="card-elevated p-4">
               <div className="flex items-center gap-2 mb-1">
                 <div className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}><AlertTriangle className="w-3.5 h-3.5" /></div>
-                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Maternal Deaths</p>
+                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('deaths.statMaternalDeaths')}</p>
               </div>
               <p className="text-2xl font-bold" style={{ color: 'var(--color-danger)' }}>{stats.maternalDeaths}</p>
             </div>
             <div className="card-elevated p-4">
               <div className="flex items-center gap-2 mb-1">
                 <div className="icon-box-sm" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--color-warning)' }}><Baby className="w-3.5 h-3.5" /></div>
-                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Under-5 Deaths</p>
+                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('deaths.statUnder5Deaths')}</p>
               </div>
               <p className="text-2xl font-bold" style={{ color: 'var(--color-warning)' }}>{stats.under5Deaths}</p>
             </div>
             <div className="card-elevated p-4">
               <div className="flex items-center gap-2 mb-1">
                 <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)', color: 'var(--accent-primary)' }}><Hash className="w-3.5 h-3.5" /></div>
-                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>With ICD-11 Code</p>
+                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('deaths.statWithIcd11')}</p>
               </div>
               <p className="text-2xl font-bold" style={{ color: 'var(--accent-primary)' }}>{stats.withICD11Code}/{stats.total}</p>
             </div>
             <div className="card-elevated p-4">
               <div className="flex items-center gap-2 mb-1">
                 <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)', color: 'var(--accent-primary)' }}><ClipboardCheck className="w-3.5 h-3.5" /></div>
-                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Registered</p>
+                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('deaths.statRegistered')}</p>
               </div>
               <p className="text-2xl font-bold" style={{ color: 'var(--accent-primary)' }}>{stats.registered}/{stats.total}</p>
             </div>
@@ -179,7 +181,7 @@ export default function DeathsPage() {
           <div className="card-elevated p-4 mb-6">
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <div className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}><AlertTriangle className="w-3.5 h-3.5" /></div>
-              Top Causes of Death (ICD-11)
+              {t('deaths.topCauses')}
             </h3>
             <hr className="section-divider" />
             <div className="grid grid-cols-5 gap-2">
@@ -198,7 +200,7 @@ export default function DeathsPage() {
         <div className="flex items-center gap-3 mb-4">
           <div className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
             <Search className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input type="text" placeholder="Search by name, certificate, or ICD code..." value={search} onChange={e => setSearch(e.target.value)}
+            <input type="text" placeholder={t('deaths.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)}
               className="flex-1 bg-transparent text-sm outline-none" style={{ color: 'var(--text-primary)' }} />
           </div>
         </div>
@@ -208,14 +210,14 @@ export default function DeathsPage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Certificate #</th>
-                <th>Deceased</th>
-                <th>Age</th>
-                <th>Date of Death</th>
-                <th>Cause (ICD-11)</th>
-                <th>Manner</th>
-                <th>Facility</th>
-                <th>Registered</th>
+                <th>{t('deaths.colCertificate')}</th>
+                <th>{t('deaths.colDeceased')}</th>
+                <th>{t('deaths.colAge')}</th>
+                <th>{t('deaths.colDateOfDeath')}</th>
+                <th>{t('deaths.colCause')}</th>
+                <th>{t('deaths.colManner')}</th>
+                <th>{t('deaths.colFacility')}</th>
+                <th>{t('deaths.colRegistered')}</th>
               </tr>
             </thead>
             <tbody>
@@ -223,7 +225,7 @@ export default function DeathsPage() {
                 <tr key={d._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setExpandedDeath(expandedDeath === d._id ? null : d._id)}>
                   <td className="font-mono text-xs">{d.certificateNumber}</td>
                   <td className="font-medium text-sm">{d.deceasedFirstName} {d.deceasedSurname}</td>
-                  <td className="text-sm">{d.ageAtDeath < 1 ? 'Neonate' : `${d.ageAtDeath}y`}</td>
+                  <td className="text-sm">{d.ageAtDeath < 1 ? t('deaths.neonate') : `${d.ageAtDeath}y`}</td>
                   <td className="text-xs font-mono">{d.dateOfDeath}</td>
                   <td>
                     <div>
@@ -236,7 +238,7 @@ export default function DeathsPage() {
                   <td>
                     <div className="flex items-center gap-1">
                       <span className={`badge text-[10px] ${d.deathRegistered ? 'badge-normal' : 'badge-warning'}`}>
-                        {d.deathRegistered ? 'Yes' : 'No'}
+                        {d.deathRegistered ? t('deaths.yes') : t('deaths.no')}
                       </span>
                       {expandedDeath === d._id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     </div>
@@ -251,28 +253,28 @@ export default function DeathsPage() {
                     <td colSpan={8} style={{ background: 'var(--overlay-subtle)', padding: 0 }}>
                       <div className="p-4">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Full Name</span>{d.deceasedFirstName} {d.deceasedSurname}</div>
-                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Gender</span>{d.deceasedGender}</div>
-                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Date of Birth</span>{d.dateOfBirth || 'N/A'}</div>
-                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Place of Death</span>{d.placeOfDeath || d.facilityName}</div>
+                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>{t('deaths.fullName')}</span>{d.deceasedFirstName} {d.deceasedSurname}</div>
+                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>{t('deaths.gender')}</span>{d.deceasedGender}</div>
+                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>{t('deaths.dateOfBirth')}</span>{d.dateOfBirth || t('deaths.na')}</div>
+                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>{t('deaths.placeOfDeath')}</span>{d.placeOfDeath || d.facilityName}</div>
                         </div>
                         <hr className="section-divider" />
                         <div className="p-3 rounded-lg" style={{ background: 'rgba(229,46,66,0.06)', border: '1px solid rgba(229,46,66,0.15)' }}>
-                          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--color-danger)' }}>Cause of Death Chain (WHO)</p>
+                          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--color-danger)' }}>{t('deaths.causeChain')}</p>
                           <div className="data-row-divider-sm text-xs">
-                            <p><span className="font-medium">a) Immediate:</span> {d.immediateCause} {d.immediateICD11 && <span className="font-mono text-[10px] px-1 rounded" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>{d.immediateICD11}</span>}</p>
-                            {d.antecedentCause1 && <p><span className="font-medium">b) Due to:</span> {d.antecedentCause1} {d.antecedentICD11_1 && <span className="font-mono text-[10px] px-1 rounded" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>{d.antecedentICD11_1}</span>}</p>}
-                            {d.antecedentCause2 && <p><span className="font-medium">c) Due to:</span> {d.antecedentCause2} {d.antecedentICD11_2 && <span className="font-mono text-[10px] px-1 rounded" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>{d.antecedentICD11_2}</span>}</p>}
-                            {d.underlyingCause && <p><span className="font-medium">d) Underlying:</span> {d.underlyingCause} {d.underlyingICD11 && <span className="font-mono text-[10px] px-1 rounded" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>{d.underlyingICD11}</span>}</p>}
-                            {d.contributingConditions && <p><span className="font-medium">Contributing:</span> {d.contributingConditions}</p>}
+                            <p><span className="font-medium">{t('deaths.causeImmediate')}</span> {d.immediateCause} {d.immediateICD11 && <span className="font-mono text-[10px] px-1 rounded" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>{d.immediateICD11}</span>}</p>
+                            {d.antecedentCause1 && <p><span className="font-medium">{t('deaths.causeDueTo')}</span> {d.antecedentCause1} {d.antecedentICD11_1 && <span className="font-mono text-[10px] px-1 rounded" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>{d.antecedentICD11_1}</span>}</p>}
+                            {d.antecedentCause2 && <p><span className="font-medium">{t('deaths.causeDueToC')}</span> {d.antecedentCause2} {d.antecedentICD11_2 && <span className="font-mono text-[10px] px-1 rounded" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>{d.antecedentICD11_2}</span>}</p>}
+                            {d.underlyingCause && <p><span className="font-medium">{t('deaths.causeUnderlying')}</span> {d.underlyingCause} {d.underlyingICD11 && <span className="font-mono text-[10px] px-1 rounded" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>{d.underlyingICD11}</span>}</p>}
+                            {d.contributingConditions && <p><span className="font-medium">{t('deaths.causeContributing')}</span> {d.contributingConditions}</p>}
                           </div>
                         </div>
                         <hr className="section-divider" />
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Manner</span><span className="capitalize">{(d.mannerOfDeath || '').replace(/_/g, ' ')}</span></div>
-                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Maternal Death</span>{d.maternalDeath ? 'Yes' : 'No'}</div>
-                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Certified By</span>{d.certifiedBy || 'N/A'} ({d.certifierRole || 'N/A'})</div>
-                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>Location</span>{d.county || 'N/A'}, {d.state}</div>
+                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>{t('deaths.colManner')}</span><span className="capitalize">{(d.mannerOfDeath || '').replace(/_/g, ' ')}</span></div>
+                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>{t('deaths.maternalDeath')}</span>{d.maternalDeath ? t('deaths.yes') : t('deaths.no')}</div>
+                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>{t('deaths.certifiedBy')}</span>{d.certifiedBy || t('deaths.na')} ({d.certifierRole || t('deaths.na')})</div>
+                          <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>{t('deaths.location')}</span>{d.county || t('deaths.na')}, {d.state}</div>
                         </div>
                       </div>
                     </td>
@@ -288,7 +290,7 @@ export default function DeathsPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
             <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="flex items-center gap-2"><FileText className="w-5 h-5" style={{ color: 'var(--color-danger)' }} /><h2 className="font-semibold">WHO Medical Certificate of Cause of Death</h2></div>
+                <div className="flex items-center gap-2"><FileText className="w-5 h-5" style={{ color: 'var(--color-danger)' }} /><h2 className="font-semibold">{t('deaths.modalTitle')}</h2></div>
                 <button onClick={() => setShowForm(false)}><X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} /></button>
               </div>
               <div className="p-4 space-y-4">
@@ -296,7 +298,7 @@ export default function DeathsPage() {
                 <div className="rounded-lg p-3" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(43,111,224,0.2))' }}>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--accent-primary)' }}>
                     <UserCheck className="w-3 h-3" />
-                    Link to existing patient (optional, but recommended)
+                    {t('deaths.linkPatient')}
                   </label>
                   {linkedPatientId ? (
                     (() => {
@@ -307,7 +309,7 @@ export default function DeathsPage() {
                             <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{lp?.firstName} {lp?.surname}</p>
                             <p style={{ color: 'var(--text-muted)' }}>{lp?.hospitalNumber} · {lp?.gender}{lp?.estimatedAge ? ` · ${lp.estimatedAge}y` : ''}</p>
                           </div>
-                          <button onClick={() => { setLinkedPatientId(undefined); }} className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>Unlink</button>
+                          <button onClick={() => { setLinkedPatientId(undefined); }} className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('deaths.unlink')}</button>
                         </div>
                       );
                     })()
@@ -319,7 +321,7 @@ export default function DeathsPage() {
                           type="text"
                           value={patientLookup}
                           onChange={e => setPatientLookup(e.target.value)}
-                          placeholder="Search patient by name or hospital number…"
+                          placeholder={t('deaths.searchPatientPlaceholder')}
                           className="w-full text-xs p-2 pl-8 rounded-lg outline-none"
                           style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                         />
@@ -340,58 +342,58 @@ export default function DeathsPage() {
                         </div>
                       )}
                       <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
-                        Linking will mark the patient as deceased and auto-fill their details below.
+                        {t('deaths.linkHint')}
                       </p>
                     </>
                   )}
                 </div>
 
                 <hr className="section-divider" />
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Deceased Information</h3>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('deaths.deceasedInfo')}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>First Name *</label><input type="text" value={form.deceasedFirstName} onChange={e => setForm({ ...form, deceasedFirstName: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
-                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Surname</label><input type="text" value={form.deceasedSurname} onChange={e => setForm({ ...form, deceasedSurname: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
-                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Gender</label><select value={form.deceasedGender} onChange={e => setForm({ ...form, deceasedGender: e.target.value as 'Male' | 'Female' })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}><option value="Male">Male</option><option value="Female">Female</option></select></div>
-                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Date of Death</label><input type="date" value={form.dateOfDeath} onChange={e => setForm({ ...form, dateOfDeath: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
-                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Age at Death</label><input type="number" value={form.ageAtDeath} onChange={e => setForm({ ...form, ageAtDeath: Number(e.target.value) })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
-                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Manner of Death</label><select value={form.mannerOfDeath} onChange={e => setForm({ ...form, mannerOfDeath: e.target.value as typeof form.mannerOfDeath })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}><option value="natural">Natural</option><option value="accident">Accident</option><option value="intentional_self_harm">Intentional self-harm</option><option value="assault">Assault</option><option value="pending_investigation">Pending investigation</option><option value="unknown">Unknown</option></select></div>
+                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.firstNameRequired')}</label><input type="text" value={form.deceasedFirstName} onChange={e => setForm({ ...form, deceasedFirstName: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
+                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.surname')}</label><input type="text" value={form.deceasedSurname} onChange={e => setForm({ ...form, deceasedSurname: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
+                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.gender')}</label><select value={form.deceasedGender} onChange={e => setForm({ ...form, deceasedGender: e.target.value as 'Male' | 'Female' })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}><option value="Male">{t('deaths.male')}</option><option value="Female">{t('deaths.female')}</option></select></div>
+                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.colDateOfDeath')}</label><input type="date" value={form.dateOfDeath} onChange={e => setForm({ ...form, dateOfDeath: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
+                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.ageAtDeath')}</label><input type="number" value={form.ageAtDeath} onChange={e => setForm({ ...form, ageAtDeath: Number(e.target.value) })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
+                  <div><label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.mannerOfDeath')}</label><select value={form.mannerOfDeath} onChange={e => setForm({ ...form, mannerOfDeath: e.target.value as typeof form.mannerOfDeath })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}><option value="natural">{t('deaths.mannerNatural')}</option><option value="accident">{t('deaths.mannerAccident')}</option><option value="intentional_self_harm">{t('deaths.mannerSelfHarm')}</option><option value="assault">{t('deaths.mannerAssault')}</option><option value="pending_investigation">{t('deaths.mannerPending')}</option><option value="unknown">{t('deaths.mannerUnknown')}</option></select></div>
                 </div>
 
                 <hr className="section-divider" />
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Cause of Death Chain (WHO Format)</h3>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('deaths.causeChainWhoFormat')}</h3>
                 <div className="p-3 rounded-lg space-y-3" style={{ background: 'rgba(229,46,66,0.05)', border: '1px solid rgba(229,46,66,0.15)' }}>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Line a: Immediate cause *</label><input type="text" value={form.immediateCause} onChange={e => setForm({ ...form, immediateCause: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} placeholder="Disease or condition directly leading to death" /></div>
-                    <ICD11Select value={form.immediateICD11} onChange={v => setForm({ ...form, immediateICD11: v })} label="ICD-11 Code (Line a)" />
+                    <div><label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.lineAImmediate')}</label><input type="text" value={form.immediateCause} onChange={e => setForm({ ...form, immediateCause: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} placeholder={t('deaths.lineAImmediatePlaceholder')} /></div>
+                    <ICD11Select value={form.immediateICD11} onChange={v => setForm({ ...form, immediateICD11: v })} label={t('deaths.icd11LineA')} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Line b: Due to (or as consequence of)</label><input type="text" value={form.antecedentCause1} onChange={e => setForm({ ...form, antecedentCause1: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
-                    <ICD11Select value={form.antecedentICD11_1} onChange={v => setForm({ ...form, antecedentICD11_1: v })} label="ICD-11 Code (Line b)" />
+                    <div><label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.lineBDueTo')}</label><input type="text" value={form.antecedentCause1} onChange={e => setForm({ ...form, antecedentCause1: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
+                    <ICD11Select value={form.antecedentICD11_1} onChange={v => setForm({ ...form, antecedentICD11_1: v })} label={t('deaths.icd11LineB')} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Line c: Due to (or as consequence of)</label><input type="text" value={form.antecedentCause2} onChange={e => setForm({ ...form, antecedentCause2: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
-                    <ICD11Select value={form.antecedentICD11_2} onChange={v => setForm({ ...form, antecedentICD11_2: v })} label="ICD-11 Code (Line c)" />
+                    <div><label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.lineCDueTo')}</label><input type="text" value={form.antecedentCause2} onChange={e => setForm({ ...form, antecedentCause2: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
+                    <ICD11Select value={form.antecedentICD11_2} onChange={v => setForm({ ...form, antecedentICD11_2: v })} label={t('deaths.icd11LineC')} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Line d: Underlying cause</label><input type="text" value={form.underlyingCause} onChange={e => setForm({ ...form, underlyingCause: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
-                    <ICD11Select value={form.underlyingICD11} onChange={v => setForm({ ...form, underlyingICD11: v })} label="ICD-11 Code (Line d)" />
+                    <div><label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.lineDUnderlying')}</label><input type="text" value={form.underlyingCause} onChange={e => setForm({ ...form, underlyingCause: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
+                    <ICD11Select value={form.underlyingICD11} onChange={v => setForm({ ...form, underlyingICD11: v })} label={t('deaths.icd11LineD')} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Contributing conditions</label><input type="text" value={form.contributingConditions} onChange={e => setForm({ ...form, contributingConditions: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
-                    <ICD11Select value={form.contributingICD11} onChange={v => setForm({ ...form, contributingICD11: v })} label="ICD-11 Code (Contributing)" />
+                    <div><label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('deaths.contributingConditions')}</label><input type="text" value={form.contributingConditions} onChange={e => setForm({ ...form, contributingConditions: e.target.value })} className="w-full p-2 rounded-lg text-sm outline-none" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }} /></div>
+                    <ICD11Select value={form.contributingICD11} onChange={v => setForm({ ...form, contributingICD11: v })} label={t('deaths.icd11Contributing')} />
                   </div>
                 </div>
 
                 <div className="flex items-center gap-6 pt-2">
-                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.maternalDeath} onChange={e => setForm({ ...form, maternalDeath: e.target.checked })} /> Maternal death</label>
-                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.pregnancyRelated} onChange={e => setForm({ ...form, pregnancyRelated: e.target.checked })} /> Pregnancy-related</label>
-                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deathNotified} onChange={e => setForm({ ...form, deathNotified: e.target.checked })} /> Death notified</label>
-                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deathRegistered} onChange={e => setForm({ ...form, deathRegistered: e.target.checked })} /> Death registered</label>
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.maternalDeath} onChange={e => setForm({ ...form, maternalDeath: e.target.checked })} /> {t('deaths.maternalDeathCheckbox')}</label>
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.pregnancyRelated} onChange={e => setForm({ ...form, pregnancyRelated: e.target.checked })} /> {t('deaths.pregnancyRelated')}</label>
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deathNotified} onChange={e => setForm({ ...form, deathNotified: e.target.checked })} /> {t('deaths.deathNotified')}</label>
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deathRegistered} onChange={e => setForm({ ...form, deathRegistered: e.target.checked })} /> {t('deaths.deathRegistered')}</label>
                 </div>
               </div>
               <div className="flex justify-end gap-3 p-4 border-t" style={{ borderColor: 'var(--border-light)' }}>
-                <button onClick={() => setShowForm(false)} className="btn btn-secondary btn-sm">Cancel</button>
-                <button onClick={handleSubmit} className="btn btn-primary btn-sm" style={{ opacity: !form.deceasedFirstName || !form.immediateCause ? 0.5 : 1 }}>Register Death</button>
+                <button onClick={() => setShowForm(false)} className="btn btn-secondary btn-sm">{t('action.cancel')}</button>
+                <button onClick={handleSubmit} className="btn btn-primary btn-sm" style={{ opacity: !form.deceasedFirstName || !form.immediateCause ? 0.5 : 1 }}>{t('deaths.registerDeath')}</button>
               </div>
             </div>
           </div>

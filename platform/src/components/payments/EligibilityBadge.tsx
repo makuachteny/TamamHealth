@@ -1,6 +1,7 @@
 'use client';
 
 import { Shield, ShieldAlert, ShieldOff, ShieldQuestion, ShieldCheck } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface EligibilityBadgeProps {
   status: 'verified' | 'unverified' | 'expired' | 'denied' | 'cached' | 'none';
@@ -8,15 +9,16 @@ interface EligibilityBadgeProps {
 }
 
 const statusConfig = {
-  verified:   { label: 'Verified',   color: 'var(--success)',  icon: ShieldCheck },
-  cached:     { label: 'Cached',     color: 'var(--success)',  icon: ShieldCheck },
-  unverified: { label: 'Unverified', color: 'var(--warning)',  icon: ShieldQuestion },
-  expired:    { label: 'Expired',    color: 'var(--error)',    icon: ShieldAlert },
-  denied:     { label: 'Denied',     color: 'var(--error)',    icon: ShieldOff },
-  none:       { label: 'No Insurance', color: 'var(--text-muted)', icon: Shield },
+  verified:   { labelKey: 'eligibility.verified',    color: 'var(--success)',  icon: ShieldCheck },
+  cached:     { labelKey: 'eligibility.cached',      color: 'var(--success)',  icon: ShieldCheck },
+  unverified: { labelKey: 'eligibility.unverified',  color: 'var(--warning)',  icon: ShieldQuestion },
+  expired:    { labelKey: 'eligibility.expired',     color: 'var(--error)',    icon: ShieldAlert },
+  denied:     { labelKey: 'eligibility.denied',      color: 'var(--error)',    icon: ShieldOff },
+  none:       { labelKey: 'eligibility.noInsurance', color: 'var(--text-muted)', icon: Shield },
 };
 
 export default function EligibilityBadge({ status, compact }: EligibilityBadgeProps) {
+  const { t } = useTranslation();
   const config = statusConfig[status] || statusConfig.none;
   const Icon = config.icon;
 
@@ -32,7 +34,7 @@ export default function EligibilityBadge({ status, compact }: EligibilityBadgePr
       whiteSpace: 'nowrap',
     }}>
       <Icon size={compact ? 12 : 14} />
-      {!compact && config.label}
+      {!compact && t(config.labelKey)}
     </span>
   );
 }

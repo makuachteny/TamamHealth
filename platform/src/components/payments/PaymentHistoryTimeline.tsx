@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowUpRight, ArrowDownLeft } from '@/components/icons/lucide';
 import { getMethodConfig } from '@/lib/payment-method-config';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface PaymentHistoryTimelineProps {
   patientId: string;
@@ -22,6 +23,7 @@ interface LedgerEntry {
 
 
 export default function PaymentHistoryTimeline({ patientId, limit = 20 }: PaymentHistoryTimelineProps) {
+  const { t } = useTranslation();
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,8 +38,8 @@ export default function PaymentHistoryTimeline({ patientId, limit = 20 }: Paymen
     })();
   }, [patientId, limit]);
 
-  if (loading) return <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>Loading history...</div>;
-  if (entries.length === 0) return <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>No financial history yet.</div>;
+  if (loading) return <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>{t('payments.loadingHistory')}</div>;
+  if (entries.length === 0) return <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>{t('payments.noFinancialHistory')}</div>;
 
   return (
     <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -62,14 +64,14 @@ export default function PaymentHistoryTimeline({ patientId, limit = 20 }: Paymen
               <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.4 }}>
                 {entry.description}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{dateStr} at {timeStr}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('payments.dateAtTime', { date: dateStr, time: timeStr })}</div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color }}>
                 {isCredit ? '-' : '+'}{Math.abs(entry.amount).toLocaleString()} {entry.currency}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                Bal: {entry.runningBalance.toLocaleString()}
+                {t('payments.balanceShort', { amount: entry.runningBalance.toLocaleString() })}
               </div>
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, createContext, useContext, ReactNode } from 'react';
 import { CheckCircle2, AlertTriangle, X } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface Toast {
   id: number;
@@ -18,6 +19,7 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 let toastId = 0;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
@@ -38,7 +40,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Toast container */}
       <div
         role="region"
-        aria-label="Notifications"
+        aria-label={t('common.notifications')}
         aria-live="polite"
         aria-atomic="false"
         className="fixed top-4 right-4 z-[9999] flex flex-col gap-2"
@@ -64,7 +66,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <p className="text-sm font-medium flex-1">{toast.message}</p>
             <button
               onClick={() => removeToast(toast.id)}
-              aria-label="Dismiss notification"
+              aria-label={t('common.dismissNotification')}
               className="p-1.5 rounded hover:bg-white/20 transition-colors flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <X className="w-3.5 h-3.5" />

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Palette, Save, Upload, X, Eye, RotateCcw, Building2, Users,
   LayoutDashboard, BarChart3, Settings, MessageSquare,
@@ -12,6 +13,7 @@ import type { OrganizationDoc } from '@/lib/db-types';
 
 export default function OrgBrandingPage() {
   const { currentUser } = useApp();
+  const { t } = useTranslation();
   const [org, setOrg] = useState<OrganizationDoc | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,7 +56,7 @@ export default function OrgBrandingPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 512000) {
-      setError('Logo must be under 500KB.');
+      setError(t('branding.errorLogoSize'));
       setTimeout(() => setError(''), 4000);
       return;
     }
@@ -68,7 +70,7 @@ export default function OrgBrandingPage() {
   const handleSave = async () => {
     if (!org || !currentUser?.orgId) return;
     if (!orgName.trim()) {
-      setError('Organization name is required.');
+      setError(t('branding.errorNameRequired'));
       setTimeout(() => setError(''), 4000);
       return;
     }
@@ -103,11 +105,11 @@ export default function OrgBrandingPage() {
         document.documentElement.style.setProperty(key, value);
       }
 
-      setSuccess('Branding saved successfully. Changes applied.');
+      setSuccess(t('branding.savedSuccess'));
       setTimeout(() => setSuccess(''), 4000);
     } catch (err: unknown) {
       const e = err as Error;
-      setError(e.message || 'Failed to save branding.');
+      setError(e.message || t('branding.errorSave'));
       setTimeout(() => setError(''), 4000);
     } finally {
       setSaving(false);
@@ -125,19 +127,19 @@ export default function OrgBrandingPage() {
 
   // Sidebar preview nav items
   const previewNav = [
-    { icon: LayoutDashboard, label: 'Dashboard' },
-    { icon: Users, label: 'Users' },
-    { icon: Building2, label: 'Facilities' },
-    { icon: Palette, label: 'Branding', active: true },
-    { icon: BarChart3, label: 'Analytics' },
-    { icon: Settings, label: 'Settings' },
-    { icon: MessageSquare, label: 'Messages' },
+    { icon: LayoutDashboard, key: 'dashboard', label: t('nav.dashboard') },
+    { icon: Users, key: 'users', label: t('breadcrumb.users') },
+    { icon: Building2, key: 'facilities', label: t('government.colFacilities') },
+    { icon: Palette, key: 'branding', label: t('branding.title'), active: true },
+    { icon: BarChart3, key: 'analytics', label: t('branding.navAnalytics') },
+    { icon: Settings, key: 'settings', label: t('nav.settings') },
+    { icon: MessageSquare, key: 'messages', label: t('breadcrumb.messages') },
   ];
 
   if (loading) {
     return (
       <div className="flex-1 flex flex-col">
-        <TopBar title="Branding" />
+        <TopBar title={t('branding.title')} />
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
         </div>
@@ -164,8 +166,8 @@ export default function OrgBrandingPage() {
 
         <PageHeader
           icon={Palette}
-          title="Brand Identity"
-          subtitle="Customize your organization's appearance"
+          title={t('branding.heading')}
+          subtitle={t('branding.subtitle')}
           actions={
             <>
               <button
@@ -174,7 +176,7 @@ export default function OrgBrandingPage() {
                 style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
               >
                 <RotateCcw className="w-4 h-4" />
-                Reset
+                {t('branding.reset')}
               </button>
               <button
                 onClick={handleSave}
@@ -187,7 +189,7 @@ export default function OrgBrandingPage() {
                 ) : (
                   <Save className="w-4 h-4" />
                 )}
-                Save Changes
+                {t('appointments.saveChanges')}
               </button>
             </>
           }
@@ -199,7 +201,7 @@ export default function OrgBrandingPage() {
             {/* Organization Name */}
             <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
               <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                Organization Name
+                {t('branding.orgName')}
               </label>
               <input
                 type="text"
@@ -213,7 +215,7 @@ export default function OrgBrandingPage() {
             {/* Logo */}
             <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
               <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                Logo
+                {t('branding.logo')}
               </label>
               <div className="flex items-center gap-4">
                 {logoUrl ? (
@@ -221,7 +223,7 @@ export default function OrgBrandingPage() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={logoUrl}
-                      alt="Logo"
+                      alt={t('branding.logo')}
                       className="w-16 h-16 rounded-lg object-cover"
                       style={{ border: '2px solid var(--border-light)' }}
                     />
@@ -247,7 +249,7 @@ export default function OrgBrandingPage() {
                     style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    Upload Logo
+                    {t('branding.uploadLogo')}
                     <input
                       type="file"
                       accept="image/*"
@@ -256,7 +258,7 @@ export default function OrgBrandingPage() {
                     />
                   </label>
                   <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                    PNG, JPG up to 500KB. Stored as data URL.
+                    {t('branding.logoHint')}
                   </p>
                 </div>
               </div>
@@ -264,12 +266,12 @@ export default function OrgBrandingPage() {
 
             {/* Color Pickers */}
             <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Brand Colors</h3>
+              <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>{t('branding.brandColors')}</h3>
               <div className="space-y-4">
                 {/* Primary */}
                 <div>
                   <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                    Primary Color
+                    {t('branding.primaryColor')}
                   </label>
                   <div className="flex items-center gap-3">
                     <input
@@ -293,7 +295,7 @@ export default function OrgBrandingPage() {
                 {/* Secondary */}
                 <div>
                   <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                    Secondary Color
+                    {t('branding.secondaryColor')}
                   </label>
                   <div className="flex items-center gap-3">
                     <input
@@ -317,7 +319,7 @@ export default function OrgBrandingPage() {
                 {/* Accent */}
                 <div>
                   <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                    Accent Color
+                    {t('branding.accentColor')}
                   </label>
                   <div className="flex items-center gap-3">
                     <input
@@ -346,7 +348,7 @@ export default function OrgBrandingPage() {
             <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2 mb-4">
                 <Eye className="w-4 h-4" style={{ color: brandColor }} />
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Live Preview</h3>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('branding.livePreview')}</h3>
               </div>
 
               {/* Simulated sidebar + header */}
@@ -364,7 +366,7 @@ export default function OrgBrandingPage() {
                           {(orgName || 'O')[0]}
                         </div>
                       )}
-                      <span className="text-sm font-bold text-white truncate">{orgName || 'Organization'}</span>
+                      <span className="text-sm font-bold text-white truncate">{orgName || t('branding.organization')}</span>
                     </div>
 
                     {/* Nav items */}
@@ -373,7 +375,7 @@ export default function OrgBrandingPage() {
                         const Icon = item.icon;
                         return (
                           <div
-                            key={item.label}
+                            key={item.key}
                             className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
                             style={{
                               background: item.active ? `${primaryColor}20` : 'transparent',
@@ -395,8 +397,8 @@ export default function OrgBrandingPage() {
                           OA
                         </div>
                         <div className="text-[10px]">
-                          <p className="text-white/80 font-medium truncate">Org Admin</p>
-                          <p className="text-white/40">admin</p>
+                          <p className="text-white/80 font-medium truncate">{t('branding.orgAdmin')}</p>
+                          <p className="text-white/40">{t('branding.adminRole')}</p>
                         </div>
                       </div>
                     </div>
@@ -406,7 +408,7 @@ export default function OrgBrandingPage() {
                   <div className="flex-1 flex flex-col">
                     {/* Top bar preview */}
                     <div className="h-[40px] flex items-center px-4" style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)' }}>
-                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Organization Dashboard</span>
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('branding.orgDashboard')}</span>
                       <div className="ml-auto flex items-center gap-2">
                         <div className="w-4 h-4 rounded" style={{ background: primaryColor, opacity: 0.3 }} />
                         <div className="w-4 h-4 rounded" style={{ background: secondaryColor, opacity: 0.3 }} />
@@ -423,46 +425,46 @@ export default function OrgBrandingPage() {
                             <Users className="w-3 h-3" style={{ color: primaryColor }} />
                           </div>
                           <p className="text-[10px] font-bold" style={{ color: 'var(--text-primary)' }}>24</p>
-                          <p className="text-[8px]" style={{ color: 'var(--text-muted)' }}>Users</p>
+                          <p className="text-[8px]" style={{ color: 'var(--text-muted)' }}>{t('breadcrumb.users')}</p>
                         </div>
                         <div className="p-2 rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
                           <div className="w-5 h-5 rounded mb-1 flex items-center justify-center" style={{ background: `${secondaryColor}20` }}>
                             <Building2 className="w-3 h-3" style={{ color: secondaryColor }} />
                           </div>
                           <p className="text-[10px] font-bold" style={{ color: 'var(--text-primary)' }}>5</p>
-                          <p className="text-[8px]" style={{ color: 'var(--text-muted)' }}>Hospitals</p>
+                          <p className="text-[8px]" style={{ color: 'var(--text-muted)' }}>{t('government.kpiHospitals')}</p>
                         </div>
                         <div className="p-2 rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
                           <div className="w-5 h-5 rounded mb-1 flex items-center justify-center" style={{ background: `${accentColor}20` }}>
                             <BarChart3 className="w-3 h-3" style={{ color: accentColor }} />
                           </div>
                           <p className="text-[10px] font-bold" style={{ color: 'var(--text-primary)' }}>1.2k</p>
-                          <p className="text-[8px]" style={{ color: 'var(--text-muted)' }}>Patients</p>
+                          <p className="text-[8px]" style={{ color: 'var(--text-muted)' }}>{t('breadcrumb.patients')}</p>
                         </div>
                       </div>
 
                       {/* Color swatches */}
                       <div className="p-2 rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-                        <p className="text-[9px] mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>COLOR PALETTE</p>
+                        <p className="text-[9px] mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>{t('branding.colorPalette')}</p>
                         <div className="flex gap-2">
                           <div className="flex-1 h-8 rounded-md" style={{ background: primaryColor }} />
                           <div className="flex-1 h-8 rounded-md" style={{ background: secondaryColor }} />
                           <div className="flex-1 h-8 rounded-md" style={{ background: accentColor }} />
                         </div>
                         <div className="flex gap-2 mt-1">
-                          <p className="flex-1 text-center text-[8px]" style={{ color: 'var(--text-muted)' }}>Primary</p>
-                          <p className="flex-1 text-center text-[8px]" style={{ color: 'var(--text-muted)' }}>Secondary</p>
-                          <p className="flex-1 text-center text-[8px]" style={{ color: 'var(--text-muted)' }}>Accent</p>
+                          <p className="flex-1 text-center text-[8px]" style={{ color: 'var(--text-muted)' }}>{t('consultation.diagPrimary')}</p>
+                          <p className="flex-1 text-center text-[8px]" style={{ color: 'var(--text-muted)' }}>{t('consultation.diagSecondary')}</p>
+                          <p className="flex-1 text-center text-[8px]" style={{ color: 'var(--text-muted)' }}>{t('branding.accent')}</p>
                         </div>
                       </div>
 
                       {/* Button preview */}
                       <div className="flex gap-2">
                         <div className="px-3 py-1.5 rounded-md text-[9px] text-white font-medium" style={{ background: primaryColor }}>
-                          Primary Button
+                          {t('branding.primaryButton')}
                         </div>
                         <div className="px-3 py-1.5 rounded-md text-[9px] font-medium" style={{ background: `${secondaryColor}15`, color: secondaryColor, border: `1px solid ${secondaryColor}30` }}>
-                          Secondary
+                          {t('consultation.diagSecondary')}
                         </div>
                       </div>
                     </div>

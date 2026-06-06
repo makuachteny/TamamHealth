@@ -1,0 +1,111 @@
+/**
+ * API: POST /api/auth/change-password
+ *
+ * Self-service password change for the signed-in user. Serves two cases:
+ *   1. First-login forced change (UserDoc.mustChangePassword === true) — the
+ *      user signs in with the admin's temporary password and must replace it.
+ *   2. Ordinary "change my password" from account settings.
+ *
+ * Verifies the current password, writes the new hash, clears the forced-change
+ * flag, and re-issues the session JWT so the flag clears without a re-login.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuthPayload, unauthorized, serverError, logApiError } from '@/lib/api-auth';
+import { createToken } from '@/lib/auth-token';
+import { CSRF_COOKIE_NAME, mintCsrfToken } from '@/lib/csrf';
+
+const MIN_PASSWORD_LENGTH = 8;
+
+export async function POST(request: NextRequest) {
+  try {
+    const { checkRateLimit } = await import('@/lib/api-security');
+    const rateLimited = checkRateLimit(request, 'auth:change-password', 10);
+    if (rateLimited) return rateLimited;
+
+    const auth = await getAuthPayload(request);
+    if (!auth) return unauthorized();
+
+    let body: { currentPassword?: string; newPassword?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
+    const currentPassword = (body.currentPassword || '').trim();
+    const newPassword = (body.newPassword || '').trim();
+
+    if (!currentPassword || !newPassword) {
+      return NextResponse.json(
+        { error: 'currentPassword and newPassword are required' },
+        { status: 400 }
+      );
+    }
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      return NextResponse.json(
+        { error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters` },
+        { status: 400 }
+      );
+    }
+    if (newPassword === currentPassword) {
+      return NextResponse.json(
+        { error: 'New password must be different from your current password' },
+        { status: 400 }
+      );
+    }
+
+    const { changeOwnPassword } = await import('@/lib/services/user-service');
+    try {
+      await changeOwnPassword(auth.sub, currentPassword, newPassword);
+    } catch (err) {
+      if (err instanceof Error && /current password is incorrect/i.test(err.message)) {
+        return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 });
+      }
+      // No user document (e.g. a seed-only demo account) — can't self-change.
+      if (err instanceof Error && /missing|not_found|404/i.test(err.message)) {
+        return NextResponse.json(
+          { error: 'Password change is not available for this account' },
+          { status: 400 }
+        );
+      }
+      throw err;
+    }
+
+    // Re-issue the session JWT without the forced-change flag so the gate
+    // clears immediately, no re-login required.
+    const token = await createToken({
+      _id: auth.sub,
+      username: auth.username,
+      role: auth.role,
+      name: auth.name,
+      hospitalId: auth.hospitalId,
+      orgId: auth.orgId,
+      countryId: auth.countryId,
+      payam: auth.payam,
+      county: auth.county,
+      state: auth.state,
+      mustChangePassword: false,
+    });
+
+    const response = NextResponse.json({ success: true });
+    response.cookies.set('tamamhealth-token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 60 * 60 * 8,
+      path: '/',
+    });
+    const csrfToken = await mintCsrfToken(auth.sub);
+    response.cookies.set(CSRF_COOKIE_NAME, csrfToken, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 60 * 60 * 8,
+      path: '/',
+    });
+    return response;
+  } catch (err) {
+    logApiError('[API /auth/change-password POST]', err);
+    return serverError();
+  }
+}

@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
       'The TamamHealth Team',
     ].join('\n');
     const welcomeHtml = `
-      <h2 style="color: #2D9B6A;">Welcome to TamamHealth Health!</h2>
+      <h2 style="color: #3B82F6;">Welcome to TamamHealth Health!</h2>
       <p>Thanks for subscribing to our newsletter. You'll receive updates about our platform, healthcare technology insights, and news from our team.</p>
       <p>Best regards,<br/>The TamamHealth Team</p>
     `;

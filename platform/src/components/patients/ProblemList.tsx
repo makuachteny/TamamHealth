@@ -18,6 +18,7 @@ import { useApp } from '@/lib/context';
 import { useProblems } from '@/lib/hooks/useProblems';
 import { useToast } from '@/components/Toast';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { ProblemStatus, ProblemDoc } from '@/lib/db-types';
 
 interface ProblemListProps {
@@ -39,6 +40,7 @@ function ProblemRow({
   onResolve?: (id: string) => void;
   onReactivate?: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const tint = STATUS_TINT[problem.status];
   return (
     <li
@@ -60,7 +62,7 @@ function ProblemRow({
             className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
             style={{ background: tint.bg, color: tint.color, letterSpacing: '0.06em' }}
           >
-            {tint.label}
+            {t(`problemList.status_${problem.status}`)}
           </span>
           {problem.icd11Code && (
             <span
@@ -73,9 +75,9 @@ function ProblemRow({
         </div>
         {(problem.onsetDate || problem.notes || problem.recordedByName) && (
           <div className="mt-1 text-[12px] leading-snug" style={{ color: 'var(--text-muted)' }}>
-            {problem.onsetDate && <span>Onset {problem.onsetDate}</span>}
+            {problem.onsetDate && <span>{t('problemList.onsetPrefix', { date: problem.onsetDate })}</span>}
             {problem.onsetDate && problem.recordedByName && <span> · </span>}
-            {problem.recordedByName && <span>by {problem.recordedByName}</span>}
+            {problem.recordedByName && <span>{t('problemList.byPrefix', { name: problem.recordedByName })}</span>}
             {problem.notes && (
               <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>{problem.notes}</p>
             )}
@@ -83,7 +85,7 @@ function ProblemRow({
         )}
         {problem.resolvedDate && (
           <div className="mt-1 text-[11px]" style={{ color: '#047857' }}>
-            Resolved {problem.resolvedDate}
+            {t('problemList.resolvedPrefix', { date: problem.resolvedDate })}
           </div>
         )}
       </div>
@@ -93,7 +95,7 @@ function ProblemRow({
           className="text-xs font-bold inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-emerald-50 transition"
           style={{ color: '#047857' }}
         >
-          <CheckCircle2 className="w-3.5 h-3.5" /> Resolve
+          <CheckCircle2 className="w-3.5 h-3.5" /> {t('problemList.resolve')}
         </button>
       )}
       {onReactivate && (
@@ -102,7 +104,7 @@ function ProblemRow({
           className="text-xs font-medium hover:underline"
           style={{ color: 'var(--text-muted)' }}
         >
-          Reactivate
+          {t('problemList.reactivate')}
         </button>
       )}
     </li>
@@ -110,6 +112,7 @@ function ProblemRow({
 }
 
 export default function ProblemList({ patientId, patientName }: ProblemListProps) {
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const { active, resolved, problems, create, setStatus, loading } = useProblems(patientId);
   const { showToast } = useToast();
@@ -143,7 +146,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
 
   const handleSubmit = async () => {
     if (!pickedCode) {
-      showToast('Pick an ICD-11 code first', 'error');
+      showToast(t('problemList.toastPickCode'), 'error');
       return;
     }
     try {
@@ -162,11 +165,11 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
         hospitalName: currentUser?.hospitalName,
         orgId: currentUser?.orgId,
       });
-      showToast('Problem added to list', 'success');
+      showToast(t('problemList.toastAdded'), 'success');
       reset();
     } catch (err) {
       console.error(err);
-      showToast('Failed to add problem', 'error');
+      showToast(t('problemList.toastAddFailed'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -175,18 +178,18 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
   const handleResolve = async (id: string) => {
     try {
       await setStatus(id, 'resolved');
-      showToast('Problem resolved', 'success');
+      showToast(t('problemList.toastResolved'), 'success');
     } catch {
-      showToast('Failed to update', 'error');
+      showToast(t('problemList.toastUpdateFailed'), 'error');
     }
   };
 
   const handleReactivate = async (id: string) => {
     try {
       await setStatus(id, 'active');
-      showToast('Problem reactivated', 'success');
+      showToast(t('problemList.toastReactivated'), 'success');
     } catch {
-      showToast('Failed to update', 'error');
+      showToast(t('problemList.toastUpdateFailed'), 'error');
     }
   };
 
@@ -199,15 +202,15 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
             <Activity className="w-5 h-5" style={{ color: '#7C3AED' }} />
           </div>
           <div>
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Problem List</h2>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{t('problemList.title')}</h2>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Longitudinal record. Anything here surfaces in the Storyboard sidebar and SBAR handoff.
+              {t('problemList.subtitle')}
             </p>
           </div>
         </div>
         {!adding && (
           <button onClick={() => setAdding(true)} className="btn btn-primary inline-flex items-center gap-1.5">
-            <Plus className="w-4 h-4" /> Add problem
+            <Plus className="w-4 h-4" /> {t('problemList.addProblem')}
           </button>
         )}
       </div>
@@ -223,9 +226,9 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
               <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
                 <Plus className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
               </div>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>New problem</h3>
+              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('problemList.newProblem')}</h3>
             </div>
-            <button onClick={reset} aria-label="Cancel" className="p-1 rounded hover:bg-gray-100">
+            <button onClick={reset} aria-label={t('action.cancel')} className="p-1 rounded hover:bg-gray-100">
               <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             </button>
           </header>
@@ -251,7 +254,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
                   className="text-xs font-semibold underline shrink-0"
                   style={{ color: 'var(--accent-primary)' }}
                 >
-                  Change
+                  {t('consultation.change')}
                 </button>
               </div>
             ) : (
@@ -259,7 +262,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
                 <label className="block text-xs font-bold uppercase mb-1.5" style={{
                   color: 'var(--text-muted)', letterSpacing: '0.06em',
                 }}>
-                  Diagnosis
+                  {t('problemList.diagnosis')}
                 </label>
                 <div className="relative">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
@@ -269,7 +272,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full"
                     style={{ paddingLeft: 36 }}
-                    placeholder="Search ICD-11 (e.g. malaria, tuberculosis, hypertension)"
+                    placeholder={t('problemList.searchPlaceholder')}
                     autoFocus
                   />
                 </div>
@@ -304,7 +307,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
               <div>
                 <label className="block text-xs font-bold uppercase mb-1.5" style={{
                   color: 'var(--text-muted)', letterSpacing: '0.06em',
-                }}>Status</label>
+                }}>{t('problemList.status')}</label>
                 <div className="grid grid-cols-3 gap-1">
                   {(['active', 'chronic', 'inactive'] as const).map(s => {
                     const tint = STATUS_TINT[s];
@@ -321,7 +324,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
                           letterSpacing: '0.06em',
                         }}
                       >
-                        {tint.label}
+                        {t(`problemList.status_${s}`)}
                       </button>
                     );
                   })}
@@ -330,7 +333,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
               <div>
                 <label className="block text-xs font-bold uppercase mb-1.5" style={{
                   color: 'var(--text-muted)', letterSpacing: '0.06em',
-                }}>Onset date</label>
+                }}>{t('problemList.onsetDate')}</label>
                 <input
                   type="date"
                   value={onsetDate}
@@ -343,25 +346,25 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
             <div>
               <label className="block text-xs font-bold uppercase mb-1.5" style={{
                 color: 'var(--text-muted)', letterSpacing: '0.06em',
-              }}>Notes</label>
+              }}>{t('problemList.notes')}</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
                 className="w-full"
-                placeholder="Clinical context (optional)"
+                placeholder={t('problemList.notesPlaceholder')}
               />
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-1">
-              <button onClick={reset} className="btn btn-secondary">Cancel</button>
+              <button onClick={reset} className="btn btn-secondary">{t('action.cancel')}</button>
               <button
                 onClick={handleSubmit}
                 disabled={!pickedCode || submitting}
                 className="btn btn-primary inline-flex items-center gap-1.5"
               >
                 <Plus className="w-4 h-4" />
-                {submitting ? 'Saving…' : 'Add to list'}
+                {submitting ? t('problemList.saving') : t('problemList.addToList')}
               </button>
             </div>
           </div>
@@ -374,13 +377,13 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
           <h3 className="text-[11px] font-bold uppercase" style={{
             color: 'var(--text-secondary)', letterSpacing: '0.08em',
           }}>
-            Active &amp; Chronic
+            {t('problemList.activeChronic')}
           </h3>
           <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>· {active.length}</span>
           <div className="flex-1 h-px" style={{ background: 'var(--border-light)' }} />
         </div>
         {loading ? (
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('problemList.loading')}</p>
         ) : active.length === 0 ? (
           <div
             className="card-elevated p-5 text-center"
@@ -390,10 +393,10 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
               <Activity className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
             </div>
             <p className="text-sm font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>
-              No active problems on file.
+              {t('problemList.emptyTitle')}
             </p>
             <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-              Add one to start the longitudinal record.
+              {t('problemList.emptyHint')}
             </p>
           </div>
         ) : (
@@ -412,7 +415,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
             <h3 className="text-[11px] font-bold uppercase" style={{
               color: 'var(--text-secondary)', letterSpacing: '0.08em',
             }}>
-              Resolved
+              {t('problemList.resolvedHeading')}
             </h3>
             <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>· {resolved.length}</span>
             <div className="flex-1 h-px" style={{ background: 'var(--border-light)' }} />
@@ -427,8 +430,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
 
       {!loading && problems.length === 0 && !adding && (
         <p className="text-[11.5px] italic px-1" style={{ color: 'var(--text-muted)' }}>
-          Tip: the problem list is what makes care continuous across visits and shifts. Items added here
-          surface in the Storyboard sidebar and SBAR handoff for every clinician who opens this chart.
+          {t('problemList.tip')}
         </p>
       )}
     </div>

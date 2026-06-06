@@ -7,6 +7,7 @@ import {
   FileText, Download, Users, Activity, Pill, BedDouble, TrendingUp,
   ChevronUp, Loader2, BarChart3, AlertTriangle
 } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useReferrals } from '@/lib/hooks/useReferrals';
@@ -90,6 +91,7 @@ const reports = [
 
 /* ── Component ─────────────────────────────────────────────────── */
 export default function ReportsPage() {
+  const { t } = useTranslation();
   const { patients, loading: patientsLoading } = usePatients();
   const { hospitals, loading: hospitalsLoading } = useHospitals();
   const { referrals, loading: referralsLoading } = useReferrals();
@@ -110,6 +112,57 @@ export default function ReportsPage() {
   const totalReferrals = referrals.length;
   const totalLabResults = labResults.length;
   const totalDiseaseAlerts = alerts.length;
+
+  /* ── Display-text translation lookups (keyed by stable identifiers) ── */
+  const categoryKey: Record<string, string> = {
+    'Patient Statistics': 'reports.categoryPatientStatistics',
+    'Disease Surveillance': 'reports.categoryDiseaseSurveillance',
+    'Pharmacy & Supply Chain': 'reports.categoryPharmacySupplyChain',
+    'Hospital Operations': 'reports.categoryHospitalOperations',
+    'Financial': 'reports.categoryFinancial',
+  };
+  const reportNameKey: Record<string, string> = {
+    'Daily Patient Census': 'reports.nameDailyPatientCensus',
+    'Monthly OPD Summary': 'reports.nameMonthlyOpdSummary',
+    'Patient Demographics Report': 'reports.namePatientDemographics',
+    'IDSR Weekly Report': 'reports.nameIdsrWeekly',
+    'Notifiable Diseases Report': 'reports.nameNotifiableDiseases',
+    'Malaria Indicators Report': 'reports.nameMalariaIndicators',
+    'TB Treatment Outcomes': 'reports.nameTbTreatmentOutcomes',
+    'HIV/AIDS Program Report': 'reports.nameHivAidsProgram',
+    'Drug Consumption Report': 'reports.nameDrugConsumption',
+    'Stock Status Report': 'reports.nameStockStatus',
+    'Essential Medicines Availability': 'reports.nameEssentialMedicines',
+    'Bed Occupancy Report': 'reports.nameBedOccupancy',
+    'Referral Summary': 'reports.nameReferralSummary',
+    'Staff Productivity Report': 'reports.nameStaffProductivity',
+    'Revenue Report': 'reports.nameRevenue',
+    'Donor Reporting Pack': 'reports.nameDonorReporting',
+  };
+  const reportDescKey: Record<string, string> = {
+    'Daily Patient Census': 'reports.descDailyPatientCensus',
+    'Monthly OPD Summary': 'reports.descMonthlyOpdSummary',
+    'Patient Demographics Report': 'reports.descPatientDemographics',
+    'IDSR Weekly Report': 'reports.descIdsrWeekly',
+    'Notifiable Diseases Report': 'reports.descNotifiableDiseases',
+    'Malaria Indicators Report': 'reports.descMalariaIndicators',
+    'TB Treatment Outcomes': 'reports.descTbTreatmentOutcomes',
+    'HIV/AIDS Program Report': 'reports.descHivAidsProgram',
+    'Drug Consumption Report': 'reports.descDrugConsumption',
+    'Stock Status Report': 'reports.descStockStatus',
+    'Essential Medicines Availability': 'reports.descEssentialMedicines',
+    'Bed Occupancy Report': 'reports.descBedOccupancy',
+    'Referral Summary': 'reports.descReferralSummary',
+    'Staff Productivity Report': 'reports.descStaffProductivity',
+    'Revenue Report': 'reports.descRevenue',
+    'Donor Reporting Pack': 'reports.descDonorReporting',
+  };
+  const periodKey: Record<string, string> = {
+    Daily: 'reports.periodDaily',
+    Weekly: 'reports.periodWeekly',
+    Monthly: 'reports.periodMonthly',
+    Quarterly: 'reports.periodQuarterly',
+  };
 
   /* ── Toggle report ──────────────────────────────────────────── */
   const toggleReport = (reportName: string) => {
@@ -247,7 +300,7 @@ export default function ReportsPage() {
             'Alert Level': a.alertLevel,
           }));
           if (rows.length === 0) {
-            return { rows: [], title: 'Malaria Indicators Report', placeholder: 'No malaria surveillance data available in the current dataset.' };
+            return { rows: [], title: 'Malaria Indicators Report', placeholder: t('reports.placeholderMalaria') };
           }
           return { rows, title: 'Malaria Indicators Report' };
         }
@@ -264,14 +317,14 @@ export default function ReportsPage() {
             Trend: a.trend,
           }));
           if (rows.length === 0) {
-            return { rows: [], title: 'TB Treatment Outcomes', placeholder: 'No TB surveillance data available in the current dataset.' };
+            return { rows: [], title: 'TB Treatment Outcomes', placeholder: t('reports.placeholderTb') };
           }
           return { rows, title: 'TB Treatment Outcomes' };
         }
 
         /* ─── HIV/AIDS Program Report ─────────────────────── */
         case 'HIV/AIDS Program Report': {
-          return { rows: [], title: 'HIV/AIDS Program Report', placeholder: 'No HIV/AIDS program data available. This report requires specialized ART registry data.' };
+          return { rows: [], title: 'HIV/AIDS Program Report', placeholder: t('reports.placeholderHivAids') };
         }
 
         /* ─── Drug Consumption Report ─────────────────────── */
@@ -301,11 +354,11 @@ export default function ReportsPage() {
 
         /* ─── Stock Status Report ─────────────────────────── */
         case 'Stock Status Report':
-          return { rows: [], title: 'Stock Status Report', placeholder: 'No prescription/inventory data available. Full stock tracking requires integration with the pharmacy module.' };
+          return { rows: [], title: 'Stock Status Report', placeholder: t('reports.placeholderStockStatus') };
 
         /* ─── Essential Medicines Availability ────────────── */
         case 'Essential Medicines Availability':
-          return { rows: [], title: 'Essential Medicines Availability', placeholder: 'No prescription/inventory data available. This report requires full pharmacy and supply chain integration.' };
+          return { rows: [], title: 'Essential Medicines Availability', placeholder: t('reports.placeholderEssentialMedicines') };
 
         /* ─── Bed Occupancy Report ────────────────────────── */
         case 'Bed Occupancy Report': {
@@ -364,7 +417,7 @@ export default function ReportsPage() {
 
         /* ─── Revenue Report ──────────────────────────────── */
         case 'Revenue Report':
-          return { rows: [], title: 'Revenue Report', placeholder: 'No financial data available. Revenue tracking requires billing module integration.' };
+          return { rows: [], title: 'Revenue Report', placeholder: t('reports.placeholderRevenue') };
 
         /* ─── Donor Reporting Pack ────────────────────────── */
         case 'Donor Reporting Pack': {
@@ -386,10 +439,10 @@ export default function ReportsPage() {
         }
 
         default:
-          return { rows: [], title: reportName, placeholder: 'No data generator configured for this report.' };
+          return { rows: [], title: reportName, placeholder: t('reports.placeholderNoGenerator') };
       }
     };
-  }, [patients, hospitals, referrals, alerts, labResults]);
+  }, [patients, hospitals, referrals, alerts, labResults, t]);
 
   /* ── Render expanded report section ─────────────────────────── */
   const renderExpandedReport = (reportName: string) => {
@@ -404,7 +457,7 @@ export default function ReportsPage() {
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              {placeholder || 'No data available for this report.'}
+              {placeholder || t('reports.noDataForReport')}
             </span>
           </div>
         </div>
@@ -430,7 +483,7 @@ export default function ReportsPage() {
               className="text-xs px-2 py-0.5 rounded-full"
               style={{ background: 'var(--accent-light)', color: 'var(--tamamhealth-blue)' }}
             >
-              {rows.length} {rows.length === 1 ? 'row' : 'rows'}
+              {rows.length} {rows.length === 1 ? t('reports.rowSingular') : t('reports.rowPlural')}
             </span>
           </div>
           <button
@@ -440,7 +493,7 @@ export default function ReportsPage() {
               downloadCSV(rows, title.replace(/\s+/g, '_').toLowerCase());
             }}
           >
-            <Download className="w-3.5 h-3.5" /> Download CSV
+            <Download className="w-3.5 h-3.5" /> {t('reports.downloadCsv')}
           </button>
         </div>
 
@@ -500,17 +553,17 @@ export default function ReportsPage() {
 
   return (
     <>
-      <TopBar title="Reports" />
+      <TopBar title={t('nav.reports')} />
       <main className="page-container page-enter">
         <PageHeader
           icon={BarChart3}
-          title="Reports & Analytics"
-          subtitle="Generate and download standardized health reports"
+          title={t('reports.pageTitle')}
+          subtitle={t('reports.pageSubtitle')}
           actions={
             <select className="text-sm" style={{ width: '180px' }}>
-              <option>February 2026</option>
-              <option>January 2026</option>
-              <option>December 2025</option>
+              <option>{t('reports.monthFeb2026')}</option>
+              <option>{t('reports.monthJan2026')}</option>
+              <option>{t('reports.monthDec2025')}</option>
             </select>
           }
         />
@@ -518,12 +571,12 @@ export default function ReportsPage() {
         {/* ── Summary stats cards ─────────────────────────────── */}
         <div className="kpi-grid mb-6">
           {[
-            { label: 'Total Patients', value: totalPatients, icon: Users, color: 'var(--tamamhealth-blue)', bg: 'rgba(43,111,224,0.12)' },
-            { label: 'Total Referrals', value: totalReferrals, icon: BedDouble, color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
-            { label: 'Lab Results', value: totalLabResults, icon: FileText, color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
-            { label: 'Disease Alerts', value: totalDiseaseAlerts, icon: Activity, color: '#E4A84B', bg: 'rgba(245,158,11,0.12)' },
+            { id: 'totalPatients', label: t('patients.kpiTotalPatients'), value: totalPatients, icon: Users, color: 'var(--tamamhealth-blue)', bg: 'rgba(43,111,224,0.12)' },
+            { id: 'totalReferrals', label: t('referrals.statTotal'), value: totalReferrals, icon: BedDouble, color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
+            { id: 'labResults', label: t('reports.statLabResults'), value: totalLabResults, icon: FileText, color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+            { id: 'diseaseAlerts', label: t('reports.statDiseaseAlerts'), value: totalDiseaseAlerts, icon: Activity, color: '#E4A84B', bg: 'rgba(245,158,11,0.12)' },
           ].map(stat => (
-            <div key={stat.label} className="kpi">
+            <div key={stat.id} className="kpi">
               <div className="kpi__icon" style={{ background: stat.bg }}>
                 <stat.icon style={{ color: stat.color }} />
               </div>
@@ -546,7 +599,7 @@ export default function ReportsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <section.icon className="w-5 h-5" style={{ color: 'var(--tamamhealth-blue)' }} />
                 <h2 className="text-base font-semibold">
-                  {section.category}
+                  {t(categoryKey[section.category] ?? section.category)}
                 </h2>
               </div>
 
@@ -570,9 +623,9 @@ export default function ReportsPage() {
                           <FileText className="w-5 h-5" style={{ color: 'var(--tamamhealth-blue)' }} />
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-sm font-medium">{report.name}</h3>
+                          <h3 className="text-sm font-medium">{t(reportNameKey[report.name] ?? report.name)}</h3>
                           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            {report.description}
+                            {t(reportDescKey[report.name] ?? report.description)}
                           </p>
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
@@ -584,10 +637,10 @@ export default function ReportsPage() {
                                 color: 'var(--text-secondary)',
                               }}
                             >
-                              {report.period}
+                              {t(periodKey[report.period] ?? report.period)}
                             </span>
                             <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                              Last: {todayIso}
+                              {t('reports.lastGenerated', { date: todayIso })}
                             </p>
                           </div>
                           <button
@@ -596,11 +649,11 @@ export default function ReportsPage() {
                           >
                             {isExpanded ? (
                               <>
-                                <ChevronUp className="w-3.5 h-3.5" /> Close
+                                <ChevronUp className="w-3.5 h-3.5" /> {t('action.close')}
                               </>
                             ) : (
                               <>
-                                <Download className="w-3.5 h-3.5" /> Generate
+                                <Download className="w-3.5 h-3.5" /> {t('reports.generate')}
                               </>
                             )}
                           </button>
@@ -621,7 +674,7 @@ export default function ReportsPage() {
                             <div className="flex items-center justify-center py-8 gap-2">
                               <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--tamamhealth-blue)' }} />
                               <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                                Loading report data...
+                                {t('reports.loadingReportData')}
                               </span>
                             </div>
                           ) : (

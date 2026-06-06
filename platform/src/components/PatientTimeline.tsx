@@ -14,6 +14,9 @@ import type {
   MedicalRecordDoc, LabResultDoc, PrescriptionDoc, ImmunizationDoc,
   ReferralDoc, ANCVisitDoc, AppointmentDoc, TriageDoc,
 } from '@/lib/db-types';
+import { useTranslation } from '@/lib/i18n/useTranslation';
+
+type TFunc = (key: string, vars?: Record<string, string | number>) => string;
 
 /**
  * Patient 360 timeline — merges every encounter type into a single
@@ -45,39 +48,39 @@ interface TimelineEvent {
   badge?: { label: string; bg: string; color: string };
 }
 
-const CATEGORY_CONFIG: Record<TimelineEvent['category'], { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string; bg: string; label: string }> = {
-  triage:        { icon: Activity,       color: '#FB923C',               bg: 'rgba(251,146,60,0.14)', label: 'Triage' },
-  consultation:  { icon: Stethoscope,    color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)', label: 'Consultation' },
-  lab:           { icon: FlaskConical,   color: '#7C3AED',               bg: 'rgba(124,58,237,0.12)', label: 'Lab' },
-  prescription:  { icon: Pill,           color: '#0D9488',               bg: 'rgba(13,148,136,0.12)', label: 'Rx' },
-  immunization:  { icon: Syringe,        color: '#059669',               bg: 'rgba(5,150,105,0.12)',  label: 'Vaccine' },
-  referral:      { icon: ArrowRightLeft, color: '#F59E0B',               bg: 'rgba(245,158,11,0.12)', label: 'Referral' },
-  anc:           { icon: HeartPulse,     color: '#EC4899',               bg: 'rgba(236,72,153,0.12)', label: 'ANC' },
-  appointment:   { icon: FileText,       color: '#6366F1',               bg: 'rgba(99,102,241,0.12)', label: 'Appointment' },
+const CATEGORY_CONFIG: Record<TimelineEvent['category'], { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string; bg: string; labelKey: string }> = {
+  triage:        { icon: Activity,       color: '#FB923C',               bg: 'rgba(251,146,60,0.14)', labelKey: 'timeline.categoryTriage' },
+  consultation:  { icon: Stethoscope,    color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)', labelKey: 'timeline.categoryConsultation' },
+  lab:           { icon: FlaskConical,   color: '#7C3AED',               bg: 'rgba(124,58,237,0.12)', labelKey: 'timeline.categoryLab' },
+  prescription:  { icon: Pill,           color: '#0D9488',               bg: 'rgba(13,148,136,0.12)', labelKey: 'timeline.categoryRx' },
+  immunization:  { icon: Syringe,        color: '#059669',               bg: 'rgba(5,150,105,0.12)',  labelKey: 'timeline.categoryVaccine' },
+  referral:      { icon: ArrowRightLeft, color: '#F59E0B',               bg: 'rgba(245,158,11,0.12)', labelKey: 'timeline.categoryReferral' },
+  anc:           { icon: HeartPulse,     color: '#EC4899',               bg: 'rgba(236,72,153,0.12)', labelKey: 'timeline.categoryAnc' },
+  appointment:   { icon: FileText,       color: '#6366F1',               bg: 'rgba(99,102,241,0.12)', labelKey: 'timeline.categoryAppointment' },
 };
 
-function buildEvents(props: PatientTimelineProps): TimelineEvent[] {
+function buildEvents(props: PatientTimelineProps, t: TFunc): TimelineEvent[] {
   const events: TimelineEvent[] = [];
 
-  for (const t of props.triages || []) {
+  for (const tr of props.triages || []) {
     const vitals: string[] = [];
-    if (t.temperature) vitals.push(`T ${t.temperature}°C`);
-    if (t.pulse) vitals.push(`HR ${t.pulse}`);
-    if (t.respiratoryRate) vitals.push(`RR ${t.respiratoryRate}`);
-    if (t.oxygenSaturation) vitals.push(`SpO₂ ${t.oxygenSaturation}%`);
-    if (t.systolic && t.diastolic) vitals.push(`BP ${t.systolic}/${t.diastolic}`);
+    if (tr.temperature) vitals.push(`T ${tr.temperature}°C`);
+    if (tr.pulse) vitals.push(`HR ${tr.pulse}`);
+    if (tr.respiratoryRate) vitals.push(`RR ${tr.respiratoryRate}`);
+    if (tr.oxygenSaturation) vitals.push(`SpO₂ ${tr.oxygenSaturation}%`);
+    if (tr.systolic && tr.diastolic) vitals.push(`BP ${tr.systolic}/${tr.diastolic}`);
     events.push({
-      id: `triage-${t._id}`,
-      date: t.triagedAt || t.createdAt,
+      id: `triage-${tr._id}`,
+      date: tr.triagedAt || tr.createdAt,
       category: 'triage',
-      title: t.chiefComplaint || `${t.priority} triage`,
-      subtitle: `A: ${t.airway} · B: ${t.breathing} · C: ${t.circulation} · AVPU-${t.consciousness.toUpperCase()[0]}`,
-      meta: `${t.triagedByName}${vitals.length ? ' · ' + vitals.join(' · ') : ''}`,
-      badge: t.priority === 'RED'
-        ? { label: 'RED', bg: 'rgba(229,46,66,0.14)', color: 'var(--color-danger)' }
-        : t.priority === 'YELLOW'
-        ? { label: 'YELLOW', bg: 'rgba(252,211,77,0.14)', color: 'var(--color-warning)' }
-        : { label: 'GREEN', bg: 'rgba(16,185,129,0.12)', color: 'var(--color-success)' },
+      title: tr.chiefComplaint || t('timeline.titleTriage', { priority: tr.priority }),
+      subtitle: `A: ${tr.airway} · B: ${tr.breathing} · C: ${tr.circulation} · AVPU-${tr.consciousness.toUpperCase()[0]}`,
+      meta: `${tr.triagedByName}${vitals.length ? ' · ' + vitals.join(' · ') : ''}`,
+      badge: tr.priority === 'RED'
+        ? { label: t('timeline.badgeRed'), bg: 'rgba(229,46,66,0.14)', color: 'var(--color-danger)' }
+        : tr.priority === 'YELLOW'
+        ? { label: t('timeline.badgeYellow'), bg: 'rgba(252,211,77,0.14)', color: 'var(--color-warning)' }
+        : { label: t('timeline.badgeGreen'), bg: 'rgba(16,185,129,0.12)', color: 'var(--color-success)' },
     });
   }
 
@@ -87,7 +90,7 @@ function buildEvents(props: PatientTimelineProps): TimelineEvent[] {
       id: `mr-${r._id}`,
       date: r.consultedAt || r.visitDate || r.createdAt,
       category: 'consultation',
-      title: r.chiefComplaint || 'Clinical consultation',
+      title: r.chiefComplaint || t('timeline.titleConsultation'),
       subtitle: dx || r.providerName || undefined,
       meta: r.providerName ? `${r.providerName}${r.department ? ` · ${r.department}` : ''}` : r.department,
       badge: r.visitType ? { label: r.visitType, bg: 'rgba(43,111,224,0.10)', color: 'var(--accent-primary)' } : undefined,
@@ -95,18 +98,18 @@ function buildEvents(props: PatientTimelineProps): TimelineEvent[] {
   }
 
   for (const lr of props.labResults || []) {
-    const status = lr.status === 'completed' ? lr.result || 'completed' : lr.status.replace('_', ' ');
+    const status = lr.status === 'completed' ? lr.result || t('timeline.statusCompleted') : lr.status.replace('_', ' ');
     events.push({
       id: `lab-${lr._id}`,
       date: lr.completedAt || lr.orderedAt || lr.createdAt,
       category: 'lab',
       title: lr.testName,
       subtitle: status,
-      meta: lr.specimen ? `Specimen: ${lr.specimen}` : undefined,
+      meta: lr.specimen ? t('timeline.metaSpecimen', { specimen: lr.specimen }) : undefined,
       badge: lr.critical
-        ? { label: 'CRITICAL', bg: 'rgba(229,46,66,0.14)', color: 'var(--color-danger)' }
+        ? { label: t('timeline.badgeCritical'), bg: 'rgba(229,46,66,0.14)', color: 'var(--color-danger)' }
         : lr.abnormal
-        ? { label: 'Abnormal', bg: 'rgba(252,211,77,0.14)', color: 'var(--color-warning)' }
+        ? { label: t('timeline.badgeAbnormal'), bg: 'rgba(252,211,77,0.14)', color: 'var(--color-warning)' }
         : undefined,
     });
   }
@@ -120,8 +123,8 @@ function buildEvents(props: PatientTimelineProps): TimelineEvent[] {
       subtitle: `${rx.dose || ''} ${rx.frequency || ''}${rx.duration ? ` · ${rx.duration}` : ''}`.trim(),
       meta: rx.prescribedBy,
       badge: rx.status === 'dispensed'
-        ? { label: 'Dispensed', bg: 'rgba(16,185,129,0.14)', color: 'var(--color-success)' }
-        : { label: 'Pending', bg: 'rgba(252,211,77,0.14)', color: 'var(--color-warning)' },
+        ? { label: t('timeline.badgeDispensed'), bg: 'rgba(16,185,129,0.14)', color: 'var(--color-success)' }
+        : { label: t('timeline.badgePending'), bg: 'rgba(252,211,77,0.14)', color: 'var(--color-warning)' },
     });
   }
 
@@ -130,8 +133,8 @@ function buildEvents(props: PatientTimelineProps): TimelineEvent[] {
       id: `imm-${im._id}`,
       date: im.dateGiven || im.createdAt,
       category: 'immunization',
-      title: `${im.vaccine} ${im.doseNumber > 0 ? `dose ${im.doseNumber}` : ''}`.trim(),
-      subtitle: im.batchNumber ? `Batch ${im.batchNumber}` : undefined,
+      title: `${im.vaccine} ${im.doseNumber > 0 ? t('timeline.doseNumber', { number: im.doseNumber }) : ''}`.trim(),
+      subtitle: im.batchNumber ? t('timeline.batchNumber', { batch: im.batchNumber }) : undefined,
       meta: im.facilityName,
     });
   }
@@ -141,7 +144,7 @@ function buildEvents(props: PatientTimelineProps): TimelineEvent[] {
       id: `ref-${ref._id}`,
       date: ref.referralDate || ref.createdAt,
       category: 'referral',
-      title: `Referred to ${ref.toHospital || 'facility'}`,
+      title: t('timeline.titleReferral', { facility: ref.toHospital || t('timeline.facilityFallback') }),
       subtitle: ref.reason || ref.department,
       meta: ref.referringDoctor,
       badge: { label: ref.status, bg: 'rgba(245,158,11,0.10)', color: 'var(--color-warning)' },
@@ -153,13 +156,13 @@ function buildEvents(props: PatientTimelineProps): TimelineEvent[] {
       id: `anc-${a._id}`,
       date: a.visitDate || a.createdAt,
       category: 'anc',
-      title: `ANC visit ${a.visitNumber}`,
-      subtitle: `Gestational age ${a.gestationalAge || '—'}w · Risk: ${a.riskLevel}`,
+      title: t('timeline.titleAncVisit', { number: a.visitNumber }),
+      subtitle: t('timeline.subtitleAnc', { weeks: a.gestationalAge || '—', risk: a.riskLevel }),
       meta: a.facilityName,
       badge: a.riskLevel === 'high'
-        ? { label: 'HIGH RISK', bg: 'rgba(229,46,66,0.14)', color: 'var(--color-danger)' }
+        ? { label: t('timeline.badgeHighRisk'), bg: 'rgba(229,46,66,0.14)', color: 'var(--color-danger)' }
         : a.riskLevel === 'moderate'
-        ? { label: 'Moderate', bg: 'rgba(252,211,77,0.14)', color: 'var(--color-warning)' }
+        ? { label: t('timeline.badgeModerate'), bg: 'rgba(252,211,77,0.14)', color: 'var(--color-warning)' }
         : undefined,
     });
   }
@@ -169,7 +172,7 @@ function buildEvents(props: PatientTimelineProps): TimelineEvent[] {
       id: `apt-${ap._id}`,
       date: `${ap.appointmentDate}T${ap.appointmentTime || '00:00'}`,
       category: 'appointment',
-      title: ap.appointmentType?.replace(/_/g, ' ') || 'Appointment',
+      title: ap.appointmentType?.replace(/_/g, ' ') || t('timeline.titleAppointment'),
       subtitle: ap.reason,
       meta: ap.providerName,
       badge: { label: ap.status, bg: 'rgba(99,102,241,0.10)', color: '#6366F1' },
@@ -182,14 +185,15 @@ function buildEvents(props: PatientTimelineProps): TimelineEvent[] {
 }
 
 export default function PatientTimeline(props: PatientTimelineProps) {
-  const events = buildEvents(props);
+  const { t } = useTranslation();
+  const events = buildEvents(props, t);
 
   if (events.length === 0) {
     return (
       <div className="card-elevated p-8 text-center">
         <FileText className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          No clinical events recorded for this patient yet.
+          {t('timeline.emptyState')}
         </p>
       </div>
     );
@@ -246,7 +250,7 @@ export default function PatientTimeline(props: PatientTimelineProps) {
                 <div className="flex items-baseline flex-wrap gap-2 mb-1">
                   <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
                   <span className="text-[10.5px] font-semibold uppercase tracking-wider" style={{ color: cfg.color }}>
-                    {cfg.label}
+                    {t(cfg.labelKey)}
                   </span>
                   <span className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{dateLabel}</span>
                 </div>

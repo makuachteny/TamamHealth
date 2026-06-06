@@ -1659,6 +1659,19 @@ export interface Patient {
   lastConsultedAt?: string;
   /** Name of the provider who conducted the most recent consultation. */
   lastConsultedBy?: string;
+  // ── Care assignment (nurse → doctor handoff) ──
+  /** User id of the doctor/clinician a nurse has assigned to provide care. */
+  assignedDoctor?: string;
+  /** Display name of the assigned doctor at time of assignment. */
+  assignedDoctorName?: string;
+  /** ISO datetime the assignment was made. */
+  assignedAt?: string;
+  /** User id of the nurse who made the assignment. */
+  assignedBy?: string;
+  /** Display name of the nurse who made the assignment. */
+  assignedByName?: string;
+  /** Optional handoff note from the nurse to the doctor. */
+  assignmentNote?: string;
   isActive: boolean;
   photoUrl?: string;
   // Follow-up tracking (expert-recommended)

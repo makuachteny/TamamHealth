@@ -54,34 +54,48 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
-      '/surveillance', '/reports', '/hospitals', '/settings',
-      '/epidemic-intelligence', '/mch-analytics', '/my-facility',
+      '/settings',
       '/appointments', '/telehealth',
-      '/payments',
-      '/wards', '/feedback', '/hr',
+      '/wards', '/alerts',
     ],
     defaultDashboard: '/dashboard',
   },
 
   clinical_officer: {
+    // Diagnoses, treats, prescribes, orders labs, refers. Clinical scope only —
+    // payment processing belongs to cashier/biller, not clinicians.
     allowed: [
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/settings', '/my-facility',
       '/appointments',
-      '/payments',
       '/wards', '/feedback',
     ],
     defaultDashboard: '/dashboard',
   },
 
   nurse: {
+    // Ward & bedside care, immunisation, ANC support, vital-event documentation.
+    // Not payment processing (cashier/biller).
     allowed: [
       '/dashboard/nurse', '/patients', '/messages',
       '/lab', '/immunizations', '/anc', '/births', '/deaths',
       '/settings', '/my-facility', '/appointments',
-      '/payments',
-      '/wards', '/feedback', '/hr',
+      '/wards', '/feedback',
+    ],
+    defaultDashboard: '/dashboard/nurse',
+  },
+
+  midwife: {
+    // ICM scope: antenatal care, conducting deliveries, postnatal & newborn
+    // care, obstetric referrals, and maternal/perinatal vital events. Reuses the
+    // nurse station dashboard. No general consultation/prescribing (clinician) or
+    // payment handling.
+    allowed: [
+      '/dashboard/nurse', '/patients', '/messages',
+      '/anc', '/births', '/deaths', '/immunizations',
+      '/wards', '/referrals', '/appointments', '/lab',
+      '/settings', '/my-facility',
     ],
     defaultDashboard: '/dashboard/nurse',
   },
@@ -101,20 +115,35 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   },
 
   front_desk: {
+    // Reception: registration, appointment booking, referral intake, feedback.
+    // Money handling moves to the dedicated cashier role; bed/ward management is
+    // a nursing function. Insurance claims belong to the medical biller.
     allowed: [
       '/dashboard/front-desk', '/patients', '/referrals', '/messages',
       '/settings', '/my-facility',
       '/appointments',
-      '/payments', '/payments/claims',
-      '/wards', '/feedback',
+      '/feedback',
     ],
     defaultDashboard: '/dashboard/front-desk',
   },
 
+  cashier: {
+    // Point-of-service collections only: takes payments, records receipts, sets
+    // up patient payment plans, looks up the patient/visit being billed. No
+    // insurance claim adjudication (biller) and no clinical access.
+    allowed: [
+      '/payments', '/payments/plans', '/payments/portal',
+      '/patients', '/appointments', '/messages', '/settings',
+    ],
+    defaultDashboard: '/payments',
+  },
+
   boma_health_worker: {
+    // Household visits, child & maternal health, plus community disease
+    // surveillance/event reporting (part of the BHI standard package).
     allowed: [
       '/dashboard/boma', '/patients', '/messages',
-      '/immunizations', '/anc', '/births', '/deaths',
+      '/immunizations', '/anc', '/births', '/deaths', '/surveillance',
     ],
     defaultDashboard: '/dashboard/boma',
   },
@@ -139,6 +168,21 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/epidemic-intelligence', '/mch-analytics', '/appointments',
     ],
     defaultDashboard: '/government',
+  },
+
+  county_health_director: {
+    // Sub-national (county) health-department oversight: supervises facilities &
+    // payams, monitors surveillance/outbreaks, reviews data quality and vital
+    // statistics, and owns DHIS2/HMIS reporting for the county. Aggregate views
+    // only — no individual patient records, prescribing, dispensing, or billing.
+    allowed: [
+      '/dashboard/state', '/dashboard/payam',
+      '/hospitals', '/surveillance', '/epidemic-intelligence', '/mch-analytics',
+      '/vital-statistics', '/immunizations', '/anc', '/births', '/deaths',
+      '/facility-assessments', '/data-quality', '/reports', '/dhis2-export',
+      '/public-stats', '/messages', '/settings',
+    ],
+    defaultDashboard: '/dashboard/state',
   },
 
   data_entry_clerk: {
@@ -166,15 +210,18 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   },
 
   hrio: {
+    // Health Records & Information Officer — records, data quality, and DHIS2
+    // reporting. NOT human-resources/payroll (that belongs to the medical
+    // superintendent / hospital manager / org admin).
     allowed: [
-      '/dashboard/hr', '/dashboard/data-entry', '/patients', '/facility-assessments',
+      '/dashboard/data-entry', '/patients', '/facility-assessments',
       '/data-quality', '/reports', '/vital-statistics',
       '/immunizations', '/anc', '/births', '/deaths',
       '/hospitals', '/messages', '/settings', '/my-facility',
-      '/hr', '/feedback',
+      '/dhis2-export',
       '/sync-conflicts',
     ],
-    defaultDashboard: '/dashboard/hr',
+    defaultDashboard: '/dashboard/data-entry',
   },
 
   community_health_volunteer: {
@@ -186,9 +233,11 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   },
 
   nutritionist: {
+    // Nutrition assessment & counselling and MCH nutrition programmes. Vaccine
+    // administration (/immunizations) is a nursing/clinical task, not dietetics.
     allowed: [
       '/dashboard/nutrition', '/patients', '/messages', '/anc',
-      '/immunizations', '/mch-analytics', '/settings', '/my-facility',
+      '/mch-analytics', '/settings', '/my-facility',
     ],
     defaultDashboard: '/dashboard/nutrition',
   },
@@ -198,6 +247,35 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard/radiology', '/patients', '/lab', '/messages', '/settings', '/my-facility',
     ],
     defaultDashboard: '/dashboard/radiology',
+  },
+
+  hospital_manager: {
+    allowed: [
+      '/dashboard/hospital-manager',
+      // Intelligence & population health
+      '/epidemic-intelligence', '/mch-analytics', '/surveillance',
+      // Network & facility
+      '/hospitals', '/my-facility', '/facility-assessments',
+      // Reporting
+      '/reports', '/data-quality', '/vital-statistics', '/dhis2-export', '/public-stats',
+      // Facility operations
+      '/equipment', '/hr', '/dashboard/hr', '/feedback',
+      // Finance oversight
+      '/payments', '/payments/claims', '/payments/plans',
+      // Clinical context (read)
+      '/patients', '/wards', '/referrals', '/appointments', '/lab', '/pharmacy', '/messages',
+      '/settings', '/sync-conflicts',
+    ],
+    defaultDashboard: '/dashboard/hospital-manager',
+  },
+
+  medical_biller: {
+    allowed: [
+      '/billing',
+      '/payments', '/payments/claims', '/payments/plans', '/payments/portal',
+      '/patients', '/appointments', '/messages', '/settings',
+    ],
+    defaultDashboard: '/billing',
   },
 };
 

@@ -15,14 +15,14 @@ import type { UserRole } from '@/lib/db-types';
 // Roles that may read patient lists
 const READ_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
-  'front_desk', 'boma_health_worker', 'medical_superintendent', 'hrio',
+  'midwife', 'front_desk', 'cashier', 'boma_health_worker', 'medical_superintendent', 'hrio',
   'payam_supervisor', 'data_entry_clerk', 'community_health_volunteer',
   'nutritionist', 'radiologist', 'government',
 ];
 // Roles that may create patients
 const CREATE_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
-  'front_desk', 'boma_health_worker', 'medical_superintendent', 'hrio',
+  'midwife', 'front_desk', 'boma_health_worker', 'medical_superintendent', 'hrio',
   'data_entry_clerk',
 ];
 export async function GET(request: NextRequest) {

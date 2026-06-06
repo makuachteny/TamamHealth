@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { ArrowRight, Building2, Home, Activity, CheckCircle2, Clock, AlertTriangle } from '@/components/icons/lucide';
 import type { ReferralDoc } from '@/lib/db-types';
 
@@ -38,6 +39,7 @@ interface ReferralChainTrackerProps {
 
 export default function ReferralChainTracker({ referrals, currentFacilityId, compact = false }: ReferralChainTrackerProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const levelStats = useMemo(() => {
     const stats: Record<string, { incoming: number; outgoing: number; pending: number; accepted: number }> = {};
@@ -92,10 +94,10 @@ export default function ReferralChainTracker({ referrals, currentFacilityId, com
         <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: 'var(--border-light)' }}>
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Referral Chain</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referralChain.title')}</span>
           </div>
           <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-            {referrals.filter(r => r.status === 'sent' || r.status === 'received').length} active
+            {t('referralChain.activeCount', { count: referrals.filter(r => r.status === 'sent' || r.status === 'received').length })}
           </span>
         </div>
 
@@ -182,8 +184,8 @@ export default function ReferralChainTracker({ referrals, currentFacilityId, com
           background: 'var(--bg-card)', border: '1px solid var(--border-light)', boxShadow: 'var(--card-shadow)',
         }}>
           <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: 'var(--border-light)' }}>
-            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Active Referrals</span>
-            <button onClick={() => router.push('/referrals')} className="text-[10px] font-medium" style={{ color: 'var(--accent-primary)' }}>View all →</button>
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referralChain.activeReferrals')}</span>
+            <button onClick={() => router.push('/referrals')} className="text-[10px] font-medium" style={{ color: 'var(--accent-primary)' }}>{t('referralChain.viewAll')} →</button>
           </div>
           <div className="p-3 space-y-1.5">
             {recentReferrals.map(ref => (
@@ -205,7 +207,7 @@ export default function ReferralChainTracker({ referrals, currentFacilityId, com
                 </div>
                 <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                   <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
-                    background: ref.status === 'seen' ? 'rgba(74,222,128,0.12)' : 'rgba(27, 154, 170,0.12)',
+                    background: ref.status === 'seen' ? 'rgba(74,222,128,0.12)' : 'rgba(59, 130, 246,0.12)',
                     color: ref.status === 'seen' ? 'var(--color-success)' : 'var(--accent-primary)',
                   }}>{ref.status.toUpperCase()}</span>
                   {ref.urgency && ref.urgency !== 'routine' && (

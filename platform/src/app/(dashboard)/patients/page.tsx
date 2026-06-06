@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
-import { Search, Filter, ChevronRight, UserPlus, Users, ScanLine, Hash, X, ArrowRight } from '@/components/icons/lucide';
+import { Search, Filter, ChevronRight, UserPlus, Users, ScanLine, Hash, X, ArrowRight, Stethoscope } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { states } from '@/data/mock';
 import QRScanner from '@/components/QRScanner';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 // Pagination cap — capped to keep DOM-node count manageable on low-end devices.
 // Each row produces ~20 DOM nodes; 100 rows ≈ 2k nodes which renders smoothly.
@@ -18,12 +19,19 @@ const PAGE_SIZE = 100;
 
 export default function PatientsPage() {
   const router = useRouter();
-  const { globalSearch } = useApp();
+  const { t } = useTranslation();
+  const { globalSearch, currentUser } = useApp();
   const { patients } = usePatients();
   const { canRegisterPatients } = usePermissions();
   const [search, setSearch] = useState('');
   const [filterState, setFilterState] = useState('');
   const [filterGender, setFilterGender] = useState('');
+  const [assignedToMe, setAssignedToMe] = useState(false);
+  // Only clinicians who can be the responsible provider get the "assigned to me" toggle.
+  const canBeAssigned = ['doctor', 'clinical_officer', 'medical_superintendent'].includes(currentUser?.role ?? '');
+  const assignedToMeCount = canBeAssigned
+    ? patients.filter(p => p.assignedDoctor === currentUser?._id).length
+    : 0;
   const [showFilters, setShowFilters] = useState(false);
   const [showFindPatient, setShowFindPatient] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
@@ -35,7 +43,7 @@ export default function PatientsPage() {
 
   const handleLookup = () => {
     const q = lookupId.trim().toLowerCase();
-    if (!q) { setLookupError('Enter a Hospital Number or Geocode ID'); return; }
+    if (!q) { setLookupError(t('patients.enterHospitalOrGeocode')); return; }
     const match = patients.find(p =>
       p.hospitalNumber?.toLowerCase() === q ||
       p.geocodeId?.toLowerCase() === q ||
@@ -48,7 +56,7 @@ export default function PatientsPage() {
       setLookupError('');
       router.push(`/patients/${match._id}`);
     } else {
-      setLookupError(`No patient found with ID "${lookupId.trim()}"`);
+      setLookupError(t('patients.noPatientWithId', { id: lookupId.trim() }));
     }
   };
 
@@ -60,7 +68,8 @@ export default function PatientsPage() {
       (p.phone || '').includes(q);
     const matchState = !filterState || p.state === filterState;
     const matchGender = !filterGender || p.gender === filterGender;
-    return matchSearch && matchState && matchGender;
+    const matchAssigned = !assignedToMe || p.assignedDoctor === currentUser?._id;
+    return matchSearch && matchState && matchGender && matchAssigned;
   });
 
   // Reset the visible window whenever the filter or search changes — otherwise
@@ -68,29 +77,29 @@ export default function PatientsPage() {
   // count that doesn't correspond to the new filtered.length.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [search, filterState, filterGender, globalSearch]);
+  }, [search, filterState, filterGender, globalSearch, assignedToMe]);
 
   const visible = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
 
   return (
     <>
-      <TopBar title="Patients" />
+      <TopBar title={t('nav.patients')} />
       <main className="page-container page-enter">
           <PageHeader
             icon={Users}
-            title="Patient Registry"
-            subtitle={`${filtered.length} patients found`}
+            title={t('patients.registryTitle')}
+            subtitle={t('patients.patientsFound', { count: filtered.length })}
             actions={
               <div className="flex gap-2">
                 <button onClick={() => setShowFindPatient(true)} className="btn btn-secondary">
                   <Hash className="w-4 h-4" />
-                  Find Patient
+                  {t('boma.findPatient')}
                 </button>
                 {canRegisterPatients && (
                   <button onClick={() => router.push('/patients/new')} className="btn btn-primary">
                     <UserPlus className="w-4 h-4" />
-                    Register New Patient
+                    {t('frontDesk.registerNewPatient')}
                   </button>
                 )}
               </div>
@@ -105,10 +114,10 @@ export default function PatientsPage() {
             const withConditions = patients.filter(p => p.chronicConditions?.length && p.chronicConditions[0] !== 'None').length;
             const withAllergies = patients.filter(p => p.allergies?.length && p.allergies[0] !== 'None known').length;
             const kpis = [
-              { label: 'Total Patients', value: patients.length, accent: '#1B9AAA', bg: 'rgba(27, 154, 170, 0.08)', border: 'rgba(27, 154, 170, 0.22)' },
-              { label: 'Visited · last 30d', value: visitedRecently, accent: '#1B9AAA', bg: 'rgba(27, 154, 170, 0.08)', border: 'rgba(27, 154, 170, 0.22)' },
-              { label: 'Chronic Conditions', value: withConditions, accent: '#B8741C', bg: 'rgba(228, 168, 75, 0.10)', border: 'rgba(228, 168, 75, 0.28)' },
-              { label: 'Allergies Flagged', value: withAllergies, accent: '#C44536', bg: 'rgba(196, 69, 54, 0.08)', border: 'rgba(196, 69, 54, 0.28)' },
+              { label: t('patients.kpiTotalPatients'), value: patients.length, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
+              { label: t('patients.kpiVisitedLast30d'), value: visitedRecently, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
+              { label: t('patient.chronicConditions'), value: withConditions, accent: '#B8741C', bg: 'rgba(228, 168, 75, 0.10)', border: 'rgba(228, 168, 75, 0.28)' },
+              { label: t('patients.kpiAllergiesFlagged'), value: withAllergies, accent: '#C44536', bg: 'rgba(196, 69, 54, 0.08)', border: 'rgba(196, 69, 54, 0.28)' },
             ];
             return (
               <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', alignItems: 'stretch' }}>
@@ -137,37 +146,58 @@ export default function PatientsPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
                 <input
                   type="search"
-                  placeholder="Search by name, hospital number, or phone..."
+                  placeholder={t('patients.searchPlaceholder')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-9 search-icon-input"
                   style={{ background: 'var(--overlay-subtle)' }}
                 />
               </div>
+              {canBeAssigned && (
+                <button
+                  onClick={() => setAssignedToMe(v => !v)}
+                  className="btn btn-sm"
+                  aria-pressed={assignedToMe}
+                  title="Show only patients assigned to you"
+                  style={assignedToMe
+                    ? { background: 'var(--accent-primary)', color: '#fff', border: '1px solid var(--accent-primary)' }
+                    : { background: 'var(--btn-secondary-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)' }}
+                >
+                  <Stethoscope className="w-4 h-4" /> Assigned to me
+                  <span
+                    className="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                    style={assignedToMe
+                      ? { background: 'rgba(255,255,255,0.25)' }
+                      : { background: 'var(--accent-light)', color: 'var(--accent-primary)' }}
+                  >
+                    {assignedToMeCount}
+                  </span>
+                </button>
+              )}
               <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary btn-sm">
-                <Filter className="w-4 h-4" /> Filters
+                <Filter className="w-4 h-4" /> {t('patients.filters')}
               </button>
             </div>
             {showFilters && (
               <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
                 <div className="w-full sm:w-48">
-                  <label>State</label>
+                  <label>{t('patients.state')}</label>
                   <select value={filterState} onChange={(e) => setFilterState(e.target.value)}>
-                    <option value="">All States</option>
+                    <option value="">{t('patients.allStates')}</option>
                     {states.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div className="w-full sm:w-36">
-                  <label>Gender</label>
+                  <label>{t('patient.gender')}</label>
                   <select value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
-                    <option value="">All</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
+                    <option value="">{t('patients.all')}</option>
+                    <option value="Male">{t('patient.male')}</option>
+                    <option value="Female">{t('patient.female')}</option>
                   </select>
                 </div>
                 <div className="flex items-end">
                   <button onClick={() => { setFilterState(''); setFilterGender(''); }} className="btn btn-secondary btn-sm">
-                    Clear
+                    {t('patients.clear')}
                   </button>
                 </div>
               </div>
@@ -180,13 +210,13 @@ export default function PatientsPage() {
               <table className="data-table patient-table">
                 <thead>
                   <tr>
-                    <th className="col-patient">Patient</th>
-                    <th className="col-hospital">Hospital No.</th>
-                    <th className="col-age">Age / Gender</th>
-                    <th className="col-state">State</th>
-                    <th className="col-phone hide-mobile">Phone</th>
-                    <th className="col-visit hide-mobile">Last Visit</th>
-                    <th className="col-cond hide-mobile">Conditions</th>
+                    <th className="col-patient">{t('frontDesk.colPatient')}</th>
+                    <th className="col-hospital">{t('patients.colHospitalNo')}</th>
+                    <th className="col-age">{t('patients.colAgeGender')}</th>
+                    <th className="col-state">{t('patients.state')}</th>
+                    <th className="col-phone hide-mobile">{t('patient.phone')}</th>
+                    <th className="col-visit hide-mobile">{t('frontDesk.lastVisit')}</th>
+                    <th className="col-cond hide-mobile">{t('patients.colConditions')}</th>
                     <th className="col-arrow"></th>
                   </tr>
                 </thead>
@@ -210,10 +240,10 @@ export default function PatientsPage() {
                     const updatedMinsAgo = updatedAt ? Math.floor((Date.now() - updatedAt.getTime()) / 60000) : null;
                     const freshnessLabel = updatedMinsAgo == null
                       ? '—'
-                      : updatedMinsAgo < 2 ? 'just now'
-                      : updatedMinsAgo < 60 ? `${updatedMinsAgo}m ago`
-                      : updatedMinsAgo < 1440 ? `${Math.floor(updatedMinsAgo / 60)}h ago`
-                      : `${Math.floor(updatedMinsAgo / 1440)}d ago`;
+                      : updatedMinsAgo < 2 ? t('sync.justNow')
+                      : updatedMinsAgo < 60 ? t('sync.minutesAgo', { count: updatedMinsAgo })
+                      : updatedMinsAgo < 1440 ? t('sync.hoursAgo', { count: Math.floor(updatedMinsAgo / 60) })
+                      : t('sync.daysAgo', { count: Math.floor(updatedMinsAgo / 1440) });
                     const isStale = updatedMinsAgo != null && updatedMinsAgo > 60 * 24 * 30; // >30d
                     const isVeryStale = updatedMinsAgo != null && updatedMinsAgo > 60 * 24 * 90; // >90d
                     return (
@@ -225,7 +255,7 @@ export default function PatientsPage() {
                               style={{
                                 background: isFemale
                                   ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)'
-                                  : 'linear-gradient(135deg, #1B9AAA 0%, #1A3A3A 100%)',
+                                  : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)',
                                 letterSpacing: 0.3,
                               }}
                               aria-hidden
@@ -244,7 +274,7 @@ export default function PatientsPage() {
                                   style={{ background: 'var(--border-medium)' }}
                                 />
                                 <span
-                                  title={`Last updated ${patient.updatedAt || 'unknown'}`}
+                                  title={t('patients.lastUpdated', { value: patient.updatedAt || t('patients.unknown') })}
                                   style={{
                                     fontSize: 10, fontWeight: 600, letterSpacing: 0.2,
                                     color: isVeryStale ? '#C44536' : isStale ? '#B8741C' : 'var(--text-muted)',
@@ -259,7 +289,7 @@ export default function PatientsPage() {
                         <td className="col-hospital">
                           <span
                             className="font-mono text-[11px] whitespace-nowrap px-2 py-0.5 rounded-md"
-                            style={{ background: 'rgba(27, 154, 170, 0.10)', color: '#1B9AAA', border: '1px solid rgba(27, 154, 170, 0.20)', fontWeight: 600 }}
+                            style={{ background: 'rgba(59, 130, 246, 0.10)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.20)', fontWeight: 600 }}
                           >
                             {patient.hospitalNumber}
                           </span>
@@ -269,7 +299,7 @@ export default function PatientsPage() {
                             <span
                               aria-hidden
                               className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                              style={{ background: isFemale ? '#D96E59' : '#1B9AAA' }}
+                              style={{ background: isFemale ? '#D96E59' : '#3b82f6' }}
                             />
                             <span className="font-semibold">{age}y</span>
                             <span style={{ color: 'var(--text-muted)' }}>· {patient.gender?.[0] ?? '?'}</span>
@@ -285,7 +315,7 @@ export default function PatientsPage() {
                               </div>
                               {daysAgo != null && (
                                 <div className="text-[10px]" style={{ color: daysAgo > 90 ? '#C44536' : daysAgo > 30 ? '#B8741C' : 'var(--text-muted)' }}>
-                                  {daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : `${daysAgo}d ago`}
+                                  {daysAgo === 0 ? t('time.today') : daysAgo === 1 ? t('time.yesterday') : t('sync.daysAgo', { count: daysAgo })}
                                 </div>
                               )}
                             </div>
@@ -299,9 +329,9 @@ export default function PatientsPage() {
                               <span
                                 className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded-md whitespace-nowrap"
                                 style={{ background: 'rgba(196, 69, 54, 0.14)', color: '#8B2E24', border: '1px solid rgba(196, 69, 54, 0.30)' }}
-                                title={`Allergy: ${patient.allergies.join(', ')}`}
+                                title={t('patients.allergyTitle', { list: patient.allergies.join(', ') })}
                               >
-                                ⚠ Allergy
+                                ⚠ {t('patients.allergyBadge')}
                               </span>
                             )}
                             {hasChronic ? (
@@ -327,14 +357,14 @@ export default function PatientsPage() {
             {hasMore && (
               <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Showing {visible.length.toLocaleString()} of {filtered.length.toLocaleString()} patients
+                  {t('patients.showingOf', { shown: visible.length.toLocaleString(), total: filtered.length.toLocaleString() })}
                 </span>
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
                   onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
                 >
-                  Load more
+                  {t('patients.loadMore')}
                 </button>
               </div>
             )}
@@ -346,7 +376,7 @@ export default function PatientsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
           <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'var(--card-bg, var(--bg-card))' }}>
             <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-              <h3 className="text-sm font-semibold">Find Patient</h3>
+              <h3 className="text-sm font-semibold">{t('boma.findPatient')}</h3>
               <button onClick={() => { setShowFindPatient(false); setLookupId(''); setLookupError(''); }} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors">
                 <X className="w-4 h-4" />
               </button>
@@ -356,7 +386,7 @@ export default function PatientsPage() {
               {/* Hospital ID / Geocode ID Lookup */}
               <div>
                 <label className="text-xs font-semibold block mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                  Enter Hospital Number, Geocode ID, or National ID
+                  {t('patients.enterLookupId')}
                 </label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
@@ -366,7 +396,7 @@ export default function PatientsPage() {
                       value={lookupId}
                       onChange={(e) => { setLookupId(e.target.value); setLookupError(''); }}
                       onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
-                      placeholder="e.g. JTH-0001 or BOMA-XY-HH1001"
+                      placeholder={t('patients.lookupPlaceholder')}
                       className="pl-9 w-full"
                       autoFocus
                       style={{ background: 'var(--overlay-subtle)' }}
@@ -384,7 +414,7 @@ export default function PatientsPage() {
               {/* Divider */}
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px" style={{ background: 'var(--border-light)' }} />
-                <span className="text-[10px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>or</span>
+                <span className="text-[10px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>{t('patients.or')}</span>
                 <div className="flex-1 h-px" style={{ background: 'var(--border-light)' }} />
               </div>
 
@@ -398,8 +428,8 @@ export default function PatientsPage() {
                   <ScanLine className="w-5 h-5" style={{ color: 'var(--tamamhealth-blue)' }} />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Scan QR Code</p>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Use device camera to scan patient QR code</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('patients.scanQrCode')}</p>
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('patients.scanQrDesc')}</p>
                 </div>
                 <ArrowRight className="w-4 h-4 ml-auto" style={{ color: 'var(--text-muted)' }} />
               </button>

@@ -10,6 +10,8 @@ import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import LockScreen from '@/components/LockScreen';
 import ConnectivityNotice from '@/components/ConnectivityNotice';
+import GetStartedCard from '@/components/onboarding/GetStartedCard';
+import ForcePasswordChange from '@/components/ForcePasswordChange';
 import { useAutoLock } from '@/lib/hooks/useAutoLock';
 import { Loader2 } from '@/components/icons/lucide';
 
@@ -48,6 +50,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
+  // Force a password change before any app content when the account is still on
+  // an admin-issued temporary credential (freshly created or reset).
+  if (currentUser?.mustChangePassword) {
+    return <ForcePasswordChange userName={currentUser.name} onLogout={logout} />;
+  }
+
   // Sidebar: 256px/80px + 12px left margin = 268px/92px. Content needs matching margin.
   const sidebarMargin = sidebarCollapsed ? '92px' : '268px';
 
@@ -75,8 +83,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         `}</style>
         <div className="dashboard-content-area flex-1 flex flex-col min-w-0 overflow-hidden pt-3">
           <Breadcrumbs />
-          <main id="main-content" className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <main id="main-content" className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
             <RoleGuard>{children}</RoleGuard>
+            {/* First-run onboarding. Self-gates: only renders for a new user
+                on their home dashboard, overlaying the content area. */}
+            <GetStartedCard />
           </main>
         </div>
       </div>

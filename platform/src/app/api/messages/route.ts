@@ -10,15 +10,15 @@ import {
 import { withAuditLog } from '@/lib/audit/with-audit';
 import type { UserRole } from '@/lib/db-types';
 const READ_ROLES: UserRole[] = [
-  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
-  'medical_superintendent', 'lab_tech', 'pharmacist', 'front_desk',
-  'boma_health_worker', 'community_health_volunteer', 'payam_supervisor',
+  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife',
+  'medical_superintendent', 'lab_tech', 'pharmacist', 'front_desk', 'cashier',
+  'boma_health_worker', 'community_health_volunteer', 'payam_supervisor', 'county_health_director',
   'data_entry_clerk', 'hrio', 'nutritionist', 'radiologist',
 ];
 const WRITE_ROLES: UserRole[] = [
-  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
-  'medical_superintendent', 'lab_tech', 'pharmacist', 'front_desk',
-  'boma_health_worker', 'community_health_volunteer', 'payam_supervisor',
+  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife',
+  'medical_superintendent', 'lab_tech', 'pharmacist', 'front_desk', 'cashier',
+  'boma_health_worker', 'community_health_volunteer', 'payam_supervisor', 'county_health_director',
   'data_entry_clerk', 'hrio', 'nutritionist', 'radiologist',
 ];
 export async function GET(request: NextRequest) {

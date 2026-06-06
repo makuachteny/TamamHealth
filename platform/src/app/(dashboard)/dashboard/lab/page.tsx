@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import {
   FlaskConical, Clock, CheckCircle2, AlertTriangle, Activity, Zap,
@@ -122,6 +123,7 @@ interface BatchEntry {
 
 export default function LabDashboardPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const { results, loading, update } = useLabResults();
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
@@ -411,15 +413,15 @@ export default function LabDashboardPage() {
   };
 
   const getTATLabel = (hrs: number) => {
-    if (hrs < 2) return 'On-time';
-    if (hrs < 4) return 'Warning';
-    return 'Overdue';
+    if (hrs < 2) return t('lab.tatOnTime');
+    if (hrs < 4) return t('lab.tatWarning');
+    return t('lab.tatOverdue');
   };
 
   if (loading) {
     return (
       <>
-        <TopBar title="Laboratory" />
+        <TopBar title={t('lab.laboratory')} />
         <main className="flex-1 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: ACCENT }} />
         </main>
@@ -430,21 +432,21 @@ export default function LabDashboardPage() {
   const unackAlerts = criticalAlerts.filter(a => !a.acknowledged);
 
   const kpiStrip = [
-    { label: 'Pending Orders', value: kpis.pending, icon: Clock, color: 'var(--color-warning)' },
-    { label: 'In Progress', value: kpis.inProgress, icon: Loader2, color: '#A855F7' },
-    { label: 'Completed Today', value: kpis.completedToday, icon: CheckCircle2, color: 'var(--color-success)' },
-    { label: 'Critical Results', value: kpis.critical, icon: AlertTriangle, color: 'var(--color-danger)' },
-    { label: 'Unack Critical', value: kpis.unacknowledgedCritical, icon: Bell, color: 'var(--color-danger)' },
-    { label: 'Abnormal', value: kpis.abnormal, icon: AlertTriangle, color: '#FB923C' },
-    { label: 'Avg Turnaround', value: `${kpis.avgTurnaround}h`, icon: Zap, color: '#5CB8A8' },
-    { label: 'Total Tests', value: kpis.total, icon: TestTubes, color: ACCENT },
+    { label: t('lab.pendingOrders'), value: kpis.pending, icon: Clock, color: 'var(--color-warning)' },
+    { label: t('lab.inProgress'), value: kpis.inProgress, icon: Loader2, color: '#A855F7' },
+    { label: t('lab.completedToday'), value: kpis.completedToday, icon: CheckCircle2, color: 'var(--color-success)' },
+    { label: t('lab.criticalResults'), value: kpis.critical, icon: AlertTriangle, color: 'var(--color-danger)' },
+    { label: t('lab.unackCritical'), value: kpis.unacknowledgedCritical, icon: Bell, color: 'var(--color-danger)' },
+    { label: t('lab.abnormal'), value: kpis.abnormal, icon: AlertTriangle, color: '#FB923C' },
+    { label: t('lab.avgTurnaround'), value: `${kpis.avgTurnaround}h`, icon: Zap, color: '#5CB8A8' },
+    { label: t('lab.totalTests'), value: kpis.total, icon: TestTubes, color: ACCENT },
   ];
 
   const quickActions = [
-    { label: 'Accept Order', icon: FileText, color: 'var(--color-success)', onClick: () => {} },
-    { label: 'Enter Result', icon: Microscope, color: ACCENT, onClick: () => setShowResultModal(true) },
-    { label: 'Batch Entry', icon: Table, color: '#A855F7', onClick: () => { setEntryMode('batch'); setShowResultModal(true); } },
-    { label: 'Message', icon: MessageSquare, color: '#5CB8A8', onClick: () => {} },
+    { label: t('lab.acceptOrder'), icon: FileText, color: 'var(--color-success)', onClick: () => {} },
+    { label: t('lab.enterResult'), icon: Microscope, color: ACCENT, onClick: () => setShowResultModal(true) },
+    { label: t('lab.batchEntry'), icon: Table, color: '#A855F7', onClick: () => { setEntryMode('batch'); setShowResultModal(true); } },
+    { label: t('lab.message'), icon: MessageSquare, color: '#5CB8A8', onClick: () => {} },
   ];
 
   return (
@@ -466,13 +468,13 @@ export default function LabDashboardPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--color-danger)' }}>CRITICAL RESULT</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--color-danger)' }}>{t('lab.criticalResult')}</span>
                   </div>
                   <p className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
                     {alert.patientName} &mdash; {alert.testName}: <span style={{ color: 'var(--color-danger)' }}>{alert.value} {alert.unit}</span>
                   </p>
                   <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    Ordered by {alert.orderedBy} &middot; {new Date(alert.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    {t('lab.orderedBy', { name: alert.orderedBy })} &middot; {new Date(alert.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
                 <button
@@ -481,7 +483,7 @@ export default function LabDashboardPage() {
                   style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--color-danger)', border: '1px solid rgba(239,68,68,0.3)' }}
                 >
                   <BellOff className="w-3 h-3" />
-                  Acknowledge
+                  {t('lab.acknowledge')}
                 </button>
               </div>
             ))}
@@ -498,10 +500,10 @@ export default function LabDashboardPage() {
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
-                Laboratory
+                {t('lab.laboratory')}
               </h1>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {currentUser?.hospital?.name || currentUser?.hospitalName || 'Laboratory'} &middot; {new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                {currentUser?.hospital?.name || currentUser?.hospitalName || t('lab.laboratory')} &middot; {new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
           </div>
@@ -512,12 +514,12 @@ export default function LabDashboardPage() {
               style={{ background: ACCENT, color: '#fff' }}
             >
               <Microscope className="w-3.5 h-3.5" />
-              Enter Result
+              {t('lab.enterResult')}
             </button>
             <div className="text-[10px] text-right" style={{ color: 'var(--text-muted)' }}>
               <div className="flex items-center gap-1">
                 <Radio className="w-3 h-3" style={{ color: ACCENT }} />
-                <span>{eventCounter} lab events tracked</span>
+                <span>{t('lab.eventsTracked', { count: eventCounter })}</span>
               </div>
             </div>
           </div>
@@ -544,17 +546,17 @@ export default function LabDashboardPage() {
             <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Orders Queue</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.ordersQueue')}</span>
                 <span className="px-2 py-0.5 rounded text-[9px] font-bold tracking-wider" style={{
                   background: 'rgba(6,182,212,0.1)', color: ACCENT, border: '1px solid rgba(6,182,212,0.2)',
-                }}>{pendingOrders.length} ACTIVE</span>
+                }}>{t('lab.activeCount', { count: pendingOrders.length })}</span>
               </div>
               <button
                 onClick={() => router.push('/lab')}
                 className="text-[10px] font-medium flex items-center gap-1"
                 style={{ color: ACCENT }}
               >
-                View all <ChevronRight className="w-3.5 h-3.5" />
+                {t('lab.viewAll')} <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
             <div className="p-3 space-y-1.5" style={{ maxHeight: '340px', overflowY: 'auto' }}>
@@ -583,10 +585,10 @@ export default function LabDashboardPage() {
                     <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
                       background: order.status === 'in_progress' ? 'rgba(168,85,247,0.12)' : 'rgba(251,191,36,0.12)',
                       color: order.status === 'in_progress' ? '#A855F7' : 'var(--color-warning)',
-                    }}>{order.status === 'in_progress' ? 'PROCESSING' : 'PENDING'}</span>
+                    }}>{order.status === 'in_progress' ? t('lab.processing') : t('lab.pending')}</span>
                     {order.critical && (
                       <div className="mt-1">
-                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>CRITICAL</span>
+                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>{t('lab.critical')}</span>
                       </div>
                     )}
                   </div>
@@ -594,7 +596,7 @@ export default function LabDashboardPage() {
               )) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <FlaskConical className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No pending orders</p>
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noPendingOrders')}</p>
                 </div>
               )}
             </div>
@@ -605,7 +607,7 @@ export default function LabDashboardPage() {
             <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <Droplets className="w-4 h-4" style={{ color: '#EC4899' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Specimen Pipeline</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.specimenPipeline')}</span>
               </div>
             </div>
             <div className="p-3 space-y-2">
@@ -624,13 +626,13 @@ export default function LabDashboardPage() {
                         width: `${pct}%`, background: ACCENT,
                       }} />
                     </div>
-                    <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>{pct}% of total</p>
+                    <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('lab.percentOfTotal', { pct })}</p>
                   </div>
                 );
               }) : (
                 <div className="flex flex-col items-center justify-center py-6">
                   <Droplets className="w-6 h-6 mb-1" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>No specimen data</p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noSpecimenData')}</p>
                 </div>
               )}
             </div>
@@ -643,9 +645,9 @@ export default function LabDashboardPage() {
               <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
                 <div className="flex items-center gap-2">
                   <Radio className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Live Feed</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.liveFeed')}</span>
                 </div>
-                <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{eventCounter} events</span>
+                <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('lab.eventsCount', { count: eventCounter })}</span>
               </div>
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
                 {liveEvents.map(evt => {
@@ -664,7 +666,7 @@ export default function LabDashboardPage() {
                           <div className="flex items-center gap-1">
                             <span className="text-[10px] font-semibold truncate" style={{ color: evt.color }}>{evt.label}</span>
                             {evt.isNew && (
-                              <span className="text-[7px] font-bold px-1 py-0.5 rounded" style={{ background: `${evt.color}20`, color: evt.color }}>NEW</span>
+                              <span className="text-[7px] font-bold px-1 py-0.5 rounded" style={{ background: `${evt.color}20`, color: evt.color }}>{t('lab.new')}</span>
                             )}
                           </div>
                           <div className="flex items-center justify-between">
@@ -681,7 +683,7 @@ export default function LabDashboardPage() {
 
             {/* Quick Actions */}
             <div className="dash-card rounded-2xl p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Quick Actions</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('lab.quickActions')}</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {quickActions.map(action => (
                   <button key={action.label} onClick={action.onClick} className="flex items-center gap-2 p-2 rounded-lg transition-all" style={{
@@ -701,9 +703,9 @@ export default function LabDashboardPage() {
           <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Recent Completed Results</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.recentCompletedResults')}</span>
             </div>
-            <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{recentCompleted.length} results</span>
+            <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('lab.resultsCount', { count: recentCompleted.length })}</span>
           </div>
           <div className="p-3">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -715,11 +717,11 @@ export default function LabDashboardPage() {
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{r.testName}</span>
                     {r.critical ? (
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>CRITICAL</span>
+                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>{t('lab.critical')}</span>
                     ) : r.abnormal ? (
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(251,146,60,0.12)', color: '#FB923C' }}>ABNORMAL</span>
+                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(251,146,60,0.12)', color: '#FB923C' }}>{t('lab.abnormalBadge')}</span>
                     ) : (
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(74,222,128,0.12)', color: 'var(--color-success)' }}>NORMAL</span>
+                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(74,222,128,0.12)', color: 'var(--color-success)' }}>{t('lab.normalBadge')}</span>
                     )}
                   </div>
                   <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{r.patientName}</p>
@@ -734,7 +736,7 @@ export default function LabDashboardPage() {
               )) : (
                 <div className="col-span-2 sm:col-span-3 flex flex-col items-center justify-center py-8 text-center">
                   <Microscope className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No completed results yet</p>
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noCompletedResults')}</p>
                 </div>
               )}
             </div>
@@ -746,7 +748,7 @@ export default function LabDashboardPage() {
           <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <div className="flex items-center gap-2">
               <Timer className="w-4 h-4" style={{ color: '#5CB8A8' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Turnaround Time (TAT) Dashboard</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.tatDashboard')}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1">
@@ -767,7 +769,7 @@ export default function LabDashboardPage() {
             {/* Summary cards */}
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Today Avg TAT</p>
+                <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('lab.todayAvgTat')}</p>
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-bold" style={{ color: getTATColor(tatData.overallTodayAvg) }}>
                     {tatData.overallTodayAvg > 0 ? tatData.overallTodayAvg.toFixed(1) : '--'}h
@@ -781,7 +783,7 @@ export default function LabDashboardPage() {
                 </div>
               </div>
               <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Weekly Avg TAT</p>
+                <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('lab.weeklyAvgTat')}</p>
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-bold" style={{ color: getTATColor(tatData.overallWeekAvg) }}>
                     {tatData.overallWeekAvg > 0 ? tatData.overallWeekAvg.toFixed(1) : '--'}h
@@ -809,11 +811,11 @@ export default function LabDashboardPage() {
                     }}>
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{row.test}</span>
-                        <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{row.todayCount} today</span>
+                        <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('lab.countToday', { count: row.todayCount })}</span>
                       </div>
                       {/* Today bar */}
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[9px] w-12 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Today</span>
+                        <span className="text-[9px] w-12 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{t('lab.today')}</span>
                         <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
                           <div className="h-full rounded-full transition-all duration-700" style={{
                             width: `${todayPct}%`,
@@ -826,7 +828,7 @@ export default function LabDashboardPage() {
                       </div>
                       {/* Weekly bar */}
                       <div className="flex items-center gap-2">
-                        <span className="text-[9px] w-12 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Week</span>
+                        <span className="text-[9px] w-12 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{t('lab.week')}</span>
                         <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
                           <div className="h-full rounded-full transition-all duration-700" style={{
                             width: `${weekPct}%`,
@@ -845,7 +847,7 @@ export default function LabDashboardPage() {
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <BarChart3 className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No turnaround data available yet</p>
+                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noTurnaroundData')}</p>
               </div>
             )}
           </div>
@@ -864,7 +866,7 @@ export default function LabDashboardPage() {
             <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <Microscope className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Enter Lab Result</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.enterLabResult')}</span>
               </div>
               <div className="flex items-center gap-2">
                 {/* Mode tabs */}
@@ -878,7 +880,7 @@ export default function LabDashboardPage() {
                     }}
                   >
                     <List className="w-3 h-3" />
-                    Single
+                    {t('lab.single')}
                   </button>
                   <button
                     onClick={() => { setEntryMode('batch'); setSelectedOrderId(''); setResultValue(''); }}
@@ -889,7 +891,7 @@ export default function LabDashboardPage() {
                     }}
                   >
                     <Table className="w-3 h-3" />
-                    Batch
+                    {t('lab.batch')}
                   </button>
                 </div>
                 <button onClick={() => { setShowResultModal(false); setEntryMode('single'); setSelectedOrderId(''); setResultValue(''); setBatchTestType(''); }} className="p-1 rounded-lg transition-all" style={{ color: 'var(--text-muted)' }}>
@@ -906,7 +908,7 @@ export default function LabDashboardPage() {
                   {/* Order Selection */}
                   <div>
                     <label className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>
-                      Select Pending Order
+                      {t('lab.selectPendingOrder')}
                     </label>
                     <select
                       value={selectedOrderId}
@@ -918,7 +920,7 @@ export default function LabDashboardPage() {
                         color: 'var(--text-primary)',
                       }}
                     >
-                      <option value="">-- Select an order --</option>
+                      <option value="">{t('lab.selectAnOrder')}</option>
                       {allPendingOrders.map(o => (
                         <option key={o._id} value={o._id}>
                           {o.testName} - {o.patientName} ({o.specimen})
@@ -933,19 +935,19 @@ export default function LabDashboardPage() {
                       <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Patient</p>
+                            <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</p>
                             <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{selectedOrder.patientName}</p>
                           </div>
                           <div>
-                            <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Test</p>
+                            <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.testName')}</p>
                             <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{selectedOrder.testName}</p>
                           </div>
                           <div>
-                            <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Specimen</p>
+                            <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.specimen')}</p>
                             <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{selectedOrder.specimen}</p>
                           </div>
                           <div>
-                            <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Ordered By</p>
+                            <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.orderedByLabel')}</p>
                             <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{selectedOrder.orderedBy}</p>
                           </div>
                         </div>
@@ -954,23 +956,23 @@ export default function LabDashboardPage() {
                       {/* Reference Range Display */}
                       {currentRefRange && (
                         <div className="p-3 rounded-xl" style={{ background: 'rgba(43,111,224,0.06)', border: '1px solid var(--accent-border)' }}>
-                          <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: ACCENT }}>Reference Range</p>
+                          <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: ACCENT }}>{t('lab.referenceRange')}</p>
                           <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
                             {currentRefRange.referenceStr}
                           </p>
                           {currentRefRange.qualitative && (
                             <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                              Expected values: {currentRefRange.qualitative.join(', ')}
+                              {t('lab.expectedValues', { values: currentRefRange.qualitative.join(', ') })}
                             </p>
                           )}
                           {currentRefRange.criticalLow !== undefined && (
                             <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-danger)' }}>
-                              Critical: {currentRefRange.criticalLow !== undefined ? `<${currentRefRange.criticalLow}` : ''}{currentRefRange.criticalLow !== undefined && currentRefRange.criticalHigh !== undefined ? ' or ' : ''}{currentRefRange.criticalHigh !== undefined ? `>${currentRefRange.criticalHigh}` : ''}
+                              {t('lab.criticalLabel')}: {currentRefRange.criticalLow !== undefined ? `<${currentRefRange.criticalLow}` : ''}{currentRefRange.criticalLow !== undefined && currentRefRange.criticalHigh !== undefined ? ' or ' : ''}{currentRefRange.criticalHigh !== undefined ? `>${currentRefRange.criticalHigh}` : ''}
                             </p>
                           )}
                           {currentRefRange.criticalLow === undefined && currentRefRange.criticalHigh !== undefined && (
                             <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-danger)' }}>
-                              Critical: &gt;{currentRefRange.criticalHigh}
+                              {t('lab.criticalLabel')}: &gt;{currentRefRange.criticalHigh}
                             </p>
                           )}
                         </div>
@@ -979,7 +981,7 @@ export default function LabDashboardPage() {
                       {/* Result Input */}
                       <div>
                         <label className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>
-                          Result Value
+                          {t('lab.resultValue')}
                         </label>
                         {currentRefRange?.qualitative ? (
                           <select
@@ -992,7 +994,7 @@ export default function LabDashboardPage() {
                               color: 'var(--text-primary)',
                             }}
                           >
-                            <option value="">-- Select result --</option>
+                            <option value="">{t('lab.selectResult')}</option>
                             {currentRefRange.qualitative.map(v => (
                               <option key={v} value={v}>{v}</option>
                             ))}
@@ -1004,7 +1006,7 @@ export default function LabDashboardPage() {
                               step="any"
                               value={resultValue}
                               onChange={e => setResultValue(e.target.value)}
-                              placeholder="Enter value..."
+                              placeholder={t('lab.enterValue')}
                               className="flex-1 px-3 py-2 rounded-xl text-[12px] outline-none transition-all"
                               style={{
                                 background: 'var(--overlay-subtle)',
@@ -1035,9 +1037,9 @@ export default function LabDashboardPage() {
                               {currentFlag.flag}
                             </span>
                             <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                              {currentFlag.flag === 'CRITICAL' ? 'This result requires immediate clinical attention!' :
-                                currentFlag.flag === 'ABNORMAL' ? 'Result is outside the normal reference range.' :
-                                  'Result is within normal reference range.'}
+                              {currentFlag.flag === 'CRITICAL' ? t('lab.flagCriticalMsg') :
+                                currentFlag.flag === 'ABNORMAL' ? t('lab.flagAbnormalMsg') :
+                                  t('lab.flagNormalMsg')}
                             </p>
                           </div>
                         </div>
@@ -1051,7 +1053,7 @@ export default function LabDashboardPage() {
                   {/* Test Type Selection */}
                   <div>
                     <label className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>
-                      Select Test Type
+                      {t('lab.selectTestType')}
                     </label>
                     <select
                       value={batchTestType}
@@ -1063,11 +1065,11 @@ export default function LabDashboardPage() {
                         color: 'var(--text-primary)',
                       }}
                     >
-                      <option value="">-- Select test type --</option>
-                      {pendingTestTypes.map(t => {
-                        const count = allPendingOrders.filter(o => o.testName === t).length;
+                      <option value="">{t('lab.selectTestTypeOption')}</option>
+                      {pendingTestTypes.map(tt => {
+                        const count = allPendingOrders.filter(o => o.testName === tt).length;
                         return (
-                          <option key={t} value={t}>{t} ({count} pending)</option>
+                          <option key={tt} value={tt}>{t('lab.testTypePending', { test: tt, count })}</option>
                         );
                       })}
                     </select>
@@ -1079,9 +1081,9 @@ export default function LabDashboardPage() {
                     return ref ? (
                       <div className="p-2.5 rounded-xl" style={{ background: 'rgba(43,111,224,0.06)', border: '1px solid var(--accent-border)' }}>
                         <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: ACCENT }}>
-                          Reference: {ref.referenceStr}
-                          {ref.criticalLow !== undefined && ` | Critical: <${ref.criticalLow}`}
-                          {ref.criticalHigh !== undefined && ` | Critical: >${ref.criticalHigh}`}
+                          {t('lab.reference')}: {ref.referenceStr}
+                          {ref.criticalLow !== undefined && ` | ${t('lab.criticalLabel')}: <${ref.criticalLow}`}
+                          {ref.criticalHigh !== undefined && ` | ${t('lab.criticalLabel')}: >${ref.criticalHigh}`}
                         </p>
                       </div>
                     ) : null;
@@ -1093,10 +1095,10 @@ export default function LabDashboardPage() {
                       <table className="w-full">
                         <thead>
                           <tr style={{ background: 'var(--overlay-subtle)' }}>
-                            <th className="text-left px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Patient</th>
-                            <th className="text-left px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Specimen</th>
-                            <th className="text-left px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Result</th>
-                            <th className="text-center px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Flag</th>
+                            <th className="text-left px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</th>
+                            <th className="text-left px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.specimen')}</th>
+                            <th className="text-left px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.result')}</th>
+                            <th className="text-center px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.flag')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1133,7 +1135,7 @@ export default function LabDashboardPage() {
                                       step="any"
                                       value={entry.resultValue}
                                       onChange={e => handleBatchEntryChange(entry.orderId, e.target.value)}
-                                      placeholder="Value..."
+                                      placeholder={t('lab.valuePlaceholder')}
                                       className="w-full px-2 py-1 rounded-lg text-[11px] outline-none"
                                       style={{
                                         background: 'var(--overlay-subtle)',
@@ -1162,7 +1164,7 @@ export default function LabDashboardPage() {
                   ) : batchTestType ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <Table className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No pending orders for this test type</p>
+                      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noPendingForType')}</p>
                     </div>
                   ) : null}
                 </div>
@@ -1176,7 +1178,7 @@ export default function LabDashboardPage() {
                 className="px-4 py-1.5 rounded-lg text-[11px] font-medium transition-all"
                 style={{ color: 'var(--text-muted)', border: '1px solid var(--border-light)' }}
               >
-                Cancel
+                {t('action.cancel')}
               </button>
 
               {entryMode === 'single' ? (
@@ -1190,7 +1192,7 @@ export default function LabDashboardPage() {
                   }}
                 >
                   {resultSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                  Save Result
+                  {t('lab.saveResult')}
                 </button>
               ) : (
                 <button
@@ -1203,7 +1205,7 @@ export default function LabDashboardPage() {
                   }}
                 >
                   {batchSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                  Save All ({batchEntries.filter(e => e.resultValue.trim() !== '').length})
+                  {t('lab.saveAll', { count: batchEntries.filter(e => e.resultValue.trim() !== '').length })}
                 </button>
               )}
             </div>

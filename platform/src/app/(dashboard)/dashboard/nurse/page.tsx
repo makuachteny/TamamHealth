@@ -11,6 +11,8 @@ import { useBirths } from '@/lib/hooks/useBirths';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useToast } from '@/components/Toast';
+import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Activity, HeartPulse, Syringe, Baby, Pill, Clock,
   Radio, Wifi, ChevronRight, Clipboard, Thermometer,
@@ -170,9 +172,10 @@ function calculateTriagePriority(triage: TriageResult): 'RED' | 'YELLOW' | 'GREE
 // Main Component
 // ============================================================
 export default function NurseDashboardPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { currentUser, globalSearch } = useApp();
-  const { patients } = usePatients();
+  const { patients, reload } = usePatients();
   const { stats: immStats } = useImmunizations();
   const { stats: ancStats } = useANC();
   const { stats: birthStats } = useBirths();
@@ -201,6 +204,7 @@ export default function NurseDashboardPage() {
   });
   // Triage is now tied to a real patient, not a free-text name.
   const [triagePatientId, setTriagePatientId] = useState('');
+  const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   const [triagePatientSearch, setTriagePatientSearch] = useState('');
   const [triageVitals, setTriageVitals] = useState({
     temperature: '', pulse: '', respiratoryRate: '', systolic: '', diastolic: '',
@@ -230,11 +234,11 @@ export default function NurseDashboardPage() {
 
   const handleSubmitTriage = async () => {
     if (!selectedTriagePatient) {
-      showToast('Select a patient first', 'error');
+      showToast(t('nurse.selectPatientFirst'), 'error');
       return;
     }
     if (!triageData.priority) {
-      showToast('Complete the ABCC assessment', 'error');
+      showToast(t('nurse.completeAbcc'), 'error');
       return;
     }
     try {
@@ -266,7 +270,7 @@ export default function NurseDashboardPage() {
         orgId: currentUser?.orgId,
         status: 'pending',
       });
-      showToast(`${triageData.priority} triage saved for ${selectedTriagePatient.firstName} ${selectedTriagePatient.surname}`, 'success');
+      showToast(t('nurse.triageSaved', { priority: triageData.priority, name: `${selectedTriagePatient.firstName} ${selectedTriagePatient.surname}` }), 'success');
       // Reset form only on success
       setTriageData({ airway: '', breathing: '', circulation: '', consciousness: '', priority: '' });
       setTriagePatientId('');
@@ -277,7 +281,7 @@ export default function NurseDashboardPage() {
     } catch (err) {
       console.error(err);
       // Keep form data intact so the nurse can retry
-      showToast('Failed to save triage. Your data is preserved — please try again.', 'error');
+      showToast(t('nurse.triageSaveFailed'), 'error');
     } finally {
       setTriageSubmitting(false);
     }
@@ -468,10 +472,10 @@ export default function NurseDashboardPage() {
         const { dispensePrescription } = await import('@/lib/services/prescription-service');
         await dispensePrescription(entryId, currentUser?.name);
       }
-      showToast('Medication marked as given', 'success');
+      showToast(t('nurse.medicationGivenToast'), 'success');
     } catch (err) {
       console.error('Failed to persist medication given:', err);
-      showToast('Marked locally but failed to save. Will retry on next sync.', 'error');
+      showToast(t('nurse.medicationGivenFailedToast'), 'error');
     }
   };
 
@@ -481,7 +485,7 @@ export default function NurseDashboardPage() {
   const todayDate = new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const displayName = currentUser.name.split(' ')[1] || currentUser.name.split(' ')[0];
   const hr = new Date().getHours();
-  const greeting = hr < 12 ? 'morning' : hr < 17 ? 'afternoon' : 'evening';
+  const greeting = hr < 12 ? t('nurse.greetingMorning') : hr < 17 ? t('nurse.greetingAfternoon') : t('nurse.greetingEvening');
   // KPI counts: in demo mode we synthesize plausible workloads from the seeded
   // patient list (`Math.max(N, ratio*length)` ensures the cards never show
   // zero against a non-empty hospital). Production has real workload data
@@ -504,25 +508,25 @@ export default function NurseDashboardPage() {
   // MAR color helper
   const marStatusColor = (status: MAREntry['status']) => {
     switch (status) {
-      case 'overdue': return { bg: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)', label: 'OVERDUE' };
-      case 'due': return { bg: 'rgba(251,191,36,0.12)', color: 'var(--color-warning)', label: 'DUE NOW' };
-      case 'upcoming': return { bg: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)', label: 'UPCOMING' };
-      case 'given': return { bg: 'rgba(74,222,128,0.12)', color: 'var(--color-success)', label: 'GIVEN' };
+      case 'overdue': return { bg: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)', label: t('nurse.marOverdue') };
+      case 'due': return { bg: 'rgba(251,191,36,0.12)', color: 'var(--color-warning)', label: t('nurse.marDueNow') };
+      case 'upcoming': return { bg: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)', label: t('nurse.marUpcoming') };
+      case 'given': return { bg: 'rgba(74,222,128,0.12)', color: 'var(--color-success)', label: t('nurse.marGiven') };
     }
   };
 
   const triagePriorityColor = (priority: string) => {
     switch (priority) {
-      case 'RED': return { bg: 'var(--color-danger)', text: '#FFF', label: 'EMERGENCY - Immediate treatment required' };
-      case 'YELLOW': return { bg: 'var(--color-warning)', text: '#000', label: 'PRIORITY - Needs prompt attention' };
-      case 'GREEN': return { bg: 'var(--color-success)', text: '#000', label: 'NON-URGENT - Standard queue' };
-      default: return { bg: 'var(--text-muted)', text: '#FFF', label: 'Complete all fields' };
+      case 'RED': return { bg: 'var(--color-danger)', text: '#FFF', label: t('nurse.priorityRedLabel') };
+      case 'YELLOW': return { bg: 'var(--color-warning)', text: '#000', label: t('nurse.priorityYellowLabel') };
+      case 'GREEN': return { bg: 'var(--color-success)', text: '#000', label: t('nurse.priorityGreenLabel') };
+      default: return { bg: 'var(--text-muted)', text: '#FFF', label: t('nurse.priorityDefaultLabel') };
     }
   };
 
   return (
     <>
-      <TopBar title="Nurse Station" />
+      <TopBar title={t('nurse.title')} />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column' }}>
 
         {/* COMMAND CENTER HEADER */}
@@ -535,7 +539,7 @@ export default function NurseDashboardPage() {
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
-                Good {greeting}, {displayName}
+                {t('nurse.greeting', { greeting, name: displayName })}
               </h1>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 {todayDate} · {hospital?.name || currentUser.hospitalName || ''}
@@ -550,16 +554,16 @@ export default function NurseDashboardPage() {
               style={{
                 background: 'var(--accent-light)',
                 color: ACCENT,
-                border: `1px solid var(--accent-border, rgba(27, 154, 170,0.2))`,
+                border: `1px solid var(--accent-border, rgba(59, 130, 246,0.2))`,
               }}
             >
               <FileText className="w-3.5 h-3.5" />
-              Shift Handoff
+              {t('nurse.shiftHandoff')}
             </button>
             <div className="text-[10px] text-right" style={{ color: 'var(--text-muted)' }}>
               <div className="flex items-center gap-1">
                 <Wifi className="w-3 h-3" style={{ color: 'var(--color-success)' }} />
-                <span>Connected · {hospital?.internetType || 'N/A'}</span>
+                <span>{t('nurse.connected', { type: hospital?.internetType || 'N/A' })}</span>
               </div>
             </div>
           </div>
@@ -570,17 +574,17 @@ export default function NurseDashboardPage() {
           {/* Ward Patients */}
           <div className="dash-card" style={{ padding: '16px 18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Ward Patients</p>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>{t('nurse.wardPatients')}</p>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-success)', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                <BedDouble className="w-3 h-3" /> Active
+                <BedDouble className="w-3 h-3" /> {t('nurse.active')}
               </span>
             </div>
             <div className="text-3xl font-bold mb-3" style={{ color: 'var(--text-primary)', lineHeight: 1 }}>{patients.length || 0}</div>
             <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 12, display: 'flex', gap: 0 }}>
               {[
-                { v: vitalsDue, l: 'Vitals Due', c: '#F87171' },
-                { v: medsDue, l: 'Meds Due', c: '#5CB8A8' },
-                { v: pendingOrders, l: 'Orders', c: '#FB923C' },
+                { v: vitalsDue, l: t('nurse.vitalsDue'), c: '#F87171' },
+                { v: medsDue, l: t('nurse.medsDue'), c: '#5CB8A8' },
+                { v: pendingOrders, l: t('nurse.orders'), c: '#FB923C' },
               ].map((s, i) => (
                 <div key={s.l} style={{ flex: 1, textAlign: 'center', borderRight: i < 2 ? '1px solid var(--border-light)' : 'none' }}>
                   <div style={{ fontSize: 16, fontWeight: 700, color: s.c }}>{s.v}</div>
@@ -592,12 +596,12 @@ export default function NurseDashboardPage() {
 
           {/* Maternal & Child */}
           <div className="dash-card" style={{ padding: '16px 18px' }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12 }}>Maternal &amp; Child</p>
+            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12 }}>{t('nurse.maternalChild')}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                { Icon: HeartPulse, label: 'ANC Mothers', count: ancStats?.totalMothers || 0, color: '#F472B6' },
-                { Icon: Baby, label: 'Births (Wk)', count: birthStats?.total || 0, color: 'var(--accent-primary)' },
-                { Icon: Syringe, label: 'Immunizations', count: immStats?.totalVaccinations || 0, color: '#A855F7' },
+                { Icon: HeartPulse, label: t('nurse.ancMothers'), count: ancStats?.totalMothers || 0, color: '#F472B6' },
+                { Icon: Baby, label: t('nurse.birthsWk'), count: birthStats?.total || 0, color: 'var(--accent-primary)' },
+                { Icon: Syringe, label: t('nurse.immunizations'), count: immStats?.totalVaccinations || 0, color: '#A855F7' },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 30, height: 30, borderRadius: 8, background: `${typeof r.color === 'string' && r.color.startsWith('#') ? r.color + '15' : 'var(--accent-light)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -612,13 +616,13 @@ export default function NurseDashboardPage() {
 
           {/* Shift Overview */}
           <div className="dash-card" style={{ padding: '16px 18px' }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 14 }}>Shift Overview</p>
+            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 14 }}>{t('nurse.shiftOverview')}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
-                { Icon: Activity, label: 'Vitals Taken', value: IS_DEMO ? Math.max(8, Math.floor(patients.length * 0.4)) : 0, color: 'var(--color-success)', bg: 'rgba(27,158,119,0.12)' },
-                { Icon: Pill, label: 'Meds Given', value: IS_DEMO ? Math.max(5, Math.floor(patients.length * 0.2)) : 0, color: '#5CB8A8', bg: 'rgba(92,184,168,0.12)' },
-                { Icon: Clipboard, label: 'Assessments', value: IS_DEMO ? Math.max(3, Math.floor(patients.length * 0.15)) : 0, color: '#A855F7', bg: 'rgba(168,85,247,0.12)' },
-                { Icon: Baby, label: 'Births Assisted', value: birthStats?.total || 0, color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
+                { Icon: Activity, label: t('nurse.vitalsTaken'), value: IS_DEMO ? Math.max(8, Math.floor(patients.length * 0.4)) : 0, color: 'var(--color-success)', bg: 'rgba(27,158,119,0.12)' },
+                { Icon: Pill, label: t('nurse.medsGiven'), value: IS_DEMO ? Math.max(5, Math.floor(patients.length * 0.2)) : 0, color: '#5CB8A8', bg: 'rgba(92,184,168,0.12)' },
+                { Icon: Clipboard, label: t('nurse.assessments'), value: IS_DEMO ? Math.max(3, Math.floor(patients.length * 0.15)) : 0, color: '#A855F7', bg: 'rgba(168,85,247,0.12)' },
+                { Icon: Baby, label: t('nurse.birthsAssisted'), value: birthStats?.total || 0, color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
               ].map(item => (
                 <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 28, height: 28, borderRadius: 7, background: item.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -633,15 +637,15 @@ export default function NurseDashboardPage() {
 
           {/* Quick Actions Card */}
           <div className="dash-card" style={{ padding: '16px 18px' }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12 }}>Quick Actions</p>
+            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12 }}>{t('nurse.quickActions')}</p>
             <div className="grid grid-cols-2 gap-1.5">
               {[
-                { label: 'Record Vitals', icon: Activity, href: '/patients', color: 'var(--color-success)' },
-                { label: 'ANC Visit', icon: HeartPulse, href: '/anc', color: '#F472B6' },
-                { label: 'Immunization', icon: Syringe, href: '/immunizations', color: '#A855F7' },
-                { label: 'Birth Reg.', icon: Baby, href: '/births', color: ACCENT },
-                { label: 'Lab Orders', icon: Stethoscope, href: '/lab', color: '#FB923C' },
-                { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#5CB8A8' },
+                { label: t('nurse.recordVitals'), icon: Activity, href: '/patients', color: 'var(--color-success)' },
+                { label: t('nurse.ancVisit'), icon: HeartPulse, href: '/anc', color: '#F472B6' },
+                { label: t('nurse.immunization'), icon: Syringe, href: '/immunizations', color: '#A855F7' },
+                { label: t('nurse.birthReg'), icon: Baby, href: '/births', color: ACCENT },
+                { label: t('nurse.labOrders'), icon: Stethoscope, href: '/lab', color: '#FB923C' },
+                { label: t('nurse.messages'), icon: MessageSquare, href: '/messages', color: '#5CB8A8' },
               ].map(action => (
                 <button
                   key={action.label}
@@ -660,9 +664,9 @@ export default function NurseDashboardPage() {
         {/* TAB NAVIGATION */}
         <div className="flex items-center gap-1 mb-4">
           {[
-            { key: 'ward' as const, label: 'Ward Patients', icon: BedDouble },
-            { key: 'mar' as const, label: 'Medication Admin (MAR)', icon: Pill },
-            { key: 'triage' as const, label: 'Triage (ETAT)', icon: AlertTriangle },
+            { key: 'ward' as const, label: t('nurse.tabWard'), icon: BedDouble },
+            { key: 'mar' as const, label: t('nurse.tabMar'), icon: Pill },
+            { key: 'triage' as const, label: t('nurse.tabTriage'), icon: AlertTriangle },
           ].map(tab => (
             <button
               key={tab.key}
@@ -688,10 +692,10 @@ export default function NurseDashboardPage() {
               <div className="flex items-center justify-between p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <div className="flex items-center gap-2">
                   <BedDouble className="w-4 h-4" style={{ color: ACCENT }} />
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Ward Patients</h3>
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.wardPatients')}</h3>
                   <span className="px-2 py-0.5 rounded text-[9px] font-bold tracking-wider" style={{
                     background: 'var(--accent-light)', color: ACCENT, border: '1px solid var(--accent-border)',
-                  }}>LIVE</span>
+                  }}>{t('nurse.live')}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
@@ -704,10 +708,10 @@ export default function NurseDashboardPage() {
                     }}
                   >
                     <ArrowUpDown className="w-3 h-3" />
-                    {sortByUrgency ? 'By Urgency' : 'Sort'}
+                    {sortByUrgency ? t('nurse.byUrgency') : t('nurse.sort')}
                   </button>
                   <button onClick={() => router.push('/patients')} className="text-[11px] font-medium flex items-center gap-0.5" style={{ color: ACCENT }}>
-                    View all <ChevronRight className="w-3 h-3" />
+                    {t('nurse.viewAll')} <ChevronRight className="w-3 h-3" />
                   </button>
                 </div>
               </div>
@@ -715,7 +719,7 @@ export default function NurseDashboardPage() {
                 <table className="w-full">
                   <thead>
                     <tr>
-                      {['Priority', 'Patient Name', 'ID', 'Gender / Age', 'Chief Complaint', 'Status', 'Actions'].map(h => (
+                      {[t('nurse.colPriority'), t('nurse.colPatientName'), t('nurse.colId'), t('nurse.colGenderAge'), t('nurse.colChiefComplaint'), t('nurse.colStatus'), t('nurse.colActions')].map(h => (
                         <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
                           {h}
                         </th>
@@ -759,16 +763,16 @@ export default function NurseDashboardPage() {
                           </td>
                           <td className="px-4 py-2.5">
                             {triageStatus === 'pending' && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(252,211,77,0.15)', color: 'var(--color-warning)' }}>WAITING</span>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(252,211,77,0.15)', color: 'var(--color-warning)' }}>{t('nurse.statusWaiting')}</span>
                             )}
                             {triageStatus === 'seen' && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(92,184,168,0.15)', color: '#5CB8A8' }}>IN CONSULT</span>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(92,184,168,0.15)', color: '#5CB8A8' }}>{t('nurse.statusInConsult')}</span>
                             )}
                             {(triageStatus === 'discharged' || triageStatus === 'admitted') && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--color-success)' }}>{triageStatus.toUpperCase()}</span>
                             )}
                             {triageStatus === 'none' && !triagePriority && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>NOT TRIAGED</span>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>{t('nurse.statusNotTriaged')}</span>
                             )}
                           </td>
                           <td className="px-4 py-2.5">
@@ -783,7 +787,7 @@ export default function NurseDashboardPage() {
                                 }}
                                 className="flex items-center justify-center w-7 h-7 rounded-lg transition-colors"
                                 style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}
-                                title="Record vitals"
+                                title={t('nurse.recordVitalsTitle')}
                               >
                                 <Thermometer className="w-3.5 h-3.5" />
                               </button>
@@ -796,7 +800,7 @@ export default function NurseDashboardPage() {
                                   }}
                                   className="flex items-center justify-center w-7 h-7 rounded-lg transition-colors"
                                   style={{ background: 'rgba(251,146,60,0.12)', color: '#FB923C' }}
-                                  title="Start triage"
+                                  title={t('nurse.startTriage')}
                                 >
                                   <AlertTriangle className="w-3.5 h-3.5" />
                                 </button>
@@ -805,11 +809,17 @@ export default function NurseDashboardPage() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    router.push(`/consultation?patientId=${patient._id}`);
+                                    setAssignTarget({
+                                      patientId: patient._id,
+                                      patientName: `${patient.firstName} ${patient.surname}`,
+                                      hospitalNumber: patient.hospitalNumber,
+                                      triageId: triage?._id,
+                                      currentDoctorId: patient.assignedDoctor,
+                                    });
                                   }}
                                   className="flex items-center justify-center w-7 h-7 rounded-lg transition-colors"
                                   style={{ background: 'rgba(74,222,128,0.12)', color: 'var(--color-success)' }}
-                                  title="Send to doctor"
+                                  title={patient.assignedDoctor ? `Assigned to ${patient.assignedDoctorName ?? 'doctor'} — reassign` : 'Assign to doctor'}
                                 >
                                   <Stethoscope className="w-3.5 h-3.5" />
                                 </button>
@@ -832,12 +842,12 @@ export default function NurseDashboardPage() {
                 <div className="px-3 py-2 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
                   <div className="flex items-center gap-2">
                     <Radio className="w-4 h-4" style={{ color: ACCENT }} />
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Care Feed</span>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.careFeed')}</span>
                     <span className="px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider" style={{
                       background: 'rgba(74,222,128,0.12)', color: 'var(--color-success)',
-                    }}>LIVE</span>
+                    }}>{t('nurse.live')}</span>
                   </div>
-                  <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{eventCounter} events</span>
+                  <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('nurse.events', { count: eventCounter })}</span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1" style={{ minHeight: 0 }}>
                   {liveEvents.map(evt => {
@@ -861,7 +871,7 @@ export default function NurseDashboardPage() {
                             <div className="flex items-center gap-1.5">
                               <span className="text-[11px] font-semibold truncate" style={{ color: evt.color }}>{evt.label}</span>
                               {evt.isNew && (
-                                <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: `${evt.color}20`, color: evt.color }}>NEW</span>
+                                <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: `${evt.color}20`, color: evt.color }}>{t('nurse.new')}</span>
                               )}
                             </div>
                             <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{evt.patient}</p>
@@ -882,17 +892,17 @@ export default function NurseDashboardPage() {
                 <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4" style={{ color: '#FB923C' }} />
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Triage Queue</span>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.triageQueue')}</span>
                   </div>
                   <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    {triageHistory.filter(t => t.status === 'pending').length} waiting
+                    {t('nurse.waiting', { count: triageHistory.filter(t => t.status === 'pending').length })}
                   </span>
                 </div>
                 <div className="p-3 space-y-2 flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
                   {[
-                    { label: 'RED (Emergency)', count: triageHistory.filter(t => t.priority === 'RED' && t.status === 'pending').length, color: 'var(--color-danger)', bg: 'rgba(196,69,54,0.12)' },
-                    { label: 'YELLOW (Priority)', count: triageHistory.filter(t => t.priority === 'YELLOW' && t.status === 'pending').length, color: 'var(--color-warning)', bg: 'rgba(228,168,75,0.12)' },
-                    { label: 'GREEN (Standard)', count: triageHistory.filter(t => t.priority === 'GREEN' && t.status === 'pending').length, color: 'var(--color-success)', bg: 'rgba(27,158,119,0.12)' },
+                    { label: t('nurse.redEmergency'), count: triageHistory.filter(ti => ti.priority === 'RED' && ti.status === 'pending').length, color: 'var(--color-danger)', bg: 'rgba(196,69,54,0.12)' },
+                    { label: t('nurse.yellowPriority'), count: triageHistory.filter(ti => ti.priority === 'YELLOW' && ti.status === 'pending').length, color: 'var(--color-warning)', bg: 'rgba(228,168,75,0.12)' },
+                    { label: t('nurse.greenStandard'), count: triageHistory.filter(ti => ti.priority === 'GREEN' && ti.status === 'pending').length, color: 'var(--color-success)', bg: 'rgba(27,158,119,0.12)' },
                   ].map(item => (
                     <div key={item.label} className="flex items-center justify-between p-2.5 rounded-lg" style={{
                       background: item.bg, border: '1px solid var(--border-light)',
@@ -903,23 +913,23 @@ export default function NurseDashboardPage() {
                   ))}
                   {/* Today's triage activity */}
                   <div className="pt-2 mt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
-                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Today&apos;s Activity</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('nurse.todaysActivity')}</p>
                     <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total triaged today</span>
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.totalTriagedToday')}</span>
                       <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                        {triageHistory.filter(t => (t.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length}
+                        {triageHistory.filter(ti => (ti.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length}
                       </span>
                     </div>
                     <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Currently in consult</span>
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.currentlyInConsult')}</span>
                       <span className="text-sm font-bold" style={{ color: '#5CB8A8' }}>
-                        {triageHistory.filter(t => t.status === 'seen').length}
+                        {triageHistory.filter(ti => ti.status === 'seen').length}
                       </span>
                     </div>
                     <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Discharged today</span>
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.dischargedToday')}</span>
                       <span className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>
-                        {triageHistory.filter(t => t.status === 'discharged' && (t.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length}
+                        {triageHistory.filter(ti => ti.status === 'discharged' && (ti.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length}
                       </span>
                     </div>
                   </div>
@@ -931,15 +941,15 @@ export default function NurseDashboardPage() {
                 <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
                   <div className="flex items-center gap-2">
                     <Pill className="w-4 h-4" style={{ color: '#5CB8A8' }} />
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Medication Status</span>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.medicationStatus')}</span>
                   </div>
                 </div>
                 <div className="p-3 space-y-2 flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
                   {[
-                    { label: 'Overdue', value: overdueMarCount, color: 'var(--color-danger)' },
-                    { label: 'Due Now', value: dueMarCount, color: 'var(--color-warning)' },
-                    { label: 'Upcoming', value: marEntries.filter(e => e.status === 'upcoming').length, color: 'var(--text-muted)' },
-                    { label: 'Given', value: marEntries.filter(e => e.status === 'given').length, color: 'var(--color-success)' },
+                    { label: t('nurse.overdue'), value: overdueMarCount, color: 'var(--color-danger)' },
+                    { label: t('nurse.dueNow'), value: dueMarCount, color: 'var(--color-warning)' },
+                    { label: t('nurse.upcoming'), value: marEntries.filter(e => e.status === 'upcoming').length, color: 'var(--text-muted)' },
+                    { label: t('nurse.given'), value: marEntries.filter(e => e.status === 'given').length, color: 'var(--color-success)' },
                   ].map(item => (
                     <div key={item.label} className="flex items-center justify-between p-2.5 rounded-lg" style={{
                       background: 'var(--overlay-subtle)',
@@ -951,13 +961,13 @@ export default function NurseDashboardPage() {
                   ))}
                   {/* MAR summary */}
                   <div className="pt-2 mt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
-                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Shift Progress</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('nurse.shiftProgress')}</p>
                     <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total scheduled</span>
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.totalScheduled')}</span>
                       <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{marEntries.length}</span>
                     </div>
                     <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Completion rate</span>
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.completionRate')}</span>
                       <span className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>
                         {marEntries.length > 0 ? Math.round((marEntries.filter(e => e.status === 'given').length / marEntries.length) * 100) : 0}%
                       </span>
@@ -975,19 +985,19 @@ export default function NurseDashboardPage() {
             <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <Pill className="w-4 h-4" style={{ color: '#5CB8A8' }} />
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Medication Administration Record</h3>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.marTitle')}</h3>
                 <span className="px-2 py-0.5 rounded text-[9px] font-bold tracking-wider" style={{
                   background: 'rgba(92,184,168,0.1)',
                   color: '#5CB8A8',
                   border: '1px solid rgba(92,184,168,0.2)',
-                }}>{marEntries.filter(e => e.status !== 'given').length} PENDING</span>
+                }}>{t('nurse.pending', { count: marEntries.filter(e => e.status !== 'given').length })}</span>
               </div>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table className="w-full">
                 <thead>
                   <tr>
-                    {['Time', 'Patient', 'Medication', 'Dose', 'Route', 'Status', 'Action'].map(h => (
+                    {[t('nurse.colTime'), t('nurse.colPatient'), t('nurse.colMedication'), t('nurse.colDose'), t('nurse.colRoute'), t('nurse.colStatus'), t('nurse.colAction')].map(h => (
                       <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
                         {h}
                       </th>
@@ -1034,7 +1044,7 @@ export default function NurseDashboardPage() {
                                 background: 'rgba(74,222,128,0.15)',
                                 border: '1px solid rgba(74,222,128,0.3)',
                               }}
-                              title="Mark as given"
+                              title={t('nurse.markAsGiven')}
                             >
                               <Check className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
                             </button>
@@ -1053,7 +1063,7 @@ export default function NurseDashboardPage() {
             {marEntries.length === 0 && (
               <div className="text-center py-12">
                 <Pill className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No medications scheduled</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('nurse.noMedications')}</p>
               </div>
             )}
           </div>
@@ -1067,18 +1077,18 @@ export default function NurseDashboardPage() {
               <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" style={{ color: '#FB923C' }} />
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>ETAT Triage Assessment</h3>
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.etatTriageAssessment')}</h3>
                 </div>
                 <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                  Today: {triageHistory.filter(t => (t.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length} · RED active: {triageHistory.filter(t => t.priority === 'RED' && t.status === 'pending').length}
+                  {t('nurse.triageHeaderSummary', { today: triageHistory.filter(ti => (ti.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length, red: triageHistory.filter(ti => ti.priority === 'RED' && ti.status === 'pending').length })}
                 </span>
               </div>
               <div className="p-4 space-y-4 flex-1 overflow-y-auto">
                 {/* Patient picker */}
                 <div className="relative">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>Patient</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nurse.patient')}</label>
                   {selectedTriagePatient ? (
-                    <div className="flex items-center justify-between px-3 py-2.5 rounded-xl" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(27, 154, 170,0.25))' }}>
+                    <div className="flex items-center justify-between px-3 py-2.5 rounded-xl" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(59, 130, 246,0.25))' }}>
                       <div>
                         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                           {selectedTriagePatient.firstName} {selectedTriagePatient.surname}
@@ -1097,7 +1107,7 @@ export default function NurseDashboardPage() {
                         type="text"
                         value={triagePatientSearch}
                         onChange={e => setTriagePatientSearch(e.target.value)}
-                        placeholder="Search by name or hospital number…"
+                        placeholder={t('nurse.searchPatientPlaceholder')}
                         className="w-full px-3 py-2 rounded-xl text-sm"
                         style={{
                           background: 'var(--overlay-subtle)',
@@ -1126,12 +1136,12 @@ export default function NurseDashboardPage() {
 
                 {/* Chief complaint */}
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>Chief Complaint</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nurse.chiefComplaint')}</label>
                   <input
                     type="text"
                     value={triageComplaint}
                     onChange={e => setTriageComplaint(e.target.value)}
-                    placeholder="e.g. fever 3 days, difficulty breathing"
+                    placeholder={t('nurse.chiefComplaintPlaceholder')}
                     className="w-full px-3 py-2 rounded-xl text-sm"
                     style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                   />
@@ -1143,7 +1153,7 @@ export default function NurseDashboardPage() {
                   <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                     <div className="flex items-center gap-2 mb-2">
                       <Wind className="w-4 h-4" style={{ color: '#5CB8A8' }} />
-                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Airway</span>
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.airway')}</span>
                     </div>
                     <div className="flex gap-2">
                       {(['clear', 'obstructed'] as const).map(opt => (
@@ -1163,7 +1173,7 @@ export default function NurseDashboardPage() {
                               : 'var(--border-light)'}`,
                           }}
                         >
-                          {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                          {opt === 'clear' ? t('nurse.airwayClear') : t('nurse.airwayObstructed')}
                         </button>
                       ))}
                     </div>
@@ -1173,7 +1183,7 @@ export default function NurseDashboardPage() {
                   <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                     <div className="flex items-center gap-2 mb-2">
                       <Activity className="w-4 h-4" style={{ color: '#A855F7' }} />
-                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Breathing</span>
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.breathing')}</span>
                     </div>
                     <div className="flex gap-2">
                       {(['normal', 'distressed', 'absent'] as const).map(opt => (
@@ -1193,7 +1203,7 @@ export default function NurseDashboardPage() {
                               : 'var(--border-light)'}`,
                           }}
                         >
-                          {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                          {opt === 'normal' ? t('nurse.breathingNormal') : opt === 'distressed' ? t('nurse.breathingDistressed') : t('nurse.breathingAbsent')}
                         </button>
                       ))}
                     </div>
@@ -1203,7 +1213,7 @@ export default function NurseDashboardPage() {
                   <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                     <div className="flex items-center gap-2 mb-2">
                       <Heart className="w-4 h-4" style={{ color: '#EC4899' }} />
-                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Circulation</span>
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.circulation')}</span>
                     </div>
                     <div className="flex gap-2">
                       {(['normal', 'impaired', 'absent'] as const).map(opt => (
@@ -1223,7 +1233,7 @@ export default function NurseDashboardPage() {
                               : 'var(--border-light)'}`,
                           }}
                         >
-                          {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                          {opt === 'normal' ? t('nurse.circulationNormal') : opt === 'impaired' ? t('nurse.circulationImpaired') : t('nurse.circulationAbsent')}
                         </button>
                       ))}
                     </div>
@@ -1233,14 +1243,14 @@ export default function NurseDashboardPage() {
                   <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                     <div className="flex items-center gap-2 mb-2">
                       <Brain className="w-4 h-4" style={{ color: '#5CB8A8' }} />
-                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Consciousness (AVPU)</span>
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.consciousnessAvpu')}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
                       {([
-                        { key: 'alert' as const, label: 'A - Alert' },
-                        { key: 'verbal' as const, label: 'V - Verbal' },
-                        { key: 'pain' as const, label: 'P - Pain' },
-                        { key: 'unresponsive' as const, label: 'U - Unresponsive' },
+                        { key: 'alert' as const, label: t('nurse.avpuAlert') },
+                        { key: 'verbal' as const, label: t('nurse.avpuVerbal') },
+                        { key: 'pain' as const, label: t('nurse.avpuPain') },
+                        { key: 'unresponsive' as const, label: t('nurse.avpuUnresponsive') },
                       ]).map(opt => (
                         <button
                           key={opt.key}
@@ -1277,7 +1287,7 @@ export default function NurseDashboardPage() {
                     <p className="text-3xl font-black mb-1">{triageData.priority}</p>
                     <p className="text-sm font-semibold">{triagePriorityColor(triageData.priority).label}</p>
                     {selectedTriagePatient && (
-                      <p className="text-xs mt-1 opacity-80">Patient: {selectedTriagePatient.firstName} {selectedTriagePatient.surname}</p>
+                      <p className="text-xs mt-1 opacity-80">{t('nurse.patientLabel', { name: `${selectedTriagePatient.firstName} ${selectedTriagePatient.surname}` })}</p>
                     )}
                   </div>
                 )}
@@ -1286,35 +1296,35 @@ export default function NurseDashboardPage() {
                 <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                   <div className="flex items-center gap-2 mb-3">
                     <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                    <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Vitals at Triage</span>
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.vitalsAtTriage')}</span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div>
-                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>Temp (°C)</label>
+                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>{t('nurse.tempC')}</label>
                       <input type="text" inputMode="decimal" value={triageVitals.temperature} onChange={e => setTriageVitals({ ...triageVitals, temperature: e.target.value })} placeholder="37.0" style={{ width: '100%', padding: '5px 8px', borderRadius: 6, fontSize: 12, background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
                     </div>
                     <div>
-                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>Pulse</label>
+                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>{t('nurse.pulse')}</label>
                       <input type="text" inputMode="numeric" value={triageVitals.pulse} onChange={e => setTriageVitals({ ...triageVitals, pulse: e.target.value })} placeholder="80" style={{ width: '100%', padding: '5px 8px', borderRadius: 6, fontSize: 12, background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
                     </div>
                     <div>
-                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>RR</label>
+                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>{t('nurse.rr')}</label>
                       <input type="text" inputMode="numeric" value={triageVitals.respiratoryRate} onChange={e => setTriageVitals({ ...triageVitals, respiratoryRate: e.target.value })} placeholder="18" style={{ width: '100%', padding: '5px 8px', borderRadius: 6, fontSize: 12, background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
                     </div>
                     <div>
-                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>SpO₂ %</label>
+                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>{t('nurse.spo2Pct')}</label>
                       <input type="text" inputMode="numeric" value={triageVitals.oxygenSaturation} onChange={e => setTriageVitals({ ...triageVitals, oxygenSaturation: e.target.value })} placeholder="98" style={{ width: '100%', padding: '5px 8px', borderRadius: 6, fontSize: 12, background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
                     </div>
                     <div>
-                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>Sys BP</label>
+                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>{t('nurse.sysBp')}</label>
                       <input type="text" inputMode="numeric" value={triageVitals.systolic} onChange={e => setTriageVitals({ ...triageVitals, systolic: e.target.value })} placeholder="120" style={{ width: '100%', padding: '5px 8px', borderRadius: 6, fontSize: 12, background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
                     </div>
                     <div>
-                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>Dia BP</label>
+                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>{t('nurse.diaBp')}</label>
                       <input type="text" inputMode="numeric" value={triageVitals.diastolic} onChange={e => setTriageVitals({ ...triageVitals, diastolic: e.target.value })} placeholder="80" style={{ width: '100%', padding: '5px 8px', borderRadius: 6, fontSize: 12, background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
                     </div>
                     <div>
-                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>Weight kg</label>
+                      <label className="text-[9px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>{t('nurse.weightKg')}</label>
                       <input type="text" inputMode="decimal" value={triageVitals.weight} onChange={e => setTriageVitals({ ...triageVitals, weight: e.target.value })} placeholder="65" style={{ width: '100%', padding: '5px 8px', borderRadius: 6, fontSize: 12, background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
                     </div>
                   </div>
@@ -1322,12 +1332,12 @@ export default function NurseDashboardPage() {
 
                 {/* Notes */}
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>Notes (optional)</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nurse.notesOptional')}</label>
                   <textarea
                     rows={2}
                     value={triageNotes}
                     onChange={e => setTriageNotes(e.target.value)}
-                    placeholder="Additional observations..."
+                    placeholder={t('nurse.additionalObservations')}
                     className="w-full px-3 py-2 rounded-xl text-sm"
                     style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                   />
@@ -1352,14 +1362,14 @@ export default function NurseDashboardPage() {
                     }}
                     disabled={triageSubmitting}
                   >
-                    Reset
+                    {t('nurse.reset')}
                   </button>
                   <button
                     onClick={handleSubmitTriage}
                     disabled={triageSubmitting || !triageData.priority || !selectedTriagePatient}
                     className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all btn btn-primary"
                   >
-                    {triageSubmitting ? 'Saving…' : 'Save Triage'}
+                    {triageSubmitting ? t('nurse.saving') : t('nurse.saveTriage')}
                   </button>
                 </div>
               </div>
@@ -1370,45 +1380,45 @@ export default function NurseDashboardPage() {
               <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4" style={{ color: ACCENT }} />
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Recent Triages</h3>
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.recentTriages')}</h3>
                 </div>
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{triageHistory.length} total</span>
+                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.total', { count: triageHistory.length })}</span>
               </div>
               <div className="p-3 flex-1 overflow-y-auto">
                 {triageHistory.length === 0 ? (
-                  <p className="text-center text-xs py-8" style={{ color: 'var(--text-muted)' }}>No triages recorded yet.</p>
+                  <p className="text-center text-xs py-8" style={{ color: 'var(--text-muted)' }}>{t('nurse.noTriages')}</p>
                 ) : (
                   <div className="space-y-2">
-                    {triageHistory.slice(0, 12).map(t => {
-                      const c = triagePriorityColor(t.priority);
+                    {triageHistory.slice(0, 12).map(ti => {
+                      const c = triagePriorityColor(ti.priority);
                       const timeAgo = (() => {
                         try {
-                          const mins = Math.floor((Date.now() - new Date(t.triagedAt).getTime()) / 60000);
-                          if (mins < 1) return 'just now';
-                          if (mins < 60) return `${mins}m ago`;
+                          const mins = Math.floor((Date.now() - new Date(ti.triagedAt).getTime()) / 60000);
+                          if (mins < 1) return t('nurse.justNow');
+                          if (mins < 60) return t('nurse.minsAgo', { mins });
                           const hrs = Math.floor(mins / 60);
-                          if (hrs < 24) return `${hrs}h ago`;
-                          return `${Math.floor(hrs / 24)}d ago`;
+                          if (hrs < 24) return t('nurse.hrsAgo', { hrs });
+                          return t('nurse.daysAgo', { days: Math.floor(hrs / 24) });
                         } catch { return ''; }
                       })();
                       return (
                         <div
-                          key={t._id}
+                          key={ti._id}
                           className="flex items-center gap-2 p-2 rounded-xl"
                           style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
                         >
                           <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: c.bg, color: c.text }}>
-                            <span className="text-[9px] font-black">{t.priority}</span>
+                            <span className="text-[9px] font-black">{ti.priority}</span>
                           </div>
-                          <button className="flex-1 min-w-0 text-left" onClick={() => router.push(`/patients/${t.patientId}`)} title="View patient record">
-                            <p className="text-[11px] font-semibold truncate hover:underline" style={{ color: 'var(--text-primary)' }}>{t.patientName}</p>
+                          <button className="flex-1 min-w-0 text-left" onClick={() => router.push(`/patients/${ti.patientId}`)} title={t('nurse.viewPatientRecord')}>
+                            <p className="text-[11px] font-semibold truncate hover:underline" style={{ color: 'var(--text-primary)' }}>{ti.patientName}</p>
                             <p className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>
-                              {t.chiefComplaint || 'ABCC'} · {timeAgo}
+                              {ti.chiefComplaint || 'ABCC'} · {timeAgo}
                             </p>
                           </button>
                           <div className="flex-shrink-0">
-                            <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: t.status === 'pending' ? 'rgba(252,211,77,0.12)' : t.status === 'seen' ? 'rgba(92,184,168,0.12)' : 'rgba(16,185,129,0.12)', color: t.status === 'pending' ? 'var(--color-warning)' : t.status === 'seen' ? '#5CB8A8' : 'var(--color-success)' }}>
-                              {t.status}
+                            <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: ti.status === 'pending' ? 'rgba(252,211,77,0.12)' : ti.status === 'seen' ? 'rgba(92,184,168,0.12)' : 'rgba(16,185,129,0.12)', color: ti.status === 'pending' ? 'var(--color-warning)' : ti.status === 'seen' ? '#5CB8A8' : 'var(--color-success)' }}>
+                              {ti.status}
                             </span>
                           </div>
                         </div>
@@ -1422,6 +1432,14 @@ export default function NurseDashboardPage() {
         )}
 
       </main>
+
+      {assignTarget && (
+        <AssignDoctorModal
+          target={assignTarget}
+          onClose={() => setAssignTarget(null)}
+          onAssigned={() => { setAssignTarget(null); reload(); }}
+        />
+      )}
 
       {/* ============================================================ */}
       {/* MODAL: Quick Vitals Entry (Feature 1) */}
@@ -1437,7 +1455,7 @@ export default function NurseDashboardPage() {
               <div className="flex items-center gap-2">
                 <Thermometer className="w-5 h-5" style={{ color: ACCENT }} />
                 <div>
-                  <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Quick Vitals Entry</h2>
+                  <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.quickVitalsEntry')}</h2>
                   <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{vitalsPatient.name}</p>
                 </div>
               </div>
@@ -1452,20 +1470,20 @@ export default function NurseDashboardPage() {
                 <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: 'rgba(74,222,128,0.15)' }}>
                   <Check className="w-7 h-7" style={{ color: 'var(--color-success)' }} />
                 </div>
-                <p className="text-sm font-semibold" style={{ color: 'var(--color-success)' }}>Vitals Saved Successfully</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-success)' }}>{t('nurse.vitalsSavedSuccess')}</p>
               </div>
             ) : (
               <div className="p-4 space-y-3">
                 {/* Blood Pressure */}
                 <div>
                   <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>
-                    Blood Pressure (mmHg)
+                    {t('nurse.bloodPressureMmhg')}
                   </label>
                   <div className="flex gap-2">
                     <div className="flex-1">
                       <input
                         type="number"
-                        placeholder="Systolic"
+                        placeholder={t('nurse.systolic')}
                         value={vitalsForm.systolic}
                         onChange={e => setVitalsForm(prev => ({ ...prev, systolic: e.target.value }))}
                         className="w-full px-3 py-2 rounded-xl text-sm"
@@ -1480,7 +1498,7 @@ export default function NurseDashboardPage() {
                     <div className="flex-1">
                       <input
                         type="number"
-                        placeholder="Diastolic"
+                        placeholder={t('nurse.diastolic')}
                         value={vitalsForm.diastolic}
                         onChange={e => setVitalsForm(prev => ({ ...prev, diastolic: e.target.value }))}
                         className="w-full px-3 py-2 rounded-xl text-sm"
@@ -1494,7 +1512,7 @@ export default function NurseDashboardPage() {
                   </div>
                   {(vitalFlags.systolic || vitalFlags.diastolic) && (
                     <p className="text-[10px] mt-1 font-semibold" style={{ color: 'var(--color-danger)' }}>
-                      <AlertCircle className="w-3 h-3 inline mr-1" />Abnormal BP detected
+                      <AlertCircle className="w-3 h-3 inline mr-1" />{t('nurse.abnormalBpDetected')}
                     </p>
                   )}
                 </div>
@@ -1502,7 +1520,7 @@ export default function NurseDashboardPage() {
                 {/* Temperature */}
                 <div>
                   <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>
-                    Temperature (°C)
+                    {t('nurse.temperatureC')}
                   </label>
                   <input
                     type="number"
@@ -1519,7 +1537,7 @@ export default function NurseDashboardPage() {
                   />
                   {vitalFlags.temperature && (
                     <p className="text-[10px] mt-1 font-semibold" style={{ color: 'var(--color-danger)' }}>
-                      <AlertCircle className="w-3 h-3 inline mr-1" />Fever detected ({'>'}38.5°C)
+                      <AlertCircle className="w-3 h-3 inline mr-1" />{t('nurse.feverDetected')}
                     </p>
                   )}
                 </div>
@@ -1528,7 +1546,7 @@ export default function NurseDashboardPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>
-                      Pulse Rate (bpm)
+                      {t('nurse.pulseRateBpm')}
                     </label>
                     <input
                       type="number"
@@ -1544,13 +1562,13 @@ export default function NurseDashboardPage() {
                     />
                     {vitalFlags.pulse && (
                       <p className="text-[10px] mt-1 font-semibold" style={{ color: 'var(--color-danger)' }}>
-                        <AlertCircle className="w-3 h-3 inline mr-1" />Abnormal pulse
+                        <AlertCircle className="w-3 h-3 inline mr-1" />{t('nurse.abnormalPulse')}
                       </p>
                     )}
                   </div>
                   <div>
                     <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>
-                      SpO2 (%)
+                      {t('nurse.spo2Label')}
                     </label>
                     <input
                       type="number"
@@ -1568,7 +1586,7 @@ export default function NurseDashboardPage() {
                     />
                     {vitalFlags.spo2 && (
                       <p className="text-[10px] mt-1 font-semibold" style={{ color: 'var(--color-danger)' }}>
-                        <AlertCircle className="w-3 h-3 inline mr-1" />Low SpO2 ({'<'}95%)
+                        <AlertCircle className="w-3 h-3 inline mr-1" />{t('nurse.lowSpo2')}
                       </p>
                     )}
                   </div>
@@ -1578,7 +1596,7 @@ export default function NurseDashboardPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>
-                      Weight (kg)
+                      {t('nurse.weightKgLabel')}
                     </label>
                     <input
                       type="number"
@@ -1596,7 +1614,7 @@ export default function NurseDashboardPage() {
                   </div>
                   <div>
                     <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>
-                      Respiratory Rate
+                      {t('nurse.respiratoryRate')}
                     </label>
                     <input
                       type="number"
@@ -1612,7 +1630,7 @@ export default function NurseDashboardPage() {
                     />
                     {vitalFlags.respiratoryRate && (
                       <p className="text-[10px] mt-1 font-semibold" style={{ color: 'var(--color-danger)' }}>
-                        <AlertCircle className="w-3 h-3 inline mr-1" />Abnormal RR
+                        <AlertCircle className="w-3 h-3 inline mr-1" />{t('nurse.abnormalRr')}
                       </p>
                     )}
                   </div>
@@ -1621,11 +1639,11 @@ export default function NurseDashboardPage() {
                 {/* Notes */}
                 <div>
                   <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>
-                    Notes
+                    {t('nurse.notes')}
                   </label>
                   <textarea
                     rows={3}
-                    placeholder="Additional observations..."
+                    placeholder={t('nurse.additionalObservations')}
                     value={vitalsForm.notes}
                     onChange={e => setVitalsForm(prev => ({ ...prev, notes: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl text-sm"
@@ -1642,13 +1660,13 @@ export default function NurseDashboardPage() {
                   <div className="p-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
                     <div className="flex items-center gap-2 mb-1">
                       <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
-                      <span className="text-xs font-semibold" style={{ color: 'var(--color-danger)' }}>Abnormal Values Detected</span>
+                      <span className="text-xs font-semibold" style={{ color: 'var(--color-danger)' }}>{t('nurse.abnormalValuesDetected')}</span>
                     </div>
                     <p className="text-[10px]" style={{ color: 'var(--color-danger)' }}>
-                      {Object.keys(vitalFlags).map(k => {
-                        const labels: Record<string, string> = { systolic: 'Systolic BP', diastolic: 'Diastolic BP', temperature: 'Temperature', spo2: 'SpO2', pulse: 'Pulse', respiratoryRate: 'Respiratory Rate' };
+                      {t('nurse.valuesFlagged', { values: Object.keys(vitalFlags).map(k => {
+                        const labels: Record<string, string> = { systolic: t('nurse.flagSystolic'), diastolic: t('nurse.flagDiastolic'), temperature: t('nurse.flagTemperature'), spo2: t('nurse.flagSpo2'), pulse: t('nurse.flagPulse'), respiratoryRate: t('nurse.flagRespiratoryRate') };
                         return labels[k] || k;
-                      }).join(', ')} flagged for review.
+                      }).join(', ') })}
                     </p>
                   </div>
                 )}
@@ -1660,7 +1678,7 @@ export default function NurseDashboardPage() {
                   className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
                   style={{ background: vitalsSaving ? 'var(--text-muted)' : ACCENT }}
                 >
-                  {vitalsSaving ? 'Saving...' : 'Save Vitals'}
+                  {vitalsSaving ? t('nurse.savingDots') : t('nurse.saveVitals')}
                 </button>
               </div>
             )}
@@ -1682,7 +1700,7 @@ export default function NurseDashboardPage() {
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5" style={{ color: ACCENT }} />
                 <div>
-                  <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Shift Handoff Report</h2>
+                  <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.shiftHandoffReport')}</h2>
                   <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{todayDate} - {currentUser.name}</p>
                 </div>
               </div>
@@ -1693,7 +1711,7 @@ export default function NurseDashboardPage() {
                   style={{ background: 'var(--accent-light)', color: ACCENT, border: '1px solid var(--accent-border)' }}
                 >
                   <Printer className="w-3 h-3" />
-                  Print
+                  {t('action.print')}
                 </button>
                 <button onClick={() => setHandoffOpen(false)} className="p-1 rounded-lg transition-all" style={{ background: 'var(--overlay-subtle)' }}>
                   <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -1706,7 +1724,7 @@ export default function NurseDashboardPage() {
               <div className="rounded-xl p-3" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <AlertCircle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
-                  <span className="text-xs font-semibold" style={{ color: 'var(--color-danger)' }}>Critical Patients (Abnormal Vitals)</span>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--color-danger)' }}>{t('nurse.criticalPatients')}</span>
                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--color-danger)' }}>
                     {criticalPatients.length}
                   </span>
@@ -1719,12 +1737,12 @@ export default function NurseDashboardPage() {
                           {(p.firstName || '?')[0]}{(p.surname || '?')[0]}
                         </div>
                         <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>{p.firstName} {p.surname}</span>
-                        <span className="text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: 'rgba(248,113,113,0.15)', color: '#F87171' }}>VITALS OVERDUE</span>
+                        <span className="text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: 'rgba(248,113,113,0.15)', color: '#F87171' }}>{t('nurse.vitalsOverdue')}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>No critical patients at this time.</p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.noCriticalPatients')}</p>
                 )}
               </div>
 
@@ -1732,19 +1750,19 @@ export default function NurseDashboardPage() {
               <div className="rounded-xl p-3" style={{ background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.15)' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <Clock className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
-                  <span className="text-xs font-semibold" style={{ color: 'var(--color-warning)' }}>Pending Tasks</span>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--color-warning)' }}>{t('nurse.pendingTasks')}</span>
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-                    <span className="text-[10px]" style={{ color: 'var(--text-primary)' }}>Vitals due</span>
+                    <span className="text-[10px]" style={{ color: 'var(--text-primary)' }}>{t('nurse.vitalsDueTask')}</span>
                     <span className="text-xs font-bold" style={{ color: '#F87171' }}>{vitalsDue}</span>
                   </div>
                   <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-                    <span className="text-[10px]" style={{ color: 'var(--text-primary)' }}>Medications overdue</span>
+                    <span className="text-[10px]" style={{ color: 'var(--text-primary)' }}>{t('nurse.medicationsOverdue')}</span>
                     <span className="text-xs font-bold" style={{ color: 'var(--color-danger)' }}>{overdueMarCount}</span>
                   </div>
                   <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-                    <span className="text-[10px]" style={{ color: 'var(--text-primary)' }}>Medications due now</span>
+                    <span className="text-[10px]" style={{ color: 'var(--text-primary)' }}>{t('nurse.medicationsDueNow')}</span>
                     <span className="text-xs font-bold" style={{ color: 'var(--color-warning)' }}>{dueMarCount}</span>
                   </div>
                 </div>
@@ -1755,14 +1773,14 @@ export default function NurseDashboardPage() {
                 <div className="rounded-xl p-3" style={{ background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.15)' }}>
                   <div className="flex items-center gap-2 mb-1">
                     <BedDouble className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                    <span className="text-xs font-semibold" style={{ color: 'var(--color-success)' }}>New Admissions Today</span>
+                    <span className="text-xs font-semibold" style={{ color: 'var(--color-success)' }}>{t('nurse.newAdmissionsToday')}</span>
                   </div>
                   <p className="text-2xl font-bold" style={{ color: 'var(--color-success)' }}>{IS_DEMO ? Math.max(1, Math.floor(patients.length * 0.05)) : 0}</p>
                 </div>
                 <div className="rounded-xl p-3" style={{ background: 'rgba(92,184,168,0.05)', border: '1px solid rgba(92,184,168,0.15)' }}>
                   <div className="flex items-center gap-2 mb-1">
                     <Eye className="w-4 h-4" style={{ color: '#5CB8A8' }} />
-                    <span className="text-xs font-semibold" style={{ color: '#5CB8A8' }}>Discharges Today</span>
+                    <span className="text-xs font-semibold" style={{ color: '#5CB8A8' }}>{t('nurse.dischargesToday')}</span>
                   </div>
                   <p className="text-2xl font-bold" style={{ color: '#5CB8A8' }}>{IS_DEMO ? Math.max(1, Math.floor(patients.length * 0.03)) : 0}</p>
                 </div>
@@ -1771,11 +1789,11 @@ export default function NurseDashboardPage() {
               {/* Notes from outgoing nurse */}
               <div>
                 <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-muted)' }}>
-                  Notes from Outgoing Nurse
+                  {t('nurse.notesOutgoingNurse')}
                 </label>
                 <textarea
                   rows={4}
-                  placeholder="Document important observations, pending follow-ups, or special instructions for the incoming shift..."
+                  placeholder={t('nurse.handoffNotesPlaceholder')}
                   value={handoffNotes}
                   onChange={e => setHandoffNotes(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl text-sm"
@@ -1790,14 +1808,14 @@ export default function NurseDashboardPage() {
               {/* Summary footer */}
               <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
                 <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                  Generated by {currentUser.name} at {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  {t('nurse.generatedBy', { name: currentUser.name, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })}
                 </p>
                 <button
                   onClick={() => setHandoffOpen(false)}
                   className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
                   style={{ background: ACCENT }}
                 >
-                  Complete Handoff
+                  {t('nurse.completeHandoff')}
                 </button>
               </div>
             </div>

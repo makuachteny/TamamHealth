@@ -6,8 +6,9 @@ import PageHeader from '@/components/PageHeader';
 import {
   AlertTriangle, Shield, Eye, Bell, TrendingUp, TrendingDown,
   Minus, MapPin, Activity, FileText, Calendar, ChevronRight,
-  Download, Plus, X,
+  Download, Plus, X, BarChart3,
 } from '@/components/icons/lucide';
+import EmptyState from '@/components/EmptyState';
 // `states` is a static reference list (28 states/oblasts) used only to
 // populate a dropdown. It contains no PHI, so importing from the mock
 // module is fine. The disease aggregates that used to come from the same
@@ -18,6 +19,7 @@ import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line, Legend
@@ -172,6 +174,7 @@ const REPORTABLE_DISEASES = [
 ];
 
 export default function SurveillancePage() {
+  const { t } = useTranslation();
   const [hoveredHospital, setHoveredHospital] = useState<string | null>(null);
   const [selectedDisease, setSelectedDisease] = useState<string>('all');
   const [showNewAlert, setShowNewAlert] = useState(false);
@@ -195,7 +198,7 @@ export default function SurveillancePage() {
 
   const handleCreateAlert = async () => {
     if (!alertForm.disease || !alertForm.state || alertForm.cases <= 0) {
-      showToast('Disease, state, and cases are required', 'error');
+      showToast(t('surveillance.validationRequired'), 'error');
       return;
     }
     try {
@@ -215,12 +218,12 @@ export default function SurveillancePage() {
       await logAudit('DISEASE_ALERT_REPORTED', currentUser?._id, currentUser?.username,
         `${alertForm.alertLevel.toUpperCase()}: ${alertForm.disease} in ${alertForm.state} — ${alertForm.cases} cases, ${alertForm.deaths} deaths`
       ).catch(() => {});
-      showToast('Disease alert reported', 'success');
+      showToast(t('surveillance.alertReported'), 'success');
       setShowNewAlert(false);
       setAlertForm({ disease: '', state: '', county: '', cases: 0, deaths: 0, alertLevel: 'watch', trend: 'increasing' });
     } catch (err) {
       console.error(err);
-      showToast('Failed to create alert', 'error');
+      showToast(t('surveillance.alertFailed'), 'error');
     } finally {
       setAlertSubmitting(false);
     }
@@ -309,7 +312,7 @@ export default function SurveillancePage() {
       .sort();
     const latest = dated.length > 0 ? dated[dated.length - 1] : new Date().toISOString().slice(0, 10);
     const w = isoWeek(latest);
-    if (!w) return 'Current week';
+    if (!w) return t('surveillance.currentWeek');
     const monday = (() => {
       const d = new Date(latest);
       const day = (d.getUTCDay() + 6) % 7;
@@ -346,31 +349,31 @@ export default function SurveillancePage() {
   };
 
   const summaryCards = [
-    { label: 'Total Alerts', value: totalAlerts.toString(), icon: Bell, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
-    { label: 'Emergencies', value: emergencies.toString(), icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.10)' },
-    { label: 'Warnings', value: warnings.toString(), icon: Shield, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.10)' },
-    { label: 'Watch Items', value: watchItems.toString(), icon: Eye, color: '#5CB8A8', bg: 'rgba(43,111,224,0.10)' },
+    { label: t('surveillance.totalAlerts'), value: totalAlerts.toString(), icon: Bell, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
+    { label: t('surveillance.emergencies'), value: emergencies.toString(), icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.10)' },
+    { label: t('surveillance.warnings'), value: warnings.toString(), icon: Shield, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.10)' },
+    { label: t('surveillance.watchItems'), value: watchItems.toString(), icon: Eye, color: '#5CB8A8', bg: 'rgba(43,111,224,0.10)' },
   ];
 
   return (
     <>
-      <TopBar title="Disease Surveillance" />
+      <TopBar title={t('nav.surveillance')} />
       <main className="page-container page-enter">
           <PageHeader
             icon={Activity}
-            title="Disease Surveillance Dashboard"
-            subtitle={`IDSR Reporting Week: ${reportingWeek} · Ministry of Health, Republic of South Sudan`}
+            title={t('surveillance.dashboardTitle')}
+            subtitle={t('surveillance.dashboardSubtitle', { week: reportingWeek })}
             actions={
               <>
                 {canReportAlert && (
                   <button className="btn btn-primary btn-sm" onClick={() => setShowNewAlert(true)}>
                     <Plus className="w-4 h-4" />
-                    Report Alert
+                    {t('surveillance.reportAlert')}
                   </button>
                 )}
                 <button className="btn btn-secondary btn-sm" onClick={handleExport}>
                   <Download className="w-4 h-4" />
-                  Export Report
+                  {t('surveillance.exportReport')}
                 </button>
               </>
             }
@@ -398,17 +401,17 @@ export default function SurveillancePage() {
                 <div className="icon-box-sm" style={{ background: 'rgba(20,184,166,0.12)' }}>
                   <Activity className="w-3.5 h-3.5" style={{ color: '#5CB8A8' }} />
                 </div>
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total Cases This Week:</span>
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('surveillance.totalCasesThisWeek')}</span>
                 <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{totalCases.toLocaleString()}</span>
               </div>
               <div className="w-px h-5" style={{ background: 'var(--border-light)' }} />
               <div className="flex items-center gap-2">
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total Deaths:</span>
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('surveillance.totalDeaths')}</span>
                 <span className="text-sm font-bold" style={{ color: 'var(--tamamhealth-red)' }}>{totalDeaths}</span>
               </div>
               <div className="w-px h-5" style={{ background: 'var(--border-light)' }} />
               <div className="flex items-center gap-2">
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Reporting Facilities:</span>
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('surveillance.reportingFacilities')}</span>
                 <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                   {(() => {
                     const reporting = new Set(
@@ -422,13 +425,13 @@ export default function SurveillancePage() {
               </div>
               <div className="w-px h-5" style={{ background: 'var(--border-light)' }} />
               <div className="flex items-center gap-2">
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>CFR (Cholera):</span>
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('surveillance.cfrCholera')}</span>
                 <span className="text-sm font-bold" style={{ color: 'var(--tamamhealth-red)' }}>{choleraCFR}%</span>
               </div>
             </div>
             <div className="flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Updated: {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('surveillance.updated', { date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) })}</span>
             </div>
           </div>
 
@@ -442,7 +445,7 @@ export default function SurveillancePage() {
                 <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                   <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                     <MapPin className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
-                    Hospital Network -- Alert Status by Location
+                    {t('surveillance.hospitalNetworkTitle')}
                   </h3>
                   <div className="flex items-center gap-4">
                     {['emergency', 'warning', 'watch', 'normal'].map(level => (
@@ -546,11 +549,16 @@ export default function SurveillancePage() {
                 <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                   <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                     <TrendingUp className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
-                    Weekly Disease Trends (Jan - Feb 2026)
+                    {t('surveillance.weeklyTrendsTitle')}
                   </h3>
-                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Source: IDSR Weekly Reports</span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('surveillance.sourceIdsrReports')}</span>
                 </div>
                 <div className="p-4">
+                  {weeklyDiseaseData.length === 0 ? (
+                    <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <EmptyState icon={TrendingUp} title="No data yet" message="No weekly disease trends for this period." />
+                    </div>
+                  ) : (
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={weeklyDiseaseData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
@@ -559,18 +567,19 @@ export default function SurveillancePage() {
                       <Tooltip content={<CustomTooltip />} />
                       <Legend iconType="circle" iconSize={8}
                         wrapperStyle={{ fontSize: '0.75rem', paddingTop: '8px' }} />
-                      <Line type="monotone" dataKey="malaria" name="Malaria" stroke={COLORS.malaria}
+                      <Line type="monotone" dataKey="malaria" name={t('surveillance.diseaseMalaria')} stroke={COLORS.malaria}
                         strokeWidth={2.5} dot={{ r: 4, fill: COLORS.malaria }} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="cholera" name="Cholera" stroke={COLORS.cholera}
+                      <Line type="monotone" dataKey="cholera" name={t('surveillance.diseaseCholera')} stroke={COLORS.cholera}
                         strokeWidth={2} dot={{ r: 3, fill: COLORS.cholera }} activeDot={{ r: 5 }} />
-                      <Line type="monotone" dataKey="measles" name="Measles" stroke={COLORS.measles}
+                      <Line type="monotone" dataKey="measles" name={t('surveillance.diseaseMeasles')} stroke={COLORS.measles}
                         strokeWidth={2} dot={{ r: 3, fill: COLORS.measles }} activeDot={{ r: 5 }} />
-                      <Line type="monotone" dataKey="pneumonia" name="Pneumonia" stroke={COLORS.pneumonia}
+                      <Line type="monotone" dataKey="pneumonia" name={t('surveillance.diseasePneumonia')} stroke={COLORS.pneumonia}
                         strokeWidth={2} dot={{ r: 3, fill: COLORS.pneumonia }} activeDot={{ r: 5 }} />
-                      <Line type="monotone" dataKey="diarrhea" name="Diarrhea" stroke={COLORS.diarrhea}
+                      <Line type="monotone" dataKey="diarrhea" name={t('surveillance.diseaseDiarrhea')} stroke={COLORS.diarrhea}
                         strokeWidth={2} dot={{ r: 3, fill: COLORS.diarrhea }} activeDot={{ r: 5 }} />
                     </LineChart>
                   </ResponsiveContainer>
+                  )}
                 </div>
               </div>
 
@@ -579,11 +588,16 @@ export default function SurveillancePage() {
                 <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                   <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                     <Activity className="w-4 h-4" style={{ color: '#5CB8A8' }} />
-                    Disease Cases by State (Cumulative 2026)
+                    {t('surveillance.casesByStateTitle')}
                   </h3>
-                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Top 5 diseases shown</span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('surveillance.top5Diseases')}</span>
                 </div>
                 <div className="p-4">
+                  {casesByState.length === 0 ? (
+                    <div style={{ height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <EmptyState icon={BarChart3} title="No data yet" message="No cases reported by state." />
+                    </div>
+                  ) : (
                   <ResponsiveContainer width="100%" height={360}>
                     <BarChart data={casesByState} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
@@ -593,13 +607,14 @@ export default function SurveillancePage() {
                       <Tooltip content={<CustomTooltip />} />
                       <Legend iconType="square" iconSize={10}
                         wrapperStyle={{ fontSize: '0.75rem', paddingTop: '4px' }} />
-                      <Bar dataKey="malaria" name="Malaria" fill={COLORS.malaria} radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="cholera" name="Cholera" fill={COLORS.cholera} radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="measles" name="Measles" fill={COLORS.measles} radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="tb" name="TB" fill={COLORS.tb} radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="hiv" name="HIV" fill={COLORS.hiv} radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="malaria" name={t('surveillance.diseaseMalaria')} fill={COLORS.malaria} radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="cholera" name={t('surveillance.diseaseCholera')} fill={COLORS.cholera} radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="measles" name={t('surveillance.diseaseMeasles')} fill={COLORS.measles} radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="tb" name={t('surveillance.diseaseTb')} fill={COLORS.tb} radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="hiv" name={t('surveillance.diseaseHiv')} fill={COLORS.hiv} radius={[2, 2, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
+                  )}
                 </div>
               </div>
             </div>
@@ -612,7 +627,7 @@ export default function SurveillancePage() {
                 <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                   <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                     <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
-                    Active Disease Alerts
+                    {t('surveillance.activeAlertsTitle')}
                   </h3>
                   <select
                     value={selectedDisease}
@@ -626,7 +641,7 @@ export default function SurveillancePage() {
                       padding: '4px 28px 4px 8px',
                     }}
                   >
-                    <option value="all">All Diseases</option>
+                    <option value="all">{t('surveillance.allDiseases')}</option>
                     {uniqueDiseases.map(d => (
                       <option key={d} value={d}>{d}</option>
                     ))}
@@ -658,10 +673,10 @@ export default function SurveillancePage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{alert.cases}</span> cases
+                              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{alert.cases}</span> {t('surveillance.cases')}
                             </span>
                             <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                              <span className="font-semibold" style={{ color: 'var(--tamamhealth-red)' }}>{alert.deaths}</span> deaths
+                              <span className="font-semibold" style={{ color: 'var(--tamamhealth-red)' }}>{alert.deaths}</span> {t('surveillance.deaths')}
                             </span>
                           </div>
                           <div className="flex items-center gap-1">
@@ -681,7 +696,7 @@ export default function SurveillancePage() {
                         </div>
                         <hr className="section-divider" />
                         <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                          Reported: {new Date(alert.reportDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {t('surveillance.reported', { date: new Date(alert.reportDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) })}
                         </p>
                       </div>
                     );
@@ -694,7 +709,7 @@ export default function SurveillancePage() {
                 <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                   <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                     <FileText className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
-                    IDSR Weekly Summary
+                    {t('surveillance.idsrWeeklySummary')}
                   </h3>
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
                     {reportingWeek}
@@ -706,27 +721,27 @@ export default function SurveillancePage() {
                       <tr>
                         <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-3 py-2.5"
                           style={{ color: 'var(--text-secondary)', background: 'var(--overlay-subtle)', borderBottom: '1px solid var(--border-light)' }}>
-                          Disease
+                          {t('surveillance.colDisease')}
                         </th>
                         <th className="text-right text-[10px] font-semibold uppercase tracking-wider px-3 py-2.5"
                           style={{ color: 'var(--text-secondary)', background: 'var(--overlay-subtle)', borderBottom: '1px solid var(--border-light)' }}>
-                          Cases
+                          {t('surveillance.colCases')}
                         </th>
                         <th className="text-right text-[10px] font-semibold uppercase tracking-wider px-3 py-2.5"
                           style={{ color: 'var(--text-secondary)', background: 'var(--overlay-subtle)', borderBottom: '1px solid var(--border-light)' }}>
-                          Prev
+                          {t('surveillance.colPrev')}
                         </th>
                         <th className="text-center text-[10px] font-semibold uppercase tracking-wider px-3 py-2.5"
                           style={{ color: 'var(--text-secondary)', background: 'var(--overlay-subtle)', borderBottom: '1px solid var(--border-light)' }}>
-                          Trend
+                          {t('surveillance.colTrend')}
                         </th>
                         <th className="text-right text-[10px] font-semibold uppercase tracking-wider px-3 py-2.5"
                           style={{ color: 'var(--text-secondary)', background: 'var(--overlay-subtle)', borderBottom: '1px solid var(--border-light)' }}>
-                          Deaths
+                          {t('surveillance.colDeaths')}
                         </th>
                         <th className="text-right text-[10px] font-semibold uppercase tracking-wider px-3 py-2.5"
                           style={{ color: 'var(--text-secondary)', background: 'var(--overlay-subtle)', borderBottom: '1px solid var(--border-light)' }}>
-                          CFR
+                          {t('surveillance.colCfr')}
                         </th>
                       </tr>
                     </thead>
@@ -781,7 +796,7 @@ export default function SurveillancePage() {
                     </tbody>
                     <tfoot>
                       <tr style={{ background: 'var(--overlay-subtle)' }}>
-                        <td className="px-3 py-2 text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Total</td>
+                        <td className="px-3 py-2 text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{t('surveillance.total')}</td>
                         <td className="px-3 py-2 text-xs text-right font-bold" style={{ color: 'var(--text-primary)' }}>
                           {idsrSummary.reduce((s, r) => s + r.casesThisWeek, 0).toLocaleString()}
                         </td>
@@ -815,7 +830,7 @@ export default function SurveillancePage() {
                     <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
                       <FileText className="w-3.5 h-3.5" />
                     </div>
-                    Download Full IDSR Report
+                    {t('surveillance.downloadFullReport')}
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -832,7 +847,7 @@ export default function SurveillancePage() {
                     <div className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.12)' }}>
                       <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
                     </div>
-                    <h3 className="text-base font-semibold">Report Disease Alert</h3>
+                    <h3 className="text-base font-semibold">{t('surveillance.modalTitle')}</h3>
                   </div>
                   <button onClick={() => setShowNewAlert(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
                     <X className="w-4 h-4" />
@@ -841,59 +856,59 @@ export default function SurveillancePage() {
                 <hr className="section-divider" />
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Disease</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelDisease')}</label>
                     <select value={alertForm.disease} onChange={e => setAlertForm({ ...alertForm, disease: e.target.value })}>
-                      <option value="">Select disease...</option>
+                      <option value="">{t('surveillance.selectDisease')}</option>
                       {REPORTABLE_DISEASES.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>State</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelState')}</label>
                       <select value={alertForm.state} onChange={e => setAlertForm({ ...alertForm, state: e.target.value })}>
-                        <option value="">Select...</option>
+                        <option value="">{t('surveillance.selectGeneric')}</option>
                         {states.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>County</label>
-                      <input type="text" value={alertForm.county} onChange={e => setAlertForm({ ...alertForm, county: e.target.value })} placeholder="County name" />
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelCounty')}</label>
+                      <input type="text" value={alertForm.county} onChange={e => setAlertForm({ ...alertForm, county: e.target.value })} placeholder={t('surveillance.countyPlaceholder')} />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Suspected Cases</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelSuspectedCases')}</label>
                       <input type="number" min={0} value={alertForm.cases || ''} onChange={e => setAlertForm({ ...alertForm, cases: parseInt(e.target.value) || 0 })} />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Deaths</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelDeaths')}</label>
                       <input type="number" min={0} value={alertForm.deaths || ''} onChange={e => setAlertForm({ ...alertForm, deaths: parseInt(e.target.value) || 0 })} />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Alert Level</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelAlertLevel')}</label>
                       <select value={alertForm.alertLevel} onChange={e => setAlertForm({ ...alertForm, alertLevel: e.target.value as typeof alertForm.alertLevel })}>
-                        <option value="watch">Watch</option>
-                        <option value="warning">Warning</option>
-                        <option value="emergency">Emergency</option>
-                        <option value="normal">Normal (monitoring)</option>
+                        <option value="watch">{t('surveillance.levelWatch')}</option>
+                        <option value="warning">{t('surveillance.levelWarning')}</option>
+                        <option value="emergency">{t('surveillance.levelEmergency')}</option>
+                        <option value="normal">{t('surveillance.levelNormal')}</option>
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Trend</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('surveillance.labelTrend')}</label>
                       <select value={alertForm.trend} onChange={e => setAlertForm({ ...alertForm, trend: e.target.value as typeof alertForm.trend })}>
-                        <option value="increasing">Increasing</option>
-                        <option value="stable">Stable</option>
-                        <option value="decreasing">Decreasing</option>
+                        <option value="increasing">{t('surveillance.trendIncreasing')}</option>
+                        <option value="stable">{t('surveillance.trendStable')}</option>
+                        <option value="decreasing">{t('surveillance.trendDecreasing')}</option>
                       </select>
                     </div>
                   </div>
                 </div>
                 <div className="flex gap-2 mt-5">
-                  <button onClick={() => setShowNewAlert(false)} className="btn btn-secondary flex-1" disabled={alertSubmitting}>Cancel</button>
+                  <button onClick={() => setShowNewAlert(false)} className="btn btn-secondary flex-1" disabled={alertSubmitting}>{t('action.cancel')}</button>
                   <button onClick={handleCreateAlert} className="btn btn-primary flex-1" disabled={alertSubmitting}>
-                    {alertSubmitting ? 'Submitting…' : 'Submit Alert'}
+                    {alertSubmitting ? t('surveillance.submitting') : t('surveillance.submitAlert')}
                   </button>
                 </div>
               </div>

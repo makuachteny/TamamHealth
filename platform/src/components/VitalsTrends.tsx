@@ -26,7 +26,10 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceArea,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, Activity } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { MedicalRecordDoc } from '@/lib/db-types';
+
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
 interface VitalsTrendsProps {
   records: MedicalRecordDoc[];
@@ -93,6 +96,7 @@ function buildMetric(
   normalRange: [number, number],
   normalLabel: string,
   selector: (rec: MedicalRecordDoc) => number | null,
+  t: TFn,
 ): MetricSummary | null {
   const points: MetricPoint[] = records
     .map(r => {
@@ -121,12 +125,16 @@ function buildMetric(
   if (latest < lo || latest > hi) {
     status = 'danger';
     const reps = points.slice(-2).filter(p => p.value < lo || p.value > hi).length;
-    message = reps >= 2 ? `Repeatedly ${latest > hi ? 'above' : 'below'} range` : `Out of range`;
+    message = reps >= 2
+      ? (latest > hi ? t('vitalsTrends.repeatedlyAboveRange') : t('vitalsTrends.repeatedlyBelowRange'))
+      : t('vitalsTrends.outOfRange');
   } else if (previous != null) {
     const pc = pctChange(latest, previous);
     if (Math.abs(pc) > 10) {
       status = 'warning';
-      message = `${pc > 0 ? 'Rising' : 'Falling'} ${Math.abs(Math.round(pc))}%`;
+      message = pc > 0
+        ? t('vitalsTrends.risingPct', { pct: Math.abs(Math.round(pc)) })
+        : t('vitalsTrends.fallingPct', { pct: Math.abs(Math.round(pc)) });
     }
   }
 
@@ -150,7 +158,7 @@ function buildMetric(
  * Blood pressure is a pair (systolic/diastolic). We build a separate summary
  * that plots both lines and flags hypertensive/hypotensive patterns.
  */
-function buildBPMetric(records: MedicalRecordDoc[]): MetricSummary | null {
+function buildBPMetric(records: MedicalRecordDoc[], t: TFn): MetricSummary | null {
   const points: MetricPoint[] = records
     .map(r => {
       const v = r.vitalSigns;
@@ -176,18 +184,18 @@ function buildBPMetric(records: MedicalRecordDoc[]): MetricSummary | null {
   if (sys >= 140 || dia >= 90) {
     status = 'danger';
     const repeat = points.slice(-2).every(p => p.value >= 140 || (p.secondary ?? 0) >= 90);
-    message = repeat ? 'Repeated hypertensive readings' : 'Elevated BP';
+    message = repeat ? t('vitalsTrends.repeatedHypertensive') : t('vitalsTrends.elevatedBp');
   } else if (sys <= 90 || dia <= 60) {
     status = 'danger';
-    message = 'Low BP';
+    message = t('vitalsTrends.lowBp');
   } else if (sys >= 130 || dia >= 85) {
     status = 'warning';
-    message = 'Approaching hypertensive range';
+    message = t('vitalsTrends.approachingHypertensive');
   }
 
   return {
     key: 'bp',
-    title: 'Blood Pressure',
+    title: t('vitals.bloodPressure'),
     unit: 'mmHg',
     points,
     latest: sys,
@@ -216,57 +224,63 @@ function extractGlucose(rec: MedicalRecordDoc): number | null {
 }
 
 export default function VitalsTrends({ records }: VitalsTrendsProps) {
+  const { t } = useTranslation();
   const metrics = useMemo<MetricSummary[]>(() => {
     const out: MetricSummary[] = [];
-    const bp = buildBPMetric(records);
+    const bp = buildBPMetric(records, t);
     if (bp) out.push(bp);
 
     const temp = buildMetric(
-      records, 'temperature', 'Temperature', '°C', '#E4A84B',
+      records, 'temperature', t('vitals.temperature'), '°C', '#E4A84B',
       [36.1, 37.5], '36.1–37.5°C',
       (r) => r.vitalSigns?.temperature ?? null,
+      t,
     );
     if (temp) out.push(temp);
 
     const pulse = buildMetric(
-      records, 'pulse', 'Heart Rate', 'bpm', '#C44536',
+      records, 'pulse', t('vitalsTrends.heartRate'), 'bpm', '#C44536',
       [60, 100], '60–100 bpm',
       (r) => r.vitalSigns?.pulse ?? null,
+      t,
     );
     if (pulse) out.push(pulse);
 
     const weight = buildMetric(
-      records, 'weight', 'Weight', 'kg', '#10b981',
+      records, 'weight', t('vitals.weight'), 'kg', '#10b981',
       // Weight has no universal normal range; treat anything as normal and
       // highlight only big swings via the warning path.
       [0, 500], '—',
       (r) => r.vitalSigns?.weight ?? null,
+      t,
     );
     if (weight) out.push(weight);
 
     const spo2 = buildMetric(
-      records, 'spo2', 'SpO₂', '%', '#8b5cf6',
+      records, 'spo2', t('vitals.spo2'), '%', '#8b5cf6',
       [95, 100], '≥95%',
       (r) => r.vitalSigns?.oxygenSaturation ?? null,
+      t,
     );
     if (spo2) out.push(spo2);
 
     const glucose = buildMetric(
-      records, 'glucose', 'Blood Glucose', 'mg/dL', '#ec4899',
+      records, 'glucose', t('vitalsTrends.bloodGlucose'), 'mg/dL', '#ec4899',
       [70, 140], '70–140 mg/dL',
       extractGlucose,
+      t,
     );
     if (glucose) out.push(glucose);
 
     return out;
-  }, [records]);
+  }, [records, t]);
 
   if (metrics.length === 0) {
     return (
       <div className="card-elevated p-6 text-center">
         <Activity className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          No vital sign history yet. Trends will appear here once consultations are recorded.
+          {t('vitalsTrends.emptyState')}
         </p>
       </div>
     );
@@ -282,6 +296,7 @@ export default function VitalsTrends({ records }: VitalsTrendsProps) {
 }
 
 function MetricCard({ metric }: { metric: MetricSummary }) {
+  const { t } = useTranslation();
   const {
     title, unit, points, latest, previous, direction: dir, status, normalLabel, message, color, key,
   } = metric;
@@ -312,7 +327,7 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
   const changeLabel = (() => {
     if (latest == null || previous == null) return null;
     const delta = latest - previous;
-    if (Math.abs(delta) < 0.01) return 'no change';
+    if (Math.abs(delta) < 0.01) return t('vitalsTrends.noChange');
     const sign = delta > 0 ? '+' : '';
     return `${sign}${delta.toFixed(Math.abs(delta) < 10 ? 1 : 0)} ${unit}`;
   })();
@@ -332,7 +347,7 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{unit}</span>
           </div>
           <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            Normal: {normalLabel}
+            {t('vitalsTrends.normalLabel', { range: normalLabel })}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -342,7 +357,7 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
           >
             {status === 'danger' && <AlertTriangle className="w-3 h-3" />}
             <Arrow className="w-3 h-3" />
-            {changeLabel ?? 'baseline'}
+            {changeLabel ?? t('vitalsTrends.baseline')}
           </span>
           {message && (
             <span className="text-[10px] font-medium" style={{ color: statusColor }}>
@@ -414,7 +429,7 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
       </div>
 
       <div className="flex items-center justify-between mt-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-        <span>{points.length} reading{points.length === 1 ? '' : 's'}</span>
+        <span>{points.length === 1 ? t('vitalsTrends.readingCountSingular', { count: points.length }) : t('vitalsTrends.readingCountPlural', { count: points.length })}</span>
         <span>{points[0].label} — {points[points.length - 1].label}</span>
       </div>
     </div>

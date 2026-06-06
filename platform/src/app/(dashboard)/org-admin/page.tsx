@@ -6,6 +6,7 @@ import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import RoleGuard from '@/components/RoleGuard';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Users, Building2, UserCheck, CreditCard, Shield,
   TrendingUp, TrendingDown, CheckCircle, XCircle, Zap, BarChart3,
@@ -28,6 +29,7 @@ export default function OrgAdminDashboardPage() {
 }
 
 function OrgAdminDashboard() {
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const router = useRouter();
   const [stats, setStats] = useState<OrgStats>({ userCount: 0, hospitalCount: 0, patientCount: 0 });
@@ -191,6 +193,7 @@ function OrgAdminDashboard() {
   const statCards = [
     {
       label: 'Total Users',
+      displayLabel: t('orgAdmin.statTotalUsers'),
       value: stats.userCount,
       icon: Users,
       color: brandColor,
@@ -198,6 +201,7 @@ function OrgAdminDashboard() {
     },
     {
       label: 'Hospitals',
+      displayLabel: t('orgAdmin.statHospitals'),
       value: stats.hospitalCount,
       icon: Building2,
       color: 'var(--accent-primary)',
@@ -205,6 +209,7 @@ function OrgAdminDashboard() {
     },
     {
       label: 'Patients',
+      displayLabel: t('orgAdmin.statPatients'),
       value: stats.patientCount,
       icon: UserCheck,
       color: 'var(--accent-primary)',
@@ -212,7 +217,8 @@ function OrgAdminDashboard() {
     },
     {
       label: 'Subscription',
-      value: org?.subscriptionStatus === 'active' ? 'Active' : org?.subscriptionStatus || 'N/A',
+      displayLabel: t('orgAdmin.statSubscription'),
+      value: org?.subscriptionStatus === 'active' ? t('orgAdmin.statusActive') : org?.subscriptionStatus || t('orgAdmin.notAvailable'),
       icon: CreditCard,
       color: org?.subscriptionStatus === 'active' ? 'var(--accent-primary)' : 'var(--color-warning)',
       bgOpacity: '15',
@@ -220,24 +226,24 @@ function OrgAdminDashboard() {
   ];
 
   const featureFlags = org?.featureFlags ? [
-    { key: 'epidemicIntelligence', label: 'Epidemic Intelligence', enabled: org.featureFlags.epidemicIntelligence },
-    { key: 'mchAnalytics', label: 'MCH Analytics', enabled: org.featureFlags.mchAnalytics },
-    { key: 'dhis2Export', label: 'DHIS2 Export', enabled: org.featureFlags.dhis2Export },
-    { key: 'aiClinicalSupport', label: 'AI Clinical Support', enabled: org.featureFlags.aiClinicalSupport },
-    { key: 'communityHealth', label: 'Community Health', enabled: org.featureFlags.communityHealth },
-    { key: 'facilityAssessments', label: 'Facility Assessments', enabled: org.featureFlags.facilityAssessments },
+    { key: 'epidemicIntelligence', label: t('orgAdmin.featureEpidemicIntelligence'), enabled: org.featureFlags.epidemicIntelligence },
+    { key: 'mchAnalytics', label: t('orgAdmin.featureMchAnalytics'), enabled: org.featureFlags.mchAnalytics },
+    { key: 'dhis2Export', label: t('orgAdmin.featureDhis2Export'), enabled: org.featureFlags.dhis2Export },
+    { key: 'aiClinicalSupport', label: t('orgAdmin.featureAiClinicalSupport'), enabled: org.featureFlags.aiClinicalSupport },
+    { key: 'communityHealth', label: t('orgAdmin.featureCommunityHealth'), enabled: org.featureFlags.communityHealth },
+    { key: 'facilityAssessments', label: t('orgAdmin.featureFacilityAssessments'), enabled: org.featureFlags.facilityAssessments },
   ] : [];
 
   const planLabels: Record<string, string> = {
-    basic: 'Basic',
-    professional: 'Professional',
-    enterprise: 'Enterprise',
+    basic: t('orgAdmin.planBasic'),
+    professional: t('orgAdmin.planProfessional'),
+    enterprise: t('orgAdmin.planEnterprise'),
   };
 
   if (loading) {
     return (
       <div className="flex-1 flex flex-col">
-        <TopBar title="Organization Dashboard" />
+        <TopBar title={t('orgAdmin.pageTitle')} />
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
         </div>
@@ -252,13 +258,13 @@ function OrgAdminDashboard() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title="Organization Dashboard" />
+      <TopBar title={t('orgAdmin.pageTitle')} />
 
       <div className="page-container page-enter">
         <PageHeader
           icon={Building2}
-          title={org?.name || currentUser?.branding?.name || 'Organization'}
-          subtitle="Your organization at a glance."
+          title={org?.name || currentUser?.branding?.name || t('orgAdmin.organization')}
+          subtitle={t('orgAdmin.subtitle')}
           actions={org?.subscriptionPlan ? (
             <div
               className="px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider"
@@ -268,7 +274,7 @@ function OrgAdminDashboard() {
                 border: `1px solid ${brandColor}30`,
               }}
             >
-              {planLabels[org.subscriptionPlan] || org.subscriptionPlan} Plan
+              {t('orgAdmin.planBadge', { plan: planLabels[org.subscriptionPlan] || org.subscriptionPlan })}
             </div>
           ) : null}
         />
@@ -298,7 +304,7 @@ function OrgAdminDashboard() {
                     <Icon className="w-5 h-5" style={{ color: card.color }} />
                   </div>
                   <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                    {card.label}
+                    {card.displayLabel}
                   </span>
                 </div>
                 <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
@@ -314,7 +320,7 @@ function OrgAdminDashboard() {
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="w-5 h-5" style={{ color: brandColor }} />
             <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Usage This Month
+              {t('orgAdmin.usageThisMonth')}
             </h2>
           </div>
           <hr className="section-divider" />
@@ -322,7 +328,7 @@ function OrgAdminDashboard() {
             {/* Patients registered */}
             <div className="p-4 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Patients Registered</span>
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.patientsRegistered')}</span>
                 {stats.patientCount > lastMonthPatients ? (
                   <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
                 ) : stats.patientCount < lastMonthPatients ? (
@@ -333,28 +339,28 @@ function OrgAdminDashboard() {
               </div>
               <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{stats.patientCount}</p>
               <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                vs {lastMonthPatients} last month
+                {t('orgAdmin.vsLastMonth', { count: lastMonthPatients })}
               </p>
             </div>
 
             {/* Consultations */}
             <div className="p-4 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Consultations</span>
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.consultations')}</span>
                 <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{thisMonthConsultations}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>This month</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.thisMonth')}</p>
             </div>
 
             {/* Referrals */}
             <div className="p-4 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Referrals</span>
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.referrals')}</span>
                 <TrendingUp className="w-4 h-4" style={{ color: '#7C3AED' }} />
               </div>
               <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{thisMonthReferrals}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>This month</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.thisMonth')}</p>
             </div>
           </div>
         </div>
@@ -364,7 +370,7 @@ function OrgAdminDashboard() {
           <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4" style={{ color: brandColor }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Facility Performance Comparison</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgAdmin.facilityComparison')}</span>
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -372,10 +378,10 @@ function OrgAdminDashboard() {
               <thead>
                 <tr>
                   {[
-                    { key: 'name', label: 'Facility' },
-                    { key: 'patients', label: 'Patients' },
-                    { key: 'staff', label: 'Staff' },
-                    { key: 'occupancy', label: 'Occupancy' },
+                    { key: 'name', label: t('orgAdmin.colFacility') },
+                    { key: 'patients', label: t('orgAdmin.colPatients') },
+                    { key: 'staff', label: t('orgAdmin.colStaff') },
+                    { key: 'occupancy', label: t('orgAdmin.colOccupancy') },
                   ].map(col => (
                     <th
                       key={col.key}
@@ -393,7 +399,7 @@ function OrgAdminDashboard() {
               </thead>
               <tbody>
                 {hospitalsLoading ? (
-                  <tr><td colSpan={4} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</td></tr>
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</td></tr>
                 ) : sortedFacilities.map(h => {
                   const isTop = h._id === topFacilityId && sortedFacilities.length > 1;
                   const isBottom = h._id === bottomFacilityId && sortedFacilities.length > 1;
@@ -407,8 +413,8 @@ function OrgAdminDashboard() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{h.name}</span>
-                          {isTop && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.12)', color: 'var(--color-success)' }}>TOP</span>}
-                          {isBottom && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>LOW</span>}
+                          {isTop && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.12)', color: 'var(--color-success)' }}>{t('orgAdmin.badgeTop')}</span>}
+                          {isBottom && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>{t('orgAdmin.badgeLow')}</span>}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{h.patientCount.toLocaleString()}</td>
@@ -434,19 +440,19 @@ function OrgAdminDashboard() {
             <div className="flex items-center gap-2 mb-4">
               <Shield className="w-5 h-5" style={{ color: brandColor }} />
               <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Subscription Details
+                {t('orgAdmin.subscriptionDetails')}
               </h2>
             </div>
 
             <div className="data-row-divider-sm">
               <div className="flex justify-between items-center py-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Plan</span>
+                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.rowPlan')}</span>
                 <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  {planLabels[org?.subscriptionPlan || ''] || 'N/A'}
+                  {planLabels[org?.subscriptionPlan || ''] || t('orgAdmin.notAvailable')}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Status</span>
+                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.rowStatus')}</span>
                 <span
                   className="text-xs font-medium px-2 py-0.5 rounded-full"
                   style={{
@@ -454,39 +460,39 @@ function OrgAdminDashboard() {
                     color: org?.subscriptionStatus === 'active' ? 'var(--accent-primary)' : 'var(--color-warning)',
                   }}
                 >
-                  {org?.subscriptionStatus || 'N/A'}
+                  {org?.subscriptionStatus || t('orgAdmin.notAvailable')}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Max Users</span>
+                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.rowMaxUsers')}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                     {stats.userCount} / {org?.maxUsers || '---'}
                   </span>
                   {org?.maxUsers && stats.userCount >= org.maxUsers && (
                     <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>
-                      Limit reached
+                      {t('orgAdmin.limitReached')}
                     </span>
                   )}
                 </div>
               </div>
               <div className="flex justify-between items-center py-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Max Hospitals</span>
+                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.rowMaxHospitals')}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                     {stats.hospitalCount} / {org?.maxHospitals || '---'}
                   </span>
                   {org?.maxHospitals && stats.hospitalCount >= org.maxHospitals && (
                     <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>
-                      Limit reached
+                      {t('orgAdmin.limitReached')}
                     </span>
                   )}
                 </div>
               </div>
               <div className="flex justify-between items-center py-2">
-                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Organization Type</span>
+                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.rowOrgType')}</span>
                 <span className="text-sm font-medium capitalize" style={{ color: 'var(--text-primary)' }}>
-                  {org?.orgType || 'N/A'}
+                  {org?.orgType || t('orgAdmin.notAvailable')}
                 </span>
               </div>
             </div>
@@ -497,7 +503,7 @@ function OrgAdminDashboard() {
             <div className="flex items-center gap-2 mb-4">
               <Zap className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
               <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Enabled Features
+                {t('orgAdmin.enabledFeatures')}
               </h2>
             </div>
 
@@ -514,12 +520,12 @@ function OrgAdminDashboard() {
                   {flag.enabled ? (
                     <div className="flex items-center gap-1.5">
                       <CheckCircle className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                      <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>Enabled</span>
+                      <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>{t('orgAdmin.enabled')}</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5">
                       <XCircle className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                      <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Disabled</span>
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.disabled')}</span>
                     </div>
                   )}
                 </div>
@@ -527,7 +533,7 @@ function OrgAdminDashboard() {
 
               {featureFlags.length === 0 && (
                 <p className="text-sm py-4 text-center" style={{ color: 'var(--text-muted)' }}>
-                  No feature flags configured.
+                  {t('orgAdmin.noFeatureFlags')}
                 </p>
               )}
             </div>
@@ -539,12 +545,12 @@ function OrgAdminDashboard() {
           <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>User Activity Log</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgAdmin.userActivityLog')}</span>
             </div>
             {inactiveUsers.length > 0 && (
               <span className="text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--color-warning)' }}>
                 <AlertTriangle className="w-3 h-3" />
-                {inactiveUsers.length} inactive user{inactiveUsers.length !== 1 ? 's' : ''}
+                {t('orgAdmin.inactiveUsers', { count: inactiveUsers.length })}
               </span>
             )}
           </div>
@@ -552,18 +558,18 @@ function OrgAdminDashboard() {
             <table className="w-full">
               <thead>
                 <tr>
-                  {['User', 'Action', 'Timestamp', 'Status'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wider sticky top-0" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)' }}>
-                      {h}
+                  {[t('orgAdmin.colUser'), t('orgAdmin.colAction'), t('orgAdmin.colTimestamp'), t('orgAdmin.colStatus')].map(header => (
+                    <th key={header} className="text-left px-4 py-3 text-xs uppercase tracking-wider sticky top-0" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)' }}>
+                      {header}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {auditLoading ? (
-                  <tr><td colSpan={4} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</td></tr>
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</td></tr>
                 ) : auditLogs.length === 0 ? (
-                  <tr><td colSpan={4} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No activity recorded yet.</td></tr>
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.noActivity')}</td></tr>
                 ) : auditLogs.slice(0, 20).map(log => {
                   const isInactive = log.username ? inactiveUsers.includes(log.username) : false;
                   return (
@@ -573,9 +579,9 @@ function OrgAdminDashboard() {
                     }}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{log.username || 'System'}</span>
+                          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{log.username || t('orgAdmin.system')}</span>
                           {isInactive && (
-                            <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--color-warning)' }}>INACTIVE</span>
+                            <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--color-warning)' }}>{t('orgAdmin.badgeInactive')}</span>
                           )}
                         </div>
                       </td>
@@ -591,7 +597,7 @@ function OrgAdminDashboard() {
                           background: log.success ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
                           color: log.success ? 'var(--color-success)' : 'var(--color-danger)',
                         }}>
-                          {log.success ? 'Success' : 'Failed'}
+                          {log.success ? t('orgAdmin.statusSuccess') : t('orgAdmin.statusFailed')}
                         </span>
                       </td>
                     </tr>
@@ -607,18 +613,18 @@ function OrgAdminDashboard() {
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="w-5 h-5" style={{ color: brandColor }} />
             <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Quick Actions
+              {t('dashboard.quickActions')}
             </h2>
           </div>
 
           <hr className="section-divider" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
-              { href: '/org-admin/users', label: 'Manage Users', icon: Users, desc: 'Create, edit, or deactivate users' },
-              { href: '/org-admin/hospitals', label: 'Facilities', icon: Building2, desc: 'View and add hospitals' },
-              { href: '/org-admin/branding', label: 'Branding', icon: Palette, desc: 'Colors, logo, and identity' },
-              { href: '/org-admin/analytics', label: 'Analytics', icon: BarChart3, desc: 'Organization-wide insights' },
-              { href: '/org-admin/settings', label: 'Settings', icon: Settings, desc: 'Plan, limits, and preferences' },
+              { href: '/org-admin/users', label: t('orgAdmin.actionManageUsers'), icon: Users, desc: t('orgAdmin.actionManageUsersDesc') },
+              { href: '/org-admin/hospitals', label: t('orgAdmin.actionFacilities'), icon: Building2, desc: t('orgAdmin.actionFacilitiesDesc') },
+              { href: '/org-admin/branding', label: t('orgAdmin.actionBranding'), icon: Palette, desc: t('orgAdmin.actionBrandingDesc') },
+              { href: '/org-admin/analytics', label: t('orgAdmin.actionAnalytics'), icon: BarChart3, desc: t('orgAdmin.actionAnalyticsDesc') },
+              { href: '/org-admin/settings', label: t('orgAdmin.actionSettings'), icon: Settings, desc: t('orgAdmin.actionSettingsDesc') },
             ].map((action) => {
               const Icon = action.icon;
               return (

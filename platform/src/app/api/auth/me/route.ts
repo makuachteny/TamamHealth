@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       role: payload.role,
       hospitalId: payload.hospitalId,
       orgId: payload.orgId,
+      mustChangePassword: payload.mustChangePassword,
     },
   });
 

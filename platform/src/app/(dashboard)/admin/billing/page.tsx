@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
 import {
@@ -13,6 +14,7 @@ import {
 
 export default function AdminBillingPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const { organizations, loading, update } = useOrganizations();
 
@@ -71,7 +73,7 @@ export default function AdminBillingPage() {
   // Summary stats
   const planRevenue: Record<string, { count: number; color: string }> = {
     enterprise: { count: organizations.filter(o => o.subscriptionPlan === 'enterprise' && o.subscriptionStatus === 'active').length, color: '#7C3AED' },
-    professional: { count: organizations.filter(o => o.subscriptionPlan === 'professional' && o.subscriptionStatus === 'active').length, color: '#2563EB' },
+    professional: { count: organizations.filter(o => o.subscriptionPlan === 'professional' && o.subscriptionStatus === 'active').length, color: '#3b82f6' },
     basic: { count: organizations.filter(o => o.subscriptionPlan === 'basic' && o.subscriptionStatus === 'active').length, color: '#6B7280' },
   };
 
@@ -93,18 +95,18 @@ export default function AdminBillingPage() {
 
   return (
     <>
-      <TopBar title="Billing & Subscriptions" />
+      <TopBar title={t('adminBilling.title')} />
       <main className="page-container page-enter">
 
         {/* KPI Cards */}
         <div className="kpi-grid mb-6">
           {[
-            { label: 'Active Subscriptions', value: totalActive, icon: CreditCard, color: 'var(--color-success)', bg: '#05966915' },
-            { label: 'Trial Organizations', value: totalTrial, icon: TrendingUp, color: 'var(--color-warning)', bg: '#D9770615' },
-            { label: 'Suspended', value: totalSuspended, icon: Building2, color: 'var(--color-danger)', bg: '#EF444415' },
-            { label: 'Total Licensed Users', value: totalMaxUsers, icon: Users, color: '#2563EB', bg: '#2563EB15' },
+            { key: 'activeSubscriptions', label: t('adminBilling.kpiActiveSubscriptions'), value: totalActive, icon: CreditCard, color: 'var(--color-success)', bg: '#05966915' },
+            { key: 'trialOrganizations', label: t('adminBilling.kpiTrialOrganizations'), value: totalTrial, icon: TrendingUp, color: 'var(--color-warning)', bg: '#D9770615' },
+            { key: 'suspended', label: t('adminBilling.kpiSuspended'), value: totalSuspended, icon: Building2, color: 'var(--color-danger)', bg: '#EF444415' },
+            { key: 'totalLicensedUsers', label: t('adminBilling.kpiTotalLicensedUsers'), value: totalMaxUsers, icon: Users, color: '#3b82f6', bg: '#3b82f615' },
           ].map(stat => (
-            <div key={stat.label} className="kpi">
+            <div key={stat.key} className="kpi">
               <div className="kpi__icon" style={{ background: stat.bg }}>
                 <stat.icon style={{ color: stat.color }} />
               </div>
@@ -118,7 +120,7 @@ export default function AdminBillingPage() {
 
         {/* Plan Breakdown */}
         <div className="rounded-xl p-5 mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>Active Subscriptions by Plan</p>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>{t('adminBilling.activeSubscriptionsByPlan')}</p>
           <div className="flex gap-6">
             {Object.entries(planRevenue).map(([plan, info]) => (
               <div key={plan} className="flex items-center gap-3 px-4 py-3 rounded-xl flex-1" style={{ background: `${info.color}08`, border: `1px solid ${info.color}20` }}>
@@ -137,7 +139,7 @@ export default function AdminBillingPage() {
           <div className="relative flex-1" style={{ maxWidth: '360px' }}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             <input
-              type="text" placeholder="Search organizations..."
+              type="text" placeholder={t('adminBilling.searchPlaceholder')}
               value={search} onChange={e => setSearch(e.target.value)}
               style={{ ...inputStyle, paddingLeft: '36px', width: '100%', padding: '10px 14px 10px 36px', borderRadius: '10px', fontSize: '14px' }}
             />
@@ -150,18 +152,25 @@ export default function AdminBillingPage() {
             <table className="w-full">
               <thead>
                 <tr>
-                  {['Organization', 'Plan', 'Status', 'Max Users', 'Max Hospitals', 'Actions'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
-                      {h}
+                  {[
+                    { key: 'organization', label: t('adminBilling.colOrganization') },
+                    { key: 'plan', label: t('adminBilling.colPlan') },
+                    { key: 'status', label: t('adminBilling.colStatus') },
+                    { key: 'maxUsers', label: t('adminBilling.colMaxUsers') },
+                    { key: 'maxHospitals', label: t('adminBilling.colMaxHospitals') },
+                    { key: 'actions', label: t('adminBilling.colActions') },
+                  ].map(h => (
+                    <th key={h.key} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
+                      {h.label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</td></tr>
                 ) : filteredOrgs.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No organizations found</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('adminBilling.noOrganizationsFound')}</td></tr>
                 ) : filteredOrgs.map(org => {
                   const isEditing = editingId === org._id;
                   return (
@@ -180,24 +189,24 @@ export default function AdminBillingPage() {
                       <td className="px-4 py-3">
                         {isEditing ? (
                           <select value={editPlan} onChange={e => setEditPlan(e.target.value as typeof editPlan)} style={selectStyle}>
-                            <option value="basic">Basic</option>
-                            <option value="professional">Professional</option>
-                            <option value="enterprise">Enterprise</option>
+                            <option value="basic">{t('adminBilling.planBasic')}</option>
+                            <option value="professional">{t('adminBilling.planProfessional')}</option>
+                            <option value="enterprise">{t('adminBilling.planEnterprise')}</option>
                           </select>
                         ) : (
                           <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
-                            background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(37,99,235,0.12)' : 'rgba(107,114,128,0.12)',
-                            color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#2563EB' : '#6B7280',
+                            background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(59, 130, 246,0.12)' : 'rgba(107,114,128,0.12)',
+                            color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#3b82f6' : '#6B7280',
                           }}>{org.subscriptionPlan}</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         {isEditing ? (
                           <select value={editStatus} onChange={e => setEditStatus(e.target.value as typeof editStatus)} style={selectStyle}>
-                            <option value="trial">Trial</option>
-                            <option value="active">Active</option>
-                            <option value="suspended">Suspended</option>
-                            <option value="cancelled">Cancelled</option>
+                            <option value="trial">{t('adminBilling.statusTrial')}</option>
+                            <option value="active">{t('adminBilling.statusActive')}</option>
+                            <option value="suspended">{t('adminBilling.statusSuspended')}</option>
+                            <option value="cancelled">{t('adminBilling.statusCancelled')}</option>
                           </select>
                         ) : (
                           <span className="flex items-center gap-1.5 text-xs font-semibold">

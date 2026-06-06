@@ -11,6 +11,7 @@ import {
   FileText, UserCheck, ArrowRightLeft,
   CheckCircle2, Building2, Eye, Flag, Clock, Home,
   Search, Check, MessageSquare, ThumbsUp,
+  PieChart as PieChartIcon,
 } from '@/components/icons/lucide';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -27,6 +28,7 @@ import type { BHWPerformance } from '@/lib/services/boma-visit-service';
 import type { BomaVisitDoc } from '@/lib/db-types';
 import type { ImmunizationDefaulter } from '@/lib/services/immunization-service';
 import { formatCompactDateTime as formatAdmittedAt } from '@/lib/format-utils';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', 'Lab', 'Pharmacy', 'ICU'];
 const DOCTORS = ['Dr. Wani James', 'Dr. Akol Deng', 'Dr. Ladu Morris', 'Dr. Achol Mabior', 'Dr. TamamHealth Philip'];
@@ -61,6 +63,7 @@ const SATISFACTION_COLORS = ['var(--color-success)', '#5CB8A8', 'var(--color-war
 
 export default function PayamSupervisorDashboard() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { currentUser, globalSearch } = useApp();
   const { patients } = usePatients();
   const { referrals, accept } = useReferrals();
@@ -149,11 +152,11 @@ export default function PayamSupervisorDashboard() {
   const getBHWAlerts = useCallback((bhw: BHWPerformance) => {
     const alerts: { label: string; color: string; bg: string }[] = [];
     const days = bhw.lastActiveDate ? Math.floor((Date.now() - new Date(bhw.lastActiveDate).getTime()) / 86400000) : 999;
-    if (days >= 3) alerts.push({ label: 'INACTIVE', color: 'var(--color-danger)', bg: '#EF444415' });
-    if (bhw.referralRate > 50) alerts.push({ label: 'HIGH REFERRAL RATE', color: 'var(--color-warning)', bg: '#F59E0B15' });
-    if (bhw.followUpCompletionRate < 50) alerts.push({ label: 'LOW FOLLOW-UP', color: 'var(--color-warning)', bg: '#F59E0B15' });
+    if (days >= 3) alerts.push({ label: t('payam.alertInactive'), color: 'var(--color-danger)', bg: '#EF444415' });
+    if (bhw.referralRate > 50) alerts.push({ label: t('payam.alertHighReferralRate'), color: 'var(--color-warning)', bg: '#F59E0B15' });
+    if (bhw.followUpCompletionRate < 50) alerts.push({ label: t('payam.alertLowFollowUp'), color: 'var(--color-warning)', bg: '#F59E0B15' });
     return alerts;
-  }, []);
+  }, [t]);
 
   if (!currentUser) return null;
 
@@ -200,10 +203,10 @@ export default function PayamSupervisorDashboard() {
 
   const satisfactionData = IS_DEMO
     ? [
-        { name: 'Excellent', value: 54, color: 'var(--color-success)' },
-        { name: 'Good', value: 23, color: '#5CB8A8' },
-        { name: 'Average', value: 20, color: 'var(--color-warning)' },
-        { name: 'Poor', value: 3, color: '#F87171' },
+        { name: t('payam.ratingExcellent'), value: 54, color: 'var(--color-success)' },
+        { name: t('payam.ratingGood'), value: 23, color: '#5CB8A8' },
+        { name: t('payam.ratingAverage'), value: 20, color: 'var(--color-warning)' },
+        { name: t('payam.ratingPoor'), value: 3, color: '#F87171' },
       ]
     : [];
   const satisfactionRate = IS_DEMO ? 76 : 0;
@@ -272,7 +275,7 @@ export default function PayamSupervisorDashboard() {
 
   return (
     <>
-      <TopBar title="Payam Dashboard" />
+      <TopBar title={t('payam.title')} />
       <main className="page-container page-enter">
 
         {/* ═══ TOP ROW: KPI Cards + Satisfaction ═══ */}
@@ -280,7 +283,7 @@ export default function PayamSupervisorDashboard() {
 
           {/* Total Admitted Patients */}
           <div className="dash-card p-4 flex flex-col">
-            <p className="text-[11px] font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Total Admitted Patients</p>
+            <p className="text-[11px] font-medium mb-2" style={{ color: 'var(--text-muted)' }}>{t('payam.totalAdmittedPatients')}</p>
             <div className="flex items-end gap-2 mb-2">
               <span className="text-2xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{patients.length || 0}</span>
               <span className="text-[10px] font-semibold flex items-center gap-0.5 mb-0.5" style={{ color: 'var(--accent-primary)' }}>
@@ -293,55 +296,55 @@ export default function PayamSupervisorDashboard() {
                   <Users className="w-2 h-2" style={{ color: '#5CB8A8' }} />
                 </span>
                 <span className="text-[10px] font-semibold" style={{ color: 'var(--text-primary)' }}>{maleCount}</span>
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Male</span>
+                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('patient.male')}</span>
               </div>
               <div className="flex items-center gap-1">
                 <span className="w-3 h-3 rounded flex items-center justify-center" style={{ background: 'rgba(236,72,153,0.15)' }}>
                   <Users className="w-2 h-2" style={{ color: '#EC4899' }} />
                 </span>
                 <span className="text-[10px] font-semibold" style={{ color: 'var(--text-primary)' }}>{femaleCount}</span>
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Female</span>
+                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('patient.female')}</span>
               </div>
             </div>
             <div className="border-t pt-2 mt-auto grid grid-cols-3 gap-1" style={{ borderColor: 'var(--border-light)' }}>
               <div className="text-center">
                 <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{waitingCount}</p>
-                <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>Waiting</p>
+                <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('payam.waiting')}</p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{dischargeCount}</p>
-                <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>Discharge</p>
+                <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('payam.discharge')}</p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{transferCount}</p>
-                <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>Transfer</p>
+                <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('payam.transfer')}</p>
               </div>
             </div>
           </div>
 
           {/* Total Active Staff */}
           <div className="dash-card p-4 flex flex-col">
-            <p className="text-[11px] font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Total Active Staff</p>
+            <p className="text-[11px] font-medium mb-2" style={{ color: 'var(--text-muted)' }}>{t('payam.totalActiveStaff')}</p>
             <span className="text-2xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{totalDoctors + totalNurses}</span>
             <div className="mt-auto space-y-2 pt-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Stethoscope className="w-3.5 h-3.5" style={{ color: '#5CB8A8' }} />
-                  <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Doctors</span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{t('payam.doctors')}</span>
                 </div>
                 <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{totalDoctors}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <UserCheck className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Nursing</span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{t('payam.nursing')}</span>
                 </div>
                 <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{totalNurses}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Users className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
-                  <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Active BHWs</span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{t('payam.activeBhws')}</span>
                 </div>
                 <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{activeBHWs}/{totalBHWs}</span>
               </div>
@@ -350,14 +353,14 @@ export default function PayamSupervisorDashboard() {
 
           {/* Quick Stats — includes incoming Boma referrals count */}
           <div className="dash-card p-4 flex flex-col">
-            <p className="text-[11px] font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Quick Overview</p>
+            <p className="text-[11px] font-medium mb-2" style={{ color: 'var(--text-muted)' }}>{t('payam.quickOverview')}</p>
             <div className="mt-auto space-y-2">
               {[
-                { Icon: ArrowRightLeft, label: 'Incoming Boma Transfers', value: incomingBomaTransfers.length, color: ACCENT },
-                { Icon: FileText, label: 'Pending Referrals', value: pendingReferrals.length, color: 'var(--color-warning)' },
-                { Icon: AlertTriangle, label: 'Active Alerts', value: activeAlerts.length, color: 'var(--color-danger)' },
-                { Icon: Syringe, label: 'Immunizations', value: immStats?.totalVaccinations || 0, color: '#A855F7' },
-                { Icon: Baby, label: 'ANC / Births', value: `${ancStats?.totalVisits || 0} / ${birthStats?.total || 0}`, color: '#EC4899' },
+                { Icon: ArrowRightLeft, label: t('payam.incomingBomaTransfers'), value: incomingBomaTransfers.length, color: ACCENT },
+                { Icon: FileText, label: t('payam.pendingReferrals'), value: pendingReferrals.length, color: 'var(--color-warning)' },
+                { Icon: AlertTriangle, label: t('payam.activeAlerts'), value: activeAlerts.length, color: 'var(--color-danger)' },
+                { Icon: Syringe, label: t('nav.immunizations'), value: immStats?.totalVaccinations || 0, color: '#A855F7' },
+                { Icon: Baby, label: t('payam.ancBirths'), value: `${ancStats?.totalVisits || 0} / ${birthStats?.total || 0}`, color: '#EC4899' },
               ].map(item => (
                 <div key={item.label} className="flex items-center gap-2">
                   <div
@@ -386,13 +389,19 @@ export default function PayamSupervisorDashboard() {
                   className="px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wider transition-colors"
                   style={{
                     color: activeTab === tab ? 'var(--accent-primary)' : 'var(--text-muted)',
-                    borderBottom: activeTab === tab ? '2px solid #1B9AAA' : '2px solid transparent',
+                    borderBottom: activeTab === tab ? '2px solid #3b82f6' : '2px solid transparent',
                   }}
                 >
-                  {tab === 'satisfaction' ? 'Satisfaction' : tab === 'equipment' ? 'Equipment' : tab === 'department' ? 'Dept' : 'Avg Wait'}
+                  {tab === 'satisfaction' ? t('payam.tabSatisfaction') : tab === 'equipment' ? t('payam.tabEquipment') : tab === 'department' ? t('payam.tabDept') : t('payam.tabAvgWait')}
                 </button>
               ))}
             </div>
+            {satisfactionData.length === 0 || satisfactionData.every(d => !d.value) ? (
+              <div className="flex flex-col items-center justify-center gap-1.5 flex-1" style={{ minHeight: 90 }}>
+                <PieChartIcon className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No data yet</span>
+              </div>
+            ) : (
             <div className="flex items-center gap-2 flex-1">
               <div className="relative flex-shrink-0">
                 <ResponsiveContainer width={90} height={90}>
@@ -415,8 +424,9 @@ export default function PayamSupervisorDashboard() {
                 ))}
               </div>
             </div>
+            )}
             <div className="mt-2 p-1.5 rounded-lg text-center" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border)' }}>
-              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Patient Satisfaction Rate</span>
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('payam.patientSatisfactionRate')}</span>
               <span className="text-xl font-bold ml-2" style={{ color: 'var(--accent-primary)' }}>{satisfactionRate}%</span>
             </div>
           </div>
@@ -428,20 +438,20 @@ export default function PayamSupervisorDashboard() {
             <div className="flex items-center justify-between p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <ArrowRightLeft className="w-4 h-4" style={{ color: ACCENT }} />
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Incoming Boma Transfers</h3>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('payam.incomingBomaTransfers')}</h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${ACCENT}15`, color: ACCENT }}>
                   {incomingBomaTransfers.length}
                 </span>
               </div>
               <button onClick={() => router.push('/referrals')} className="text-[11px] font-medium flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
-                All Referrals <ChevronRight className="w-3 h-3" />
+                {t('payam.allReferrals')} <ChevronRight className="w-3 h-3" />
               </button>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table className="w-full">
                 <thead>
                   <tr>
-                    {['Patient', 'From Facility', 'Department', 'Urgency', 'Date', 'Action'].map(h => (
+                    {[t('payam.colPatient'), t('payam.colFromFacility'), t('frontDesk.department'), t('payam.colUrgency'), t('frontDesk.date'), t('payam.colAction')].map(h => (
                       <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
                         {h}
                       </th>
@@ -481,7 +491,7 @@ export default function PayamSupervisorDashboard() {
                           }}
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          Accept
+                          {t('payam.accept')}
                         </button>
                       </td>
                     </tr>
@@ -495,14 +505,14 @@ export default function PayamSupervisorDashboard() {
         {/* ═══ RECENTLY ADMITTED PATIENTS TABLE ═══ */}
         <div className="dash-card mb-6 overflow-hidden">
           <div className="flex items-center justify-between p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Recently Admitted Patients</h3>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('payam.recentlyAdmittedPatients')}</h3>
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1.5 text-[10px]">
                 <span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-danger)' }} />
-                <span style={{ color: 'var(--text-muted)' }}>Critical</span>
+                <span style={{ color: 'var(--text-muted)' }}>{t('payam.critical')}</span>
               </span>
               <button onClick={() => router.push('/patients')} className="text-[11px] font-medium flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
-                Details <ChevronRight className="w-3 h-3" />
+                {t('payam.details')} <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>
@@ -510,7 +520,7 @@ export default function PayamSupervisorDashboard() {
             <table className="w-full">
               <thead>
                 <tr>
-                  {['Patient Name', 'Patient ID', 'Admitted', 'Ward-Room No.', 'Assigned Doctor', 'Assigned Nurse', 'Division'].map(h => (
+                  {[t('patient.name'), t('payam.colPatientId'), t('payam.colAdmitted'), t('payam.colWardRoom'), t('payam.colAssignedDoctor'), t('payam.colAssignedNurse'), t('payam.colDivision')].map(h => (
                     <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
                       {h}
                     </th>
@@ -527,7 +537,7 @@ export default function PayamSupervisorDashboard() {
                     onClick={() => router.push(`/patients/${p._id}`)}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${p._id}`); } }}
                     style={{ borderBottom: '1px solid var(--border-light)' }}
-                    title="View patient record"
+                    title={t('payam.viewPatientRecord')}
                   >
                     <td className="px-4 py-2.5">
                       <span className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{p.name}</span>
@@ -565,9 +575,9 @@ export default function PayamSupervisorDashboard() {
           {/* Disease Distribution Donut */}
           <div className="glass-section">
             <div className="glass-section-header">
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Disease Distribution</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('payam.diseaseDistribution')}</span>
               <button onClick={() => router.push('/surveillance')} className="text-[10px] font-medium flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
-                Details <ChevronRight className="w-3 h-3" />
+                {t('payam.details')} <ChevronRight className="w-3 h-3" />
               </button>
             </div>
             <div className="p-4 flex items-center gap-4">
@@ -584,7 +594,7 @@ export default function PayamSupervisorDashboard() {
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="text-center">
                     <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{totalCases}</p>
-                    <p className="text-[8px]" style={{ color: 'var(--text-muted)' }}>Patients</p>
+                    <p className="text-[8px]" style={{ color: 'var(--text-muted)' }}>{t('payam.patients')}</p>
                   </div>
                 </div>
               </div>
@@ -606,7 +616,7 @@ export default function PayamSupervisorDashboard() {
             {activeAlerts.length > 0 && (
               <div className="mx-4 mb-4 p-2 rounded-lg flex items-center gap-2" style={{ background: 'rgba(229,46,66,0.06)', border: '1px solid rgba(229,46,66,0.12)' }}>
                 <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
-                <span className="text-[11px] font-medium" style={{ color: 'var(--color-danger)' }}>{activeAlerts.length} active disease alert(s)</span>
+                <span className="text-[11px] font-medium" style={{ color: 'var(--color-danger)' }}>{t('payam.activeDiseaseAlerts', { count: activeAlerts.length })}</span>
               </div>
             )}
           </div>
@@ -615,7 +625,7 @@ export default function PayamSupervisorDashboard() {
           <div className="glass-section">
             <div className="glass-section-header">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Bed Occupancy</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('payam.bedOccupancy')}</span>
                 <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>({bedOccupancy}/{bedTotal})</span>
               </div>
             </div>
@@ -639,7 +649,7 @@ export default function PayamSupervisorDashboard() {
           {/* In Patient-Out Patient Rate Line Chart */}
           <div className="glass-section">
             <div className="glass-section-header">
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>In Patient-Out Patient Rate</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('payam.inOutPatientRate')}</span>
             </div>
             <div className="p-4">
               <ResponsiveContainer width="100%" height={220}>
@@ -659,16 +669,16 @@ export default function PayamSupervisorDashboard() {
 
         {/* ═══ QUICK ACTIONS ═══ */}
         <div className="mt-6 dash-card p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Quick Actions</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('nurse.quickActions')}</p>
           <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
             {[
-              { label: 'New Patient', icon: Users, href: '/patients/new', color: 'var(--accent-primary)' },
-              { label: 'Consultation', icon: FileText, href: '/consultation', color: 'var(--accent-primary)' },
-              { label: 'Referral', icon: ArrowRightLeft, href: '/referrals', color: ACCENT },
-              { label: 'Immunization', icon: Syringe, href: '/immunizations', color: '#A855F7' },
-              { label: 'ANC Visit', icon: HeartPulse, href: '/anc', color: '#EC4899' },
-              { label: 'Birth Reg.', icon: Baby, href: '/births', color: 'var(--color-warning)' },
-              { label: 'Lab Results', icon: FlaskConical, href: '/lab', color: '#5CB8A8' },
+              { label: t('payam.newPatient'), icon: Users, href: '/patients/new', color: 'var(--accent-primary)' },
+              { label: t('nav.consultation'), icon: FileText, href: '/consultation', color: 'var(--accent-primary)' },
+              { label: t('payam.referral'), icon: ArrowRightLeft, href: '/referrals', color: ACCENT },
+              { label: t('nurse.immunization'), icon: Syringe, href: '/immunizations', color: '#A855F7' },
+              { label: t('nurse.ancVisit'), icon: HeartPulse, href: '/anc', color: '#EC4899' },
+              { label: t('nurse.birthReg'), icon: Baby, href: '/births', color: 'var(--color-warning)' },
+              { label: t('nav.lab'), icon: FlaskConical, href: '/lab', color: '#5CB8A8' },
             ].map(action => (
               <button
                 key={action.label}
@@ -688,20 +698,20 @@ export default function PayamSupervisorDashboard() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Eye className="w-5 h-5" style={{ color: ACCENT }} />
-              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>BHW Supervision</h2>
+              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('payam.bhwSupervision')}</h2>
             </div>
             <div className="flex gap-3 text-xs font-medium">
-              <span style={{ color: 'var(--text-muted)' }}>Reviews: <strong style={{ color: ACCENT }}>{reviewStats.pending}</strong></span>
-              <span style={{ color: 'var(--text-muted)' }}>Defaulters: <strong style={{ color: '#8B5CF6' }}>{defaulterStats.uniqueChildren}</strong></span>
+              <span style={{ color: 'var(--text-muted)' }}>{t('payam.reviews')}: <strong style={{ color: ACCENT }}>{reviewStats.pending}</strong></span>
+              <span style={{ color: 'var(--text-muted)' }}>{t('payam.defaulters')}: <strong style={{ color: '#8B5CF6' }}>{defaulterStats.uniqueChildren}</strong></span>
             </div>
           </div>
 
           {/* Supervision tabs */}
           <div className="flex gap-1 mb-4 p-1 rounded-xl" style={{ background: 'var(--overlay-subtle)' }}>
             {[
-              { id: 'bhw' as const, label: 'BHW Performance', icon: Users },
-              { id: 'review' as const, label: `Review Queue (${reviewStats.pending})`, icon: Eye },
-              { id: 'defaulters' as const, label: `Defaulters (${defaulterStats.uniqueChildren})`, icon: Syringe },
+              { id: 'bhw' as const, label: t('payam.bhwPerformance'), icon: Users },
+              { id: 'review' as const, label: t('payam.reviewQueueCount', { count: reviewStats.pending }), icon: Eye },
+              { id: 'defaulters' as const, label: t('payam.defaultersCount', { count: defaulterStats.uniqueChildren }), icon: Syringe },
             ].map(tab => (
               <button key={tab.id} onClick={() => setSupervisionTab(tab.id)}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-semibold transition-all"
@@ -714,7 +724,7 @@ export default function PayamSupervisorDashboard() {
           {/* BHW Performance Tab */}
           {supervisionTab === 'bhw' && (
             <div className="space-y-3">
-              {bhwPerformance.length === 0 && (<div className="text-center py-12"><Users className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} /><p className="text-sm" style={{ color: 'var(--text-muted)' }}>No BHW data available yet</p></div>)}
+              {bhwPerformance.length === 0 && (<div className="text-center py-12"><Users className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} /><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('payam.noBhwData')}</p></div>)}
               {bhwPerformance.map(bhw => {
                 const daysSinceActive = bhw.lastActiveDate ? Math.floor((Date.now() - new Date(bhw.lastActiveDate).getTime()) / 86400000) : 0;
                 const perfScore = getPerformanceScore(bhw);
@@ -731,7 +741,7 @@ export default function PayamSupervisorDashboard() {
                           </div>
                           <div>
                             <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{bhw.workerName}</p>
-                            <div className="flex items-center gap-2"><Home className="w-3 h-3" style={{ color: 'var(--text-muted)' }} /><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Boma: {bhw.boma}</span></div>
+                            <div className="flex items-center gap-2"><Home className="w-3 h-3" style={{ color: 'var(--text-muted)' }} /><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('payam.boma')}: {bhw.boma}</span></div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -741,7 +751,7 @@ export default function PayamSupervisorDashboard() {
                               <span className="text-xs font-bold text-white">{perfScore}</span>
                             </div>
                             <div>
-                              <p className="text-[9px] font-bold" style={{ color: scoreColor }}>SCORE</p>
+                              <p className="text-[9px] font-bold" style={{ color: scoreColor }}>{t('payam.score')}</p>
                               <div className="flex items-center gap-0.5">
                                 {perfScore >= 50 ? <TrendingUp className="w-2.5 h-2.5" style={{ color: scoreColor }} /> : <TrendingDown className="w-2.5 h-2.5" style={{ color: scoreColor }} />}
                                 <span className="text-[8px] font-bold" style={{ color: scoreColor }}>/100</span>
@@ -749,7 +759,7 @@ export default function PayamSupervisorDashboard() {
                             </div>
                           </div>
                           <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: bhw.isActive ? '#05966915' : '#EF444415', color: bhw.isActive ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                            {bhw.isActive ? 'ACTIVE' : `INACTIVE ${daysSinceActive}d`}
+                            {bhw.isActive ? t('payam.active') : t('payam.inactiveDays', { days: daysSinceActive })}
                           </span>
                         </div>
                       </div>
@@ -767,11 +777,11 @@ export default function PayamSupervisorDashboard() {
 
                       <div className="grid grid-cols-5 gap-2">
                         {[
-                          { label: 'This Week', value: bhw.thisWeekVisits, color: '#1B9AAA' },
-                          { label: 'Total Visits', value: bhw.totalVisits, color: 'var(--color-success)' },
-                          { label: 'Treated', value: bhw.treated, color: 'var(--color-success)' },
-                          { label: 'Referred', value: bhw.referred, color: 'var(--color-warning)' },
-                          { label: 'Follow-Up %', value: `${bhw.followUpCompletionRate}%`, color: bhw.followUpCompletionRate >= 80 ? 'var(--color-success)' : 'var(--color-danger)' },
+                          { label: t('payam.metricThisWeek'), value: bhw.thisWeekVisits, color: '#3b82f6' },
+                          { label: t('payam.metricTotalVisits'), value: bhw.totalVisits, color: 'var(--color-success)' },
+                          { label: t('payam.metricTreated'), value: bhw.treated, color: 'var(--color-success)' },
+                          { label: t('payam.metricReferred'), value: bhw.referred, color: 'var(--color-warning)' },
+                          { label: t('payam.metricFollowUpPct'), value: `${bhw.followUpCompletionRate}%`, color: bhw.followUpCompletionRate >= 80 ? 'var(--color-success)' : 'var(--color-danger)' },
                         ].map(metric => (
                           <div key={metric.label} className="p-2 rounded-lg text-center" style={{ background: 'var(--overlay-subtle)' }}>
                             <p className="text-base font-bold" style={{ color: metric.color }}>{metric.value}</p>
@@ -781,7 +791,7 @@ export default function PayamSupervisorDashboard() {
                       </div>
 
                       <div className="mt-2 flex items-center gap-2">
-                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Referral Rate:</span>
+                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('payam.referralRate')}:</span>
                         <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--overlay-subtle)' }}>
                           <div className="h-full rounded-full" style={{ width: `${bhw.referralRate}%`, background: bhw.referralRate > 40 ? 'var(--color-danger)' : bhw.referralRate > 20 ? 'var(--color-warning)' : 'var(--color-success)' }} />
                         </div>
@@ -789,7 +799,7 @@ export default function PayamSupervisorDashboard() {
                       </div>
 
                       {bhw.pendingReviews > 0 && (
-                        <div className="mt-2 flex items-center gap-1.5"><Clock className="w-3 h-3" style={{ color: ACCENT }} /><span className="text-[10px] font-medium" style={{ color: ACCENT }}>{bhw.pendingReviews} visits pending review</span></div>
+                        <div className="mt-2 flex items-center gap-1.5"><Clock className="w-3 h-3" style={{ color: ACCENT }} /><span className="text-[10px] font-medium" style={{ color: ACCENT }}>{t('payam.visitsPendingReview', { count: bhw.pendingReviews })}</span></div>
                       )}
 
                       {/* Feedback indicator */}
@@ -797,7 +807,7 @@ export default function PayamSupervisorDashboard() {
                         <div className="mt-2 flex items-center gap-1.5 px-2 py-1 rounded-lg" style={{ background: feedback.type === 'good' ? '#05966908' : feedback.type === 'urgent' ? '#EF444408' : '#F59E0B08' }}>
                           <MessageSquare className="w-3 h-3" style={{ color: feedback.type === 'good' ? 'var(--color-success)' : feedback.type === 'urgent' ? 'var(--color-danger)' : 'var(--color-warning)' }} />
                           <span className="text-[9px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                            Feedback: {feedback.type === 'good' ? 'Good Work' : feedback.type === 'urgent' ? 'Urgent Attention' : 'Needs Improvement'} ({new Date(feedback.timestamp).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})
+                            {t('payam.feedbackLabel')}: {feedback.type === 'good' ? t('payam.feedbackGoodWork') : feedback.type === 'urgent' ? t('payam.feedbackUrgentAttention') : t('payam.feedbackNeedsImprovement')} ({new Date(feedback.timestamp).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})
                           </span>
                         </div>
                       )}
@@ -805,18 +815,18 @@ export default function PayamSupervisorDashboard() {
                       {/* Supervisor Feedback */}
                       {feedbackWorkerId === bhw.workerId ? (
                         <div className="mt-3 p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Send Feedback</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('payam.sendFeedback')}</p>
                           <div className="flex gap-2 mb-2">
-                            <button onClick={() => saveFeedback(bhw.workerId, 'good')} className="flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95" style={{ background: '#05966915', color: 'var(--color-success)', border: '1px solid #05966920' }}><ThumbsUp className="w-3.5 h-3.5" /> Good Work</button>
-                            <button onClick={() => saveFeedback(bhw.workerId, 'needs_improvement')} className="flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95" style={{ background: '#F59E0B15', color: 'var(--color-warning)', border: '1px solid #F59E0B20' }}><AlertTriangle className="w-3.5 h-3.5" /> Needs Work</button>
-                            <button onClick={() => saveFeedback(bhw.workerId, 'urgent')} className="flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95" style={{ background: '#EF444415', color: 'var(--color-danger)', border: '1px solid #EF444420' }}><Flag className="w-3.5 h-3.5" /> Urgent</button>
+                            <button onClick={() => saveFeedback(bhw.workerId, 'good')} className="flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95" style={{ background: '#05966915', color: 'var(--color-success)', border: '1px solid #05966920' }}><ThumbsUp className="w-3.5 h-3.5" /> {t('payam.feedbackGoodWork')}</button>
+                            <button onClick={() => saveFeedback(bhw.workerId, 'needs_improvement')} className="flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95" style={{ background: '#F59E0B15', color: 'var(--color-warning)', border: '1px solid #F59E0B20' }}><AlertTriangle className="w-3.5 h-3.5" /> {t('payam.feedbackNeedsWork')}</button>
+                            <button onClick={() => saveFeedback(bhw.workerId, 'urgent')} className="flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95" style={{ background: '#EF444415', color: 'var(--color-danger)', border: '1px solid #EF444420' }}><Flag className="w-3.5 h-3.5" /> {t('payam.feedbackUrgent')}</button>
                           </div>
-                          <textarea value={feedbackNote} onChange={e => setFeedbackNote(e.target.value)} placeholder="Optional note..." className="w-full px-3 py-2 rounded-lg text-xs mb-2" style={{ background: 'var(--bg-input)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', minHeight: '50px' }} />
-                          <button onClick={() => { setFeedbackWorkerId(null); setFeedbackNote(''); }} className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Cancel</button>
+                          <textarea value={feedbackNote} onChange={e => setFeedbackNote(e.target.value)} placeholder={t('payam.optionalNote')} className="w-full px-3 py-2 rounded-lg text-xs mb-2" style={{ background: 'var(--bg-input)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', minHeight: '50px' }} />
+                          <button onClick={() => { setFeedbackWorkerId(null); setFeedbackNote(''); }} className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('action.cancel')}</button>
                         </div>
                       ) : (
                         <button onClick={() => setFeedbackWorkerId(bhw.workerId)} className="mt-2 w-full py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]" style={{ background: `${ACCENT}10`, color: ACCENT, border: `1px solid ${ACCENT}20` }}>
-                          <MessageSquare className="w-3.5 h-3.5" /> Send Feedback
+                          <MessageSquare className="w-3.5 h-3.5" /> {t('payam.sendFeedback')}
                         </button>
                       )}
                     </div>
@@ -831,27 +841,27 @@ export default function PayamSupervisorDashboard() {
             <div>
               <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                <input type="text" value={reviewSearchQ} onChange={e => setReviewSearchQ(e.target.value)} placeholder="Search by patient or BHW name..."
+                <input type="text" value={reviewSearchQ} onChange={e => setReviewSearchQ(e.target.value)} placeholder={t('payam.searchByPatientOrBhw')}
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
               </div>
 
               {/* Bulk Actions */}
               <div className="flex items-center justify-between mb-3 px-3 py-2 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{selectedVisits.size > 0 ? `${selectedVisits.size} selected` : 'Bulk Actions'}</span>
-                  <button onClick={selectAllRoutine} className="text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all active:scale-95" style={{ background: `${ACCENT}15`, color: ACCENT, border: `1px solid ${ACCENT}20` }}>Select All Routine</button>
+                  <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{selectedVisits.size > 0 ? t('payam.selectedCount', { count: selectedVisits.size }) : t('payam.bulkActions')}</span>
+                  <button onClick={selectAllRoutine} className="text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all active:scale-95" style={{ background: `${ACCENT}15`, color: ACCENT, border: `1px solid ${ACCENT}20` }}>{t('payam.selectAllRoutine')}</button>
                 </div>
                 {selectedVisits.size > 0 && (
                   <div className="flex items-center gap-2">
                     <button onClick={handleBulkApprove} disabled={bulkApproving} className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-lg text-white transition-all active:scale-95" style={{ background: 'var(--color-success)', opacity: bulkApproving ? 0.7 : 1 }}>
-                      <CheckCircle2 className="w-3 h-3" />{bulkApproving ? 'Approving...' : `Approve Selected (${selectedVisits.size})`}
+                      <CheckCircle2 className="w-3 h-3" />{bulkApproving ? t('payam.approving') : t('payam.approveSelected', { count: selectedVisits.size })}
                     </button>
-                    <button onClick={() => setSelectedVisits(new Set())} className="text-[10px] font-medium px-2 py-1" style={{ color: 'var(--text-muted)' }}>Clear</button>
+                    <button onClick={() => setSelectedVisits(new Set())} className="text-[10px] font-medium px-2 py-1" style={{ color: 'var(--text-muted)' }}>{t('payam.clear')}</button>
                   </div>
                 )}
               </div>
 
-              {filteredReviewQueue.length === 0 && (<div className="text-center py-12"><CheckCircle2 className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--color-success)', opacity: 0.3 }} /><p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>All visits reviewed!</p></div>)}
+              {filteredReviewQueue.length === 0 && (<div className="text-center py-12"><CheckCircle2 className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--color-success)', opacity: 0.3 }} /><p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{t('payam.allVisitsReviewed')}</p></div>)}
 
               <div className="space-y-2">
                 {filteredReviewQueue.map(visit => (
@@ -876,23 +886,23 @@ export default function PayamSupervisorDashboard() {
                         </div>
                       </div>
                       <div className="grid grid-cols-3 gap-2 mb-2">
-                        <div className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}><p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>Complaint</p><p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{visit.chiefComplaint}</p></div>
-                        <div className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}><p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>Condition</p><p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{visit.suspectedCondition}</p></div>
-                        <div className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}><p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>BHW</p><p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{visit.workerName}</p></div>
+                        <div className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}><p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('payam.complaint')}</p><p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{visit.chiefComplaint}</p></div>
+                        <div className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}><p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('payam.condition')}</p><p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{visit.suspectedCondition}</p></div>
+                        <div className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}><p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('payam.bhw')}</p><p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{visit.workerName}</p></div>
                       </div>
-                      {visit.treatmentGiven && <p className="text-xs mb-2 p-1.5 rounded-lg" style={{ background: '#05966908', color: 'var(--color-success)' }}>Treatment: {visit.treatmentGiven}</p>}
-                      {visit.referredTo && <p className="text-xs mb-2 p-1.5 rounded-lg" style={{ background: '#EF444408', color: 'var(--color-danger)' }}>Referred to: {visit.referredTo}</p>}
+                      {visit.treatmentGiven && <p className="text-xs mb-2 p-1.5 rounded-lg" style={{ background: '#05966908', color: 'var(--color-success)' }}>{t('payam.treatment')}: {visit.treatmentGiven}</p>}
+                      {visit.referredTo && <p className="text-xs mb-2 p-1.5 rounded-lg" style={{ background: '#EF444408', color: 'var(--color-danger)' }}>{t('payam.referredTo')}: {visit.referredTo}</p>}
                       {reviewingId === visit._id ? (
                         <div className="space-y-2 mt-2">
-                          <textarea value={reviewNotes} onChange={e => setReviewNotes(e.target.value)} placeholder="Add review notes (optional)..." className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg-input)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', minHeight: '60px' }} />
+                          <textarea value={reviewNotes} onChange={e => setReviewNotes(e.target.value)} placeholder={t('payam.reviewNotesPlaceholder')} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg-input)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', minHeight: '60px' }} />
                           <div className="flex gap-2">
-                            <button onClick={() => handleReview(visit._id, 'reviewed')} className="flex-1 py-2.5 rounded-lg text-xs font-bold text-white flex items-center justify-center gap-1.5" style={{ background: 'var(--color-success)' }}><CheckCircle2 className="w-3.5 h-3.5" /> Approve</button>
-                            <button onClick={() => handleReview(visit._id, 'flagged')} className="flex-1 py-2.5 rounded-lg text-xs font-bold text-white flex items-center justify-center gap-1.5" style={{ background: 'var(--color-danger)' }}><Flag className="w-3.5 h-3.5" /> Flag</button>
-                            <button onClick={() => { setReviewingId(null); setReviewNotes(''); }} className="px-3 py-2.5 rounded-lg text-xs font-medium" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>Cancel</button>
+                            <button onClick={() => handleReview(visit._id, 'reviewed')} className="flex-1 py-2.5 rounded-lg text-xs font-bold text-white flex items-center justify-center gap-1.5" style={{ background: 'var(--color-success)' }}><CheckCircle2 className="w-3.5 h-3.5" /> {t('payam.approve')}</button>
+                            <button onClick={() => handleReview(visit._id, 'flagged')} className="flex-1 py-2.5 rounded-lg text-xs font-bold text-white flex items-center justify-center gap-1.5" style={{ background: 'var(--color-danger)' }}><Flag className="w-3.5 h-3.5" /> {t('payam.flag')}</button>
+                            <button onClick={() => { setReviewingId(null); setReviewNotes(''); }} className="px-3 py-2.5 rounded-lg text-xs font-medium" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>{t('action.cancel')}</button>
                           </div>
                         </div>
                       ) : (
-                        <button onClick={() => setReviewingId(visit._id)} className="w-full py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 mt-1" style={{ background: `${ACCENT}10`, color: ACCENT, border: `1px solid ${ACCENT}20` }}><Eye className="w-3.5 h-3.5" /> Review This Visit</button>
+                        <button onClick={() => setReviewingId(visit._id)} className="w-full py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 mt-1" style={{ background: `${ACCENT}10`, color: ACCENT, border: `1px solid ${ACCENT}20` }}><Eye className="w-3.5 h-3.5" /> {t('payam.reviewThisVisit')}</button>
                       )}
                     </div>
                   </div>
@@ -906,10 +916,10 @@ export default function PayamSupervisorDashboard() {
             <div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                 {[
-                  { label: 'Total Overdue', value: defaulterStats.totalDefaulters, color: 'var(--color-danger)' },
-                  { label: 'Children', value: defaulterStats.uniqueChildren, color: '#8B5CF6' },
-                  { label: 'Critical (>30d)', value: defaulterStats.critical, color: 'var(--color-danger)' },
-                  { label: 'High (>14d)', value: defaulterStats.high, color: 'var(--color-warning)' },
+                  { label: t('payam.totalOverdue'), value: defaulterStats.totalDefaulters, color: 'var(--color-danger)' },
+                  { label: t('payam.children'), value: defaulterStats.uniqueChildren, color: '#8B5CF6' },
+                  { label: t('payam.criticalOver30d'), value: defaulterStats.critical, color: 'var(--color-danger)' },
+                  { label: t('payam.highOver14d'), value: defaulterStats.high, color: 'var(--color-warning)' },
                 ].map(stat => (
                   <div key={stat.label} className="rounded-xl p-3" style={{ background: `${stat.color}08`, border: `1px solid ${stat.color}15` }}>
                     <p className="text-xl font-bold" style={{ color: stat.color }}>{stat.value}</p>
@@ -917,7 +927,7 @@ export default function PayamSupervisorDashboard() {
                   </div>
                 ))}
               </div>
-              {defaulters.length === 0 && (<div className="text-center py-12"><Syringe className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--color-success)', opacity: 0.3 }} /><p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>No immunization defaulters!</p></div>)}
+              {defaulters.length === 0 && (<div className="text-center py-12"><Syringe className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--color-success)', opacity: 0.3 }} /><p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{t('payam.noDefaulters')}</p></div>)}
               <div className="space-y-2">
                 {defaulters.map((d, i) => (
                   <div key={`${d.patientId}-${d.vaccine}-${i}`} className="rounded-2xl p-3" style={{ background: 'var(--bg-card)', border: `1px solid ${d.urgency === 'critical' ? 'rgba(239,68,68,0.3)' : d.urgency === 'high' ? 'rgba(245,158,11,0.2)' : 'var(--border-light)'}`, boxShadow: 'var(--card-shadow)' }}>
@@ -928,18 +938,18 @@ export default function PayamSupervisorDashboard() {
                         </div>
                         <div>
                           <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{d.patientName}</p>
-                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{d.gender} &middot; {d.ageMonths} months &middot; {d.facilityName}</p>
+                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{d.gender} &middot; {t('payam.ageMonths', { count: d.ageMonths })} &middot; {d.facilityName}</p>
                         </div>
                       </div>
                       <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: d.urgency === 'critical' ? '#EF444415' : d.urgency === 'high' ? '#F59E0B15' : '#8B5CF615', color: d.urgency === 'critical' ? 'var(--color-danger)' : d.urgency === 'high' ? 'var(--color-warning)' : '#8B5CF6' }}>
-                        {d.daysOverdue} DAYS OVERDUE
+                        {t('payam.daysOverdue', { count: d.daysOverdue })}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg" style={{ background: '#8B5CF610' }}>
-                        <Syringe className="w-3 h-3" style={{ color: '#8B5CF6' }} /><span className="text-xs font-medium" style={{ color: '#8B5CF6' }}>{d.vaccine} Dose {d.doseNumber}</span>
+                        <Syringe className="w-3 h-3" style={{ color: '#8B5CF6' }} /><span className="text-xs font-medium" style={{ color: '#8B5CF6' }}>{t('payam.vaccineDose', { vaccine: d.vaccine, dose: d.doseNumber })}</span>
                       </div>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Due: {new Date(d.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('payam.due')}: {new Date(d.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                     </div>
                   </div>
                 ))}

@@ -10,6 +10,7 @@ import {
 } from '@/components/icons/lucide';
 import { useClinicalScribe } from '@/lib/hooks/useClinicalScribe';
 import type { ScribeExtraction } from '@/lib/services/clinical-scribe-service';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface ClinicalScribeProps {
   onApply: (extraction: ScribeExtraction) => void;
@@ -19,6 +20,7 @@ interface ClinicalScribeProps {
 type PreviewTab = 'transcript' | 'fields' | 'soap';
 
 export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps) {
+  const { t } = useTranslation();
   const scribe = useClinicalScribe();
   const [activeTab, setActiveTab] = useState<PreviewTab>('transcript');
   const [showManualInput, setShowManualInput] = useState(false);
@@ -80,10 +82,10 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
           </div>
           <div>
             <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              AI Clinical Scribe
+              {t('scribe.title')}
             </h3>
             <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-              {isRecording ? 'Listening...' : isPaused ? 'Paused' : isDone ? 'Review & Apply' : 'Ready to record'}
+              {isRecording ? t('scribe.statusListening') : isPaused ? t('scribe.statusPaused') : isDone ? t('scribe.statusReviewApply') : t('scribe.statusReady')}
             </p>
           </div>
         </div>
@@ -111,14 +113,14 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
           <>
             {scribe.isSupported ? (
               <button onClick={scribe.startRecording} className="btn btn-primary btn-sm flex-1">
-                <Mic className="w-4 h-4" /> Start Recording
+                <Mic className="w-4 h-4" /> {t('scribe.startRecording')}
               </button>
             ) : (
               <button onClick={() => setShowManualInput(true)} className="btn btn-primary btn-sm flex-1">
-                <Keyboard className="w-4 h-4" /> Enter Transcript
+                <Keyboard className="w-4 h-4" /> {t('scribe.enterTranscript')}
               </button>
             )}
-            <button onClick={() => setShowManualInput(!showManualInput)} className="btn btn-secondary btn-sm" title="Manual transcript entry">
+            <button onClick={() => setShowManualInput(!showManualInput)} className="btn btn-secondary btn-sm" title={t('scribe.manualTranscriptEntry')}>
               <Keyboard className="w-3.5 h-3.5" />
             </button>
           </>
@@ -127,10 +129,10 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
         {isRecording && (
           <>
             <button onClick={scribe.pauseRecording} className="btn btn-secondary btn-sm">
-              <Pause className="w-4 h-4" /> Pause
+              <Pause className="w-4 h-4" /> {t('scribe.pause')}
             </button>
             <button onClick={handleFinalize} className="btn btn-primary btn-sm flex-1">
-              <Square className="w-4 h-4" /> Stop & Process
+              <Square className="w-4 h-4" /> {t('scribe.stopAndProcess')}
             </button>
           </>
         )}
@@ -138,10 +140,10 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
         {isPaused && (
           <>
             <button onClick={scribe.resumeRecording} className="btn btn-secondary btn-sm">
-              <Play className="w-4 h-4" /> Resume
+              <Play className="w-4 h-4" /> {t('scribe.resume')}
             </button>
             <button onClick={handleFinalize} className="btn btn-primary btn-sm flex-1">
-              <CheckCircle2 className="w-4 h-4" /> Finalize Note
+              <CheckCircle2 className="w-4 h-4" /> {t('scribe.finalizeNote')}
             </button>
           </>
         )}
@@ -151,16 +153,16 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4 31.4" strokeLinecap="round" style={{ color: 'var(--accent-primary)' }} />
             </svg>
-            <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>Extracting clinical data...</span>
+            <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>{t('scribe.extractingData')}</span>
           </div>
         )}
 
         {isDone && (
           <>
             <button onClick={handleApply} className="btn btn-primary btn-sm flex-1">
-              <CheckCircle2 className="w-4 h-4" /> Apply to Consultation
+              <CheckCircle2 className="w-4 h-4" /> {t('scribe.applyToConsultation')}
             </button>
-            <button onClick={scribe.reset} className="btn btn-secondary btn-sm" title="Start over">
+            <button onClick={scribe.reset} className="btn btn-secondary btn-sm" title={t('scribe.startOver')}>
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
           </>
@@ -168,7 +170,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
 
         {hasContent && scribe.status === 'idle' && !isDone && (
           <button onClick={() => scribe.processTranscript()} className="btn btn-primary btn-sm">
-            <Sparkles className="w-3.5 h-3.5" /> Process
+            <Sparkles className="w-3.5 h-3.5" /> {t('scribe.process')}
           </button>
         )}
       </div>
@@ -177,22 +179,22 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
       {showManualInput && (
         <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
           <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>
-            Paste or type consultation transcript
+            {t('scribe.manualInputLabel')}
           </label>
           <textarea
             value={manualText}
             onChange={e => setManualText(e.target.value)}
             rows={6}
-            placeholder="Doctor: What brings you in today?&#10;Patient: I've been having fever and headaches for three days...&#10;Doctor: Let me check your temperature. It's 38.5 degrees celsius..."
+            placeholder={t('scribe.manualInputPlaceholder')}
             className="text-xs mb-2"
             style={{ fontSize: '0.8rem', lineHeight: '1.5' }}
           />
           <div className="flex gap-2">
             <button onClick={handleManualProcess} disabled={!manualText.trim()} className="btn btn-primary btn-sm flex-1">
-              <Sparkles className="w-3.5 h-3.5" /> Process Transcript
+              <Sparkles className="w-3.5 h-3.5" /> {t('scribe.processTranscript')}
             </button>
             <button onClick={() => setShowManualInput(false)} className="btn btn-secondary btn-sm">
-              Cancel
+              {t('action.cancel')}
             </button>
           </div>
         </div>
@@ -218,7 +220,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
               className={`flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider transition-colors relative ${activeTab === tab ? 'tab-active' : ''}`}
               style={{ color: activeTab === tab ? 'var(--accent-primary)' : 'var(--text-muted)' }}
             >
-              {tab === 'transcript' ? 'Transcript' : tab === 'fields' ? 'Extracted Fields' : 'SOAP Note'}
+              {tab === 'transcript' ? t('scribe.tabTranscript') : tab === 'fields' ? t('scribe.tabExtractedFields') : t('scribe.tabSoapNote')}
             </button>
           ))}
         </div>
@@ -243,11 +245,11 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
                 <Mic className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.2 }} />
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
                   {scribe.isSupported
-                    ? 'Click "Start Recording" to begin capturing the consultation.'
-                    : 'Speech recognition unavailable. Use "Enter Transcript" to paste text.'}
+                    ? t('scribe.emptyStartHint')
+                    : t('scribe.emptyUnsupportedHint')}
                 </p>
                 <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>
-                  All processing happens locally on your device.
+                  {t('scribe.localProcessingNote')}
                 </p>
               </div>
             )}
@@ -258,18 +260,18 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
         {activeTab === 'fields' && scribe.extraction && (
           <div className="p-3 space-y-2">
             <FieldSection
-              icon={Clipboard} label="Chief Complaint" color="#1B9AAA"
+              icon={Clipboard} label={t('scribe.sectionChiefComplaint')} color="#3b82f6"
               expanded={expandedSections.has('complaint')}
               onToggle={() => toggleSection('complaint')}
               empty={!scribe.extraction.chiefComplaint}
             >
               <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                {scribe.extraction.chiefComplaint || 'Not detected'}
+                {scribe.extraction.chiefComplaint || t('scribe.notDetected')}
               </p>
             </FieldSection>
 
             <FieldSection
-              icon={Thermometer} label="Vitals" color="#5CB8A8"
+              icon={Thermometer} label={t('scribe.sectionVitals')} color="#5CB8A8"
               expanded={expandedSections.has('vitals')}
               onToggle={() => toggleSection('vitals')}
               empty={!Object.values(scribe.extraction.vitals).some(v => v)}
@@ -277,15 +279,15 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             >
               <div className="grid grid-cols-3 gap-2">
                 {([
-                  ['temperature', 'Temp', '°C'],
-                  ['systolic', 'Systolic', 'mmHg'],
-                  ['diastolic', 'Diastolic', 'mmHg'],
-                  ['pulse', 'Pulse', 'bpm'],
-                  ['respRate', 'Resp Rate', '/min'],
-                  ['o2Sat', 'SpO2', '%'],
-                  ['weight', 'Weight', 'kg'],
-                  ['height', 'Height', 'cm'],
-                  ['muac', 'MUAC', 'cm'],
+                  ['temperature', t('scribe.vitalTemp'), '°C'],
+                  ['systolic', t('scribe.vitalSystolic'), 'mmHg'],
+                  ['diastolic', t('scribe.vitalDiastolic'), 'mmHg'],
+                  ['pulse', t('scribe.vitalPulse'), 'bpm'],
+                  ['respRate', t('scribe.vitalRespRate'), '/min'],
+                  ['o2Sat', t('scribe.vitalSpo2'), '%'],
+                  ['weight', t('scribe.vitalWeight'), 'kg'],
+                  ['height', t('scribe.vitalHeight'), 'cm'],
+                  ['muac', t('scribe.vitalMuac'), 'cm'],
                 ] as const).map(([key, label, unit]) => {
                   const val = scribe.extraction!.vitals[key];
                   return val ? (
@@ -299,7 +301,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             </FieldSection>
 
             <FieldSection
-              icon={Stethoscope} label="Exam Findings" color="#A855F7"
+              icon={Stethoscope} label={t('scribe.sectionExamFindings')} color="#A855F7"
               expanded={expandedSections.has('exam')}
               onToggle={() => toggleSection('exam')}
               empty={scribe.extraction.examFindings.length === 0}
@@ -318,7 +320,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             </FieldSection>
 
             <FieldSection
-              icon={AlertTriangle} label="Diagnoses" color="#E4A84B"
+              icon={AlertTriangle} label={t('scribe.sectionDiagnoses')} color="#E4A84B"
               expanded={expandedSections.has('diagnoses')}
               onToggle={() => toggleSection('diagnoses')}
               empty={scribe.extraction.diagnoses.length === 0}
@@ -334,7 +336,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
                     )}
                     <span className="text-xs font-medium flex-1" style={{ color: 'var(--text-primary)' }}>{dx.name}</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{
-                      background: dx.certainty === 'confirmed' ? 'rgba(27, 154, 170,0.12)' : 'rgba(252,211,77,0.12)',
+                      background: dx.certainty === 'confirmed' ? 'rgba(59, 130, 246,0.12)' : 'rgba(252,211,77,0.12)',
                       color: dx.certainty === 'confirmed' ? 'var(--accent-primary)' : 'var(--color-warning)',
                     }}>{dx.certainty}</span>
                   </div>
@@ -343,7 +345,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             </FieldSection>
 
             <FieldSection
-              icon={Pill} label="Medications" color="#EC4899"
+              icon={Pill} label={t('scribe.sectionMedications')} color="#EC4899"
               expanded={expandedSections.has('medications')}
               onToggle={() => toggleSection('medications')}
               empty={scribe.extraction.medications.length === 0}
@@ -354,7 +356,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
                   <div key={i} className="p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                     <p className="text-xs font-semibold" style={{ color: 'var(--accent-primary)' }}>{med.name}</p>
                     <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                      {[med.dose, med.frequency, med.route, med.duration].filter(Boolean).join(' · ') || 'Details not captured'}
+                      {[med.dose, med.frequency, med.route, med.duration].filter(Boolean).join(' · ') || t('scribe.detailsNotCaptured')}
                     </p>
                   </div>
                 ))}
@@ -362,7 +364,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             </FieldSection>
 
             <FieldSection
-              icon={Heart} label="Allergies" color="#C44536"
+              icon={Heart} label={t('scribe.sectionAllergies')} color="#C44536"
               expanded={expandedSections.has('allergies')}
               onToggle={() => toggleSection('allergies')}
               empty={scribe.extraction.allergies.length === 0}
@@ -380,7 +382,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             </FieldSection>
 
             <FieldSection
-              icon={FlaskConical} label="Lab Orders" color="#06B6D4"
+              icon={FlaskConical} label={t('scribe.sectionLabOrders')} color="#06B6D4"
               expanded={expandedSections.has('labs')}
               onToggle={() => toggleSection('labs')}
               empty={scribe.extraction.labOrders.length === 0}
@@ -398,7 +400,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             </FieldSection>
 
             <FieldSection
-              icon={FileText} label="Treatment Plan" color="#1B9AAA"
+              icon={FileText} label={t('scribe.sectionTreatmentPlan')} color="#3b82f6"
               expanded={expandedSections.has('plan')}
               onToggle={() => toggleSection('plan')}
               empty={scribe.extraction.treatmentPlan.length === 0}
@@ -413,13 +415,13 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             </FieldSection>
 
             <FieldSection
-              icon={Calendar} label="Follow-up" color="#8B5CF6"
+              icon={Calendar} label={t('scribe.sectionFollowUp')} color="#8B5CF6"
               expanded={expandedSections.has('followup')}
               onToggle={() => toggleSection('followup')}
               empty={!scribe.extraction.followUp}
             >
               <p className="text-xs" style={{ color: 'var(--text-primary)' }}>
-                {scribe.extraction.followUp || 'Not discussed'}
+                {scribe.extraction.followUp || t('scribe.notDiscussed')}
               </p>
             </FieldSection>
 
@@ -428,11 +430,11 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
               <div className="p-3 rounded-lg" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-warning)' }}>Conflicts — Doctor Verify</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-warning)' }}>{t('scribe.conflictsHeader')}</span>
                 </div>
                 {scribe.extraction.conflicts.map((c, i) => (
                   <p key={i} className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                    <strong>{c.field}:</strong> earlier &quot;{c.earlier}&quot; → now &quot;{c.latest}&quot;
+                    <strong>{c.field}:</strong> {t('scribe.conflictLine', { earlier: c.earlier, latest: c.latest })}
                   </p>
                 ))}
               </div>
@@ -443,7 +445,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
               <div className="p-3 rounded-lg" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <AlertCircle className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>Items to Confirm</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>{t('scribe.itemsToConfirm')}</span>
                 </div>
                 {scribe.extraction.uncertainItems.map((u, i) => (
                   <p key={i} className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>{u}</p>
@@ -457,7 +459,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
           <div className="p-8 text-center">
             <Sparkles className="w-8 h-8 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.2 }} />
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Record or enter a transcript, then process it to see extracted clinical fields.
+              {t('scribe.fieldsEmptyHint')}
             </p>
           </div>
         )}
@@ -476,7 +478,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
               <div className="text-center py-8">
                 <FileText className="w-8 h-8 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.2 }} />
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Process a transcript to generate the SOAP note.
+                  {t('scribe.soapEmptyHint')}
                 </p>
               </div>
             )}
@@ -490,14 +492,14 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
             <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>
-              {countExtracted(scribe.extraction)} fields auto-populated
+              {t('scribe.fieldsAutoPopulated', { count: countExtracted(scribe.extraction) })}
             </span>
           </div>
           <button onClick={handleApply} className="btn btn-primary w-full">
-            <CheckCircle2 className="w-4 h-4" /> Apply All Fields to Consultation
+            <CheckCircle2 className="w-4 h-4" /> {t('scribe.applyAllFields')}
           </button>
           <p className="text-[10px] text-center mt-2" style={{ color: 'var(--text-muted)' }}>
-            Fields will be pre-filled — review and approve before saving.
+            {t('scribe.reviewBeforeSaving')}
           </p>
         </div>
       )}
@@ -517,6 +519,7 @@ function FieldSection({ icon: Icon, label, color, expanded, onToggle, empty, cou
   count?: number;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-lg overflow-hidden" style={{
       border: `1px solid ${empty ? 'var(--border-light)' : color + '25'}`,
@@ -534,7 +537,7 @@ function FieldSection({ icon: Icon, label, color, expanded, onToggle, empty, cou
             </span>
           )}
           {empty && (
-            <span className="text-[9px] italic" style={{ color: 'var(--text-muted)' }}>Not detected</span>
+            <span className="text-[9px] italic" style={{ color: 'var(--text-muted)' }}>{t('scribe.notDetected')}</span>
           )}
         </div>
         {expanded ? <ChevronUp className="w-3 h-3" style={{ color: 'var(--text-muted)' }} /> : <ChevronDown className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />}

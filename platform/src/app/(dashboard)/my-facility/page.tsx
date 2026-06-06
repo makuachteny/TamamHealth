@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -11,6 +12,7 @@ import {
 } from '@/components/icons/lucide';
 
 export default function MyFacilityPage() {
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const { hospitals, loading: hospitalsLoading, update } = useHospitals();
   const [saving, setSaving] = useState(false);
@@ -90,7 +92,7 @@ export default function MyFacilityPage() {
     } catch (err) {
       // Surface the real failure (validation, 4xx/5xx, etc.) instead of a
       // generic message — silently swallowing the cause hid actual problems.
-      setError(err instanceof Error ? err.message : 'Failed to save. Please try again.');
+      setError(err instanceof Error ? err.message : t('myFacility.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -104,13 +106,13 @@ export default function MyFacilityPage() {
   if (!hospitalId) {
     return (
       <>
-        <TopBar title="My Facility" />
+        <TopBar title={t('breadcrumb.myFacility')} />
         <main className="page-container page-enter">
           <div className="card-elevated p-8 text-center max-w-md mx-auto mt-16">
             <Building2 className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
-            <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Not Assigned to a Facility</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>{t('myFacility.notAssignedTitle')}</h2>
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              Your account is not currently linked to a hospital facility. Contact your administrator to be assigned.
+              {t('myFacility.notAssignedDesc')}
             </p>
           </div>
         </main>
@@ -121,7 +123,7 @@ export default function MyFacilityPage() {
   if (hospitalsLoading) {
     return (
       <>
-        <TopBar title="My Facility" />
+        <TopBar title={t('breadcrumb.myFacility')} />
         <main className="page-container page-enter flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--text-muted)' }} />
         </main>
@@ -130,10 +132,10 @@ export default function MyFacilityPage() {
   }
 
   const statusColors: Record<string, { bg: string; color: string; label: string }> = {
-    functional: { bg: 'rgba(74,222,128,0.12)', color: 'var(--color-success)', label: 'Functional' },
-    partially_functional: { bg: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)', label: 'Partially Functional' },
-    non_functional: { bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)', label: 'Non-Functional' },
-    closed: { bg: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)', label: 'Closed' },
+    functional: { bg: 'rgba(74,222,128,0.12)', color: 'var(--color-success)', label: t('myFacility.statusFunctional') },
+    partially_functional: { bg: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)', label: t('myFacility.statusPartiallyFunctional') },
+    non_functional: { bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)', label: t('myFacility.statusNonFunctional') },
+    closed: { bg: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)', label: t('myFacility.statusClosed') },
   };
 
   const sectionClass = 'card-elevated p-5 space-y-4';
@@ -185,13 +187,13 @@ export default function MyFacilityPage() {
 
   return (
     <>
-      <TopBar title="My Facility" />
+      <TopBar title={t('breadcrumb.myFacility')} />
       <main className="page-container page-enter">
 
         <PageHeader
           icon={Building2}
-          title={hospital?.name || 'My Facility'}
-          subtitle={`${hospital?.state || ''} · ${hospital?.facilityType?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Facility'}`}
+          title={hospital?.name || t('breadcrumb.myFacility')}
+          subtitle={`${hospital?.state || ''} · ${hospital?.facilityType?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || t('common.facility')}`}
           actions={
             <>
               {error && (
@@ -201,7 +203,7 @@ export default function MyFacilityPage() {
               )}
               {saved && (
                 <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--color-success)' }}>
-                  <CheckCircle className="w-3.5 h-3.5" /> Saved successfully
+                  <CheckCircle className="w-3.5 h-3.5" /> {t('myFacility.savedSuccessfully')}
                 </span>
               )}
               <button
@@ -209,12 +211,12 @@ export default function MyFacilityPage() {
                 disabled={saving}
                 className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all"
                 style={{
-                  background: saving ? 'var(--text-muted)' : 'linear-gradient(135deg, #1B9AAA, #1E4D4A)',
+                  background: saving ? 'var(--text-muted)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
                   boxShadow: '0 2px 8px rgba(0,119,215,0.3)',
                 }}
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? t('consultation.saving') : t('appointments.saveChanges')}
               </button>
             </>
           }
@@ -225,9 +227,9 @@ export default function MyFacilityPage() {
 
           {/* Operational Status */}
           <div className={sectionClass}>
-            {sectionTitle(<Activity className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />, 'Operational Status')}
+            {sectionTitle(<Activity className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />, t('myFacility.operationalStatus'))}
             <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Current Status</label>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('myFacility.currentStatus')}</label>
               <select
                 value={operationalStatus}
                 onChange={e => setOperationalStatus(e.target.value)}
@@ -239,10 +241,10 @@ export default function MyFacilityPage() {
                   outline: 'none',
                 }}
               >
-                <option value="functional">Functional</option>
-                <option value="partially_functional">Partially Functional</option>
-                <option value="non_functional">Non-Functional</option>
-                <option value="closed">Closed</option>
+                <option value="functional">{t('myFacility.statusFunctional')}</option>
+                <option value="partially_functional">{t('myFacility.statusPartiallyFunctional')}</option>
+                <option value="non_functional">{t('myFacility.statusNonFunctional')}</option>
+                <option value="closed">{t('myFacility.statusClosed')}</option>
               </select>
               <hr className="section-divider" />
               <div>
@@ -259,46 +261,46 @@ export default function MyFacilityPage() {
 
           {/* Bed Capacity */}
           <div className={sectionClass}>
-            {sectionTitle(<BedDouble className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />, 'Bed Capacity', 'rgba(252,211,77,0.12)')}
+            {sectionTitle(<BedDouble className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />, t('myFacility.bedCapacity'), 'rgba(252,211,77,0.12)')}
             <div className="grid grid-cols-2 gap-3">
-              {numberInput('Total Beds', totalBeds, setTotalBeds)}
-              {numberInput('ICU Beds', icuBeds, setIcuBeds)}
-              {numberInput('Maternity Beds', maternityBeds, setMaternityBeds)}
-              {numberInput('Pediatric Beds', pediatricBeds, setPediatricBeds)}
+              {numberInput(t('dataEntry.totalBeds'), totalBeds, setTotalBeds)}
+              {numberInput(t('dataEntry.icuBeds'), icuBeds, setIcuBeds)}
+              {numberInput(t('dataEntry.maternityBeds'), maternityBeds, setMaternityBeds)}
+              {numberInput(t('dataEntry.pediatricBeds'), pediatricBeds, setPediatricBeds)}
             </div>
           </div>
 
           {/* Staffing */}
           <div className={sectionClass}>
-            {sectionTitle(<Users className="w-3.5 h-3.5" style={{ color: '#1B9AAA' }} />, 'Staffing', 'rgba(27, 154, 170,0.12)')}
+            {sectionTitle(<Users className="w-3.5 h-3.5" style={{ color: '#3b82f6' }} />, t('myFacility.staffing'), 'rgba(59, 130, 246,0.12)')}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {numberInput('Doctors', doctors, setDoctors)}
-              {numberInput('Nurses', nurses, setNurses)}
-              {numberInput('Clinical Officers', clinicalOfficers, setClinicalOfficers)}
-              {numberInput('Lab Technicians', labTechnicians, setLabTechnicians)}
-              {numberInput('Pharmacists', pharmacists, setPharmacists)}
+              {numberInput(t('dashboard.doctors'), doctors, setDoctors)}
+              {numberInput(t('dataEntry.nurses'), nurses, setNurses)}
+              {numberInput(t('dataEntry.clinicalOfficers'), clinicalOfficers, setClinicalOfficers)}
+              {numberInput(t('dataEntry.labTechnicians'), labTechnicians, setLabTechnicians)}
+              {numberInput(t('dataEntry.pharmacists'), pharmacists, setPharmacists)}
             </div>
           </div>
 
           {/* Infrastructure */}
           <div className={sectionClass}>
-            {sectionTitle(<Zap className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />, 'Infrastructure', 'rgba(252,211,77,0.12)')}
+            {sectionTitle(<Zap className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />, t('myFacility.infrastructure'), 'rgba(252,211,77,0.12)')}
             <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
-              {toggle('Has Electricity', hasElectricity, setHasElectricity)}
+              {toggle(t('myFacility.hasElectricity'), hasElectricity, setHasElectricity)}
               {hasElectricity && (
                 <div className="pl-4 pb-2">
-                  {numberInput('Electricity Hours/Day', electricityHours, setElectricityHours, 24)}
+                  {numberInput(t('myFacility.electricityHoursPerDay'), electricityHours, setElectricityHours, 24)}
                 </div>
               )}
-              {toggle('Has Generator', hasGenerator, setHasGenerator)}
-              {toggle('Has Solar Power', hasSolar, setHasSolar)}
+              {toggle(t('myFacility.hasGenerator'), hasGenerator, setHasGenerator)}
+              {toggle(t('myFacility.hasSolarPower'), hasSolar, setHasSolar)}
             </div>
             <hr className="section-divider" />
             <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
-              {toggle('Has Internet', hasInternet, setHasInternet)}
+              {toggle(t('myFacility.hasInternet'), hasInternet, setHasInternet)}
               {hasInternet && (
                 <div className="pl-4 pb-2">
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Internet Type</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('myFacility.internetType')}</label>
                   <select
                     value={internetType}
                     onChange={e => setInternetType(e.target.value)}
@@ -310,33 +312,33 @@ export default function MyFacilityPage() {
                       outline: 'none',
                     }}
                   >
-                    <option value="">Select type</option>
-                    <option value="fiber">Fiber</option>
-                    <option value="4g">4G/LTE</option>
-                    <option value="3g">3G</option>
-                    <option value="satellite">Satellite</option>
-                    <option value="dsl">DSL</option>
+                    <option value="">{t('myFacility.selectType')}</option>
+                    <option value="fiber">{t('myFacility.internetFiber')}</option>
+                    <option value="4g">{t('myFacility.internet4g')}</option>
+                    <option value="3g">{t('myFacility.internet3g')}</option>
+                    <option value="satellite">{t('myFacility.internetSatellite')}</option>
+                    <option value="dsl">{t('myFacility.internetDsl')}</option>
                   </select>
                 </div>
               )}
-              {toggle('Has Ambulance', hasAmbulance, setHasAmbulance)}
-              {toggle('24hr Emergency', emergency24hr, setEmergency24hr)}
+              {toggle(t('myFacility.hasAmbulance'), hasAmbulance, setHasAmbulance)}
+              {toggle(t('myFacility.emergency24hr'), emergency24hr, setEmergency24hr)}
             </div>
           </div>
 
           {/* Services */}
           <div className="lg:col-span-2">
             <div className={sectionClass}>
-              {sectionTitle(<CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />, 'Services Offered', 'rgba(74,222,128,0.12)')}
+              {sectionTitle(<CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />, t('myFacility.servicesOffered'), 'rgba(74,222,128,0.12)')}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 data-row-divider-sm">
-                {toggle('EPI (Immunization)', serviceFlags.epi, () => toggleService('epi'))}
-                {toggle('Antenatal Care', serviceFlags.anc, () => toggleService('anc'))}
-                {toggle('Delivery Services', serviceFlags.delivery, () => toggleService('delivery'))}
-                {toggle('HIV/AIDS', serviceFlags.hiv, () => toggleService('hiv'))}
-                {toggle('Tuberculosis', serviceFlags.tb, () => toggleService('tb'))}
-                {toggle('Emergency Surgery', serviceFlags.emergencySurgery, () => toggleService('emergencySurgery'))}
-                {toggle('Laboratory', serviceFlags.laboratory, () => toggleService('laboratory'))}
-                {toggle('Pharmacy', serviceFlags.pharmacy, () => toggleService('pharmacy'))}
+                {toggle(t('myFacility.serviceEpi'), serviceFlags.epi, () => toggleService('epi'))}
+                {toggle(t('anc.title'), serviceFlags.anc, () => toggleService('anc'))}
+                {toggle(t('myFacility.serviceDelivery'), serviceFlags.delivery, () => toggleService('delivery'))}
+                {toggle(t('boma.conditionHiv'), serviceFlags.hiv, () => toggleService('hiv'))}
+                {toggle(t('boma.conditionTb'), serviceFlags.tb, () => toggleService('tb'))}
+                {toggle(t('myFacility.serviceEmergencySurgery'), serviceFlags.emergencySurgery, () => toggleService('emergencySurgery'))}
+                {toggle(t('lab.laboratory'), serviceFlags.laboratory, () => toggleService('laboratory'))}
+                {toggle(t('nav.pharmacy'), serviceFlags.pharmacy, () => toggleService('pharmacy'))}
               </div>
             </div>
           </div>

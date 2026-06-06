@@ -19,6 +19,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   DuotonePause as Pause,
   DuotonePlay as Play,
@@ -33,21 +34,21 @@ interface BadgeView {
   pulse: boolean;
 }
 
-function formatRelative(iso: string | null | undefined): string {
-  if (!iso) return 'never';
+function formatRelative(iso: string | null | undefined, t: (key: string, vars?: Record<string, string | number>) => string): string {
+  if (!iso) return t('sync.never');
   const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return 'never';
+  if (Number.isNaN(then)) return t('sync.never');
   const diffMs = Date.now() - then;
-  if (diffMs < 0) return 'just now';
+  if (diffMs < 0) return t('sync.justNow');
   const sec = Math.floor(diffMs / 1000);
-  if (sec < 5) return 'just now';
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 5) return t('sync.justNow');
+  if (sec < 60) return t('sync.secondsAgo', { count: sec });
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return t('sync.minutesAgo', { count: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t('sync.hoursAgo', { count: hr });
   const day = Math.floor(hr / 24);
-  return `${day}d ago`;
+  return t('sync.daysAgo', { count: day });
 }
 
 function toneToColor(tone: Tone): string {
@@ -61,6 +62,7 @@ function toneToColor(tone: Tone): string {
 }
 
 export default function SyncStatusBadge() {
+  const { t } = useTranslation();
   const { isOnline, isNetworkUp, syncPaused, syncStatus, lastSync, toggleOnline, syncNow } = useApp();
   const [open, setOpen] = useState(false);
   // Force re-render every 30s so "Last synced: 2m ago" stays fresh.
@@ -95,19 +97,19 @@ export default function SyncStatusBadge() {
   }, [open]);
 
   const view: BadgeView = (() => {
-    if (!isNetworkUp) return { tone: 'warning', label: 'Offline', pulse: false };
-    if (syncPaused)   return { tone: 'warning', label: 'Paused',  pulse: false };
+    if (!isNetworkUp) return { tone: 'warning', label: t('status.offline'), pulse: false };
+    if (syncPaused)   return { tone: 'warning', label: t('sync.paused'),  pulse: false };
     const state = syncStatus?.state;
-    if (state === 'disabled') return { tone: 'muted',   label: 'Local only', pulse: false };
-    if (state === 'error')    return { tone: 'danger',  label: 'Sync error', pulse: false };
-    if (state === 'syncing')  return { tone: 'info',    label: 'Syncing',    pulse: true };
-    if (state === 'offline')  return { tone: 'warning', label: 'Offline',    pulse: false };
+    if (state === 'disabled') return { tone: 'muted',   label: t('sync.localOnly'), pulse: false };
+    if (state === 'error')    return { tone: 'danger',  label: t('sync.syncError'), pulse: false };
+    if (state === 'syncing')  return { tone: 'info',    label: t('status.syncing'),    pulse: true };
+    if (state === 'offline')  return { tone: 'warning', label: t('status.offline'),    pulse: false };
     // Follower: another tab in the same origin holds the leader Web Lock.
     // This tab will start syncing automatically once that tab closes.
-    if (state === 'follower') return { tone: 'muted',   label: 'Following another tab', pulse: false };
-    if (state === 'synced')   return { tone: 'success', label: 'Synced',     pulse: false };
+    if (state === 'follower') return { tone: 'muted',   label: t('sync.followingTab'), pulse: false };
+    if (state === 'synced')   return { tone: 'success', label: t('sync.synced'),     pulse: false };
     // 'idle' or null status while manager spins up
-    return { tone: 'success', label: 'Online', pulse: false };
+    return { tone: 'success', label: t('status.online'), pulse: false };
   })();
 
   const dotColor = toneToColor(view.tone);
@@ -122,7 +124,7 @@ export default function SyncStatusBadge() {
     if (!syncStatus) return null;
     for (const s of Object.values(syncStatus.databases)) {
       if (s.state === 'error' && s.error) return s.error;
-      if (s.state === 'denied') return 'Authentication denied';
+      if (s.state === 'denied') return t('sync.authDenied');
     }
     return null;
   })();
@@ -138,7 +140,7 @@ export default function SyncStatusBadge() {
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-pressed={!syncPaused}
-        aria-label={`Sync status: ${view.label}. Click to open controls.`}
+        aria-label={t('sync.badgeAriaLabel', { label: view.label })}
         className="hidden sm:inline-flex items-center gap-1.5 h-9 px-2.5 rounded-full text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
         style={{
           background: 'var(--overlay-subtle)',
@@ -163,7 +165,7 @@ export default function SyncStatusBadge() {
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-pressed={!syncPaused}
-        aria-label={`Sync status: ${view.label}. Click to open controls.`}
+        aria-label={t('sync.badgeAriaLabel', { label: view.label })}
         className="sm:hidden w-10 h-10 rounded-lg flex items-center justify-center transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
         style={{ background: 'transparent' }}
       >
@@ -178,7 +180,7 @@ export default function SyncStatusBadge() {
         <div
           ref={popoverRef}
           role="dialog"
-          aria-label="Sync controls"
+          aria-label={t('sync.controlsAriaLabel')}
           className="absolute right-0 top-full mt-2 z-50 w-72 rounded-xl overflow-hidden sync-popover-enter"
           style={{
             background: 'var(--bg-card-solid)',
@@ -198,30 +200,30 @@ export default function SyncStatusBadge() {
               </span>
             </div>
             <p className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
-              {!isNetworkUp && 'Your device is offline. Changes are saved locally and will sync when you reconnect.'}
-              {isNetworkUp && syncPaused && 'You paused syncing. Changes stay on this device until you resume.'}
+              {!isNetworkUp && t('sync.bodyOffline')}
+              {isNetworkUp && syncPaused && t('sync.bodyPaused')}
               {isNetworkUp && !syncPaused && view.tone === 'danger' && (
-                <>Sync error{errorMsg ? `: ${errorMsg}` : ''}. We will keep retrying.</>
+                errorMsg ? t('sync.bodyErrorDetail', { msg: errorMsg }) : t('sync.bodyError')
               )}
               {isNetworkUp && !syncPaused && view.tone === 'info' && (
-                <>Syncing across {interval} database{interval === 1 ? '' : 's'}…</>
+                interval === 1 ? t('sync.bodySyncingOne') : t('sync.bodySyncingMany', { count: interval })
               )}
               {isNetworkUp && !syncPaused && view.tone === 'muted' && isFollower && (
-                'Another tab in this browser is handling sync. This tab will take over automatically when that tab closes.'
+                t('sync.bodyFollower')
               )}
               {isNetworkUp && !syncPaused && view.tone === 'muted' && !isFollower && (
-                'Sync is disabled in this build. All data lives on this device.'
+                t('sync.bodyDisabled')
               )}
               {isNetworkUp && !syncPaused && view.tone === 'success' && (
-                'You are online. Changes are syncing in the background.'
+                t('sync.bodyOnline')
               )}
             </p>
           </div>
 
           <div className="px-4 py-3 flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
-            <span>Last synced</span>
+            <span>{t('sync.lastSynced')}</span>
             <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-              {formatRelative(lastSync || syncStatus?.lastSync)}
+              {formatRelative(lastSync || syncStatus?.lastSync, t)}
             </span>
           </div>
 
@@ -238,7 +240,7 @@ export default function SyncStatusBadge() {
               }}
             >
               {syncPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-              {syncPaused ? 'Resume sync' : 'Pause sync'}
+              {syncPaused ? t('sync.resume') : t('sync.pause')}
             </button>
             <button
               type="button"
@@ -254,7 +256,7 @@ export default function SyncStatusBadge() {
               }}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${view.pulse ? 'animate-spin' : ''}`} />
-              Sync now
+              {t('sync.syncNow')}
             </button>
           </div>
         </div>

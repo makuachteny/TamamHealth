@@ -13,6 +13,7 @@ import {
   ClipboardCheck, Bell,
 } from '@/components/icons/lucide';
 import { useRouter } from 'next/navigation';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import PageHeader from '@/components/PageHeader';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -37,6 +38,7 @@ const departments = [
 
 export default function ReferralsPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { referrals, createWithTransfer, accept, updateStatus, updateNotes } = useReferrals();
   const { showToast } = useToast();
   const { hospitals } = useHospitals();
@@ -153,19 +155,19 @@ export default function ReferralsPage() {
   ).length;
 
   const stats = [
-    { label: 'Total Referrals', value: totalReferrals, icon: ArrowRightLeft, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-    { label: 'Pending', value: pendingCount, icon: Clock, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.10)' },
-    { label: 'In Progress', value: inProgressCount, icon: Stethoscope, color: '#5CB8A8', bg: 'rgba(92,184,168,0.10)' },
-    { label: 'Completed', value: completedCount, icon: CheckCircle2, color: '#16A34A', bg: 'rgba(22,163,74,0.12)' },
+    { label: 'Total Referrals', displayLabel: t('referrals.statTotal'), value: totalReferrals, icon: ArrowRightLeft, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
+    { label: 'Pending', displayLabel: t('referrals.statPending'), value: pendingCount, icon: Clock, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.10)' },
+    { label: 'In Progress', displayLabel: t('referrals.statInProgress'), value: inProgressCount, icon: Stethoscope, color: '#5CB8A8', bg: 'rgba(92,184,168,0.10)' },
+    { label: 'Completed', displayLabel: t('referrals.statCompleted'), value: completedCount, icon: CheckCircle2, color: '#16A34A', bg: 'rgba(22,163,74,0.12)' },
   ];
 
   const getStatusLabel = (status: string) => {
     const map: Record<string, string> = {
-      sent: 'Sent',
-      received: 'Received',
-      seen: 'Being Seen',
-      completed: 'Completed',
-      cancelled: 'Cancelled',
+      sent: t('referral.sent'),
+      received: t('referral.received'),
+      seen: t('referral.seen'),
+      completed: t('referral.completed'),
+      cancelled: t('referral.cancelled'),
     };
     return map[status] || status;
   };
@@ -210,7 +212,7 @@ export default function ReferralsPage() {
         formAttachments,
         currentUser?.name || 'Unknown'
       );
-      showToast('Referral sent with patient data package', 'success');
+      showToast(t('referrals.toastSent'), 'success');
       setShowNewReferral(false);
       setFormPatient('');
       setFormPatientSearch('');
@@ -222,7 +224,7 @@ export default function ReferralsPage() {
       setFormAttachments([]);
     } catch (err) {
       console.error('Failed to submit referral:', err);
-      showToast('Failed to submit referral. Please try again.', 'error');
+      showToast(t('referrals.toastSubmitFailed'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -238,11 +240,11 @@ export default function ReferralsPage() {
       const updatedNotes = existingNotes ? `${existingNotes}\n\n${declineNote}` : declineNote;
       await updateStatus(declineModalId, 'cancelled');
       await updateNotes(declineModalId, updatedNotes);
-      showToast('Referral declined', 'success');
+      showToast(t('referrals.toastDeclined'), 'success');
       setDeclineModalId(null);
       setDeclineReason('');
     } catch {
-      showToast('Failed to decline referral', 'error');
+      showToast(t('referrals.toastDeclineFailed'), 'error');
     } finally {
       setActionSubmitting(false);
     }
@@ -258,11 +260,11 @@ export default function ReferralsPage() {
       const updatedNotes = existingNotes ? `${existingNotes}\n\n${outcomeNote}` : outcomeNote;
       await updateStatus(completeModalId, 'completed');
       await updateNotes(completeModalId, updatedNotes);
-      showToast('Referral completed \u2014 outcome recorded', 'success');
+      showToast(t('referrals.toastCompleted'), 'success');
       setCompleteModalId(null);
       setCompleteOutcome('');
     } catch {
-      showToast('Failed to complete referral', 'error');
+      showToast(t('referrals.toastCompleteFailed'), 'error');
     } finally {
       setActionSubmitting(false);
     }
@@ -277,11 +279,11 @@ export default function ReferralsPage() {
       const newNote = `[${new Date().toISOString().split('T')[0]} ${currentUser?.name || 'Unknown'}] ${noteText.trim()}`;
       const updatedNotes = existingNotes ? `${existingNotes}\n\n${newNote}` : newNote;
       await updateNotes(noteModalId, updatedNotes);
-      showToast('Note added to referral', 'success');
+      showToast(t('referrals.toastNoteAdded'), 'success');
       setNoteModalId(null);
       setNoteText('');
     } catch {
-      showToast('Failed to add note', 'error');
+      showToast(t('referrals.toastNoteFailed'), 'error');
     } finally {
       setActionSubmitting(false);
     }
@@ -313,12 +315,12 @@ export default function ReferralsPage() {
         {/* Reason & Notes */}
         <div className="grid grid-cols-2 gap-4">
           <div className="p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Reason for Referral</p>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('referrals.reasonForReferral')}</p>
             <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{reason}</p>
           </div>
           <div className="p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Clinical Notes</p>
-            <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{notes || 'None'}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('referral.notes')}</p>
+            <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{notes || t('referrals.none')}</p>
           </div>
         </div>
 
@@ -331,7 +333,7 @@ export default function ReferralsPage() {
               <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
                 <Paperclip className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
               </div>
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Referral Attachments ({refAttachments.length})</span>
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.referralAttachments', { count: refAttachments.length })}</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {refAttachments.map(att => (
@@ -360,18 +362,18 @@ export default function ReferralsPage() {
             <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
               <User className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
             </div>
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Patient Demographics</span>
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.patientDemographics')}</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { l: 'Name', v: `${demo.firstName} ${demo.middleName || ''} ${demo.surname}`.replace(/\s+/g, ' ').trim() },
-              { l: 'Hospital #', v: demo.hospitalNumber },
-              { l: 'DOB', v: demo.dateOfBirth },
-              { l: 'Gender', v: demo.gender },
-              { l: 'Phone', v: demo.phone },
-              { l: 'Location', v: `${demo.county}, ${demo.state}` },
-              { l: 'Tribe', v: demo.tribe },
-              { l: 'Blood Type', v: demo.bloodType },
+              { l: t('referrals.demoName'), v: `${demo.firstName} ${demo.middleName || ''} ${demo.surname}`.replace(/\s+/g, ' ').trim() },
+              { l: t('referrals.demoHospitalNo'), v: demo.hospitalNumber },
+              { l: t('referrals.demoDob'), v: demo.dateOfBirth },
+              { l: t('patient.gender'), v: demo.gender },
+              { l: t('patient.phone'), v: demo.phone },
+              { l: t('patient.location'), v: `${demo.county}, ${demo.state}` },
+              { l: t('patient.tribe'), v: demo.tribe },
+              { l: t('patient.bloodType'), v: demo.bloodType },
             ].map(item => (
               <div key={item.l}>
                 <p className="text-[10px] font-medium uppercase" style={{ color: 'var(--text-muted)' }}>{item.l}</p>
@@ -383,7 +385,7 @@ export default function ReferralsPage() {
             <div className="mt-3 flex items-center gap-2">
               <AlertTriangle className="w-3.5 h-3.5" style={{ color: '#F87171' }} />
               <span className="text-xs font-medium" style={{ color: '#F87171' }}>
-                Allergies: {demo.allergies.join(', ')}
+                {t('referrals.allergiesLabel', { list: demo.allergies.join(', ') })}
               </span>
             </div>
           )}
@@ -391,12 +393,12 @@ export default function ReferralsPage() {
             <div className="mt-1 flex items-center gap-2">
               <Activity className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />
               <span className="text-xs font-medium" style={{ color: 'var(--color-warning)' }}>
-                Chronic: {demo.chronicConditions.join(', ')}
+                {t('referrals.chronicLabel', { list: demo.chronicConditions.join(', ') })}
               </span>
             </div>
           )}
           <div className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-            NOK: {demo.nokName} ({demo.nokRelationship}) — {demo.nokPhone}
+            {t('referrals.nokLabel', { name: demo.nokName, relationship: demo.nokRelationship, phone: demo.nokPhone })}
           </div>
         </div>
 
@@ -409,7 +411,7 @@ export default function ReferralsPage() {
               <div className="icon-box-sm" style={{ background: 'rgba(92,184,168,0.12)' }}>
                 <Stethoscope className="w-4 h-4" style={{ color: '#5CB8A8' }} />
               </div>
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Medical Records ({pkg.medicalRecords.length})</span>
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.medicalRecords', { count: pkg.medicalRecords.length })}</span>
             </div>
             <div className="data-row-divider-sm">
               {pkg.medicalRecords.map(rec => {
@@ -435,11 +437,11 @@ export default function ReferralsPage() {
                     </button>
                     {isExpanded && (
                       <div className="px-3 pb-3 space-y-2">
-                        <p className="text-xs"><span className="font-medium">Complaint:</span> {rec.chiefComplaint}</p>
-                        <p className="text-xs"><span className="font-medium">Provider:</span> {rec.providerName} ({rec.providerRole}) at {rec.hospitalName}</p>
+                        <p className="text-xs"><span className="font-medium">{t('referrals.complaintLabel')}</span> {rec.chiefComplaint}</p>
+                        <p className="text-xs"><span className="font-medium">{t('referrals.providerLabel')}</span> {rec.providerName} ({rec.providerRole}) {t('referrals.atFacility')} {rec.hospitalName}</p>
                         {rec.diagnoses.length > 0 && (
                           <div>
-                            <p className="text-[10px] font-semibold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>Diagnoses</p>
+                            <p className="text-[10px] font-semibold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>{t('referrals.diagnoses')}</p>
                             <div className="flex flex-wrap gap-1">
                               {rec.diagnoses.map((d, i) => (
                                 <span key={i} className="text-[10px] px-2 py-0.5 rounded" style={{ background: 'var(--accent-light)', color: 'var(--tamamhealth-blue)' }}>
@@ -459,7 +461,7 @@ export default function ReferralsPage() {
                         )}
                         {rec.prescriptions.length > 0 && (
                           <div>
-                            <p className="text-[10px] font-semibold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>Prescriptions</p>
+                            <p className="text-[10px] font-semibold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>{t('tab.prescriptions')}</p>
                             <div className="data-row-divider-sm">
                               {rec.prescriptions.map((rx, i) => (
                                 <p key={i} className="text-xs">{rx.drugName} — {rx.dose} {rx.route} {rx.frequency} x {rx.duration}</p>
@@ -468,7 +470,7 @@ export default function ReferralsPage() {
                           </div>
                         )}
                         {rec.treatmentPlan && (
-                          <p className="text-xs"><span className="font-medium">Plan:</span> {rec.treatmentPlan}</p>
+                          <p className="text-xs"><span className="font-medium">{t('referrals.planLabel')}</span> {rec.treatmentPlan}</p>
                         )}
                       </div>
                     )}
@@ -488,17 +490,17 @@ export default function ReferralsPage() {
               <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
                 <FlaskConical className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
               </div>
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Lab Results ({pkg.labResults.length})</span>
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.labResults', { count: pkg.labResults.length })}</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <th className="text-left py-1.5 pr-3 font-medium" style={{ color: 'var(--text-muted)' }}>Test</th>
-                    <th className="text-left py-1.5 pr-3 font-medium" style={{ color: 'var(--text-muted)' }}>Result</th>
-                    <th className="text-left py-1.5 pr-3 font-medium" style={{ color: 'var(--text-muted)' }}>Reference</th>
-                    <th className="text-left py-1.5 pr-3 font-medium" style={{ color: 'var(--text-muted)' }}>Date</th>
-                    <th className="text-left py-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>Status</th>
+                    <th className="text-left py-1.5 pr-3 font-medium" style={{ color: 'var(--text-muted)' }}>{t('lab.testName')}</th>
+                    <th className="text-left py-1.5 pr-3 font-medium" style={{ color: 'var(--text-muted)' }}>{t('lab.result')}</th>
+                    <th className="text-left py-1.5 pr-3 font-medium" style={{ color: 'var(--text-muted)' }}>{t('lab.reference')}</th>
+                    <th className="text-left py-1.5 pr-3 font-medium" style={{ color: 'var(--text-muted)' }}>{t('referrals.date')}</th>
+                    <th className="text-left py-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>{t('lab.status')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -513,10 +515,10 @@ export default function ReferralsPage() {
                       <td className="py-1.5">
                         {lab.abnormal ? (
                           <span className={`badge text-[10px] ${lab.critical ? 'badge-emergency' : 'badge-warning'}`}>
-                            {lab.critical ? 'Critical' : 'Abnormal'}
+                            {lab.critical ? t('referrals.labCritical') : t('lab.abnormal')}
                           </span>
                         ) : (
-                          <span className="badge badge-normal text-[10px]">Normal</span>
+                          <span className="badge badge-normal text-[10px]">{t('lab.normal')}</span>
                         )}
                       </td>
                     </tr>
@@ -536,7 +538,7 @@ export default function ReferralsPage() {
               <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
                 <ImageIcon className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
               </div>
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Patient Attachments ({pkg.attachments.length})</span>
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.patientAttachments', { count: pkg.attachments.length })}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {pkg.attachments.map(att => (
@@ -563,13 +565,13 @@ export default function ReferralsPage() {
             <Package className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
           </div>
           <span style={{ color: 'var(--text-muted)' }}>
-            Packaged by <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{pkg.packagedBy}</span> on {new Date(pkg.packagedAt).toLocaleDateString()} at {new Date(pkg.packagedAt).toLocaleTimeString()}
+            {t('referrals.packagedByPrefix')} <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{pkg.packagedBy}</span> {t('referrals.packagedOnAt', { date: new Date(pkg.packagedAt).toLocaleDateString(), time: new Date(pkg.packagedAt).toLocaleTimeString() })}
           </span>
           <span style={{ color: 'var(--text-muted)' }}>
-            Total size: <span className="font-medium">{formatFileSize(pkg.packageSizeBytes)}</span>
+            {t('referrals.totalSize')} <span className="font-medium">{formatFileSize(pkg.packageSizeBytes)}</span>
           </span>
           <span style={{ color: 'var(--text-muted)' }}>
-            {pkg.medicalRecords.length} records &middot; {pkg.labResults.length} labs &middot; {pkg.attachments.length} files
+            {t('referrals.packageCounts', { records: pkg.medicalRecords.length, labs: pkg.labResults.length, files: pkg.attachments.length })}
           </span>
         </div>
       </div>
@@ -578,21 +580,21 @@ export default function ReferralsPage() {
 
   return (
     <>
-      <TopBar title="Referrals" />
+      <TopBar title={t('nav.referrals')} />
       <main className="page-container page-enter">
           <PageHeader
             icon={ArrowRightLeft}
-            title="Referral Management"
-            subtitle="Manage incoming and outgoing patient referrals"
+            title={t('referrals.pageTitle')}
+            subtitle={t('referrals.pageSubtitle')}
             actions={canManageReferrals && (
               <button
                 onClick={() => setShowNewReferral(!showNewReferral)}
                 className="btn btn-primary"
               >
                 {showNewReferral ? (
-                  <><X className="w-4 h-4" /> Cancel</>
+                  <><X className="w-4 h-4" /> {t('action.cancel')}</>
                 ) : (
-                  <><Plus className="w-4 h-4" /> New Referral</>
+                  <><Plus className="w-4 h-4" /> {t('referrals.newReferral')}</>
                 )}
               </button>
             )}
@@ -610,7 +612,7 @@ export default function ReferralsPage() {
                 </div>
                 <div className="kpi__body">
                   <div className="kpi__value">{stat.value}</div>
-                  <div className="kpi__label">{stat.label}</div>
+                  <div className="kpi__label">{stat.displayLabel}</div>
                 </div>
               </div>
             ))}
@@ -624,15 +626,15 @@ export default function ReferralsPage() {
                   <div className="icon-box-sm" style={{ background: 'rgba(245,158,11,0.12)' }}>
                     <ArrowRightLeft className="w-4 h-4" style={{ color: '#F59E0B' }} />
                   </div>
-                  <h3 className="font-semibold text-sm">Referral Network</h3>
+                  <h3 className="font-semibold text-sm">{t('referrals.network')}</h3>
                 </div>
                 <div className="flex items-center gap-3 text-[11px]">
-                  <span><span className="font-bold" style={{ color: 'var(--color-success)' }}>{networkStats.acceptanceRate}%</span> accepted</span>
-                  <span><span className="font-bold" style={{ color: 'var(--accent-primary)' }}>{networkStats.completionRate}%</span> completed</span>
-                  <span><span className="font-bold" style={{ color: 'var(--color-danger)' }}>{networkStats.cancellationRate}%</span> cancelled</span>
+                  <span><span className="font-bold" style={{ color: 'var(--color-success)' }}>{networkStats.acceptanceRate}%</span> {t('referrals.accepted')}</span>
+                  <span><span className="font-bold" style={{ color: 'var(--accent-primary)' }}>{networkStats.completionRate}%</span> {t('referrals.completedLower')}</span>
+                  <span><span className="font-bold" style={{ color: 'var(--color-danger)' }}>{networkStats.cancellationRate}%</span> {t('referrals.cancelledLower')}</span>
                 </div>
               </div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Top destinations (outgoing)</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('referrals.topDestinations')}</p>
               <div className="data-row-divider-sm">
                 {networkStats.top.map(d => {
                   const acceptRate = d.sent > 0 ? Math.round((d.accepted / d.sent) * 100) : 0;
@@ -648,7 +650,7 @@ export default function ReferralsPage() {
                         </div>
                       </div>
                       <span className="text-[10px] w-24 text-right" style={{ color: 'var(--text-muted)' }}>
-                        {acceptRate}% accept · {completeRate}% done
+                        {t('referrals.acceptDone', { accept: acceptRate, done: completeRate })}
                       </span>
                     </div>
                   );
@@ -663,24 +665,24 @@ export default function ReferralsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <Send className="w-5 h-5" style={{ color: 'var(--tamamhealth-blue)' }} />
                 <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Create New Referral
+                  {t('referrals.createNew')}
                 </h2>
                 <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--tamamhealth-blue)' }}>
-                  Auto-packages patient data
+                  {t('referrals.autoPackages')}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                 {/* Patient */}
                 <div>
-                  <label>Patient</label>
+                  <label>{t('referrals.patient')}</label>
                   {(() => {
                     const selected = formPatient ? patients.find(p => p._id === formPatient) : null;
                     if (selected) {
                       return (
                         <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                           <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                            Selected: <span className="font-medium">{selected.firstName} {selected.surname}</span>
+                            {t('referrals.selectedPrefix')} <span className="font-medium">{selected.firstName} {selected.surname}</span>
                             <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>({selected.hospitalNumber})</span>
                           </span>
                           <button
@@ -689,7 +691,7 @@ export default function ReferralsPage() {
                             className="text-xs underline"
                             style={{ color: 'var(--accent-primary)' }}
                           >
-                            change
+                            {t('referrals.change')}
                           </button>
                         </div>
                       );
@@ -709,7 +711,7 @@ export default function ReferralsPage() {
                           type="search"
                           value={formPatientSearch}
                           onChange={e => setFormPatientSearch(e.target.value)}
-                          placeholder="Search by name, hospital number, or phone…"
+                          placeholder={t('referrals.patientSearchPlaceholder')}
                           className="w-full p-2.5 rounded-lg outline-none text-sm"
                           style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                         />
@@ -730,7 +732,7 @@ export default function ReferralsPage() {
                           </div>
                         )}
                         {q.length >= 1 && matches.length === 0 && (
-                          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>No patients match — try a different search.</p>
+                          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{t('referrals.noPatientsMatch')}</p>
                         )}
                       </div>
                     );
@@ -739,9 +741,9 @@ export default function ReferralsPage() {
 
                 {/* Destination Hospital */}
                 <div>
-                  <label>Destination Hospital</label>
+                  <label>{t('referrals.destinationHospital')}</label>
                   <select value={formHospital} onChange={(e) => setFormHospital(e.target.value)}>
-                    <option value="">Select hospital...</option>
+                    <option value="">{t('referrals.selectHospital')}</option>
                     {otherHospitals.map(h => (
                       <option key={h._id} value={h._id}>
                         {h.name} ({h.state})
@@ -752,9 +754,9 @@ export default function ReferralsPage() {
 
                 {/* Department */}
                 <div>
-                  <label>Department</label>
+                  <label>{t('referrals.department')}</label>
                   <select value={formDepartment} onChange={(e) => setFormDepartment(e.target.value)}>
-                    <option value="">Select department...</option>
+                    <option value="">{t('referrals.selectDepartment')}</option>
                     {departments.map(d => (
                       <option key={d} value={d}>{d}</option>
                     ))}
@@ -763,7 +765,7 @@ export default function ReferralsPage() {
 
                 {/* Urgency */}
                 <div>
-                  <label>Urgency</label>
+                  <label>{t('referrals.urgency')}</label>
                   <div className="flex gap-3 mt-1">
                     {(['routine', 'urgent', 'emergency'] as const).map(level => (
                       <button
@@ -779,7 +781,7 @@ export default function ReferralsPage() {
                         }}
                       >
                         {level === 'emergency' && <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />}
-                        {level.charAt(0).toUpperCase() + level.slice(1)}
+                        {t(`referrals.urgency_${level}`)}
                       </button>
                     ))}
                   </div>
@@ -787,31 +789,31 @@ export default function ReferralsPage() {
 
                 {/* Reason */}
                 <div className="col-span-2">
-                  <label>Reason for Referral</label>
+                  <label>{t('referrals.reasonForReferral')}</label>
                   <textarea
                     value={formReason}
                     onChange={(e) => setFormReason(e.target.value)}
                     rows={2}
-                    placeholder="Describe the reason for this referral..."
+                    placeholder={t('referrals.reasonPlaceholder')}
                   />
                 </div>
 
                 {/* Clinical Notes */}
                 <div className="col-span-2">
-                  <label>Clinical Notes</label>
+                  <label>{t('referral.notes')}</label>
                   <textarea
                     value={formNotes}
                     onChange={(e) => setFormNotes(e.target.value)}
                     rows={3}
-                    placeholder="Include relevant clinical history, examination findings, and investigation results..."
+                    placeholder={t('referrals.notesPlaceholder')}
                   />
                 </div>
 
                 {/* Referral Attachments */}
                 <div className="col-span-2">
-                  <label>Attachments (optional)</label>
+                  <label>{t('referrals.attachmentsOptional')}</label>
                   <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
-                    Attach additional scans, reports, or documents specific to this referral.
+                    {t('referrals.attachmentsHint')}
                   </p>
                   <FileUpload
                     attachments={formAttachments}
@@ -828,7 +830,7 @@ export default function ReferralsPage() {
                   onClick={() => setShowNewReferral(false)}
                   className="btn btn-secondary"
                 >
-                  Cancel
+                  {t('action.cancel')}
                 </button>
                 <button
                   onClick={handleSubmitReferral}
@@ -840,7 +842,7 @@ export default function ReferralsPage() {
                   }}
                 >
                   <Package className="w-4 h-4" />
-                  {submitting ? 'Packaging & Sending...' : 'Send Referral with Data Package'}
+                  {submitting ? t('referrals.packagingSending') : t('referrals.sendWithPackage')}
                 </button>
               </div>
             </div>
@@ -854,7 +856,7 @@ export default function ReferralsPage() {
               style={{ color: activeTab === 'incoming' ? 'var(--tamamhealth-blue)' : 'var(--text-muted)' }}
             >
               <span className="flex items-center gap-2">
-                Incoming Referrals
+                {t('referrals.incoming')}
                 <span
                   className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                   style={{
@@ -874,7 +876,7 @@ export default function ReferralsPage() {
                     }}
                   >
                     <Bell className="w-3 h-3" />
-                    {newIncomingCount} new
+                    {t('referrals.newCount', { count: newIncomingCount })}
                   </span>
                 )}
               </span>
@@ -885,7 +887,7 @@ export default function ReferralsPage() {
               style={{ color: activeTab === 'outgoing' ? 'var(--tamamhealth-blue)' : 'var(--text-muted)' }}
             >
               <span className="flex items-center gap-2">
-                Outgoing Referrals
+                {t('referrals.outgoing')}
                 <span
                   className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                   style={{
@@ -903,7 +905,7 @@ export default function ReferralsPage() {
           <div className="card-elevated p-4 mb-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-              <input type="search" placeholder="Search referrals by patient, hospital, or department..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 search-icon-input" style={{ background: 'var(--overlay-subtle)' }} />
+              <input type="search" placeholder={t('referrals.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 search-icon-input" style={{ background: 'var(--overlay-subtle)' }} />
             </div>
           </div>
 
@@ -913,11 +915,11 @@ export default function ReferralsPage() {
               <div className="card-elevated">
                 <EmptyState
                   icon={ArrowRightLeft}
-                  title={activeTab === 'outgoing' ? 'No outgoing referrals' : 'No incoming referrals'}
+                  title={activeTab === 'outgoing' ? t('referrals.emptyOutgoingTitle') : t('referrals.emptyIncomingTitle')}
                   message={activeTab === 'outgoing'
-                    ? 'Refer patients to specialists or higher-level facilities. Each referral packages the patient\u2019s history for the receiving team.'
-                    : 'Referrals from other facilities will land here for review and acceptance.'}
-                  action={activeTab === 'outgoing' ? { label: 'Create referral', onClick: () => setShowNewReferral(true) } : undefined}
+                    ? t('referrals.emptyOutgoingMsg')
+                    : t('referrals.emptyIncomingMsg')}
+                  action={activeTab === 'outgoing' ? { label: t('referrals.createReferral'), onClick: () => setShowNewReferral(true) } : undefined}
                 />
               </div>
             ) : (
@@ -949,21 +951,21 @@ export default function ReferralsPage() {
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <span className={`badge urgency-${ref.urgency} text-[11px]`}>
                           {ref.urgency === 'emergency' && <AlertTriangle className="w-3 h-3" />}
-                          {ref.urgency.charAt(0).toUpperCase() + ref.urgency.slice(1)}
+                          {t(`referrals.urgency_${ref.urgency}`)}
                         </span>
                         <span className={`badge ${getStatusClass(ref.status)} text-[11px]`}>
                           {getStatusLabel(ref.status)}
                         </span>
                         {tp && (
                           <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-medium" style={{ background: 'var(--accent-light)', color: 'var(--tamamhealth-blue)', border: '1px solid var(--accent-border)' }}>
-                            <Package className="w-3 h-3" /> Data Package
+                            <Package className="w-3 h-3" /> {t('referrals.dataPackage')}
                           </span>
                         )}
                         <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{ref.referralDate}</span>
                         <button
                           onClick={() => setExpandedReferral(isExpanded ? null : ref._id)}
                           className="btn btn-secondary btn-sm"
-                          title="View details"
+                          title={t('referrals.viewDetails')}
                           style={{ padding: '5px 10px' }}
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -973,51 +975,51 @@ export default function ReferralsPage() {
                           <>
                             <button
                               className="btn btn-success btn-sm"
-                              title="Accept referral and transfer patient to this hospital"
+                              title={t('referrals.acceptTitle')}
                               style={{ padding: '5px 10px' }}
                               onClick={async () => {
                                 try {
                                   await accept(ref._id);
-                                  showToast(`Referral accepted \u2014 ${ref.patientName} transferred to your hospital`, 'success');
+                                  showToast(t('referrals.toastAccepted', { name: ref.patientName }), 'success');
                                 } catch {
-                                  showToast('Failed to accept referral', 'error');
+                                  showToast(t('referrals.toastAcceptFailed'), 'error');
                                 }
                               }}
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              Accept
+                              {t('referrals.accept')}
                             </button>
                             <button
                               className="btn btn-sm"
-                              title="Decline this referral"
+                              title={t('referrals.declineTitle')}
                               style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)', border: '1px solid rgba(239,68,68,0.25)' }}
                               onClick={() => { setDeclineModalId(ref._id); setDeclineReason(''); }}
                             >
                               <XCircle className="w-3.5 h-3.5" />
-                              Decline
+                              {t('referrals.decline')}
                             </button>
                           </>
                         )}
                         {canManageReferrals && activeTab === 'incoming' && ref.status === 'seen' && (
                           <button
                             className="btn btn-sm"
-                            title="Mark referral as completed with outcome notes"
+                            title={t('referrals.markCompleteTitle')}
                             style={{ padding: '5px 10px', background: 'rgba(34,197,94,0.12)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.25)' }}
                             onClick={() => { setCompleteModalId(ref._id); setCompleteOutcome(''); }}
                           >
                             <ClipboardCheck className="w-3.5 h-3.5" />
-                            Mark Complete
+                            {t('referrals.markComplete')}
                           </button>
                         )}
                         {canManageReferrals && ref.status !== 'cancelled' && (
                           <button
                             className="btn btn-secondary btn-sm"
-                            title="Add a note to this referral"
+                            title={t('referrals.addNoteTitle')}
                             style={{ padding: '5px 10px' }}
                             onClick={(e) => { e.stopPropagation(); setNoteModalId(ref._id); setNoteText(''); }}
                           >
                             <MessageSquarePlus className="w-3.5 h-3.5" />
-                            Add Note
+                            {t('action.addNote')}
                           </button>
                         )}
                       </div>
@@ -1031,18 +1033,18 @@ export default function ReferralsPage() {
                         ) : (
                           <div className="mt-4 space-y-3">
                             <div className="p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                              <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Reason</p>
+                              <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('referral.reason')}</p>
                               <p className="text-sm">{ref.reason}</p>
                             </div>
                             <div className="p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                              <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Clinical Notes</p>
-                              <p className="text-sm whitespace-pre-wrap">{ref.notes || 'None'}</p>
+                              <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('referral.notes')}</p>
+                              <p className="text-sm whitespace-pre-wrap">{ref.notes || t('referrals.none')}</p>
                             </div>
                             <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
                               <div className="icon-box-sm" style={{ background: 'rgba(239,68,68,0.12)' }}>
                                 <AlertTriangle className="w-3.5 h-3.5" style={{ color: '#EF4444' }} />
                               </div>
-                              No data package available for this referral (created before data packaging was enabled)
+                              {t('referrals.noDataPackage')}
                             </div>
                           </div>
                         )}
@@ -1059,26 +1061,26 @@ export default function ReferralsPage() {
             <div className="modal-backdrop" onClick={() => setNoteModalId(null)}>
               <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Add Note</h3>
+                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('action.addNote')}</h3>
                   <button onClick={() => setNoteModalId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
                     <X className="w-4 h-4" />
                   </button>
                 </div>
                 <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                  Add a progress note to this referral. Notes are timestamped and visible to both facilities.
+                  {t('referrals.addNoteHint')}
                 </p>
                 <textarea
                   value={noteText}
                   onChange={e => setNoteText(e.target.value)}
                   rows={4}
-                  placeholder="Enter your note..."
+                  placeholder={t('referrals.notePlaceholder')}
                   className="w-full mb-4"
                   style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
                 />
                 <div className="flex gap-2">
-                  <button onClick={() => setNoteModalId(null)} className="btn btn-secondary flex-1">Cancel</button>
+                  <button onClick={() => setNoteModalId(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
                   <button onClick={handleAddNote} disabled={!noteText.trim() || actionSubmitting} className="btn btn-primary flex-1" style={{ opacity: !noteText.trim() ? 0.5 : 1 }}>
-                    {actionSubmitting ? 'Saving...' : 'Add Note'}
+                    {actionSubmitting ? t('referrals.saving') : t('action.addNote')}
                   </button>
                 </div>
               </div>
@@ -1090,26 +1092,26 @@ export default function ReferralsPage() {
             <div className="modal-backdrop" onClick={() => setDeclineModalId(null)}>
               <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Decline Referral</h3>
+                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referrals.declineReferral')}</h3>
                   <button onClick={() => setDeclineModalId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
                     <X className="w-4 h-4" />
                   </button>
                 </div>
                 <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                  Please provide a reason for declining this referral. The referring facility will be notified.
+                  {t('referrals.declineHint')}
                 </p>
                 <textarea
                   value={declineReason}
                   onChange={e => setDeclineReason(e.target.value)}
                   rows={3}
-                  placeholder="Reason for declining (e.g., no capacity, incorrect specialty...)"
+                  placeholder={t('referrals.declinePlaceholder')}
                   className="w-full mb-4"
                   style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
                 />
                 <div className="flex gap-2">
-                  <button onClick={() => setDeclineModalId(null)} className="btn btn-secondary flex-1">Cancel</button>
+                  <button onClick={() => setDeclineModalId(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
                   <button onClick={handleDecline} disabled={!declineReason.trim() || actionSubmitting} className="btn btn-primary flex-1" style={{ opacity: !declineReason.trim() ? 0.5 : 1, background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}>
-                    {actionSubmitting ? 'Declining...' : 'Confirm Decline'}
+                    {actionSubmitting ? t('referrals.declining') : t('referrals.confirmDecline')}
                   </button>
                 </div>
               </div>
@@ -1121,26 +1123,26 @@ export default function ReferralsPage() {
             <div className="modal-backdrop" onClick={() => setCompleteModalId(null)}>
               <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Complete Referral</h3>
+                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referrals.completeReferral')}</h3>
                   <button onClick={() => setCompleteModalId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
                     <X className="w-4 h-4" />
                   </button>
                 </div>
                 <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                  Record the outcome of this referral. This will close the referral and notify the referring facility.
+                  {t('referrals.completeHint')}
                 </p>
                 <textarea
                   value={completeOutcome}
                   onChange={e => setCompleteOutcome(e.target.value)}
                   rows={4}
-                  placeholder="Patient outcome (e.g., treated and discharged, admitted for further care...)"
+                  placeholder={t('referrals.completePlaceholder')}
                   className="w-full mb-4"
                   style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
                 />
                 <div className="flex gap-2">
-                  <button onClick={() => setCompleteModalId(null)} className="btn btn-secondary flex-1">Cancel</button>
+                  <button onClick={() => setCompleteModalId(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
                   <button onClick={handleComplete} disabled={!completeOutcome.trim() || actionSubmitting} className="btn btn-primary flex-1" style={{ opacity: !completeOutcome.trim() ? 0.5 : 1, background: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
-                    {actionSubmitting ? 'Completing...' : 'Mark Complete'}
+                    {actionSubmitting ? t('referrals.completing') : t('referrals.markComplete')}
                   </button>
                 </div>
               </div>
@@ -1187,7 +1189,7 @@ export default function ReferralsPage() {
                   ) : (
                     <div className="text-center py-12">
                       <FileText className="w-16 h-16 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-                      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Preview not available for this file type</p>
+                      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('referrals.previewNotAvailable')}</p>
                     </div>
                   )}
                 </div>

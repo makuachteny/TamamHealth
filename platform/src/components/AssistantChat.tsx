@@ -3,8 +3,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, X, Send, Brain, Trash2, Sparkles } from '@/components/icons/lucide';
 import { getAssistantResponse, type AssistantMessage } from '@/lib/ai/medical-assistant';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export default function AssistantChat() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [input, setInput] = useState('');
@@ -170,7 +172,7 @@ export default function AssistantChat() {
           cursor: 'pointer',
           color: 'white',
         }}
-        title="Clinical Assistant"
+        title={t('assistantChat.title')}
       >
         {isOpen ? (
           <X className="w-5 h-5" />
@@ -208,10 +210,10 @@ export default function AssistantChat() {
               </div>
               <div>
                 <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Assistant
+                  {t('assistantChat.assistant')}
                 </p>
                 <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                  WHO/IMCI Clinical Guidance &middot; Offline
+                  {t('assistantChat.headerSubtitle')}
                 </p>
               </div>
             </div>
@@ -221,7 +223,7 @@ export default function AssistantChat() {
                   onClick={clearChat}
                   className="p-1.5 rounded-lg transition-colors"
                   style={{ color: 'var(--text-muted)' }}
-                  title="Clear chat"
+                  title={t('assistantChat.clearChat')}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(229,46,66,0.1)'; e.currentTarget.style.color = '#F87171'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
                 >
@@ -251,18 +253,18 @@ export default function AssistantChat() {
                   <Sparkles className="w-7 h-7" style={{ color: 'var(--accent-primary)' }} />
                 </div>
                 <p className="text-sm font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
-                  Clinical Assistant
+                  {t('assistantChat.title')}
                 </p>
                 <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-                  Ask me about treatment protocols, drug dosing, emergency management, or clinical guidelines.
+                  {t('assistantChat.emptyPrompt')}
                 </p>
                 <div className="grid grid-cols-2 gap-2 w-full">
                   {[
-                    'Malaria treatment',
-                    'DKA protocol',
-                    'Pneumonia in children',
-                    'Pre-eclampsia MgSO4',
-                  ].map(q => (
+                    { query: 'Malaria treatment', label: t('assistantChat.suggestionMalaria') },
+                    { query: 'DKA protocol', label: t('assistantChat.suggestionDka') },
+                    { query: 'Pneumonia in children', label: t('assistantChat.suggestionPneumonia') },
+                    { query: 'Pre-eclampsia MgSO4', label: t('assistantChat.suggestionPreeclampsia') },
+                  ].map(({ query: q, label }) => (
                     <button
                       key={q}
                       onClick={() => {
@@ -297,7 +299,7 @@ export default function AssistantChat() {
                       onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; e.currentTarget.style.color = 'var(--accent-primary)'; }}
                       onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-light)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
                     >
-                      {q}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -362,7 +364,7 @@ export default function AssistantChat() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask a clinical question..."
+                placeholder={t('assistantChat.inputPlaceholder')}
                 className="flex-1 text-sm rounded-xl px-4 py-2.5"
                 style={{
                   background: 'var(--overlay-subtle)',
@@ -391,7 +393,7 @@ export default function AssistantChat() {
               </button>
             </div>
             <p className="text-[9px] text-center mt-2" style={{ color: 'var(--text-muted)' }}>
-              Offline &middot; WHO/IMCI guidelines &middot; Not a substitute for clinical judgment
+              {t('assistantChat.footerDisclaimer')}
             </p>
           </div>
         </div>

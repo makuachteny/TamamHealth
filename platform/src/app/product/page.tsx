@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, ReactNode } from "react";
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 import {
   Users, Brain, Activity, Baby, ArrowRight,
   Check, ChevronDown, Mail, MapPin, Globe, Lock, Database,
@@ -69,155 +70,156 @@ function Counter({ end, suffix = "", prefix = "", duration = 2200 }: { end: numb
 // ─── DATA ───────────────────────────────────────────────────────
 
 const HERO_STATS = [
-  { value: 90, suffix: "+", label: "Features", sub: "to support any specialty" },
-  { value: 11, suffix: ".4M", label: "People to Serve", sub: "across South Sudan" },
-  { value: 8, suffix: "+", label: "Core Modules", sub: "clinical & administrative" },
-  { value: 4, suffix: "+", label: "Yearly Releases", sub: "continuous improvement" },
+  { value: 90, suffix: "+", label: "product.stat.featuresLabel", sub: "product.stat.featuresSub" },
+  { value: 11, suffix: ".4M", label: "product.stat.peopleLabel", sub: "product.stat.peopleSub" },
+  { value: 8, suffix: "+", label: "product.stat.modulesLabel", sub: "product.stat.modulesSub" },
+  { value: 4, suffix: "+", label: "product.stat.releasesLabel", sub: "product.stat.releasesSub" },
 ];
 
 const FEATURE_CATEGORIES = [
   {
-    title: "Configurable for Any Clinical Program",
+    title: "product.feature.configurableTitle",
     icon: Stethoscope,
-    color: "#1B9AAA",
-    desc: "Flexible and configurable for any clinical area. Today TamamHealth is used in a wide variety of areas: from Primary Care for Outpatients; to Specialty Centers for NCD, MCH/ANC, HIV, TB, Malaria, and more; to large Hospital-based Inpatient care.",
-    highlights: ["Primary Care & Outpatient", "MCH / ANC / Immunization", "NCD, HIV, TB, Malaria", "Inpatient & Surgery"],
+    color: "#3b82f6",
+    desc: "product.feature.configurableDesc",
+    highlights: ["product.feature.configurableH1", "product.feature.configurableH2", "product.feature.configurableH3", "product.feature.configurableH4"],
   },
   {
-    title: "Clinical Documentation & Flexible Forms",
+    title: "product.feature.documentationTitle",
     icon: FileText,
-    color: "#246860",
-    desc: "Triage and track your patients' history. Write orders electronically. Create and customize all the forms your providers might need, for any clinical area. Non-developers can build new forms easily with the user-friendly Form Builder.",
-    highlights: ["Electronic clinical notes", "Customizable form builder", "ICD-10/ICD-11 coding", "Diagnosis & treatment tracking"],
+    color: "#1d4ed8",
+    desc: "product.feature.documentationDesc",
+    highlights: ["product.feature.documentationH1", "product.feature.documentationH2", "product.feature.documentationH3", "product.feature.documentationH4"],
   },
   {
-    title: "Registration, Appointments, Queues & Billing",
+    title: "product.feature.registrationTitle",
     icon: Calendar,
-    color: "#1A3A3A",
-    desc: "Manage your patient lists and bookings in one location or across multiple sites. Connect your registration to national patient databases. Handle bills, inventory, labs, and dispensing directly or through integration.",
-    highlights: ["Patient registration & search", "Appointment scheduling", "Queue management", "Billing & stock management"],
+    color: "#1E3A8A",
+    desc: "product.feature.registrationDesc",
+    highlights: ["product.feature.registrationH1", "product.feature.registrationH2", "product.feature.registrationH3", "product.feature.registrationH4"],
   },
   {
-    title: "Interoperable Locally and Nationally",
+    title: "product.feature.interopTitle",
     icon: Network,
-    color: "#1B9AAA",
-    desc: "The TamamHealth REST and FHIR-ready APIs enable integration with other end-user tools, such as ERP Systems, Lab Systems, DHIS2, and more; or, with National Health Exchanges.",
-    highlights: ["DHIS2 automated export", "REST API", "FHIR-ready architecture", "National system integration"],
+    color: "#3b82f6",
+    desc: "product.feature.interopDesc",
+    highlights: ["product.feature.interopH1", "product.feature.interopH2", "product.feature.interopH3", "product.feature.interopH4"],
   },
   {
-    title: "Privileges & User Management",
+    title: "product.feature.privilegesTitle",
     icon: Lock,
-    color: "#246860",
-    desc: "Role-based access and deeper permissions granularity, such as by location or data types. Audit logging enables follow up on actions taken. 11+ distinct user roles from CHW to Ministry admin.",
-    highlights: ["11+ user roles (RBAC)", "Location-based access", "Audit logging", "Session management"],
+    color: "#1d4ed8",
+    desc: "product.feature.privilegesDesc",
+    highlights: ["product.feature.privilegesH1", "product.feature.privilegesH2", "product.feature.privilegesH3", "product.feature.privilegesH4"],
   },
   {
-    title: "Language Translation",
+    title: "product.feature.translationTitle",
     icon: Languages,
-    color: "#1A3A3A",
-    desc: "TamamHealth has configurable translation tools so your team can set up the languages your users need — including supporting multiple different languages at once, and Right-to-Left language support.",
-    highlights: ["Multi-language interface", "60+ South Sudan languages", "RTL support", "Icon-driven for low-literacy"],
+    color: "#1E3A8A",
+    desc: "product.feature.translationDesc",
+    highlights: ["product.feature.translationH1", "product.feature.translationH2", "product.feature.translationH3", "product.feature.translationH4"],
   },
   {
-    title: "Clinical Data Reporting & Exports",
+    title: "product.feature.reportingTitle",
     icon: BarChart3,
-    color: "#1B9AAA",
-    desc: "Track and analyze clinical data: See your impact, report to stakeholders, and monitor key metrics. Generate IDSR reports, MCH analytics, and donor-ready outputs.",
-    highlights: ["IDSR weekly reports", "MCH analytics dashboard", "Custom report builder", "Donor-ready exports"],
+    color: "#3b82f6",
+    desc: "product.feature.reportingDesc",
+    highlights: ["product.feature.reportingH1", "product.feature.reportingH2", "product.feature.reportingH3", "product.feature.reportingH4"],
   },
   {
-    title: "AI-Powered Clinical Decision Support",
+    title: "product.feature.aiTitle",
     icon: Brain,
-    color: "#246860",
-    desc: "Rule-based clinical decision support running entirely in the browser. WHO/IMCI guideline-aligned. Suggests diagnoses, treatments, and lab orders — no internet required.",
-    highlights: ["WHO/IMCI guidelines", "15+ priority diseases", "Offline AI inference", "Severity triage"],
+    color: "#1d4ed8",
+    desc: "product.feature.aiDesc",
+    highlights: ["product.feature.aiH1", "product.feature.aiH2", "product.feature.aiH3", "product.feature.aiH4"],
   },
 ];
 
 const SHOWCASE_SECTIONS = [
   {
-    eyebrow: "Features",
-    title: "A rich feature set to meet all your facility use cases",
-    desc: "TamamHealth is designed to be extremely flexible and configurable for any use case — from the smallest rural PHCU to the largest teaching hospital.",
-    cta: "See key features below",
+    eyebrow: "product.showcase.featuresEyebrow",
+    title: "product.showcase.featuresTitle",
+    desc: "product.showcase.featuresDesc",
+    cta: "product.showcase.featuresCta",
     ctaId: "features",
     visual: "features",
-    color: "#1B9AAA",
+    color: "#3b82f6",
   },
   {
-    eyebrow: "Roadmap",
-    title: "Collaborating on shared needs",
-    desc: "We build together with the clinical teams who use TamamHealth every day. See what's happening now, what's next, and share new ideas to shape the platform's direction.",
-    cta: "Go to our roadmap",
+    eyebrow: "product.showcase.roadmapEyebrow",
+    title: "product.showcase.roadmapTitle",
+    desc: "product.showcase.roadmapDesc",
+    cta: "product.showcase.roadmapCta",
     ctaId: "roadmap",
     visual: "roadmap",
-    color: "#246860",
+    color: "#1d4ed8",
   },
   {
-    eyebrow: "Releases",
-    title: "What's in the latest release?",
-    desc: "We regularly release new features, updates and security patches. You can learn more about all the changes in our release notes.",
-    cta: "View release notes",
+    eyebrow: "product.showcase.releasesEyebrow",
+    title: "product.showcase.releasesTitle",
+    desc: "product.showcase.releasesDesc",
+    cta: "product.showcase.releasesCta",
     ctaId: "releases",
     visual: "releases",
-    color: "#1A3A3A",
+    color: "#1E3A8A",
   },
   {
-    eyebrow: "Deploy",
-    title: "The purpose-built EMR for South Sudan.",
-    desc: "From the smallest clinic to the largest healthcare network, TamamHealth is for you. Deploy offline-first with zero infrastructure dependency and rapid onboarding for any clinical team.",
-    cta: "Try the Demo",
+    eyebrow: "product.showcase.deployEyebrow",
+    title: "product.showcase.deployTitle",
+    desc: "product.showcase.deployDesc",
+    cta: "product.showcase.deployCta",
     ctaHref: "/login",
     visual: "download",
-    color: "#1B9AAA",
+    color: "#3b82f6",
   },
 ];
 
 const TECH_STACK = [
-  { name: "React / Next.js", desc: "Modern component architecture", icon: Code2 },
-  { name: "TypeScript", desc: "Type-safe clinical data", icon: Layers },
-  { name: "PouchDB / CouchDB", desc: "Offline-first sync", icon: Database },
-  { name: "PostgreSQL", desc: "Server-side analytics", icon: Server },
-  { name: "Tailwind CSS", desc: "Responsive design system", icon: MonitorSmartphone },
-  { name: "Claude AI", desc: "Clinical decision support", icon: Cpu },
+  { name: "React / Next.js", desc: "product.tech.reactDesc", icon: Code2 },
+  { name: "TypeScript", desc: "product.tech.typescriptDesc", icon: Layers },
+  { name: "PouchDB / CouchDB", desc: "product.tech.pouchdbDesc", icon: Database },
+  { name: "PostgreSQL", desc: "product.tech.postgresDesc", icon: Server },
+  { name: "Tailwind CSS", desc: "product.tech.tailwindDesc", icon: MonitorSmartphone },
+  { name: "Claude AI", desc: "product.tech.claudeDesc", icon: Cpu },
 ];
 
 const INTEROP_ITEMS = [
-  { name: "DHIS2", desc: "Automated monthly data export to the national health information system. 142+ data elements mapped.", icon: Globe },
-  { name: "FHIR-Ready", desc: "Architecture designed for HL7 FHIR compliance. Patient, Observation, and Encounter resources.", icon: GitBranch },
-  { name: "WHO Standards", desc: "ICD-10/ICD-11 coding, IMCI guidelines, IDSR reporting, and ISO 13606 health record communication.", icon: Shield },
-  { name: "Lab Systems", desc: "Order management and result integration. Supports referral lab workflows across facilities.", icon: FlaskConical },
-  { name: "National ID", desc: "Geocode-based patient identification (BOMA-{code}-HH{number}) for populations without national IDs.", icon: Users },
-  { name: "REST API", desc: "Full REST API for third-party integration. Authentication, patient data, and reporting endpoints.", icon: Server },
+  { name: "DHIS2", desc: "product.interop.dhis2Desc", icon: Globe },
+  { name: "FHIR-Ready", desc: "product.interop.fhirDesc", icon: GitBranch },
+  { name: "WHO Standards", desc: "product.interop.whoDesc", icon: Shield },
+  { name: "Lab Systems", desc: "product.interop.labDesc", icon: FlaskConical },
+  { name: "National ID", desc: "product.interop.nationalIdDesc", icon: Users },
+  { name: "REST API", desc: "product.interop.restApiDesc", icon: Server },
 ];
 
 const RELEASES = [
-  { version: "v2.4", date: "March 2026", title: "MCH Analytics & Surveillance", highlights: ["Maternal health dashboards", "IDSR outbreak detection", "Enhanced offline sync"] },
-  { version: "v2.3", date: "January 2026", title: "AI Clinical Decision Support", highlights: ["WHO/IMCI diagnosis engine", "15+ disease protocols", "Browser-based inference"] },
-  { version: "v2.2", date: "November 2025", title: "Telehealth & Billing", highlights: ["Video consultations", "ISO 13131 compliance", "Patient billing module"] },
-  { version: "v2.1", date: "September 2025", title: "Multi-Facility Administration", highlights: ["Org-level admin panel", "Cross-facility referrals", "Role-based branding"] },
+  { version: "v2.4", date: "March 2026", title: "product.release.v24Title", highlights: ["product.release.v24H1", "product.release.v24H2", "product.release.v24H3"] },
+  { version: "v2.3", date: "January 2026", title: "product.release.v23Title", highlights: ["product.release.v23H1", "product.release.v23H2", "product.release.v23H3"] },
+  { version: "v2.2", date: "November 2025", title: "product.release.v22Title", highlights: ["product.release.v22H1", "product.release.v22H2", "product.release.v22H3"] },
+  { version: "v2.1", date: "September 2025", title: "product.release.v21Title", highlights: ["product.release.v21H1", "product.release.v21H2", "product.release.v21H3"] },
 ];
 
 const ROADMAP_ITEMS = [
-  { status: "done", label: "Done", items: ["Patient registration & records", "Offline-first sync engine", "AI diagnosis support", "DHIS2 export", "Telehealth module", "Birth & death registration"] },
-  { status: "now", label: "Now", items: ["FHIR R4 compliance", "End-to-end encryption", "Community health worker app", "Enhanced MCH analytics", "Stock management v2"] },
-  { status: "next", label: "Next", items: ["OMOP CDM mapping", "National health exchange", "Biometric patient ID", "Multi-tenant SaaS", "Research data exports", "Mobile-native app"] },
+  { status: "done", label: "product.roadmap.doneLabel", items: ["product.roadmap.done1", "product.roadmap.done2", "product.roadmap.done3", "product.roadmap.done4", "product.roadmap.done5", "product.roadmap.done6"] },
+  { status: "now", label: "product.roadmap.nowLabel", items: ["product.roadmap.now1", "product.roadmap.now2", "product.roadmap.now3", "product.roadmap.now4", "product.roadmap.now5"] },
+  { status: "next", label: "product.roadmap.nextLabel", items: ["product.roadmap.next1", "product.roadmap.next2", "product.roadmap.next3", "product.roadmap.next4", "product.roadmap.next5", "product.roadmap.next6"] },
 ];
 
 const TOUR_FEATURES = [
-  { icon: Users, label: "Patient Registry", desc: "Photo-based ID, geocode tracking" },
-  { icon: Stethoscope, label: "Clinical Notes", desc: "Structured documentation & forms" },
-  { icon: FlaskConical, label: "Lab Management", desc: "Order, track, and result" },
-  { icon: Pill, label: "Pharmacy", desc: "Dispensing & stock control" },
-  { icon: Calendar, label: "Appointments", desc: "Schedule & queue management" },
-  { icon: Activity, label: "Surveillance", desc: "Real-time disease monitoring" },
-  { icon: Baby, label: "CRVS", desc: "Birth & death registration" },
-  { icon: Video, label: "Telehealth", desc: "Video & audio consultations" },
+  { icon: Users, label: "product.tour.registryLabel", desc: "product.tour.registryDesc" },
+  { icon: Stethoscope, label: "product.tour.notesLabel", desc: "product.tour.notesDesc" },
+  { icon: FlaskConical, label: "product.tour.labLabel", desc: "product.tour.labDesc" },
+  { icon: Pill, label: "product.tour.pharmacyLabel", desc: "product.tour.pharmacyDesc" },
+  { icon: Calendar, label: "product.tour.appointmentsLabel", desc: "product.tour.appointmentsDesc" },
+  { icon: Activity, label: "product.tour.surveillanceLabel", desc: "product.tour.surveillanceDesc" },
+  { icon: Baby, label: "product.tour.crvsLabel", desc: "product.tour.crvsDesc" },
+  { icon: Video, label: "product.tour.telehealthLabel", desc: "product.tour.telehealthDesc" },
 ];
 
 // ─── MAIN PAGE COMPONENT ────────────────────────────────────────
 
 export default function ProductPage() {
+  const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [activeTour, setActiveTour] = useState(0);
@@ -249,24 +251,24 @@ export default function ProductPage() {
 
           <nav className="p-nav">
             {[
-              { label: "Product", href: "/product" },
-              { label: "Features", action: () => scrollTo("features") },
-              { label: "Technology", action: () => scrollTo("technology") },
-              { label: "Roadmap", action: () => scrollTo("roadmap") },
+              { id: "product", label: t("product.nav.product"), href: "/product", active: true },
+              { id: "features", label: t("product.nav.features"), action: () => scrollTo("features") },
+              { id: "technology", label: t("product.nav.technology"), action: () => scrollTo("technology") },
+              { id: "roadmap", label: t("product.nav.roadmap"), action: () => scrollTo("roadmap") },
             ].map((item) => (
               item.href ? (
-                <Link key={item.label} href={item.href} className={`p-nav__link ${item.label === "Product" ? "p-nav__link--active" : ""}`}>{item.label}</Link>
+                <Link key={item.id} href={item.href} className={`p-nav__link ${item.active ? "p-nav__link--active" : ""}`}>{item.label}</Link>
               ) : (
-                <button key={item.label} className="p-nav__link" onClick={item.action}>{item.label}</button>
+                <button key={item.id} className="p-nav__link" onClick={item.action}>{item.label}</button>
               )
             ))}
           </nav>
 
           <div className="p-header__actions">
-            <Link href="/patient-portal" className="p-btn p-btn--ghost">Patient Sign In</Link>
-            <Link href="/login" className="p-btn p-btn--ghost">Staff Sign In</Link>
+            <Link href="/patient-portal" className="p-btn p-btn--ghost">{t("product.nav.patientSignIn")}</Link>
+            <Link href="/login" className="p-btn p-btn--ghost">{t("landing.cta.staffSignIn")}</Link>
             <Link href="/login" className="p-btn p-btn--primary">
-              Try Demo <ArrowRight size={14} />
+              {t("product.nav.tryDemo")} <ArrowRight size={14} />
             </Link>
           </div>
 
@@ -277,15 +279,15 @@ export default function ProductPage() {
 
         {mobileNav && (
           <div className="p-mobile-nav">
-            <button className="p-mobile-nav__link" onClick={() => scrollTo("features")}>Features</button>
-            <button className="p-mobile-nav__link" onClick={() => scrollTo("technology")}>Technology</button>
-            <button className="p-mobile-nav__link" onClick={() => scrollTo("interoperability")}>Interoperability</button>
-            <button className="p-mobile-nav__link" onClick={() => scrollTo("roadmap")}>Roadmap</button>
+            <button className="p-mobile-nav__link" onClick={() => scrollTo("features")}>{t("product.nav.features")}</button>
+            <button className="p-mobile-nav__link" onClick={() => scrollTo("technology")}>{t("product.nav.technology")}</button>
+            <button className="p-mobile-nav__link" onClick={() => scrollTo("interoperability")}>{t("product.nav.interoperability")}</button>
+            <button className="p-mobile-nav__link" onClick={() => scrollTo("roadmap")}>{t("product.nav.roadmap")}</button>
             <div className="p-mobile-nav__actions">
-              <Link href="/patient-portal" className="p-btn p-btn--outline" style={{ width: "100%" }}>Patient Sign In</Link>
-              <Link href="/login" className="p-btn p-btn--outline" style={{ width: "100%" }}>Staff Sign In</Link>
+              <Link href="/patient-portal" className="p-btn p-btn--outline" style={{ width: "100%" }}>{t("product.nav.patientSignIn")}</Link>
+              <Link href="/login" className="p-btn p-btn--outline" style={{ width: "100%" }}>{t("landing.cta.staffSignIn")}</Link>
               <Link href="/login" className="p-btn p-btn--primary" style={{ width: "100%" }}>
-                Try Demo <ArrowRight size={14} />
+                {t("product.nav.tryDemo")} <ArrowRight size={14} />
               </Link>
             </div>
           </div>
@@ -300,24 +302,22 @@ export default function ProductPage() {
           <div className="p-container">
             <Reveal delay={0.05}>
               <h1 className="p-hero__title">
-                The digital health record<br />
-                <span className="p-hero__title--accent">built for South Sudan</span>
+                {t("product.hero.titleLine1")}<br />
+                <span className="p-hero__title--accent">{t("product.hero.titleAccent")}</span>
               </h1>
             </Reveal>
             <Reveal delay={0.1}>
               <p className="p-hero__subtitle">
-                Quality clinical information for every patient, provider and funder.
-                Offline-first, WHO/IMCI-aligned, and designed for the places where
-                connectivity isn&apos;t guaranteed.
+                {t("product.hero.subtitle")}
               </p>
             </Reveal>
             <Reveal delay={0.15}>
               <div className="p-hero__ctas">
                 <Link href="/login" className="p-btn p-btn--primary p-btn--lg">
-                  Try the Demo <ArrowRight size={16} />
+                  {t("product.hero.tryDemo")} <ArrowRight size={16} />
                 </Link>
                 <button className="p-btn p-btn--outline p-btn--lg" onClick={() => scrollTo("features")}>
-                  Explore Features
+                  {t("product.hero.exploreFeatures")}
                 </button>
               </div>
             </Reveal>
@@ -328,8 +328,8 @@ export default function ProductPage() {
                     <div className="p-hero__stat-value">
                       <Counter end={s.value} suffix={s.suffix} />
                     </div>
-                    <div className="p-hero__stat-label">{s.label}</div>
-                    {s.sub && <div className="p-hero__stat-sub">{s.sub}</div>}
+                    <div className="p-hero__stat-label">{t(s.label)}</div>
+                    {s.sub && <div className="p-hero__stat-sub">{t(s.sub)}</div>}
                   </div>
                 ))}
               </div>
@@ -344,15 +344,15 @@ export default function ProductPage() {
               <Reveal key={i} delay={i * 0.08}>
                 <div className={`p-showcase__card ${i % 2 !== 0 ? "p-showcase__card--reverse" : ""}`}>
                   <div className="p-showcase__content">
-                    <span className="p-showcase__eyebrow" style={{ color: s.color }}>{s.eyebrow}</span>
-                    <h2 className="p-showcase__title">{s.title}</h2>
-                    <p className="p-showcase__desc">{s.desc}</p>
+                    <span className="p-showcase__eyebrow" style={{ color: s.color }}>{t(s.eyebrow)}</span>
+                    <h2 className="p-showcase__title">{t(s.title)}</h2>
+                    <p className="p-showcase__desc">{t(s.desc)}</p>
                     <button
                       className="p-showcase__cta"
                       style={{ color: s.color }}
                       onClick={() => s.ctaId ? scrollTo(s.ctaId) : (s.ctaHref && (window.location.href = s.ctaHref))}
                     >
-                      {s.cta} <ArrowRight size={16} />
+                      {t(s.cta)} <ArrowRight size={16} />
                     </button>
                   </div>
                   <div className="p-showcase__visual">
@@ -369,21 +369,20 @@ export default function ProductPage() {
           <div className="p-container">
             <Reveal>
               <div className="p-section-header">
-                <span className="p-eyebrow">Technology</span>
-                <h2 className="p-section-title">A modern, standards-based health stack</h2>
+                <span className="p-eyebrow">{t("product.tech.eyebrow")}</span>
+                <h2 className="p-section-title">{t("product.tech.title")}</h2>
                 <p className="p-section-desc">
-                  TamamHealth is built on proven web technologies and open clinical standards so your
-                  teams and integration partners work with familiar, well-documented tools.
+                  {t("product.tech.desc")}
                 </p>
               </div>
             </Reveal>
             <div className="p-tech__grid">
-              {TECH_STACK.map((t, i) => (
+              {TECH_STACK.map((techItem, i) => (
                 <Reveal key={i} delay={i * 0.06}>
                   <div className="p-tech__card">
-                    <div className="p-tech__card-icon"><t.icon size={34} /></div>
-                    <h3 className="p-tech__card-name">{t.name}</h3>
-                    <p className="p-tech__card-desc">{t.desc}</p>
+                    <div className="p-tech__card-icon"><techItem.icon size={34} /></div>
+                    <h3 className="p-tech__card-name">{techItem.name}</h3>
+                    <p className="p-tech__card-desc">{t(techItem.desc)}</p>
                   </div>
                 </Reveal>
               ))}
@@ -392,33 +391,33 @@ export default function ProductPage() {
               <div className="p-tech__arch">
                 <div className="p-tech__arch-header">
                   <div className="p-tech__arch-dots"><span /><span /><span /></div>
-                  <span>TamamHealth EMR Architecture</span>
+                  <span>{t("product.tech.archHeader")}</span>
                 </div>
                 <div className="p-tech__arch-body">
                   <div className="p-tech__arch-layer">
-                    <div className="p-tech__arch-label">Frontend</div>
+                    <div className="p-tech__arch-label">{t("product.tech.archFrontend")}</div>
                     <div className="p-tech__arch-items">
                       <span>React / Next.js</span><span>TypeScript</span><span>Tailwind CSS</span><span>PouchDB</span>
                     </div>
                   </div>
                   <div className="p-tech__arch-connector">
                     <div className="p-tech__arch-line" />
-                    <span>REST API + Sync Protocol</span>
+                    <span>{t("product.tech.archRestSync")}</span>
                     <div className="p-tech__arch-line" />
                   </div>
                   <div className="p-tech__arch-layer">
-                    <div className="p-tech__arch-label">Backend</div>
+                    <div className="p-tech__arch-label">{t("product.tech.archBackend")}</div>
                     <div className="p-tech__arch-items">
                       <span>Node.js / Next.js API</span><span>JWT Auth</span><span>CouchDB Sync</span><span>Claude AI</span>
                     </div>
                   </div>
                   <div className="p-tech__arch-connector">
                     <div className="p-tech__arch-line" />
-                    <span>Data Layer</span>
+                    <span>{t("product.tech.archDataLayer")}</span>
                     <div className="p-tech__arch-line" />
                   </div>
                   <div className="p-tech__arch-layer">
-                    <div className="p-tech__arch-label">Database</div>
+                    <div className="p-tech__arch-label">{t("product.tech.archDatabase")}</div>
                     <div className="p-tech__arch-items">
                       <span>PostgreSQL</span><span>CouchDB</span><span>PouchDB (local)</span><span>DHIS2 Export</span>
                     </div>
@@ -434,11 +433,10 @@ export default function ProductPage() {
           <div className="p-container">
             <Reveal>
               <div className="p-section-header">
-                <span className="p-eyebrow">Interoperability</span>
-                <h2 className="p-section-title">Interoperability at the core</h2>
+                <span className="p-eyebrow">{t("product.interop.eyebrow")}</span>
+                <h2 className="p-section-title">{t("product.interop.title")}</h2>
                 <p className="p-section-desc">
-                  Yes, TamamHealth can talk with other systems! Most teams need their EMR to connect with other
-                  software: from within a facility, up to national-level systems.
+                  {t("product.interop.desc")}
                 </p>
               </div>
             </Reveal>
@@ -451,7 +449,7 @@ export default function ProductPage() {
                     </div>
                     <div>
                       <div className="p-interop__card-badge">{item.name}</div>
-                      <p className="p-interop__card-desc">{item.desc}</p>
+                      <p className="p-interop__card-desc">{t(item.desc)}</p>
                     </div>
                   </div>
                 </Reveal>
@@ -462,15 +460,15 @@ export default function ProductPage() {
                 <div className="p-interop__cta-card">
                   <Globe size={34} />
                   <div>
-                    <h4>DHIS2 Compatible</h4>
-                    <p>Automated monthly data export feeds the national health information system directly.</p>
+                    <h4>{t("product.interop.dhis2CompatibleTitle")}</h4>
+                    <p>{t("product.interop.dhis2CompatibleDesc")}</p>
                   </div>
                 </div>
                 <div className="p-interop__cta-card">
                   <Shield size={34} />
                   <div>
-                    <h4>FHIR-Ready &amp; WHO-Aligned</h4>
-                    <p>Architecture designed for HL7 FHIR, ICD-10/ICD-11, and IMCI guideline compliance.</p>
+                    <h4>{t("product.interop.fhirAlignedTitle")}</h4>
+                    <p>{t("product.interop.fhirAlignedDesc")}</p>
                   </div>
                 </div>
               </div>
@@ -483,9 +481,9 @@ export default function ProductPage() {
           <div className="p-container">
             <Reveal>
               <div className="p-section-header">
-                <span className="p-eyebrow">Features</span>
-                <h2 className="p-section-title">TamamHealth EMR Features</h2>
-                <p className="p-section-desc">Some of the key features of TamamHealth include:</p>
+                <span className="p-eyebrow">{t("product.features.eyebrow")}</span>
+                <h2 className="p-section-title">{t("product.features.title")}</h2>
+                <p className="p-section-desc">{t("product.features.desc")}</p>
               </div>
             </Reveal>
             <div className="p-features__grid">
@@ -499,18 +497,18 @@ export default function ProductPage() {
                       <div className="p-features__card-icon" style={{ background: f.color + "0D", color: f.color }}>
                         <f.icon size={56} />
                       </div>
-                      <h3 className="p-features__card-title">{f.title}</h3>
+                      <h3 className="p-features__card-title">{t(f.title)}</h3>
                       <ChevronDown
                         size={44}
                         className="p-features__card-chevron"
                         style={{ transform: expandedFeature === i ? "rotate(180deg)" : "rotate(0)" }}
                       />
                     </div>
-                    <p className="p-features__card-desc">{f.desc}</p>
+                    <p className="p-features__card-desc">{t(f.desc)}</p>
                     {expandedFeature === i && (
                       <ul className="p-features__card-list">
                         {f.highlights.map((h, j) => (
-                          <li key={j}><Check size={14} style={{ color: f.color }} /> {h}</li>
+                          <li key={j}><Check size={14} style={{ color: f.color }} /> {t(h)}</li>
                         ))}
                       </ul>
                     )}
@@ -520,9 +518,9 @@ export default function ProductPage() {
             </div>
             <Reveal delay={0.3}>
               <div className="p-features__more">
-                <p>There are more than <strong>90 major features</strong> in the starter TamamHealth EMR, and many more that can be optionally added on — or, you can add your own features!</p>
+                <p>{t("product.features.morePrefix")} <strong>{t("product.features.moreCount")}</strong> {t("product.features.moreSuffix")}</p>
                 <button className="p-btn p-btn--outline" onClick={() => scrollTo("tour")}>
-                  Take a Quick Tour <ArrowRight size={14} />
+                  {t("product.features.takeTour")} <ArrowRight size={14} />
                 </button>
               </div>
             </Reveal>
@@ -534,9 +532,9 @@ export default function ProductPage() {
           <div className="p-container">
             <Reveal>
               <div className="p-section-header">
-                <span className="p-eyebrow">Releases</span>
-                <h2 className="p-section-title">Release History</h2>
-                <p className="p-section-desc">We regularly release new features, updates and security patches.</p>
+                <span className="p-eyebrow">{t("product.releases.eyebrow")}</span>
+                <h2 className="p-section-title">{t("product.releases.title")}</h2>
+                <p className="p-section-desc">{t("product.releases.desc")}</p>
               </div>
             </Reveal>
             <div className="p-releases__timeline">
@@ -552,10 +550,10 @@ export default function ProductPage() {
                         <span className="p-releases__item-version">{r.version}</span>
                         <span className="p-releases__item-date">{r.date}</span>
                       </div>
-                      <h3 className="p-releases__item-title">{r.title}</h3>
+                      <h3 className="p-releases__item-title">{t(r.title)}</h3>
                       <ul className="p-releases__item-highlights">
                         {r.highlights.map((h, j) => (
-                          <li key={j}><Check size={12} /> {h}</li>
+                          <li key={j}><Check size={12} /> {t(h)}</li>
                         ))}
                       </ul>
                     </div>
@@ -571,9 +569,9 @@ export default function ProductPage() {
           <div className="p-container">
             <Reveal>
               <div className="p-section-header">
-                <span className="p-eyebrow">Roadmap</span>
-                <h2 className="p-section-title">What we&apos;re building</h2>
-                <p className="p-section-desc">A transparent view into our development priorities and direction.</p>
+                <span className="p-eyebrow">{t("product.roadmap.eyebrow")}</span>
+                <h2 className="p-section-title">{t("product.roadmap.title")}</h2>
+                <p className="p-section-desc">{t("product.roadmap.desc")}</p>
               </div>
             </Reveal>
             <div className="p-roadmap__columns">
@@ -581,13 +579,13 @@ export default function ProductPage() {
                 <Reveal key={i} delay={i * 0.1}>
                   <div className="p-roadmap__column">
                     <div className={`p-roadmap__column-header p-roadmap__column-header--${col.status}`}>
-                      {col.label}
+                      {t(col.label)}
                     </div>
                     <div className="p-roadmap__column-body">
                       {col.items.map((item, j) => (
                         <div key={j} className="p-roadmap__item">
                           <div className={`p-roadmap__item-dot p-roadmap__item-dot--${col.status}`} />
-                          {item}
+                          {t(item)}
                         </div>
                       ))}
                     </div>
@@ -603,8 +601,8 @@ export default function ProductPage() {
           <div className="p-container">
             <Reveal>
               <div className="p-section-header">
-                <span className="p-eyebrow">Tour</span>
-                <h2 className="p-section-title">Quick Tour of the TamamHealth EMR</h2>
+                <span className="p-eyebrow">{t("product.tour.eyebrow")}</span>
+                <h2 className="p-section-title">{t("product.tour.title")}</h2>
               </div>
             </Reveal>
             <div className="p-tour__grid">
@@ -614,18 +612,18 @@ export default function ProductPage() {
                     <div className={`p-tour__card-icon ${activeTour === i ? "p-tour__card-icon--active" : ""}`}>
                       <f.icon size={44} />
                     </div>
-                    <h4 className="p-tour__card-label">{f.label}</h4>
-                    <p className="p-tour__card-desc">{f.desc}</p>
+                    <h4 className="p-tour__card-label">{t(f.label)}</h4>
+                    <p className="p-tour__card-desc">{t(f.desc)}</p>
                   </div>
                 </Reveal>
               ))}
             </div>
             <Reveal delay={0.3}>
               <div className="p-tour__cta">
-                <h3>Ready to dive in?</h3>
-                <p>Try out the latest version of TamamHealth with sample data in our demo environment.</p>
+                <h3>{t("product.tour.ctaTitle")}</h3>
+                <p>{t("product.tour.ctaDesc")}</p>
                 <Link href="/login" className="p-btn p-btn--primary p-btn--lg">
-                  Explore the Demo <ArrowRight size={16} />
+                  {t("product.tour.ctaButton")} <ArrowRight size={16} />
                 </Link>
               </div>
             </Reveal>
@@ -637,14 +635,14 @@ export default function ProductPage() {
           <div className="p-container">
             <Reveal>
               <div className="p-final-cta__inner">
-                <h2>Built by South Sudanese,<br />for South Sudan.</h2>
-                <p>&ldquo;TamamHealth&rdquo; means &ldquo;Hope&rdquo; in Dinka. Purpose-built digital health records for the world&apos;s hardest health environments.</p>
+                <h2>{t("product.finalCta.titleLine1")}<br />{t("product.finalCta.titleLine2")}</h2>
+                <p>{t("product.finalCta.desc")}</p>
                 <div className="p-final-cta__buttons">
                   <Link href="/login" className="p-btn p-btn--cta">
-                    Try the Demo <ArrowRight size={16} />
+                    {t("product.finalCta.tryDemo")} <ArrowRight size={16} />
                   </Link>
                   <Link href="/" className="p-btn p-btn--cta-outline">
-                    Back to Home
+                    {t("product.finalCta.backHome")}
                   </Link>
                 </div>
               </div>
@@ -663,35 +661,35 @@ export default function ProductPage() {
                 <img src="/assets/tamamhealth-icon.svg" alt="TamamHealth" className="p-logo__icon" />
                 <span className="p-logo__text" style={{ color: "#fff" }}>TamamHealth</span>
               </div>
-              <p className="p-footer__tagline">&ldquo;Hope&rdquo; in Dinka. Purpose-built digital health records for the world&apos;s hardest health environments.</p>
+              <p className="p-footer__tagline">{t("product.footer.tagline")}</p>
             </div>
             <div className="p-footer__col">
-              <h4>Product</h4>
-              <Link href="/product">EMR Features</Link>
-              <button onClick={() => scrollTo("technology")}>Technology</button>
-              <button onClick={() => scrollTo("roadmap")}>Roadmap</button>
-              <button onClick={() => scrollTo("releases")}>Releases</button>
+              <h4>{t("product.footer.productHeading")}</h4>
+              <Link href="/product">{t("product.footer.emrFeatures")}</Link>
+              <button onClick={() => scrollTo("technology")}>{t("product.nav.technology")}</button>
+              <button onClick={() => scrollTo("roadmap")}>{t("product.nav.roadmap")}</button>
+              <button onClick={() => scrollTo("releases")}>{t("product.releases.eyebrow")}</button>
             </div>
             <div className="p-footer__col">
-              <h4>Community</h4>
-              <button onClick={() => scrollTo("interoperability")}>Integrations</button>
-              <Link href="/">Get Involved</Link>
-              <Link href="/public-stats">Public Statistics</Link>
+              <h4>{t("product.footer.communityHeading")}</h4>
+              <button onClick={() => scrollTo("interoperability")}>{t("product.footer.integrations")}</button>
+              <Link href="/">{t("product.footer.getInvolved")}</Link>
+              <Link href="/public-stats">{t("landing.footer.publicStats")}</Link>
             </div>
             <div className="p-footer__col">
-              <h4>About Us</h4>
-              <Link href="/">Our Story</Link>
-              <Link href="/login">Staff Sign In</Link>
+              <h4>{t("product.footer.aboutHeading")}</h4>
+              <Link href="/">{t("product.footer.ourStory")}</Link>
+              <Link href="/login">{t("landing.cta.staffSignIn")}</Link>
               <div className="p-footer__contact"><Mail size={14} /> info@tamamhealth.org</div>
               <div className="p-footer__contact"><MapPin size={14} /> Juba, South Sudan</div>
             </div>
           </div>
           <div className="p-footer__bottom">
-            <p>&copy; {new Date().getFullYear()} TamamHealth Health Technologies. All rights reserved.</p>
+            <p>{t("product.footer.copyright", { year: new Date().getFullYear() })}</p>
             <div className="p-footer__badges">
               <span><Shield size={12} /> ISO 13606</span>
               <span><Lock size={12} /> ISO 13131</span>
-              <span><Globe size={12} /> DHIS2 Compatible</span>
+              <span><Globe size={12} /> {t("product.footer.dhis2Compatible")}</span>
             </div>
           </div>
         </div>
@@ -703,13 +701,14 @@ export default function ProductPage() {
 // ─── SHOWCASE VISUAL COMPONENT ──────────────────────────────────
 
 function ShowcaseVisual({ type }: { type: string }) {
+  const { t } = useTranslation();
   if (type === "features") {
     return (
       <div className="p-showcase__visual-wrap">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/dashboard-screenshot.png" alt="TamamHealth EMR patient summary dashboard showing vitals, patient list, and clinical data" className="p-showcase__photo" />
+        <img src="/assets/dashboard-screenshot.png" alt={t("product.visual.featuresAlt")} className="p-showcase__photo" />
         <div className="p-showcase__photo-caption">
-          <span>Live Dashboard</span> — Patient summary, vitals, diagnosis tracking
+          <span>{t("product.visual.featuresLabel")}</span> — {t("product.visual.featuresCaption")}
         </div>
       </div>
     );
@@ -719,9 +718,9 @@ function ShowcaseVisual({ type }: { type: string }) {
     return (
       <div className="p-showcase__visual-wrap">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/landing-img.jpg" alt="South Sudanese healthcare workers building the future of digital health" className="p-showcase__photo" />
+        <img src="/assets/landing-img.jpg" alt={t("product.visual.roadmapAlt")} className="p-showcase__photo" />
         <div className="p-showcase__photo-caption">
-          <span>Our Team</span> — South Sudanese healthcare workers shaping the roadmap
+          <span>{t("product.visual.roadmapLabel")}</span> — {t("product.visual.roadmapCaption")}
         </div>
       </div>
     );
@@ -731,9 +730,9 @@ function ShowcaseVisual({ type }: { type: string }) {
     return (
       <div className="p-showcase__visual-wrap">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/health-data.jpg" alt="Health analytics dashboard showing clinical data reporting" className="p-showcase__photo" />
+        <img src="/assets/health-data.jpg" alt={t("product.visual.releasesAlt")} className="p-showcase__photo" />
         <div className="p-showcase__photo-caption">
-          <span>Data-Driven</span> — Clinical analytics and reporting in every release
+          <span>{t("product.visual.releasesLabel")}</span> — {t("product.visual.releasesCaption")}
         </div>
       </div>
     );
@@ -743,9 +742,9 @@ function ShowcaseVisual({ type }: { type: string }) {
   return (
     <div className="p-showcase__visual-wrap">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/assets/african-nurse.jpg" alt="African healthcare worker using digital health records on mobile" className="p-showcase__photo" />
+      <img src="/assets/african-nurse.jpg" alt={t("product.visual.downloadAlt")} className="p-showcase__photo" />
       <div className="p-showcase__photo-caption">
-        <span>Digital-First</span> — Works on any device, even without internet
+        <span>{t("product.visual.downloadLabel")}</span> — {t("product.visual.downloadCaption")}
       </div>
     </div>
   );
@@ -759,16 +758,16 @@ const productCSS = `
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&family=IBM+Plex+Serif:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  --p-blue: #1B9AAA;
-  --p-blue-hover: #1E4D4A;
-  --p-blue-dark: #1A3A3A;
-  --p-blue-mid: #246860;
+  --p-blue: #3b82f6;
+  --p-blue-hover: #1E40AF;
+  --p-blue-dark: #1E3A8A;
+  --p-blue-mid: #1d4ed8;
   --p-blue-light: #E8F3FD;
   --p-blue-pale: #F5FAFF;
 
-  --p-text: #1A3A3A;
-  --p-text-secondary: #3D5854;
-  --p-text-muted: #5A7370;
+  --p-text: #1E3A8A;
+  --p-text-secondary: #334155;
+  --p-text-muted: #64748b;
 
   --p-bg: #FFFFFF;
   --p-bg-warm: #F2F0EB;

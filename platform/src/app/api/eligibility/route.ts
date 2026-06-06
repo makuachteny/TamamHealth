@@ -10,7 +10,7 @@ import type { UserRole } from '@/lib/db-types';
 // coverage before ordering a procedure.
 const ELIGIBILITY_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'medical_superintendent',
-  'doctor', 'clinical_officer', 'nurse', 'front_desk',
+  'doctor', 'clinical_officer', 'nurse', 'front_desk', 'medical_biller',
 ];
 
 interface EligibilityRequest {

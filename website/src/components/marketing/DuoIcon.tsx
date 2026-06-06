@@ -50,7 +50,7 @@ const RED = "#C44536";
 const AMBER = "#E4A84B";
 const PURPLE = "#8B5CF6";
 const GREEN = "#1F9D6F";
-const DARK = "#1A3A3A";
+const DARK = "#1E3A8A";
 const GRAY = "#5A7370";
 
 const ICON_COMPONENTS: Record<IconName, LucideIcon> = {

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { UserDoc, UserRole } from '@/lib/db-types';
 import {
@@ -16,10 +17,13 @@ const ROLE_LABELS: Record<UserRole, string> = {
   doctor: 'Doctor',
   clinical_officer: 'Clinical Officer',
   nurse: 'Nurse',
+  midwife: 'Midwife',
   lab_tech: 'Lab Technician',
   pharmacist: 'Pharmacist',
   front_desk: 'Front Desk',
+  cashier: 'Cashier',
   government: 'Government',
+  county_health_director: 'County Health Director',
   boma_health_worker: 'Boma Health Worker',
   payam_supervisor: 'Payam Supervisor',
   data_entry_clerk: 'Data Entry Clerk',
@@ -28,6 +32,8 @@ const ROLE_LABELS: Record<UserRole, string> = {
   community_health_volunteer: 'Community Health Volunteer',
   nutritionist: 'Nutritionist',
   radiologist: 'Radiologist',
+  hospital_manager: 'Hospital Manager',
+  medical_biller: 'Medical Biller',
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -48,10 +54,14 @@ const ROLE_COLORS: Record<string, string> = {
   community_health_volunteer: 'var(--color-success)',
   nutritionist: 'var(--color-success)',
   radiologist: 'var(--accent-primary)',
+  hospital_manager: 'var(--accent-primary)',
+  medical_biller: 'var(--accent-primary)',
 };
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const { t } = useTranslation();
+  const roleLabel = (role: string) => t(`adminUsers.role_${role}`);
   const { currentUser } = useApp();
   const { organizations } = useOrganizations();
   const [users, setUsers] = useState<UserDoc[]>([]);
@@ -59,6 +69,7 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterOrg, setFilterOrg] = useState<string>('all');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Access control
   useEffect(() => {
@@ -134,16 +145,16 @@ export default function AdminUsersPage() {
 
   return (
     <>
-      <TopBar title="Cross-Org Users" />
+      <TopBar title={t('adminUsers.title')} />
       <main className="page-container page-enter">
 
         {/* Header stats */}
         <div className="kpi-grid mb-6">
           {[
-            { label: 'Total Users', value: users.length, icon: Users, color: '#2563EB', bg: '#2563EB15' },
-            { label: 'Active Users', value: users.filter(u => u.isActive).length, icon: UserCheck, color: 'var(--color-success)', bg: '#05966915' },
-            { label: 'Inactive Users', value: users.filter(u => !u.isActive).length, icon: UserX, color: 'var(--color-danger)', bg: '#EF444415' },
-            { label: 'Admin Users', value: users.filter(u => u.role === 'super_admin' || u.role === 'org_admin').length, icon: Shield, color: '#7C3AED', bg: '#7C3AED15' },
+            { label: t('adminUsers.statTotalUsers'), value: users.length, icon: Users, color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
+            { label: t('adminUsers.statActiveUsers'), value: users.filter(u => u.isActive).length, icon: UserCheck, color: 'var(--color-success)', bg: '#05966915' },
+            { label: t('adminUsers.statInactiveUsers'), value: users.filter(u => !u.isActive).length, icon: UserX, color: 'var(--color-danger)', bg: '#EF444415' },
+            { label: t('adminUsers.statAdminUsers'), value: users.filter(u => u.role === 'super_admin' || u.role === 'org_admin').length, icon: Shield, color: '#7C3AED', bg: '#7C3AED15' },
           ].map(stat => (
             <div key={stat.label} className="kpi">
               <div className="kpi__icon" style={{ background: stat.bg }}>
@@ -162,19 +173,19 @@ export default function AdminUsersPage() {
           <div className="relative flex-1" style={{ minWidth: '200px', maxWidth: '360px' }}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             <input
-              type="text" placeholder="Search by name, username, or hospital..."
+              type="text" placeholder={t('adminUsers.searchPlaceholder')}
               value={search} onChange={e => setSearch(e.target.value)}
               style={{ ...inputStyle, paddingLeft: '36px' }}
             />
           </div>
           <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '180px' }}>
-            <option value="all">All Roles</option>
-            {Object.entries(ROLE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label} ({roleCounts[value] || 0})</option>
+            <option value="all">{t('adminUsers.allRoles')}</option>
+            {Object.keys(ROLE_LABELS).map((value) => (
+              <option key={value} value={value}>{roleLabel(value)} ({roleCounts[value] || 0})</option>
             ))}
           </select>
           <select value={filterOrg} onChange={e => setFilterOrg(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '200px' }}>
-            <option value="all">All Organizations</option>
+            <option value="all">{t('adminUsers.allOrganizations')}</option>
             {organizations.map(o => <option key={o._id} value={o._id}>{o.name}</option>)}
           </select>
           <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs" style={{ color: 'var(--text-muted)', background: 'var(--overlay-subtle)' }}>
@@ -189,7 +200,11 @@ export default function AdminUsersPage() {
             <table className="w-full">
               <thead>
                 <tr>
-                  {['Name', 'Username', 'Role', 'Organization', 'Hospital', 'Status', 'Actions'].map(h => (
+                  {[
+                    t('adminUsers.colName'), t('adminUsers.colUsername'), t('adminUsers.colRole'),
+                    t('adminUsers.colOrganization'), t('adminUsers.colHospital'), t('adminUsers.colStatus'),
+                    t('adminUsers.colActions'),
+                  ].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
                       {h}
                     </th>
@@ -198,13 +213,19 @@ export default function AdminUsersPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading users...</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('adminUsers.loadingUsers')}</td></tr>
                 ) : filteredUsers.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No users found</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('adminUsers.noUsersFound')}</td></tr>
                 ) : filteredUsers.map(u => {
                   const roleColor = ROLE_COLORS[u.role] || '#6B7280';
+                  const isExpanded = expandedId === u._id;
                   return (
-                    <tr key={u._id} style={{ borderBottom: '1px solid var(--border-light)' }} className="transition-colors">
+                    <Fragment key={u._id}>
+                    <tr
+                      onClick={() => setExpandedId(isExpanded ? null : u._id)}
+                      style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--border-light)' }}
+                      className="transition-colors cursor-pointer hover:bg-[var(--overlay-subtle)]"
+                    >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: roleColor }}>
@@ -220,7 +241,7 @@ export default function AdminUsersPage() {
                         <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
                           background: `${roleColor}18`,
                           color: roleColor,
-                        }}>{ROLE_LABELS[u.role] || u.role}</span>
+                        }}>{roleLabel(u.role)}</span>
                       </td>
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
                         {u.orgId ? (orgNameMap[u.orgId] || u.orgId) : '--'}
@@ -231,13 +252,13 @@ export default function AdminUsersPage() {
                       <td className="px-4 py-3">
                         <span className="flex items-center gap-1.5 text-xs font-semibold">
                           <span className="w-2 h-2 rounded-full" style={{ background: u.isActive ? 'var(--color-success)' : 'var(--text-muted)' }} />
-                          <span style={{ color: u.isActive ? 'var(--color-success)' : 'var(--text-muted)' }}>{u.isActive ? 'Active' : 'Inactive'}</span>
+                          <span style={{ color: u.isActive ? 'var(--color-success)' : 'var(--text-muted)' }}>{u.isActive ? t('adminUsers.statusActive') : t('adminUsers.statusInactive')}</span>
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <button
-                          onClick={() => handleToggleActive(u._id, u.isActive)}
-                          title={u.isActive ? 'Deactivate' : 'Activate'}
+                          onClick={(e) => { e.stopPropagation(); handleToggleActive(u._id, u.isActive); }}
+                          title={u.isActive ? t('adminUsers.deactivate') : t('adminUsers.activate')}
                           className="p-1.5 rounded-lg transition-colors"
                           style={{ color: u.isActive ? 'var(--color-danger)' : 'var(--color-success)' }}
                         >
@@ -245,6 +266,23 @@ export default function AdminUsersPage() {
                         </button>
                       </td>
                     </tr>
+                    {isExpanded && (
+                      <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--overlay-subtle)' }}>
+                        <td colSpan={7} className="px-4 py-3">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+                            <div><span style={{ color: 'var(--text-muted)' }}>{t('adminUsers.colRole')}: </span><span style={{ color: 'var(--text-primary)' }}>{roleLabel(u.role)}</span></div>
+                            <div><span style={{ color: 'var(--text-muted)' }}>Department: </span><span style={{ color: 'var(--text-primary)' }}>{u.department || '--'}</span></div>
+                            <div><span style={{ color: 'var(--text-muted)' }}>Specialty: </span><span style={{ color: 'var(--text-primary)' }}>{u.specialty || '--'}</span></div>
+                            <div><span style={{ color: 'var(--text-muted)' }}>Phone: </span><span style={{ color: 'var(--text-primary)' }}>{u.phone || '--'}</span></div>
+                            <div><span style={{ color: 'var(--text-muted)' }}>{t('adminUsers.colOrganization')}: </span><span style={{ color: 'var(--text-primary)' }}>{u.orgId ? (orgNameMap[u.orgId] || u.orgId) : '--'}</span></div>
+                            <div><span style={{ color: 'var(--text-muted)' }}>{t('adminUsers.colHospital')}: </span><span style={{ color: 'var(--text-primary)' }}>{u.hospitalName || '--'}</span></div>
+                            <div><span style={{ color: 'var(--text-muted)' }}>Created: </span><span style={{ color: 'var(--text-primary)' }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '--'}</span></div>
+                            <div><span style={{ color: 'var(--text-muted)' }}>User ID: </span><code style={{ color: 'var(--text-secondary)' }}>{u._id}</code></div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -254,16 +292,16 @@ export default function AdminUsersPage() {
 
         {/* Role Distribution */}
         <div className="mt-6 rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>Role Distribution</p>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>{t('adminUsers.roleDistribution')}</p>
           <div className="flex flex-wrap gap-3">
-            {Object.entries(ROLE_LABELS).map(([role, label]) => {
+            {Object.keys(ROLE_LABELS).map((role) => {
               const count = roleCounts[role] || 0;
               if (count === 0) return null;
               const color = ROLE_COLORS[role] || '#6B7280';
               return (
                 <div key={role} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: `${color}10`, border: `1px solid ${color}20` }}>
                   <span className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
-                  <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{label}</span>
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{roleLabel(role)}</span>
                   <span className="text-xs font-bold" style={{ color }}>{count}</span>
                 </div>
               );

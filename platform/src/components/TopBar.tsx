@@ -12,11 +12,14 @@ import {
   DuotoneArrowRight as ArrowRight,
 } from '@/components/icons';
 import SyncStatusBadge from '@/components/SyncStatusBadge';
+import QuickActions from '@/components/QuickActions';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { getRoleConfig } from '@/lib/permissions';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export default function TopBar({ hideSearch }: { title?: string; hideSearch?: boolean }) {
+  const { t } = useTranslation();
   const { currentUser, theme, toggleTheme, globalSearch, setGlobalSearch, setSidebarOpen } = useApp();
   const [localSearch, setLocalSearch] = useState(globalSearch);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -83,7 +86,7 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
         {/* Hamburger menu - visible on mobile/tablet */}
         <button
           onClick={() => setSidebarOpen(true)}
-          aria-label="Open navigation menu"
+          aria-label={t('topbar.openNavMenu')}
           className={`lg:hidden ${iconBtn} -ml-1`}
           style={{ background: 'var(--overlay-subtle)' }}
         >
@@ -96,7 +99,7 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px]" style={{ color: 'var(--text-muted)' }} />
             <input
               type="search"
-              placeholder="Search by name, ID, or record..."
+              placeholder={t('topbar.searchPlaceholder')}
               value={localSearch}
               onChange={e => handleSearch(e.target.value)}
               onFocus={e => {
@@ -130,16 +133,16 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
                 {patientMatches.length === 0 ? (
                   <div className="px-3 py-4 text-center">
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      No patient matches for &ldquo;{localSearch}&rdquo;
+                      {t('topbar.noPatientMatches', { query: localSearch })}
                     </p>
                     <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                      Try searching by hospital number or phone
+                      {t('topbar.searchHint')}
                     </p>
                   </div>
                 ) : (
                   <>
                     <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
-                      Patients ({patientMatches.length})
+                      {t('topbar.patientsCount', { count: patientMatches.length })}
                     </div>
                     {patientMatches.map(p => (
                       <button
@@ -170,7 +173,7 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
                     <div className="px-3 py-2 text-[10px]" style={{ color: 'var(--text-muted)', background: 'var(--overlay-subtle)' }}>
                       <span className="inline-flex items-center gap-1">
                         <UserIcon className="w-3 h-3" />
-                        Press Enter to filter the current page
+                        {t('topbar.pressEnterToFilter')}
                       </span>
                     </div>
                   </>
@@ -183,11 +186,11 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
         {/* Mobile search button */}
         {!hideSearch && (
           <button
-            aria-label="Search patients and records"
+            aria-label={t('topbar.searchPatientsRecords')}
             className={`sm:hidden ${iconBtn}`}
             style={{ background: 'var(--overlay-subtle)' }}
             onClick={() => {
-              const val = prompt('Search patients, records...');
+              const val = prompt(t('topbar.searchPrompt'));
               if (val !== null) handleSearch(val);
             }}
           >
@@ -197,10 +200,13 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
       </div>
 
       <div className="flex items-center gap-1.5">
+        {/* Quick actions: create appointment / availability, announcements, messages */}
+        <QuickActions />
+
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}
-          aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          aria-label={theme === 'light' ? t('topbar.switchToDark') : t('topbar.switchToLight')}
           className={iconBtn}
           style={{ background: 'transparent' }}
         >
@@ -216,7 +222,7 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
 
         {/* Notifications */}
         <button
-          aria-label="Notifications"
+          aria-label={t('topbar.notifications')}
           className={`relative ${iconBtn}`}
           style={{ background: 'transparent' }}
         >

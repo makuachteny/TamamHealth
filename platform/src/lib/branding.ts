@@ -10,9 +10,10 @@ export interface OrgBranding {
 
 export const DEFAULT_BRANDING: OrgBranding = {
   name: 'TamamHealth',
-  primaryColor: '#1B9AAA',
-  secondaryColor: '#1E4D4A',
-  accentColor: '#1B9AAA',
+  // Tamam Healthcare System brand greens (style guide, June 2026).
+  primaryColor: '#3b82f6',
+  secondaryColor: '#1e3a8a',
+  accentColor: '#3b82f6',
 };
 
 export function getOrgBranding(org?: OrganizationDoc | null): OrgBranding {

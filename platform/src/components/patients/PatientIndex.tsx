@@ -20,6 +20,7 @@ import {
 } from '@/components/icons/lucide';
 import type { PatientDoc } from '@/lib/db-types';
 import { useWards } from '@/lib/hooks/useWards';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface IndexCellProps {
   href?: string;
@@ -150,6 +151,7 @@ function calcAge(dob?: string): number | null {
 }
 
 export default function PatientIndex({ patient, counts, onJump }: PatientIndexProps) {
+  const { t } = useTranslation();
   const { activeAdmissions } = useWards();
   const admission = useMemo(
     () => activeAdmissions.find(a => a.patientId === patient._id),
@@ -165,53 +167,53 @@ export default function PatientIndex({ patient, counts, onJump }: PatientIndexPr
     <div className="space-y-7">
       <header>
         <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-          What can I do for {patient.firstName}?
+          {t('patientIndex.headerTitle', { name: patient.firstName })}
         </h2>
         <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-          Curated index of activities for this patient. Cells light up only when relevant data is present.
+          {t('patientIndex.headerSubtitle')}
         </p>
       </header>
 
-      <IndexGroup title="Quick View">
+      <IndexGroup title={t('patientIndex.groupQuickView')}>
         <IndexCell
           icon={ClipboardList}
-          label="Overview"
-          hint="Vitals, last visit"
+          label={t('tab.overview')}
+          hint={t('patientIndex.overviewHint')}
           onClick={() => onJump('overview')}
         />
         <IndexCell
           icon={FileText}
-          label="SBAR Handoff"
-          hint="Auto-generated"
+          label={t('patientIndex.sbarHandoff')}
+          hint={t('patientIndex.sbarHandoffHint')}
           onClick={() => onJump('sbar')}
         />
         <IndexCell
           icon={ClipboardList}
-          label="Timeline"
-          hint="Encounter history"
+          label={t('patientIndex.timeline')}
+          hint={t('patientIndex.timelineHint')}
           badge={counts.consultations || undefined}
           empty={counts.consultations === 0}
           onClick={() => onJump('timeline')}
         />
         <IndexCell
           icon={Activity}
-          label="Trends"
-          hint="Vital sign charts"
+          label={t('patientIndex.trends')}
+          hint={t('patientIndex.trendsHint')}
           onClick={() => onJump('trends')}
         />
       </IndexGroup>
 
-      <IndexGroup title="Clinical">
+      <IndexGroup title={t('patientIndex.groupClinical')}>
         <IndexCell
           icon={Stethoscope}
-          label="New Consultation"
-          hint="Start an encounter"
+          label={t('action.newConsultation')}
+          hint={t('patientIndex.newConsultationHint')}
           href={`/consultation/${patient._id}`}
         />
         <IndexCell
           icon={AlertTriangle}
-          label="Problem List"
-          hint="Active & chronic"
+          label={t('patientIndex.problemList')}
+          hint={t('patientIndex.problemListHint')}
           badge={counts.activeProblems || undefined}
           empty={counts.activeProblems === 0}
           emphasis={counts.activeProblems > 0 ? 'safety' : 'default'}
@@ -219,23 +221,23 @@ export default function PatientIndex({ patient, counts, onJump }: PatientIndexPr
         />
         <IndexCell
           icon={Activity}
-          label="Vitals"
-          hint="All readings"
+          label={t('tab.vitals')}
+          hint={t('patientIndex.vitalsHint')}
           onClick={() => onJump('vitals')}
         />
         <IndexCell
           icon={Brain}
-          label="AI Decision Support"
-          hint="Per-encounter"
+          label={t('patientIndex.aiDecisionSupport')}
+          hint={t('patientIndex.aiDecisionSupportHint')}
           onClick={() => onJump('history')}
         />
       </IndexGroup>
 
-      <IndexGroup title="Orders & Results">
+      <IndexGroup title={t('patientIndex.groupOrdersResults')}>
         <IndexCell
           icon={FlaskConical}
-          label="Lab Results"
-          hint="Ordered tests"
+          label={t('tab.labResults')}
+          hint={t('patientIndex.labResultsHint')}
           badge={counts.labs || undefined}
           empty={counts.labs === 0}
           emphasis={counts.criticalLabs > 0 ? 'safety' : 'default'}
@@ -243,54 +245,54 @@ export default function PatientIndex({ patient, counts, onJump }: PatientIndexPr
         />
         <IndexCell
           icon={Pill}
-          label="Prescriptions"
-          hint="Active & dispensed"
+          label={t('tab.prescriptions')}
+          hint={t('patientIndex.prescriptionsHint')}
           badge={counts.prescriptions || undefined}
           empty={counts.prescriptions === 0}
           onClick={() => onJump('prescriptions')}
         />
         <IndexCell
           icon={TestTubes}
-          label="Order New Lab"
-          hint="Add to lab queue"
+          label={t('patientIndex.orderNewLab')}
+          hint={t('patientIndex.orderNewLabHint')}
           href={`/lab?patientId=${patient._id}&new=1`}
         />
         <IndexCell
           icon={Pill}
-          label="Pharmacy"
-          hint="Dispense / interactions"
+          label={t('nav.pharmacy')}
+          hint={t('patientIndex.pharmacyHint')}
           href={`/pharmacy?patientId=${patient._id}`}
         />
       </IndexGroup>
 
       {/* Inpatient — only when admitted */}
       {admission && (
-        <IndexGroup title="Inpatient">
+        <IndexGroup title={t('patientIndex.groupInpatient')}>
           <IndexCell
             icon={BedDouble}
-            label="Ward Bed"
+            label={t('patientIndex.wardBed')}
             hint={`${admission.wardName}${admission.bedNumber ? ' · ' + admission.bedNumber : ''}`}
             href="/wards"
             emphasis="inpatient"
           />
           <IndexCell
             icon={Pill}
-            label="MAR"
-            hint="Bedside med admin"
+            label={t('mar.title')}
+            hint={t('patientIndex.marHint')}
             href={`/wards/mar/${admission._id}`}
             emphasis="inpatient"
           />
           <IndexCell
             icon={ShieldAlert}
-            label="Isolation"
-            hint={admission.isolationRequired ? (admission.isolationReason || 'Required') : 'Not required'}
+            label={t('ward.isolation')}
+            hint={admission.isolationRequired ? (admission.isolationReason || t('patientIndex.isolationRequired')) : t('patientIndex.isolationNotRequired')}
             empty={!admission.isolationRequired}
             emphasis={admission.isolationRequired ? 'safety' : 'default'}
           />
           <IndexCell
             icon={ClipboardList}
-            label="Discharge Plan"
-            hint="Summary & follow-up"
+            label={t('patientIndex.dischargePlan')}
+            hint={t('patientIndex.dischargePlanHint')}
             href="/wards"
             emphasis="inpatient"
           />
@@ -299,18 +301,18 @@ export default function PatientIndex({ patient, counts, onJump }: PatientIndexPr
 
       {/* Maternal — women of reproductive age */}
       {isFemale && isAdult && age != null && age <= 49 && (
-        <IndexGroup title="Maternal Health">
+        <IndexGroup title={t('patientIndex.groupMaternalHealth')}>
           <IndexCell
             icon={Heart}
-            label="ANC Visits"
-            hint="WHO 8-contact"
+            label={t('patientIndex.ancVisits')}
+            hint={t('patientIndex.ancVisitsHint')}
             href={`/anc?patientId=${patient._id}`}
             emphasis="maternal"
           />
           <IndexCell
             icon={Baby}
-            label="Birth Registration"
-            hint="CRVS"
+            label={t('patientIndex.birthRegistration')}
+            hint={t('patientIndex.birthRegistrationHint')}
             href={`/births?patientId=${patient._id}`}
             emphasis="maternal"
           />
@@ -319,11 +321,11 @@ export default function PatientIndex({ patient, counts, onJump }: PatientIndexPr
 
       {/* Paediatric — under 5 */}
       {isUnder5 && (
-        <IndexGroup title="Paediatric / EPI">
+        <IndexGroup title={t('patientIndex.groupPaediatricEpi')}>
           <IndexCell
             icon={Syringe}
-            label="Immunizations"
-            hint="EPI schedule"
+            label={t('nav.immunizations')}
+            hint={t('patientIndex.immunizationsHint')}
             badge={counts.immunizations || undefined}
             empty={counts.immunizations === 0}
             href={`/immunizations?patientId=${patient._id}`}
@@ -331,33 +333,33 @@ export default function PatientIndex({ patient, counts, onJump }: PatientIndexPr
           />
           <IndexCell
             icon={Activity}
-            label="Growth Monitoring"
-            hint="Weight / MUAC"
+            label={t('patientIndex.growthMonitoring')}
+            hint={t('patientIndex.growthMonitoringHint')}
             onClick={() => onJump('trends')}
             emphasis="paediatric"
           />
         </IndexGroup>
       )}
 
-      <IndexGroup title="Coordination">
+      <IndexGroup title={t('patientIndex.groupCoordination')}>
         <IndexCell
           icon={ArrowRightLeft}
-          label="Referrals"
-          hint="In & out"
+          label={t('tab.referrals')}
+          hint={t('patientIndex.referralsHint')}
           badge={counts.activeReferrals || undefined}
           empty={counts.referrals === 0}
           onClick={() => onJump('referrals')}
         />
         <IndexCell
           icon={MessageSquare}
-          label="Send Message"
-          hint="Patient or clinician"
+          label={t('action.sendMessage')}
+          hint={t('patientIndex.sendMessageHint')}
           href={`/messages?patientId=${patient._id}`}
         />
         <IndexCell
           icon={Wallet}
-          label="Billing"
-          hint="Charges & balance"
+          label={t('billing.sidebarTitle')}
+          hint={t('patientIndex.billingHint')}
           onClick={() => onJump('billing')}
         />
       </IndexGroup>

@@ -18,10 +18,12 @@ import {
   AreaChart, Area, RadarChart, Radar, PolarGrid, PolarAngleAxis,
   PolarRadiusAxis, ComposedChart,
 } from 'recharts';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useReferrals } from '@/lib/hooks/useReferrals';
+import EmptyState from '@/components/EmptyState';
 import type { HospitalDoc, DiseaseAlertDoc } from '@/lib/db-types';
 
 /**
@@ -236,6 +238,7 @@ function TableauMultiSelect({ label, options, selected, onChange, icon: Icon }: 
   onChange: (selected: string[]) => void;
   icon?: React.ElementType;
 }) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -271,7 +274,7 @@ function TableauMultiSelect({ label, options, selected, onChange, icon: Icon }: 
           }}
         >
           <span className="truncate flex-1 text-left">
-            {selected.length === options.length ? 'All' : `${selected.length} selected`}
+            {selected.length === options.length ? t('government.all') : t('government.countSelected', { count: selected.length })}
           </span>
           <ChevronDown className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
         </button>
@@ -287,7 +290,7 @@ function TableauMultiSelect({ label, options, selected, onChange, icon: Icon }: 
               onClick={() => onChange(options.map(o => o.value))}
               className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}
             >
-              Select All
+              {t('government.selectAll')}
             </button>
           </div>
           {options.map(o => {
@@ -351,11 +354,14 @@ function ChartTypeSelector({ value, options, onChange }: {
 }
 
 /* ─── Inline Expanded Chart View (fills the content area beside sidebar) ── */
-function ExpandedChartView({ title, onClose, children }: {
+function ExpandedChartView({ title, onClose, children, hasData = true, emptyMessage }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  hasData?: boolean;
+  emptyMessage?: string;
 }) {
+  const { t } = useTranslation();
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -378,7 +384,7 @@ function ExpandedChartView({ title, onClose, children }: {
             style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
           >
             <ChevronLeft className="w-3.5 h-3.5" />
-            Back to Dashboard
+            {t('government.backToDashboard')}
           </button>
           <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
         </div>
@@ -386,7 +392,7 @@ function ExpandedChartView({ title, onClose, children }: {
           onClick={onClose}
           className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:opacity-70"
           style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
-          title="Close (Esc)"
+          title={t('government.closeEsc')}
         >
           <X className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
         </button>
@@ -396,9 +402,15 @@ function ExpandedChartView({ title, onClose, children }: {
         className="flex-1 min-h-0 p-5 rounded-b-xl"
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderTop: '1px solid var(--border-light)' }}
       >
-        <ResponsiveContainer width="100%" height="100%">
-          {children as React.ReactElement}
-        </ResponsiveContainer>
+        {hasData ? (
+          <ResponsiveContainer width="100%" height="100%">
+            {children as React.ReactElement}
+          </ResponsiveContainer>
+        ) : (
+          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <EmptyState icon={Activity} title="No data yet" message={emptyMessage || 'No data to display for this chart.'} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -406,12 +418,13 @@ function ExpandedChartView({ title, onClose, children }: {
 
 /* ─── Expand Button ──────────────────────────────────────────────── */
 function ExpandButton({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
   return (
     <button
       onClick={onClick}
       className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:opacity-70"
       style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
-      title="Enlarge chart"
+      title={t('government.enlargeChart')}
     >
       <Maximize2 className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
     </button>
@@ -457,6 +470,7 @@ function calcDataQuality(h: HospitalDoc): number {
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════ */
 export default function GovernmentDashboardPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useApp();
   const { hospitals } = useHospitals();
@@ -549,15 +563,15 @@ export default function GovernmentDashboardPage() {
   const facilityDistribution = useMemo(() => {
     const counts: Record<string, number> = {};
     const labels: Record<string, string> = {
-      national_referral: 'National Referral', state_hospital: 'State Hospital',
-      county_hospital: 'County Hospital', phcc: 'PHCC', phcu: 'PHCU',
+      national_referral: t('government.facilityNationalReferral'), state_hospital: t('government.facilityStateHospital'),
+      county_hospital: t('government.facilityCountyHospital'), phcc: t('government.facilityPhcc'), phcu: t('government.facilityPhcu'),
     };
     filteredHospitals.forEach(h => {
       const t = labels[h.facilityType] || h.facilityType;
       counts[t] = (counts[t] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [filteredHospitals]);
+  }, [filteredHospitals, t]);
 
   // OPD trend data
   const opdTrendData = useMemo(() => {
@@ -566,8 +580,8 @@ export default function GovernmentDashboardPage() {
     return months.map((m, i) => {
       let opd = 0, anc = 0, imm = 0;
       filteredHospitals.forEach(h => {
-        const t = h.monthlyTrends?.find((t: { month: string }) => t.month === m);
-        if (t) { opd += t.opdVisits || 0; anc += t.ancVisits || 0; imm += t.immunizations || 0; }
+        const tr = h.monthlyTrends?.find((row: { month: string }) => row.month === m);
+        if (tr) { opd += tr.opdVisits || 0; anc += tr.ancVisits || 0; imm += tr.immunizations || 0; }
       });
       return { month: labels[i], 'OPD Visits': opd, 'ANC Visits': anc, 'Immunizations': imm };
     });
@@ -633,13 +647,28 @@ export default function GovernmentDashboardPage() {
   }, [filteredHospitals]);
 
   const perfRadarData = useMemo(() => [
-    { metric: 'Reporting', value: avgReporting },
-    { metric: 'Readiness', value: avgReadiness },
-    { metric: 'EPI Coverage', value: avgImmCoverage },
-    { metric: 'Functional', value: functionalPct },
-    { metric: 'Medicine', value: avgMedicine },
-    { metric: 'Quality', value: avgQualityScore },
-  ], [avgReporting, avgReadiness, avgImmCoverage, functionalPct, avgMedicine, avgQualityScore]);
+    { metric: t('government.metricReporting'), value: avgReporting },
+    { metric: t('government.metricReadiness'), value: avgReadiness },
+    { metric: t('government.metricEpiCoverage'), value: avgImmCoverage },
+    { metric: t('government.metricFunctional'), value: functionalPct },
+    { metric: t('government.metricMedicine'), value: avgMedicine },
+    { metric: t('government.metricQuality'), value: avgQualityScore },
+  ], [avgReporting, avgReadiness, avgImmCoverage, functionalPct, avgMedicine, avgQualityScore, t]);
+
+  /* ─── Empty-state flags: whether each chart has anything to plot ── */
+  const diseaseTrendHasData = weeklyDiseaseData.length > 0
+    && dtSelectedDiseases.length > 0
+    && weeklyDiseaseData.some(row => WEEKLY_DISEASE_KEYS.some(k => dtSelectedDiseases.includes(k) && ((row as Record<string, unknown>)[k] as number) > 0));
+  const stateCasesHasData = stateBarData.length > 0
+    && (csChartType === 'pie'
+      ? statePieData.some(d => d.value > 0)
+      : stateBarData.some(row => Object.entries(row).some(([k, v]) => k !== 'state' && typeof v === 'number' && v > 0)));
+  const visitsHasData = hvSelectedSeries.length > 0
+    && opdTrendData.some(row => hvSelectedSeries.some(s => ((row as unknown as Record<string, number>)[s] || 0) > 0));
+  const staffHasData = staffDistribution.length > 0
+    && sdSelectedRoles.length > 0
+    && staffDistribution.some(row => sdSelectedRoles.some(r => ((row as Record<string, unknown>)[r] as number) > 0));
+  const performanceHasData = perfRadarData.some(d => d.value > 0);
 
   const sortedAlerts = useMemo(() => {
     let filtered = selectedState === 'all' ? [...diseaseAlerts] : diseaseAlerts.filter(a => a.state === selectedState);
@@ -721,9 +750,9 @@ export default function GovernmentDashboardPage() {
 
   const typeLabel = (type: string) => {
     switch (type) {
-      case 'national_referral': return 'National Referral';
-      case 'state_hospital': return 'State Hospital';
-      case 'county_hospital': return 'County Hospital';
+      case 'national_referral': return t('government.facilityNationalReferral');
+      case 'state_hospital': return t('government.facilityStateHospital');
+      case 'county_hospital': return t('government.facilityCountyHospital');
       default: return type;
     }
   };
@@ -915,6 +944,13 @@ export default function GovernmentDashboardPage() {
 
   // Performance
   const renderPerformance = () => {
+    if ((perfView === 'radar' || perfView === 'bar') && !performanceHasData) {
+      return (
+        <div className="p-3" style={{ height: 224, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <EmptyState icon={Activity} title="No data yet" message="No performance metrics for the selected facilities." />
+        </div>
+      );
+    }
     if (perfView === 'radar') {
       return (
         <div className="p-3">
@@ -923,7 +959,7 @@ export default function GovernmentDashboardPage() {
               <PolarGrid stroke="var(--border-light)" />
               <PolarAngleAxis dataKey="metric" tick={{ fontSize: 8, fill: 'var(--text-muted)' }} />
               <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 8, fill: 'var(--text-muted)' }} />
-              <Radar name="Performance" dataKey="value" stroke="var(--accent-primary)" fill="var(--accent-primary)" fillOpacity={0.2} />
+              <Radar name={t('government.performance')} dataKey="value" stroke="var(--accent-primary)" fill="var(--accent-primary)" fillOpacity={0.2} />
               <Tooltip />
             </RadarChart>
           </ResponsiveContainer>
@@ -939,7 +975,7 @@ export default function GovernmentDashboardPage() {
               <XAxis dataKey="metric" tick={{ fontSize: 7, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} angle={-20} textAnchor="end" height={40} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
               <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="value" name="Score %" radius={[4, 4, 0, 0]} barSize={24}>
+              <Bar dataKey="value" name={t('government.scorePct')} radius={[4, 4, 0, 0]} barSize={24}>
                 {perfRadarData.map((e, i) => <Cell key={i} fill={e.value >= 80 ? '#1B9E77' : e.value >= 60 ? '#FCD34D' : '#E52E42'} />)}
               </Bar>
             </BarChart>
@@ -949,10 +985,10 @@ export default function GovernmentDashboardPage() {
     }
     return (
       <div className="p-3 grid grid-cols-2 gap-2">
-        <CircularGauge value={avgReporting} label="Reporting" color="#5CB8A8" size={96} strokeWidth={5} />
-        <CircularGauge value={avgReadiness} label="Readiness" color="#1B9AAA" size={96} strokeWidth={5} />
-        <CircularGauge value={avgImmCoverage} label="EPI Coverage" color="#A855F7" size={96} strokeWidth={5} />
-        <CircularGauge value={functionalPct} label="Functional" color="#FCD34D" size={96} strokeWidth={5} />
+        <CircularGauge value={avgReporting} label={t('government.metricReporting')} color="#5CB8A8" size={96} strokeWidth={5} />
+        <CircularGauge value={avgReadiness} label={t('government.metricReadiness')} color="#3b82f6" size={96} strokeWidth={5} />
+        <CircularGauge value={avgImmCoverage} label={t('government.metricEpiCoverage')} color="#A855F7" size={96} strokeWidth={5} />
+        <CircularGauge value={functionalPct} label={t('government.metricFunctional')} color="#FCD34D" size={96} strokeWidth={5} />
       </div>
     );
   };
@@ -966,16 +1002,16 @@ export default function GovernmentDashboardPage() {
     const expandedContent = (() => {
       switch (fullscreenChart) {
         case 'diseaseTrend':
-          return <ExpandedChartView title="Weekly Disease Trends" onClose={closeExpanded}>{renderDiseaseTrend()}</ExpandedChartView>;
+          return <ExpandedChartView title={t('government.weeklyDiseaseTrends')} onClose={closeExpanded} hasData={diseaseTrendHasData} emptyMessage="No disease trends for the selected diseases or period.">{renderDiseaseTrend()}</ExpandedChartView>;
         case 'performance':
           return (
-            <ExpandedChartView title="National Performance" onClose={closeExpanded}>
+            <ExpandedChartView title={t('government.nationalPerformance')} onClose={closeExpanded} hasData={performanceHasData} emptyMessage="No performance metrics for the selected facilities.">
               {perfView === 'radar' ? (
                 <RadarChart data={perfRadarData} cx="50%" cy="50%" outerRadius="70%">
                   <PolarGrid stroke="var(--border-light)" />
                   <PolarAngleAxis dataKey="metric" tick={{ fontSize: 14, fill: 'var(--text-primary)' }} />
                   <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
-                  <Radar name="Performance" dataKey="value" stroke="var(--accent-primary)" fill="var(--accent-primary)" fillOpacity={0.2} />
+                  <Radar name={t('government.performance')} dataKey="value" stroke="var(--accent-primary)" fill="var(--accent-primary)" fillOpacity={0.2} />
                   <Tooltip />
                 </RadarChart>
               ) : (
@@ -984,7 +1020,7 @@ export default function GovernmentDashboardPage() {
                   <XAxis dataKey="metric" tick={{ fontSize: 12, fill: 'var(--text-primary)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="value" name="Score %" radius={[6, 6, 0, 0]} barSize={40}>
+                  <Bar dataKey="value" name={t('government.scorePct')} radius={[6, 6, 0, 0]} barSize={40}>
                     {perfRadarData.map((e, i) => <Cell key={i} fill={e.value >= 80 ? '#1B9E77' : e.value >= 60 ? '#FCD34D' : '#E52E42'} />)}
                   </Bar>
                 </BarChart>
@@ -992,11 +1028,11 @@ export default function GovernmentDashboardPage() {
             </ExpandedChartView>
           );
         case 'stateCases':
-          return <ExpandedChartView title="Disease Cases by State" onClose={closeExpanded}>{renderStateCases()}</ExpandedChartView>;
+          return <ExpandedChartView title={t('government.diseaseCasesByState')} onClose={closeExpanded} hasData={stateCasesHasData} emptyMessage="No cases reported for the selected states or diseases.">{renderStateCases()}</ExpandedChartView>;
         case 'healthVisits':
-          return <ExpandedChartView title="National Health Visits (6 Months)" onClose={closeExpanded}>{renderVisits()}</ExpandedChartView>;
+          return <ExpandedChartView title={t('government.nationalHealthVisits6m')} onClose={closeExpanded} hasData={visitsHasData} emptyMessage="No health-visit records for the selected metrics or period.">{renderVisits()}</ExpandedChartView>;
         case 'staffDist':
-          return <ExpandedChartView title="Staff Distribution by Hospital" onClose={closeExpanded}>{renderStaff()}</ExpandedChartView>;
+          return <ExpandedChartView title={t('government.staffDistributionByHospital')} onClose={closeExpanded} hasData={staffHasData} emptyMessage="No staffing data for the selected roles or facilities.">{renderStaff()}</ExpandedChartView>;
         default:
           return null;
       }
@@ -1004,7 +1040,7 @@ export default function GovernmentDashboardPage() {
 
     return (
       <>
-        <TopBar title="National Dashboard" />
+        <TopBar title={t('government.nationalDashboard')} />
         <div className="page-container page-enter flex flex-col flex-1 min-h-0" style={{ padding: '12px 16px' }}>
           {expandedContent}
         </div>
@@ -1014,7 +1050,7 @@ export default function GovernmentDashboardPage() {
 
   return (
     <>
-      <TopBar title="National Dashboard" />
+      <TopBar title={t('government.nationalDashboard')} />
       <main className="page-container page-enter">
 
         {/* ═══ GLOBAL FILTER BAR ═══ */}
@@ -1024,20 +1060,20 @@ export default function GovernmentDashboardPage() {
               <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
                 <Filter className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               </div>
-              <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Filters</span>
+              <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{t('government.filters')}</span>
             </div>
             <TableauSelect
-              label="State"
+              label={t('government.state')}
               value={selectedState}
-              options={[{ value: 'all', label: 'All States' }, ...allStates.map(s => ({ value: s, label: s }))]}
+              options={[{ value: 'all', label: t('government.allStates') }, ...allStates.map(s => ({ value: s, label: s }))]}
               onChange={setSelectedState}
               icon={MapPin}
               width="160px"
             />
             <TableauSelect
-              label="Alert Disease"
+              label={t('government.alertDisease')}
               value={alertDiseaseFilter}
-              options={[{ value: 'all', label: 'All Diseases' }, ...ALL_COLLECTED_DISEASES.map(d => ({ value: d, label: d }))]}
+              options={[{ value: 'all', label: t('government.allDiseases') }, ...ALL_COLLECTED_DISEASES.map(d => ({ value: d, label: d }))]}
               onChange={setAlertDiseaseFilter}
               icon={AlertTriangle}
               width="180px"
@@ -1048,7 +1084,7 @@ export default function GovernmentDashboardPage() {
                 className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all"
                 style={{ background: 'rgba(229,46,66,0.1)', color: 'var(--color-danger)', border: '1px solid rgba(229,46,66,0.2)' }}
               >
-                <X className="w-3 h-3" /> Clear Filters
+                <X className="w-3 h-3" /> {t('government.clearFilters')}
               </button>
             )}
           </div>
@@ -1057,14 +1093,14 @@ export default function GovernmentDashboardPage() {
         {/* ═══ KPI STRIP ═══ */}
         <div className="kpi-grid mb-4">
           {[
-            { label: 'Hospitals', value: totalHospitals.toString(), icon: Building2, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
-            { label: 'Patients', value: totalPatients.toLocaleString(), icon: Users, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
-            { label: 'Beds', value: totalBeds.toLocaleString(), icon: BedDouble, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
-            { label: 'Staff', value: totalStaff.toLocaleString(), icon: Stethoscope, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
-            { label: 'Online', value: onlineHospitals.toString(), icon: Wifi, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
-            { label: 'Offline', value: offlineHospitals.toString(), icon: WifiOff, color: 'var(--text-muted)', bg: 'rgba(100,116,139,0.10)', href: '/hospitals' },
-            { label: 'Alerts', value: activeAlerts.toString(), icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.08)', href: '/surveillance' },
-            { label: 'Referrals', value: pendingReferrals.toString(), icon: ArrowRightLeft, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)' },
+            { label: t('government.kpiHospitals'), value: totalHospitals.toString(), icon: Building2, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
+            { label: t('government.kpiPatients'), value: totalPatients.toLocaleString(), icon: Users, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
+            { label: t('government.kpiBeds'), value: totalBeds.toLocaleString(), icon: BedDouble, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
+            { label: t('government.kpiStaff'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
+            { label: t('government.kpiOnline'), value: onlineHospitals.toString(), icon: Wifi, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
+            { label: t('government.kpiOffline'), value: offlineHospitals.toString(), icon: WifiOff, color: 'var(--text-muted)', bg: 'rgba(100,116,139,0.10)', href: '/hospitals' },
+            { label: t('government.kpiAlerts'), value: activeAlerts.toString(), icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.08)', href: '/surveillance' },
+            { label: t('government.kpiReferrals'), value: pendingReferrals.toString(), icon: ArrowRightLeft, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)' },
           ].map(stat => (
             <div key={stat.label} className="kpi" onClick={() => stat.href && router.push(stat.href)}>
               <div className="kpi__icon" style={{ background: stat.bg }}><stat.icon style={{ color: stat.color }} /></div>
@@ -1083,22 +1119,22 @@ export default function GovernmentDashboardPage() {
           <div className="lg:col-span-2 glass-section flex flex-col">
             <div className="glass-section-header flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Weekly Disease Trends</span>
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(229,46,66,0.1)', color: 'var(--color-danger)' }}>Surveillance</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.weeklyDiseaseTrends')}</span>
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(229,46,66,0.1)', color: 'var(--color-danger)' }}>{t('government.surveillance')}</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <ChartTypeSelector
                   value={dtChartType}
                   options={[
-                    { value: 'line', label: 'Line', icon: LineChartIcon },
-                    { value: 'area', label: 'Area', icon: Activity },
-                    { value: 'bar', label: 'Bar', icon: BarChart3 },
-                    { value: 'composed', label: 'Mixed', icon: Layers },
+                    { value: 'line', label: t('government.chartLine'), icon: LineChartIcon },
+                    { value: 'area', label: t('government.chartArea'), icon: Activity },
+                    { value: 'bar', label: t('government.chartBar'), icon: BarChart3 },
+                    { value: 'composed', label: t('government.chartMixed'), icon: Layers },
                   ]}
                   onChange={setDtChartType}
                 />
                 <TableauMultiSelect
-                  label="Diseases"
+                  label={t('government.diseases')}
                   options={WEEKLY_DISEASE_KEYS.map(d => ({
                     value: d, label: d.charAt(0).toUpperCase() + d.slice(1), color: DISEASE_COLORS[d],
                   }))}
@@ -1110,9 +1146,15 @@ export default function GovernmentDashboardPage() {
               </div>
             </div>
             <div className="p-3 flex-1 min-h-0">
-              <ResponsiveContainer width="100%" height="100%">
-                {renderDiseaseTrend()}
-              </ResponsiveContainer>
+              {diseaseTrendHasData ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  {renderDiseaseTrend()}
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: '100%', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <EmptyState icon={TrendingUp} title="No data yet" message="No disease trends for the selected diseases or period." />
+                </div>
+              )}
             </div>
           </div>
 
@@ -1120,8 +1162,14 @@ export default function GovernmentDashboardPage() {
           <div className="space-y-3">
             <div className="glass-section">
               <div className="glass-section-header">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Facility Types</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.facilityTypes')}</span>
               </div>
+              {facilityDistribution.length === 0 || facilityDistribution.every(d => !d.value) ? (
+                <div className="p-3" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 110 }}>
+                  <PieChartIcon className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No data yet</span>
+                </div>
+              ) : (
               <div className="p-3 flex items-center gap-3">
                 <div className="relative flex-shrink-0">
                   <ResponsiveContainer width={110} height={110}>
@@ -1148,18 +1196,19 @@ export default function GovernmentDashboardPage() {
                   ))}
                 </div>
               </div>
+              )}
             </div>
 
             <div className="glass-section">
               <div className="glass-section-header">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Performance</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.performance')}</span>
                 <div className="flex items-center gap-1.5">
                   <ChartTypeSelector
                     value={perfView}
                     options={[
-                      { value: 'gauges', label: 'Gauges', icon: Target },
-                      { value: 'radar', label: 'Radar', icon: Activity },
-                      { value: 'bar', label: 'Bar', icon: BarChart3 },
+                      { value: 'gauges', label: t('government.chartGauges'), icon: Target },
+                      { value: 'radar', label: t('government.chartRadar'), icon: Activity },
+                      { value: 'bar', label: t('government.chartBar'), icon: BarChart3 },
                     ]}
                     onChange={setPerfView}
                   />
@@ -1177,15 +1226,15 @@ export default function GovernmentDashboardPage() {
           {/* Cases by State */}
           <div className="glass-section flex flex-col">
             <div className="glass-section-header flex-wrap gap-2">
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Cases by State</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.casesByState')}</span>
               <div className="flex items-center gap-1.5">
                 <ChartTypeSelector
                   value={csChartType}
                   options={[
-                    { value: 'bar', label: 'Bar', icon: BarChart3 },
-                    { value: 'stacked', label: 'Stacked', icon: Layers },
-                    { value: 'radar', label: 'Radar', icon: Activity },
-                    { value: 'pie', label: 'Pie', icon: PieChartIcon },
+                    { value: 'bar', label: t('government.chartBar'), icon: BarChart3 },
+                    { value: 'stacked', label: t('government.chartStacked'), icon: Layers },
+                    { value: 'radar', label: t('government.chartRadar'), icon: Activity },
+                    { value: 'pie', label: t('government.chartPie'), icon: PieChartIcon },
                   ]}
                   onChange={setCsChartType}
                 />
@@ -1195,7 +1244,7 @@ export default function GovernmentDashboardPage() {
             <div className="px-3 pt-2 flex items-center gap-2 flex-wrap">
               {csChartType === 'bar' ? (
                 <TableauSelect
-                  label="Disease"
+                  label={t('government.disease')}
                   value={csSingleDisease}
                   options={[
                     ...STATE_DISEASE_KEYS.map(d => ({ value: d, label: d.charAt(0).toUpperCase() + d.slice(1) })),
@@ -1206,7 +1255,7 @@ export default function GovernmentDashboardPage() {
                 />
               ) : (
                 <TableauMultiSelect
-                  label="Diseases"
+                  label={t('government.diseases')}
                   options={STATE_DISEASE_KEYS.map(d => ({
                     value: d, label: d.charAt(0).toUpperCase() + d.slice(1), color: DISEASE_COLORS[d],
                   }))}
@@ -1217,9 +1266,15 @@ export default function GovernmentDashboardPage() {
               )}
             </div>
             <div className="p-3 flex-1 min-h-0" style={{ minHeight: '220px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                {renderStateCases()}
-              </ResponsiveContainer>
+              {stateCasesHasData ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  {renderStateCases()}
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: '100%', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <EmptyState icon={BarChart3} title="No data yet" message="No cases reported for the selected states or diseases." />
+                </div>
+              )}
             </div>
           </div>
 
@@ -1227,16 +1282,16 @@ export default function GovernmentDashboardPage() {
           <div className="glass-section flex flex-col">
             <div className="glass-section-header flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Health Visits</span>
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>6 Months</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.healthVisits')}</span>
+                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.sixMonths')}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <ChartTypeSelector
                   value={hvChartType}
                   options={[
-                    { value: 'line', label: 'Line', icon: LineChartIcon },
-                    { value: 'area', label: 'Area', icon: Activity },
-                    { value: 'bar', label: 'Bar', icon: BarChart3 },
+                    { value: 'line', label: t('government.chartLine'), icon: LineChartIcon },
+                    { value: 'area', label: t('government.chartArea'), icon: Activity },
+                    { value: 'bar', label: t('government.chartBar'), icon: BarChart3 },
                   ]}
                   onChange={setHvChartType}
                 />
@@ -1245,11 +1300,11 @@ export default function GovernmentDashboardPage() {
             </div>
             <div className="px-3 pt-2">
               <TableauMultiSelect
-                label="Metrics"
+                label={t('government.metrics')}
                 options={[
-                  { value: 'OPD Visits', label: 'OPD Visits', color: '#5CB8A8' },
-                  { value: 'ANC Visits', label: 'ANC Visits', color: '#EC4899' },
-                  { value: 'Immunizations', label: 'Immunizations', color: '#A855F7' },
+                  { value: 'OPD Visits', label: t('government.opdVisits'), color: '#5CB8A8' },
+                  { value: 'ANC Visits', label: t('government.ancVisits'), color: '#EC4899' },
+                  { value: 'Immunizations', label: t('government.immunizations'), color: '#A855F7' },
                 ]}
                 selected={hvSelectedSeries}
                 onChange={setHvSelectedSeries}
@@ -1257,23 +1312,29 @@ export default function GovernmentDashboardPage() {
               />
             </div>
             <div className="p-3 flex-1 min-h-0" style={{ minHeight: '220px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                {renderVisits()}
-              </ResponsiveContainer>
+              {visitsHasData ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  {renderVisits()}
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: '100%', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <EmptyState icon={TrendingUp} title="No data yet" message="No health-visit records for the selected metrics or period." />
+                </div>
+              )}
             </div>
           </div>
 
           {/* Staff Distribution */}
           <div className="glass-section flex flex-col">
             <div className="glass-section-header flex-wrap gap-2">
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Staff Distribution</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.staffDistribution')}</span>
               <div className="flex items-center gap-1.5">
                 <ChartTypeSelector
                   value={sdChartType}
                   options={[
-                    { value: 'bar', label: 'Grouped', icon: BarChart3 },
-                    { value: 'stacked', label: 'Stacked', icon: Layers },
-                    { value: 'pie', label: 'Pie', icon: PieChartIcon },
+                    { value: 'bar', label: t('government.chartGrouped'), icon: BarChart3 },
+                    { value: 'stacked', label: t('government.chartStacked'), icon: Layers },
+                    { value: 'pie', label: t('government.chartPie'), icon: PieChartIcon },
                   ]}
                   onChange={setSdChartType}
                 />
@@ -1282,19 +1343,19 @@ export default function GovernmentDashboardPage() {
             </div>
             <div className="px-3 pt-2 flex items-center gap-2 flex-wrap">
               <TableauSelect
-                label="Show"
+                label={t('government.show')}
                 value={sdMetric}
-                options={[{ value: 'count', label: 'Headcount' }, { value: 'ratio', label: '% Ratio' }]}
+                options={[{ value: 'count', label: t('government.headcount') }, { value: 'ratio', label: t('government.ratioPct') }]}
                 onChange={v => setSdMetric(v as 'count' | 'ratio')}
                 icon={Sliders}
                 width="100px"
               />
               <TableauMultiSelect
-                label="Roles"
+                label={t('government.roles')}
                 options={[
-                  { value: 'Doctors', label: 'Doctors', color: '#5CB8A8' },
-                  { value: 'Nurses', label: 'Nurses', color: '#1B9E77' },
-                  { value: 'Clinical Officers', label: 'Clinical Officers', color: '#A855F7' },
+                  { value: 'Doctors', label: t('government.roleDoctors'), color: '#5CB8A8' },
+                  { value: 'Nurses', label: t('government.roleNurses'), color: '#1B9E77' },
+                  { value: 'Clinical Officers', label: t('government.roleClinicalOfficers'), color: '#A855F7' },
                 ]}
                 selected={sdSelectedRoles}
                 onChange={setSdSelectedRoles}
@@ -1302,9 +1363,15 @@ export default function GovernmentDashboardPage() {
               />
             </div>
             <div className="p-3 flex-1 min-h-0" style={{ minHeight: '220px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                {renderStaff()}
-              </ResponsiveContainer>
+              {staffHasData ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  {renderStaff()}
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: '100%', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <EmptyState icon={BarChart3} title="No data yet" message="No staffing data for the selected roles or facilities." />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1317,15 +1384,15 @@ export default function GovernmentDashboardPage() {
                 <Download className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <div>
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Export to DHIS2</h3>
-                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Download data in DHIS2 data value set format</p>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.exportToDhis2')}</h3>
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.dhis2ExportDesc')}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <TableauSelect
-                label="Period"
+                label={t('government.period')}
                 value={dhis2Period}
-                options={[{ value: 'monthly', label: 'Monthly' }, { value: 'quarterly', label: 'Quarterly' }]}
+                options={[{ value: 'monthly', label: t('government.periodMonthly') }, { value: 'quarterly', label: t('government.periodQuarterly') }]}
                 onChange={v => setDhis2Period(v as 'monthly' | 'quarterly')}
                 icon={Calendar}
                 width="100px"
@@ -1336,7 +1403,7 @@ export default function GovernmentDashboardPage() {
                 style={{ background: 'var(--color-success)' }}
               >
                 <Download className="w-3.5 h-3.5" />
-                Export .json
+                {t('government.exportJson')}
               </button>
             </div>
           </div>
@@ -1347,7 +1414,7 @@ export default function GovernmentDashboardPage() {
           <div className="flex items-center justify-between p-4 pb-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              Hospital Performance by State
+              {t('government.hospitalPerformanceByState')}
             </h3>
             <div className="flex items-center gap-2">
               <button
@@ -1356,22 +1423,22 @@ export default function GovernmentDashboardPage() {
                 style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
               >
                 <ArrowUpDown className="w-3 h-3" />
-                Sort: {tableSortBy === 'quality' ? 'Data Quality' : 'Name'}
+                {t('government.sortLabel', { field: tableSortBy === 'quality' ? t('government.dataQuality') : t('government.name') })}
               </button>
-              <button onClick={() => router.push('/hospitals')} className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>View All</button>
+              <button onClick={() => router.push('/hospitals')} className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>{t('government.viewAll')}</button>
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>State / Hospital</th>
-                  <th>Facilities</th>
-                  <th>Patients</th>
-                  <th>Beds</th>
-                  <th>Staff</th>
-                  <th>Data Quality</th>
-                  <th>Status</th>
+                  <th>{t('government.colStateHospital')}</th>
+                  <th>{t('government.colFacilities')}</th>
+                  <th>{t('government.colPatients')}</th>
+                  <th>{t('government.colBeds')}</th>
+                  <th>{t('government.colStaff')}</th>
+                  <th>{t('government.colDataQuality')}</th>
+                  <th>{t('government.colStatus')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1396,7 +1463,7 @@ export default function GovernmentDashboardPage() {
                         <td className="text-sm">{sa.totalBeds.toLocaleString()}</td>
                         <td className="text-sm">{sa.totalStaff.toLocaleString()}</td>
                         <td><DataQualityBadge score={avgQuality} /></td>
-                        <td><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{sa.hospitals.filter(h => h.syncStatus === 'online').length}/{sa.facilityCount} online</span></td>
+                        <td><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.onlineCount', { online: sa.hospitals.filter(h => h.syncStatus === 'online').length, total: sa.facilityCount })}</span></td>
                       </tr>
                       {isExpanded && stateHospitals.map(h => (
                         <tr key={h._id} className="cursor-pointer" onClick={() => router.push(`/hospitals?facility=${h._id}`)}>
@@ -1439,8 +1506,8 @@ export default function GovernmentDashboardPage() {
               <GitCompareArrows className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
             </div>
             <div>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Facility Comparison Tool</h3>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Select 2-3 facilities to compare side by side</p>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.facilityComparisonTool')}</h3>
+              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.facilityComparisonDesc')}</p>
             </div>
           </div>
           <div className="relative mb-4">
@@ -1449,7 +1516,7 @@ export default function GovernmentDashboardPage() {
               className="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm"
               style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
             >
-              <span>{comparisonIds.length === 0 ? 'Select facilities to compare...' : `${comparisonIds.length} facilit${comparisonIds.length === 1 ? 'y' : 'ies'} selected`}</span>
+              <span>{comparisonIds.length === 0 ? t('government.selectFacilitiesToCompare') : (comparisonIds.length === 1 ? t('government.facilitySelectedSingular', { count: comparisonIds.length }) : t('government.facilitiesSelectedPlural', { count: comparisonIds.length }))}</span>
               <ChevronDown className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             </button>
             {compDropdownOpen && (
@@ -1479,18 +1546,18 @@ export default function GovernmentDashboardPage() {
           {comparisonFacilities.length >= 2 && (
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table">
-                <thead><tr><th>Metric</th>{comparisonFacilities.map(f => <th key={f._id}>{f.name}</th>)}</tr></thead>
+                <thead><tr><th>{t('government.metric')}</th>{comparisonFacilities.map(f => <th key={f._id}>{f.name}</th>)}</tr></thead>
                 <tbody>
                   {[
-                    { label: 'Patients', values: comparisonFacilities.map(f => f.patientCount), higherBetter: true },
-                    { label: 'Beds', values: comparisonFacilities.map(f => f.totalBeds), higherBetter: true },
-                    { label: 'Staff', values: comparisonFacilities.map(f => f.doctors + f.nurses + f.clinicalOfficers), higherBetter: true },
-                    { label: 'Reporting %', values: comparisonFacilities.map(f => f.performance?.reportingCompleteness || 0), higherBetter: true },
-                    { label: 'Readiness %', values: comparisonFacilities.map(f => f.performance?.serviceReadinessScore || 0), higherBetter: true },
-                    { label: 'EPI Coverage %', values: comparisonFacilities.map(f => f.performance?.immunizationCoverage || 0), higherBetter: true },
-                    { label: 'Quality Score', values: comparisonFacilities.map(f => f.performance?.qualityScore || 0), higherBetter: true },
-                    { label: 'Medicine Avail. %', values: comparisonFacilities.map(f => f.performance?.tracerMedicineAvailability || 0), higherBetter: true },
-                    { label: 'Stock-Out Days', values: comparisonFacilities.map(f => f.performance?.stockOutDays || 0), higherBetter: false },
+                    { label: t('government.compPatients'), values: comparisonFacilities.map(f => f.patientCount), higherBetter: true },
+                    { label: t('government.compBeds'), values: comparisonFacilities.map(f => f.totalBeds), higherBetter: true },
+                    { label: t('government.compStaff'), values: comparisonFacilities.map(f => f.doctors + f.nurses + f.clinicalOfficers), higherBetter: true },
+                    { label: t('government.compReportingPct'), values: comparisonFacilities.map(f => f.performance?.reportingCompleteness || 0), higherBetter: true },
+                    { label: t('government.compReadinessPct'), values: comparisonFacilities.map(f => f.performance?.serviceReadinessScore || 0), higherBetter: true },
+                    { label: t('government.compEpiCoveragePct'), values: comparisonFacilities.map(f => f.performance?.immunizationCoverage || 0), higherBetter: true },
+                    { label: t('government.compQualityScore'), values: comparisonFacilities.map(f => f.performance?.qualityScore || 0), higherBetter: true },
+                    { label: t('government.compMedicineAvailPct'), values: comparisonFacilities.map(f => f.performance?.tracerMedicineAvailability || 0), higherBetter: true },
+                    { label: t('government.compStockOutDays'), values: comparisonFacilities.map(f => f.performance?.stockOutDays || 0), higherBetter: false },
                   ].map(m => {
                     const best = getBest(m.values, m.higherBetter);
                     return (
@@ -1507,7 +1574,7 @@ export default function GovernmentDashboardPage() {
             </div>
           )}
           {comparisonFacilities.length < 2 && comparisonIds.length > 0 && (
-            <p className="text-xs text-center py-3" style={{ color: 'var(--text-muted)' }}>Select at least 2 facilities to compare</p>
+            <p className="text-xs text-center py-3" style={{ color: 'var(--text-muted)' }}>{t('government.selectAtLeast2')}</p>
           )}
         </div>
 
@@ -1518,7 +1585,7 @@ export default function GovernmentDashboardPage() {
             <div className="glass-section-header">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Disease Alerts</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.diseaseAlerts')}</span>
                 {alertDiseaseFilter !== 'all' && (
                   <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(229,46,66,0.1)', color: 'var(--color-danger)' }}>{alertDiseaseFilter}</span>
                 )}
@@ -1526,11 +1593,11 @@ export default function GovernmentDashboardPage() {
                   <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>{selectedState}</span>
                 )}
               </div>
-              <button onClick={() => router.push('/surveillance')} className="text-[10px] font-medium" style={{ color: 'var(--accent-primary)' }}>View All</button>
+              <button onClick={() => router.push('/surveillance')} className="text-[10px] font-medium" style={{ color: 'var(--accent-primary)' }}>{t('government.viewAll')}</button>
             </div>
             <div className="p-3 space-y-2" style={{ maxHeight: '280px', overflowY: 'auto' }}>
               {sortedAlerts.length === 0 && (
-                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>No alerts match the current filters</p>
+                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>{t('government.noAlertsMatch')}</p>
               )}
               {sortedAlerts.slice(0, 6).map(alert => (
                 <div key={alert._id} className="p-3 rounded-md cursor-pointer" onClick={() => router.push('/surveillance')} style={{
@@ -1544,7 +1611,7 @@ export default function GovernmentDashboardPage() {
                       color: alert.alertLevel === 'emergency' ? 'var(--color-danger)' : alert.alertLevel === 'warning' ? 'var(--color-warning)' : '#5CB8A8',
                     }}>{alert.alertLevel.toUpperCase()}</span>
                   </div>
-                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{alert.state} · {alert.cases} cases · {alert.deaths} deaths</p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.alertCasesDeaths', { state: alert.state, cases: alert.cases, deaths: alert.deaths })}</p>
                   <div className="flex items-center gap-1 mt-0.5">
                     {alert.trend === 'increasing' ? <TrendingUp className="w-2.5 h-2.5" style={{ color: 'var(--color-danger)' }} /> : alert.trend === 'decreasing' ? <TrendingDown className="w-2.5 h-2.5" style={{ color: 'var(--color-success)' }} /> : <Minus className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} />}
                     <span className="text-[9px]" style={{ color: alert.trend === 'increasing' ? 'var(--color-danger)' : alert.trend === 'decreasing' ? 'var(--color-success)' : 'var(--color-warning)' }}>{alert.trend}</span>
@@ -1559,9 +1626,9 @@ export default function GovernmentDashboardPage() {
             <div className="glass-section-header">
               <div className="flex items-center gap-2">
                 <ArrowRightLeft className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Recent Referrals</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.recentReferrals')}</span>
               </div>
-              <button onClick={() => router.push('/referrals')} className="text-[10px] font-medium" style={{ color: 'var(--accent-primary)' }}>View All</button>
+              <button onClick={() => router.push('/referrals')} className="text-[10px] font-medium" style={{ color: 'var(--accent-primary)' }}>{t('government.viewAll')}</button>
             </div>
             <div className="p-3 space-y-2">
               {referrals.slice(0, 4).map(ref => (

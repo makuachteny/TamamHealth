@@ -6,6 +6,7 @@ import {
   ChevronRight, Clock, CheckCircle, Wallet, Building2,
 } from '@/components/icons/lucide';
 import { getMethodConfig } from '@/lib/payment-method-config';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { PaymentDoc, PaymentPlanDoc, ClaimDoc, InsurancePolicyDoc } from '@/lib/db-types-payments';
 
 interface BillingSidebarCardProps {
@@ -29,6 +30,7 @@ interface BillingSnapshot {
 }
 
 export default function BillingSidebarCard({ patientId, onPayClick, onViewBilling }: BillingSidebarCardProps) {
+  const { t } = useTranslation();
   const [data, setData] = useState<BillingSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -92,10 +94,10 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
       <div className="card-elevated">
         <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
           <Wallet className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-          <h3 className="font-semibold text-sm">Billing</h3>
+          <h3 className="font-semibold text-sm">{t('billing.sidebarTitle')}</h3>
         </div>
         <div className="p-5 text-center">
-          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading...</div>
+          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</div>
         </div>
       </div>
     );
@@ -111,7 +113,7 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
       <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
         <div className="flex items-center gap-2">
           <Wallet className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-          <h3 className="font-semibold text-sm">Billing & Payments</h3>
+          <h3 className="font-semibold text-sm">{t('billing.billingAndPayments')}</h3>
         </div>
         {onViewBilling && (
           <button
@@ -119,7 +121,7 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
             className="text-[11px] font-medium flex items-center gap-0.5 transition-colors"
             style={{ color: 'var(--accent-primary)' }}
           >
-            View All <ChevronRight className="w-3 h-3" />
+            {t('billing.viewAll')} <ChevronRight className="w-3 h-3" />
           </button>
         )}
       </div>
@@ -128,7 +130,7 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
       <div className="px-5 py-4" style={{
         background: hasBalance
           ? 'linear-gradient(135deg, rgba(196, 69, 54, 0.08) 0%, rgba(228, 168, 75, 0.06) 100%)'
-          : 'linear-gradient(135deg, rgba(27, 158, 119, 0.08) 0%, rgba(27, 154, 170, 0.04) 100%)',
+          : 'linear-gradient(135deg, rgba(27, 158, 119, 0.08) 0%, rgba(59, 130, 246, 0.04) 100%)',
         borderBottom: '1px solid var(--border-light)',
         position: 'relative',
       }}>
@@ -138,18 +140,18 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
             <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{
               color: hasBalance ? '#8B2E24' : '#15795C',
             }}>
-              {hasBalance ? 'Outstanding Balance' : 'Account Status'}
+              {hasBalance ? t('billing.outstandingBalance') : t('billing.accountStatus')}
             </div>
             <div className="text-2xl font-extrabold" style={{
               letterSpacing: -0.5,
               color: hasBalance ? '#8B2E24' : '#15795C',
               fontVariantNumeric: 'tabular-nums',
             }}>
-              {hasBalance ? fmt(d.balance) : 'Paid in Full'}
+              {hasBalance ? fmt(d.balance) : t('billing.paidInFull')}
             </div>
             {hasBalance && (
               <div className="text-[11px] mt-1" style={{ color: '#8B2E24', opacity: 0.7 }}>
-                Plan active · collect at checkout
+                {t('billing.planActiveCollect')}
               </div>
             )}
           </div>
@@ -169,11 +171,11 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
             onClick={onPayClick}
             className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold text-white transition-all"
             style={{
-              background: 'linear-gradient(135deg, #1B9AAA, #1E4D4A)',
-              boxShadow: '0 2px 8px rgba(27, 154, 170,0.3)',
+              background: 'linear-gradient(135deg, #3b82f6, #1E40AF)',
+              boxShadow: '0 2px 8px rgba(59, 130, 246,0.3)',
             }}
           >
-            <CreditCard size={14} /> Collect Payment
+            <CreditCard size={14} /> {t('billing.collectPayment')}
           </button>
         )}
       </div>
@@ -182,11 +184,11 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
       <div>
         {/* Insurance */}
         <div className="data-row">
-          <div className="data-row__icon" style={d.hasInsurance ? { background: 'rgba(27, 154, 170, 0.12)', color: '#1B9AAA' } : undefined}>
+          <div className="data-row__icon" style={d.hasInsurance ? { background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' } : undefined}>
             <Shield size={16} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="data-row__label">Insurance</div>
+            <div className="data-row__label">{t('billing.insurance')}</div>
             {d.hasInsurance ? (
               <>
                 <div className="data-row__value truncate">{d.primaryPayer}</div>
@@ -203,7 +205,7 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
                 </div>
               </>
             ) : (
-              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Self-pay &mdash; No insurance on file</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('billing.selfPayNoInsurance')}</div>
             )}
           </div>
         </div>
@@ -214,7 +216,7 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
             <DollarSign size={16} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="data-row__label">Last Payment</div>
+            <div className="data-row__label">{t('billing.lastPayment')}</div>
             {d.lastPaymentAmount ? (
               <>
                 <div className="data-row__value">{fmt(d.lastPaymentAmount)}</div>
@@ -234,7 +236,7 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
                 </div>
               </>
             ) : (
-              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>No payments recorded</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('billing.noPaymentsRecorded')}</div>
             )}
           </div>
         </div>
@@ -246,8 +248,8 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
               <Clock size={16} />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="data-row__label">Payment Plan</div>
-              <div className="data-row__value">{d.activePlanCount} active &middot; {fmt(d.activePlanBalance)} remaining</div>
+              <div className="data-row__label">{t('billing.paymentPlanLabel')}</div>
+              <div className="data-row__value">{t('billing.planSummary', { count: d.activePlanCount, amount: fmt(d.activePlanBalance) })}</div>
             </div>
           </div>
         )}
@@ -255,12 +257,12 @@ export default function BillingSidebarCard({ patientId, onPayClick, onViewBillin
         {/* Pending Claims */}
         {d.pendingClaimsCount > 0 && (
           <div className="data-row">
-            <div className="data-row__icon" style={{ background: 'rgba(27, 154, 170, 0.12)', color: '#1B9AAA' }}>
+            <div className="data-row__icon" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' }}>
               <Building2 size={16} />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="data-row__label">Pending Claims</div>
-              <div className="data-row__value">{d.pendingClaimsCount} claim{d.pendingClaimsCount > 1 ? 's' : ''} awaiting adjudication</div>
+              <div className="data-row__label">{t('billing.pendingClaims')}</div>
+              <div className="data-row__value">{t('billing.claimsAwaiting', { count: d.pendingClaimsCount })}</div>
             </div>
           </div>
         )}

@@ -12,6 +12,7 @@ import { usePharmacyInventory } from '@/lib/hooks/usePharmacyInventory';
 import { useToast } from '@/components/Toast';
 import { medications } from '@/data/mock';
 import { classifyStockStatus } from '@/lib/services/pharmacy-inventory-service';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 const UNITS = ['tablets', 'vials', 'bottles', 'sachets', 'tubes', 'ampoules', 'sachet', 'ml'];
 
@@ -21,6 +22,7 @@ export default function PharmacyPage() {
   const { globalSearch, currentUser } = useApp();
   const { canDispense } = usePermissions();
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const router = useRouter();
   const { prescriptions: rxQueue, loading: rxLoading, dispense } = usePrescriptions();
   const { items: rawInventory, create: createInventory, update: updateInventory } = usePharmacyInventory();
@@ -55,27 +57,27 @@ export default function PharmacyPage() {
       const { decrementStock } = await import('@/lib/services/pharmacy-inventory-service');
       await decrementStock(rx.medication, currentUser?.hospitalId, 1);
     } catch {
-      showToast('Out of stock — cannot dispense', 'error');
+      showToast(t('pharmacy.outOfStockCannotDispense'), 'error');
       return;
     }
     try {
       await dispense(rxId);
     } catch {
-      showToast('Failed to mark prescription as dispensed', 'error');
+      showToast(t('pharmacy.dispenseMarkFailed'), 'error');
       return;
     }
     const { logAudit } = await import('@/lib/services/audit-service');
     logAudit('DISPENSE_PRESCRIPTION', currentUser?._id, currentUser?.username, `Dispensed ${rx.medication} to ${rx.patientName} (${rxId})`).catch(() => {});
-    showToast(`Dispensed ${rx.medication}`, 'success');
+    showToast(t('pharmacy.dispensedMedication', { medication: rx.medication }), 'success');
   };
 
   const handleStockIn = async () => {
     if (!stockForm.medicationName.trim() || stockForm.stockLevel <= 0) {
-      showToast('Medication name and stock level are required', 'error');
+      showToast(t('pharmacy.medAndStockRequired'), 'error');
       return;
     }
     if (!currentUser?.hospitalId) {
-      showToast('Your account is not assigned to a facility', 'error');
+      showToast(t('pharmacy.noFacilityAssigned'), 'error');
       return;
     }
     try {
@@ -92,12 +94,12 @@ export default function PharmacyPage() {
         lastReceived: new Date().toISOString(),
         orgId: currentUser.orgId,
       });
-      showToast(`Stocked ${stockForm.medicationName}`, 'success');
+      showToast(t('pharmacy.stockedMedication', { medication: stockForm.medicationName }), 'success');
       setShowStockInModal(false);
       setStockForm({ medicationName: '', category: 'General', stockLevel: 0, unit: 'tablets', reorderLevel: 50, batchNumber: '', expiryDate: '' });
     } catch (err) {
       console.error(err);
-      showToast('Failed to save stock receipt', 'error');
+      showToast(t('pharmacy.saveStockReceiptFailed'), 'error');
     }
   };
 
@@ -115,7 +117,7 @@ export default function PharmacyPage() {
 
   const handleRestock = async () => {
     if (!restockTarget || restockForm.qty <= 0) {
-      showToast('Enter a quantity greater than zero', 'error');
+      showToast(t('pharmacy.enterQtyGreaterThanZero'), 'error');
       return;
     }
     const existing = inventory.find(i => i._id === restockTarget.id);
@@ -127,11 +129,11 @@ export default function PharmacyPage() {
         ...(restockForm.batchNumber.trim() ? { batchNumber: restockForm.batchNumber.trim() } : {}),
         ...(restockForm.expiryDate ? { expiryDate: restockForm.expiryDate } : {}),
       });
-      showToast(`Added ${restockForm.qty} ${restockTarget.unit} to ${restockTarget.name}`, 'success');
+      showToast(t('pharmacy.addedToStockToast', { qty: restockForm.qty, unit: restockTarget.unit, name: restockTarget.name }), 'success');
       setRestockTarget(null);
     } catch (err) {
       console.error(err);
-      showToast('Failed to update stock', 'error');
+      showToast(t('pharmacy.updateStockFailed'), 'error');
     }
   };
 
@@ -150,15 +152,15 @@ export default function PharmacyPage() {
 
   return (
     <>
-      <TopBar title="Pharmacy" />
+      <TopBar title={t('nav.pharmacy')} />
       <main className="page-container page-enter">
           <PageHeader
             icon={Pill}
-            title="Pharmacy Management"
-            subtitle="Dispense medications and manage inventory"
+            title={t('pharmacy.managementTitle')}
+            subtitle={t('pharmacy.managementSubtitle')}
             actions={canDispense && (
               <button onClick={() => setShowStockInModal(true)} className="btn btn-primary">
-                <Plus className="w-4 h-4" /> Receive Stock
+                <Plus className="w-4 h-4" /> {t('pharmacy.receiveStock')}
               </button>
             )}
           />
@@ -166,10 +168,10 @@ export default function PharmacyPage() {
           {/* Stats */}
           <div className="kpi-grid mb-4">
             {[
-              { label: 'Pending Prescriptions', value: pendingRx, icon: Pill, color: '#14B8A6', bg: 'rgba(20,184,166,0.10)' },
-              { label: 'Dispensed Today', value: dispensedRx, icon: CheckCircle2, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.12)' },
-              { label: 'Low Stock Items', value: lowStock, icon: TrendingDown, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.10)' },
-              { label: 'Expired Items', value: expiredItems, icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.12)' },
+              { label: 'Pending Prescriptions', displayLabel: t('pharmacy.kpiPendingPrescriptions'), value: pendingRx, icon: Pill, color: '#14B8A6', bg: 'rgba(20,184,166,0.10)' },
+              { label: 'Dispensed Today', displayLabel: t('pharmacy.kpiDispensedToday'), value: dispensedRx, icon: CheckCircle2, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.12)' },
+              { label: 'Low Stock Items', displayLabel: t('pharmacy.kpiLowStockItems'), value: lowStock, icon: TrendingDown, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.10)' },
+              { label: 'Expired Items', displayLabel: t('pharmacy.kpiExpiredItems'), value: expiredItems, icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.12)' },
             ].map(s => (
               <div key={s.label} className="kpi cursor-pointer" onClick={() => {
                 const tabMap: Record<string, 'queue' | 'inventory'> = { 'Pending Prescriptions': 'queue', 'Dispensed Today': 'queue', 'Low Stock Items': 'inventory', 'Expired Items': 'inventory' };
@@ -180,7 +182,7 @@ export default function PharmacyPage() {
                 </div>
                 <div className="kpi__body">
                   <div className="kpi__value">{s.value}</div>
-                  <div className="kpi__label">{s.label}</div>
+                  <div className="kpi__label">{s.displayLabel}</div>
                 </div>
               </div>
             ))}
@@ -191,12 +193,12 @@ export default function PharmacyPage() {
             <button onClick={() => setActiveTab('queue')}
               className={`px-4 py-3 text-sm font-medium ${activeTab === 'queue' ? 'tab-active' : ''}`}
               style={{ color: activeTab === 'queue' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-              Prescription Queue ({pendingRx})
+              {t('pharmacy.prescriptionQueue')} ({pendingRx})
             </button>
             <button onClick={() => setActiveTab('inventory')}
               className={`px-4 py-3 text-sm font-medium ${activeTab === 'inventory' ? 'tab-active' : ''}`}
               style={{ color: activeTab === 'inventory' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-              Inventory ({inventory.length})
+              {t('pharmacy.inventory')} ({inventory.length})
             </button>
           </div>
 
@@ -206,7 +208,7 @@ export default function PharmacyPage() {
                 <div className="icon-box-sm" style={{ background: 'rgba(20,184,166,0.10)' }}>
                   <Pill className="w-4 h-4" style={{ color: '#14B8A6' }} />
                 </div>
-                <span className="text-sm font-semibold">Prescription Queue</span>
+                <span className="text-sm font-semibold">{t('pharmacy.prescriptionQueue')}</span>
                 <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>({filteredQueue.length})</span>
               </div>
               <hr className="section-divider" />
@@ -218,20 +220,20 @@ export default function PharmacyPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Patient</th>
-                    <th>Medication</th>
-                    <th>Dosage</th>
-                    <th>Prescribed By</th>
-                    <th>Time</th>
-                    <th>Status</th>
-                    <th>Action</th>
+                    <th>{t('pharmacy.patient')}</th>
+                    <th>{t('pharmacy.medication')}</th>
+                    <th>{t('pharmacy.dosage')}</th>
+                    <th>{t('pharmacy.prescribedBy')}</th>
+                    <th>{t('pharmacy.time')}</th>
+                    <th>{t('pharmacy.statusLabel')}</th>
+                    <th>{t('pharmacy.action')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredQueue.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-                        No prescriptions found. Prescriptions will appear here when doctors save consultations.
+                        {t('pharmacy.noPrescriptionsFound')}
                       </td>
                     </tr>
                   ) : filteredQueue.map(rx => (
@@ -257,16 +259,16 @@ export default function PharmacyPage() {
                       </td>
                       <td>
                         <span className={`badge text-[10px] ${rx.status === 'pending' ? 'badge-warning' : 'badge-normal'}`}>
-                          {rx.status === 'pending' ? 'Pending' : 'Dispensed'}
+                          {rx.status === 'pending' ? t('pharmacy.pending') : t('pharmacy.dispensed')}
                         </span>
                       </td>
                       <td>
                         {rx.status === 'pending' && canDispense && (
                           <button className="btn btn-primary btn-sm" style={{ padding: '4px 12px', fontSize: '0.75rem' }}
-                            onClick={(e) => { e.stopPropagation(); handleDispense(rx._id); }}>Dispense</button>
+                            onClick={(e) => { e.stopPropagation(); handleDispense(rx._id); }}>{t('pharmacy.dispense')}</button>
                         )}
                         {rx.status === 'pending' && !canDispense && (
-                          <span className="text-[10px] font-medium px-2 py-1 rounded" style={{ background: 'rgba(148,163,184,0.1)', color: 'var(--text-muted)' }}>Pharmacist only</span>
+                          <span className="text-[10px] font-medium px-2 py-1 rounded" style={{ background: 'rgba(148,163,184,0.1)', color: 'var(--text-muted)' }}>{t('pharmacy.pharmacistOnly')}</span>
                         )}
                       </td>
                     </tr>
@@ -282,7 +284,7 @@ export default function PharmacyPage() {
               <div className="card-elevated p-4 mb-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                  <input type="search" placeholder="Search medications..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 search-icon-input" style={{ background: 'var(--overlay-subtle)' }} />
+                  <input type="search" placeholder={t('pharmacy.searchMedicationsPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 search-icon-input" style={{ background: 'var(--overlay-subtle)' }} />
                 </div>
               </div>
               <div className="card-elevated overflow-hidden">
@@ -290,29 +292,29 @@ export default function PharmacyPage() {
                   <div className="icon-box-sm" style={{ background: 'rgba(20,184,166,0.10)' }}>
                     <Pill className="w-4 h-4" style={{ color: '#14B8A6' }} />
                   </div>
-                  <span className="text-sm font-semibold">Medication Inventory</span>
+                  <span className="text-sm font-semibold">{t('pharmacy.medicationInventory')}</span>
                   <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>({filteredInventory.length})</span>
                 </div>
                 <hr className="section-divider" />
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Medication</th>
-                      <th>Category</th>
-                      <th>Stock</th>
-                      <th>Reorder Level</th>
-                      <th>Status</th>
-                      <th>Batch</th>
-                      <th>Expiry</th>
-                      <th>Dispensed Today</th>
-                      {canDispense && <th>Action</th>}
+                      <th>{t('pharmacy.medication')}</th>
+                      <th>{t('pharmacy.category')}</th>
+                      <th>{t('pharmacy.stockLabel')}</th>
+                      <th>{t('pharmacy.reorderLevel')}</th>
+                      <th>{t('pharmacy.statusLabel')}</th>
+                      <th>{t('pharmacy.batchLabel')}</th>
+                      <th>{t('pharmacy.expiry')}</th>
+                      <th>{t('pharmacy.kpiDispensedToday')}</th>
+                      {canDispense && <th>{t('pharmacy.action')}</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredInventory.length === 0 ? (
                       <tr>
                         <td colSpan={canDispense ? 9 : 8} className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-                          No items in inventory yet. Click &ldquo;Receive Stock&rdquo; to record the first stock receipt for your facility.
+                          {t('pharmacy.noInventoryItems')}
                         </td>
                       </tr>
                     ) : filteredInventory.map(item => (
@@ -350,7 +352,7 @@ export default function PharmacyPage() {
                             item.status === 'low' ? 'badge-warning' :
                             'badge-emergency'
                           }`}>
-                            {item.status === 'adequate' ? 'In Stock' : item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                            {item.status === 'adequate' ? t('pharmacy.inStock') : t(`pharmacy.invStatus_${item.status}`)}
                           </span>
                         </td>
                         <td className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{item.batchNumber}</td>
@@ -360,7 +362,7 @@ export default function PharmacyPage() {
                         <td className="text-center font-semibold text-sm">{item.dispensedToday}</td>
                         {canDispense && (
                           <td>
-                            <button className="btn btn-secondary btn-sm" onClick={() => openRestock(item._id)}>+ Receive</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => openRestock(item._id)}>+ {t('pharmacy.receive')}</button>
                           </td>
                         )}
                       </tr>
@@ -380,7 +382,7 @@ export default function PharmacyPage() {
                     <div className="icon-box-sm" style={{ background: 'rgba(20,184,166,0.10)' }}>
                       <Pill className="w-4 h-4" style={{ color: '#14B8A6' }} />
                     </div>
-                    <h3 className="text-base font-semibold">Receive Stock</h3>
+                    <h3 className="text-base font-semibold">{t('pharmacy.receiveStock')}</h3>
                   </div>
                   <button onClick={() => setShowStockInModal(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
                     <X className="w-4 h-4" />
@@ -389,7 +391,7 @@ export default function PharmacyPage() {
                 <hr className="section-divider" />
                 <div className="data-row-divider-sm">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Medication</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.medication')}</label>
                     <input
                       list="medication-list"
                       type="text"
@@ -398,7 +400,7 @@ export default function PharmacyPage() {
                         const med = medications.find(m => m.name === e.target.value);
                         setStockForm({ ...stockForm, medicationName: e.target.value, category: med?.category || stockForm.category });
                       }}
-                      placeholder="e.g. Amoxicillin 500mg"
+                      placeholder={t('pharmacy.medicationPlaceholder')}
                     />
                     <datalist id="medication-list">
                       {medications.map(m => <option key={m.name} value={m.name}>{m.category}</option>)}
@@ -406,11 +408,11 @@ export default function PharmacyPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Quantity</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.quantity')}</label>
                       <input type="number" min={1} value={stockForm.stockLevel || ''} onChange={e => setStockForm({ ...stockForm, stockLevel: parseInt(e.target.value) || 0 })} />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Unit</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.unit')}</label>
                       <select value={stockForm.unit} onChange={e => setStockForm({ ...stockForm, unit: e.target.value })}>
                         {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                       </select>
@@ -418,23 +420,23 @@ export default function PharmacyPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Reorder Level</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.reorderLevel')}</label>
                       <input type="number" min={0} value={stockForm.reorderLevel} onChange={e => setStockForm({ ...stockForm, reorderLevel: parseInt(e.target.value) || 0 })} />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Batch Number</label>
-                      <input type="text" value={stockForm.batchNumber} onChange={e => setStockForm({ ...stockForm, batchNumber: e.target.value })} placeholder="Optional" />
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.batchNumber')}</label>
+                      <input type="text" value={stockForm.batchNumber} onChange={e => setStockForm({ ...stockForm, batchNumber: e.target.value })} placeholder={t('pharmacy.optional')} />
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Expiry Date</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.expiryDate')}</label>
                     <input type="date" value={stockForm.expiryDate} onChange={e => setStockForm({ ...stockForm, expiryDate: e.target.value })} />
                   </div>
                 </div>
                 <hr className="section-divider" />
                 <div className="flex gap-2 mt-2">
-                  <button onClick={() => setShowStockInModal(false)} className="btn btn-secondary flex-1">Cancel</button>
-                  <button onClick={handleStockIn} className="btn btn-primary flex-1">Save Stock Receipt</button>
+                  <button onClick={() => setShowStockInModal(false)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
+                  <button onClick={handleStockIn} className="btn btn-primary flex-1">{t('pharmacy.saveStockReceipt')}</button>
                 </div>
               </div>
             </div>
@@ -446,7 +448,7 @@ export default function PharmacyPage() {
               <div className="modal-content card-elevated p-6 max-w-md w-full" style={{ maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-base font-semibold">Receive Stock</h3>
+                    <h3 className="text-base font-semibold">{t('pharmacy.receiveStock')}</h3>
                     <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{restockTarget.name}</p>
                   </div>
                   <button onClick={() => setRestockTarget(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
@@ -456,7 +458,7 @@ export default function PharmacyPage() {
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>
-                      Quantity received ({restockTarget.unit}) <span style={{ color: 'var(--color-danger)' }}>*</span>
+                      {t('pharmacy.quantityReceived', { unit: restockTarget.unit })} <span style={{ color: 'var(--color-danger)' }}>*</span>
                     </label>
                     <input
                       type="number"
@@ -469,16 +471,16 @@ export default function PharmacyPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Batch No.</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.batchNo')}</label>
                       <input
                         type="text"
                         value={restockForm.batchNumber}
                         onChange={e => setRestockForm({ ...restockForm, batchNumber: e.target.value })}
-                        placeholder="Auto-generate"
+                        placeholder={t('pharmacy.autoGenerate')}
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Expiry Date</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.expiryDate')}</label>
                       <input
                         type="date"
                         value={restockForm.expiryDate}
@@ -487,13 +489,13 @@ export default function PharmacyPage() {
                     </div>
                   </div>
                   <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    Leave batch / expiry blank to keep existing values.
+                    {t('pharmacy.leaveBlankKeepExisting')}
                   </p>
                 </div>
                 <hr className="section-divider" />
                 <div className="flex gap-2 mt-2">
-                  <button onClick={() => setRestockTarget(null)} className="btn btn-secondary flex-1">Cancel</button>
-                  <button onClick={handleRestock} className="btn btn-primary flex-1">Add to Stock</button>
+                  <button onClick={() => setRestockTarget(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
+                  <button onClick={handleRestock} className="btn btn-primary flex-1">{t('pharmacy.addToStock')}</button>
                 </div>
               </div>
             </div>

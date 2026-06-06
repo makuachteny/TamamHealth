@@ -9,14 +9,14 @@ const config: Config = {
     extend: {
       colors: {
         tamamhealth: {
-          navy: '#1A3A3A',
-          teal: '#2A7A6E',
+          navy: '#1E3A8A',
+          teal: '#2563EB',
           sage: '#1B9E77',
           earth: '#D4A843',
           gold: '#E4A84B',
           green: '#1B9E77',
           red: '#C44536',
-          cream: '#FAFAF8',
+          cream: '#F8FAFC',
         },
       },
       fontFamily: {

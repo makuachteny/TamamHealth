@@ -6,6 +6,7 @@ import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import SendMessageModal, { type MessageRecipient } from '@/components/SendMessageModal';
 import EmptyState from '@/components/EmptyState';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useMessages } from '@/lib/hooks/useMessages';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useUsers } from '@/lib/hooks/useUsers';
@@ -25,6 +26,7 @@ import type { UserRole } from '@/lib/db-types';
 type ContactTab = 'doctors' | 'staff' | 'patients';
 
 export default function MessagesPage() {
+  const { t } = useTranslation();
   const { messages, loading } = useMessages();
   const { patients } = usePatients();
   const { users } = useUsers();
@@ -125,7 +127,7 @@ export default function MessagesPage() {
       name: fullName,
       phone: p.phone || '',
       type: 'patient',
-      subtitle: `Patient · ${p.hospitalNumber || 'No record #'}`,
+      subtitle: t('messages.subtitlePatientRecord', { record: p.hospitalNumber || t('messages.noRecordNumber') }),
     });
     setShowPicker(false);
     setShowModal(true);
@@ -166,9 +168,9 @@ export default function MessagesPage() {
 
   const channelLabel = (ch: string) => {
     switch (ch) {
-      case 'app':  return <span className="flex items-center gap-2 text-xs"><span className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Smartphone className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></span> App</span>;
-      case 'sms':  return <span className="flex items-center gap-2 text-xs"><span className="icon-box-sm" style={{ background: 'rgba(31,157,111,0.12)' }}><MessageSquare className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} /></span> SMS</span>;
-      case 'both': return <span className="flex items-center gap-2 text-xs"><span className="icon-box-sm" style={{ background: 'rgba(228,168,75,0.16)' }}><Radio className="w-3.5 h-3.5" style={{ color: '#B8741C' }} /></span> Both</span>;
+      case 'app':  return <span className="flex items-center gap-2 text-xs"><span className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Smartphone className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></span> {t('messages.channelApp')}</span>;
+      case 'sms':  return <span className="flex items-center gap-2 text-xs"><span className="icon-box-sm" style={{ background: 'rgba(31,157,111,0.12)' }}><MessageSquare className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} /></span> {t('messages.channelSms')}</span>;
+      case 'both': return <span className="flex items-center gap-2 text-xs"><span className="icon-box-sm" style={{ background: 'rgba(228,168,75,0.16)' }}><Radio className="w-3.5 h-3.5" style={{ color: '#B8741C' }} /></span> {t('messages.channelBoth')}</span>;
       default:     return ch;
     }
   };
@@ -185,15 +187,15 @@ export default function MessagesPage() {
 
   return (
     <>
-      <TopBar title="Messages" />
+      <TopBar title={t('messages.title')} />
       <main className="page-container page-enter">
         <PageHeader
           icon={MessageSquare}
-          title="Messages"
-          subtitle="Send messages to patients, doctors, and clinical staff via app or SMS"
+          title={t('messages.title')}
+          subtitle={t('messages.subtitle')}
           actions={
             <button onClick={openPicker} className="btn btn-primary flex items-center gap-2">
-              <Plus className="w-4 h-4" /> New Message
+              <Plus className="w-4 h-4" /> {t('messages.newMessage')}
             </button>
           }
         />
@@ -207,7 +209,7 @@ export default function MessagesPage() {
             <Search className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             <input
               type="text"
-              placeholder="Search by name or message..."
+              placeholder={t('messages.searchPlaceholder')}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="flex-1 bg-transparent text-sm outline-none"
@@ -228,7 +230,7 @@ export default function MessagesPage() {
                   color: recipientFilter === rf ? 'var(--accent-primary)' : 'var(--text-muted)',
                 }}
               >
-                {rf === 'all' ? 'All' : rf === 'inbound' ? 'From Patients' : rf === 'patient' ? 'Patients' : 'Staff'}
+                {rf === 'all' ? t('messages.filterAll') : rf === 'inbound' ? t('messages.filterFromPatients') : rf === 'patient' ? t('messages.filterPatients') : t('messages.filterStaff')}
               </button>
             ))}
           </div>
@@ -245,7 +247,7 @@ export default function MessagesPage() {
                   color: channelFilter === ch ? 'var(--accent-primary)' : 'var(--text-muted)',
                 }}
               >
-                {ch === 'all' ? 'All Channels' : ch.toUpperCase()}
+                {ch === 'all' ? t('messages.channelAll') : ch.toUpperCase()}
               </button>
             ))}
           </div>
@@ -257,25 +259,25 @@ export default function MessagesPage() {
         <div className="card-elevated overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading messages...</p>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('messages.loading')}</p>
             </div>
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={MessageSquare}
-              title="No messages yet"
-              message="Send appointment reminders, lab results, or quick messages to patients, doctors, and clinical staff."
-              action={{ label: 'Send a message', onClick: openPicker }}
+              title={t('messages.emptyTitle')}
+              message={t('messages.emptyMessage')}
+              action={{ label: t('messages.sendAMessage'), onClick: openPicker }}
             />
           ) : (
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Contact</th>
-                  <th>Message</th>
-                  <th>Channel</th>
-                  <th>Status</th>
-                  <th>From</th>
-                  <th>Date</th>
+                  <th>{t('messages.colContact')}</th>
+                  <th>{t('messages.colMessage')}</th>
+                  <th>{t('messages.colChannel')}</th>
+                  <th>{t('messages.colStatus')}</th>
+                  <th>{t('messages.colFrom')}</th>
+                  <th>{t('messages.colDate')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -304,7 +306,7 @@ export default function MessagesPage() {
                       name: msg.patientName,
                       phone: msg.patientPhone || '',
                       type: 'patient',
-                      subtitle: msg.recipientDepartment ? `Patient · ${msg.recipientDepartment}` : 'Patient',
+                      subtitle: msg.recipientDepartment ? t('messages.subtitlePatientRecord', { record: msg.recipientDepartment }) : t('messages.subtitlePatient'),
                     });
                     setShowModal(true);
                   };
@@ -338,9 +340,9 @@ export default function MessagesPage() {
                                 background: 'rgba(217, 110, 89, 0.14)',
                                 color: '#D96E59',
                               }}
-                              title="Patient-originated message via patient portal"
+                              title={t('messages.patientOriginatedTitle')}
                             >
-                              Patient → Facility
+                              {t('messages.patientToFacility')}
                             </span>
                           )}
                         </div>
@@ -368,7 +370,7 @@ export default function MessagesPage() {
                             className="btn btn-secondary btn-sm"
                             style={{ fontSize: 11, padding: '4px 10px' }}
                           >
-                            Reply
+                            {t('messages.reply')}
                           </button>
                         )}
                       </td>
@@ -393,22 +395,22 @@ export default function MessagesPage() {
               className="flex items-center justify-between p-4"
               style={{ borderBottom: '1px solid var(--border-light)' }}
             >
-              <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>New Message</h3>
+              <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{t('messages.newMessage')}</h3>
               <button
                 onClick={() => setShowPicker(false)}
                 className="text-xs"
                 style={{ color: 'var(--text-muted)' }}
               >
-                Cancel
+                {t('messages.cancel')}
               </button>
             </div>
 
             {/* Tabs */}
             <div className="flex" style={{ borderBottom: '1px solid var(--border-light)' }}>
               {([
-                { key: 'doctors',  label: 'Doctors',  count: physicians.length },
-                { key: 'staff',    label: 'All Staff', count: clinicalStaff.length },
-                { key: 'patients', label: 'Patients', count: patients.length },
+                { key: 'doctors',  label: t('messages.tabDoctors'),  count: physicians.length },
+                { key: 'staff',    label: t('messages.tabAllStaff'), count: clinicalStaff.length },
+                { key: 'patients', label: t('messages.tabPatients'), count: patients.length },
               ] as const).map(t => (
                 <button
                   key={t.key}
@@ -444,10 +446,10 @@ export default function MessagesPage() {
                   type="text"
                   placeholder={
                     pickerTab === 'patients'
-                      ? 'Search patients by name, phone, hospital #...'
+                      ? t('messages.searchPatientsPlaceholder')
                       : pickerTab === 'doctors'
-                        ? 'Search doctors by name, specialty, department, hospital...'
-                        : 'Search staff by name, role, department, hospital...'
+                        ? t('messages.searchDoctorsPlaceholder')
+                        : t('messages.searchStaffPlaceholder')
                   }
                   value={pickerQuery}
                   onChange={e => setPickerQuery(e.target.value)}
@@ -464,7 +466,7 @@ export default function MessagesPage() {
                 {pickerTab === 'patients' ? (
                   pickerResults.length === 0 ? (
                     <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>
-                      No patients match.
+                      {t('messages.noPatientsMatch')}
                     </p>
                   ) : (
                     (pickerResults as typeof patients).map(p => (
@@ -502,7 +504,7 @@ export default function MessagesPage() {
                             color: '#D96E59',
                           }}
                         >
-                          PATIENT
+                          {t('messages.patientBadge')}
                         </span>
                       </button>
                     ))
@@ -510,7 +512,7 @@ export default function MessagesPage() {
                 ) : (
                   pickerResults.length === 0 ? (
                     <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>
-                      {pickerTab === 'doctors' ? 'No doctors match.' : 'No staff match.'}
+                      {pickerTab === 'doctors' ? t('messages.noDoctorsMatch') : t('messages.noStaffMatch')}
                     </p>
                   ) : (
                     (pickerResults as typeof users).map(u => {

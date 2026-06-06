@@ -40,6 +40,8 @@ interface AppUser {
   payam?: string;
   county?: string;
   state?: string;
+  /** True when the user must set a new password before using the app. */
+  mustChangePassword?: boolean;
   branding: OrgBranding;
 }
 
@@ -484,7 +486,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Geographic claims may live on UserDoc (server augment) or the auth
       // response shape. Read defensively so we still populate them when the
       // server-side login returns them but the local PouchDB record doesn't.
-      const geo = user as unknown as { payam?: string; county?: string; state?: string };
+      const geo = user as unknown as { payam?: string; county?: string; state?: string; mustChangePassword?: boolean };
       setCurrentUser({
         _id: user._id,
         username: user.username,
@@ -498,6 +500,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         payam: geo.payam,
         county: geo.county,
         state: geo.state,
+        mustChangePassword: geo.mustChangePassword,
         branding,
       });
       setIsAuthenticated(true);
@@ -505,8 +508,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Login error:', err);
       captureException(err, { tag: '[client/login]' });
-      // Expose the real error for debugging (remove in production)
-      (window as unknown as Record<string, unknown>).__lastLoginError = err instanceof Error ? err.message : String(err);
 
       // Stale-chunk recovery: this happens when a long-lived browser tab tries
       // to lazy-load a JS chunk that the dev server already rebuilt under a
@@ -520,7 +521,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      alert(`Login internal error: ${err instanceof Error ? err.message : String(err)}`);
+      // Surface the failure to the caller (the login form renders a friendly
+      // message). We intentionally do NOT use a raw alert() or leak the
+      // internal error text to the user — diagnostics go to the console and
+      // Sentry above.
       return false;
     }
   }, []);

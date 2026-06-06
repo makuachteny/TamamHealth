@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { Lock, LogOut, ShieldCheck } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface LockScreenProps {
   userName: string;
@@ -13,6 +14,7 @@ interface LockScreenProps {
 }
 
 export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, onUnlock, onLogout }: LockScreenProps) {
+  const { t } = useTranslation();
   const [pin, setPin] = useState('');
   const [setupPin, setSetupPin] = useState(''); // stores first entry during setup
   const [error, setError] = useState('');
@@ -46,7 +48,7 @@ export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, on
             if (valid) {
               onUnlock();
             } else {
-              setError('Incorrect PIN');
+              setError(t('lock.incorrectPin'));
               setPin('');
               triggerShake();
             }
@@ -61,7 +63,7 @@ export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, on
               await onSetPin(next);
               onUnlock();
             } else {
-              setError('PINs do not match. Try again.');
+              setError(t('lock.pinsDoNotMatch'));
               setPin('');
               setSetupPin('');
               setMode('setup');
@@ -82,13 +84,13 @@ export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, on
     setError('');
   }, []);
 
-  const title = mode === 'unlock' ? 'Session Locked'
-    : mode === 'setup' ? 'Set a PIN'
-    : 'Confirm PIN';
+  const title = mode === 'unlock' ? t('auth.sessionLocked')
+    : mode === 'setup' ? t('lock.setPin')
+    : t('lock.confirmPin');
 
-  const subtitle = mode === 'unlock' ? 'Enter your PIN to unlock'
-    : mode === 'setup' ? 'Choose a 4-digit PIN for quick unlock'
-    : 'Enter the same PIN again';
+  const subtitle = mode === 'unlock' ? t('lock.enterYourPin')
+    : mode === 'setup' ? t('lock.choosePin')
+    : t('lock.enterSamePin');
 
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
@@ -164,7 +166,7 @@ export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, on
           style={{ color: 'var(--text-muted)', background: 'var(--overlay-subtle)' }}
         >
           <LogOut className="w-3.5 h-3.5" />
-          Switch User
+          {t('auth.switchUser')}
         </button>
       </div>
 

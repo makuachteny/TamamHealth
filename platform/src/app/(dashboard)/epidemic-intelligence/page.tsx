@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import { useEpidemicIntelligence } from '@/lib/hooks/useEpidemicIntelligence';
@@ -31,6 +32,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export default function EpidemicIntelligencePage() {
+  const { t } = useTranslation();
   const { data, loading } = useEpidemicIntelligence();
   const [activeTab, setActiveTab] = useState<TabView>('overview');
   const [selectedDisease, setSelectedDisease] = useState<string | null>(null);
@@ -39,14 +41,14 @@ export default function EpidemicIntelligencePage() {
   if (loading || !data) {
     return (
       <>
-        <TopBar title="Epidemic Intelligence" />
+        <TopBar title={t('epidemic.pageTitle')} />
         <main className="page-container flex items-center justify-center">
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.1)' }}>
               <Activity className="w-8 h-8" style={{ color: 'var(--color-danger)' }} />
             </div>
-            <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Loading epidemic intelligence...</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Analyzing disease surveillance data</p>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{t('epidemic.loading')}</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{t('epidemic.loadingSubtitle')}</p>
           </div>
         </main>
       </>
@@ -86,23 +88,23 @@ export default function EpidemicIntelligencePage() {
   const maxCases = weekTotals.length > 0 ? Math.max(...weekTotals, 1) : 1;
 
   const tabs: { key: TabView; label: string; icon: typeof Activity }[] = [
-    { key: 'overview', label: 'Overview', icon: Eye },
-    { key: 'curves', label: 'Epidemic Curves', icon: BarChart3 },
-    { key: 'syndromic', label: 'Syndromic', icon: Thermometer },
-    { key: 'geographic', label: 'Geographic', icon: MapPin },
-    { key: 'idsr', label: 'IDSR Report', icon: FileText },
-    { key: 'alerts', label: 'EWARS Alerts', icon: AlertTriangle },
+    { key: 'overview', label: t('epidemic.tabOverview'), icon: Eye },
+    { key: 'curves', label: t('epidemic.tabCurves'), icon: BarChart3 },
+    { key: 'syndromic', label: t('epidemic.tabSyndromic'), icon: Thermometer },
+    { key: 'geographic', label: t('epidemic.tabGeographic'), icon: MapPin },
+    { key: 'idsr', label: t('epidemic.tabIdsr'), icon: FileText },
+    { key: 'alerts', label: t('epidemic.tabAlerts'), icon: AlertTriangle },
   ];
 
   return (
     <>
-      <TopBar title="Epidemic Intelligence" />
+      <TopBar title={t('epidemic.pageTitle')} />
       <main className="page-container page-enter">
 
         <PageHeader
           icon={Bug}
-          title="Epidemic Intelligence Center"
-          subtitle="WHO EWARS · IDSR Surveillance · Real-time Disease Tracking"
+          title={t('epidemic.headerTitle')}
+          subtitle={t('epidemic.headerSubtitle')}
           actions={
             <>
               <div className="px-4 py-2 rounded-xl flex items-center gap-2" style={{
@@ -111,11 +113,11 @@ export default function EpidemicIntelligencePage() {
               }}>
                 <Shield className="w-4 h-4" style={{ color: risk.text }} />
                 <span className="text-xs font-bold uppercase tracking-wider" style={{ color: risk.text }}>
-                  {summary.overallRiskLevel} Risk
+                  {t('epidemic.riskSuffix', { level: summary.overallRiskLevel })}
                 </span>
               </div>
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>IDSR Week</p>
+                <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>{t('epidemic.idsrWeek')}</p>
                 <p className="text-sm font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{idsrReport.reportingWeek}</p>
               </div>
             </>
@@ -125,12 +127,12 @@ export default function EpidemicIntelligencePage() {
         {/* ═══ KPI STRIP ═══ */}
         <div className="kpi-grid mb-4">
           {[
-            { label: 'Active Diseases', value: summary.totalActiveDiseases, icon: Bug, color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.12)' },
-            { label: 'Cases This Week', value: summary.totalCasesThisWeek.toLocaleString(), icon: Activity, color: '#FB923C', bg: 'rgba(251,146,60,0.12)' },
-            { label: 'Deaths This Week', value: summary.totalDeathsThisWeek, icon: AlertTriangle, color: '#F87171', bg: 'rgba(248,113,113,0.12)' },
-            { label: 'Highest Rt', value: summary.highestRt ? `${summary.highestRt.value.toFixed(2)}` : 'N/A', icon: TrendingUp, color: summary.highestRt && summary.highestRt.value > 1 ? 'var(--color-danger)' : 'var(--color-success)', bg: summary.highestRt && summary.highestRt.value > 1 ? 'rgba(239,68,68,0.12)' : 'rgba(74,222,128,0.12)' },
-            { label: 'Emergency States', value: summary.statesWithEmergency.length, icon: Zap, color: '#F87171', bg: 'rgba(248,113,113,0.12)' },
-            { label: 'EWARS Alerts', value: ewarsAlerts.length, icon: Radio, color: 'var(--color-warning)', bg: 'rgba(251,191,36,0.12)' },
+            { label: t('epidemic.kpiActiveDiseases'), value: summary.totalActiveDiseases, icon: Bug, color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.12)' },
+            { label: t('epidemic.kpiCasesThisWeek'), value: summary.totalCasesThisWeek.toLocaleString(), icon: Activity, color: '#FB923C', bg: 'rgba(251,146,60,0.12)' },
+            { label: t('epidemic.kpiDeathsThisWeek'), value: summary.totalDeathsThisWeek, icon: AlertTriangle, color: '#F87171', bg: 'rgba(248,113,113,0.12)' },
+            { label: t('epidemic.kpiHighestRt'), value: summary.highestRt ? `${summary.highestRt.value.toFixed(2)}` : t('epidemic.notAvailable'), icon: TrendingUp, color: summary.highestRt && summary.highestRt.value > 1 ? 'var(--color-danger)' : 'var(--color-success)', bg: summary.highestRt && summary.highestRt.value > 1 ? 'rgba(239,68,68,0.12)' : 'rgba(74,222,128,0.12)' },
+            { label: t('epidemic.kpiEmergencyStates'), value: summary.statesWithEmergency.length, icon: Zap, color: '#F87171', bg: 'rgba(248,113,113,0.12)' },
+            { label: t('epidemic.kpiEwarsAlerts'), value: ewarsAlerts.length, icon: Radio, color: 'var(--color-warning)', bg: 'rgba(251,191,36,0.12)' },
           ].map((kpi) => (
             <div key={kpi.label} className="kpi">
               <div className="kpi__icon" style={{ background: kpi.bg }}>
@@ -174,9 +176,9 @@ export default function EpidemicIntelligencePage() {
               <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                 <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                   <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
-                  Reproduction Number (Rt) Tracker
+                  {t('epidemic.rtTrackerTitle')}
                 </h3>
-                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Rt {'>'} 1.0 = epidemic growing &middot; Rt {'<'} 1.0 = epidemic declining</p>
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('epidemic.rtTrackerHint')}</p>
               </div>
               <div className="p-4 space-y-3">
                 {rtEstimates.map(rt => {
@@ -194,7 +196,7 @@ export default function EpidemicIntelligencePage() {
                             background: severityColors[rt.confidence === 'high' ? 'low' : rt.confidence === 'medium' ? 'medium' : 'high'].bg,
                             color: severityColors[rt.confidence === 'high' ? 'low' : rt.confidence === 'medium' ? 'medium' : 'high'].text,
                           }}>
-                            {rt.confidence} confidence
+                            {t('epidemic.confidenceSuffix', { level: rt.confidence })}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -247,7 +249,7 @@ export default function EpidemicIntelligencePage() {
               <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                 <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                   <AlertTriangle className="w-4 h-4" style={{ color: '#F87171' }} />
-                  Active EWARS Alerts
+                  {t('epidemic.activeEwarsAlerts')}
                 </h3>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -273,7 +275,7 @@ export default function EpidemicIntelligencePage() {
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-bold" style={{ color: sev.text }}>{alert.cases}</p>
-                          <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>cases</p>
+                          <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('epidemic.cases')}</p>
                         </div>
                       </div>
                       {expandedAlert === i && (
@@ -292,7 +294,7 @@ export default function EpidemicIntelligencePage() {
               <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                 <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                   <MapPin className="w-4 h-4" style={{ color: '#FB923C' }} />
-                  Geographic Risk Heatmap
+                  {t('epidemic.geoHeatmapTitle')}
                 </h3>
               </div>
               <div className="p-4">
@@ -309,17 +311,17 @@ export default function EpidemicIntelligencePage() {
                       }}>
                         <p className="text-[10px] font-medium mb-1 truncate" style={{ color: 'var(--text-secondary)' }}>{state.replace('Northern ', 'N. ').replace('Western ', 'W. ').replace('Eastern ', 'E. ').replace('Central ', 'C. ')}</p>
                         <p className="text-lg font-bold" style={{ color }}>{score}</p>
-                        <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{spread?.totalCases || 0} cases</p>
+                        <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('epidemic.casesCount', { count: spread?.totalCases || 0 })}</p>
                       </div>
                     );
                   })}
                 </div>
                 <div className="flex items-center justify-center gap-3 mt-3">
                   {[
-                    { label: 'Low Risk (0-29)', color: 'var(--color-success)' },
-                    { label: 'Moderate (30-49)', color: 'var(--color-warning)' },
-                    { label: 'High (50-69)', color: '#FB923C' },
-                    { label: 'Critical (70+)', color: '#F87171' },
+                    { label: t('epidemic.legendLow'), color: 'var(--color-success)' },
+                    { label: t('epidemic.legendModerate'), color: 'var(--color-warning)' },
+                    { label: t('epidemic.legendHigh'), color: '#FB923C' },
+                    { label: t('epidemic.legendCritical'), color: '#F87171' },
                   ].map(l => (
                     <div key={l.label} className="flex items-center gap-1">
                       <div className="w-2.5 h-2.5 rounded" style={{ background: l.color }} />
@@ -335,26 +337,26 @@ export default function EpidemicIntelligencePage() {
               <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                 <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                   <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  IDSR Summary
+                  {t('epidemic.idsrSummary')}
                 </h3>
               </div>
               <div className="p-4 space-y-3">
                 <div className="p-3 rounded-xl text-center" style={{ background: 'var(--overlay-subtle)' }}>
-                  <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>Reporting Completeness</p>
+                  <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>{t('epidemic.reportingCompleteness')}</p>
                   <p className="text-2xl font-bold mt-1 stat-value" style={{
                     color: idsrReport.completeness >= 80 ? 'var(--color-success)' : idsrReport.completeness >= 60 ? 'var(--color-warning)' : '#F87171',
                   }}>{idsrReport.completeness}%</p>
-                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{idsrReport.totalFacilitiesReporting} facilities reporting</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('epidemic.facilitiesReporting', { count: idsrReport.totalFacilitiesReporting })}</p>
                 </div>
                 {idsrReport.diseases.slice(0, 4).map(d => (
                   <div key={d.disease} className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
                     <div>
                       <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{d.disease}</p>
-                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{d.states.length} state{d.states.length > 1 ? 's' : ''}</p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{d.states.length > 1 ? t('epidemic.statesCountPlural', { count: d.states.length }) : t('epidemic.statesCountSingular', { count: d.states.length })}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{d.cases}</p>
-                      <p className="text-[9px]" style={{ color: d.cfr > 5 ? '#F87171' : 'var(--text-muted)' }}>CFR {d.cfr}%</p>
+                      <p className="text-[9px]" style={{ color: d.cfr > 5 ? '#F87171' : 'var(--text-muted)' }}>{t('epidemic.cfrValue', { value: d.cfr })}</p>
                     </div>
                   </div>
                 ))}
@@ -376,7 +378,7 @@ export default function EpidemicIntelligencePage() {
                   color: !selectedDisease ? 'var(--nav-active-text)' : 'var(--text-muted)',
                   border: !selectedDisease ? '1px solid var(--border-accent)' : '1px solid var(--border-light)',
                 }}
-              >All Diseases</button>
+              >{t('epidemic.allDiseases')}</button>
               {diseases.map(d => (
                 <button
                   key={d}
@@ -396,9 +398,9 @@ export default function EpidemicIntelligencePage() {
               <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                 <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                   <BarChart3 className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
-                  Epidemic Curve — {selectedDisease || 'All Diseases'}
+                  {t('epidemic.epidemicCurveTitle', { disease: selectedDisease || t('epidemic.allDiseases') })}
                 </h3>
-                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Weekly case counts, 12-week window</p>
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('epidemic.weeklyCaseCounts')}</p>
               </div>
               <div className="p-4">
                 <div className="flex items-end gap-1.5" style={{ height: '220px' }}>
@@ -413,7 +415,7 @@ export default function EpidemicIntelligencePage() {
                         {/* Tooltip on hover */}
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity text-center mb-1">
                           <p className="text-[10px] font-bold" style={{ color: 'var(--text-primary)' }}>{totalCases}</p>
-                          <p className="text-[8px]" style={{ color: '#F87171' }}>{totalDeaths} deaths</p>
+                          <p className="text-[8px]" style={{ color: '#F87171' }}>{t('epidemic.deathsCount', { count: totalDeaths })}</p>
                         </div>
                         <div className="w-full flex flex-col justify-end" style={{ height: '180px' }}>
                           <div
@@ -438,18 +440,18 @@ export default function EpidemicIntelligencePage() {
             {/* Per-disease breakdown table */}
             <div className="card-elevated overflow-hidden">
               <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Disease-Level Breakdown</h3>
+                <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{t('epidemic.diseaseLevelBreakdown')}</h3>
               </div>
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Disease</th>
-                    <th>Rt</th>
-                    <th>Trend</th>
-                    <th>12-Week Cases</th>
-                    <th>12-Week Deaths</th>
-                    <th>CFR</th>
-                    <th>Confidence</th>
+                    <th>{t('epidemic.colDisease')}</th>
+                    <th>{t('epidemic.colRt')}</th>
+                    <th>{t('epidemic.colTrend')}</th>
+                    <th>{t('epidemic.col12WeekCases')}</th>
+                    <th>{t('epidemic.col12WeekDeaths')}</th>
+                    <th>{t('epidemic.colCfr')}</th>
+                    <th>{t('epidemic.colConfidence')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -500,7 +502,7 @@ export default function EpidemicIntelligencePage() {
                 <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                   <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                     <Zap className="w-4 h-4" style={{ color: '#F87171' }} />
-                    Threshold Exceeded
+                    {t('epidemic.thresholdExceeded')}
                   </h3>
                 </div>
                 <div className="p-3 space-y-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
@@ -517,15 +519,15 @@ export default function EpidemicIntelligencePage() {
                       </div>
                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{alert.state}</p>
                       <div className="flex items-center gap-3 mt-1.5 text-[11px]">
-                        <span style={{ color: '#F87171' }}><strong>{alert.currentWeekCases}</strong> this week</span>
-                        <span style={{ color: 'var(--text-muted)' }}>vs {alert.previousWeekCases} last week</span>
-                        <span style={{ color: 'var(--text-muted)' }}>threshold: {alert.threshold}</span>
+                        <span style={{ color: '#F87171' }}><strong>{alert.currentWeekCases}</strong> {t('epidemic.thisWeek')}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>{t('epidemic.vsLastWeek', { count: alert.previousWeekCases })}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>{t('epidemic.thresholdValue', { value: alert.threshold })}</span>
                       </div>
                     </div>
                   ))}
                   {syndromicAlerts.filter(a => a.exceeded).length === 0 && (
                     <div className="text-center py-6">
-                      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No thresholds exceeded</p>
+                      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('epidemic.noThresholdsExceeded')}</p>
                     </div>
                   )}
                 </div>
@@ -536,7 +538,7 @@ export default function EpidemicIntelligencePage() {
                 <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                   <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                     <Eye className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
-                    Under Watch
+                    {t('epidemic.underWatch')}
                   </h3>
                 </div>
                 <div className="p-3 space-y-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
@@ -550,7 +552,7 @@ export default function EpidemicIntelligencePage() {
                         <span className="text-[10px]" style={{ color: 'var(--color-warning)' }}>+{alert.percentChange}%</span>
                       </div>
                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {alert.state} &middot; {alert.currentWeekCases} cases &middot; {alert.threshold ? Math.round((alert.currentWeekCases / alert.threshold) * 100) : 0}% of threshold
+                        {alert.state} &middot; {t('epidemic.casesCount', { count: alert.currentWeekCases })} &middot; {t('epidemic.percentOfThreshold', { percent: alert.threshold ? Math.round((alert.currentWeekCases / alert.threshold) * 100) : 0 })}
                       </p>
                     </div>
                   ))}
@@ -561,18 +563,18 @@ export default function EpidemicIntelligencePage() {
             {/* Full syndromic table */}
             <div className="card-elevated overflow-hidden">
               <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Full Syndromic Surveillance Matrix</h3>
+                <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{t('epidemic.fullSyndromicMatrix')}</h3>
               </div>
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Syndrome</th>
-                    <th>State</th>
-                    <th>This Week</th>
-                    <th>Last Week</th>
-                    <th>Change</th>
-                    <th>Threshold</th>
-                    <th>Status</th>
+                    <th>{t('epidemic.colSyndrome')}</th>
+                    <th>{t('epidemic.colState')}</th>
+                    <th>{t('epidemic.colThisWeek')}</th>
+                    <th>{t('epidemic.colLastWeek')}</th>
+                    <th>{t('epidemic.colChange')}</th>
+                    <th>{t('epidemic.colThreshold')}</th>
+                    <th>{t('epidemic.colStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -592,9 +594,9 @@ export default function EpidemicIntelligencePage() {
                       <td className="text-xs font-mono">{alert.threshold}</td>
                       <td>
                         {alert.exceeded ? (
-                          <span className="badge badge-emergency text-[10px]">EXCEEDED</span>
+                          <span className="badge badge-emergency text-[10px]">{t('epidemic.statusExceeded')}</span>
                         ) : (
-                          <span className="badge badge-normal text-[10px]">Normal</span>
+                          <span className="badge badge-normal text-[10px]">{t('epidemic.statusNormal')}</span>
                         )}
                       </td>
                     </tr>
@@ -619,13 +621,13 @@ export default function EpidemicIntelligencePage() {
                         <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{state.state}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{state.totalCases} total cases</span>
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('epidemic.totalCases', { count: state.totalCases })}</span>
                         <div className="px-2 py-0.5 rounded-lg text-xs font-bold" style={{
                           background: `${color}15`,
                           color,
                           border: `1px solid ${color}25`,
                         }}>
-                          Risk: {state.riskScore}
+                          {t('epidemic.riskScore', { score: state.riskScore })}
                         </div>
                       </div>
                     </div>
@@ -647,8 +649,8 @@ export default function EpidemicIntelligencePage() {
                             <span style={{ color: 'var(--text-primary)' }}>{d.disease}</span>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="font-semibold">{d.cases} cases</span>
-                            <span style={{ color: '#F87171' }}>{d.deaths} deaths</span>
+                            <span className="font-semibold">{t('epidemic.casesCount', { count: d.cases })}</span>
+                            <span style={{ color: '#F87171' }}>{t('epidemic.deathsCount', { count: d.deaths })}</span>
                             {d.trend === 'increasing' ? (
                               <TrendingUp className="w-3 h-3" style={{ color: 'var(--color-danger)' }} />
                             ) : d.trend === 'decreasing' ? (
@@ -660,7 +662,7 @@ export default function EpidemicIntelligencePage() {
                         </div>
                       ))}
                       {state.diseases.length === 0 && (
-                        <p className="text-[11px] text-center py-2" style={{ color: 'var(--text-muted)' }}>No active disease alerts</p>
+                        <p className="text-[11px] text-center py-2" style={{ color: 'var(--text-muted)' }}>{t('epidemic.noActiveDiseaseAlerts')}</p>
                       )}
                     </div>
                   </div>
@@ -675,19 +677,19 @@ export default function EpidemicIntelligencePage() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="card-elevated p-4">
-                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Reporting Week</p>
+                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('epidemic.reportingWeek')}</p>
                 <p className="text-2xl font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{idsrReport.reportingWeek}</p>
               </div>
               <div className="card-elevated p-4">
-                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Facilities Reporting</p>
+                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('epidemic.facilitiesReportingLabel')}</p>
                 <p className="text-2xl font-bold" style={{ color: 'var(--accent-primary)' }}>{idsrReport.totalFacilitiesReporting}</p>
               </div>
               <div className="card-elevated p-4">
-                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Completeness</p>
+                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('epidemic.completeness')}</p>
                 <p className="text-2xl font-bold stat-value" style={{
                   color: idsrReport.completeness >= 80 ? 'var(--color-success)' : idsrReport.completeness >= 60 ? 'var(--color-warning)' : '#F87171',
                 }}>{idsrReport.completeness}%</p>
-                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>WHO target: 80%</p>
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('epidemic.whoTarget')}</p>
               </div>
             </div>
 
@@ -695,18 +697,18 @@ export default function EpidemicIntelligencePage() {
               <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                 <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                   <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  IDSR Weekly Disease Report
+                  {t('epidemic.idsrWeeklyReport')}
                 </h3>
               </div>
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Priority Disease</th>
-                    <th>Cases</th>
-                    <th>Deaths</th>
-                    <th>CFR (%)</th>
-                    <th>Affected States</th>
-                    <th>Severity</th>
+                    <th>{t('epidemic.colPriorityDisease')}</th>
+                    <th>{t('epidemic.colCases')}</th>
+                    <th>{t('epidemic.colDeaths')}</th>
+                    <th>{t('epidemic.colCfrPercent')}</th>
+                    <th>{t('epidemic.colAffectedStates')}</th>
+                    <th>{t('epidemic.colSeverity')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -732,13 +734,13 @@ export default function EpidemicIntelligencePage() {
                       </td>
                       <td>
                         {d.cfr > 10 ? (
-                          <span className="badge badge-emergency text-[10px]">Critical</span>
+                          <span className="badge badge-emergency text-[10px]">{t('epidemic.severityCritical')}</span>
                         ) : d.cfr > 5 ? (
-                          <span className="badge badge-warning text-[10px]">High</span>
+                          <span className="badge badge-warning text-[10px]">{t('epidemic.severityHigh')}</span>
                         ) : d.cases > 50 ? (
-                          <span className="badge badge-watch text-[10px]">Watch</span>
+                          <span className="badge badge-watch text-[10px]">{t('epidemic.severityWatch')}</span>
                         ) : (
-                          <span className="badge badge-normal text-[10px]">Low</span>
+                          <span className="badge badge-normal text-[10px]">{t('epidemic.severityLow')}</span>
                         )}
                       </td>
                     </tr>
@@ -802,9 +804,9 @@ export default function EpidemicIntelligencePage() {
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           <span className="text-lg font-bold" style={{ color: sev.text }}>{alert.cases}</span>
-                          <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>cases</span>
+                          <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>{t('epidemic.cases')}</span>
                           {alert.deaths > 0 && (
-                            <span className="text-xs ml-2" style={{ color: '#F87171' }}>{alert.deaths} deaths</span>
+                            <span className="text-xs ml-2" style={{ color: '#F87171' }}>{t('epidemic.deathsCount', { count: alert.deaths })}</span>
                           )}
                         </div>
                         {isExpanded ? <ChevronDown className="w-4 h-4" style={{ color: 'var(--text-muted)' }} /> : <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}

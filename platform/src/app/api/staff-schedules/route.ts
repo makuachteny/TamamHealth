@@ -11,12 +11,14 @@ import {
 } from '@/lib/api-auth';
 import { withAuditLog } from '@/lib/audit/with-audit';
 import type { UserRole } from '@/lib/db-types';
+// Staff scheduling is a human-resources function. HRIO (Health Records &
+// Information Officer) is records/DHIS2 only and is intentionally excluded.
 const READ_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
-  'pharmacist', 'medical_superintendent', 'hrio',
+  'pharmacist', 'medical_superintendent', 'hospital_manager',
 ];
 const WRITE_ROLES: UserRole[] = [
-  'super_admin', 'org_admin', 'hrio', 'medical_superintendent',
+  'super_admin', 'org_admin', 'medical_superintendent', 'hospital_manager',
 ];
 export async function GET(request: NextRequest) {
   try {

@@ -13,6 +13,7 @@ import {
 } from '@/components/icons/lucide';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { PaymentPlanDoc, PaymentPlanStatus } from '@/lib/db-types-payments';
 
 interface PaymentPlanKPIs {
@@ -84,6 +85,7 @@ const KPICard: React.FC<KPICardProps> = ({ icon, label, value, color }) => {
 };
 
 export default function PaymentPlansPage() {
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const [plans, setPlans] = useState<PaymentPlanDoc[]>([]);
   const [filteredPlans, setFilteredPlans] = useState<PaymentPlanDoc[]>([]);
@@ -287,7 +289,7 @@ export default function PaymentPlansPage() {
               transition: 'all 0.2s ease',
               cursor: 'pointer',
             }}
-            title={`Month ${inst.number}: ${inst.status}`}
+            title={t('plans.installmentTooltip', { number: inst.number, status: inst.status })}
             onMouseEnter={(e) => {
               const el = e.currentTarget as HTMLElement;
               el.style.width = '12px';
@@ -311,7 +313,7 @@ export default function PaymentPlansPage() {
 
   return (
     <div className="page-container page-enter">
-      <TopBar title="Payment Plans" />
+      <TopBar title={t('billing.paymentPlans')} />
 
       {/* KPI Cards Grid - 4 columns */}
       <div
@@ -325,25 +327,25 @@ export default function PaymentPlansPage() {
       >
         <KPICard
           icon={<BarChart3 size={34} style={{ color: 'var(--color-success)' }} />}
-          label="Active Plans"
+          label={t('plans.kpiActivePlans')}
           value={kpis.activePlans}
           color="success"
         />
         <KPICard
           icon={<Wallet size={34} style={{ color: 'var(--accent-primary)' }} />}
-          label="Total Outstanding"
+          label={t('plans.kpiTotalOutstanding')}
           value={`SSP ${kpis.totalOutstanding.toLocaleString()}`}
           color="primary"
         />
         <KPICard
           icon={<AlertTriangle size={34} style={{ color: 'var(--color-danger)' }} />}
-          label="Delinquent Plans"
+          label={t('plans.kpiDelinquentPlans')}
           value={kpis.delinquentPlans}
           color="danger"
         />
         <KPICard
           icon={<CheckCircle size={34} style={{ color: 'var(--color-warning)' }} />}
-          label="Completed This Month"
+          label={t('plans.kpiCompletedThisMonth')}
           value={kpis.completedThisMonth}
           color="warning"
         />
@@ -375,7 +377,7 @@ export default function PaymentPlansPage() {
           />
           <input
             type="text"
-            placeholder="Search by patient name..."
+            placeholder={t('pharmacy.searchPatientPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -410,7 +412,7 @@ export default function PaymentPlansPage() {
               color: 'var(--text-secondary)',
             }}
           >
-            Loading payment plans...
+            {t('plans.loading')}
           </div>
         ) : filteredPlans.length === 0 ? (
           <div
@@ -421,7 +423,7 @@ export default function PaymentPlansPage() {
               color: 'var(--text-secondary)',
             }}
           >
-            No payment plans found
+            {t('plans.emptyState')}
           </div>
         ) : (
           filteredPlans.map((plan) => {
@@ -488,7 +490,7 @@ export default function PaymentPlansPage() {
                           color: 'var(--text-muted)',
                         }}
                       >
-                        Plan ID: {plan._id?.substring(0, 8)}
+                        {t('plans.planIdLabel')} {plan._id?.substring(0, 8)}
                       </div>
                     </div>
                     <span style={getStatusBadgeStyle(plan.status)}>
@@ -514,7 +516,7 @@ export default function PaymentPlansPage() {
                           color: 'var(--text-secondary)',
                         }}
                       >
-                        Next Due
+                        {t('plans.nextDue')}
                       </div>
                       <div
                         style={{
@@ -546,7 +548,7 @@ export default function PaymentPlansPage() {
                           textTransform: 'uppercase',
                         }}
                       >
-                        Progress
+                        {t('plans.progress')}
                       </span>
                       <span
                         style={{
@@ -597,7 +599,7 @@ export default function PaymentPlansPage() {
                           textTransform: 'uppercase',
                         }}
                       >
-                        Total
+                        {t('plans.total')}
                       </div>
                       <div
                         style={{
@@ -619,7 +621,7 @@ export default function PaymentPlansPage() {
                           textTransform: 'uppercase',
                         }}
                       >
-                        Paid
+                        {t('plans.paid')}
                       </div>
                       <div
                         style={{
@@ -641,7 +643,7 @@ export default function PaymentPlansPage() {
                           textTransform: 'uppercase',
                         }}
                       >
-                        Remaining
+                        {t('plans.remaining')}
                       </div>
                       <div
                         style={{
@@ -672,7 +674,7 @@ export default function PaymentPlansPage() {
                         textTransform: 'uppercase',
                       }}
                     >
-                      Installment Status
+                      {t('plans.installmentStatus')}
                     </div>
                     {renderInstallmentTimeline(plan)}
                   </div>
@@ -706,7 +708,7 @@ export default function PaymentPlansPage() {
                       }}
                     >
                       <CreditCard size={16} />
-                      Record Payment
+                      {t('plans.recordPayment')}
                     </button>
                   )}
                 </div>
@@ -752,7 +754,7 @@ export default function PaymentPlansPage() {
                 margin: 0,
               }}
             >
-              Record Payment
+              {t('plans.recordPayment')}
             </h2>
 
             <div style={{ marginBottom: '1.5rem' }}>
@@ -765,13 +767,13 @@ export default function PaymentPlansPage() {
                   marginBottom: '0.5rem',
                 }}
               >
-                Payment Amount (SSP)
+                {t('plans.paymentAmountLabel')}
               </label>
               <input
                 type="number"
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
-                placeholder="Enter payment amount"
+                placeholder={t('plans.paymentAmountPlaceholder')}
                 style={{
                   width: '100%',
                   padding: '0.75rem 1rem',
@@ -795,12 +797,12 @@ export default function PaymentPlansPage() {
                   marginBottom: '0.5rem',
                 }}
               >
-                Notes (Optional)
+                {t('plans.notesLabel')}
               </label>
               <textarea
                 value={paymentNotes}
                 onChange={(e) => setPaymentNotes(e.target.value)}
-                placeholder="Add notes about this payment..."
+                placeholder={t('plans.notesPlaceholder')}
                 style={{
                   width: '100%',
                   padding: '0.75rem 1rem',
@@ -838,7 +840,7 @@ export default function PaymentPlansPage() {
                   (e.target as HTMLButtonElement).style.backgroundColor = 'var(--border-light)';
                 }}
               >
-                Cancel
+                {t('action.cancel')}
               </button>
               <button
                 onClick={handleRecordPayment}
@@ -871,7 +873,7 @@ export default function PaymentPlansPage() {
                 }}
               >
                 <Receipt size={16} />
-                <span>Record Payment</span>
+                <span>{t('plans.recordPayment')}</span>
               </button>
             </div>
           </div>

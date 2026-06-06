@@ -3,18 +3,20 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Keyboard } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 const SHORTCUTS = [
-  { keys: ['Alt', 'N'], altKeys: ['Ctrl', 'N'], description: 'New patient', action: '/patients/new' },
-  { keys: ['Alt', 'S'], altKeys: ['/'], description: 'Focus search', action: 'focus-search' },
-  { keys: ['Alt', 'D'], description: 'Go to Dashboard', action: '/dashboard' },
-  { keys: ['Alt', 'P'], description: 'Go to Patients', action: '/patients' },
-  { keys: ['Alt', 'R'], description: 'Go to Referrals', action: '/referrals' },
-  { keys: ['Alt', 'M'], description: 'Go to Messages', action: '/messages' },
-  { keys: ['?'], description: 'Show keyboard shortcuts', action: 'show-help' },
+  { keys: ['Alt', 'N'], altKeys: ['Ctrl', 'N'], descriptionKey: 'keyboardShortcuts.newPatient', action: '/patients/new' },
+  { keys: ['Alt', 'S'], altKeys: ['/'], descriptionKey: 'keyboardShortcuts.focusSearch', action: 'focus-search' },
+  { keys: ['Alt', 'D'], descriptionKey: 'keyboardShortcuts.goToDashboard', action: '/dashboard' },
+  { keys: ['Alt', 'P'], descriptionKey: 'keyboardShortcuts.goToPatients', action: '/patients' },
+  { keys: ['Alt', 'R'], descriptionKey: 'keyboardShortcuts.goToReferrals', action: '/referrals' },
+  { keys: ['Alt', 'M'], descriptionKey: 'keyboardShortcuts.goToMessages', action: '/messages' },
+  { keys: ['?'], descriptionKey: 'keyboardShortcuts.showKeyboardShortcuts', action: 'show-help' },
 ];
 
 export default function KeyboardShortcuts() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [showHelp, setShowHelp] = useState(false);
 
@@ -114,7 +116,7 @@ export default function KeyboardShortcuts() {
           <div className="flex items-center gap-2">
             <Keyboard className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
             <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Keyboard Shortcuts
+              {t('keyboardShortcuts.title')}
             </span>
           </div>
           <button
@@ -135,7 +137,7 @@ export default function KeyboardShortcuts() {
               style={{ borderBottom: i < SHORTCUTS.length - 1 ? '1px solid var(--table-row-border)' : 'none' }}
             >
               <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                {shortcut.description}
+                {t(shortcut.descriptionKey)}
               </span>
               <div className="flex items-center gap-1.5">
                 {shortcut.keys.map((key, j) => (
@@ -158,7 +160,7 @@ export default function KeyboardShortcuts() {
                 ))}
                 {shortcut.altKeys && (
                   <>
-                    <span className="text-xs mx-1" style={{ color: 'var(--text-muted)' }}>or</span>
+                    <span className="text-xs mx-1" style={{ color: 'var(--text-muted)' }}>{t('keyboardShortcuts.or')}</span>
                     {shortcut.altKeys.map((key, j) => (
                       <span key={j}>
                         <kbd
@@ -187,7 +189,7 @@ export default function KeyboardShortcuts() {
         {/* Footer */}
         <div className="px-5 py-3" style={{ borderTop: '1px solid var(--table-row-border)' }}>
           <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-            Press <kbd className="px-1.5 py-0.5 rounded text-xs font-mono" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>?</kbd> to toggle this dialog
+            {t('keyboardShortcuts.pressToToggle')} <kbd className="px-1.5 py-0.5 rounded text-xs font-mono" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>?</kbd> {t('keyboardShortcuts.toToggleDialog')}
           </p>
         </div>
       </div>

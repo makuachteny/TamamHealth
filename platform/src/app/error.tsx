@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle, RotateCcw, Home } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export default function Error({
   error,
@@ -10,6 +11,8 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useTranslation();
+
   useEffect(() => {
     console.error('[TamamHealth] Application error:', error);
   }, [error]);
@@ -24,10 +27,10 @@ export default function Error({
           <AlertTriangle className="w-8 h-8" style={{ color: '#E52E42' }} />
         </div>
         <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary, #f1f5f9)' }}>
-          Something went wrong
+          {t('error.title')}
         </h2>
         <p className="text-sm mb-6" style={{ color: 'var(--text-muted, #64748b)' }}>
-          An unexpected error occurred. Your data is safe — this is just a display issue.
+          {t('error.description')}
         </p>
         {process.env.NODE_ENV !== 'production' && (
           <div className="mb-6 p-3 rounded-xl text-left" style={{
@@ -44,22 +47,22 @@ export default function Error({
             onClick={reset}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
             style={{
-              background: 'linear-gradient(135deg, #1B9AAA, #1d5bc4)',
-              boxShadow: '0 4px 16px rgba(27, 154, 170,0.3)',
+              background: 'linear-gradient(135deg, #3b82f6, #1d5bc4)',
+              boxShadow: '0 4px 16px rgba(59, 130, 246,0.3)',
             }}
           >
-            <RotateCcw className="w-4 h-4" /> Try Again
+            <RotateCcw className="w-4 h-4" /> {t('error.tryAgain')}
           </button>
           <a
             href="/dashboard"
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
             style={{
               background: 'var(--overlay-subtle, rgba(255,255,255,0.05))',
-              color: 'var(--text-secondary, #8A9E9A)',
+              color: 'var(--text-secondary, #64748b)',
               border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
             }}
           >
-            <Home className="w-4 h-4" /> Dashboard
+            <Home className="w-4 h-4" /> {t('error.dashboard')}
           </a>
         </div>
       </div>

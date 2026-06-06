@@ -388,9 +388,9 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             const isPregnant = !!activeANC;
 
             const infoBits: { icon: 'qr' | 'patient' | 'phone' | 'mapPin' | 'clock'; label: string; value: string; accent: string; mono?: boolean }[] = [
-              { icon: 'qr', label: 'Geocode', value: patient.geocodeId || patient.hospitalNumber, accent: '#1A3A3A', mono: true },
+              { icon: 'qr', label: 'Geocode', value: patient.geocodeId || patient.hospitalNumber, accent: '#1E3A8A', mono: true },
               { icon: 'patient', label: 'Age / Sex', value: `${age} y · ${patient.gender}`, accent: 'var(--accent-primary)' },
-              ...(patient.phone ? [{ icon: 'phone' as const, label: 'Phone', value: patient.phone, accent: '#1B9AAA', mono: true }] : []),
+              ...(patient.phone ? [{ icon: 'phone' as const, label: 'Phone', value: patient.phone, accent: '#3b82f6', mono: true }] : []),
               ...(patient.state ? [{ icon: 'mapPin' as const, label: 'Location', value: patient.state, accent: '#C44536' }] : []),
               { icon: 'clock', label: 'Last Visit', value: lastConsultedDisplay, accent: '#E4A84B' },
             ];
@@ -408,7 +408,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                       width: 180, borderRadius: 14,
                       background: isFemale
                         ? 'linear-gradient(135deg, #D96E59 0%, #9A2F27 100%)'
-                        : 'linear-gradient(135deg, #1B9AAA 0%, #0E5566 100%)',
+                        : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                       boxShadow: '0 4px 14px rgba(26, 58, 58, 0.10), inset 0 0 0 1px rgba(255,255,255,0.08)',
                     }}
                   >
@@ -516,7 +516,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                           <ArrowRightLeft className="w-4 h-4" /> Refer
                         </button>
                         <button onClick={() => setShowMessageModal(true)} className="btn btn-secondary">
-                          <MessageSquare className="w-4 h-4" style={{ color: '#1A3A3A' }} /> Message
+                          <MessageSquare className="w-4 h-4" style={{ color: '#1E3A8A' }} /> Message
                         </button>
                       </div>
 
@@ -907,7 +907,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                     <button
                       onClick={() => setActiveTab('trends')}
                       className="text-xs font-semibold inline-flex items-center gap-1 px-2.5 py-1 rounded-md"
-                      style={{ color: 'var(--tamamhealth-blue)', background: 'rgba(27, 154, 170, 0.08)' }}
+                      style={{ color: 'var(--tamamhealth-blue)', background: 'rgba(59, 130, 246, 0.08)' }}
                     >
                       <TrendingUpIcon className="w-3.5 h-3.5" /> View Trends
                     </button>

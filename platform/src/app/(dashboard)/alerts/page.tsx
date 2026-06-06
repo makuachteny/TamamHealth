@@ -11,6 +11,7 @@ import {
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { useLabResults } from '@/lib/hooks/useLabResults';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 type Severity = 'critical' | 'warning' | 'info';
 type AlertCategory = 'surveillance' | 'lab' | 'immunization';
@@ -72,21 +73,22 @@ function bucketByRecency(alerts: AlertItem[]) {
   return { recent, thisWeek, earlier };
 }
 
-function formatRelative(iso: string): string {
-  const t = new Date(iso).getTime();
-  if (!t) return '—';
-  const diffMin = (Date.now() - t) / 60000;
-  if (diffMin < 1) return 'just now';
-  if (diffMin < 60) return `${Math.floor(diffMin)}m ago`;
+function formatRelative(iso: string, t: (key: string, vars?: Record<string, string | number>) => string): string {
+  const time = new Date(iso).getTime();
+  if (!time) return '—';
+  const diffMin = (Date.now() - time) / 60000;
+  if (diffMin < 1) return t('alerts.justNow');
+  if (diffMin < 60) return t('alerts.minutesAgo', { count: Math.floor(diffMin) });
   const diffHr = diffMin / 60;
-  if (diffHr < 24) return `${Math.floor(diffHr)}h ago`;
+  if (diffHr < 24) return t('alerts.hoursAgo', { count: Math.floor(diffHr) });
   const diffDay = diffHr / 24;
-  if (diffDay < 7) return `${Math.floor(diffDay)}d ago`;
+  if (diffDay < 7) return t('alerts.daysAgo', { count: Math.floor(diffDay) });
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
 export default function AlertsPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { alerts: diseaseAlerts } = useSurveillance();
   const { immunizations } = useImmunizations();
   const { results: labResults } = useLabResults();
@@ -216,7 +218,7 @@ export default function AlertsPage() {
               </span>
             )}
             <span className="text-[11px] ml-auto" style={{ color: 'var(--text-muted)' }}>
-              {formatRelative(a.timestamp)}
+              {formatRelative(a.timestamp, t)}
             </span>
           </div>
           <p className="text-sm font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>

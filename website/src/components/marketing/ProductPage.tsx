@@ -254,7 +254,7 @@ export function ProductIllustration({
 
         {/* Sidebar */}
         <div style={{ paddingTop: 26, background: "#FAFAF8", borderRight: "1px solid #E8E6E2", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 22, height: 22, borderRadius: 6, background: `linear-gradient(135deg, ${accent} 0%, #1A3A3A 100%)` }} />
+          <div style={{ width: 22, height: 22, borderRadius: 6, background: `linear-gradient(135deg, ${accent} 0%, #1E3A8A 100%)` }} />
           {[0, 1, 2, 3, 4].map((i) => (
             <div key={i} style={{ width: 26, height: 26, borderRadius: 6, background: i === 1 ? `${accent}20` : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <div style={{ width: 12, height: 12, borderRadius: 3, background: i === 1 ? accent : "#5A7370", opacity: i === 1 ? 1 : 0.5 }} />
@@ -341,7 +341,7 @@ function MockClinic({ accent }: { accent: string }) {
           { name: "Stella Wani", id: "JTH-0245", status: "Pharmacy", color: accent },
         ].map((p) => (
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: 5, background: "#FAFAF8", borderRadius: 5, border: "1px solid #F2F5F3" }}>
-            <div style={{ width: 18, height: 18, borderRadius: 4, background: `linear-gradient(135deg, ${accent} 0%, #1A3A3A 100%)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 7 }}>{p.name.split(" ").map(n => n[0]).join("")}</div>
+            <div style={{ width: 18, height: 18, borderRadius: 4, background: `linear-gradient(135deg, ${accent} 0%, #1E3A8A 100%)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 7 }}>{p.name.split(" ").map(n => n[0]).join("")}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 8.5, fontWeight: 700, color: "#1A2C2A" }}>{p.name}</div>
               <div style={{ fontSize: 7, color: "#5A7370" }}>{p.id}</div>
@@ -407,7 +407,7 @@ function MockImaging({ accent }: { accent: string }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, flex: 1 }}>
         {[0, 1, 2].map((i) => (
           <div key={i} style={{
-            background: "linear-gradient(135deg, #1A3A3A 0%, #0a1a1a 100%)",
+            background: "linear-gradient(135deg, #1E3A8A 0%, #0a1a1a 100%)",
             borderRadius: 4,
             position: "relative",
             overflow: "hidden",

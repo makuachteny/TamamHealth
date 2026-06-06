@@ -30,6 +30,12 @@
  *                                     conflict surface; not analytics-bound.
  *   - tamamhealth_saved_payment_methods  PCI-sensitive tokens. Must never
  *                                        leave the clinic perimeter.
+ *   - tamamhealth_availability        Provider booking windows. Facility-
+ *                                     operational scheduling, not a national
+ *                                     analytics target.
+ *   - tamamhealth_announcements       Staff broadcast notices. Facility-
+ *                                     operational, not a national analytics
+ *                                     target.
  *
  * All remaining databases land in DB_TABLE_MAP below; a missing entry causes a
  * 400 from this route, so the sync-worker surfaces a hard failure rather than

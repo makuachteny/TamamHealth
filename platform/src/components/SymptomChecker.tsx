@@ -8,12 +8,13 @@ import {
 } from '@/components/icons/lucide';
 import { evaluatePatient, type PatientInput } from '@/lib/ai/diagnosis-engine';
 import type { AIEvaluation } from '@/lib/db-types';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 // Simplified symptom categories for BHW-level workers
 const SYMPTOM_GROUPS = [
   {
     id: 'fever',
-    label: 'Fever / Hot',
+    label: 'symptomChecker.groupFever',
     icon: Thermometer,
     color: 'var(--color-danger)',
     bg: 'rgba(239,68,68,0.1)',
@@ -25,7 +26,7 @@ const SYMPTOM_GROUPS = [
   },
   {
     id: 'diarrhea',
-    label: 'Diarrhea / Vomiting',
+    label: 'symptomChecker.groupDiarrhea',
     icon: Droplets,
     color: 'var(--color-warning)',
     bg: 'rgba(245,158,11,0.1)',
@@ -37,7 +38,7 @@ const SYMPTOM_GROUPS = [
   },
   {
     id: 'cough',
-    label: 'Cough / Breathing',
+    label: 'symptomChecker.groupCough',
     icon: Wind,
     color: 'var(--accent-primary)',
     bg: 'var(--accent-light)',
@@ -49,7 +50,7 @@ const SYMPTOM_GROUPS = [
   },
   {
     id: 'skin',
-    label: 'Rash / Skin',
+    label: 'symptomChecker.groupSkin',
     icon: Activity,
     color: 'var(--accent-primary)',
     bg: 'var(--accent-light)',
@@ -58,7 +59,7 @@ const SYMPTOM_GROUPS = [
   },
   {
     id: 'weakness',
-    label: 'Weakness / Pale',
+    label: 'symptomChecker.groupWeakness',
     icon: Heart,
     color: 'var(--accent-primary)',
     bg: 'var(--accent-light)',
@@ -67,7 +68,7 @@ const SYMPTOM_GROUPS = [
   },
   {
     id: 'pregnancy',
-    label: 'Pregnancy Problem',
+    label: 'symptomChecker.groupPregnancy',
     icon: Baby,
     color: 'var(--accent-primary)',
     bg: 'var(--accent-light)',
@@ -79,7 +80,7 @@ const SYMPTOM_GROUPS = [
   },
   {
     id: 'pain',
-    label: 'Belly Pain',
+    label: 'symptomChecker.groupPain',
     icon: AlertTriangle,
     color: 'var(--accent-primary)',
     bg: 'var(--accent-light)',
@@ -88,7 +89,7 @@ const SYMPTOM_GROUPS = [
   },
   {
     id: 'malnutrition',
-    label: 'Not Eating / Thin',
+    label: 'symptomChecker.groupMalnutrition',
     icon: Brain,
     color: 'var(--color-warning)',
     bg: 'rgba(217,119,6,0.1)',
@@ -113,6 +114,7 @@ export default function SymptomChecker({
   patientGender,
   onDiagnosisComplete,
 }: SymptomCheckerProps) {
+  const { t } = useTranslation();
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [evaluation, setEvaluation] = useState<AIEvaluation | null>(null);
   const [evaluating, setEvaluating] = useState(false);
@@ -196,13 +198,13 @@ export default function SymptomChecker({
         <div className="flex items-center gap-2">
           <Stethoscope className="w-5 h-5" style={{ color: 'var(--color-success)' }} />
           <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
-            AI Health Companion
+            {t('symptomChecker.title')}
           </h3>
         </div>
         {step === 'results' && (
           <button onClick={reset} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
             style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
-            <X className="w-3 h-3" /> New Check
+            <X className="w-3 h-3" /> {t('symptomChecker.newCheck')}
           </button>
         )}
       </div>
@@ -211,15 +213,15 @@ export default function SymptomChecker({
         <div className="p-4">
           {patientName && (
             <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-              Checking symptoms for <strong style={{ color: 'var(--text-primary)' }}>{patientName}</strong>
+              {t('symptomChecker.checkingFor')} <strong style={{ color: 'var(--text-primary)' }}>{patientName}</strong>
               {patientAge ? ` (${patientAge}y${patientGender ? `, ${patientGender}` : ''})` : ''}
             </p>
           )}
           <p className="text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>
-            What is the patient complaining about?
+            {t('symptomChecker.complaintQuestion')}
           </p>
           <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-            Tap all that apply
+            {t('boma.tapAllThatApply')}
           </p>
 
           {/* Symptom buttons grid */}
@@ -244,7 +246,7 @@ export default function SymptomChecker({
                   <span className="text-sm font-medium" style={{
                     color: isSelected ? group.color : 'var(--text-primary)',
                   }}>
-                    {group.label}
+                    {t(group.label)}
                   </span>
                   {isSelected && (
                     <CheckCircle2 className="w-4 h-4 ml-auto flex-shrink-0" style={{ color: group.color }} />
@@ -268,12 +270,12 @@ export default function SymptomChecker({
             {evaluating ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Analyzing symptoms...
+                {t('boma.analyzingSymptoms')}
               </>
             ) : (
               <>
                 <Stethoscope className="w-4 h-4" />
-                Check Diagnosis ({selectedSymptoms.length} symptom{selectedSymptoms.length !== 1 ? 's' : ''})
+                {t('symptomChecker.checkDiagnosis', { count: selectedSymptoms.length })}
               </>
             )}
           </button>
@@ -320,7 +322,7 @@ export default function SymptomChecker({
 
           {/* Suggested diagnoses */}
           <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
-            Possible Conditions
+            {t('symptomChecker.possibleConditions')}
           </p>
           <div className="space-y-2.5 mb-4">
             {evaluation.suggestedDiagnoses.slice(0, 3).map((dx, i) => {
@@ -379,7 +381,7 @@ export default function SymptomChecker({
           {evaluation.recommendedTests.length > 0 && (
             <div className="mb-4">
               <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
-                Recommended Tests
+                {t('boma.recommendedTests')}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {evaluation.recommendedTests.map(test => (
@@ -397,7 +399,7 @@ export default function SymptomChecker({
           {evaluation.vitalSignAlerts.length > 0 && (
             <div className="mb-4">
               <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
-                Alerts
+                {t('symptomChecker.alerts')}
               </p>
               <div className="space-y-1.5">
                 {evaluation.vitalSignAlerts.map((alert, i) => (
@@ -417,14 +419,14 @@ export default function SymptomChecker({
             border: '1px solid rgba(5,150,105,0.15)',
           }}>
             <p className="text-xs font-bold mb-1" style={{ color: 'var(--color-success)' }}>
-              <ChevronRight className="w-3 h-3 inline" /> What should I do?
+              <ChevronRight className="w-3 h-3 inline" /> {t('boma.whatShouldIDo')}
             </p>
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
               {evaluation.severityAssessment.includes('HIGH')
-                ? 'REFER IMMEDIATELY to the nearest PHCC or hospital. This patient needs urgent care. Give first aid and arrange transport.'
+                ? t('symptomChecker.guidanceHigh')
                 : evaluation.severityAssessment.includes('MODERATE')
-                  ? 'Consider referral if you cannot provide the suggested treatment. Monitor the patient closely. Follow up within 24 hours.'
-                  : 'You can treat this patient at the community level. Follow the treatment suggestions above. Schedule a follow-up in 2-3 days.'}
+                  ? t('symptomChecker.guidanceModerate')
+                  : t('symptomChecker.guidanceLow')}
             </p>
           </div>
 
@@ -434,7 +436,7 @@ export default function SymptomChecker({
             border: '1px solid rgba(59,130,246,0.15)',
           }}>
             <p className="text-xs font-bold mb-2 flex items-center gap-1.5" style={{ color: 'var(--accent-primary)' }}>
-              <FlaskConical className="w-3 h-3" /> Learn More
+              <FlaskConical className="w-3 h-3" /> {t('symptomChecker.learnMore')}
             </p>
             <div className="space-y-1.5">
               {evaluation.suggestedDiagnoses.slice(0, 2).map(dx => {
@@ -450,7 +452,7 @@ export default function SymptomChecker({
                         className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium"
                         style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--accent-primary)' }}
                       >
-                        WHO Guidelines
+                        {t('symptomChecker.whoGuidelines')}
                       </a>
                       <a
                         href={`https://www.thelancet.com/action/doSearch?text1=${searchTerm}&startPage=0&pageSize=5`}
@@ -475,14 +477,14 @@ export default function SymptomChecker({
                 );
               })}
               <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                South Sudan National Treatment Guidelines apply. Links for reference only.
+                {t('symptomChecker.referenceNote')}
               </p>
             </div>
           </div>
 
           {/* Disclaimer */}
           <p className="text-[10px] mt-3 text-center" style={{ color: 'var(--text-muted)' }}>
-            AI suggestion based on WHO/IMCI guidelines. Use your clinical judgment.
+            {t('boma.aiDisclaimer')}
           </p>
         </div>
       )}

@@ -8,7 +8,7 @@ import type { CSSProperties, ReactNode, SVGProps } from 'react';
 // Two layers: a gradient-filled "body" and a crisp foreground stroke + accent shapes.
 // Designed to read well at 18-48px. Below 18px, falls back to a "flat" mode (no shadow).
 
-export const TABAN_ACCENT_DEFAULT = '#2E9E7E';
+export const TABAN_ACCENT_DEFAULT = '#3b82f6';
 
 export type TabanCategory =
   | 'Vitals'
@@ -27,8 +27,8 @@ export const TABAN_CATEGORY_ACCENTS: Record<
   Clinical: { base: '#2E9E7E', light: '#4FC9A6', deep: '#1A6B54' },
   'Lab & Pharmacy': { base: '#B07A2E', light: '#E0A858', deep: '#7A4F18' },
   'Maternal & Child': { base: '#D96E59', light: '#F09784', deep: '#9A4A38' },
-  Billing: { base: '#1B9AAA', light: '#4AA8CE', deep: '#0F5577' },
-  Navigation: { base: '#2E5E5E', light: '#4F8585', deep: '#1A3A3A' },
+  Billing: { base: '#3b82f6', light: '#4AA8CE', deep: '#0F5577' },
+  Navigation: { base: '#2E5E5E', light: '#4F8585', deep: '#1E3A8A' },
   Neutral: { base: '#3D5854', light: '#6B8884', deep: '#1A2C2A' },
 };
 

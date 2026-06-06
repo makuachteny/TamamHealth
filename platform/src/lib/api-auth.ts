@@ -22,6 +22,8 @@ export interface AuthPayload {
   payam?: string;
   county?: string;
   state?: string;
+  /** True when the user must set a new password before using the app. */
+  mustChangePassword?: boolean;
 }
 
 /**

@@ -16,6 +16,7 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { AppointmentType, AppointmentPriority, AppointmentStatus, FacilityLevel } from '@/lib/db-types';
 
 /* ─── Config ─── */
@@ -81,6 +82,27 @@ export default function AppointmentsPage() {
   const { currentUser, globalSearch } = useApp();
   const { canBookAppointments } = usePermissions();
   const { showToast } = useToast();
+  const { t } = useTranslation();
+
+  // Translated label lookups for module-level config (which can't call t()).
+  const typeLabelKey: Record<AppointmentType, string> = {
+    general: 'appointments.typeGeneral', follow_up: 'appointments.typeFollowUp',
+    specialist: 'appointments.typeSpecialist', anc: 'appointments.typeAnc',
+    immunization: 'appointments.typeImmunization', lab: 'appointments.typeLab',
+    telehealth: 'appointments.typeTelehealth', surgical: 'appointments.typeSurgical',
+    dental: 'appointments.typeDental', mental_health: 'appointments.typeMentalHealth',
+    walk_in: 'appointments.typeWalkIn',
+  };
+  const statusLabelKey: Record<AppointmentStatus, string> = {
+    scheduled: 'appointments.statusScheduled', confirmed: 'appointments.statusConfirmed',
+    checked_in: 'appointments.statusCheckedIn', in_progress: 'appointments.statusInProgress',
+    completed: 'appointments.statusCompleted', cancelled: 'appointments.statusCancelled',
+    no_show: 'appointments.statusNoShow',
+  };
+  const priorityLabelKey: Record<AppointmentPriority, string> = {
+    routine: 'appointments.priorityRoutine', urgent: 'appointments.priorityUrgent',
+    emergency: 'appointments.priorityEmergency',
+  };
 
   const [view, setView] = useState<'calendar' | 'list'>('calendar');
   const [calView, setCalView] = useState<'month' | 'week' | 'day'>('month');
@@ -94,6 +116,20 @@ export default function AppointmentsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [patientInsurance, setPatientInsurance] = useState<Record<string, boolean>>({});
+
+  // Deep link: TopBar "+ → Schedule appointment" routes here with ?new=1 to
+  // open the booking form straight away. Read on the client to avoid needing a
+  // Suspense boundary around useSearchParams, then strip the param.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') === '1') {
+      setShowNewForm(true);
+      params.delete('new');
+      const qs = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
+    }
+  }, []);
 
   // Calendar state
   const todayObj = new Date();
@@ -237,10 +273,10 @@ export default function AppointmentsPage() {
 
   const handleSubmit = async () => {
     if (!formPatient || !formDate || !formTime || !formReason) {
-      showToast('Please fill in all required fields', 'error'); return;
+      showToast(t('appointments.toastFillRequired'), 'error'); return;
     }
     const patient = patients.find(p => p._id === formPatient);
-    if (!patient) { showToast('Please select a valid patient', 'error'); return; }
+    if (!patient) { showToast(t('appointments.toastSelectValidPatient'), 'error'); return; }
     setSubmitting(true);
     try {
       await create({
@@ -255,15 +291,15 @@ export default function AppointmentsPage() {
         recurrencePattern: formRecurring ? formRecurrencePattern : undefined,
         bookedBy: currentUser?._id || '', bookedByName: currentUser?.name || '', state: '',
       });
-      showToast('Appointment booked', 'success'); setShowNewForm(false); resetForm();
-    } catch (err) { showToast(err instanceof Error ? err.message : 'Failed to book', 'error'); }
+      showToast(t('appointments.toastBooked'), 'success'); setShowNewForm(false); resetForm();
+    } catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailedBook'), 'error'); }
     finally { setSubmitting(false); }
   };
 
   const handleWalkIn = async () => {
-    if (!wiPatient || !wiReason) { showToast('Please fill required fields', 'error'); return; }
+    if (!wiPatient || !wiReason) { showToast(t('appointments.toastFillRequiredShort'), 'error'); return; }
     const patient = patients.find(p => p._id === wiPatient);
-    if (!patient) { showToast('Select a valid patient', 'error'); return; }
+    if (!patient) { showToast(t('appointments.toastSelectValidPatientShort'), 'error'); return; }
     setSubmitting(true);
     try {
       const now = new Date();
@@ -278,27 +314,27 @@ export default function AppointmentsPage() {
         status: 'checked_in', reminderSent: false, isRecurring: false,
         bookedBy: currentUser?._id || '', bookedByName: currentUser?.name || '', state: '',
       });
-      showToast('Walk-in registered', 'success'); setShowWalkIn(false);
+      showToast(t('appointments.toastWalkInRegistered'), 'success'); setShowWalkIn(false);
       setWiPatient(''); setWiReason(''); setWiNotes(''); setWiDepartment('Outpatient'); setWiPriority('routine');
-    } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); }
+    } catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailed'), 'error'); }
     finally { setSubmitting(false); }
   };
 
   const handleStatusChange = useCallback(async (id: string, status: AppointmentStatus) => {
-    try { await updateStatus(id, status); showToast(`Appointment ${status.replace('_', ' ')}`, 'success'); }
-    catch { showToast('Failed to update', 'error'); }
-  }, [updateStatus, showToast]);
+    try { await updateStatus(id, status); showToast(t('appointments.toastStatusChanged', { status: t(statusLabelKey[status]).toLowerCase() }), 'success'); }
+    catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
+  }, [updateStatus, showToast, t, statusLabelKey]);
 
   const handleReschedule = async () => {
     if (!rescheduleId || !rescheduleDate || !rescheduleTime) return;
-    try { await reschedule(rescheduleId, rescheduleDate, rescheduleTime); showToast('Rescheduled', 'success'); setRescheduleId(null); }
-    catch { showToast('Failed to reschedule', 'error'); }
+    try { await reschedule(rescheduleId, rescheduleDate, rescheduleTime); showToast(t('appointments.toastRescheduled'), 'success'); setRescheduleId(null); }
+    catch { showToast(t('appointments.toastFailedReschedule'), 'error'); }
   };
 
   const handleCancel = async () => {
     if (!cancelId) return;
-    try { await updateStatus(cancelId, 'cancelled', { cancelledReason: cancelReason, cancelledBy: currentUser?.name }); showToast('Cancelled', 'success'); setCancelId(null); setCancelReason(''); }
-    catch { showToast('Failed to cancel', 'error'); }
+    try { await updateStatus(cancelId, 'cancelled', { cancelledReason: cancelReason, cancelledBy: currentUser?.name }); showToast(t('appointments.toastCancelled'), 'success'); setCancelId(null); setCancelReason(''); }
+    catch { showToast(t('appointments.toastFailedCancel'), 'error'); }
   };
 
   const prevMonth = () => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); };
@@ -311,19 +347,19 @@ export default function AppointmentsPage() {
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <PageHeader
           icon={Calendar}
-          title="Appointments"
-          subtitle="Schedule, approve, and manage patient appointments"
+          title={t('appointments.title')}
+          subtitle={t('appointments.subtitle')}
         />
 
         {/* ═══ Quick Stats ═══ */}
         {stats && (
           <div className="stat-grid" style={{ marginBottom: 20 }}>
             {[
-              { label: "Today's Appointments", value: stats.todayTotal, icon: Calendar, color: '#6366F1', bg: 'rgba(99,102,241,0.12)' },
-              { label: 'Pending Approval', value: pendingApprovals.length, icon: Clock, color: '#D97706', bg: 'rgba(217,119,6,0.12)' },
-              { label: 'Walk-Ins Today', value: walkIns.length, icon: UserPlus, color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
-              { label: 'Completed', value: stats.todayCompleted, icon: CheckCircle2, color: 'var(--color-success)', bg: 'rgba(5,150,105,0.12)' },
-              { label: 'No-Show Rate', value: `${stats.noShowRate}%`, icon: XCircle, color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.12)' },
+              { label: t('appointments.statTodaysAppointments'), value: stats.todayTotal, icon: Calendar, color: '#6366F1', bg: 'rgba(99,102,241,0.12)' },
+              { label: t('appointments.statPendingApproval'), value: pendingApprovals.length, icon: Clock, color: '#D97706', bg: 'rgba(217,119,6,0.12)' },
+              { label: t('appointments.statWalkInsToday'), value: walkIns.length, icon: UserPlus, color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
+              { label: t('appointments.statCompleted'), value: stats.todayCompleted, icon: CheckCircle2, color: 'var(--color-success)', bg: 'rgba(5,150,105,0.12)' },
+              { label: t('appointments.statNoShowRate'), value: `${stats.noShowRate}%`, icon: XCircle, color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.12)' },
             ].map((c, i) => (
               <div key={i} className="card-elevated" style={{ padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -348,7 +384,7 @@ export default function AppointmentsPage() {
                 background: view === v ? 'var(--accent-primary)' : 'var(--bg-card)',
                 color: view === v ? '#fff' : 'var(--text-secondary)',
               }}>
-                {v === 'calendar' ? 'Calendar' : 'List'}
+                {v === 'calendar' ? t('appointments.viewCalendar') : t('appointments.viewList')}
               </button>
             ))}
           </div>
@@ -370,7 +406,7 @@ export default function AppointmentsPage() {
           )}
 
           <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary" style={{ gap: 6 }}>
-            <Filter size={14} /> Filters
+            <Filter size={14} /> {t('appointments.filters')}
           </button>
 
           <div style={{ flex: 1 }} />
@@ -378,10 +414,10 @@ export default function AppointmentsPage() {
           {canBookAppointments && (
             <>
               <button onClick={() => setShowWalkIn(true)} className="btn btn-secondary" style={{ gap: 6, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }}>
-                <UserPlus size={16} /> Walk-In
+                <UserPlus size={16} /> {t('appointments.walkIn')}
               </button>
               <button onClick={() => setShowNewForm(true)} className="btn btn-primary" style={{ gap: 6 }}>
-                <Plus size={16} /> Book Appointment
+                <Plus size={16} /> {t('appointments.bookAppointment')}
               </button>
             </>
           )}
@@ -392,16 +428,16 @@ export default function AppointmentsPage() {
           <div className="card-elevated" style={{ padding: 12, marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search patients, providers..."
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('appointments.searchPlaceholder')}
                 style={{ paddingLeft: 32 }} />
             </div>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-              <option value="all">All Status</option>
-              {Object.entries(statusConfig).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              <option value="all">{t('appointments.allStatus')}</option>
+              {Object.keys(statusConfig).map(k => <option key={k} value={k}>{t(statusLabelKey[k as AppointmentStatus])}</option>)}
             </select>
             {selectedDate && (
               <button onClick={() => setSelectedDate(null)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-                <X size={12} /> Clear date
+                <X size={12} /> {t('appointments.clearDate')}
               </button>
             )}
           </div>
@@ -424,7 +460,7 @@ export default function AppointmentsPage() {
                 </h3>
                 <button onClick={nextMonth} style={calNavBtn}><ChevronRight size={44} /></button>
               </div>
-              <button onClick={goToday} className="btn btn-secondary btn-sm">Today</button>
+              <button onClick={goToday} className="btn btn-secondary btn-sm">{t('appointments.today')}</button>
             </div>
 
             {/* ── Month View ── */}
@@ -461,9 +497,9 @@ export default function AppointmentsPage() {
                         }}>{day.day}</span>
                         {counts && (
                           <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: 'center' }}>
-                            {counts.pending > 0 && <span style={dotStyle('var(--color-warning)')} title={`${counts.pending} pending`} />}
-                            {counts.confirmed > 0 && <span style={dotStyle('var(--color-success)')} title={`${counts.confirmed} active`} />}
-                            {counts.walkIn > 0 && <span style={dotStyle('var(--accent-primary)')} title={`${counts.walkIn} walk-in`} />}
+                            {counts.pending > 0 && <span style={dotStyle('var(--color-warning)')} title={`${counts.pending} ${t('appointments.legendPending').toLowerCase()}`} />}
+                            {counts.confirmed > 0 && <span style={dotStyle('var(--color-success)')} title={`${counts.confirmed} ${t('appointments.legendActive').toLowerCase()}`} />}
+                            {counts.walkIn > 0 && <span style={dotStyle('var(--accent-primary)')} title={`${counts.walkIn} ${t('appointments.legendWalkIn').toLowerCase()}`} />}
                             <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{counts.total}</span>
                           </div>
                         )}
@@ -560,12 +596,12 @@ export default function AppointmentsPage() {
                                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{a.patientName}</div>
                                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.department} · {a.providerName}</div>
                                   </div>
-                                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: `${sc?.color || 'var(--accent-primary)'}12`, color: sc?.color || 'var(--accent-primary)' }}>{sc?.label || a.status}</span>
+                                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: `${sc?.color || 'var(--accent-primary)'}12`, color: sc?.color || 'var(--accent-primary)' }}>{sc ? t(statusLabelKey[a.status]) : a.status}</span>
                                 </div>
                               );
                             })}
                             {hourApts.length === 0 && (
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)', opacity: 0.4, padding: '4px 0' }}>Click to book</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', opacity: 0.4, padding: '4px 0' }}>{t('appointments.clickToBook')}</div>
                             )}
                           </div>
                         </React.Fragment>
@@ -579,9 +615,9 @@ export default function AppointmentsPage() {
             {/* Legend */}
             <div style={{ display: 'flex', gap: 16, padding: '10px 20px', borderTop: '1px solid var(--border-medium)', flexWrap: 'wrap' }}>
               {[
-                { color: 'var(--color-warning)', label: 'Pending' },
-                { color: 'var(--color-success)', label: 'Active' },
-                { color: 'var(--accent-primary)', label: 'Walk-In' },
+                { color: 'var(--color-warning)', label: t('appointments.legendPending') },
+                { color: 'var(--color-success)', label: t('appointments.legendActive') },
+                { color: 'var(--accent-primary)', label: t('appointments.legendWalkIn') },
               ].map(l => (
                 <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
                   <span style={{ ...dotStyle(l.color), position: 'relative' }} />
@@ -602,12 +638,12 @@ export default function AppointmentsPage() {
             </div>
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                {pendingApprovals.length} appointment{pendingApprovals.length > 1 ? 's' : ''} pending approval
+                {t('appointments.pendingApprovalBanner', { count: pendingApprovals.length, plural: pendingApprovals.length > 1 ? 's' : '' })}
               </span>
             </div>
             <button onClick={() => { setFilterStatus('scheduled'); setSelectedDate(null); setView('list'); }}
               className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-              <ClipboardList size={14} /> Review
+              <ClipboardList size={14} /> {t('appointments.review')}
             </button>
           </div>
         )}
@@ -618,7 +654,7 @@ export default function AppointmentsPage() {
             <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
               {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </h3>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{filteredAppointments.length} appointments</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('appointments.appointmentsCount', { count: filteredAppointments.length })}</span>
           </div>
         )}
 
@@ -628,13 +664,13 @@ export default function AppointmentsPage() {
             {filteredAppointments.length === 0 ? (
               <div className="card-elevated" style={{ textAlign: 'center', padding: 48 }}>
                 <Calendar size={56} style={{ color: 'var(--text-muted)', opacity: 0.3, marginBottom: 12 }} />
-                <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>No appointments {selectedDate ? 'on this date' : 'found'}</p>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>{selectedDate ? t('appointments.noneOnDate') : t('appointments.noneFound')}</p>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
                   {canBookAppointments && <button onClick={() => setShowNewForm(true)} className="btn btn-primary btn-sm" style={{ gap: 4 }}>
-                    <Plus size={14} /> Book Appointment
+                    <Plus size={14} /> {t('appointments.bookAppointment')}
                   </button>}
                   {canBookAppointments && <button onClick={() => setShowWalkIn(true)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-                    <UserPlus size={14} /> Walk-In
+                    <UserPlus size={14} /> {t('appointments.walkIn')}
                   </button>}
                 </div>
               </div>
@@ -652,7 +688,7 @@ export default function AppointmentsPage() {
                     }}>
                       <div style={{ minWidth: 52, textAlign: 'center' }}>
                         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{apt.appointmentTime}</div>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{apt.duration}min</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{t('appointments.minShort', { count: apt.duration })}</div>
                       </div>
                       <div className="icon-box-sm" style={{
                         background: typeInfo?.bg || sc.bg, flexShrink: 0,
@@ -667,7 +703,7 @@ export default function AppointmentsPage() {
                               onClick={(e) => e.stopPropagation()}
                               style={{ color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                               className="hover:underline"
-                              title="View patient record"
+                              title={t('appointments.viewPatientRecord')}
                             >
                               {apt.patientName}
                               <ExternalLink size={11} style={{ opacity: 0.55 }} />
@@ -675,47 +711,47 @@ export default function AppointmentsPage() {
                           ) : (
                             apt.patientName
                           )}
-                          {isWalkIn && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)' }}>WALK-IN</span>}
+                          {isWalkIn && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)' }}>{t('appointments.walkInBadge')}</span>}
                           {patientInsurance[apt.patientId] && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
                               style={{ background: '#05966915', color: 'var(--color-success)' }}>
-                              Insured
+                              {t('appointments.insured')}
                             </span>
                           )}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {typeInfo?.label || apt.appointmentType} &middot; {apt.department}
+                          {typeInfo ? t(typeLabelKey[apt.appointmentType]) : apt.appointmentType} &middot; {apt.department}
                         </div>
                       </div>
                       {!selectedDate && <div style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 70 }}>{apt.appointmentDate}</div>}
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, color: pc.color, background: `${pc.color}12` }}>{pc.label}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 6, color: sc.color, background: sc.bg }}>{sc.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, color: pc.color, background: `${pc.color}12` }}>{t(priorityLabelKey[apt.priority])}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 6, color: sc.color, background: sc.bg }}>{t(statusLabelKey[apt.status])}</span>
                       {isExpanded ? <ChevronUp size={14} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />}
                     </div>
 
                     {isExpanded && (
                       <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border-medium)', paddingTop: 14 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', alignItems: 'stretch', gap: 14 }}>
-                          <Detail label="Reason" value={apt.reason} />
-                          {apt.notes && <Detail label="Notes" value={apt.notes} />}
-                          <Detail label="Provider" value={`Dr. ${apt.providerName}`} />
-                          <Detail label="Facility" value={apt.facilityName || 'N/A'} icon={<Building2 size={13} />} />
-                          {apt.patientPhone && <Detail label="Phone" value={apt.patientPhone} icon={<Phone size={13} />} />}
-                          <Detail label="Booked By" value={apt.bookedByName} />
-                          {apt.isRecurring && <Detail label="Recurrence" value={apt.recurrencePattern || ''} icon={<RefreshCw size={13} />} />}
-                          {apt.reminderSent && <Detail label="Reminder" value="Sent" icon={<Bell size={13} />} />}
+                          <Detail label={t('appointments.detailReason')} value={apt.reason} />
+                          {apt.notes && <Detail label={t('appointments.detailNotes')} value={apt.notes} />}
+                          <Detail label={t('appointments.detailProvider')} value={t('appointments.providerPrefix', { name: apt.providerName })} />
+                          <Detail label={t('appointments.detailFacility')} value={apt.facilityName || t('appointments.notAvailable')} icon={<Building2 size={13} />} />
+                          {apt.patientPhone && <Detail label={t('appointments.detailPhone')} value={apt.patientPhone} icon={<Phone size={13} />} />}
+                          <Detail label={t('appointments.detailBookedBy')} value={apt.bookedByName} />
+                          {apt.isRecurring && <Detail label={t('appointments.detailRecurrence')} value={apt.recurrencePattern || ''} icon={<RefreshCw size={13} />} />}
+                          {apt.reminderSent && <Detail label={t('appointments.detailReminder')} value={t('appointments.reminderSent')} icon={<Bell size={13} />} />}
                         </div>
                         {apt.status !== 'completed' && apt.status !== 'cancelled' && apt.status !== 'no_show' && (
                           <>
                           <hr className="section-divider" />
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {apt.status === 'scheduled' && <ActionBtn color="#7C3AED" icon={<CheckCircle2 size={13} />} label="Approve" onClick={() => handleStatusChange(apt._id, 'confirmed')} />}
-                            {(apt.status === 'scheduled' || apt.status === 'confirmed') && <ActionBtn color="#D97706" icon={<User size={13} />} label="Check In" onClick={() => handleStatusChange(apt._id, 'checked_in')} />}
-                            {apt.status === 'checked_in' && <ActionBtn color="#059669" icon={<Stethoscope size={13} />} label="Start" onClick={() => handleStatusChange(apt._id, 'in_progress')} />}
-                            {apt.status === 'in_progress' && <ActionBtn color="#10B981" icon={<CheckCircle2 size={13} />} label="Complete" onClick={() => handleStatusChange(apt._id, 'completed')} />}
-                            <ActionBtn color="var(--accent-primary)" icon={<RefreshCw size={13} />} label="Reschedule" onClick={() => { setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); }} />
-                            {(apt.status === 'scheduled' || apt.status === 'confirmed') && <ActionBtn color="#6B7280" icon={<XCircle size={13} />} label="No Show" onClick={() => handleStatusChange(apt._id, 'no_show')} />}
-                            <ActionBtn color="#EF4444" icon={<X size={13} />} label="Cancel" onClick={() => setCancelId(apt._id)} />
+                            {apt.status === 'scheduled' && <ActionBtn color="#7C3AED" icon={<CheckCircle2 size={13} />} label={t('appointments.actionApprove')} onClick={() => handleStatusChange(apt._id, 'confirmed')} />}
+                            {(apt.status === 'scheduled' || apt.status === 'confirmed') && <ActionBtn color="#D97706" icon={<User size={13} />} label={t('appointments.actionCheckIn')} onClick={() => handleStatusChange(apt._id, 'checked_in')} />}
+                            {apt.status === 'checked_in' && <ActionBtn color="#059669" icon={<Stethoscope size={13} />} label={t('appointments.actionStart')} onClick={() => handleStatusChange(apt._id, 'in_progress')} />}
+                            {apt.status === 'in_progress' && <ActionBtn color="#10B981" icon={<CheckCircle2 size={13} />} label={t('appointments.actionComplete')} onClick={() => handleStatusChange(apt._id, 'completed')} />}
+                            <ActionBtn color="var(--accent-primary)" icon={<RefreshCw size={13} />} label={t('appointments.actionReschedule')} onClick={() => { setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); }} />
+                            {(apt.status === 'scheduled' || apt.status === 'confirmed') && <ActionBtn color="#6B7280" icon={<XCircle size={13} />} label={t('appointments.actionNoShow')} onClick={() => handleStatusChange(apt._id, 'no_show')} />}
+                            <ActionBtn color="#EF4444" icon={<X size={13} />} label={t('appointments.actionCancel')} onClick={() => setCancelId(apt._id)} />
                           </div>
                           </>
                         )}
@@ -723,7 +759,7 @@ export default function AppointmentsPage() {
                           <>
                             <hr className="section-divider" />
                             <div style={{ padding: 10, background: 'rgba(239,68,68,0.04)', borderRadius: 8, fontSize: 12, color: 'var(--color-danger)' }}>
-                              <strong>Cancellation:</strong> {apt.cancelledReason}
+                              <strong>{t('appointments.cancellationLabel')}</strong> {apt.cancelledReason}
                             </div>
                           </>
                         )}
@@ -740,82 +776,82 @@ export default function AppointmentsPage() {
 
         {/* Book Appointment */}
         {showNewForm && (
-          <Modal onClose={() => { setShowNewForm(false); resetForm(); }} title="Book Appointment" size="lg">
+          <Modal onClose={() => { setShowNewForm(false); resetForm(); }} title={t('appointments.bookAppointment')} size="lg">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label>Patient *</label>
+                <label>{t('appointments.labelPatient')}</label>
                 <select value={formPatient} onChange={e => setFormPatient(e.target.value)}>
-                  <option value="">Select patient...</option>
+                  <option value="">{t('appointments.selectPatient')}</option>
                   {patients.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.surname} {p.hospitalNumber ? `(${p.hospitalNumber})` : ''}</option>)}
                 </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>Date *</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
-                <div><label>Time *</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                <div><label>Duration</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{d} min</option>)}</select></div>
+                <div><label>{t('appointments.labelDate')}</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
+                <div><label>{t('appointments.labelTime')}</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</select></div>
+                <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>Type</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(t => t.value !== 'walk_in').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-                <div><label>Priority</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">Routine</option><option value="urgent">Urgent</option><option value="emergency">Emergency</option></select></div>
+                <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</select></div>
+                <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>Department</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
-                <div><label>Provider</label><input value={formProvider} onChange={e => setFormProvider(e.target.value)} placeholder="Doctor name" /></div>
+                <div><label>{t('appointments.labelDepartment')}</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+                <div><label>{t('appointments.labelProvider')}</label><input value={formProvider} onChange={e => setFormProvider(e.target.value)} placeholder={t('appointments.providerPlaceholder')} /></div>
               </div>
-              <div><label>Reason *</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} placeholder="Chief complaint..." /></div>
-              <div><label>Notes</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} placeholder="Special instructions..." /></div>
+              <div><label>{t('appointments.labelReason')}</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} placeholder={t('appointments.reasonPlaceholder')} /></div>
+              <div><label>{t('appointments.labelNotes')}</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} placeholder={t('appointments.notesPlaceholder')} /></div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', textTransform: 'none', fontSize: 13 }}>
-                <input type="checkbox" checked={formRecurring} onChange={e => setFormRecurring(e.target.checked)} /> Recurring appointment
+                <input type="checkbox" checked={formRecurring} onChange={e => setFormRecurring(e.target.checked)} /> {t('appointments.recurringAppointment')}
                 {formRecurring && <select value={formRecurrencePattern} onChange={e => setFormRecurrencePattern(e.target.value as typeof formRecurrencePattern)} style={{ width: 'auto' }}>
-                  <option value="weekly">Weekly</option><option value="biweekly">Bi-weekly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option>
+                  <option value="weekly">{t('appointments.recurrenceWeekly')}</option><option value="biweekly">{t('appointments.recurrenceBiweekly')}</option><option value="monthly">{t('appointments.recurrenceMonthly')}</option><option value="quarterly">{t('appointments.recurrenceQuarterly')}</option>
                 </select>}
               </label>
-              <ModalActions onCancel={() => { setShowNewForm(false); resetForm(); }} onConfirm={handleSubmit} confirmLabel={submitting ? 'Booking...' : 'Book Appointment'} disabled={submitting} />
+              <ModalActions onCancel={() => { setShowNewForm(false); resetForm(); }} onConfirm={handleSubmit} confirmLabel={submitting ? t('appointments.booking') : t('appointments.bookAppointment')} cancelLabel={t('action.cancel')} disabled={submitting} />
             </div>
           </Modal>
         )}
 
         {/* Walk-In */}
         {showWalkIn && (
-          <Modal onClose={() => setShowWalkIn(false)} title="Register Walk-In" icon={<UserPlus size={34} style={{ color: 'var(--accent-primary)' }} />}>
+          <Modal onClose={() => setShowWalkIn(false)} title={t('appointments.registerWalkIn')} icon={<UserPlus size={34} style={{ color: 'var(--accent-primary)' }} />}>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
-              Register a walk-in patient for immediate attention. They will be automatically checked in.
+              {t('appointments.walkInIntro')}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label>Patient *</label>
+                <label>{t('appointments.labelPatient')}</label>
                 <select value={wiPatient} onChange={e => setWiPatient(e.target.value)}>
-                  <option value="">Select patient...</option>
+                  <option value="">{t('appointments.selectPatient')}</option>
                   {patients.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.surname}</option>)}
                 </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>Department</label><select value={wiDepartment} onChange={e => setWiDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
-                <div><label>Priority</label><select value={wiPriority} onChange={e => setWiPriority(e.target.value as AppointmentPriority)}><option value="routine">Routine</option><option value="urgent">Urgent</option><option value="emergency">Emergency</option></select></div>
+                <div><label>{t('appointments.labelDepartment')}</label><select value={wiDepartment} onChange={e => setWiDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+                <div><label>{t('appointments.labelPriority')}</label><select value={wiPriority} onChange={e => setWiPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
               </div>
-              <div><label>Reason for Visit *</label><textarea value={wiReason} onChange={e => setWiReason(e.target.value)} rows={2} placeholder="What brings the patient in today?" /></div>
-              <div><label>Notes</label><textarea value={wiNotes} onChange={e => setWiNotes(e.target.value)} rows={2} placeholder="Additional details..." /></div>
-              <ModalActions onCancel={() => setShowWalkIn(false)} onConfirm={handleWalkIn} confirmLabel={submitting ? 'Registering...' : 'Register Walk-In'} confirmColor="var(--accent-primary)" disabled={submitting} />
+              <div><label>{t('appointments.labelReasonForVisit')}</label><textarea value={wiReason} onChange={e => setWiReason(e.target.value)} rows={2} placeholder={t('appointments.reasonForVisitPlaceholder')} /></div>
+              <div><label>{t('appointments.labelNotes')}</label><textarea value={wiNotes} onChange={e => setWiNotes(e.target.value)} rows={2} placeholder={t('appointments.walkInNotesPlaceholder')} /></div>
+              <ModalActions onCancel={() => setShowWalkIn(false)} onConfirm={handleWalkIn} confirmLabel={submitting ? t('appointments.registering') : t('appointments.registerWalkIn')} cancelLabel={t('action.cancel')} confirmColor="var(--accent-primary)" disabled={submitting} />
             </div>
           </Modal>
         )}
 
         {/* Reschedule */}
         {rescheduleId && (
-          <Modal onClose={() => setRescheduleId(null)} title="Reschedule Appointment" size="sm">
+          <Modal onClose={() => setRescheduleId(null)} title={t('appointments.rescheduleTitle')} size="sm">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div><label>New Date</label><input type="date" value={rescheduleDate} onChange={e => setRescheduleDate(e.target.value)} min={today} /></div>
-              <div><label>New Time</label><select value={rescheduleTime} onChange={e => setRescheduleTime(e.target.value)}>{timeSlots.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-              <ModalActions onCancel={() => setRescheduleId(null)} onConfirm={handleReschedule} confirmLabel="Reschedule" />
+              <div><label>{t('appointments.labelNewDate')}</label><input type="date" value={rescheduleDate} onChange={e => setRescheduleDate(e.target.value)} min={today} /></div>
+              <div><label>{t('appointments.labelNewTime')}</label><select value={rescheduleTime} onChange={e => setRescheduleTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</select></div>
+              <ModalActions onCancel={() => setRescheduleId(null)} onConfirm={handleReschedule} confirmLabel={t('appointments.actionReschedule')} cancelLabel={t('action.cancel')} />
             </div>
           </Modal>
         )}
 
         {/* Cancel */}
         {cancelId && (
-          <Modal onClose={() => { setCancelId(null); setCancelReason(''); }} title="Cancel Appointment" titleColor="#EF4444" icon={<AlertTriangle size={34} style={{ color: 'var(--color-danger)' }} />} size="sm">
-            <div><label>Reason for cancellation</label><textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)} rows={3} placeholder="Why is this being cancelled?" /></div>
-            <ModalActions onCancel={() => { setCancelId(null); setCancelReason(''); }} onConfirm={handleCancel} confirmLabel="Cancel Appointment" confirmColor="#EF4444" cancelLabel="Go Back" />
+          <Modal onClose={() => { setCancelId(null); setCancelReason(''); }} title={t('appointments.cancelTitle')} titleColor="#EF4444" icon={<AlertTriangle size={34} style={{ color: 'var(--color-danger)' }} />} size="sm">
+            <div><label>{t('appointments.labelCancelReason')}</label><textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)} rows={3} placeholder={t('appointments.cancelReasonPlaceholder')} /></div>
+            <ModalActions onCancel={() => { setCancelId(null); setCancelReason(''); }} onConfirm={handleCancel} confirmLabel={t('appointments.cancelTitle')} confirmColor="#EF4444" cancelLabel={t('appointments.goBack')} />
           </Modal>
         )}
 
@@ -826,10 +862,10 @@ export default function AppointmentsPage() {
             {canBookAppointments && (
               <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                 <button className="btn btn-primary btn-sm" style={{ gap: 4 }} onClick={() => { setShowDayPopup(false); setFormDate(selectedDate); setShowNewForm(true); }}>
-                  <Plus size={14} /> New Appointment
+                  <Plus size={14} /> {t('appointments.newAppointment')}
                 </button>
                 <button className="btn btn-secondary btn-sm" style={{ gap: 4, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }} onClick={() => { setShowDayPopup(false); setShowWalkIn(true); }}>
-                  <UserPlus size={14} /> Walk-In
+                  <UserPlus size={14} /> {t('appointments.walkIn')}
                 </button>
               </div>
             )}
@@ -840,12 +876,12 @@ export default function AppointmentsPage() {
               if (dayApts.length === 0) return (
                 <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
                   <Calendar size={44} style={{ opacity: 0.3, marginBottom: 8 }} />
-                  <p style={{ fontSize: 13 }}>No appointments on this date</p>
+                  <p style={{ fontSize: 13 }}>{t('appointments.noneOnDate')}</p>
                 </div>
               );
               return (
                 <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{dayApts.length} appointment{dayApts.length > 1 ? 's' : ''}</p>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{t('appointments.appointmentsCount', { count: dayApts.length })}</p>
                   {dayApts.map(apt => {
                     const sc = statusConfig[apt.status];
                     const pc = priorityConfig[apt.priority];
@@ -868,7 +904,7 @@ export default function AppointmentsPage() {
                                 onClick={(e) => { e.stopPropagation(); setShowDayPopup(false); }}
                                 style={{ color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: 3 }}
                                 className="hover:underline"
-                                title="View patient record"
+                                title={t('appointments.viewPatientRecord')}
                               >
                                 {apt.patientName}
                                 <ExternalLink size={10} style={{ opacity: 0.55 }} />
@@ -876,27 +912,27 @@ export default function AppointmentsPage() {
                             ) : (
                               apt.patientName
                             )}
-                            {isWI && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: 'rgba(124,58,237,0.08)', color: 'var(--accent-primary)' }}>WALK-IN</span>}
+                            {isWI && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: 'rgba(124,58,237,0.08)', color: 'var(--accent-primary)' }}>{t('appointments.walkInBadge')}</span>}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{apt.reason.slice(0, 40)}{apt.reason.length > 40 ? '...' : ''}</div>
                         </div>
-                        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, color: pc.color, background: `${pc.color}12` }}>{pc.label}</span>
-                        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4, color: sc.color, background: sc.bg }}>{sc.label}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, color: pc.color, background: `${pc.color}12` }}>{t(priorityLabelKey[apt.priority])}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4, color: sc.color, background: sc.bg }}>{t(statusLabelKey[apt.status])}</span>
                         {/* Action buttons */}
                         <div style={{ display: 'flex', gap: 4 }}>
                           {apt.status === 'scheduled' && (
-                            <button onClick={() => { handleStatusChange(apt._id, 'confirmed'); }} title="Approve" style={miniBtn('#7C3AED')}>
+                            <button onClick={() => { handleStatusChange(apt._id, 'confirmed'); }} title={t('appointments.actionApprove')} style={miniBtn('#7C3AED')}>
                               <CheckCircle2 size={12} />
                             </button>
                           )}
-                          <button onClick={() => { setShowDayPopup(false); setEditingApt(apt._id); loadEditForm(apt); }} title="Edit" style={miniBtn('var(--accent-primary)')}>
+                          <button onClick={() => { setShowDayPopup(false); setEditingApt(apt._id); loadEditForm(apt); }} title={t('action.edit')} style={miniBtn('var(--accent-primary)')}>
                             <ClipboardList size={12} />
                           </button>
-                          <button onClick={() => { setShowDayPopup(false); setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); }} title="Reschedule" style={miniBtn('var(--color-warning)')}>
+                          <button onClick={() => { setShowDayPopup(false); setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); }} title={t('appointments.actionReschedule')} style={miniBtn('var(--color-warning)')}>
                             <RefreshCw size={12} />
                           </button>
                           {(apt.status !== 'completed' && apt.status !== 'cancelled') && (
-                            <button onClick={() => { setShowDayPopup(false); setCancelId(apt._id); }} title="Cancel" style={miniBtn('var(--color-danger)')}>
+                            <button onClick={() => { setShowDayPopup(false); setCancelId(apt._id); }} title={t('appointments.actionCancel')} style={miniBtn('var(--color-danger)')}>
                               <X size={12} />
                             </button>
                           )}
@@ -915,23 +951,23 @@ export default function AppointmentsPage() {
           const apt = appointments.find(a => a._id === editingApt);
           if (!apt) return null;
           return (
-            <Modal onClose={() => setEditingApt(null)} title="Edit Appointment" size="lg">
+            <Modal onClose={() => setEditingApt(null)} title={t('appointments.editTitle')} size="lg">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                  <div><label>Date</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
-                  <div><label>Time</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                  <div><label>Duration</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{d} min</option>)}</select></div>
+                  <div><label>{t('frontDesk.date')}</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
+                  <div><label>{t('frontDesk.colTime')}</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(ts => <option key={ts} value={ts}>{ts}</option>)}</select></div>
+                  <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                  <div><label>Type</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(t => t.value !== 'walk_in').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-                  <div><label>Priority</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">Routine</option><option value="urgent">Urgent</option><option value="emergency">Emergency</option></select></div>
+                  <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</select></div>
+                  <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                  <div><label>Department</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
-                  <div><label>Provider</label><input value={formProvider} onChange={e => setFormProvider(e.target.value)} placeholder="Doctor name" /></div>
+                  <div><label>{t('appointments.labelDepartment')}</label><select value={formDepartment} onChange={e => setFormDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+                  <div><label>{t('appointments.labelProvider')}</label><input value={formProvider} onChange={e => setFormProvider(e.target.value)} placeholder={t('appointments.providerPlaceholder')} /></div>
                 </div>
-                <div><label>Reason</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} /></div>
-                <div><label>Notes</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} /></div>
+                <div><label>{t('appointments.detailReason')}</label><textarea value={formReason} onChange={e => setFormReason(e.target.value)} rows={2} /></div>
+                <div><label>{t('appointments.labelNotes')}</label><textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} /></div>
                 <ModalActions
                   onCancel={() => setEditingApt(null)}
                   onConfirm={async () => {
@@ -941,10 +977,11 @@ export default function AppointmentsPage() {
                         appointmentType: formType, priority: formPriority, department: formDepartment,
                         providerName: formProvider, reason: formReason, notes: formNotes,
                       });
-                      showToast('Appointment updated', 'success'); setEditingApt(null);
-                    } catch { showToast('Failed to update', 'error'); }
+                      showToast(t('appointments.toastUpdated'), 'success'); setEditingApt(null);
+                    } catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
                   }}
-                  confirmLabel="Save Changes"
+                  confirmLabel={t('appointments.saveChanges')}
+                  cancelLabel={t('action.cancel')}
                 />
               </div>
             </Modal>

@@ -53,7 +53,7 @@ export default function MarketingFooter() {
           <div className="mk-footer-brand">
             <Link href="/" className="mk-nav-logo" style={{ textDecoration: "none" }}>
               <span className="mk-nav-logo-text">
-                Tamam<span style={{ color: "#5EC38A" }}>Health</span>
+                Tamam<span style={{ color: "#0d8844" }}>Health</span>
               </span>
             </Link>
 
@@ -148,12 +148,12 @@ export default function MarketingFooter() {
             {nlStatus === "success" ? (
               <div style={{
                 background: "var(--tb-tint-green, #E8F5E9)",
-                border: "1px solid var(--tb-green, #2D9B6A)",
+                border: "1px solid var(--tb-green, #3B82F6)",
                 borderRadius: 8,
                 padding: "14px 20px",
                 fontSize: 14,
                 fontWeight: 600,
-                color: "var(--tb-green, #2D9B6A)",
+                color: "var(--tb-green, #3B82F6)",
                 textAlign: "center",
               }}>
                 You&apos;re subscribed! Check your inbox for a welcome email.

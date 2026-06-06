@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
@@ -12,14 +13,15 @@ import type { DataScope } from '@/lib/services/data-scope';
 import { SOUTH_SUDAN_STATES } from '@/lib/geographic-data';
 
 const FACILITY_TYPES = [
-  { value: 'national_referral', label: 'National Referral' },
-  { value: 'state_hospital', label: 'State Hospital' },
-  { value: 'county_hospital', label: 'County Hospital' },
-  { value: 'phcc', label: 'Primary Health Care Centre' },
-  { value: 'phcu', label: 'Primary Health Care Unit' },
+  { value: 'national_referral', label: 'National Referral', labelKey: 'hospitals.typeNationalReferral' },
+  { value: 'state_hospital', label: 'State Hospital', labelKey: 'hospitals.typeStateHospital' },
+  { value: 'county_hospital', label: 'County Hospital', labelKey: 'hospitals.typeCountyHospital' },
+  { value: 'phcc', label: 'Primary Health Care Centre', labelKey: 'hospitals.typePhccFull' },
+  { value: 'phcu', label: 'Primary Health Care Unit', labelKey: 'hospitals.typePhcuFull' },
 ];
 
 export default function OrgHospitalsPage() {
+  const { t } = useTranslation();
   const { currentUser, globalSearch } = useApp();
   const [hospitals, setHospitals] = useState<HospitalDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +58,7 @@ export default function OrgHospitalsPage() {
   const handleCreate = async () => {
     setError('');
     if (!formName.trim() || !formState || !formTown.trim() || !formType) {
-      setError('Name, state, location, and facility type are required.');
+      setError(t('orgHospitals.errRequiredFields'));
       return;
     }
 
@@ -95,7 +97,7 @@ export default function OrgHospitalsPage() {
         currentUser?.username
       );
 
-      setSuccess(`Hospital "${formName}" created successfully.`);
+      setSuccess(t('orgHospitals.successCreated', { name: formName }));
       setShowCreateModal(false);
       setFormName('');
       setFormState('');
@@ -106,7 +108,7 @@ export default function OrgHospitalsPage() {
       setTimeout(() => setSuccess(''), 4000);
     } catch (err: unknown) {
       const e = err as Error;
-      setError(e.message || 'Failed to create hospital.');
+      setError(e.message || t('orgHospitals.errCreateFailed'));
     } finally {
       setCreating(false);
     }
@@ -124,7 +126,8 @@ export default function OrgHospitalsPage() {
   });
 
   const facilityLabel = (ft: string) => {
-    return FACILITY_TYPES.find(f => f.value === ft)?.label || ft;
+    const match = FACILITY_TYPES.find(f => f.value === ft);
+    return match ? t(match.labelKey) : ft;
   };
 
   const facilityColor = (ft: string) => {
@@ -141,7 +144,7 @@ export default function OrgHospitalsPage() {
   if (loading) {
     return (
       <div className="flex-1 flex flex-col">
-        <TopBar title="Facility Management" />
+        <TopBar title={t('orgHospitals.topBarTitle')} />
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
         </div>
@@ -151,7 +154,7 @@ export default function OrgHospitalsPage() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title="Facility Management" />
+      <TopBar title={t('orgHospitals.topBarTitle')} />
 
       <div className="page-container page-enter">
         {/* Success/Error */}
@@ -168,8 +171,8 @@ export default function OrgHospitalsPage() {
 
         <PageHeader
           icon={Building2}
-          title="Hospitals & Facilities"
-          subtitle={`${hospitals.length} facilities in your organization`}
+          title={t('orgHospitals.headerTitle')}
+          subtitle={t('orgHospitals.headerSubtitle', { count: hospitals.length })}
           actions={
             <button
               onClick={() => { setError(''); setShowCreateModal(true); }}
@@ -177,7 +180,7 @@ export default function OrgHospitalsPage() {
               style={{ background: brandColor }}
             >
               <Plus className="w-4 h-4" />
-              Add Facility
+              {t('orgHospitals.addFacility')}
             </button>
           }
         />
@@ -187,19 +190,19 @@ export default function OrgHospitalsPage() {
           <table className="w-full">
             <thead>
               <tr>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Name</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>State</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Type</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Beds</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Patients</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Today Visits</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('hospitals.colName')}</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('hospitals.fieldState')}</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('hospitals.colType')}</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('hospitals.colBeds')}</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('hospitals.statPatients')}</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgHospitals.colTodayVisits')}</th>
               </tr>
             </thead>
             <tbody>
               {filteredHospitals.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                    No hospitals found.
+                    {t('orgHospitals.noHospitals')}
                   </td>
                 </tr>
               ) : (
@@ -271,7 +274,7 @@ export default function OrgHospitalsPage() {
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Add New Facility</h2>
+              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{t('orgHospitals.modalTitle')}</h2>
               <button onClick={() => setShowCreateModal(false)} className="p-1 rounded-lg hover:opacity-80">
                 <X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
               </button>
@@ -287,12 +290,12 @@ export default function OrgHospitalsPage() {
             <div className="space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Facility Name *</label>
+                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgHospitals.labelFacilityName')}</label>
                 <input
                   type="text"
                   value={formName}
                   onChange={e => setFormName(e.target.value)}
-                  placeholder="e.g. Juba Teaching Hospital"
+                  placeholder={t('orgHospitals.placeholderFacilityName')}
                   className="w-full px-3 py-2 rounded-lg text-sm"
                   style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                 />
@@ -300,7 +303,7 @@ export default function OrgHospitalsPage() {
 
               {/* State */}
               <div>
-                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>State *</label>
+                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgHospitals.labelState')}</label>
                 <div className="relative">
                   <select
                     value={formState}
@@ -308,7 +311,7 @@ export default function OrgHospitalsPage() {
                     className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm"
                     style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                   >
-                    <option value="">Select a state...</option>
+                    <option value="">{t('orgHospitals.selectState')}</option>
                     {SOUTH_SUDAN_STATES.map(s => (
                       <option key={s} value={s}>{s}</option>
                     ))}
@@ -319,12 +322,12 @@ export default function OrgHospitalsPage() {
 
               {/* Location / Town */}
               <div>
-                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Town / Location *</label>
+                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgHospitals.labelTown')}</label>
                 <input
                   type="text"
                   value={formTown}
                   onChange={e => setFormTown(e.target.value)}
-                  placeholder="e.g. Juba"
+                  placeholder={t('orgHospitals.placeholderTown')}
                   className="w-full px-3 py-2 rounded-lg text-sm"
                   style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                 />
@@ -332,7 +335,7 @@ export default function OrgHospitalsPage() {
 
               {/* Facility Type */}
               <div>
-                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Facility Type *</label>
+                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgHospitals.labelFacilityType')}</label>
                 <div className="relative">
                   <select
                     value={formType}
@@ -341,7 +344,7 @@ export default function OrgHospitalsPage() {
                     style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                   >
                     {FACILITY_TYPES.map(ft => (
-                      <option key={ft.value} value={ft.value}>{ft.label}</option>
+                      <option key={ft.value} value={ft.value}>{t(ft.labelKey)}</option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
@@ -350,7 +353,7 @@ export default function OrgHospitalsPage() {
 
               {/* Total Beds */}
               <div>
-                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Total Beds</label>
+                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('hospitals.colTotalBeds')}</label>
                 <input
                   type="number"
                   value={formBeds}
@@ -369,7 +372,7 @@ export default function OrgHospitalsPage() {
                 className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
                 style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
               >
-                Cancel
+                {t('action.cancel')}
               </button>
               <button
                 onClick={handleCreate}
@@ -382,7 +385,7 @@ export default function OrgHospitalsPage() {
                 ) : (
                   <Plus className="w-4 h-4" />
                 )}
-                Create Facility
+                {t('orgHospitals.createFacility')}
               </button>
             </div>
           </div>

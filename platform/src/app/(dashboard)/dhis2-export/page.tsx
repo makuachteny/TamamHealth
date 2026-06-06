@@ -13,6 +13,7 @@ import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { useANC } from '@/lib/hooks/useANC';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 // ── DHIS2 Data Element definitions (South Sudan HMIS) ──
 const DHIS2_DATA_ELEMENTS = [
@@ -37,6 +38,7 @@ const DHIS2_REPORTS = [
 ];
 
 export default function DHIS2ExportPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'overview' | 'reports' | 'aggregate' | 'export' | 'log'>('overview');
   const [syncing, setSyncing] = useState(false);
   const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
@@ -44,12 +46,12 @@ export default function DHIS2ExportPage() {
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState<{ format: string; rows: number; date: string } | null>(null);
   const [syncLog, setSyncLog] = useState([
-    { time: '08:00', message: 'Auto-sync completed: 8/10 data elements pushed', status: 'success' as const },
-    { time: '07:55', message: 'Connecting to DHIS2 instance: hmis.southsudan.health', status: 'info' as const },
-    { time: 'Feb 21 16:45', message: 'Manual sync: Immunization data pushed', status: 'success' as const },
-    { time: 'Feb 21 14:30', message: 'Sync failed: TB Cases — network timeout', status: 'error' as const },
-    { time: 'Feb 21 08:00', message: 'Auto-sync completed: 7/10 data elements pushed', status: 'success' as const },
-    { time: 'Feb 20 08:00', message: 'Auto-sync completed: 10/10 data elements pushed', status: 'success' as const },
+    { time: '08:00', message: t('dhis2.logAutoSync', { synced: 8, total: 10 }), status: 'success' as const },
+    { time: '07:55', message: t('dhis2.logConnecting'), status: 'info' as const },
+    { time: 'Feb 21 16:45', message: t('dhis2.logManualSync'), status: 'success' as const },
+    { time: 'Feb 21 14:30', message: t('dhis2.logSyncFailedTb'), status: 'error' as const },
+    { time: 'Feb 21 08:00', message: t('dhis2.logAutoSync', { synced: 7, total: 10 }), status: 'success' as const },
+    { time: 'Feb 20 08:00', message: t('dhis2.logAutoSync', { synced: 10, total: 10 }), status: 'success' as const },
   ]);
 
   const { patients } = usePatients();
@@ -81,7 +83,7 @@ export default function DHIS2ExportPage() {
   const handleSync = async () => {
     setSyncing(true);
     setSyncLog(prev => [
-      { time: 'Now', message: 'Initiating manual sync to DHIS2...', status: 'info' as const },
+      { time: 'Now', message: t('dhis2.logInitiatingSync'), status: 'info' as const },
       ...prev,
     ]);
     try {
@@ -98,7 +100,7 @@ export default function DHIS2ExportPage() {
       ]);
     } catch (err) {
       setSyncLog(prev => [
-        { time: 'Now', message: `Sync failed: ${(err as Error).message}`, status: 'error' as const },
+        { time: 'Now', message: t('dhis2.logSyncFailed', { msg: (err as Error).message }), status: 'error' as const },
         ...prev,
       ]);
     } finally {
@@ -129,30 +131,30 @@ export default function DHIS2ExportPage() {
 
   // Aggregate summary from real patient data
   const summaryData = [
-    { label: 'OPD Visits', value: patients.length, icon: BarChart3, color: 'var(--accent-primary)' },
-    { label: 'Malaria Cases', value: diseaseAlerts.filter(a => a.disease?.toLowerCase().includes('malaria')).length, icon: AlertTriangle, color: 'var(--color-danger)' },
-    { label: 'Active Surveillance Alerts', value: diseaseAlerts.length, icon: AlertTriangle, color: 'var(--color-warning)' },
-    { label: 'ANC Visits', value: ancStats?.totalVisits || 0, icon: FileText, color: '#EC4899' },
-    { label: 'Immunizations Given', value: immStats?.totalVaccinations || 0, icon: CheckCircle, color: '#10B944' },
-    { label: 'Total Patients Registered', value: patients.length, icon: Database, color: '#8B5CF6' },
+    { label: t('dhis2.summaryOpdVisits'), value: patients.length, icon: BarChart3, color: 'var(--accent-primary)' },
+    { label: t('dhis2.summaryMalariaCases'), value: diseaseAlerts.filter(a => a.disease?.toLowerCase().includes('malaria')).length, icon: AlertTriangle, color: 'var(--color-danger)' },
+    { label: t('dhis2.summaryActiveSurveillanceAlerts'), value: diseaseAlerts.length, icon: AlertTriangle, color: 'var(--color-warning)' },
+    { label: t('dhis2.summaryAncVisits'), value: ancStats?.totalVisits || 0, icon: FileText, color: '#EC4899' },
+    { label: t('dhis2.summaryImmunizationsGiven'), value: immStats?.totalVaccinations || 0, icon: CheckCircle, color: '#10B944' },
+    { label: t('dhis2.summaryTotalPatients'), value: patients.length, icon: Database, color: '#8B5CF6' },
   ];
 
   const tabs = [
-    { id: 'overview' as const, label: 'Data Elements', icon: Database },
-    { id: 'reports' as const, label: 'HMIS Reports', icon: FileText },
-    { id: 'aggregate' as const, label: 'Aggregate Data', icon: BarChart3 },
-    { id: 'export' as const, label: 'Export', icon: Download },
-    { id: 'log' as const, label: 'Sync Log', icon: Clock },
+    { id: 'overview' as const, label: t('dhis2.tabDataElements'), icon: Database },
+    { id: 'reports' as const, label: t('dhis2.tabHmisReports'), icon: FileText },
+    { id: 'aggregate' as const, label: t('dhis2.tabAggregateData'), icon: BarChart3 },
+    { id: 'export' as const, label: t('action.export'), icon: Download },
+    { id: 'log' as const, label: t('dhis2.tabSyncLog'), icon: Clock },
   ];
 
   return (
     <>
-      <TopBar title="DHIS2 Integration" />
+      <TopBar title={t('dhis2.pageTitle')} />
       <main className="page-container page-enter">
 
         <PageHeader
           icon={Globe}
-          title="DHIS2 Integration"
+          title={t('dhis2.pageTitle')}
           subtitle={`${hospitalName} → hmis.southsudan.health`}
           actions={
             <button
@@ -160,13 +162,13 @@ export default function DHIS2ExportPage() {
               disabled={syncing}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
               style={{
-                background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #1B9AAA, #1E4D4A)',
+                background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
                 color: syncing ? 'var(--text-muted)' : '#fff',
                 boxShadow: syncing ? 'none' : '0 4px 12px rgba(43,111,224,0.3)',
               }}
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync Now'}
+              {syncing ? t('dhis2.syncing') : t('dhis2.syncNow')}
             </button>
           }
         />
@@ -174,10 +176,10 @@ export default function DHIS2ExportPage() {
         {/* Status Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           {[
-            { label: 'Connection', value: 'Active', icon: Wifi, color: '#10B944', sub: 'hmis.southsudan.health' },
-            { label: 'Data Elements', value: `${syncedCount}/${DHIS2_DATA_ELEMENTS.length}`, icon: Database, color: 'var(--accent-primary)', sub: 'Synced' },
-            { label: 'Reports Due', value: String(DHIS2_REPORTS.filter(r => r.status !== 'submitted').length), icon: FileText, color: 'var(--color-warning)', sub: 'Pending completion' },
-            { label: 'Last Sync', value: '08:00 Today', icon: Clock, color: '#0D9488', sub: 'Feb 22, 2026' },
+            { label: t('dhis2.statConnection'), value: t('dhis2.statConnectionActive'), icon: Wifi, color: '#10B944', sub: 'hmis.southsudan.health' },
+            { label: t('dhis2.tabDataElements'), value: `${syncedCount}/${DHIS2_DATA_ELEMENTS.length}`, icon: Database, color: 'var(--accent-primary)', sub: t('sync.synced') },
+            { label: t('dhis2.statReportsDue'), value: String(DHIS2_REPORTS.filter(r => r.status !== 'submitted').length), icon: FileText, color: 'var(--color-warning)', sub: t('dhis2.statPendingCompletion') },
+            { label: t('dhis2.statLastSync'), value: t('dhis2.statLastSyncValue'), icon: Clock, color: '#0D9488', sub: 'Feb 22, 2026' },
           ].map((stat) => (
             <div key={stat.label} className="card-elevated p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -199,7 +201,7 @@ export default function DHIS2ExportPage() {
               className="flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors"
               style={{
                 color: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--text-muted)',
-                borderBottom: activeTab === tab.id ? '2px solid #1B9AAA' : '2px solid transparent',
+                borderBottom: activeTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
               }}
             >
               <tab.icon className="w-4 h-4" />
@@ -216,7 +218,7 @@ export default function DHIS2ExportPage() {
               padding: '10px 20px',
               borderBottom: '1px solid var(--border-light)',
             }}>
-              {['Data Element', 'DHIS2 UID', 'Category', 'Status', 'Last Sync'].map(h => (
+              {[t('dhis2.colDataElement'), t('dhis2.colDhis2Uid'), t('pharmacy.category'), t('lab.status'), t('dhis2.statLastSync')].map(h => (
                 <span key={h} className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</span>
               ))}
             </div>
@@ -240,7 +242,7 @@ export default function DHIS2ExportPage() {
                     de.synced ? 'badge-normal' : 'badge-warning'
                   }`}>
                     {de.synced ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                    {de.synced ? 'Synced' : 'Pending'}
+                    {de.synced ? t('sync.synced') : t('lab.filterPending')}
                   </span>
                 </div>
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{de.lastSync}</span>
@@ -257,7 +259,7 @@ export default function DHIS2ExportPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{report.name}</h3>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{report.period} · Due: {report.dueDate}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{report.period} · {t('dhis2.due')}: {report.dueDate}</p>
                   </div>
                   <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-md ${
                     report.status === 'submitted' ? 'badge-normal' :
@@ -296,7 +298,7 @@ export default function DHIS2ExportPage() {
                         border: '1px solid var(--accent-border)',
                       }}
                     >
-                      <FileText className="w-3 h-3" /> Review Data
+                      <FileText className="w-3 h-3" /> {t('dhis2.reviewData')}
                     </button>
                     {report.completeness > 80 && (
                       <button
@@ -310,7 +312,7 @@ export default function DHIS2ExportPage() {
                           cursor: syncing ? 'not-allowed' : 'pointer',
                         }}
                       >
-                        <Upload className="w-3 h-3" /> {syncing ? 'Submitting…' : 'Submit'}
+                        <Upload className="w-3 h-3" /> {syncing ? t('dhis2.submitting') : t('action.submit')}
                       </button>
                     )}
                   </div>
@@ -326,13 +328,13 @@ export default function DHIS2ExportPage() {
             <div className="card-elevated p-5 mb-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Auto-Aggregated from Patient Records</h3>
+                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{t('dhis2.autoAggregated')}</h3>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>February 2026 · {hospitalName}</p>
                 </div>
                 <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-md" style={{
                   background: 'var(--accent-light)',
                   color: 'var(--accent-primary)',
-                }}>Live Data</span>
+                }}>{t('dhis2.liveData')}</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {summaryData.map((item) => (
@@ -345,7 +347,7 @@ export default function DHIS2ExportPage() {
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.label}</span>
                     </div>
                     <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{item.value}</p>
-                    <p className="text-[10px] font-medium mt-1" style={{ color: item.color }}>→ Maps to DHIS2</p>
+                    <p className="text-[10px] font-medium mt-1" style={{ color: item.color }}>{t('dhis2.mapsToDhis2')}</p>
                   </div>
                 ))}
               </div>
@@ -355,12 +357,12 @@ export default function DHIS2ExportPage() {
               disabled={syncing}
               className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all"
               style={{
-                background: 'linear-gradient(135deg, #1B9AAA, #1E4D4A)',
+                background: 'linear-gradient(135deg, #3b82f6, #1E40AF)',
                 boxShadow: '0 4px 12px rgba(43,111,224,0.3)',
               }}
             >
               <Upload className="w-4 h-4" />
-              Push Aggregate Data to DHIS2
+              {t('dhis2.pushAggregateData')}
             </button>
           </div>
         )}
@@ -369,10 +371,10 @@ export default function DHIS2ExportPage() {
         {activeTab === 'export' && (
           <div className="max-w-2xl">
             <div className="card-elevated p-6 mb-5">
-              <h3 className="font-semibold text-sm mb-4">Export Configuration</h3>
+              <h3 className="font-semibold text-sm mb-4">{t('dhis2.exportConfiguration')}</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Reporting Period</label>
+                  <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('dhis2.reportingPeriod')}</label>
                   <input
                     type="month"
                     value={period}
@@ -382,31 +384,31 @@ export default function DHIS2ExportPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Aggregation Level</label>
+                  <label className="text-xs font-medium uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('dhis2.aggregationLevel')}</label>
                   <select
                     value={exportLevel}
                     onChange={e => setExportLevel(e.target.value as typeof exportLevel)}
                     className="w-full p-2.5 rounded-xl text-sm outline-none"
                     style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
                   >
-                    <option value="facility" disabled={!currentUser?.hospitalId}>Facility{currentUser?.hospitalId ? '' : ' (no facility assigned)'}</option>
-                    <option value="payam" disabled={!u?.payam}>Payam{u?.payam ? '' : ' (none set on user)'}</option>
-                    <option value="county" disabled={!u?.county}>County{u?.county ? '' : ' (none set on user)'}</option>
-                    <option value="state" disabled={!u?.state}>State{u?.state ? '' : ' (none set on user)'}</option>
-                    <option value="national" disabled={!nationalAllowed}>National{nationalAllowed ? '' : ' (super_admin / government only)'}</option>
+                    <option value="facility" disabled={!currentUser?.hospitalId}>{t('dhis2.levelFacility')}{currentUser?.hospitalId ? '' : ` ${t('dhis2.noFacilityAssigned')}`}</option>
+                    <option value="payam" disabled={!u?.payam}>{t('dhis2.levelPayam')}{u?.payam ? '' : ` ${t('dhis2.noneSetOnUser')}`}</option>
+                    <option value="county" disabled={!u?.county}>{t('dhis2.levelCounty')}{u?.county ? '' : ` ${t('dhis2.noneSetOnUser')}`}</option>
+                    <option value="state" disabled={!u?.state}>{t('dhis2.levelState')}{u?.state ? '' : ` ${t('dhis2.noneSetOnUser')}`}</option>
+                    <option value="national" disabled={!nationalAllowed}>{t('dhis2.levelNational')}{nationalAllowed ? '' : ` ${t('dhis2.nationalRestricted')}`}</option>
                   </select>
-                  <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>The chosen tier becomes the DHIS2 orgUnit of the exported dataset.</p>
+                  <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>{t('dhis2.tierHelp')}</p>
                 </div>
                 <div>
-                  <label className="text-xs font-medium uppercase tracking-wider mb-2 block" style={{ color: 'var(--text-muted)' }}>Data Elements Included</label>
+                  <label className="text-xs font-medium uppercase tracking-wider mb-2 block" style={{ color: 'var(--text-muted)' }}>{t('dhis2.dataElementsIncluded')}</label>
                   <div className="space-y-1.5">
                     {[
-                      'Population health indicators (hospitals, patients, beds, staff)',
-                      'CRVS — births registered, deaths registered, ICD-11 coded',
-                      'Maternal, neonatal, and under-5 mortality',
-                      'Disease surveillance alerts and referrals',
-                      'Data quality (completeness, timeliness, accuracy)',
-                      'Per-facility births, deaths, and immunizations',
+                      t('dhis2.includePopulationHealth'),
+                      t('dhis2.includeCrvs'),
+                      t('dhis2.includeMortality'),
+                      t('dhis2.includeSurveillance'),
+                      t('dhis2.includeDataQuality'),
+                      t('dhis2.includePerFacility'),
                     ].map(item => (
                       <div key={item} className="flex items-center gap-2">
                         <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
@@ -419,7 +421,7 @@ export default function DHIS2ExportPage() {
             </div>
 
             <div className="card-elevated p-6 mb-5">
-              <h3 className="font-semibold text-sm mb-4">Export Format</h3>
+              <h3 className="font-semibold text-sm mb-4">{t('dhis2.exportFormat')}</h3>
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => handleExport('json')}
@@ -431,10 +433,10 @@ export default function DHIS2ExportPage() {
                     <FileJson className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
                     <span className="font-semibold text-sm">JSON</span>
                   </div>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>DHIS2-compatible JSON for API import</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('dhis2.jsonDesc')}</p>
                   <div className="mt-3 flex items-center gap-2 text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
                     {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                    Download .json
+                    {t('dhis2.downloadJson')}
                   </div>
                 </button>
                 <button
@@ -447,10 +449,10 @@ export default function DHIS2ExportPage() {
                     <FileSpreadsheet className="w-5 h-5" style={{ color: '#10B944' }} />
                     <span className="font-semibold text-sm">CSV</span>
                   </div>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>For Excel, Google Sheets, or bulk import</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('dhis2.csvDesc')}</p>
                   <div className="mt-3 flex items-center gap-2 text-xs font-medium" style={{ color: '#10B944' }}>
                     {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                    Download .csv
+                    {t('dhis2.downloadCsv')}
                   </div>
                 </button>
               </div>
@@ -460,10 +462,10 @@ export default function DHIS2ExportPage() {
               <div className="card-elevated p-4" style={{ background: 'rgba(43,111,224,0.06)', border: '1px solid var(--accent-border)' }}>
                 <div className="flex items-center gap-2 mb-1">
                   <CheckCircle className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  <span className="font-semibold text-sm" style={{ color: 'var(--accent-primary)' }}>Export Successful</span>
+                  <span className="font-semibold text-sm" style={{ color: 'var(--accent-primary)' }}>{t('dhis2.exportSuccessful')}</span>
                 </div>
                 <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  Exported {exportResult.rows} data values in {exportResult.format} format · Period: {period} · {exportResult.date}
+                  {t('dhis2.exportSummary', { rows: exportResult.rows, format: exportResult.format, period, date: exportResult.date })}
                 </p>
               </div>
             )}
@@ -494,7 +496,7 @@ export default function DHIS2ExportPage() {
             {syncLog.length === 0 && (
               <div className="text-center py-12">
                 <Clock className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No sync activity yet</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('dhis2.noSyncActivity')}</p>
               </div>
             )}
           </div>

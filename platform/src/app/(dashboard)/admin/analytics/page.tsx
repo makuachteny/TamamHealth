@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import {
   BarChart3, PieChart as PieChartIcon, TrendingUp, Users, HeartPulse, Building2
 } from '@/components/icons/lucide';
+import EmptyState from '@/components/EmptyState';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend
@@ -21,6 +23,7 @@ interface OrgDataPoint {
 }
 
 export default function AdminAnalyticsPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useApp();
   const { organizations, loading: orgsLoading, getStats } = useOrganizations();
@@ -69,17 +72,17 @@ export default function AdminAnalyticsPage() {
 
   // Plan distribution data for pie chart
   const planDistribution = [
-    { name: 'Basic', value: organizations.filter(o => o.subscriptionPlan === 'basic').length, color: '#6B7280' },
-    { name: 'Professional', value: organizations.filter(o => o.subscriptionPlan === 'professional').length, color: '#2563EB' },
-    { name: 'Enterprise', value: organizations.filter(o => o.subscriptionPlan === 'enterprise').length, color: '#7C3AED' },
+    { name: t('analytics.planBasic'), value: organizations.filter(o => o.subscriptionPlan === 'basic').length, color: '#6B7280' },
+    { name: t('analytics.planProfessional'), value: organizations.filter(o => o.subscriptionPlan === 'professional').length, color: '#3b82f6' },
+    { name: t('analytics.planEnterprise'), value: organizations.filter(o => o.subscriptionPlan === 'enterprise').length, color: '#7C3AED' },
   ].filter(d => d.value > 0);
 
   // Status distribution for pie chart
   const statusDistribution = [
-    { name: 'Active', value: organizations.filter(o => o.subscriptionStatus === 'active').length, color: 'var(--color-success)' },
-    { name: 'Trial', value: organizations.filter(o => o.subscriptionStatus === 'trial').length, color: 'var(--color-warning)' },
-    { name: 'Suspended', value: organizations.filter(o => o.subscriptionStatus === 'suspended').length, color: 'var(--color-danger)' },
-    { name: 'Cancelled', value: organizations.filter(o => o.subscriptionStatus === 'cancelled').length, color: 'var(--text-muted)' },
+    { name: t('analytics.statusActive'), value: organizations.filter(o => o.subscriptionStatus === 'active').length, color: 'var(--color-success)' },
+    { name: t('analytics.statusTrial'), value: organizations.filter(o => o.subscriptionStatus === 'trial').length, color: 'var(--color-warning)' },
+    { name: t('analytics.statusSuspended'), value: organizations.filter(o => o.subscriptionStatus === 'suspended').length, color: 'var(--color-danger)' },
+    { name: t('analytics.statusCancelled'), value: organizations.filter(o => o.subscriptionStatus === 'cancelled').length, color: 'var(--text-muted)' },
   ].filter(d => d.value > 0);
 
   // Growth chart. There is no historical timeseries source yet, so in demo
@@ -117,16 +120,16 @@ export default function AdminAnalyticsPage() {
 
   return (
     <>
-      <TopBar title="Platform Analytics" />
+      <TopBar title={t('analytics.title')} />
       <main className="page-container page-enter">
 
         {/* Summary Cards */}
         <div className="kpi-grid mb-6">
           {[
-            { label: 'Total Organizations', value: organizations.length, icon: Building2, color: 'var(--color-danger)', bg: '#DC262615' },
-            { label: 'Total Users', value: totalUsersAll, icon: Users, color: '#2563EB', bg: '#2563EB15' },
-            { label: 'Total Patients', value: totalPatientsAll, icon: HeartPulse, color: 'var(--color-success)', bg: '#05966915' },
-            { label: 'Avg Patients/Org', value: organizations.length > 0 ? Math.round(totalPatientsAll / organizations.length) : 0, icon: TrendingUp, color: 'var(--color-warning)', bg: '#D9770615' },
+            { label: t('analytics.totalOrganizations'), value: organizations.length, icon: Building2, color: 'var(--color-danger)', bg: '#DC262615' },
+            { label: t('analytics.totalUsers'), value: totalUsersAll, icon: Users, color: '#3b82f6', bg: '#3b82f615' },
+            { label: t('patients.kpiTotalPatients'), value: totalPatientsAll, icon: HeartPulse, color: 'var(--color-success)', bg: '#05966915' },
+            { label: t('analytics.avgPatientsPerOrg'), value: organizations.length > 0 ? Math.round(totalPatientsAll / organizations.length) : 0, icon: TrendingUp, color: 'var(--color-warning)', bg: '#D9770615' },
           ].map(stat => (
             <div key={stat.label} className="kpi">
               <div className="icon-box-sm" style={{ background: stat.bg }}>
@@ -146,19 +149,19 @@ export default function AdminAnalyticsPage() {
           {/* Patients per Org Bar Chart */}
           <div className="lg:col-span-2 rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2 mb-4">
-              <div className="icon-box-sm" style={{ background: '#2563EB15' }}>
-                <BarChart3 size={14} style={{ color: '#2563EB' }} />
+              <div className="icon-box-sm" style={{ background: '#3b82f615' }}>
+                <BarChart3 size={14} style={{ color: '#3b82f6' }} />
               </div>
-              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Patients per Organization</span>
+              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.patientsPerOrganization')}</span>
             </div>
             <hr className="section-divider" />
             {dataLoading || orgsLoading ? (
               <div className="flex items-center justify-center h-64">
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading chart data...</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('analytics.loadingChartData')}</p>
               </div>
             ) : orgData.length === 0 ? (
               <div className="flex items-center justify-center h-64">
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No data available</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.noData')}</p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
@@ -166,7 +169,7 @@ export default function AdminAnalyticsPage() {
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
                   <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
                   <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="patients" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="patients" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -180,10 +183,10 @@ export default function AdminAnalyticsPage() {
                 <div className="icon-box-sm" style={{ background: '#7C3AED15' }}>
                   <PieChartIcon size={14} style={{ color: '#7C3AED' }} />
                 </div>
-                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Plans</span>
+                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.plansHeading')}</span>
               </div>
               {planDistribution.length === 0 ? (
-                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>No data</p>
+                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>{t('analytics.noDataShort')}</p>
               ) : (
                 <>
                 <hr className="section-divider" />
@@ -217,10 +220,10 @@ export default function AdminAnalyticsPage() {
                 <div className="icon-box-sm" style={{ background: '#05966915' }}>
                   <PieChartIcon size={14} style={{ color: 'var(--color-success)' }} />
                 </div>
-                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Status</span>
+                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.statusHeading')}</span>
               </div>
               {statusDistribution.length === 0 ? (
-                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>No data</p>
+                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>{t('analytics.noDataShort')}</p>
               ) : (
                 <>
                 <hr className="section-divider" />
@@ -259,9 +262,14 @@ export default function AdminAnalyticsPage() {
               <div className="icon-box-sm" style={{ background: '#05966915' }}>
                 <TrendingUp size={14} style={{ color: 'var(--color-success)' }} />
               </div>
-              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Growth Trend (Simulated)</span>
+              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.growthTrendSimulated')}</span>
             </div>
             <hr className="section-divider" />
+            {growthData.length === 0 || growthData.every(d => !d.users && !d.patients && !d.organizations) ? (
+              <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <EmptyState icon={TrendingUp} title="No data yet" message="No growth data to display for this period." />
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={growthData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
@@ -269,11 +277,12 @@ export default function AdminAnalyticsPage() {
                 <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Line type="monotone" dataKey="users" stroke="#2563EB" strokeWidth={2} dot={{ r: 3 }} name="Users" />
-                <Line type="monotone" dataKey="patients" stroke="#059669" strokeWidth={2} dot={{ r: 3 }} name="Patients" />
-                <Line type="monotone" dataKey="organizations" stroke="#7C3AED" strokeWidth={2} dot={{ r: 3 }} name="Organizations" />
+                <Line type="monotone" dataKey="users" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name={t('analytics.legendUsers')} />
+                <Line type="monotone" dataKey="patients" stroke="#059669" strokeWidth={2} dot={{ r: 3 }} name={t('analytics.legendPatients')} />
+                <Line type="monotone" dataKey="organizations" stroke="#7C3AED" strokeWidth={2} dot={{ r: 3 }} name={t('analytics.legendOrganizations')} />
               </LineChart>
             </ResponsiveContainer>
+            )}
           </div>
 
           {/* Users per Org Bar Chart */}
@@ -282,16 +291,16 @@ export default function AdminAnalyticsPage() {
               <div className="icon-box-sm" style={{ background: '#D9770615' }}>
                 <Users size={14} style={{ color: 'var(--color-warning)' }} />
               </div>
-              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Users per Organization</span>
+              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.usersPerOrganization')}</span>
             </div>
             <hr className="section-divider" />
             {dataLoading || orgsLoading ? (
               <div className="flex items-center justify-center h-64">
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</p>
               </div>
             ) : orgData.length === 0 ? (
               <div className="flex items-center justify-center h-64">
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No data available</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.noData')}</p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={260}>
@@ -309,12 +318,12 @@ export default function AdminAnalyticsPage() {
         {/* Per-Org Data Table */}
         <div className="mt-6 rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
           <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Organization Metrics</span>
+            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.organizationMetrics')}</span>
           </div>
           <table className="w-full">
             <thead>
               <tr>
-                {['Organization', 'Patients', 'Users', 'Plan', 'Status'].map(h => (
+                {[t('analytics.colOrganization'), t('analytics.colPatients'), t('analytics.colUsers'), t('analytics.colPlan'), t('analytics.colStatus')].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
                     {h}
                   </th>
@@ -335,11 +344,11 @@ export default function AdminAnalyticsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm font-bold" style={{ color: 'var(--color-success)' }}>{data?.patients ?? '...'}</td>
-                    <td className="px-4 py-3 text-sm font-bold" style={{ color: '#2563EB' }}>{data?.users ?? '...'}</td>
+                    <td className="px-4 py-3 text-sm font-bold" style={{ color: '#3b82f6' }}>{data?.users ?? '...'}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
-                        background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(37,99,235,0.12)' : 'rgba(107,114,128,0.12)',
-                        color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#2563EB' : '#6B7280',
+                        background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(59, 130, 246,0.12)' : 'rgba(107,114,128,0.12)',
+                        color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#3b82f6' : '#6B7280',
                       }}>{org.subscriptionPlan}</span>
                     </td>
                     <td className="px-4 py-3">

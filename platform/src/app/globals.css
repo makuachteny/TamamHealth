@@ -1,8 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=DM+Sans:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@font-face {
+    font-family: Untitled Sans;
+    src: url(https://cdn.prod.website-files.com/6668a68…/66cca75…_UntitledSansWeb-Light.woff2) format("woff2");
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
 
 /* ============ LAYOUT SYSTEM ============ */
 :root {
@@ -20,105 +28,104 @@
   --sidebar-collapsed: 72px;
 }
 
-/* ============ LIGHT THEME — Pan-African TamamHealth Palette ============ */
+/* ============ LIGHT THEME — Blue & White Palette ============ */
 :root {
-  /* Solid backgrounds — very light warm tones (near-white) */
-  --bg-gradient: #FAFAF8;
+  /* Solid backgrounds — clean neutral white */
+  --bg-gradient: #FFFFFF;
   --bg-mesh-1: none;
   --bg-mesh-2: none;
   --bg-mesh-3: none;
   --bg-mesh-4: none;
 
-  /* Core palette — near-white with subtle warmth */
-  --bg-primary: #FAFAF8;
-  --bg-secondary: #F5F4F2;
+  /* Core palette — clear whitish page, white cards lifted by borders/shadow */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8FAFC;
   --bg-sidebar: #FFFFFF;
   --bg-card: #FFFFFF;
   --bg-card-solid: #FFFFFF;
-  --bg-card-hover: #F7F7F5;
+  --bg-card-hover: #F1F5F9;
   --bg-input: #FFFFFF;
-  --bg-tinted: #F3F6F9;
+  --bg-tinted: #eff6ff;
 
-  /* TamamHealth brand colors (pan-African palette, colorblind-safe) */
-  --tamamhealth-teal-deep: #1A3A3A;
-  --tamamhealth-teal: #1B9AAA;
+  /* Tamam Healthcare System brand colors (blue primary; amber/red kept semantic) */
+  --tamamhealth-teal-deep: #1e3a8a;     /* deep brand blue (blue-900) */
+  --tamamhealth-teal: #3b82f6;          /* primary brand blue (blue-600) */
   --tamamhealth-amber: #E4A84B;
-  --tamamhealth-green: #1B9E77;
-  --tamamhealth-green-text: #157E5F;
+  --tamamhealth-green: #3b82f6;
+  --tamamhealth-green-text: #1e3a8a;
   --tamamhealth-red: #C44536;
   --tamamhealth-red-text: #C24435;
 
-  /* Accent — Brand Teal (TamamHealth palette) */
-  --accent-primary: #1B9AAA;            /* fills, icons, button bgs */
-  --accent-hover: #0E5566;
-  --accent-text: #0F6E7B;               /* AA-passing teal for text/links on light bg */
-  --accent-light: rgba(27, 154, 170, 0.12);
-  --accent-border: rgba(27, 154, 170, 0.30);
-  --accent-glow: rgba(27, 154, 170, 0.20);
+  /* Accent — Brand Blue (Tailwind blue-600) */
+  --accent-primary: #3b82f6;            /* fills, icons, button bgs */
+  --accent-hover: #2563eb;
+  --accent-text: #1e3a8a;               /* AA-passing deep blue for text/links on light bg */
+  --accent-light: rgba(59, 130, 246, 0.12);
+  --accent-border: rgba(59, 130, 246, 0.30);
+  --accent-glow: rgba(59, 130, 246, 0.20);
 
-  /* Icon default — neutral so icons don't take on the accent tint */
-  --icon-color: #5A7370;
+  /* Icon default — neutral slate so icons don't take on the accent tint */
+  --icon-color: #64748B;
 
-  /* Text — neutral charcoal with a faint teal-cyan tilt for brand cohesion.
+  /* Text — cool slate charcoal.
      Contrast ratios on white: primary 16:1 · secondary 9.4:1 · muted 5.7:1 */
-  --text-primary: #14242B;
-  --text-secondary: #3A5158;
-  --text-muted: #586F75;                /* darkened from #607980 to clear AA for body */
-  --link-color: #0F6E7B;                /* uses accent-text so links pass AA on white */
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-muted: #64748B;
+  --link-color: #1e3a8a;                /* uses accent-text so links pass AA on white */
 
-  /* Borders — slightly tealer + crisper for clearer card definition.
-     light reads at ~1.10:1 vs white (subtle), medium ~1.36:1 (visible). */
-  --border-light: #DCE3E5;
-  --border-medium: #BFCACC;
-  --border-accent: #1B9AAA;
-  --border-panel: #DCE3E5;
+  /* Borders — cool slate for clear card definition. */
+  --border-light: #E2E8F0;
+  --border-medium: #CBD5E1;
+  --border-accent: #3b82f6;
+  --border-panel: #E2E8F0;
 
   /* Subtle backgrounds for zebra striping and hover states */
-  --overlay-subtle: #FEFEFD;
-  --overlay-light: #FAFAF8;
-  --overlay-medium: #F5F4F2;
+  --overlay-subtle: #FCFDFE;
+  --overlay-light: #F8FAFC;
+  --overlay-medium: #F1F5F9;
 
   /* Topbar */
   --topbar-bg: #FFFFFF;
-  --topbar-border: #E8E6E2;
+  --topbar-border: #E2E8F0;
 
   /* Sidebar */
   --sidebar-bg: #FFFFFF;
 
-  /* Card shadow — teal-tinted for brand cohesion, slightly deeper for depth */
-  --card-shadow: 0 1px 3px rgba(14, 85, 102, 0.06), 0 4px 12px rgba(14, 85, 102, 0.05);
-  --card-shadow-lg: 0 8px 24px rgba(14, 85, 102, 0.10);
-  --card-shadow-xl: 0 16px 48px rgba(14, 85, 102, 0.12);
-  --card-hover-border: #B8C5C7;
-  --panel-shadow: 0 1px 3px rgba(14, 85, 102, 0.06), 0 4px 12px rgba(14, 85, 102, 0.05);
+  /* Card shadow — green-tinted for brand cohesion */
+  --card-shadow: 0 1px 3px rgba(30, 58, 138, 0.06), 0 4px 12px rgba(30, 58, 138, 0.05);
+  --card-shadow-lg: 0 8px 24px rgba(30, 58, 138, 0.10);
+  --card-shadow-xl: 0 16px 48px rgba(30, 58, 138, 0.12);
+  --card-hover-border: #bfdbfe;
+  --panel-shadow: 0 1px 3px rgba(30, 58, 138, 0.06), 0 4px 12px rgba(30, 58, 138, 0.05);
 
   /* Toggle */
-  --toggle-track: #DDDBD7;
+  --toggle-track: #CBD5E1;
 
   /* Scrollbar */
-  --scrollbar-thumb: rgba(26, 58, 58, 0.10);
-  --scrollbar-thumb-hover: rgba(26, 58, 58, 0.18);
+  --scrollbar-thumb: rgba(30, 58, 138, 0.14);
+  --scrollbar-thumb-hover: rgba(30, 58, 138, 0.24);
 
   /* Table */
-  --table-header-bg: #FAFAF8;
-  --table-row-border: #E8E6E2;
-  --table-row-hover: #FEFEFD;
+  --table-header-bg: #F8FAFC;
+  --table-row-border: #E2E8F0;
+  --table-row-hover: #FCFDFE;
 
   /* Nav */
-  --nav-text: #3D5854;
-  --nav-text-hover: #1A2C2A;
-  --nav-hover-bg: #F1F5F9;
-  --nav-active-bg: #1A3A3A;
+  --nav-text: #475569;
+  --nav-text-hover: #0F172A;
+  --nav-hover-bg: #eff6ff;
+  --nav-active-bg: #1e3a8a;
   --nav-active-text: #FFFFFF;
 
   /* Button secondary */
   --btn-secondary-bg: #FFFFFF;
-  --btn-secondary-hover-bg: #FAFAF8;
-  --btn-secondary-hover-border: #DDDBD7;
+  --btn-secondary-hover-bg: #F8FAFC;
+  --btn-secondary-hover-border: #CBD5E1;
 
   /* Status — colorblind-safe (Okabe-Ito derived) */
   --status-online: #1B9E77;
-  --status-offline: #8A9E9A;
+  --status-offline: #94A3B8;
   --status-syncing: #E4A84B;
   --status-error: #C44536;
 
@@ -131,113 +138,113 @@
   --color-danger: #C44536;
   --color-danger-text: #C24435;
   --color-danger-bg: rgba(196, 69, 54, 0.08);
-  --color-info: #1B9AAA;                /* fills/icons */
-  --color-info-text: #0F6E7B;           /* AA-passing variant for text */
-  --color-info-bg: rgba(27, 154, 170, 0.12);
+  --color-info: #3b82f6;                /* fills/icons */
+  --color-info-text: #1e3a8a;           /* AA-passing variant for text */
+  --color-info-bg: rgba(59, 130, 246, 0.12);
 
   /* Chart colors — brand-aligned series */
-  --color-chart-1: #1B9AAA;
-  --color-chart-2: #3FA9C9;
+  --color-chart-1: #3b82f6;
+  --color-chart-2: #60A5FA;
   --color-chart-3: #E4A84B;
   --color-chart-4: #C44536;
-  --color-chart-5: #1F9D6F;
-  --color-chart-6: #5A7370;
+  --color-chart-5: #1e3a8a;
+  --color-chart-6: #64748B;
 
   /* SVG map colors */
-  --map-bg: rgba(27, 154, 170, 0.06);
+  --map-bg: rgba(59, 130, 246, 0.06);
   --map-stroke: rgba(0, 0, 0, 0.05);
   --map-lines: rgba(0, 0, 0, 0.03);
-  --map-nile: rgba(27, 154, 170, 0.18);
+  --map-nile: rgba(59, 130, 246, 0.18);
   --map-label: rgba(0, 0, 0, 0.2);
   --map-tooltip-bg: rgba(255, 255, 255, 0.95);
-  --map-tooltip-stroke: rgba(26, 58, 58, 0.06);
-  --map-tooltip-text: #1A2C2A;
-  --map-tooltip-sub: #5A7370;
+  --map-tooltip-stroke: rgba(30, 58, 138, 0.06);
+  --map-tooltip-text: #0F172A;
+  --map-tooltip-sub: #64748B;
   --map-dot-stroke: #FFFFFF;
 }
 
 /* ============ DARK THEME ============ */
 [data-theme="dark"] {
-  /* Deep teal-toned dark background (cyan-leaning, not green-leaning) */
-  --bg-gradient: #0E2128;
+  /* Deep brand-green dark background */
+  --bg-gradient: #0a1a33;
   --bg-mesh-1: none;
   --bg-mesh-2: none;
   --bg-mesh-3: none;
   --bg-mesh-4: none;
 
-  --bg-primary: #0E2128;
-  --bg-secondary: #08161B;
-  --bg-sidebar: #112A33;
-  --bg-card: #163039;
-  --bg-card-solid: #163039;
-  --bg-card-hover: #1F3F49;
-  --bg-input: #163039;
-  --bg-tinted: #122B33;
+  --bg-primary: #0a1a33;
+  --bg-secondary: #06122a;
+  --bg-sidebar: #11244d;
+  --bg-card: #11244d;
+  --bg-card-solid: #11244d;
+  --bg-card-hover: #1a3160;
+  --bg-input: #11244d;
+  --bg-tinted: #13264f;
 
-  /* Lighter teal accent so it pops against the dark teal background. */
-  --accent-primary: #4AC0CE;
-  --accent-hover: #6FD3DF;
-  --accent-text: #6FD3DF;               /* mirrors hover — bright teal reads as text on dark */
-  --accent-light: rgba(74, 192, 206, 0.16);
-  --accent-border: rgba(74, 192, 206, 0.32);
-  --accent-glow: rgba(74, 192, 206, 0.20);
+  /* Brighter blue accent so it pops against the deep navy background. */
+  --accent-primary: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-text: #93c5fd;               /* bright blue reads as text on dark */
+  --accent-light: rgba(59, 130, 246, 0.18);
+  --accent-border: rgba(59, 130, 246, 0.34);
+  --accent-glow: rgba(59, 130, 246, 0.22);
 
-  --icon-color: #5CC0CC;
-  --link-color: #4AC0CE;
+  --icon-color: #93a9d6;
+  --link-color: #60a5fa;
 
-  --text-primary: #F2F0EB;
-  --text-secondary: #D4CFC5;
-  --text-muted: #8A9E9A;
+  --text-primary: #F1F5F9;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
 
-  --border-light: #2C3F47;
-  --border-medium: #3C5258;
-  --border-accent: #4AC0CE;
-  --border-panel: #2C3F47;
+  --border-light: #1e3a6b;
+  --border-medium: #2c4a82;
+  --border-accent: #3b82f6;
+  --border-panel: #1e3a6b;
 
-  --overlay-subtle: #122B33;
-  --overlay-light: #163039;
-  --overlay-medium: #1F3F49;
+  --overlay-subtle: #0f2046;
+  --overlay-light: #11244d;
+  --overlay-medium: #1a3160;
 
-  --topbar-bg: #112A33;
-  --topbar-border: #2C3F47;
+  --topbar-bg: #11244d;
+  --topbar-border: #1e3a6b;
 
-  --sidebar-bg: #112A33;
+  --sidebar-bg: #11244d;
 
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   --card-shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.5);
   --card-shadow-xl: 0 4px 16px rgba(0, 0, 0, 0.6);
-  --card-hover-border: #3D5258;
+  --card-hover-border: #2c4a82;
   --panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 
-  --toggle-track: #3D5258;
+  --toggle-track: #2c4a82;
 
-  --scrollbar-thumb: #34464D;
-  --scrollbar-thumb-hover: #3D5258;
+  --scrollbar-thumb: #1e3a6b;
+  --scrollbar-thumb-hover: #2c4a82;
 
-  --table-header-bg: #122B33;
-  --table-row-border: #2C3F47;
-  --table-row-hover: #163039;
+  --table-header-bg: #0f2046;
+  --table-row-border: #1e3a6b;
+  --table-row-hover: #11244d;
 
-  --nav-text: #8A9E9A;
-  --nav-text-hover: #D4CFC5;
-  --nav-hover-bg: #163039;
-  --nav-active-bg: #0E2128;
+  --nav-text: #93a9d6;
+  --nav-text-hover: #e6edf9;
+  --nav-hover-bg: #11244d;
+  --nav-active-bg: #0a1838;
   --nav-active-text: #FFFFFF;
 
-  --btn-secondary-bg: #163039;
-  --btn-secondary-hover-bg: #1F3F49;
-  --btn-secondary-hover-border: #3D5258;
+  --btn-secondary-bg: #11244d;
+  --btn-secondary-hover-bg: #1a3160;
+  --btn-secondary-hover-border: #2c4a82;
 
-  --map-bg: rgba(74, 192, 206, 0.05);
+  --map-bg: rgba(59, 130, 246, 0.06);
   --map-stroke: rgba(255, 255, 255, 0.06);
   --map-lines: rgba(255, 255, 255, 0.05);
-  --map-nile: rgba(74, 192, 206, 0.18);
+  --map-nile: rgba(59, 130, 246, 0.20);
   --map-label: rgba(255, 255, 255, 0.3);
-  --map-tooltip-bg: rgba(14, 33, 40, 0.95);
+  --map-tooltip-bg: rgba(8, 18, 40, 0.95);
   --map-tooltip-stroke: rgba(255, 255, 255, 0.1);
-  --map-tooltip-text: #D4CFC5;
-  --map-tooltip-sub: #8A9E9A;
-  --map-dot-stroke: #0E2128;
+  --map-tooltip-text: #CBD5E1;
+  --map-tooltip-sub: #94A3B8;
+  --map-dot-stroke: #0a1a33;
 
   /* Success keeps its green — universal medical meaning. */
   --color-success: #3ECF8E;
@@ -248,12 +255,12 @@
   --color-danger: #F87171;
   --color-danger-text: #F87171;
   --color-danger-bg: rgba(248, 113, 113, 0.10);
-  --color-info: #4AC0CE;
-  --color-info-text: #6FD3DF;
-  --color-info-bg: rgba(74, 192, 206, 0.14);
+  --color-info: #3b82f6;
+  --color-info-text: #93c5fd;
+  --color-info-bg: rgba(59, 130, 246, 0.16);
 
-  --color-chart-1: #4AC0CE;
-  --color-chart-2: #6FA8B5;
+  --color-chart-1: #3b82f6;
+  --color-chart-2: #7fd9a8;
   --color-chart-3: #E4A84B;
   --color-chart-4: #F87171;
   --color-chart-5: #a78bfa;
@@ -268,7 +275,7 @@ html {
 }
 
 body {
-  font-family: 'Inter', 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -316,7 +323,7 @@ svg.lucide:not([style*="color"]) {
 }
 
 /* ============ Typography ============ */
-.font-display { font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+.font-display { font-family: 'Untitled Sans', Arial, sans-serif; }
 .font-mono { font-family: 'JetBrains Mono', 'Menlo', 'Consolas', monospace; }
 
 .animate-fadeInUp { animation: fadeInUp 0.4s ease-out both; }
@@ -324,7 +331,7 @@ svg.lucide:not([style*="color"]) {
 /* ============ Heading scale (explicit sizes — was relying on browser
    defaults, which made hierarchy drift between pages) ============ */
 h1 {
-  font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   font-size: 1.875rem;        /* ~28px at 15px base */
   letter-spacing: -0.025em;
   font-weight: 800;
@@ -334,7 +341,7 @@ h1 {
 }
 
 h2 {
-  font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   font-size: 1.4375rem;       /* ~21.5px */
   letter-spacing: -0.02em;
   font-weight: 700;
@@ -344,7 +351,7 @@ h2 {
 }
 
 h3 {
-  font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   font-size: 1.1875rem;       /* ~17.8px */
   letter-spacing: -0.015em;
   font-weight: 700;
@@ -354,7 +361,7 @@ h3 {
 }
 
 h4 {
-  font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   font-size: 1.0625rem;       /* ~16px */
   letter-spacing: -0.01em;
   font-weight: 700;
@@ -364,7 +371,7 @@ h4 {
 }
 
 h5 {
-  font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   font-size: 0.9375rem;       /* ~14px */
   letter-spacing: 0;
   font-weight: 700;
@@ -437,7 +444,7 @@ a.link-accent:hover {
   font-weight: 700;
   letter-spacing: 0.01em;
   transition: all 0.2s ease;
-  font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
 }
 
 .badge-online { background: rgba(27, 158, 119, 0.12); color: #157E5F; border: 1px solid rgba(27, 158, 119, 0.25); }
@@ -445,7 +452,7 @@ a.link-accent:hover {
 .badge-syncing { background: rgba(228, 168, 75, 0.12); color: #8F6823; border: 1px solid rgba(228, 168, 75, 0.2); }
 .badge-emergency { background: rgba(196, 69, 54, 0.12); color: #C24435; border: 1px solid rgba(196, 69, 54, 0.2); }
 .badge-warning { background: rgba(228, 168, 75, 0.12); color: #8F6823; border: 1px solid rgba(228, 168, 75, 0.2); }
-.badge-watch { background: rgba(27, 154, 170, 0.12); color: #1B9AAA; border: 1px solid rgba(27, 154, 170, 0.2); }
+.badge-watch { background: rgba(59, 130, 246, 0.12); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); }
 .badge-normal { background: rgba(27, 158, 119, 0.12); color: #157E5F; border: 1px solid rgba(27, 158, 119, 0.2); }
 
 .urgency-routine { background: rgba(27, 158, 119, 0.12); color: #157E5F; border: 1px solid rgba(27, 158, 119, 0.2); }
@@ -468,7 +475,7 @@ input[type="search"],
 input[type="password"],
 select,
 textarea {
-  font-family: 'Inter', 'DM Sans', -apple-system, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   font-size: 0.85rem;
   font-weight: 450;
   border: 1px solid var(--border-medium);
@@ -516,7 +523,7 @@ label {
   margin-bottom: 6px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
 }
 
 /* Body paragraph rhythm — kicks in when components don't override */
@@ -543,7 +550,7 @@ small,
   border-radius: var(--btn-radius);
   font-size: 0.82rem;
   font-weight: 650;
-  font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   cursor: pointer;
   transition: all 0.2s ease;
   border: none;
@@ -558,11 +565,11 @@ small,
 .btn-primary {
   background: var(--accent-primary);
   color: white;
-  box-shadow: 0 1px 2px rgba(14, 85, 102, 0.15), 0 4px 12px rgba(14, 85, 102, 0.18);
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.15), 0 4px 12px rgba(59, 130, 246, 0.18);
 }
 .btn-primary:hover {
   background: var(--accent-hover);
-  box-shadow: 0 2px 4px rgba(14, 85, 102, 0.20), 0 8px 20px rgba(14, 85, 102, 0.28);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.20), 0 8px 20px rgba(59, 130, 246, 0.28);
   transform: translateY(-1px);
 }
 
@@ -570,13 +577,13 @@ small,
   background: var(--bg-card-solid);
   color: var(--text-secondary);
   border: 1px solid var(--border-medium);
-  box-shadow: 0 1px 2px rgba(14, 85, 102, 0.04);
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.04);
 }
 .btn-secondary:hover {
   background: var(--overlay-subtle);
   border-color: var(--card-hover-border);
   color: var(--text-primary);
-  box-shadow: 0 2px 6px rgba(14, 85, 102, 0.08);
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.08);
 }
 
 .btn-danger {
@@ -619,7 +626,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   color: var(--text-muted);
   text-align: left;
   border-bottom: 1px solid var(--table-row-border);
-  font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
 }
 .data-table thead th:first-child { border-radius: 12px 0 0 0; }
 .data-table thead th:last-child { border-radius: 0 12px 0 0; }
@@ -674,7 +681,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   cursor: pointer;
   transition: all 0.2s ease;
   text-decoration: none;
-  font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   white-space: nowrap;
   overflow: hidden;
 }
@@ -686,7 +693,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   color: var(--nav-active-text) !important;
   background: var(--nav-active-bg) !important;
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(26, 58, 58, 0.25);
+  box-shadow: 0 2px 8px rgba(30, 58, 138, 0.25);
   border-left: none;
   padding-left: 14px;
 }
@@ -706,7 +713,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   border-color: var(--accent-primary);
   background: var(--accent-primary);
   color: white;
-  box-shadow: 0 2px 8px rgba(26, 58, 58, 0.3);
+  box-shadow: 0 2px 8px rgba(30, 58, 138, 0.3);
 }
 .step-dot-completed {
   border-color: var(--accent-primary);
@@ -719,7 +726,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 
 /* ============ Stat cards ============ */
 .stat-value {
-  font-family: 'Space Grotesk', 'DM Sans', -apple-system, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.025em;
   font-weight: 700;
@@ -755,7 +762,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 .kpi__icon svg { width: 13px; height: 13px; }
 .kpi__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0; }
 .kpi__value {
-  font-family: 'Space Grotesk', 'DM Sans', -apple-system, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   font-size: 1.05rem;
   font-weight: 700;
   line-height: 1.15;
@@ -763,16 +770,19 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
 }
+/* Labels hidden — KPI cards show icon + value only across all dashboards.
+   Text is kept in the DOM (clipped, not display:none) so it stays available
+   to screen readers and as the accessible name. */
 .kpi__label {
-  font-size: 0.6rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  line-height: 1.1;
-  white-space: nowrap;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* KPI grid — stretches evenly to fill width */
@@ -795,7 +805,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   padding-bottom: 10px;
 }
 .kpi-card-title {
-  font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   font-size: 13px;
   font-weight: 700;
   color: var(--text-primary);
@@ -1031,7 +1041,7 @@ html, body { overflow-x: hidden; max-width: 100vw; }
 
 /* ============ Selection ============ */
 ::selection {
-  background: rgba(27, 154, 170, 0.24);
+  background: rgba(59, 130, 246, 0.24);
   color: var(--text-primary);
 }
 
@@ -1112,7 +1122,7 @@ svg circle {
 
 /* ============ Leaflet Map Overrides ============ */
 .leaflet-container {
-  font-family: 'Plus Jakarta Sans', 'DM Sans', sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   z-index: 1;
   border-radius: 16px;
 }
@@ -1133,7 +1143,7 @@ svg circle {
 
 .facility-popup .leaflet-popup-content {
   margin: 10px 14px;
-  font-family: 'Inter', 'DM Sans', Helvetica, Arial, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
 }
 
 .facility-popup .leaflet-popup-tip {
@@ -1150,7 +1160,7 @@ svg circle {
   border-radius: 8px !important;
   padding: 3px 8px !important;
   font-size: 10px !important;
-  font-family: 'DM Sans', sans-serif !important;
+  font-family: 'Untitled Sans', Arial, sans-serif !important;
   font-weight: 500 !important;
   box-shadow: var(--card-shadow) !important;
 }
@@ -1298,10 +1308,10 @@ svg circle {
   border: 1px solid var(--accent-border);
   color: var(--accent-primary);
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(26, 58, 58, 0.04);
+  box-shadow: 0 1px 2px rgba(30, 58, 138, 0.04);
 }
 .page-header__title {
-  font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+  font-family: 'Untitled Sans', Arial, sans-serif;
   font-size: 1.5rem;
   font-weight: 800;
   color: var(--text-primary);
@@ -1505,7 +1515,7 @@ svg circle {
   width: 32px; height: 32px; border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
-  background: rgba(27, 154, 170, 0.10);
+  background: rgba(59, 130, 246, 0.10);
   color: var(--accent-primary);
 }
 .data-row__label { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-muted); }
@@ -1542,7 +1552,7 @@ svg circle {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(14, 85, 102, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.20);
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.20);
 }
 
 .icon-box-sm {
@@ -1553,7 +1563,7 @@ svg circle {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(14, 85, 102, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
 .icon-box-lg {
@@ -1564,7 +1574,7 @@ svg circle {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(14, 85, 102, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
 /* ============ Data Row — icon + label + value layout ============ */

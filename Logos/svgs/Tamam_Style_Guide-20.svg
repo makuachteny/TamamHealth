@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 305.84 199.74">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #0d8844;
+      }
+
+      .cls-2 {
+        fill: #0e4724;
+      }
+    </style>
+  </defs>
+  <g>
+    <g id="_Radial_Repeat_" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="169.55" cy="14.67" r="14.67"/>
+    </g>
+    <g id="_Radial_Repeat_-2" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="215.84" cy="23.54" r="14.67"/>
+    </g>
+    <g id="_Radial_Repeat_-3" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="255.2" cy="49.44" r="14.67"/>
+    </g>
+    <g id="_Radial_Repeat_-4" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="281.66" cy="88.44" r="14.67"/>
+    </g>
+    <g id="_Radial_Repeat_-5" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="291.18" cy="134.59" r="14.67"/>
+    </g>
+    <g id="_Radial_Repeat_-6" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="170.87" cy="52.65" r="12.71"/>
+    </g>
+    <g id="_Radial_Repeat_-7" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="202.51" cy="59.13" r="12.71"/>
+    </g>
+    <g id="_Radial_Repeat_-8" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="229.27" cy="77.23" r="12.71"/>
+    </g>
+    <g id="_Radial_Repeat_-9" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="247.06" cy="104.19" r="12.71"/>
+    </g>
+    <g id="_Radial_Repeat_-10" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="253.19" cy="135.91" r="12.71"/>
+    </g>
+    <g id="_Radial_Repeat_-11" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="170.44" cy="87.3" r="7.39"/>
+    </g>
+    <g id="_Radial_Repeat_-12" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="188.86" cy="90.98" r="7.39"/>
+    </g>
+    <g id="_Radial_Repeat_-13" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="204.47" cy="101.42" r="7.39"/>
+    </g>
+    <g id="_Radial_Repeat_-14" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="214.89" cy="117.05" r="7.39"/>
+    </g>
+    <g id="_Radial_Repeat_-15" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="218.54" cy="135.48" r="7.39"/>
+    </g>
+    <g id="_Radial_Repeat_-16" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="170.42" cy="108.77" r="4.09"/>
+    </g>
+    <g id="_Radial_Repeat_-17" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="180.62" cy="110.81" r="4.09"/>
+    </g>
+    <g id="_Radial_Repeat_-18" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="189.27" cy="116.6" r="4.09"/>
+    </g>
+    <g id="_Radial_Repeat_-19" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="195.05" cy="125.25" r="4.09"/>
+    </g>
+    <g id="_Radial_Repeat_-20" data-name="&amp;lt;Radial Repeat&amp;gt;">
+      <circle class="cls-1" cx="197.07" cy="135.46" r="4.09"/>
+    </g>
+  </g>
+  <g>
+    <path class="cls-2" d="M0,169.61v-72.61h14.31v26.36h40.97v13.11H14.31v33.14c0,11.75,6.18,16.87,15.52,16.87s15.67-4.97,15.67-16.87v-1.66h14.16v1.66c0,20.19-12.05,30.13-29.83,30.13S0,189.8,0,169.61Z"/>
+    <path class="cls-2" d="M68.56,154.69c0-22.75,13.26-33.29,30.73-33.29,11.45,0,21.09,5.12,26.21,14.76,5.12-9.64,14.62-14.76,26.21-14.76,17.48,0,30.73,10.55,30.73,33.29v43.08h-14.31v-43.08c0-13.86-7.38-20.03-17.78-20.03s-17.63,6.48-17.63,20.03v43.08h-14.31v-43.08c0-13.56-7.68-20.03-17.78-20.03s-17.78,6.18-17.78,20.03v43.08h-14.31v-43.08Z"/>
+  </g>
+</svg>

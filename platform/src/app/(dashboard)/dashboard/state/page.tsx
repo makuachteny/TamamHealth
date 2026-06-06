@@ -14,6 +14,7 @@ import { useDeaths } from '@/lib/hooks/useDeaths';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { jubaYearMonth } from '@/lib/time-juba';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 function countByState(
   agg: Record<string, number> | undefined,
@@ -25,6 +26,7 @@ function countByState(
 
 export default function StateDashboardPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const stateName = (currentUser as unknown as { state?: string } | null)?.state || '';
 
@@ -76,27 +78,27 @@ export default function StateDashboardPage() {
 
   return (
     <RoleGuard>
-      <TopBar title="State Dashboard" />
+      <TopBar title={t('state.title')} />
       <main className="page-container page-enter">
         <PageHeader
           icon={Building2}
-          title={stateName || 'State Dashboard'}
-          subtitle={stateName ? `${facilitiesInState.length} facilities · ${counties.length} counties reporting` : 'No state assigned to this user'}
+          title={stateName || t('state.title')}
+          subtitle={stateName ? t('state.subtitle', { facilities: facilitiesInState.length, counties: counties.length }) : t('state.noStateAssigned')}
         />
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Kpi label="Births this month" value={stateBirthsThisMonth} icon={Baby} />
-          <Kpi label="Deaths this month" value={stateDeathsThisMonth} icon={Skull} />
-          <Kpi label="ANC1 coverage" value={`${anc1Rate}%`} icon={HeartPulse} />
-          <Kpi label="Immunizations YTD" value={immStats?.totalVaccinations ?? 0} icon={Syringe} />
+          <Kpi label={t('state.birthsThisMonth')} value={stateBirthsThisMonth} icon={Baby} />
+          <Kpi label={t('state.deathsThisMonth')} value={stateDeathsThisMonth} icon={Skull} />
+          <Kpi label={t('state.anc1Coverage')} value={`${anc1Rate}%`} icon={HeartPulse} />
+          <Kpi label={t('state.immunizationsYtd')} value={immStats?.totalVaccinations ?? 0} icon={Syringe} />
         </div>
 
         <div className="card-elevated p-5">
-          <h3 className="font-semibold text-sm mb-3">Counties in {stateName || '—'}</h3>
+          <h3 className="font-semibold text-sm mb-3">{t('state.countiesIn', { state: stateName || '—' })}</h3>
           {mchLoading && counties.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</p>
           ) : counties.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No county data yet — facilities in this state have not reported.</p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('state.noCountyData')}</p>
           ) : (
             <div className="space-y-2">
               {counties.map(c => (
@@ -109,7 +111,7 @@ export default function StateDashboardPage() {
                   <div>
                     <p className="font-medium text-sm">{c.county}</p>
                     <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      Births: {c.birthCount} · Deaths: {c.deathCount} · ANC mothers: {c.ancTotal}
+                      {t('state.countyStats', { births: c.birthCount, deaths: c.deathCount, anc: c.ancTotal })}
                     </p>
                   </div>
                   <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />

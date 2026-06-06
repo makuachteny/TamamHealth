@@ -8,6 +8,7 @@ import {
   Plus, ArrowRight, Wallet, Activity,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useUsers } from '@/lib/hooks/useUsers';
 import type { LeaveRequestDoc } from '@/lib/db-types-hr';
 import type { StaffScheduleDoc } from '@/lib/db-types';
@@ -19,6 +20,7 @@ import type { StaffScheduleDoc } from '@/lib/db-types';
  * a wall of charts.
  */
 export default function HRDashboardPage() {
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const { users } = useUsers();
   const [leave, setLeave] = useState<LeaveRequestDoc[]>([]);
@@ -27,7 +29,7 @@ export default function HRDashboardPage() {
 
   const today = new Date().toISOString().slice(0, 10);
   const facilityId = currentUser?.hospitalId;
-  const facilityName = currentUser?.hospitalName || 'Facility';
+  const facilityName = currentUser?.hospitalName || t('common.facility');
 
   useEffect(() => {
     let cancelled = false;
@@ -79,11 +81,11 @@ export default function HRDashboardPage() {
   if (loading) {
     return (
       <>
-        <TopBar title="HR Dashboard" />
+        <TopBar title={t('hr.dashboardTitle')} />
         <main className="page-container page-enter">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320, color: 'var(--text-muted)' }}>
             <Activity size={44} style={{ marginRight: 8, animation: 'spin 1s linear infinite' }} />
-            <span>Loading HR data…</span>
+            <span>{t('hr.loadingData')}</span>
           </div>
         </main>
       </>
@@ -92,21 +94,21 @@ export default function HRDashboardPage() {
 
   return (
     <>
-      <TopBar title="HR Dashboard" />
+      <TopBar title={t('hr.dashboardTitle')} />
       <main className="page-container page-enter">
         <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>HR Dashboard</h1>
+            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>{t('hr.dashboardTitle')}</h1>
             <p className="text-[12px]" style={{ color: 'var(--text-muted)', marginTop: 2 }}>
-              {facilityName} · Welcome, {currentUser?.name || 'HR Officer'}
+              {t('hr.facilityWelcome', { facility: facilityName, name: currentUser?.name || t('hr.hrOfficer') })}
             </p>
           </div>
           <div className="flex gap-2">
             <Link href="/hr" className="btn btn-secondary">
-              <Users className="w-4 h-4" /> Manage Staff
+              <Users className="w-4 h-4" /> {t('hr.manageStaff')}
             </Link>
             <Link href="/hr?tab=leave" className="btn btn-primary">
-              <Plus className="w-4 h-4" /> New Leave Request
+              <Plus className="w-4 h-4" /> {t('hr.newLeaveRequest')}
             </Link>
           </div>
         </div>
@@ -114,14 +116,14 @@ export default function HRDashboardPage() {
         {/* KPI strip */}
         <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', alignItems: 'stretch' }}>
           {[
-            { label: 'Active Staff', value: facilityUsers.length, accent: 'var(--accent-primary)', bg: 'rgba(27, 154, 170, 0.08)', border: 'rgba(27, 154, 170, 0.22)' },
-            { label: 'Present Today', value: presentToday, accent: '#15795C', bg: 'rgba(27, 158, 119, 0.10)', border: 'rgba(27, 158, 119, 0.26)' },
-            { label: 'On Leave Today', value: onLeaveToday.length, accent: onLeaveToday.length > 0 ? '#B8741C' : 'var(--accent-primary)', bg: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.12)' : 'rgba(27, 154, 170, 0.08)', border: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.30)' : 'rgba(27, 154, 170, 0.22)' },
-            { label: 'Pending Decisions', value: pendingLeave.length, accent: pendingLeave.length > 0 ? '#C44536' : 'var(--accent-primary)', bg: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.10)' : 'rgba(27, 154, 170, 0.08)', border: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.28)' : 'rgba(27, 154, 170, 0.22)' },
-            { label: 'On Call Today', value: onCallToday, accent: '#1B9AAA', bg: 'rgba(27, 154, 170, 0.10)', border: 'rgba(27, 154, 170, 0.26)' },
+            { id: 'activeStaff', label: t('hr.kpiActiveStaff'), value: facilityUsers.length, accent: 'var(--accent-primary)', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
+            { id: 'presentToday', label: t('hr.kpiPresentToday'), value: presentToday, accent: '#15795C', bg: 'rgba(27, 158, 119, 0.10)', border: 'rgba(27, 158, 119, 0.26)' },
+            { id: 'onLeaveToday', label: t('hr.kpiOnLeaveToday'), value: onLeaveToday.length, accent: onLeaveToday.length > 0 ? '#B8741C' : 'var(--accent-primary)', bg: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.12)' : 'rgba(59, 130, 246, 0.08)', border: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.30)' : 'rgba(59, 130, 246, 0.22)' },
+            { id: 'pendingDecisions', label: t('hr.kpiPendingDecisions'), value: pendingLeave.length, accent: pendingLeave.length > 0 ? '#C44536' : 'var(--accent-primary)', bg: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.10)' : 'rgba(59, 130, 246, 0.08)', border: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.28)' : 'rgba(59, 130, 246, 0.22)' },
+            { id: 'onCallToday', label: t('hr.kpiOnCallToday'), value: onCallToday, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
           ].map(k => (
-            <div key={k.label} style={{ padding: '14px 16px', borderRadius: 10, background: k.bg, border: `1px solid ${k.border}`, position: 'relative' }}>
-              {k.label === 'Pending Decisions' && pendingLeave.length > 0 && <span className="data-tile__alarm-pulse" aria-hidden="true" />}
+            <div key={k.id} style={{ padding: '14px 16px', borderRadius: 10, background: k.bg, border: `1px solid ${k.border}`, position: 'relative' }}>
+              {k.id === 'pendingDecisions' && pendingLeave.length > 0 && <span className="data-tile__alarm-pulse" aria-hidden="true" />}
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: k.accent }}>{k.label}</div>
               <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, marginTop: 2 }}>{k.value}</div>
             </div>
@@ -132,15 +134,15 @@ export default function HRDashboardPage() {
           {/* Pending decisions queue (bigger column) */}
           <div className="dash-card overflow-hidden">
             <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-              <h3 className="font-semibold text-sm">Pending Leave Decisions</h3>
+              <h3 className="font-semibold text-sm">{t('hr.pendingLeaveDecisions')}</h3>
               <Link href="/hr?tab=leave" className="text-[11px] font-bold inline-flex items-center gap-1" style={{ color: 'var(--accent-primary)' }}>
-                View all <ChevronRight className="w-3 h-3" />
+                {t('hr.viewAll')} <ChevronRight className="w-3 h-3" />
               </Link>
             </div>
             {pendingLeave.length === 0 ? (
               <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
                 <CheckCircle2 className="w-8 h-8 mx-auto mb-2" style={{ color: '#15795C', opacity: 0.6 }} />
-                No pending leave requests — you&apos;re all caught up.
+                {t('hr.noPendingLeave')}
               </div>
             ) : (
               <div>
@@ -148,7 +150,7 @@ export default function HRDashboardPage() {
                   const initials = r.userName.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
                   return (
                     <Link key={r._id} href="/hr?tab=leave" className="data-row data-row--warning">
-                      <div className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white" style={{ background: 'linear-gradient(135deg, #1B9AAA 0%, #1A3A3A 100%)' }}>{initials || '?'}</div>
+                      <div className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)' }}>{initials || '?'}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2 flex-wrap">
                           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{r.userName}</span>
@@ -171,23 +173,23 @@ export default function HRDashboardPage() {
           <div className="space-y-4">
             <div className="dash-card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                <h3 className="font-semibold text-sm">Today&apos;s Shifts</h3>
+                <h3 className="font-semibold text-sm">{t('hr.todaysShifts')}</h3>
               </div>
               <div className="p-4 space-y-2">
-                <ShiftRow label="Morning" count={morningStaff} accent="#15795C" />
-                <ShiftRow label="Afternoon" count={schedules.filter(s => s.shiftType === 'afternoon').length} accent="#E4A84B" />
-                <ShiftRow label="Night" count={nightStaff} accent="#1A3A3A" />
-                <ShiftRow label="On Call" count={onCallToday} accent="#1B9AAA" />
+                <ShiftRow label={t('hr.shiftMorning')} count={morningStaff} accent="#15795C" />
+                <ShiftRow label={t('hr.shiftAfternoon')} count={schedules.filter(s => s.shiftType === 'afternoon').length} accent="#E4A84B" />
+                <ShiftRow label={t('hr.shiftNight')} count={nightStaff} accent="#1E3A8A" />
+                <ShiftRow label={t('hr.shiftOnCall')} count={onCallToday} accent="#3b82f6" />
               </div>
             </div>
 
             <div className="dash-card overflow-hidden">
               <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-                <h3 className="font-semibold text-sm">Upcoming Leave</h3>
-                <Link href="/hr?tab=leave" className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{leave.filter(l => l.status === 'approved' && l.startDate > today).length} approved</Link>
+                <h3 className="font-semibold text-sm">{t('hr.upcomingLeave')}</h3>
+                <Link href="/hr?tab=leave" className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('hr.countApproved', { count: leave.filter(l => l.status === 'approved' && l.startDate > today).length })}</Link>
               </div>
               {upcomingLeave.length === 0 ? (
-                <div className="p-6 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>No upcoming approved leave.</div>
+                <div className="p-6 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>{t('hr.noUpcomingLeave')}</div>
               ) : (
                 <div>
                   {upcomingLeave.map(l => (
@@ -201,7 +203,7 @@ export default function HRDashboardPage() {
                           <span className="capitalize">{l.leaveType}</span> · {l.startDate}
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(27, 154, 170, 0.14)', color: '#1B9AAA' }}>{l.days}d</span>
+                      <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.14)', color: '#3b82f6' }}>{l.days}d</span>
                     </div>
                   ))}
                 </div>
@@ -210,11 +212,11 @@ export default function HRDashboardPage() {
 
             <div className="dash-card overflow-hidden">
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                <h3 className="font-semibold text-sm">Roster by Role</h3>
+                <h3 className="font-semibold text-sm">{t('hr.rosterByRole')}</h3>
               </div>
               <div className="p-4 space-y-2">
                 {roleCounts.length === 0 ? (
-                  <div className="text-[12px] text-center" style={{ color: 'var(--text-muted)' }}>No staff registered.</div>
+                  <div className="text-[12px] text-center" style={{ color: 'var(--text-muted)' }}>{t('hr.noStaffRegistered')}</div>
                 ) : roleCounts.map(([role, count]) => (
                   <div key={role} className="flex items-center justify-between text-[12.5px]">
                     <span className="capitalize" style={{ color: 'var(--text-secondary)' }}>{role.replace(/_/g, ' ')}</span>
@@ -228,12 +230,12 @@ export default function HRDashboardPage() {
 
         {/* Quick actions */}
         <div className="dash-card mt-4 p-4">
-          <h3 className="font-semibold text-sm mb-3">Quick Actions</h3>
+          <h3 className="font-semibold text-sm mb-3">{t('hr.quickActions')}</h3>
           <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', alignItems: 'stretch' }}>
-            <QuickAction href="/hr?tab=roster" icon={<Users className="w-4 h-4" />} label="Staff Roster" subtitle={`${facilityUsers.length} staff`} />
-            <QuickAction href="/hr?tab=leave" icon={<Calendar className="w-4 h-4" />} label="Leave Queue" subtitle={`${pendingLeave.length} pending`} alarm={pendingLeave.length > 0} />
-            <QuickAction href="/hr?tab=schedule" icon={<Clock className="w-4 h-4" />} label="Schedule Shifts" subtitle={`${schedules.length} today`} />
-            <QuickAction href="/hr?tab=payroll" icon={<Wallet className="w-4 h-4" />} label="Payroll Register" subtitle="Monthly payroll" />
+            <QuickAction href="/hr?tab=roster" icon={<Users className="w-4 h-4" />} label={t('hr.staffRoster')} subtitle={t('hr.staffCount', { count: facilityUsers.length })} />
+            <QuickAction href="/hr?tab=leave" icon={<Calendar className="w-4 h-4" />} label={t('hr.leaveQueue')} subtitle={t('hr.pendingCount', { count: pendingLeave.length })} alarm={pendingLeave.length > 0} />
+            <QuickAction href="/hr?tab=schedule" icon={<Clock className="w-4 h-4" />} label={t('hr.scheduleShifts')} subtitle={t('hr.todayCount', { count: schedules.length })} />
+            <QuickAction href="/hr?tab=payroll" icon={<Wallet className="w-4 h-4" />} label={t('hr.payrollRegister')} subtitle={t('hr.monthlyPayroll')} />
           </div>
         </div>
       </main>

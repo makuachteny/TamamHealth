@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check hospital assignment — super_admin, org_admin, government bypass
-    const ROLES_WITHOUT_HOSPITAL = ['super_admin', 'org_admin', 'government'];
+    const ROLES_WITHOUT_HOSPITAL = ['super_admin', 'org_admin', 'government', 'county_health_director'];
     if (!ROLES_WITHOUT_HOSPITAL.includes(user.role) && hospitalId && user.hospitalId && user.hospitalId !== hospitalId) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
@@ -155,6 +155,9 @@ export async function POST(request: NextRequest) {
       payam: user.payam,
       county: user.county,
       state: user.state,
+      // Carry the forced-change flag so the client can route a freshly created
+      // or reset user straight to the "set your password" screen.
+      mustChangePassword: user.mustChangePassword,
     });
 
     const response = NextResponse.json({
@@ -166,6 +169,7 @@ export async function POST(request: NextRequest) {
         hospitalId: user.hospitalId,
         hospitalName: user.hospitalName,
         orgId: user.orgId,
+        mustChangePassword: user.mustChangePassword,
       },
     });
 

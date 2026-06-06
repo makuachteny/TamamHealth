@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera, X, RotateCcw } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface PhotoCaptureProps {
   value?: string; // base64 data URL
@@ -10,6 +11,7 @@ interface PhotoCaptureProps {
 }
 
 export default function PhotoCapture({ value, onChange, size = 112 }: PhotoCaptureProps) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<'idle' | 'camera'>('idle');
   const [stream, setStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -37,7 +39,7 @@ export default function PhotoCapture({ value, onChange, size = 112 }: PhotoCaptu
 
   const stopCamera = useCallback(() => {
     if (stream) {
-      stream.getTracks().forEach(t => t.stop());
+      stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
     setMode('idle');
@@ -50,7 +52,7 @@ export default function PhotoCapture({ value, onChange, size = 112 }: PhotoCaptu
   useEffect(() => {
     return () => {
       if (stream) {
-        stream.getTracks().forEach(t => t.stop());
+        stream.getTracks().forEach(track => track.stop());
       }
     };
   }, [stream]);
@@ -118,7 +120,7 @@ export default function PhotoCapture({ value, onChange, size = 112 }: PhotoCaptu
             onClick={capturePhoto}
             className="w-8 h-8 rounded-full flex items-center justify-center"
             style={{ background: 'var(--tamamhealth-blue)', color: '#fff' }}
-            title="Take photo"
+            title={t('photoCapture.takePhotoTitle')}
           >
             <Camera className="w-4 h-4" />
           </button>
@@ -127,7 +129,7 @@ export default function PhotoCapture({ value, onChange, size = 112 }: PhotoCaptu
             onClick={stopCamera}
             className="w-8 h-8 rounded-full flex items-center justify-center"
             style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}
-            title="Cancel"
+            title={t('action.cancel')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -143,7 +145,7 @@ export default function PhotoCapture({ value, onChange, size = 112 }: PhotoCaptu
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={value}
-          alt="Patient photo"
+          alt={t('photoCapture.patientPhotoAlt')}
           className="w-full h-full object-cover rounded-lg"
         />
         <div className="absolute inset-0 rounded-lg flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.5)' }}>
@@ -152,7 +154,7 @@ export default function PhotoCapture({ value, onChange, size = 112 }: PhotoCaptu
             onClick={startCamera}
             className="w-8 h-8 rounded-full flex items-center justify-center"
             style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}
-            title="Retake photo"
+            title={t('photoCapture.retakeTitle')}
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -161,7 +163,7 @@ export default function PhotoCapture({ value, onChange, size = 112 }: PhotoCaptu
             onClick={() => onChange(undefined)}
             className="w-8 h-8 rounded-full flex items-center justify-center"
             style={{ background: 'rgba(229,46,66,0.8)', color: '#fff' }}
-            title="Remove photo"
+            title={t('photoCapture.removeTitle')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -187,14 +189,14 @@ export default function PhotoCapture({ value, onChange, size = 112 }: PhotoCaptu
         onClick={startCamera}
       >
         <Camera className="w-6 h-6 mb-1" style={{ color: 'var(--text-muted)' }} />
-        <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Take Photo</span>
+        <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>{t('photoCapture.takePhoto')}</span>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
           className="mt-1 text-[9px] underline"
           style={{ color: 'var(--tamamhealth-blue)' }}
         >
-          or upload
+          {t('photoCapture.orUpload')}
         </button>
       </div>
       <input

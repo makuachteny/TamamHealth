@@ -17,6 +17,7 @@ import {
 } from 'recharts';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { HospitalDoc, UserRole } from '@/lib/db-types';
 
 // Roles that can open the per-hospital management dashboard. The route itself
@@ -32,12 +33,12 @@ import {
 import { states, statesAndCounties } from '@/data/mock';
 
 // ───────────────────────────── helpers ─────────────────────────────
-const TYPE_LABELS: Record<string, string> = {
-  national_referral: 'National Referral',
-  state_hospital: 'State Hospital',
-  county_hospital: 'County Hospital',
-  phcc: 'PHCC',
-  phcu: 'PHCU',
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  national_referral: 'hospitals.typeNationalReferral',
+  state_hospital: 'hospitals.typeStateHospital',
+  county_hospital: 'hospitals.typeCountyHospital',
+  phcc: 'hospitals.typePhcc',
+  phcu: 'hospitals.typePhcu',
 };
 
 const TYPE_SHORT: Record<string, string> = {
@@ -48,18 +49,18 @@ const TYPE_SHORT: Record<string, string> = {
   phcu: 'PHCU',
 };
 
-const OWNERSHIP_LABELS: Record<string, string> = {
-  public: 'Public',
-  ngo: 'NGO',
-  private: 'Private',
-  faith_based: 'Faith-Based',
+const OWNERSHIP_LABEL_KEYS: Record<string, string> = {
+  public: 'hospitals.ownershipPublic',
+  ngo: 'hospitals.ownershipNgo',
+  private: 'hospitals.ownershipPrivate',
+  faith_based: 'hospitals.ownershipFaithBased',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  functional: 'Functional',
-  partially_functional: 'Partial',
-  non_functional: 'Non-Functional',
-  closed: 'Closed',
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  functional: 'hospitals.statusFunctional',
+  partially_functional: 'hospitals.statusPartial',
+  non_functional: 'hospitals.statusNonFunctional',
+  closed: 'hospitals.statusClosed',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -80,15 +81,15 @@ const PERCENTAGE_METRICS: PerformanceMetricKey[] = [
   'staffingScore', 'ancCoverage', 'immunizationCoverage', 'qualityScore',
 ];
 
-const SERVICE_FLAG_ICONS: Record<string, { icon: React.ElementType; label: string }> = {
-  epi: { icon: Syringe, label: 'EPI' },
-  anc: { icon: Baby, label: 'ANC' },
-  delivery: { icon: HeartPulse, label: 'Delivery' },
-  hiv: { icon: ShieldCheck, label: 'HIV' },
-  tb: { icon: Activity, label: 'TB' },
-  emergencySurgery: { icon: FlaskConical, label: 'Surgery' },
-  laboratory: { icon: Microscope, label: 'Lab' },
-  pharmacy: { icon: Pill, label: 'Pharmacy' },
+const SERVICE_FLAG_ICONS: Record<string, { icon: React.ElementType; labelKey: string }> = {
+  epi: { icon: Syringe, labelKey: 'hospitals.serviceEpi' },
+  anc: { icon: Baby, labelKey: 'hospitals.serviceAnc' },
+  delivery: { icon: HeartPulse, labelKey: 'hospitals.serviceDelivery' },
+  hiv: { icon: ShieldCheck, labelKey: 'hospitals.serviceHiv' },
+  tb: { icon: Activity, labelKey: 'hospitals.serviceTb' },
+  emergencySurgery: { icon: FlaskConical, labelKey: 'hospitals.serviceSurgery' },
+  laboratory: { icon: Microscope, labelKey: 'hospitals.serviceLab' },
+  pharmacy: { icon: Pill, labelKey: 'hospitals.servicePharmacy' },
 };
 
 function formatMetricValue(key: PerformanceMetricKey, value: number): string {
@@ -105,6 +106,7 @@ function normalizeMetricForColor(key: PerformanceMetricKey, value: number): numb
 
 // ───────────────────────────── page ─────────────────────────────
 function HospitalsPageInner() {
+  const { t } = useTranslation();
   const { hospitals, loading } = useHospitals();
   const { globalSearch, currentUser } = useApp();
   const canManage = !!currentUser && MANAGE_ROLES.includes(currentUser.role);
@@ -188,7 +190,7 @@ function HospitalsPageInner() {
       'Doctors', 'Nurses', 'Reporting%', 'Readiness%', 'Medicines%', 'Staffing%',
       'ANC Coverage%', 'EPI Coverage%', 'Quality', 'OPD/Month', 'Stock-out Days'];
     const rows = filteredHospitals.map(h => [
-      h.name, TYPE_LABELS[h.facilityType] || h.facilityType, h.state, h.county, h.town,
+      h.name, TYPE_LABEL_KEYS[h.facilityType] ? t(TYPE_LABEL_KEYS[h.facilityType]) : h.facilityType, h.state, h.county, h.town,
       h.ownership, h.operationalStatus, h.totalBeds,
       h.doctors, h.nurses,
       h.performance?.reportingCompleteness, h.performance?.serviceReadinessScore,
@@ -209,9 +211,9 @@ function HospitalsPageInner() {
   if (loading) {
     return (
       <>
-        <TopBar title="Health Facility Performance" />
+        <TopBar title={t('hospitals.topBarTitle')} />
         <main className="page-container flex items-center justify-center page-enter">
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading facilities...</p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('hospitals.loadingFacilities')}</p>
         </main>
       </>
     );
@@ -219,25 +221,25 @@ function HospitalsPageInner() {
 
   return (
     <>
-      <TopBar title="Health Facility Performance" />
+      <TopBar title={t('hospitals.topBarTitle')} />
       <main className="page-container page-enter">
         <PageHeader
           icon={Building2}
-          title="Hospital Network"
-          subtitle={`${filteredHospitals.length} facilities`}
+          title={t('hospitalManager.hospitalNetwork')}
+          subtitle={t('hospitals.facilitiesCount', { count: filteredHospitals.length })}
           actions={
             <>
               <div style={{ position: 'relative' }}>
                 <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: 'var(--text-muted)' }} />
-                <input type="text" placeholder="Search facilities..." value={search} onChange={e => setSearch(e.target.value)}
+                <input type="text" placeholder={t('hospitals.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)}
                   style={{ paddingLeft: 32, width: 200 }} />
               </div>
               <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-                <Filter style={{ width: 13, height: 13 }} /> Filters
+                <Filter style={{ width: 13, height: 13 }} /> {t('hospitals.filters')}
                 <ChevronDown style={{ width: 12, height: 12, transform: showFilters ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </button>
               <button onClick={handleExport} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-                <Download style={{ width: 13, height: 13 }} /> Export
+                <Download style={{ width: 13, height: 13 }} /> {t('action.export')}
               </button>
             </>
           }
@@ -246,27 +248,27 @@ function HospitalsPageInner() {
         {/* ── Filters ── */}
         {showFilters && (
           <div className="card-elevated" style={{ padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <FilterDropdown label="State" value={filterState} onChange={setFilterState} options={[{ value: 'all', label: 'All States' }, ...states.map(s => ({ value: s, label: s }))]} />
+            <FilterDropdown label={t('hospitals.filterState')} value={filterState} onChange={setFilterState} options={[{ value: 'all', label: t('hospitals.allStates') }, ...states.map(s => ({ value: s, label: s }))]} />
             {availableCounties.length > 0 && (
-              <FilterDropdown label="County" value={filterCounty} onChange={setFilterCounty} options={[{ value: 'all', label: 'All Counties' }, ...availableCounties.map(c => ({ value: c, label: c }))]} />
+              <FilterDropdown label={t('hospitals.filterCounty')} value={filterCounty} onChange={setFilterCounty} options={[{ value: 'all', label: t('hospitals.allCounties') }, ...availableCounties.map(c => ({ value: c, label: c }))]} />
             )}
-            <FilterDropdown label="Type" value={filterType} onChange={setFilterType} options={[{ value: 'all', label: 'All Types' }, ...Object.entries(TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))]} />
-            <FilterDropdown label="Ownership" value={filterOwnership} onChange={setFilterOwnership} options={[{ value: 'all', label: 'All' }, ...Object.entries(OWNERSHIP_LABELS).map(([v, l]) => ({ value: v, label: l }))]} />
-            <FilterDropdown label="Service" value={filterService} onChange={setFilterService} options={[{ value: 'all', label: 'All Services' }, ...Object.entries(SERVICE_FLAG_ICONS).map(([k, v]) => ({ value: k, label: v.label }))]} />
-            <FilterDropdown label="Status" value={filterStatus} onChange={setFilterStatus} options={[{ value: 'all', label: 'All Status' }, ...Object.entries(STATUS_LABELS).map(([v, l]) => ({ value: v, label: l }))]} />
+            <FilterDropdown label={t('hospitals.filterType')} value={filterType} onChange={setFilterType} options={[{ value: 'all', label: t('hospitals.allTypes') }, ...Object.entries(TYPE_LABEL_KEYS).map(([v, l]) => ({ value: v, label: t(l) }))]} />
+            <FilterDropdown label={t('hospitals.filterOwnership')} value={filterOwnership} onChange={setFilterOwnership} options={[{ value: 'all', label: t('hospitals.allOwnership') }, ...Object.entries(OWNERSHIP_LABEL_KEYS).map(([v, l]) => ({ value: v, label: t(l) }))]} />
+            <FilterDropdown label={t('hospitals.filterService')} value={filterService} onChange={setFilterService} options={[{ value: 'all', label: t('hospitals.allServices') }, ...Object.entries(SERVICE_FLAG_ICONS).map(([k, v]) => ({ value: k, label: t(v.labelKey) }))]} />
+            <FilterDropdown label={t('hospitals.filterStatus')} value={filterStatus} onChange={setFilterStatus} options={[{ value: 'all', label: t('hospitals.allStatus') }, ...Object.entries(STATUS_LABEL_KEYS).map(([v, l]) => ({ value: v, label: t(l) }))]} />
             <div style={{ width: 1, height: 20, background: 'var(--border-light)' }} />
-            <FilterDropdown label="Color by" value={colorMetric} onChange={v => setColorMetric(v as PerformanceMetricKey)} options={METRIC_KEYS.map(k => ({ value: k, label: METRIC_LABELS[k] }))} />
+            <FilterDropdown label={t('hospitals.colorBy')} value={colorMetric} onChange={v => setColorMetric(v as PerformanceMetricKey)} options={METRIC_KEYS.map(k => ({ value: k, label: METRIC_LABELS[k] }))} />
           </div>
         )}
 
         {/* ── KPIs ── */}
         <div className="kpi-grid" style={{ marginBottom: 16 }}>
-          <KpiCard label="Facilities" value={kpis.total} icon={Building2} color="#14B8A6" />
-          <KpiCard label="Functional" value={`${kpis.pctFunctional}%`} icon={ShieldCheck} color={getPerformanceColor(kpis.pctFunctional)} />
-          <KpiCard label="Reporting" value={`${kpis.avgReporting}%`} icon={Activity} color={getPerformanceColor(kpis.avgReporting)} />
-          <KpiCard label="Readiness" value={`${kpis.avgReadiness}%`} icon={Stethoscope} color={getPerformanceColor(kpis.avgReadiness)} />
-          <KpiCard label="Gaps" value={kpis.coverageGaps} icon={Syringe} color={kpis.coverageGaps > 5 ? 'var(--color-danger)' : 'var(--color-warning)'} />
-          <KpiCard label="Staff/Bed" value={kpis.staffPerBed} icon={Users} color="#3B82F6" />
+          <KpiCard label={t('hospitals.kpiFacilities')} value={kpis.total} icon={Building2} color="#14B8A6" />
+          <KpiCard label={t('hospitals.kpiFunctional')} value={`${kpis.pctFunctional}%`} icon={ShieldCheck} color={getPerformanceColor(kpis.pctFunctional)} />
+          <KpiCard label={t('hospitals.kpiReporting')} value={`${kpis.avgReporting}%`} icon={Activity} color={getPerformanceColor(kpis.avgReporting)} />
+          <KpiCard label={t('hospitals.kpiReadiness')} value={`${kpis.avgReadiness}%`} icon={Stethoscope} color={getPerformanceColor(kpis.avgReadiness)} />
+          <KpiCard label={t('hospitals.kpiGaps')} value={kpis.coverageGaps} icon={Syringe} color={kpis.coverageGaps > 5 ? 'var(--color-danger)' : 'var(--color-warning)'} />
+          <KpiCard label={t('hospitals.kpiStaffPerBed')} value={kpis.staffPerBed} icon={Users} color="#3B82F6" />
         </div>
 
         {/* ── Facility Table / Profile ── */}
@@ -348,11 +350,12 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
   onSelect: (h: HospitalDoc) => void;
   canManage: boolean;
 }) {
+  const { t } = useTranslation();
   if (hospitals.length === 0) {
     return (
       <div style={{ padding: 48, textAlign: 'center' }}>
         <Building2 style={{ width: 32, height: 32, color: 'var(--text-muted)', opacity: 0.3, margin: '0 auto 12px' }} />
-        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No facilities match your filters</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('hospitals.noFacilitiesMatch')}</p>
       </div>
     );
   }
@@ -362,14 +365,14 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
       <table className="data-table" style={{ minWidth: 700 }}>
         <thead>
           <tr>
-            <th style={{ width: '28%' }}>Facility</th>
-            <th style={{ width: '10%' }}>Type</th>
-            <th style={{ width: '14%' }}>Location</th>
-            <th style={{ width: '8%' }}>Status</th>
-            <th style={{ width: '8%' }}>Beds</th>
-            <th style={{ width: '8%' }}>Staff</th>
+            <th style={{ width: '28%' }}>{t('hospitals.colFacility')}</th>
+            <th style={{ width: '10%' }}>{t('hospitals.colType')}</th>
+            <th style={{ width: '14%' }}>{t('hospitals.colLocation')}</th>
+            <th style={{ width: '8%' }}>{t('hospitals.colStatus')}</th>
+            <th style={{ width: '8%' }}>{t('hospitals.colBeds')}</th>
+            <th style={{ width: '8%' }}>{t('hospitals.colStaff')}</th>
             <th style={{ width: '14%' }}>{METRIC_LABELS[colorMetric]}</th>
-            <th style={{ width: '10%' }}>Sync</th>
+            <th style={{ width: '10%' }}>{t('hospitals.colSync')}</th>
             {canManage && <th style={{ width: '8%' }}></th>}
           </tr>
         </thead>
@@ -399,7 +402,7 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
                   {h.operationalStatus && (
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: STATUS_COLORS[h.operationalStatus] }}>
                       <span style={{ width: 5, height: 5, borderRadius: '50%', background: STATUS_COLORS[h.operationalStatus] }} />
-                      {STATUS_LABELS[h.operationalStatus]}
+                      {t(STATUS_LABEL_KEYS[h.operationalStatus])}
                     </span>
                   )}
                 </td>
@@ -440,7 +443,7 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
                       className="btn btn-secondary btn-sm"
                       style={{ gap: 4, padding: '4px 8px', fontSize: 11 }}
                     >
-                      <Settings style={{ width: 11, height: 11 }} /> Manage
+                      <Settings style={{ width: 11, height: 11 }} /> {t('hospitals.manage')}
                     </Link>
                   </td>
                 )}
@@ -461,17 +464,18 @@ function FacilityProfile({ hospital, onClose, canManage }: {
   onClose: () => void;
   canManage: boolean;
 }) {
+  const { t } = useTranslation();
   const formatLastSync = (iso: string) => {
-    if (!iso) return 'Unknown';
+    if (!iso) return t('hospitals.syncUnknown');
     const d = new Date(iso);
-    if (isNaN(d.getTime())) return 'Unknown';
+    if (isNaN(d.getTime())) return t('hospitals.syncUnknown');
     const now = new Date();
     const diffMin = Math.floor((now.getTime() - d.getTime()) / 60000);
-    if (diffMin < 1) return 'Just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffMin < 1) return t('hospitals.syncJustNow');
+    if (diffMin < 60) return t('hospitals.syncMinutesAgo', { count: diffMin });
     const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return `${diffHr}h ago`;
-    return `${Math.floor(diffHr / 24)}d ago`;
+    if (diffHr < 24) return t('hospitals.syncHoursAgo', { count: diffHr });
+    return t('hospitals.syncDaysAgo', { count: Math.floor(diffHr / 24) });
   };
 
   const totalStaff = (hospital.doctors || 0) + (hospital.clinicalOfficers || 0) + (hospital.nurses || 0) + (hospital.labTechnicians || 0) + (hospital.pharmacists || 0);
@@ -484,16 +488,16 @@ function FacilityProfile({ hospital, onClose, canManage }: {
           <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>{hospital.name}</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12, color: 'var(--text-secondary)' }}>
             <span className="badge" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)', fontSize: 11 }}>
-              {TYPE_LABELS[hospital.facilityType] || hospital.facilityType}
+              {TYPE_LABEL_KEYS[hospital.facilityType] ? t(TYPE_LABEL_KEYS[hospital.facilityType]) : hospital.facilityType}
             </span>
-            {hospital.ownership && <span style={{ color: 'var(--text-muted)' }}>{OWNERSHIP_LABELS[hospital.ownership]}</span>}
+            {hospital.ownership && <span style={{ color: 'var(--text-muted)' }}>{t(OWNERSHIP_LABEL_KEYS[hospital.ownership])}</span>}
             <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--text-muted)' }}>
               <MapPin style={{ width: 12, height: 12 }} />{hospital.town}, {hospital.state}
             </span>
             {hospital.operationalStatus && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, color: STATUS_COLORS[hospital.operationalStatus] }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLORS[hospital.operationalStatus] }} />
-                {STATUS_LABELS[hospital.operationalStatus]}
+                {t(STATUS_LABEL_KEYS[hospital.operationalStatus])}
               </span>
             )}
           </div>
@@ -505,7 +509,7 @@ function FacilityProfile({ hospital, onClose, canManage }: {
               className="btn btn-primary btn-sm"
               style={{ gap: 4 }}
             >
-              <Settings style={{ width: 13, height: 13 }} /> Manage
+              <Settings style={{ width: 13, height: 13 }} /> {t('hospitals.manage')}
             </Link>
           )}
           <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -518,10 +522,10 @@ function FacilityProfile({ hospital, onClose, canManage }: {
 
       {/* Quick stats row */}
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Users style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.patientCount.toLocaleString()}</div><div className="kpi__label">Patients</div></div></div>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Activity style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.todayVisits}</div><div className="kpi__label">Today</div></div></div>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'rgba(168,85,247,0.08)' }}><BedDouble style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.totalBeds}</div><div className="kpi__label">Beds</div></div></div>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'rgba(168,85,247,0.08)' }}><Stethoscope style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{totalStaff}</div><div className="kpi__label">Staff</div></div></div>
+        <div className="kpi"><div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Users style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.patientCount.toLocaleString()}</div><div className="kpi__label">{t('hospitals.statPatients')}</div></div></div>
+        <div className="kpi"><div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Activity style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.todayVisits}</div><div className="kpi__label">{t('hospitals.statToday')}</div></div></div>
+        <div className="kpi"><div className="icon-box-sm" style={{ background: 'rgba(168,85,247,0.08)' }}><BedDouble style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.totalBeds}</div><div className="kpi__label">{t('hospitals.statBeds')}</div></div></div>
+        <div className="kpi"><div className="icon-box-sm" style={{ background: 'rgba(168,85,247,0.08)' }}><Stethoscope style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{totalStaff}</div><div className="kpi__label">{t('hospitals.statStaff')}</div></div></div>
       </div>
 
       <hr className="section-divider" />
@@ -530,7 +534,7 @@ function FacilityProfile({ hospital, onClose, canManage }: {
       {hospital.performance && (
         <div className="card-elevated" style={{ padding: 16, marginBottom: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Eye style={{ width: 14, height: 14, color: 'var(--text-muted)' }} /> Performance Metrics
+            <Eye style={{ width: 14, height: 14, color: 'var(--text-muted)' }} /> {t('hospitals.performanceMetrics')}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[...PERCENTAGE_METRICS, 'stockOutDays' as PerformanceMetricKey, 'opdVisitsPerMonth' as PerformanceMetricKey].map(key => {
@@ -560,29 +564,33 @@ function FacilityProfile({ hospital, onClose, canManage }: {
         {/* Trend */}
         {hospital.monthlyTrends && hospital.monthlyTrends.length > 0 && (
           <div className="card-elevated" style={{ padding: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>6-Month Trend</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>{t('hospitals.sixMonthTrend')}</div>
+            {hospital.monthlyTrends.every(m => !m.opdVisits && !m.reportingTimeliness) ? (
+              <div style={{ height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--text-muted)' }}>—</div>
+            ) : (
             <ResponsiveContainer width="100%" height={50}>
               <LineChart data={hospital.monthlyTrends} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
-                <Line type="monotone" dataKey="opdVisits" stroke="#1B9AAA" strokeWidth={1.5} dot={false} />
+                <Line type="monotone" dataKey="opdVisits" stroke="#3b82f6" strokeWidth={1.5} dot={false} />
                 <Line type="monotone" dataKey="reportingTimeliness" stroke="#10B981" strokeWidth={1.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
+            )}
             <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 2, borderRadius: 1, background: 'var(--accent-primary)' }} />OPD</span>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 2, borderRadius: 1, background: 'var(--color-success)' }} />Reporting</span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 2, borderRadius: 1, background: 'var(--accent-primary)' }} />{t('hospitals.legendOpd')}</span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 2, borderRadius: 1, background: 'var(--color-success)' }} />{t('hospitals.legendReporting')}</span>
             </div>
           </div>
         )}
 
         {/* Beds breakdown */}
         <div className="card-elevated" style={{ padding: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>Beds ({hospital.totalBeds})</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>{t('hospitals.bedsHeader', { count: hospital.totalBeds })}</div>
           <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
             {[
-              { label: 'ICU', value: hospital.icuBeds, color: 'var(--color-danger)' },
-              { label: 'Maternity', value: hospital.maternityBeds, color: '#EC4899' },
-              { label: 'Pediatric', value: hospital.pediatricBeds, color: '#5CB8A8' },
-              { label: 'General', value: Math.max(0, hospital.totalBeds - hospital.icuBeds - hospital.maternityBeds - hospital.pediatricBeds), color: 'var(--text-muted)' },
+              { label: t('hospitals.bedsIcu'), value: hospital.icuBeds, color: 'var(--color-danger)' },
+              { label: t('hospitals.bedsMaternity'), value: hospital.maternityBeds, color: '#EC4899' },
+              { label: t('hospitals.bedsPediatric'), value: hospital.pediatricBeds, color: '#5CB8A8' },
+              { label: t('hospitals.bedsGeneral'), value: Math.max(0, hospital.totalBeds - hospital.icuBeds - hospital.maternityBeds - hospital.pediatricBeds), color: 'var(--text-muted)' },
             ].map(b => (
               <div key={b.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
@@ -601,14 +609,14 @@ function FacilityProfile({ hospital, onClose, canManage }: {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
         {/* Staff */}
         <div className="card-elevated" style={{ padding: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>Staff ({totalStaff})</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>{t('hospitals.staffHeader', { count: totalStaff })}</div>
           <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
             {[
-              { label: 'Doctors', value: hospital.doctors, color: 'var(--accent-primary)' },
-              { label: 'Clinical Officers', value: hospital.clinicalOfficers, color: '#A78BFA' },
-              { label: 'Nurses', value: hospital.nurses, color: '#EC4899' },
-              { label: 'Lab Tech', value: hospital.labTechnicians, color: 'var(--color-warning)' },
-              { label: 'Pharmacists', value: hospital.pharmacists, color: 'var(--color-success)' },
+              { label: t('hospitals.staffDoctors'), value: hospital.doctors, color: 'var(--accent-primary)' },
+              { label: t('hospitals.staffClinicalOfficers'), value: hospital.clinicalOfficers, color: '#A78BFA' },
+              { label: t('hospitals.staffNurses'), value: hospital.nurses, color: '#EC4899' },
+              { label: t('hospitals.staffLabTech'), value: hospital.labTechnicians, color: 'var(--color-warning)' },
+              { label: t('hospitals.staffPharmacists'), value: hospital.pharmacists, color: 'var(--color-success)' },
             ].map(s => (
               <div key={s.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
@@ -622,20 +630,20 @@ function FacilityProfile({ hospital, onClose, canManage }: {
 
         {/* Infrastructure */}
         <div className="card-elevated" style={{ padding: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>Infrastructure</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>{t('hospitals.infrastructure')}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {hospital.hasElectricity ? <InfraBadge icon={Zap} label="Power" color="#FCD34D" bg="rgba(252,211,77,0.10)" />
-              : <InfraBadge icon={ZapOff} label="No Power" color="#8A9E9A" bg="rgba(100,116,139,0.10)" />}
-            {hospital.hasGenerator && <InfraBadge icon={Activity} label="Generator" color="#10B981" bg="rgba(16,185,129,0.10)" />}
-            {hospital.hasSolar && <InfraBadge icon={Sun} label="Solar" color="#FCD34D" bg="rgba(252,211,77,0.08)" />}
+            {hospital.hasElectricity ? <InfraBadge icon={Zap} label={t('hospitals.infraPower')} color="#FCD34D" bg="rgba(252,211,77,0.10)" />
+              : <InfraBadge icon={ZapOff} label={t('hospitals.infraNoPower')} color="#8A9E9A" bg="rgba(100,116,139,0.10)" />}
+            {hospital.hasGenerator && <InfraBadge icon={Activity} label={t('hospitals.infraGenerator')} color="#10B981" bg="rgba(16,185,129,0.10)" />}
+            {hospital.hasSolar && <InfraBadge icon={Sun} label={t('hospitals.infraSolar')} color="#FCD34D" bg="rgba(252,211,77,0.08)" />}
             {hospital.hasInternet ? <InfraBadge icon={Signal} label={hospital.internetType} color="#5CB8A8" bg="rgba(96,165,250,0.10)" />
-              : <InfraBadge icon={WifiOff} label="No Internet" color="#8A9E9A" bg="rgba(100,116,139,0.10)" />}
-            {hospital.hasAmbulance && <InfraBadge icon={Truck} label="Ambulance" color="#EF4444" bg="rgba(239,68,68,0.08)" />}
-            {hospital.emergency24hr && <InfraBadge icon={HeartPulse} label="24hr ER" color="#EF4444" bg="rgba(239,68,68,0.08)" />}
+              : <InfraBadge icon={WifiOff} label={t('hospitals.infraNoInternet')} color="#8A9E9A" bg="rgba(100,116,139,0.10)" />}
+            {hospital.hasAmbulance && <InfraBadge icon={Truck} label={t('hospitals.infraAmbulance')} color="#EF4444" bg="rgba(239,68,68,0.08)" />}
+            {hospital.emergency24hr && <InfraBadge icon={HeartPulse} label={t('hospitals.infra24hrEr')} color="#EF4444" bg="rgba(239,68,68,0.08)" />}
           </div>
           {hospital.electricityHours > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>Power</span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>{t('hospitals.infraPower')}</span>
               <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'var(--overlay-subtle)', overflow: 'hidden' }}>
                 <div style={{ width: `${(hospital.electricityHours / 24) * 100}%`, height: '100%', borderRadius: 2, background: hospital.electricityHours >= 12 ? 'var(--color-success)' : hospital.electricityHours >= 6 ? 'var(--color-warning)' : 'var(--color-danger)' }} />
               </div>
@@ -650,13 +658,13 @@ function FacilityProfile({ hospital, onClose, canManage }: {
       {/* Services + Sync */}
       {hospital.serviceFlags && (
         <div className="card-elevated" style={{ padding: 12, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>Services Available</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>{t('hospitals.servicesAvailable')}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {Object.entries(SERVICE_FLAG_ICONS).map(([key, { icon: FlagIcon, label }]) => {
+            {Object.entries(SERVICE_FLAG_ICONS).map(([key, { icon: FlagIcon, labelKey }]) => {
               const available = (hospital.serviceFlags as Record<string, boolean>)?.[key];
               return (
                 <span key={key} className="badge" style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, background: available ? 'rgba(0,119,215,0.08)' : 'rgba(100,116,139,0.06)', color: available ? 'var(--accent-primary)' : 'var(--text-muted)', opacity: available ? 1 : 0.5 }}>
-                  <FlagIcon style={{ width: 11, height: 11 }} /> {label}
+                  <FlagIcon style={{ width: 11, height: 11 }} /> {t(labelKey)}
                 </span>
               );
             })}
@@ -690,8 +698,9 @@ function InfraBadge({ icon: Icon, label, color, bg }: { icon: React.ElementType;
 }
 
 export default function HospitalsPage() {
+  const { t } = useTranslation();
   return (
-    <Suspense fallback={<div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Loading...</div>}>
+    <Suspense fallback={<div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>{t('status.loading')}</div>}>
       <HospitalsPageInner />
     </Suspense>
   );

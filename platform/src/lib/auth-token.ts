@@ -82,7 +82,7 @@ function verifyFallbackToken(token: string): Record<string, unknown> | null {
   }
 }
 
-export async function createToken(user: { _id: string; username: string; role: string; name: string; hospitalId?: string; orgId?: string; countryId?: string; payam?: string; county?: string; state?: string }): Promise<string> {
+export async function createToken(user: { _id: string; username: string; role: string; name: string; hospitalId?: string; orgId?: string; countryId?: string; payam?: string; county?: string; state?: string; mustChangePassword?: boolean }): Promise<string> {
   const payload = {
     sub: user._id,
     username: user.username,
@@ -94,6 +94,7 @@ export async function createToken(user: { _id: string; username: string; role: s
     payam: user.payam,
     county: user.county,
     state: user.state,
+    mustChangePassword: user.mustChangePassword,
   };
 
   // Use jose when crypto.subtle is available (HTTPS / localhost / server-side)
@@ -123,6 +124,7 @@ export async function verifyToken(token: string): Promise<{
   payam?: string;
   county?: string;
   state?: string;
+  mustChangePassword?: boolean;
 } | null> {
   // Try jose first (works server-side and on HTTPS)
   if (hasCryptoSubtle()) {
@@ -142,6 +144,7 @@ export async function verifyToken(token: string): Promise<{
         payam?: string;
         county?: string;
         state?: string;
+        mustChangePassword?: boolean;
       };
     } catch {
       // Fall through to try fallback
@@ -162,6 +165,7 @@ export async function verifyToken(token: string): Promise<{
       payam: fallback.payam as string | undefined,
       county: fallback.county as string | undefined,
       state: fallback.state as string | undefined,
+      mustChangePassword: fallback.mustChangePassword as boolean | undefined,
     };
   }
 

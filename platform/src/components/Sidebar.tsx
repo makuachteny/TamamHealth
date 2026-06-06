@@ -69,7 +69,9 @@ export default function Sidebar() {
   const hasSections = navItems.some(i => i.section);
 
   const branding = currentUser?.branding;
-  const brandName = role === 'super_admin' ? 'TamamHealth' : (branding?.name || 'TamamHealth');
+  // The top of the sidebar is the product brand. The org/facility identity is
+  // shown exactly once in the user card below, so it must not be repeated here.
+  const brandName = 'Tamam Healthcare System';
   const brandLogo = branding?.logoUrl;
 
   const handleNavClick = () => {
@@ -161,15 +163,9 @@ export default function Sidebar() {
           />
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <h1 className="font-extrabold text-[17px] leading-none truncate" style={{ color: 'var(--text-primary)', letterSpacing: '-0.015em' }}>
+              <h1 className="font-extrabold text-[15px] leading-[1.12]" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
                 {brandName}
               </h1>
-              <p className="text-[9.5px] uppercase tracking-[0.16em] font-semibold mt-1" style={{ color: 'var(--text-muted)' }}>
-                {role === 'government' ? 'Ministry of Health'
-                  : role === 'super_admin' ? 'Platform Administration'
-                  : role === 'org_admin' ? 'Organization Admin'
-                  : 'Digital Health Records'}
-              </p>
             </div>
           )}
           {/* Close button - only on mobile/tablet */}

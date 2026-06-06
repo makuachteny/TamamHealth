@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import TopBar from '@/components/TopBar';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import {
@@ -33,6 +34,7 @@ const SAMPLE_STUDIES = [
 ];
 
 export default function RadiologyDashboard() {
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const { patients } = usePatients();
   const { results: labResults } = useLabResults();
@@ -58,7 +60,7 @@ export default function RadiologyDashboard() {
     if (!findings.trim()) return;
     setSubmittedFindings(prev => ({ ...prev, [studyId]: findings.trim() }));
     setFindings('');
-    setSubmitToast(`Report submitted for ${studyId}`);
+    setSubmitToast(t('radiology.reportSubmittedFor', { id: studyId }));
     window.setTimeout(() => setSubmitToast(null), 3000);
   };
 
@@ -77,7 +79,7 @@ export default function RadiologyDashboard() {
 
   return (
     <>
-      <TopBar title="Radiology Dashboard" />
+      <TopBar title={t('radiology.title')} />
       <main className="page-container page-enter">
 
         {IS_DEMO && <DemoModeBanner />}
@@ -95,14 +97,14 @@ export default function RadiologyDashboard() {
         {/* KPI strip */}
         <div className="kpi-grid mb-4">
           {[
-            { label: 'Total Studies', value: stats.total, icon: Scan, color: 'var(--accent-primary)' },
-            { label: 'Pending', value: stats.pending, icon: Clock, color: 'var(--accent-primary)' },
-            { label: 'In Progress', value: stats.inProgress, icon: Activity, color: 'var(--accent-primary)' },
-            { label: 'Completed', value: stats.completed, icon: CheckCircle2, color: 'var(--accent-primary)' },
-            { label: 'Urgent/Emergency', value: stats.urgent, icon: AlertTriangle, color: 'var(--color-danger)' },
-            { label: 'X-Rays', value: stats.xray, icon: Image, color: 'var(--accent-primary)' },
-            { label: 'Ultrasounds', value: stats.ultrasound, icon: Eye, color: 'var(--accent-primary)' },
-            { label: 'Avg. TAT', value: stats.avgTAT, icon: TrendingUp, color: 'var(--accent-primary)' },
+            { label: t('radiology.kpiTotalStudies'), value: stats.total, icon: Scan, color: 'var(--accent-primary)' },
+            { label: t('radiology.kpiPending'), value: stats.pending, icon: Clock, color: 'var(--accent-primary)' },
+            { label: t('radiology.kpiInProgress'), value: stats.inProgress, icon: Activity, color: 'var(--accent-primary)' },
+            { label: t('radiology.kpiCompleted'), value: stats.completed, icon: CheckCircle2, color: 'var(--accent-primary)' },
+            { label: t('radiology.kpiUrgentEmergency'), value: stats.urgent, icon: AlertTriangle, color: 'var(--color-danger)' },
+            { label: t('radiology.kpiXrays'), value: stats.xray, icon: Image, color: 'var(--accent-primary)' },
+            { label: t('radiology.kpiUltrasounds'), value: stats.ultrasound, icon: Eye, color: 'var(--accent-primary)' },
+            { label: t('radiology.kpiAvgTat'), value: stats.avgTAT, icon: TrendingUp, color: 'var(--accent-primary)' },
           ].map(k => (
             <div key={k.label} className="kpi">
               <div className="kpi__icon" style={{ background: `${k.color}15` }}><k.icon style={{ color: k.color }} /></div>
@@ -121,7 +123,7 @@ export default function RadiologyDashboard() {
             <div className="glass-section-header">
               <div className="flex items-center gap-2">
                 <Scan className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Imaging Worklist</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('radiology.imagingWorklist')}</span>
               </div>
               <div className="flex items-center gap-2">
                 {['all', 'pending', 'in_progress', 'completed'].map(s => (
@@ -131,7 +133,7 @@ export default function RadiologyDashboard() {
                     color: filterStatus === s ? '#fff' : 'var(--text-muted)',
                     border: filterStatus === s ? 'none' : '1px solid var(--border-medium)',
                     cursor: 'pointer', textTransform: 'capitalize',
-                  }}>{s === 'all' ? 'All' : s.replace('_', ' ')}</button>
+                  }}>{t(`radiology.filter_${s}`)}</button>
                 ))}
               </div>
             </div>
@@ -143,9 +145,9 @@ export default function RadiologyDashboard() {
                 >
                   <Scan className="w-6 h-6" style={{ opacity: 0.5 }} />
                   <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                    No imaging studies yet
+                    {t('radiology.noStudies')}
                   </p>
-                  <p className="text-xs">Orders from clinicians will appear here.</p>
+                  <p className="text-xs">{t('radiology.noStudiesDesc')}</p>
                 </div>
               )}
               {filtered.map(study => (
@@ -168,38 +170,38 @@ export default function RadiologyDashboard() {
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
                           background: study.priority === 'emergency' ? '#DC262615' : study.priority === 'urgent' ? '#D9770615' : 'var(--overlay-subtle)',
                           color: study.priority === 'emergency' ? 'var(--color-danger)' : study.priority === 'urgent' ? 'var(--color-warning)' : 'var(--text-muted)',
-                        }}>{study.priority.toUpperCase()}</span>
+                        }}>{t(`radiology.priority_${study.priority}`)}</span>
                       </div>
                       <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                         {study.modality} &middot; {study.bodyPart} &middot; {study.date}
                       </p>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{
-                      background: study.status === 'completed' ? '#05966915' : study.status === 'in_progress' ? '#1B9AAA15' : '#D9770615',
+                      background: study.status === 'completed' ? '#05966915' : study.status === 'in_progress' ? '#3b82f615' : '#D9770615',
                       color: study.status === 'completed' ? 'var(--color-success)' : study.status === 'in_progress' ? 'var(--accent-primary)' : 'var(--color-warning)',
-                    }}>{study.status.replace('_', ' ')}</span>
+                    }}>{t(`radiology.status_${study.status}`)}</span>
                   </div>
 
                   {selectedStudy === study.id && (
                     <div style={{ marginTop: 12, padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
                       <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Ordered By</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.orderedBy}</p></div>
-                        <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Modality</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.modality}</p></div>
+                        <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.orderedBy')}</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.orderedBy}</p></div>
+                        <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.modality')}</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.modality}</p></div>
                       </div>
-                      <div className="mb-3"><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Clinical Notes</span><p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{study.notes}</p></div>
+                      <div className="mb-3"><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.clinicalNotes')}</span><p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{study.notes}</p></div>
 
                       {study.findings && (
                         <div className="mb-3 p-3 rounded-lg" style={{ background: '#05966908', border: '1px solid #05966920' }}>
-                          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>Findings</span>
+                          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>{t('radiology.findings')}</span>
                           <p className="text-xs mt-1" style={{ color: 'var(--text-primary)' }}>{study.findings}</p>
                         </div>
                       )}
 
                       {study.status !== 'completed' && (
                         <div>
-                          <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>Enter Findings</label>
+                          <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('radiology.enterFindings')}</label>
                           <textarea rows={3} value={findings} onChange={e => setFindings(e.target.value)}
-                            placeholder="Describe imaging findings..."
+                            placeholder={t('radiology.findingsPlaceholder')}
                             className="w-full p-3 rounded-lg text-xs" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', resize: 'vertical' }}
                           />
                           <div className="flex gap-2 mt-2">
@@ -215,11 +217,11 @@ export default function RadiologyDashboard() {
                                 opacity: findings.trim() ? 1 : 0.7,
                               }}
                             >
-                              <CheckCircle2 className="w-3 h-3" /> Submit Report
+                              <CheckCircle2 className="w-3 h-3" /> {t('radiology.submitReport')}
                             </button>
                             <button
                               disabled
-                              title="Image upload not yet available — coming with PACS integration"
+                              title={t('radiology.attachImageTitle')}
                               className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold"
                               style={{
                                 background: 'var(--overlay-subtle)',
@@ -229,7 +231,7 @@ export default function RadiologyDashboard() {
                                 opacity: 0.6,
                               }}
                             >
-                              <Upload className="w-3 h-3" /> Attach Image
+                              <Upload className="w-3 h-3" /> {t('radiology.attachImage')}
                             </button>
                           </div>
                         </div>
@@ -248,7 +250,7 @@ export default function RadiologyDashboard() {
             <div className="dash-card">
               <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <BarChart3 className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>By Modality</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('radiology.byModality')}</span>
               </div>
               <div className="p-4 space-y-3">
                 {MODALITIES.map(mod => {
@@ -273,7 +275,7 @@ export default function RadiologyDashboard() {
             <div className="dash-card">
               <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Body Regions</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('radiology.bodyRegions')}</span>
               </div>
               <div className="p-4 space-y-1">
                 {[...new Set(studies.map(s => s.bodyPart))].map(part => (
@@ -289,14 +291,14 @@ export default function RadiologyDashboard() {
             <div className="dash-card">
               <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Performance</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('radiology.performance')}</span>
               </div>
               <div className="p-4 grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Completion Rate', value: `${studies.length > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%` },
-                  { label: 'Avg. TAT', value: stats.avgTAT },
-                  { label: 'Total Patients', value: patients.length },
-                  { label: 'Lab Cross-refs', value: labResults.length },
+                  { label: t('radiology.completionRate'), value: `${studies.length > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%` },
+                  { label: t('radiology.kpiAvgTat'), value: stats.avgTAT },
+                  { label: t('radiology.totalPatients'), value: patients.length },
+                  { label: t('radiology.labCrossRefs'), value: labResults.length },
                 ].map(s => (
                   <div key={s.label} className="p-2.5 rounded-md text-center" style={{ background: 'var(--overlay-subtle)' }}>
                     <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{s.value}</div>

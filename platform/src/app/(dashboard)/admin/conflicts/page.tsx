@@ -11,6 +11,7 @@ import { useApp } from '@/lib/context';
 import { apiFetch } from '@/lib/api-fetch';
 import { useToast } from '@/components/Toast';
 import { CONFLICT_RESOLUTION_ROLES } from '@/lib/permissions';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 const RISK_STYLES: Record<ConflictQueueDoc['risk'], { bg: string; fg: string; border: string; label: string }> = {
   high:   { bg: 'rgba(229,46,66,0.08)',  fg: '#C44536', border: 'rgba(229,46,66,0.25)', label: 'HIGH' },
@@ -21,6 +22,7 @@ const RISK_STYLES: Record<ConflictQueueDoc['risk'], { bg: string; fg: string; bo
 export default function ConflictsPage() {
   const { currentUser } = useApp();
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const [conflicts, setConflicts] = useState<ConflictQueueDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'pending' | 'resolved' | 'dismissed'>('pending');
@@ -36,20 +38,20 @@ export default function ConflictsPage() {
         setConflicts(data.conflicts || []);
       } else {
         const body = await res.json().catch(() => ({}));
-        const msg = body?.error || `Failed to load conflicts (HTTP ${res.status})`;
+        const msg = body?.error || t('conflicts.errorLoadFailedHttp', { status: res.status });
         setConflicts([]);
         setErrorMsg(msg);
         showToast(msg, 'error');
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load conflicts';
+      const msg = err instanceof Error ? err.message : t('syncConflicts.errorLoadFailed');
       setConflicts([]);
       setErrorMsg(msg);
       showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
-  }, [filterStatus, showToast]);
+  }, [filterStatus, showToast, t]);
 
   useEffect(() => { loadConflicts(); }, [loadConflicts]);
 
@@ -58,7 +60,7 @@ export default function ConflictsPage() {
   // here are surfacing success/failure as toasts instead of alert(), which
   // also makes failures non-blocking and accessible.
   const handleResolve = async (id: string, chosenRev: string) => {
-    const note = window.prompt('Resolution note (optional)');
+    const note = window.prompt(t('conflicts.promptResolutionNote'));
     if (note === null) return;
     try {
       const res = await apiFetch(`/api/admin/conflicts/${id}`, {
@@ -67,20 +69,20 @@ export default function ConflictsPage() {
         body: JSON.stringify({ action: 'resolve', chosenRev, note: note || undefined }),
       });
       if (res.ok) {
-        showToast('Conflict resolved', 'success');
+        showToast(t('conflicts.toastResolved'), 'success');
         await loadConflicts();
       } else {
         const body = await res.json().catch(() => ({}));
-        showToast(body?.error || 'Failed to resolve conflict', 'error');
+        showToast(body?.error || t('conflicts.toastResolveFailed'), 'error');
       }
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to resolve conflict', 'error');
+      showToast(err instanceof Error ? err.message : t('conflicts.toastResolveFailed'), 'error');
     }
   };
 
   const handleDismiss = async (id: string) => {
-    if (!window.confirm('Dismiss this conflict without picking a winner?')) return;
-    const note = window.prompt('Reason for dismissal (optional)');
+    if (!window.confirm(t('conflicts.confirmDismiss'))) return;
+    const note = window.prompt(t('conflicts.promptDismissReason'));
     try {
       const res = await apiFetch(`/api/admin/conflicts/${id}`, {
         method: 'POST',
@@ -88,14 +90,14 @@ export default function ConflictsPage() {
         body: JSON.stringify({ action: 'dismiss', note: note || undefined }),
       });
       if (res.ok) {
-        showToast('Conflict dismissed', 'success');
+        showToast(t('conflicts.toastDismissed'), 'success');
         await loadConflicts();
       } else {
         const body = await res.json().catch(() => ({}));
-        showToast(body?.error || 'Failed to dismiss conflict', 'error');
+        showToast(body?.error || t('conflicts.toastDismissFailed'), 'error');
       }
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to dismiss conflict', 'error');
+      showToast(err instanceof Error ? err.message : t('conflicts.toastDismissFailed'), 'error');
     }
   };
 
@@ -104,8 +106,8 @@ export default function ConflictsPage() {
   if (!allowed) {
     return (
       <div style={{ padding: 32 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>Conflict Reconciliation</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Access restricted to administrators.</p>
+        <h1 style={{ fontSize: 22, fontWeight: 700 }}>{t('conflicts.title')}</h1>
+        <p style={{ color: 'var(--text-muted)' }}>{t('conflicts.accessRestricted')}</p>
       </div>
     );
   }
@@ -114,10 +116,10 @@ export default function ConflictsPage() {
     <div style={{ padding: '24px 32px', maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
         <div>
-          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '0 0 6px' }}>Admin · Sync</p>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 6px' }}>Conflict Reconciliation</h1>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '0 0 6px' }}>{t('conflicts.eyebrow')}</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 6px' }}>{t('conflicts.title')}</h1>
           <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: 0 }}>
-            High-risk clinical data (allergies, referrals, discharge status) flagged for human review after a replication conflict.
+            {t('conflicts.subtitle')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -129,12 +131,12 @@ export default function ConflictsPage() {
               style={{
                 padding: '8px 14px',
                 borderRadius: 999,
-                border: `1.5px solid ${filterStatus === s ? 'var(--accent-primary, #1B9AAA)' : 'var(--border-medium)'}`,
-                background: filterStatus === s ? 'var(--accent-primary, #1B9AAA)' : 'transparent',
+                border: `1.5px solid ${filterStatus === s ? 'var(--accent-primary, #3b82f6)' : 'var(--border-medium)'}`,
+                background: filterStatus === s ? 'var(--accent-primary, #3b82f6)' : 'transparent',
                 color: filterStatus === s ? '#fff' : 'var(--text-secondary)',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize',
               }}>
-              {s}
+              {t(`conflicts.status_${s}`)}
             </button>
           ))}
         </div>
@@ -157,14 +159,14 @@ export default function ConflictsPage() {
       )}
 
       {loading ? (
-        <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
+        <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>{t('syncConflicts.loading')}</div>
       ) : conflicts.length === 0 ? (
         <div style={{
           padding: 48, textAlign: 'center',
           background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', borderRadius: 10,
           color: 'var(--text-muted)',
         }}>
-          No {filterStatus} conflicts.
+          {t('conflicts.emptyState', { status: t(`conflicts.status_${filterStatus}`) })}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -181,7 +183,7 @@ export default function ConflictsPage() {
                         fontSize: 11, fontWeight: 700, letterSpacing: '0.1em',
                         padding: '3px 10px', borderRadius: 999,
                         background: risk.bg, color: risk.fg, border: `1px solid ${risk.border}`,
-                      }}>{risk.label}</span>
+                      }}>{t(`conflicts.risk_${c.risk}`)}</span>
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                         {c.resourceType}
                       </span>
@@ -190,17 +192,21 @@ export default function ConflictsPage() {
                       </span>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      Default winner: <span style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{c.winningRev}</span>
+                      {t('conflicts.defaultWinner')} <span style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{c.winningRev}</span>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                      Losing revisions: {c.losingRevs.map((r) => (
+                      {t('conflicts.losingRevisions')} {c.losingRevs.map((r) => (
                         <span key={r} style={{ fontFamily: 'monospace', color: 'var(--text-primary)', marginRight: 8 }}>{r}</span>
                       ))}
                     </div>
                     {c.status !== 'pending' && (
                       <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
-                        {c.status === 'resolved' ? 'Resolved' : 'Dismissed'} by {c.resolvedBy || 'unknown'} on {c.resolvedAt?.slice(0, 16).replace('T', ' ')}
-                        {c.resolvedRev && <> → kept <span style={{ fontFamily: 'monospace' }}>{c.resolvedRev}</span></>}
+                        {t('conflicts.resolvedBy', {
+                          action: c.status === 'resolved' ? t('conflicts.actionResolved') : t('conflicts.actionDismissed'),
+                          user: c.resolvedBy || t('syncConflicts.unknownUser'),
+                          date: c.resolvedAt?.slice(0, 16).replace('T', ' ') ?? '',
+                        })}
+                        {c.resolvedRev && <> → {t('conflicts.kept')} <span style={{ fontFamily: 'monospace' }}>{c.resolvedRev}</span></>}
                         {c.resolutionNote && <> — “{c.resolutionNote}”</>}
                       </div>
                     )}
@@ -212,10 +218,10 @@ export default function ConflictsPage() {
                         onClick={() => handleResolve(c._id, c.winningRev)}
                         style={{
                           padding: '6px 14px', borderRadius: 6,
-                          background: 'var(--accent-primary, #1B9AAA)', color: '#fff',
+                          background: 'var(--accent-primary, #3b82f6)', color: '#fff',
                           border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                         }}>
-                        Keep winner
+                        {t('conflicts.keepWinner')}
                       </button>
                       {c.losingRevs.map((rev) => (
                         <button
@@ -227,7 +233,7 @@ export default function ConflictsPage() {
                             background: 'transparent', color: 'var(--text-primary)',
                             border: '1.5px solid var(--border-medium)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                           }}>
-                          Use {rev.slice(0, 6)}…
+                          {t('conflicts.useRev', { rev: rev.slice(0, 6) })}
                         </button>
                       ))}
                       <button
@@ -238,7 +244,7 @@ export default function ConflictsPage() {
                           background: 'transparent', color: 'var(--text-muted)',
                           border: '1.5px solid var(--border-medium)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                         }}>
-                        Dismiss
+                        {t('syncConflicts.dismissButton')}
                       </button>
                     </div>
                   )}

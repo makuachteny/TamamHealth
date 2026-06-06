@@ -15,7 +15,7 @@ export interface BaseDoc {
   countryId?: string;
 }
 
-export type UserRole = 'super_admin' | 'org_admin' | 'doctor' | 'clinical_officer' | 'nurse' | 'lab_tech' | 'pharmacist' | 'front_desk' | 'government' | 'boma_health_worker' | 'payam_supervisor' | 'data_entry_clerk' | 'medical_superintendent' | 'hrio' | 'community_health_volunteer' | 'nutritionist' | 'radiologist';
+export type UserRole = 'super_admin' | 'org_admin' | 'doctor' | 'clinical_officer' | 'nurse' | 'midwife' | 'lab_tech' | 'pharmacist' | 'front_desk' | 'cashier' | 'government' | 'county_health_director' | 'boma_health_worker' | 'payam_supervisor' | 'data_entry_clerk' | 'medical_superintendent' | 'hrio' | 'community_health_volunteer' | 'nutritionist' | 'radiologist' | 'hospital_manager' | 'medical_biller';
 
 export interface UserDoc extends BaseDoc {
   type: 'user';
@@ -27,6 +27,15 @@ export interface UserDoc extends BaseDoc {
   hospitalName?: string;
   orgId?: string;
   isActive: boolean;
+  /**
+   * Set when an admin creates the account or resets the password. Forces the
+   * user to choose a new password at next login before they can use the app,
+   * so the admin's temporary password never becomes a permanent credential.
+   * Cleared once the user sets their own password.
+   */
+  mustChangePassword?: boolean;
+  /** ISO timestamp of the last password change (admin reset or self-service). */
+  passwordUpdatedAt?: string;
   /** Hashed 4-6 digit PIN for screen-lock quick unlock */
   pinHash?: string;
   /** Staff directory: department (e.g. "Cardiology", "Pediatrics", "OPD"). */
@@ -35,6 +44,25 @@ export interface UserDoc extends BaseDoc {
   specialty?: string;
   /** Staff directory: contact phone for messaging. */
   phone?: string;
+  /**
+   * First-run "Get Started" onboarding progress. Absent for users created
+   * before the feature shipped — treated as "not yet started", so the
+   * onboarding surfaces once and then records completion/dismissal here.
+   * Stored on the (synced) user doc so progress follows the user across
+   * devices.
+   */
+  onboarding?: OnboardingState;
+}
+
+export interface OnboardingState {
+  /** Stable IDs of the checklist steps the user has finished. */
+  completedStepIds: string[];
+  /** Set when the user finishes every step. Hides the panel for good. */
+  completedAt?: string;
+  /** Set when the user explicitly skips setup. Hides the panel for good. */
+  dismissedAt?: string;
+  /** Whether the user minimised the panel to the launcher pill. */
+  collapsed?: boolean;
 }
 
 export interface PatientDoc extends BaseDoc, Omit<Patient, 'id'> {
@@ -788,6 +816,52 @@ export interface StaffScheduleDoc extends BaseDoc {
   status: 'scheduled' | 'confirmed' | 'completed' | 'absent' | 'swapped';
   swappedWith?: string; // userId of swap partner
   orgId?: string;
+}
+
+// ===== Provider Availability (bookable windows for appointments/telehealth) =====
+export type AvailabilityModality = 'in_person' | 'telehealth' | 'both';
+export type AvailabilityStatus = 'open' | 'partially_booked' | 'full' | 'cancelled';
+
+export interface AvailabilityDoc extends BaseDoc {
+  type: 'availability';
+  providerId: string;
+  providerName: string;
+  facilityId: string;
+  facilityName: string;
+  date: string;            // YYYY-MM-DD
+  startTime: string;       // HH:MM (24h)
+  endTime: string;         // HH:MM (24h)
+  slotMinutes: number;     // length of each bookable slot
+  modality: AvailabilityModality;
+  department?: string;
+  notes?: string;
+  status: AvailabilityStatus;
+  orgId?: string;
+  payam?: string;
+}
+
+// ===== Announcements (broadcast notices to staff) =====
+export type AnnouncementAudience = 'organization' | 'facility' | 'role';
+export type AnnouncementPriority = 'normal' | 'important' | 'urgent';
+
+export interface AnnouncementDoc extends BaseDoc {
+  type: 'announcement';
+  title: string;
+  body: string;
+  audience: AnnouncementAudience;
+  /** When audience === 'role', the roles this announcement targets. */
+  targetRoles?: UserRole[];
+  priority: AnnouncementPriority;
+  authorId: string;
+  authorName: string;
+  facilityId?: string;
+  facilityName?: string;
+  /** Optional auto-expiry (ISO). After this the announcement is hidden. */
+  expiresAt?: string;
+  /** User IDs that have dismissed this announcement. */
+  dismissedBy?: string[];
+  orgId?: string;
+  payam?: string;
 }
 
 // ===== Blood Bank Management =====

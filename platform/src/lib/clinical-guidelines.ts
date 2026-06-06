@@ -88,7 +88,7 @@ export const SEVERITY_TOKENS: Record<VitalSeverity, {
     tileBorder: 'var(--border-light, #E8E6E2)',
     badge: 'rgba(27, 158, 119, 0.12)',
     text: 'var(--text-primary, #1A2C2A)',
-    accent: 'var(--accent-primary, #1B9AAA)',
+    accent: 'var(--accent-primary, #3b82f6)',
     ring: 'transparent',
   },
   warning: {

@@ -8,6 +8,7 @@ import {
 } from '@/components/icons/lucide';
 import { BalanceBanner, InsuranceSnapshot, PaymentHistoryTimeline, PaymentPanel, PaymentPlanWizard } from '@/components/payments';
 import { getMethodConfig } from '@/lib/payment-method-config';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { PatientDoc } from '@/lib/db-types';
 import type { PaymentDoc, ChargeDoc, PaymentPlanDoc, ClaimDoc, InsurancePolicyDoc } from '@/lib/db-types-payments';
 
@@ -40,6 +41,7 @@ export default function BillingTab({
   patient, patientBalance, showPaymentPanel, showPlanWizard,
   setShowPaymentPanel, setShowPlanWizard, reloadPayments,
 }: BillingTabProps) {
+  const { t } = useTranslation();
   const [data, setData] = useState<FinancialOverview | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -98,7 +100,7 @@ export default function BillingTab({
       <div className="flex items-center justify-center py-16" style={{ color: 'var(--text-muted)' }}>
         <div className="flex items-center gap-3">
           <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--border-light)', borderTopColor: 'var(--accent-primary)' }} />
-          Loading billing information...
+          {t('billing.loadingBillingInfo')}
         </div>
       </div>
     );
@@ -125,7 +127,7 @@ export default function BillingTab({
               <FileText size={44} style={{ color: 'var(--accent-primary)' }} />
             </div>
             <div>
-              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Total Billed</div>
+              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('billing.totalBilled')}</div>
               <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{fmt(d.totalCharged)}</div>
             </div>
           </div>
@@ -138,7 +140,7 @@ export default function BillingTab({
               <CheckCircle size={44} style={{ color: 'var(--color-success)' }} />
             </div>
             <div>
-              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Total Paid</div>
+              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('billing.totalPaid')}</div>
               <div className="text-lg font-bold" style={{ color: 'var(--color-success)' }}>{fmt(d.totalPaid)}</div>
             </div>
           </div>
@@ -151,7 +153,7 @@ export default function BillingTab({
               <Shield size={44} style={{ color: 'var(--color-info)' }} />
             </div>
             <div>
-              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Insurance Paid</div>
+              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('billing.insurancePaid')}</div>
               <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{fmt(d.insurancePaid)}</div>
             </div>
           </div>
@@ -164,9 +166,9 @@ export default function BillingTab({
               <DollarSign size={44} style={{ color: d.outstanding > 0 ? 'var(--color-danger)' : 'var(--color-success)' }} />
             </div>
             <div>
-              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Outstanding</div>
+              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('billing.kpiOutstanding')}</div>
               <div className="text-lg font-bold" style={{ color: d.outstanding > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
-                {d.outstanding > 0 ? fmt(d.outstanding) : 'Paid in Full'}
+                {d.outstanding > 0 ? fmt(d.outstanding) : t('billing.paidInFull')}
               </div>
             </div>
           </div>
@@ -180,21 +182,21 @@ export default function BillingTab({
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
           style={{ background: 'var(--color-success)' }}
         >
-          <Wallet size={16} /> Collect Payment
+          <Wallet size={16} /> {t('billing.collectPayment')}
         </button>
         <button
           onClick={() => setShowPlanWizard(true)}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
           style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
         >
-          <CalendarClock size={16} /> Create Payment Plan
+          <CalendarClock size={16} /> {t('billing.createPaymentPlan')}
         </button>
         <button
           onClick={() => window.print()}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
           style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
         >
-          <Printer size={16} /> Print Statement
+          <Printer size={16} /> {t('billing.printStatement')}
         </button>
       </div>
 
@@ -205,11 +207,11 @@ export default function BillingTab({
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <Shield size={16} style={{ color: 'var(--accent-primary)' }} />
-              Insurance Coverage
+              {t('billing.insuranceCoverage')}
             </h3>
             {hasInsurance && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-                ACTIVE
+                {t('billing.badgeActive')}
               </span>
             )}
           </div>
@@ -220,7 +222,7 @@ export default function BillingTab({
         <div className="card-elevated p-5">
           <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
             <Receipt size={16} style={{ color: 'var(--accent-primary)' }} />
-            Recent Charges
+            {t('billing.recentCharges')}
             {d.charges.length > 0 && (
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
                 {d.charges.length}
@@ -230,7 +232,7 @@ export default function BillingTab({
           {d.charges.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 text-center" style={{ color: 'var(--text-muted)' }}>
               <Receipt size={44} style={{ opacity: 0.3, marginBottom: 8 }} />
-              <div className="text-xs">No charges recorded yet</div>
+              <div className="text-xs">{t('billing.noChargesRecorded')}</div>
             </div>
           ) : (
             <div className="space-y-0">
@@ -256,7 +258,7 @@ export default function BillingTab({
               {d.charges.length > 8 && (
                 <div className="text-center pt-2">
                   <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
-                    +{d.charges.length - 8} more charges
+                    {t('billing.moreCharges', { count: d.charges.length - 8 })}
                   </span>
                 </div>
               )}
@@ -270,7 +272,7 @@ export default function BillingTab({
         <div className="card-elevated p-5">
           <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
             <CalendarClock size={16} style={{ color: 'var(--accent-primary)' }} />
-            Active Payment Plans
+            {t('billing.activePaymentPlans')}
             <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
               {activePlans.length}
             </span>
@@ -283,10 +285,10 @@ export default function BillingTab({
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {plan.termMonths}-Month Plan
+                        {t('billing.monthPlan', { count: plan.termMonths })}
                       </div>
                       <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                        {fmt(plan.monthlyAmount)}/month &middot; Started {new Date(plan.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {t('billing.planMonthlyStarted', { amount: fmt(plan.monthlyAmount), date: new Date(plan.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) })}
                       </div>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{
@@ -301,7 +303,7 @@ export default function BillingTab({
                   <div className="mb-2">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                        {fmt(plan.paidToDate)} of {fmt(plan.totalBalance)}
+                        {t('billing.paidOfTotal', { paid: fmt(plan.paidToDate), total: fmt(plan.totalBalance) })}
                       </span>
                       <span className="text-[11px] font-bold" style={{ color: 'var(--color-success)' }}>
                         {Math.round(progress)}%
@@ -334,10 +336,10 @@ export default function BillingTab({
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                       <Clock size={11} />
-                      Next due: {plan.nextDueDate ? new Date(plan.nextDueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'}
+                      {t('billing.nextDue', { date: plan.nextDueDate ? new Date(plan.nextDueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—' })}
                     </div>
                     <div className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                      Remaining: {fmt(plan.remainingBalance)}
+                      {t('billing.remaining', { amount: fmt(plan.remainingBalance) })}
                     </div>
                   </div>
                 </div>
@@ -352,7 +354,7 @@ export default function BillingTab({
         <div className="card-elevated p-5">
           <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
             <FileText size={16} style={{ color: 'var(--accent-primary)' }} />
-            Insurance Claims
+            {t('billing.insuranceClaims')}
             <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
               {d.claims.length}
             </span>
@@ -375,7 +377,7 @@ export default function BillingTab({
                     {claim.payerName}
                   </div>
                   <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    {claim.claimNumber || claim._id.slice(0, 10)} &middot; {claim.submittedDate ? new Date(claim.submittedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Draft'}
+                    {claim.claimNumber || claim._id.slice(0, 10)} &middot; {claim.submittedDate ? new Date(claim.submittedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : t('billing.claimDraft')}
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">
@@ -406,7 +408,7 @@ export default function BillingTab({
         <div className="card-elevated p-5">
           <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
             <CreditCard size={16} style={{ color: 'var(--accent-primary)' }} />
-            Recent Payments
+            {t('billing.recentPayments')}
             <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
               {d.payments.length}
             </span>
@@ -441,7 +443,7 @@ export default function BillingTab({
       <div className="card-elevated p-5">
         <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
           <BarChart3 size={16} style={{ color: 'var(--accent-primary)' }} />
-          Transaction Ledger
+          {t('billing.transactionLedger')}
         </h3>
         <PaymentHistoryTimeline patientId={patient._id} limit={30} />
       </div>
@@ -454,9 +456,9 @@ export default function BillingTab({
               <Wallet size={56} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
             </div>
             <div>
-              <div className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No billing records yet</div>
+              <div className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('billing.noBillingRecords')}</div>
               <div className="text-xs" style={{ color: 'var(--text-muted)', maxWidth: 280, margin: '0 auto' }}>
-                This patient has no charges, payments, or insurance on file. Billing records are created automatically during encounters.
+                {t('billing.noBillingRecordsDesc')}
               </div>
             </div>
           </div>

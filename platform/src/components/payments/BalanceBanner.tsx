@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { DollarSign, AlertTriangle, Calendar, CreditCard } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface BalanceBannerProps {
   patientId: string;
@@ -19,6 +20,7 @@ interface Summary {
 }
 
 export default function BalanceBanner({ patientId, compact, onPayClick }: BalanceBannerProps) {
+  const { t } = useTranslation();
   const [summary, setSummary] = useState<Summary | null>(null);
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export default function BalanceBanner({ patientId, compact, onPayClick }: Balanc
         background: `color-mix(in srgb, ${bannerColor} 10%, transparent)`,
       }}>
         <DollarSign size={12} />
-        {summary.totalBalance.toLocaleString()} SSP
+        {t('balanceBanner.amountSsp', { amount: summary.totalBalance.toLocaleString() })}
         {isOverdue && <AlertTriangle size={11} />}
       </span>
     );
@@ -64,14 +66,14 @@ export default function BalanceBanner({ patientId, compact, onPayClick }: Balanc
         </span>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: bannerColor }}>
-            Balance: {summary.totalBalance.toLocaleString()} SSP
+            {t('balanceBanner.balanceSsp', { amount: summary.totalBalance.toLocaleString() })}
           </div>
           {isOverdue && (
             <div style={{ fontSize: 11, color: 'var(--error)', display: 'flex', alignItems: 'center', gap: 4 }}>
               <span className="icon-box-sm" style={{ color: 'var(--error)', width: 20, height: 20 }}>
                 <AlertTriangle size={10} />
               </span>
-              {summary.overdueBalance.toLocaleString()} SSP overdue
+              {t('balanceBanner.overdueSsp', { amount: summary.overdueBalance.toLocaleString() })}
             </div>
           )}
         </div>
@@ -84,7 +86,7 @@ export default function BalanceBanner({ patientId, compact, onPayClick }: Balanc
           <span className="icon-box-sm" style={{ color: 'var(--indigo, #6366f1)', width: 20, height: 20 }}>
             <Calendar size={11} />
           </span>
-          Next plan payment: {summary.nextPlanPaymentAmount?.toLocaleString()} SSP on {summary.nextPlanPaymentDate}
+          {t('balanceBanner.nextPlanPayment', { amount: (summary.nextPlanPaymentAmount ?? 0).toLocaleString(), date: summary.nextPlanPaymentDate })}
         </div>
       )}
 
@@ -101,7 +103,7 @@ export default function BalanceBanner({ patientId, compact, onPayClick }: Balanc
           <span className="icon-box-sm" style={{ color: 'var(--teal, #14b8a6)', width: 22, height: 22 }}>
             <CreditCard size={13} />
           </span>
-          Collect Payment
+          {t('billing.collectPayment')}
         </button>
       )}
     </div>

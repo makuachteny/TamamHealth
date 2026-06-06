@@ -16,6 +16,7 @@
  */
 
 import { AlertTriangle } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export interface DemoModeBannerProps {
   /** Compact spacing for placement directly above KPI strips. */
@@ -23,6 +24,7 @@ export interface DemoModeBannerProps {
 }
 
 export default function DemoModeBanner({ dense = false }: DemoModeBannerProps) {
+  const { t } = useTranslation();
   return (
     <div
       role="status"
@@ -41,7 +43,7 @@ export default function DemoModeBanner({ dense = false }: DemoModeBannerProps) {
     >
       <AlertTriangle className="w-4 h-4 flex-shrink-0" />
       <span>
-        Demo Mode — data shown below is sample data for evaluation. Not real patient records.
+        {t('common.demoModeBanner')}
       </span>
     </div>
   );

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X, Send, MessageSquare, Smartphone, Radio } from '@/components/icons/lucide';
 import { useMessages } from '@/lib/hooks/useMessages';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export interface MessageRecipient {
   _id: string;
@@ -26,19 +27,18 @@ interface SendMessageModalProps {
   recipient: MessageRecipient | null;
 }
 
-const quickMessagesPatient = [
-  'Your lab results are ready',
-  'Your medicine is ready at pharmacy',
-  'Please come for follow-up',
-];
-
-const quickMessagesStaff = [
-  'Please review the latest results',
-  'Patient needs urgent consult',
-  'Can you cover my shift?',
-];
-
 export default function SendMessageModal({ isOpen, onClose, recipient }: SendMessageModalProps) {
+  const { t } = useTranslation();
+  const quickMessagesPatient = [
+    t('message.quickPatientLabReady'),
+    t('message.quickPatientMedReady'),
+    t('message.quickPatientFollowUp'),
+  ];
+  const quickMessagesStaff = [
+    t('message.quickStaffReviewResults'),
+    t('message.quickStaffUrgentConsult'),
+    t('message.quickStaffCoverShift'),
+  ];
   const [channel, setChannel] = useState<'app' | 'sms' | 'both'>('app');
   const [body, setBody] = useState('');
   const [subject, setSubject] = useState('');
@@ -64,7 +64,7 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
       const phone = (recipient.phone || '').trim();
       const phonePattern = /^\+?\d[\d\s-]{6,20}$/;
       if (!phone || !phonePattern.test(phone)) {
-        setPhoneError('A valid phone number is required to send SMS. Update the contact or pick the App channel.');
+        setPhoneError(t('message.phoneRequiredForSms'));
         return;
       }
     }
@@ -127,7 +127,7 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
           <div className="flex items-center gap-2">
             <MessageSquare className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
             <h2 className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>
-              {isStaff ? 'Message Staff' : 'Message Patient'}
+              {isStaff ? t('message.messageStaff') : t('message.messagePatient')}
             </h2>
           </div>
           <button
@@ -146,7 +146,7 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
               className="text-xs font-medium uppercase tracking-wider mb-1 block"
               style={{ color: 'var(--text-muted)' }}
             >
-              To
+              {t('message.to')}
             </label>
             <div
               className="p-3 rounded-lg flex items-center gap-3"
@@ -178,7 +178,7 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
                   </p>
                 )}
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {recipient.phone || 'No phone on file'}
+                  {recipient.phone || t('message.noPhoneOnFile')}
                 </p>
               </div>
             </div>
@@ -190,13 +190,13 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
               className="text-xs font-medium uppercase tracking-wider mb-2 block"
               style={{ color: 'var(--text-muted)' }}
             >
-              Channel
+              {t('message.channel')}
             </label>
             <div className="flex gap-2">
               {([
-                { value: 'app' as const, label: 'App', icon: Smartphone },
-                { value: 'sms' as const, label: 'SMS', icon: MessageSquare },
-                { value: 'both' as const, label: 'Both', icon: Radio },
+                { value: 'app' as const, label: t('message.channelApp'), icon: Smartphone },
+                { value: 'sms' as const, label: t('message.channelSms'), icon: MessageSquare },
+                { value: 'both' as const, label: t('message.channelBoth'), icon: Radio },
               ]).map((opt) => (
                 <button
                   key={opt.value}
@@ -224,13 +224,13 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
               className="text-xs font-medium uppercase tracking-wider mb-1 block"
               style={{ color: 'var(--text-muted)' }}
             >
-              Subject
+              {t('message.subject')}
             </label>
             <input
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Message subject..."
+              placeholder={t('message.subjectPlaceholder')}
               className="w-full p-2.5 rounded-lg text-sm outline-none"
               style={{
                 background: 'var(--bg-card-solid)',
@@ -246,7 +246,7 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
               className="text-xs font-medium uppercase tracking-wider mb-2 block"
               style={{ color: 'var(--text-muted)' }}
             >
-              Quick Messages
+              {t('message.quickMessages')}
             </label>
             <div className="flex flex-wrap gap-2">
               {quickMessages.map((msg) => (
@@ -273,7 +273,7 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
                 className="text-xs font-medium uppercase tracking-wider"
                 style={{ color: 'var(--text-muted)' }}
               >
-                Message
+                {t('message.message')}
               </label>
               {isSMS && (
                 <span
@@ -289,7 +289,7 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder="Type your message..."
+              placeholder={t('message.bodyPlaceholder')}
               rows={4}
               className="w-full p-3 rounded-lg text-sm outline-none"
               style={{
@@ -300,8 +300,7 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
             />
             {isSMS && charCount > 160 && (
               <p className="text-xs mt-1" style={{ color: 'var(--color-danger)' }}>
-                SMS messages are limited to 160 characters. Message will be split into{' '}
-                {Math.ceil(charCount / 160)} parts.
+                {t('message.smsSplitWarning', { parts: Math.ceil(charCount / 160) })}
               </p>
             )}
             {phoneError && (
@@ -318,7 +317,7 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
           style={{ borderTop: '1px solid var(--border-light)' }}
         >
           <button onClick={onClose} className="btn btn-secondary btn-sm">
-            Cancel
+            {t('action.cancel')}
           </button>
           <button
             onClick={handleSend}
@@ -327,12 +326,12 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
             style={{ opacity: !body.trim() || sending ? 0.5 : 1 }}
           >
             {sent ? (
-              <>Sent!</>
+              <>{t('message.sent')}</>
             ) : sending ? (
-              <>Sending...</>
+              <>{t('message.sending')}</>
             ) : (
               <>
-                <Send className="w-4 h-4" /> Send Message
+                <Send className="w-4 h-4" /> {t('action.sendMessage')}
               </>
             )}
           </button>

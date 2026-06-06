@@ -5,6 +5,7 @@ import TopBar from '@/components/TopBar';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   AlertTriangle, CheckCircle2, TrendingDown,
   Baby, HeartPulse, BarChart3, Activity, Scale,
@@ -44,6 +45,7 @@ const SUPPLY_ITEMS = [
 
 export default function NutritionDashboard() {
   const { currentUser } = useApp();
+  const { t } = useTranslation();
   usePatients();
 
   // Stable references so the stats memo below doesn't re-run every render.
@@ -74,7 +76,7 @@ export default function NutritionDashboard() {
 
   return (
     <>
-      <TopBar title="Nutrition Dashboard" />
+      <TopBar title={t('nutrition.title')} />
       <main className="page-container page-enter">
 
         {IS_DEMO && <DemoModeBanner />}
@@ -82,14 +84,14 @@ export default function NutritionDashboard() {
         {/* KPI strip */}
         <div className="kpi-grid mb-4">
           {[
-            { label: 'Screenings', value: stats.total, icon: Scale, color: ACCENT },
-            { label: 'SAM Cases', value: stats.sam, icon: AlertTriangle, color: 'var(--color-danger)' },
-            { label: 'MAM Cases', value: stats.mam, icon: TrendingDown, color: 'var(--color-warning)' },
-            { label: 'At Risk', value: stats.atRisk, icon: Activity, color: 'var(--color-warning)' },
-            { label: 'Normal', value: stats.normal, icon: CheckCircle2, color: 'var(--color-success)' },
-            { label: 'Children <5', value: stats.children, icon: Baby, color: 'var(--accent-primary)' },
-            { label: 'ANC Mothers', value: stats.anc, icon: HeartPulse, color: '#EC4899' },
-            { label: 'Supply Alerts', value: stats.criticalSupply, icon: Droplets, color: stats.criticalSupply > 0 ? 'var(--color-danger)' : 'var(--color-success)' },
+            { label: t('nutrition.kpiScreenings'), value: stats.total, icon: Scale, color: ACCENT },
+            { label: t('nutrition.kpiSamCases'), value: stats.sam, icon: AlertTriangle, color: 'var(--color-danger)' },
+            { label: t('nutrition.kpiMamCases'), value: stats.mam, icon: TrendingDown, color: 'var(--color-warning)' },
+            { label: t('nutrition.kpiAtRisk'), value: stats.atRisk, icon: Activity, color: 'var(--color-warning)' },
+            { label: t('nutrition.kpiNormal'), value: stats.normal, icon: CheckCircle2, color: 'var(--color-success)' },
+            { label: t('nutrition.kpiChildrenUnder5'), value: stats.children, icon: Baby, color: 'var(--accent-primary)' },
+            { label: t('nutrition.kpiAncMothers'), value: stats.anc, icon: HeartPulse, color: '#EC4899' },
+            { label: t('nutrition.kpiSupplyAlerts'), value: stats.criticalSupply, icon: Droplets, color: stats.criticalSupply > 0 ? 'var(--color-danger)' : 'var(--color-success)' },
           ].map(k => (
             <div key={k.label} className="kpi">
               <div className="kpi__icon" style={{ background: `${k.color}15` }}><k.icon style={{ color: k.color }} /></div>
@@ -108,9 +110,9 @@ export default function NutritionDashboard() {
             <div className="flex items-center justify-between mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <Scale className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Nutrition Screenings</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nutrition.screenings')}</span>
               </div>
-              <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{stats.total} total</span>
+              <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{t('nutrition.totalCount', { count: stats.total })}</span>
             </div>
             {screenings.length === 0 ? (
               <div
@@ -119,23 +121,23 @@ export default function NutritionDashboard() {
               >
                 <Scale className="w-6 h-6" style={{ opacity: 0.5 }} />
                 <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                  No nutrition screenings yet
+                  {t('nutrition.noScreenings')}
                 </p>
-                <p className="text-xs">Screenings recorded by clinicians will appear here.</p>
+                <p className="text-xs">{t('nutrition.noScreeningsDesc')}</p>
               </div>
             ) : (
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Patient</th>
-                    <th>Age/Type</th>
-                    <th>MUAC (cm)</th>
-                    <th>Weight (kg)</th>
-                    <th>Height (cm)</th>
-                    <th>Edema</th>
-                    <th>Status</th>
-                    <th>Date</th>
+                    <th>{t('nutrition.colPatient')}</th>
+                    <th>{t('nutrition.colAgeType')}</th>
+                    <th>{t('nutrition.colMuac')}</th>
+                    <th>{t('nutrition.colWeight')}</th>
+                    <th>{t('nutrition.colHeight')}</th>
+                    <th>{t('nutrition.colEdema')}</th>
+                    <th>{t('nutrition.colStatus')}</th>
+                    <th>{t('nutrition.colDate')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -155,7 +157,7 @@ export default function NutritionDashboard() {
                       </td>
                       <td className="text-xs">{s.weight}</td>
                       <td className="text-xs">{s.height}</td>
-                      <td>{s.edema ? <span className="text-[10px] font-bold" style={{ color: 'var(--color-danger)' }}>Yes</span> : <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>No</span>}</td>
+                      <td>{s.edema ? <span className="text-[10px] font-bold" style={{ color: 'var(--color-danger)' }}>{t('nutrition.edemaYes')}</span> : <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nutrition.edemaNo')}</span>}</td>
                       <td>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${getStatusColor(s.status)}15`, color: getStatusColor(s.status) }}>
                           {s.status}
@@ -177,14 +179,14 @@ export default function NutritionDashboard() {
             <div className="dash-card">
               <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <BarChart3 className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Classification</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nutrition.classification')}</span>
               </div>
               <div className="p-4 space-y-3">
                 {[
-                  { label: 'Severe Acute Malnutrition (SAM)', count: stats.sam, color: 'var(--color-danger)', desc: 'MUAC < 11.5cm or edema' },
-                  { label: 'Moderate Acute Malnutrition (MAM)', count: stats.mam, color: 'var(--color-warning)', desc: 'MUAC 11.5 - 12.5cm' },
-                  { label: 'At Risk / Underweight', count: stats.atRisk, color: 'var(--color-warning)', desc: 'MUAC 12.5 - 13.5cm' },
-                  { label: 'Normal', count: stats.normal, color: 'var(--color-success)', desc: 'MUAC > 13.5cm' },
+                  { label: t('nutrition.classSam'), count: stats.sam, color: 'var(--color-danger)', desc: t('nutrition.classSamDesc') },
+                  { label: t('nutrition.classMam'), count: stats.mam, color: 'var(--color-warning)', desc: t('nutrition.classMamDesc') },
+                  { label: t('nutrition.classAtRisk'), count: stats.atRisk, color: 'var(--color-warning)', desc: t('nutrition.classAtRiskDesc') },
+                  { label: t('nutrition.classNormal'), count: stats.normal, color: 'var(--color-success)', desc: t('nutrition.classNormalDesc') },
                 ].map(item => {
                   const pct = stats.total > 0 ? Math.round((item.count / stats.total) * 100) : 0;
                   return (
@@ -207,7 +209,7 @@ export default function NutritionDashboard() {
             <div className="dash-card">
               <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <Utensils className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Nutrition Supplies</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nutrition.supplies')}</span>
               </div>
               <div className="p-3 space-y-1">
                 {supplies.length === 0 && (
@@ -215,7 +217,7 @@ export default function NutritionDashboard() {
                     className="text-xs text-center"
                     style={{ color: 'var(--text-muted)', padding: '16px 8px' }}
                   >
-                    No supply records yet.
+                    {t('nutrition.noSupplies')}
                   </p>
                 )}
                 {supplies.map(item => (

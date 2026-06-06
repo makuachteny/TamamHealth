@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import {
   Building2, Users, HeartPulse, CreditCard, ChevronRight, ChevronLeft,
@@ -15,6 +16,7 @@ import type { AuditLogDoc } from '@/lib/db-types';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const { organizations, loading: orgsLoading } = useOrganizations();
   const [totalUsers, setTotalUsers] = useState(0);
@@ -81,19 +83,19 @@ export default function AdminDashboardPage() {
       try {
         const { getDB } = await import('@/lib/db');
         const dbNames = [
-          { key: 'tamamhealth_users', label: 'Users' },
-          { key: 'tamamhealth_patients', label: 'Patients' },
-          { key: 'tamamhealth_hospitals', label: 'Hospitals' },
-          { key: 'tamamhealth_medical_records', label: 'Medical Records' },
-          { key: 'tamamhealth_referrals', label: 'Referrals' },
-          { key: 'tamamhealth_lab_results', label: 'Lab Results' },
-          { key: 'tamamhealth_disease_alerts', label: 'Disease Alerts' },
-          { key: 'tamamhealth_prescriptions', label: 'Prescriptions' },
-          { key: 'tamamhealth_audit_log', label: 'Audit Log' },
-          { key: 'tamamhealth_organizations', label: 'Organizations' },
-          { key: 'tamamhealth_immunizations', label: 'Immunizations' },
-          { key: 'tamamhealth_births', label: 'Births' },
-          { key: 'tamamhealth_deaths', label: 'Deaths' },
+          { key: 'tamamhealth_users', label: t('admin.dbUsers') },
+          { key: 'tamamhealth_patients', label: t('admin.dbPatients') },
+          { key: 'tamamhealth_hospitals', label: t('admin.dbHospitals') },
+          { key: 'tamamhealth_medical_records', label: t('admin.dbMedicalRecords') },
+          { key: 'tamamhealth_referrals', label: t('admin.dbReferrals') },
+          { key: 'tamamhealth_lab_results', label: t('admin.dbLabResults') },
+          { key: 'tamamhealth_disease_alerts', label: t('admin.dbDiseaseAlerts') },
+          { key: 'tamamhealth_prescriptions', label: t('admin.dbPrescriptions') },
+          { key: 'tamamhealth_audit_log', label: t('admin.dbAuditLog') },
+          { key: 'tamamhealth_organizations', label: t('admin.dbOrganizations') },
+          { key: 'tamamhealth_immunizations', label: t('admin.dbImmunizations') },
+          { key: 'tamamhealth_births', label: t('admin.dbBirths') },
+          { key: 'tamamhealth_deaths', label: t('admin.dbDeaths') },
         ];
         const stats: Array<{ name: string; docCount: number }> = [];
         for (const { key, label } of dbNames) {
@@ -167,11 +169,11 @@ export default function AdminDashboardPage() {
     .slice(0, 5);
 
   const quickLinks = [
-    { label: 'Organizations', icon: Building2, href: '/admin/organizations', color: 'var(--accent-primary)' },
-    { label: 'All Users', icon: Users, href: '/admin/users', color: 'var(--accent-primary)' },
-    { label: 'System Config', icon: Settings, href: '/admin/system', color: 'var(--accent-primary)' },
-    { label: 'Billing', icon: CreditCard, href: '/admin/billing', color: 'var(--accent-primary)' },
-    { label: 'Analytics', icon: BarChart3, href: '/admin/analytics', color: 'var(--accent-primary)' },
+    { label: t('admin.linkOrganizations'), icon: Building2, href: '/admin/organizations', color: 'var(--accent-primary)' },
+    { label: t('admin.linkAllUsers'), icon: Users, href: '/admin/users', color: 'var(--accent-primary)' },
+    { label: t('admin.linkSystemConfig'), icon: Settings, href: '/admin/system', color: 'var(--accent-primary)' },
+    { label: t('admin.linkBilling'), icon: CreditCard, href: '/admin/billing', color: 'var(--accent-primary)' },
+    { label: t('admin.linkAnalytics'), icon: BarChart3, href: '/admin/analytics', color: 'var(--accent-primary)' },
   ];
 
   const healthColor = (status: string) => {
@@ -185,12 +187,12 @@ export default function AdminDashboardPage() {
 
   const healthLabel = (status: string) => {
     switch (status) {
-      case 'healthy': return 'Healthy';
-      case 'synced': return 'Synced';
-      case 'warning': return 'Warning';
-      case 'critical': return 'Critical';
-      case 'inactive': return 'Inactive';
-      default: return 'Unknown';
+      case 'healthy': return t('admin.healthHealthy');
+      case 'synced': return t('admin.healthSynced');
+      case 'warning': return t('admin.healthWarning');
+      case 'critical': return t('admin.healthCritical');
+      case 'inactive': return t('admin.healthInactive');
+      default: return t('admin.healthUnknown');
     }
   };
 
@@ -201,50 +203,54 @@ export default function AdminDashboardPage() {
 
   return (
     <>
-      <TopBar title="Super Admin" />
+      <TopBar title={t('admin.topBarTitle')} />
       <main className="page-container page-enter">
 
         <PageHeader
           icon={Shield}
-          title="Platform Administration"
-          subtitle="Multi-tenant management console"
+          title={t('admin.pageTitle')}
+          subtitle={t('admin.pageSubtitle')}
         />
 
         {/* KPI Stat Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
             {
-              label: 'Total Organizations',
+              id: 'totalOrgs',
+              label: t('admin.kpiTotalOrganizations'),
               value: orgsLoading ? '...' : organizations.length.toString(),
-              sub: `${activeOrgs.length} active`,
+              sub: t('admin.kpiOrgsActive', { count: activeOrgs.length }),
               icon: Building2,
               accent: 'var(--accent-primary)',
             },
             {
-              label: 'Total Users',
+              id: 'totalUsers',
+              label: t('admin.kpiTotalUsers'),
               value: countsLoading ? '...' : totalUsers.toLocaleString(),
-              sub: 'Across all orgs',
+              sub: t('admin.kpiAcrossAllOrgs'),
               icon: Users,
               accent: 'var(--accent-primary)',
             },
             {
-              label: 'Total Patients',
+              id: 'totalPatients',
+              label: t('admin.kpiTotalPatients'),
               value: countsLoading ? '...' : totalPatients.toLocaleString(),
-              sub: 'Across all orgs',
+              sub: t('admin.kpiAcrossAllOrgs'),
               icon: HeartPulse,
               accent: 'var(--accent-primary)',
             },
             {
-              label: 'Active Subscriptions',
+              id: 'activeSubs',
+              label: t('admin.kpiActiveSubscriptions'),
               value: orgsLoading ? '...' : activeSubscriptions.toString(),
-              sub: `${trialOrgs} trial, ${suspendedOrgs} suspended`,
+              sub: t('admin.kpiSubsBreakdown', { trial: trialOrgs, suspended: suspendedOrgs }),
               icon: CreditCard,
               accent: 'var(--accent-primary)',
             },
           ].map((stat) => (
-            <div key={stat.label} className="p-5 rounded-xl cursor-pointer" onClick={() => {
-              const routes: Record<string, string> = { 'Total Organizations': '/admin/organizations', 'Total Users': '/admin/users', 'Total Patients': '/patients', 'Active Subscriptions': '/admin/billing' };
-              if (routes[stat.label]) router.push(routes[stat.label]);
+            <div key={stat.id} className="p-5 rounded-xl cursor-pointer" onClick={() => {
+              const routes: Record<string, string> = { totalOrgs: '/admin/organizations', totalUsers: '/admin/users', totalPatients: '/patients', activeSubs: '/admin/billing' };
+              if (routes[stat.id]) router.push(routes[stat.id]);
             }} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-3">
                 <div className="icon-box-sm" style={{ background: `${stat.accent}15` }}>
@@ -263,54 +269,54 @@ export default function AdminDashboardPage() {
         <div className="rounded-2xl p-5 mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-5 h-5" style={{ color: 'var(--color-success)' }} />
-            <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>System Health Dashboard</h2>
+            <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('admin.systemHealthDashboard')}</h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {/* Database Health */}
             <div className="p-4 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Database</span>
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('admin.healthDatabase')}</span>
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: healthColor(dbHealth) }} />
               </div>
               <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{dbStatsLoading ? '...' : totalDocs.toLocaleString()}</p>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total documents across {dbStats.length} databases</p>
+              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('admin.healthTotalDocuments', { count: dbStats.length })}</p>
             </div>
 
             {/* Sync Status */}
             <div className="p-4 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Sync Status</span>
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('admin.healthSyncStatus')}</span>
                 <RefreshCw className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
               </div>
               <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
                 {syncStatuses.filter(s => s.status === 'synced').length}/{syncStatuses.length}
               </p>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Organizations synced</p>
+              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('admin.healthOrgsSynced')}</p>
             </div>
 
             {/* Last Backup */}
             <div className="p-4 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Last Backup</span>
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('admin.healthLastBackup')}</span>
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: healthColor(backupHealth) }} />
               </div>
               <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                {lastBackupTime ? formatTimestamp(lastBackupTime) : 'No backup'}
+                {lastBackupTime ? formatTimestamp(lastBackupTime) : t('admin.healthNoBackup')}
               </p>
               <p className="text-[10px]" style={{ color: healthColor(backupHealth) }}>
-                {backupHealth === 'healthy' ? 'Recent' : backupHealth === 'warning' ? 'Over 24h ago' : backupHealth === 'critical' ? 'Over 72h ago' : 'Not configured'}
+                {backupHealth === 'healthy' ? t('admin.backupRecent') : backupHealth === 'warning' ? t('admin.backupOver24h') : backupHealth === 'critical' ? t('admin.backupOver72h') : t('admin.backupNotConfigured')}
               </p>
             </div>
 
             {/* Overall Platform */}
             <div className="p-4 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Platform</span>
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('admin.healthPlatform')}</span>
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--color-success)' }} />
               </div>
-              <p className="text-lg font-bold" style={{ color: 'var(--color-success)' }}>Operational</p>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>All systems running</p>
+              <p className="text-lg font-bold" style={{ color: 'var(--color-success)' }}>{t('admin.healthOperational')}</p>
+              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('admin.healthAllSystemsRunning')}</p>
             </div>
           </div>
 
@@ -335,7 +341,7 @@ export default function AdminDashboardPage() {
           {syncStatuses.length > 0 && (
             <div className="mt-0">
               <hr className="section-divider" />
-              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Organization Sync</p>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('admin.organizationSync')}</p>
               <div className="flex flex-wrap gap-2">
                 {syncStatuses.map(s => (
                   <span key={s.org} className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
@@ -356,27 +362,33 @@ export default function AdminDashboardPage() {
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Recent Organizations</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('admin.recentOrganizations')}</span>
               </div>
               <button onClick={() => router.push('/admin/organizations')} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--accent-primary)' }}>
-                View all <ChevronRight className="w-3.5 h-3.5" />
+                {t('admin.viewAll')} <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
             <table className="w-full">
               <thead>
                 <tr>
-                  {['Name', 'Plan', 'Status', 'Type', 'Created'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
-                      {h}
+                  {[
+                    { key: 'name', label: t('admin.colName') },
+                    { key: 'plan', label: t('admin.colPlan') },
+                    { key: 'status', label: t('admin.colStatus') },
+                    { key: 'type', label: t('admin.colType') },
+                    { key: 'created', label: t('admin.colCreated') },
+                  ].map(h => (
+                    <th key={h.key} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
+                      {h.label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {orgsLoading ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('admin.loading')}</td></tr>
                 ) : recentOrgs.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No organizations yet</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('admin.noOrganizationsYet')}</td></tr>
                 ) : recentOrgs.map(org => (
                   <tr key={org._id} className="cursor-pointer transition-colors" onClick={() => router.push('/admin/organizations')}
                       style={{ borderBottom: '1px solid var(--border-light)' }}>
@@ -393,8 +405,8 @@ export default function AdminDashboardPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
-                        background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(37,99,235,0.12)' : 'rgba(107,114,128,0.12)',
-                        color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#2563EB' : '#6B7280',
+                        background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(59, 130, 246,0.12)' : 'rgba(107,114,128,0.12)',
+                        color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#3b82f6' : '#6B7280',
                       }}>{org.subscriptionPlan}</span>
                     </td>
                     <td className="px-4 py-3">
@@ -427,7 +439,7 @@ export default function AdminDashboardPage() {
 
             {/* Quick Links */}
             <div className="rounded-xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Quick Actions</p>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('admin.quickActions')}</p>
               <div className="data-row-divider-sm">
                 {quickLinks.map(link => (
                   <button
@@ -446,14 +458,14 @@ export default function AdminDashboardPage() {
 
             {/* Plan Distribution */}
             <div className="rounded-xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Plan Distribution</p>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('admin.planDistribution')}</p>
               <div className="data-row-divider-sm">
                 {[
-                  { plan: 'Enterprise', count: planCounts.enterprise, color: '#7C3AED' },
-                  { plan: 'Professional', count: planCounts.professional, color: '#2563EB' },
-                  { plan: 'Basic', count: planCounts.basic, color: '#6B7280' },
+                  { id: 'enterprise', plan: t('admin.planEnterprise'), count: planCounts.enterprise, color: '#7C3AED' },
+                  { id: 'professional', plan: t('admin.planProfessional'), count: planCounts.professional, color: '#3b82f6' },
+                  { id: 'basic', plan: t('admin.planBasic'), count: planCounts.basic, color: '#6B7280' },
                 ].map(p => (
-                  <div key={p.plan}>
+                  <div key={p.id}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{p.plan}</span>
                       <span className="text-sm font-bold" style={{ color: p.color }}>{p.count}</span>
@@ -476,9 +488,9 @@ export default function AdminDashboardPage() {
           <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Audit Log</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('admin.auditLog')}</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
-                {filteredAuditLogs.length} entries
+                {t('admin.auditEntries', { count: filteredAuditLogs.length })}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -488,7 +500,7 @@ export default function AdminDashboardPage() {
                   type="text"
                   value={auditSearch}
                   onChange={e => { setAuditSearch(e.target.value); setAuditPage(0); }}
-                  placeholder="Search user or action..."
+                  placeholder={t('admin.searchPlaceholder')}
                   className="text-xs pl-8 pr-3 py-2 rounded-lg outline-none"
                   style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', width: '200px' }}
                 />
@@ -499,19 +511,25 @@ export default function AdminDashboardPage() {
             <table className="w-full">
               <thead>
                 <tr>
-                  {['Timestamp', 'User', 'Action', 'Details', 'Status'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
-                      {h}
+                  {[
+                    { key: 'timestamp', label: t('admin.colTimestamp') },
+                    { key: 'user', label: t('admin.colUser') },
+                    { key: 'action', label: t('admin.colAction') },
+                    { key: 'details', label: t('admin.colDetails') },
+                    { key: 'status', label: t('admin.colStatus') },
+                  ].map(h => (
+                    <th key={h.key} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
+                      {h.label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {auditLoading ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading audit log...</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('admin.loadingAuditLog')}</td></tr>
                 ) : paginatedLogs.length === 0 ? (
                   <tr><td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                    {auditSearch ? 'No matching entries' : 'No audit entries yet'}
+                    {auditSearch ? t('admin.noMatchingEntries') : t('admin.noAuditEntriesYet')}
                   </td></tr>
                 ) : paginatedLogs.map(log => (
                   <tr key={log._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
@@ -521,7 +539,7 @@ export default function AdminDashboardPage() {
                         {formatTimestamp(log.createdAt)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{log.username || 'System'}</td>
+                    <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{log.username || t('admin.systemUser')}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: 'rgba(124,58,237,0.08)', color: '#7C3AED' }}>
                         {log.action}
@@ -535,7 +553,7 @@ export default function AdminDashboardPage() {
                         background: log.success ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
                         color: log.success ? 'var(--color-success)' : 'var(--color-danger)',
                       }}>
-                        {log.success ? 'Success' : 'Failed'}
+                        {log.success ? t('admin.statusSuccess') : t('admin.statusFailed')}
                       </span>
                     </td>
                   </tr>
@@ -547,7 +565,7 @@ export default function AdminDashboardPage() {
           {totalAuditPages > 1 && (
             <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: '1px solid var(--border-light)' }}>
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Page {auditPage + 1} of {totalAuditPages}
+                {t('admin.pageOf', { current: auditPage + 1, total: totalAuditPages })}
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -561,7 +579,7 @@ export default function AdminDashboardPage() {
                     opacity: auditPage === 0 ? 0.5 : 1,
                   }}
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" /> Prev
+                  <ChevronLeft className="w-3.5 h-3.5" /> {t('admin.prev')}
                 </button>
                 <button
                   onClick={() => setAuditPage(p => Math.min(totalAuditPages - 1, p + 1))}
@@ -574,7 +592,7 @@ export default function AdminDashboardPage() {
                     opacity: auditPage >= totalAuditPages - 1 ? 0.5 : 1,
                   }}
                 >
-                  Next <ChevronRight className="w-3.5 h-3.5" />
+                  {t('admin.next')} <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

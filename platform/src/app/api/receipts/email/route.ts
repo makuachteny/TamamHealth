@@ -12,7 +12,7 @@ import type { UserRole } from '@/lib/db-types';
 // have their own service-specific receipts.
 const RECEIPT_EMAIL_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'medical_superintendent',
-  'front_desk', 'doctor', 'clinical_officer', 'nurse',
+  'cashier', 'medical_biller', 'doctor', 'clinical_officer', 'nurse',
 ];
 
 /**

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Download, Printer } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface PatientQRCodeProps {
   patientId: string;
@@ -11,6 +12,7 @@ interface PatientQRCodeProps {
 }
 
 export default function PatientQRCode({ patientId, patientName, hospitalNumber, size = 160 }: PatientQRCodeProps) {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ready, setReady] = useState(false);
 
@@ -77,7 +79,7 @@ export default function PatientQRCode({ patientId, patientName, hospitalNumber, 
     const dataUrl = canvasRef.current.toDataURL('image/png');
     printWindow.document.write(`
       <html>
-        <head><title>Patient QR - ${hospitalNumber}</title></head>
+        <head><title>${t('patientQrCode.printTitle')} - ${hospitalNumber}</title></head>
         <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;font-family:sans-serif;">
           <img src="${dataUrl}" width="${size}" height="${size}" />
           <p style="font-weight:bold;margin:12px 0 4px;">${patientName}</p>
@@ -97,7 +99,7 @@ export default function PatientQRCode({ patientId, patientName, hospitalNumber, 
       {ready && (
         <>
           <p className="text-[11px] font-mono text-center" style={{ color: 'var(--text-muted)' }}>
-            Scan to retrieve patient records
+            {t('patientQrCode.scanHint')}
           </p>
           <div className="flex gap-2">
             <button
@@ -106,7 +108,7 @@ export default function PatientQRCode({ patientId, patientName, hospitalNumber, 
               className="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors"
               style={{ background: 'var(--overlay-subtle)', color: 'var(--tamamhealth-blue)', border: '1px solid var(--border-light)' }}
             >
-              <Download className="w-3.5 h-3.5" /> Download
+              <Download className="w-3.5 h-3.5" /> {t('patientQrCode.download')}
             </button>
             <button
               type="button"
@@ -114,7 +116,7 @@ export default function PatientQRCode({ patientId, patientName, hospitalNumber, 
               className="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors"
               style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
             >
-              <Printer className="w-3.5 h-3.5" /> Print
+              <Printer className="w-3.5 h-3.5" /> {t('action.print')}
             </button>
           </div>
         </>

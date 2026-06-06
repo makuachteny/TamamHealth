@@ -169,6 +169,8 @@ export const followUpsDB = () => getDB('tamamhealth_follow_ups');
 export const organizationsDB = () => getDB('tamamhealth_organizations');
 export const platformConfigDB = () => getDB('tamamhealth_platform_config');
 export const appointmentsDB = () => getDB('tamamhealth_appointments');
+export const availabilityDB = () => getDB('tamamhealth_availability');
+export const announcementsDB = () => getDB('tamamhealth_announcements');
 export const telehealthDB = () => getDB('tamamhealth_telehealth');
 export const pharmacyInventoryDB = () => getDB('tamamhealth_pharmacy_inventory');
 export const triageDB = () => getDB('tamamhealth_triage');
@@ -203,7 +205,7 @@ export const invoicesDB = () => getDB('tamamhealth_invoices');
 export const ledgerDB = () => getDB('tamamhealth_ledger');
 
 // Bump this version to force a re-seed (destroys all data and re-creates)
-export const SEED_VERSION = 25;
+export const SEED_VERSION = 27;
 
 export async function isSeeded(): Promise<boolean> {
   try {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Shield, Plus, Edit3, Building2 } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import EligibilityBadge from './EligibilityBadge';
 
 interface InsuranceSnapshotProps {
@@ -26,6 +27,7 @@ interface Policy {
 }
 
 export default function InsuranceSnapshot({ patientId, editable, onAddInsurance, onEditInsurance }: InsuranceSnapshotProps) {
+  const { t } = useTranslation();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [eligStatus, setEligStatus] = useState<'verified' | 'unverified' | 'expired' | 'denied' | 'cached' | 'none'>('none');
   const [loading, setLoading] = useState(true);
@@ -46,7 +48,7 @@ export default function InsuranceSnapshot({ patientId, editable, onAddInsurance,
   }, [patientId]);
 
   if (loading) {
-    return <div style={{ padding: 12, fontSize: 13, color: 'var(--text-muted)' }}>Loading insurance...</div>;
+    return <div style={{ padding: 12, fontSize: 13, color: 'var(--text-muted)' }}>{t('insuranceSnapshot.loading')}</div>;
   }
 
   if (policies.length === 0) {
@@ -60,7 +62,7 @@ export default function InsuranceSnapshot({ patientId, editable, onAddInsurance,
           <span className="icon-box-sm" style={{ color: 'var(--teal, #14b8a6)' }}>
             <Shield size={16} />
           </span>
-          No insurance on file — Self-pay
+          {t('insuranceSnapshot.noInsuranceSelfPay')}
         </div>
         {editable && onAddInsurance && (
           <button onClick={onAddInsurance} style={{
@@ -68,7 +70,7 @@ export default function InsuranceSnapshot({ patientId, editable, onAddInsurance,
             padding: '4px 12px', borderRadius: 16, border: '1px solid var(--accent)',
             background: 'transparent', color: 'var(--accent)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
           }}>
-            <Plus size={12} /> Add Insurance
+            <Plus size={12} /> {t('insuranceSnapshot.addInsurance')}
           </button>
         )}
       </div>
@@ -91,16 +93,16 @@ export default function InsuranceSnapshot({ patientId, editable, onAddInsurance,
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{policy.payerName}</span>
               {policy.isPrimary && (
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Primary</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('insuranceSnapshot.primary')}</span>
               )}
               <EligibilityBadge status={eligStatus} compact />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              {policy.memberId && <span>ID: {policy.memberId}</span>}
-              {policy.copayAmount != null && <span>Copay: ${policy.copayAmount}</span>}
-              {policy.coinsurancePct != null && <span>Coinsurance: {policy.coinsurancePct}%</span>}
-              {policy.donorCoverageType && <span>Coverage: {policy.donorCoverageType}</span>}
-              <span>Eff: {policy.effectiveDate}</span>
+              {policy.memberId && <span>{t('insuranceSnapshot.memberId', { id: policy.memberId })}</span>}
+              {policy.copayAmount != null && <span>{t('insuranceSnapshot.copay', { amount: policy.copayAmount })}</span>}
+              {policy.coinsurancePct != null && <span>{t('insuranceSnapshot.coinsurance', { pct: policy.coinsurancePct })}</span>}
+              {policy.donorCoverageType && <span>{t('insuranceSnapshot.coverage', { type: policy.donorCoverageType })}</span>}
+              <span>{t('insuranceSnapshot.effective', { date: policy.effectiveDate })}</span>
             </div>
           </div>
           {editable && onEditInsurance && (
@@ -121,7 +123,7 @@ export default function InsuranceSnapshot({ patientId, editable, onAddInsurance,
           padding: '8px 0', borderRadius: 12, border: '1px dashed var(--border-medium)',
           background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer',
         }}>
-          <Plus size={12} /> Add Another Plan
+          <Plus size={12} /> {t('insuranceSnapshot.addAnotherPlan')}
         </button>
       )}
     </div>

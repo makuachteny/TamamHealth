@@ -11,6 +11,7 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useBodyScrollLock } from '@/lib/hooks/useBodyScrollLock';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { ImmunizationDefaulter } from '@/lib/services/immunization-service';
 import {
   Syringe, Search, Plus, X, CheckCircle2, Clock, AlertTriangle,
@@ -28,6 +29,7 @@ const statusConfig = {
 };
 
 export default function ImmunizationsPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useApp();
   const { immunizations, stats, coverage, loading, register } = useImmunizations();
@@ -159,12 +161,12 @@ export default function ImmunizationsPage() {
   if (loading) {
     return (
       <>
-        <TopBar title="Immunizations" />
+        <TopBar title={t('immun.title')} />
         <main className="page-container page-enter">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading immunization records...</p>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('immun.loadingRecords')}</p>
             </div>
           </div>
         </main>
@@ -174,15 +176,15 @@ export default function ImmunizationsPage() {
 
   return (
     <>
-      <TopBar title="Immunizations" />
+      <TopBar title={t('immun.title')} />
       <main className="page-container page-enter">
         <PageHeader
           icon={Syringe}
-          title="Immunization Tracker"
-          subtitle="EPI vaccination records & coverage monitoring"
+          title={t('immun.trackerTitle')}
+          subtitle={t('immun.trackerSubtitle')}
           actions={canRecordVitalEvents && (
             <button onClick={() => setShowModal(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> Record Vaccination
+              <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}
             </button>
           )}
         />
@@ -191,10 +193,10 @@ export default function ImmunizationsPage() {
         {stats && (
           <div className="kpi-grid mb-6">
             {[
-              { label: 'Total Vaccinations', value: stats.totalVaccinations.toString(), color: '#059669', bg: 'rgba(5,150,105,0.12)', icon: Syringe },
-              { label: 'Children Tracked', value: stats.totalChildren.toString(), color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)', icon: Users },
-              { label: 'Overdue Doses', value: stats.overdue.toString(), color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.12)', icon: AlertTriangle },
-              { label: 'Coverage Rate', value: `${stats.coverageRate}%`, color: '#059669', bg: 'rgba(5,150,105,0.12)', icon: CheckCircle2 },
+              { label: t('immun.totalVaccinations'), value: stats.totalVaccinations.toString(), color: '#059669', bg: 'rgba(5,150,105,0.12)', icon: Syringe },
+              { label: t('immun.childrenTracked'), value: stats.totalChildren.toString(), color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)', icon: Users },
+              { label: t('immun.overdueDoses'), value: stats.overdue.toString(), color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.12)', icon: AlertTriangle },
+              { label: t('immun.coverageRate'), value: `${stats.coverageRate}%`, color: '#059669', bg: 'rgba(5,150,105,0.12)', icon: CheckCircle2 },
             ].map(stat => (
               <div key={stat.label} className="kpi">
                 <div className="icon-box-sm" style={{ background: stat.bg }}>
@@ -214,15 +216,15 @@ export default function ImmunizationsPage() {
           <button onClick={() => setActiveTab('records')}
             className={`px-4 py-3 text-sm font-medium ${activeTab === 'records' ? 'tab-active' : ''}`}
             style={{ color: activeTab === 'records' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-            Records ({stats?.totalChildren || 0})
+            {t('immun.tabRecords', { count: stats?.totalChildren || 0 })}
           </button>
           <button onClick={() => setActiveTab('defaulters')}
             className={`px-4 py-3 text-sm font-medium flex items-center gap-2 ${activeTab === 'defaulters' ? 'tab-active' : ''}`}
             style={{ color: activeTab === 'defaulters' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-            Defaulters ({defaulterStats?.uniqueChildren || 0})
+            {t('immun.tabDefaulters', { count: defaulterStats?.uniqueChildren || 0 })}
             {defaulterStats && defaulterStats.critical > 0 && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(229,46,66,0.15)', color: 'var(--color-danger)' }}>
-                {defaulterStats.critical} critical
+                {t('immun.criticalBadge', { count: defaulterStats.critical })}
               </span>
             )}
           </button>
@@ -235,7 +237,7 @@ export default function ImmunizationsPage() {
               <span className="icon-box-sm" style={{ background: 'rgba(5,150,105,0.12)' }}>
                 <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
               </span>
-              Coverage by Antigen
+              {t('immun.coverageByAntigen')}
             </h3>
             <hr className="section-divider" />
             <div className="data-row-divider-sm">
@@ -270,15 +272,15 @@ export default function ImmunizationsPage() {
                 <span className="icon-box-sm" style={{ background: 'rgba(5,150,105,0.12)' }}>
                   <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
                 </span>
-                <h3 className="font-semibold text-sm">Coverage by Age Cohort</h3>
+                <h3 className="font-semibold text-sm">{t('immun.coverageByAgeCohort')}</h3>
               </div>
-              <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>EPI schedule alignment</span>
+              <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>{t('immun.epiScheduleAlignment')}</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr>
-                    <th className="text-left p-2" style={{ color: 'var(--text-muted)' }}>Vaccine</th>
+                    <th className="text-left p-2" style={{ color: 'var(--text-muted)' }}>{t('immun.colVaccine')}</th>
                     {cohortKeys.map(c => (
                       <th key={c} className="text-center p-2" style={{ color: 'var(--text-muted)' }}>{c}</th>
                     ))}
@@ -318,7 +320,7 @@ export default function ImmunizationsPage() {
           <input
             type="search"
             className="search-icon-input"
-            placeholder="Search by child name..."
+            placeholder={t('immun.searchByChildName')}
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -331,10 +333,10 @@ export default function ImmunizationsPage() {
             {defaulterStats && (
               <div className="kpi-grid mb-4">
                 {[
-                  { label: 'Critical (>30 days)', value: defaulterStats.critical, bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)', filter: 'critical' as const },
-                  { label: 'High (>14 days)', value: defaulterStats.high, bg: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)', filter: 'high' as const },
-                  { label: 'Medium (>0 days)', value: defaulterStats.medium, bg: 'rgba(43,111,224,0.12)', color: 'var(--accent-primary)', filter: 'medium' as const },
-                  { label: 'Unique Children', value: defaulterStats.uniqueChildren, bg: 'rgba(43,111,224,0.08)', color: 'var(--accent-primary)', filter: 'all' as const },
+                  { label: t('immun.critical30Days'), value: defaulterStats.critical, bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)', filter: 'critical' as const },
+                  { label: t('immun.high14Days'), value: defaulterStats.high, bg: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)', filter: 'high' as const },
+                  { label: t('immun.medium0Days'), value: defaulterStats.medium, bg: 'rgba(43,111,224,0.12)', color: 'var(--accent-primary)', filter: 'medium' as const },
+                  { label: t('immun.uniqueChildren'), value: defaulterStats.uniqueChildren, bg: 'rgba(43,111,224,0.08)', color: 'var(--accent-primary)', filter: 'all' as const },
                 ].map(k => (
                   <div key={k.label} className="kpi cursor-pointer" onClick={() => setDefaulterFilter(k.filter)}>
                     <div className="icon-box-sm" style={{ background: k.bg }}>
@@ -356,31 +358,31 @@ export default function ImmunizationsPage() {
                     <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
                   </span>
                   <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                    Immunization Defaulters {defaulterFilter !== 'all' && `· ${defaulterFilter}`}
+                    {t('immun.defaultersTitle')} {defaulterFilter !== 'all' && `· ${defaulterFilter}`}
                   </h3>
                 </div>
                 {defaulterFilter !== 'all' && (
-                  <button onClick={() => setDefaulterFilter('all')} className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>Clear filter</button>
+                  <button onClick={() => setDefaulterFilter('all')} className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>{t('immun.clearFilter')}</button>
                 )}
               </div>
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Child</th>
-                    <th>Age</th>
-                    <th>Gender</th>
-                    <th>Overdue Vaccine</th>
-                    <th>Dose</th>
-                    <th>Due Date</th>
-                    <th>Days Overdue</th>
-                    <th>Facility</th>
-                    <th>Urgency</th>
+                    <th>{t('immun.colChild')}</th>
+                    <th>{t('immun.colAge')}</th>
+                    <th>{t('immun.colGender')}</th>
+                    <th>{t('immun.colOverdueVaccine')}</th>
+                    <th>{t('immun.colDose')}</th>
+                    <th>{t('immun.colDueDate')}</th>
+                    <th>{t('immun.colDaysOverdue')}</th>
+                    <th>{t('immun.colFacility')}</th>
+                    <th>{t('immun.colUrgency')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {defaulters.filter(d => defaulterFilter === 'all' || d.urgency === defaulterFilter).length === 0 ? (
                     <tr><td colSpan={9} className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-                      No defaulters in this category — all children are up to date.
+                      {t('immun.noDefaultersInCategory')}
                     </td></tr>
                   ) : defaulters.filter(d => defaulterFilter === 'all' || d.urgency === defaulterFilter).map((d, i) => {
                     const urgencyColor = d.urgency === 'critical' ? 'var(--color-danger)' : d.urgency === 'high' ? 'var(--color-warning)' : 'var(--accent-primary)';
@@ -417,7 +419,7 @@ export default function ImmunizationsPage() {
               <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
             </span>
             <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-              Vaccination Records ({filteredChildren.length} children)
+              {t('immun.vaccinationRecords', { count: filteredChildren.length })}
             </h3>
           </div>
 
@@ -449,11 +451,11 @@ export default function ImmunizationsPage() {
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
-                      {completedCount} given
+                      {t('immun.given', { count: completedCount })}
                     </span>
                     {overdueCount > 0 && (
                       <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>
-                        {overdueCount} overdue
+                        {t('immun.overdueCount', { count: overdueCount })}
                       </span>
                     )}
                     <Link
@@ -461,9 +463,9 @@ export default function ImmunizationsPage() {
                       onClick={(e) => e.stopPropagation()}
                       className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full transition-colors hover:bg-[var(--accent-light)]"
                       style={{ color: 'var(--accent-primary)' }}
-                      title="View patient record"
+                      title={t('immun.viewPatientRecord')}
                     >
-                      View <ExternalLink className="w-3 h-3" />
+                      {t('immun.view')} <ExternalLink className="w-3 h-3" />
                     </Link>
                     {isExpanded ? <ChevronUp className="w-4 h-4" style={{ color: 'var(--text-muted)' }} /> : <ChevronDown className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}
                   </div>
@@ -477,7 +479,7 @@ export default function ImmunizationsPage() {
                         if (doses.length === 0) return (
                           <div key={vac} className="p-2 rounded-lg border" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
                             <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{vac}</p>
-                            <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>Not scheduled</p>
+                            <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('immun.notScheduled')}</p>
                           </div>
                         );
                         return doses.map(dose => {
@@ -489,7 +491,7 @@ export default function ImmunizationsPage() {
                                 <p className="text-xs font-medium" style={{ color: cfg.color }}>{dose.vaccine} {dose.doseNumber > 0 ? `#${dose.doseNumber}` : ''}</p>
                               </div>
                               <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-                                {dose.status === 'completed' ? dose.dateGiven : dose.status === 'scheduled' ? `Due: ${dose.nextDueDate}` : cfg.label}
+                                {dose.status === 'completed' ? dose.dateGiven : dose.status === 'scheduled' ? t('immun.due', { date: dose.nextDueDate }) : t(`immun.status${dose.status.charAt(0).toUpperCase()}${dose.status.slice(1)}`)}
                               </p>
                             </div>
                           );
@@ -505,11 +507,11 @@ export default function ImmunizationsPage() {
           {filteredChildren.length === 0 && (
             <EmptyState
               icon={Syringe}
-              title={search ? 'No matching children' : 'No immunization records yet'}
+              title={search ? t('immun.noMatchingChildren') : t('immun.noRecordsYet')}
               message={search
-                ? 'Try a different search term, or clear the search to see all children.'
-                : 'Record childhood vaccinations (BCG, OPV, Penta, PCV, Rota, Measles, Yellow Fever) to track South Sudan EPI coverage and surface defaulters.'}
-              action={!search && canRecordVitalEvents ? { label: 'Record vaccination', onClick: () => setShowModal(true) } : undefined}
+                ? t('immun.noMatchingMessage')
+                : t('immun.noRecordsMessage')}
+              action={!search && canRecordVitalEvents ? { label: t('immun.recordVaccinationAction'), onClick: () => setShowModal(true) } : undefined}
             />
           )}
         </div>
@@ -520,7 +522,7 @@ export default function ImmunizationsPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
             <div className="card-elevated p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fadeIn" style={{ margin: '20px' }}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Record Vaccination</h3>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{t('immun.recordVaccination')}</h3>
                 <button onClick={() => setShowModal(false)} className="p-1 rounded-lg hover:bg-[var(--overlay-light)]">
                   <X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
                 </button>
@@ -531,7 +533,7 @@ export default function ImmunizationsPage() {
                 <div className="rounded-lg p-3" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(43,111,224,0.25))' }}>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--accent-primary)', textTransform: 'uppercase' }}>
                     <Users className="w-3 h-3" />
-                    Link to existing child (recommended)
+                    {t('immun.linkToExistingChild')}
                   </label>
                   {form.patientId ? (
                     <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
@@ -539,7 +541,7 @@ export default function ImmunizationsPage() {
                         <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{form.patientName}</p>
                         <p style={{ color: 'var(--text-muted)' }}>{form.gender}{form.dateOfBirth ? ` · DOB ${form.dateOfBirth}` : ''}</p>
                       </div>
-                      <button type="button" onClick={() => setForm(f => ({ ...f, patientId: '', patientName: '', dateOfBirth: '' }))} className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>Unlink</button>
+                      <button type="button" onClick={() => setForm(f => ({ ...f, patientId: '', patientName: '', dateOfBirth: '' }))} className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('immun.unlink')}</button>
                     </div>
                   ) : (
                     <>
@@ -549,7 +551,7 @@ export default function ImmunizationsPage() {
                           type="text"
                           value={patientLookup}
                           onChange={e => setPatientLookup(e.target.value)}
-                          placeholder="Search child by name or hospital number…"
+                          placeholder={t('immun.searchChildPlaceholder')}
                           className="w-full text-xs p-2 pl-8 rounded-lg outline-none"
                           style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                         />
@@ -571,7 +573,7 @@ export default function ImmunizationsPage() {
                         </div>
                       )}
                       <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
-                        Linking the child to an existing patient prevents duplicate records and lets you view their full health history.
+                        {t('immun.linkingHint')}
                       </p>
                     </>
                   )}
@@ -579,54 +581,54 @@ export default function ImmunizationsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label>Child Name</label>
-                    <input type="text" required value={form.patientName} onChange={e => setForm({ ...form, patientName: e.target.value })} placeholder="Full name" />
+                    <label>{t('immun.childName')}</label>
+                    <input type="text" required value={form.patientName} onChange={e => setForm({ ...form, patientName: e.target.value })} placeholder={t('immun.fullName')} />
                   </div>
                   <div>
-                    <label>Gender</label>
+                    <label>{t('immun.gender')}</label>
                     <select value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value as 'Male' | 'Female' })}>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
+                      <option value="Male">{t('immun.male')}</option>
+                      <option value="Female">{t('immun.female')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label>Date of Birth</label>
+                  <label>{t('immun.dateOfBirth')}</label>
                   <input type="date" required value={form.dateOfBirth} onChange={e => setForm({ ...form, dateOfBirth: e.target.value })} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label>Vaccine</label>
+                    <label>{t('immun.vaccine')}</label>
                     <select value={form.vaccine} onChange={e => setForm({ ...form, vaccine: e.target.value })}>
                       {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label>Dose Number</label>
+                    <label>{t('immun.doseNumber')}</label>
                     <input type="number" min={0} max={5} value={form.doseNumber} onChange={e => setForm({ ...form, doseNumber: parseInt(e.target.value, 10) || 0 })} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label>Date Given</label>
+                    <label>{t('immun.dateGiven')}</label>
                     <input type="date" required value={form.dateGiven} onChange={e => setForm({ ...form, dateGiven: e.target.value })} />
                   </div>
                   <div>
-                    <label>Next Due Date</label>
+                    <label>{t('immun.nextDueDate')}</label>
                     <input type="date" value={form.nextDueDate} onChange={e => setForm({ ...form, nextDueDate: e.target.value })} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label>Batch Number</label>
-                    <input type="text" value={form.batchNumber} onChange={e => setForm({ ...form, batchNumber: e.target.value })} placeholder="e.g. BCG-2026-001" />
+                    <label>{t('immun.batchNumber')}</label>
+                    <input type="text" value={form.batchNumber} onChange={e => setForm({ ...form, batchNumber: e.target.value })} placeholder={t('immun.batchNumberPlaceholder')} />
                   </div>
                   <div>
-                    <label>Site</label>
+                    <label>{t('immun.site')}</label>
                     <select value={form.site} onChange={e => setForm({ ...form, site: e.target.value as typeof SITES[number] })}>
                       {SITES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
@@ -636,13 +638,13 @@ export default function ImmunizationsPage() {
                 <div>
                   <label className="flex items-center gap-2 cursor-pointer" style={{ textTransform: 'none', fontSize: '0.875rem' }}>
                     <input type="checkbox" checked={form.adverseReaction} onChange={e => setForm({ ...form, adverseReaction: e.target.checked })} className="w-4 h-4" />
-                    Adverse reaction observed
+                    {t('immun.adverseReactionObserved')}
                   </label>
                   {form.adverseReaction && (
                     <textarea
                       className="mt-2"
                       rows={2}
-                      placeholder="Describe the adverse reaction..."
+                      placeholder={t('immun.adverseReactionPlaceholder')}
                       value={form.adverseReactionDetails}
                       onChange={e => setForm({ ...form, adverseReactionDetails: e.target.value })}
                     />
@@ -650,9 +652,9 @@ export default function ImmunizationsPage() {
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary flex-1">Cancel</button>
+                  <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary flex-1">{t('immun.cancel')}</button>
                   <button type="submit" className="btn btn-primary flex-1">
-                    <Syringe className="w-4 h-4" /> Record Vaccination
+                    <Syringe className="w-4 h-4" /> {t('immun.recordVaccination')}
                   </button>
                 </div>
               </form>

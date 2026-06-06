@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
@@ -34,7 +35,7 @@ type OrgFormData = {
 
 const emptyForm: OrgFormData = {
   name: '', slug: '', orgType: 'public', contactEmail: '', country: 'South Sudan',
-  primaryColor: 'var(--accent-primary)', secondaryColor: '#0F47AF', accentColor: 'var(--color-warning)',
+  primaryColor: '#3b82f6', secondaryColor: '#1e3a8a', accentColor: '#3b82f6',
   subscriptionPlan: 'professional', subscriptionStatus: 'trial',
   maxUsers: 50, maxHospitals: 10,
   epidemicIntelligence: true, mchAnalytics: true, dhis2Export: false,
@@ -42,6 +43,7 @@ const emptyForm: OrgFormData = {
 };
 
 export default function AdminOrganizationsPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useApp();
   const { organizations, loading, create, update, deactivate, getStats } = useOrganizations();
@@ -166,7 +168,7 @@ export default function AdminOrganizationsPage() {
   };
 
   const handleDeactivate = async (org: OrganizationDoc) => {
-    if (!confirm(`Are you sure you want to deactivate "${org.name}"?`)) return;
+    if (!confirm(t('orgAdmin.confirmDeactivate', { name: org.name }))) return;
     try {
       await deactivate(org._id, currentUser._id, currentUser.username);
     } catch (err) {
@@ -192,7 +194,7 @@ export default function AdminOrganizationsPage() {
 
   return (
     <>
-      <TopBar title="Organizations" />
+      <TopBar title={t('orgAdmin.title')} />
       <main className="page-container page-enter">
 
         {/* Toolbar */}
@@ -200,21 +202,21 @@ export default function AdminOrganizationsPage() {
           <div className="relative flex-1" style={{ minWidth: '200px', maxWidth: '360px' }}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             <input
-              type="text" placeholder="Search organizations..."
+              type="text" placeholder={t('orgAdmin.searchPlaceholder')}
               value={search} onChange={e => setSearch(e.target.value)}
               style={{ ...inputStyle, paddingLeft: '36px' }}
             />
           </div>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '160px' }}>
-            <option value="all">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="trial">Trial</option>
-            <option value="suspended">Suspended</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="all">{t('orgAdmin.statusAll')}</option>
+            <option value="active">{t('orgAdmin.statusActive')}</option>
+            <option value="trial">{t('orgAdmin.statusTrial')}</option>
+            <option value="suspended">{t('orgAdmin.statusSuspended')}</option>
+            <option value="cancelled">{t('orgAdmin.statusCancelled')}</option>
           </select>
           <div className="flex-1" />
           <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: 'var(--color-danger)' }}>
-            <Plus className="w-4 h-4" /> New Organization
+            <Plus className="w-4 h-4" /> {t('orgAdmin.newOrganization')}
           </button>
         </div>
 
@@ -224,18 +226,26 @@ export default function AdminOrganizationsPage() {
             <table className="w-full">
               <thead>
                 <tr>
-                  {['Name', 'Slug', 'Type', 'Plan', 'Status', 'Users', 'Actions'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
-                      {h}
+                  {[
+                    { key: 'name', label: t('orgAdmin.colName') },
+                    { key: 'slug', label: t('orgAdmin.colSlug') },
+                    { key: 'type', label: t('orgAdmin.colType') },
+                    { key: 'plan', label: t('orgAdmin.colPlan') },
+                    { key: 'status', label: t('orgAdmin.colStatus') },
+                    { key: 'users', label: t('orgAdmin.colUsers') },
+                    { key: 'actions', label: t('orgAdmin.colActions') },
+                  ].map(h => (
+                    <th key={h.key} className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
+                      {h.label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading organizations...</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.loading')}</td></tr>
                 ) : filteredOrgs.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No organizations found</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.empty')}</td></tr>
                 ) : filteredOrgs.map(org => (
                   <tr key={org._id} style={{ borderBottom: '1px solid var(--border-light)' }} className="transition-colors">
                     <td className="px-4 py-3">
@@ -260,8 +270,8 @@ export default function AdminOrganizationsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
-                        background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(37,99,235,0.12)' : 'rgba(107,114,128,0.12)',
-                        color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#2563EB' : '#6B7280',
+                        background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(59, 130, 246,0.12)' : 'rgba(107,114,128,0.12)',
+                        color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#3b82f6' : '#6B7280',
                       }}>{org.subscriptionPlan}</span>
                     </td>
                     <td className="px-4 py-3">
@@ -279,11 +289,11 @@ export default function AdminOrganizationsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <button onClick={() => openEdit(org)} title="Edit" className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }}>
+                        <button onClick={() => openEdit(org)} title={t('action.edit')} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }}>
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         {org.isActive && (
-                          <button onClick={() => handleDeactivate(org)} title="Deactivate" className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-danger)' }}>
+                          <button onClick={() => handleDeactivate(org)} title={t('orgAdmin.deactivate')} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-danger)' }}>
                             <Ban className="w-3.5 h-3.5" />
                           </button>
                         )}
@@ -311,7 +321,7 @@ export default function AdminOrganizationsPage() {
 
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                {editingId ? 'Edit Organization' : 'Create Organization'}
+                {editingId ? t('orgAdmin.editOrganization') : t('orgAdmin.createOrganization')}
               </h3>
               <button onClick={() => setShowForm(false)} className="p-1 rounded-lg" style={{ color: 'var(--text-muted)' }}>
                 <X className="w-5 h-5" />
@@ -321,33 +331,33 @@ export default function AdminOrganizationsPage() {
             <div className="space-y-5">
               {/* Basic Info */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--color-danger)' }}>Basic Information</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--color-danger)' }}>{t('orgAdmin.sectionBasicInfo')}</h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <label style={labelStyle}>Organization Name</label>
+                    <label style={labelStyle}>{t('orgAdmin.labelName')}</label>
                     <input type="text" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                      placeholder="e.g. Ministry of Health South Sudan" style={inputStyle} />
+                      placeholder={t('orgAdmin.placeholderName')} style={inputStyle} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Slug (URL identifier)</label>
+                    <label style={labelStyle}>{t('orgAdmin.labelSlug')}</label>
                     <input type="text" value={form.slug}
                       onChange={e => setForm(p => ({ ...p, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                      placeholder="e.g. moh-south-sudan" style={inputStyle} disabled={!!editingId} />
+                      placeholder={t('orgAdmin.placeholderSlug')} style={inputStyle} disabled={!!editingId} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Organization Type</label>
+                    <label style={labelStyle}>{t('orgAdmin.labelOrgType')}</label>
                     <select value={form.orgType} onChange={e => setForm(p => ({ ...p, orgType: e.target.value as 'public' | 'private' }))} style={selectStyle}>
-                      <option value="public">Public</option>
-                      <option value="private">Private</option>
+                      <option value="public">{t('orgAdmin.typePublic')}</option>
+                      <option value="private">{t('orgAdmin.typePrivate')}</option>
                     </select>
                   </div>
                   <div>
-                    <label style={labelStyle}>Contact Email</label>
+                    <label style={labelStyle}>{t('orgAdmin.labelContactEmail')}</label>
                     <input type="email" value={form.contactEmail} onChange={e => setForm(p => ({ ...p, contactEmail: e.target.value }))}
                       placeholder="admin@example.org" style={inputStyle} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Country</label>
+                    <label style={labelStyle}>{t('orgAdmin.labelCountry')}</label>
                     <input type="text" value={form.country} onChange={e => setForm(p => ({ ...p, country: e.target.value }))}
                       style={inputStyle} />
                   </div>
@@ -356,31 +366,31 @@ export default function AdminOrganizationsPage() {
 
               {/* Subscription */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--color-danger)' }}>Subscription</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--color-danger)' }}>{t('orgAdmin.sectionSubscription')}</h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label style={labelStyle}>Plan</label>
+                    <label style={labelStyle}>{t('orgAdmin.labelPlan')}</label>
                     <select value={form.subscriptionPlan} onChange={e => setForm(p => ({ ...p, subscriptionPlan: e.target.value as OrgFormData['subscriptionPlan'] }))} style={selectStyle}>
-                      <option value="basic">Basic</option>
-                      <option value="professional">Professional</option>
-                      <option value="enterprise">Enterprise</option>
+                      <option value="basic">{t('orgAdmin.planBasic')}</option>
+                      <option value="professional">{t('orgAdmin.planProfessional')}</option>
+                      <option value="enterprise">{t('orgAdmin.planEnterprise')}</option>
                     </select>
                   </div>
                   <div>
-                    <label style={labelStyle}>Status</label>
+                    <label style={labelStyle}>{t('orgAdmin.labelStatus')}</label>
                     <select value={form.subscriptionStatus} onChange={e => setForm(p => ({ ...p, subscriptionStatus: e.target.value as OrgFormData['subscriptionStatus'] }))} style={selectStyle}>
-                      <option value="trial">Trial</option>
-                      <option value="active">Active</option>
-                      <option value="suspended">Suspended</option>
-                      <option value="cancelled">Cancelled</option>
+                      <option value="trial">{t('orgAdmin.statusTrial')}</option>
+                      <option value="active">{t('orgAdmin.statusActive')}</option>
+                      <option value="suspended">{t('orgAdmin.statusSuspended')}</option>
+                      <option value="cancelled">{t('orgAdmin.statusCancelled')}</option>
                     </select>
                   </div>
                   <div>
-                    <label style={labelStyle}>Max Users</label>
+                    <label style={labelStyle}>{t('orgAdmin.labelMaxUsers')}</label>
                     <input type="number" min="1" value={form.maxUsers} onChange={e => setForm(p => ({ ...p, maxUsers: parseInt(e.target.value) || 1 }))} style={inputStyle} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Max Hospitals</label>
+                    <label style={labelStyle}>{t('orgAdmin.labelMaxHospitals')}</label>
                     <input type="number" min="1" value={form.maxHospitals} onChange={e => setForm(p => ({ ...p, maxHospitals: parseInt(e.target.value) || 1 }))} style={inputStyle} />
                   </div>
                 </div>
@@ -388,12 +398,12 @@ export default function AdminOrganizationsPage() {
 
               {/* Branding */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--color-danger)' }}>Branding Colors</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--color-danger)' }}>{t('orgAdmin.sectionBranding')}</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
-                    { key: 'primaryColor' as const, label: 'Primary Color' },
-                    { key: 'secondaryColor' as const, label: 'Secondary Color' },
-                    { key: 'accentColor' as const, label: 'Accent Color' },
+                    { key: 'primaryColor' as const, label: t('orgAdmin.colorPrimary') },
+                    { key: 'secondaryColor' as const, label: t('orgAdmin.colorSecondary') },
+                    { key: 'accentColor' as const, label: t('orgAdmin.colorAccent') },
                   ].map(c => (
                     <div key={c.key}>
                       <label style={labelStyle}>{c.label}</label>
@@ -410,15 +420,15 @@ export default function AdminOrganizationsPage() {
 
               {/* Feature Flags */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--color-danger)' }}>Feature Flags</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--color-danger)' }}>{t('orgAdmin.sectionFeatureFlags')}</h4>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   {[
-                    { key: 'epidemicIntelligence' as const, label: 'Epidemic Intelligence' },
-                    { key: 'mchAnalytics' as const, label: 'MCH Analytics' },
-                    { key: 'dhis2Export' as const, label: 'DHIS2 Export' },
-                    { key: 'aiClinicalSupport' as const, label: 'AI Clinical Support' },
-                    { key: 'communityHealth' as const, label: 'Community Health' },
-                    { key: 'facilityAssessments' as const, label: 'Facility Assessments' },
+                    { key: 'epidemicIntelligence' as const, label: t('orgAdmin.featureEpidemicIntelligence') },
+                    { key: 'mchAnalytics' as const, label: t('orgAdmin.featureMchAnalytics') },
+                    { key: 'dhis2Export' as const, label: t('orgAdmin.featureDhis2Export') },
+                    { key: 'aiClinicalSupport' as const, label: t('orgAdmin.featureAiClinicalSupport') },
+                    { key: 'communityHealth' as const, label: t('orgAdmin.featureCommunityHealth') },
+                    { key: 'facilityAssessments' as const, label: t('orgAdmin.featureFacilityAssessments') },
                   ].map(ff => (
                     <label key={ff.key} className="flex items-center gap-3 cursor-pointer text-sm" style={{ color: 'var(--text-primary)' }}>
                       <button type="button" onClick={() => setForm(p => ({ ...p, [ff.key]: !p[ff.key] }))}
@@ -437,10 +447,10 @@ export default function AdminOrganizationsPage() {
 
               <div className="flex justify-end gap-3 pt-4" style={{ borderTop: '1px solid var(--border-light)' }}>
                 <button onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl text-sm font-medium" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
-                  Cancel
+                  {t('action.cancel')}
                 </button>
                 <button onClick={handleSubmit} disabled={formLoading} className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--color-danger)', opacity: formLoading ? 0.6 : 1 }}>
-                  {formLoading ? 'Saving...' : editingId ? 'Update Organization' : 'Create Organization'}
+                  {formLoading ? t('orgAdmin.saving') : editingId ? t('orgAdmin.updateOrganization') : t('orgAdmin.createOrganization')}
                 </button>
               </div>
             </div>

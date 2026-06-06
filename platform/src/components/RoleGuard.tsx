@@ -4,11 +4,13 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { isRouteAllowed, getDefaultDashboard } from '@/lib/permissions';
 import { ShieldAlert, ArrowLeft, Loader2 } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export default function RoleGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { currentUser } = useApp();
+  const { t } = useTranslation();
 
   if (!currentUser) {
     return (
@@ -30,17 +32,17 @@ export default function RoleGuard({ children }: { children: React.ReactNode }) {
             <ShieldAlert className="w-8 h-8" style={{ color: 'var(--color-danger)' }} />
           </div>
           <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-            Access Restricted
+            {t('consultation.accessRestricted')}
           </h2>
           <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-            Your role ({currentUser.role.replace('_', ' ')}) does not have access to this page.
+            {t('roleGuard.noAccessMessage', { role: currentUser.role.replace('_', ' ') })}
           </p>
           <button
             onClick={() => router.push(defaultDash)}
             className="btn btn-primary"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
+            {t('government.backToDashboard')}
           </button>
         </div>
       </div>

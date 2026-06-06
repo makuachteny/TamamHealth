@@ -11,6 +11,7 @@ import {
 } from '@/components/icons/lucide';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { ClaimDoc, ClaimStatus } from '@/lib/db-types-payments';
 
 interface ClaimKPIs {
@@ -34,6 +35,7 @@ interface AdjudicationForm {
 }
 
 export default function ClaimsPage() {
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const [claims, setClaims] = useState<ClaimDoc[]>([]);
   const [filteredClaims, setFilteredClaims] = useState<ClaimDoc[]>([]);
@@ -234,7 +236,7 @@ export default function ClaimsPage() {
 
   return (
     <main className="page-container page-enter">
-      <TopBar title="Claims Management" />
+      <TopBar title={t('claims.title')} />
 
       {/* KPI Cards - Premium Style with Top Border Accents */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', alignItems: 'stretch', gap: '1.5rem', marginBottom: '2.5rem' }}>
@@ -270,7 +272,7 @@ export default function ClaimsPage() {
                 color: 'var(--text-secondary)',
                 marginTop: '0.5rem',
               }}>
-                Total Claims
+                {t('claims.kpiTotalClaims')}
               </div>
             </div>
           </div>
@@ -308,7 +310,7 @@ export default function ClaimsPage() {
                 color: 'var(--text-secondary)',
                 marginTop: '0.5rem',
               }}>
-                Pending Review
+                {t('claims.kpiPendingReview')}
               </div>
               <div style={{
                 fontSize: '0.75rem',
@@ -353,7 +355,7 @@ export default function ClaimsPage() {
                 color: 'var(--text-secondary)',
                 marginTop: '0.5rem',
               }}>
-                Approved Claims
+                {t('claims.kpiApprovedClaims')}
               </div>
               <div style={{
                 fontSize: '0.75rem',
@@ -398,7 +400,7 @@ export default function ClaimsPage() {
                 color: 'var(--text-secondary)',
                 marginTop: '0.5rem',
               }}>
-                Denied Claims
+                {t('claims.kpiDeniedClaims')}
               </div>
               <div style={{
                 fontSize: '0.75rem',
@@ -437,7 +439,7 @@ export default function ClaimsPage() {
           />
           <input
             type="text"
-            placeholder="Search by claim #, patient, or payer..."
+            placeholder={t('claims.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -499,7 +501,7 @@ export default function ClaimsPage() {
                   }
                 }}
               >
-                {status === 'all' ? 'All Claims' : status.charAt(0).toUpperCase() + status.slice(1)}
+                {status === 'all' ? t('claims.filterAll') : t(`claims.status_${status}`)}
               </button>
             )
           )}
@@ -523,7 +525,7 @@ export default function ClaimsPage() {
             color: 'var(--text-secondary)',
             fontSize: '0.9375rem',
           }}>
-            Loading claims...
+            {t('claims.loading')}
           </div>
         ) : filteredClaims.length === 0 ? (
           <div style={{
@@ -536,9 +538,9 @@ export default function ClaimsPage() {
           }}>
             <AlertTriangle size={56} color="var(--text-muted)" />
             <div>
-              <p style={{ margin: 0, fontWeight: '600', color: 'var(--text-primary)' }}>No claims found</p>
+              <p style={{ margin: 0, fontWeight: '600', color: 'var(--text-primary)' }}>{t('claims.emptyTitle')}</p>
               <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                Adjust your filters or search to see results
+                {t('claims.emptyDescription')}
               </p>
             </div>
           </div>
@@ -561,7 +563,7 @@ export default function ClaimsPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
                   color: 'var(--text-secondary)',
-                }}>Claim #</th>
+                }}>{t('claims.colClaimNumber')}</th>
                 <th style={{
                   padding: '12px 20px',
                   textAlign: 'left',
@@ -570,7 +572,7 @@ export default function ClaimsPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
                   color: 'var(--text-secondary)',
-                }}>Patient Name</th>
+                }}>{t('claims.colPatientName')}</th>
                 <th style={{
                   padding: '12px 20px',
                   textAlign: 'left',
@@ -579,7 +581,7 @@ export default function ClaimsPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
                   color: 'var(--text-secondary)',
-                }}>Payer Name</th>
+                }}>{t('claims.colPayerName')}</th>
                 <th style={{
                   padding: '12px 20px',
                   textAlign: 'left',
@@ -588,7 +590,7 @@ export default function ClaimsPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
                   color: 'var(--text-secondary)',
-                }}>Payer Type</th>
+                }}>{t('claims.colPayerType')}</th>
                 <th style={{
                   padding: '12px 20px',
                   textAlign: 'right',
@@ -597,7 +599,7 @@ export default function ClaimsPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
                   color: 'var(--text-secondary)',
-                }}>Billed</th>
+                }}>{t('claims.colBilled')}</th>
                 <th style={{
                   padding: '12px 20px',
                   textAlign: 'right',
@@ -606,7 +608,7 @@ export default function ClaimsPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
                   color: 'var(--text-secondary)',
-                }}>Allowed</th>
+                }}>{t('claims.colAllowed')}</th>
                 <th style={{
                   padding: '12px 20px',
                   textAlign: 'right',
@@ -615,7 +617,7 @@ export default function ClaimsPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
                   color: 'var(--text-secondary)',
-                }}>Paid</th>
+                }}>{t('claims.colPaid')}</th>
                 <th style={{
                   padding: '12px 20px',
                   textAlign: 'center',
@@ -624,7 +626,7 @@ export default function ClaimsPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
                   color: 'var(--text-secondary)',
-                }}>Status</th>
+                }}>{t('claims.colStatus')}</th>
                 <th style={{
                   padding: '12px 20px',
                   textAlign: 'left',
@@ -633,7 +635,7 @@ export default function ClaimsPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
                   color: 'var(--text-secondary)',
-                }}>Submitted Date</th>
+                }}>{t('claims.colSubmittedDate')}</th>
                 <th style={{
                   padding: '12px 20px',
                   textAlign: 'center',
@@ -642,7 +644,7 @@ export default function ClaimsPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
                   color: 'var(--text-secondary)',
-                }}>Actions</th>
+                }}>{t('claims.colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -710,7 +712,7 @@ export default function ClaimsPage() {
                       backgroundColor: getStatusBgColor(claim.status),
                       color: getStatusTextColor(claim.status),
                       borderLeft: `2px solid ${getStatusBorderColor(claim.status)}`,
-                    }}>{claim.status}</span>
+                    }}>{t(`claims.status_${claim.status}`)}</span>
                   </td>
                   <td style={{
                     padding: '12px 20px',
@@ -744,7 +746,7 @@ export default function ClaimsPage() {
                           e.currentTarget.style.transform = 'translateY(0)';
                         }}
                       >
-                        Adjudicate
+                        {t('claims.actionAdjudicate')}
                       </button>
                     )}
                   </td>
@@ -783,7 +785,7 @@ export default function ClaimsPage() {
               fontSize: '1.375rem',
               fontWeight: '700',
             }}>
-              Adjudicate Claim
+              {t('claims.modalTitle')}
             </h2>
 
             <div style={{ marginBottom: '1.5rem' }}>
@@ -796,7 +798,7 @@ export default function ClaimsPage() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
               }}>
-                Status
+                {t('claims.colStatus')}
               </label>
               <select
                 value={adjForm.status}
@@ -818,13 +820,13 @@ export default function ClaimsPage() {
                   cursor: 'pointer',
                 }}
               >
-                <option value="draft">Draft</option>
-                <option value="submitted">Submitted</option>
-                <option value="accepted">Accepted</option>
-                <option value="denied">Denied</option>
-                <option value="paid">Paid</option>
-                <option value="appealed">Appealed</option>
-                <option value="partial">Partial</option>
+                <option value="draft">{t('claims.status_draft')}</option>
+                <option value="submitted">{t('claims.status_submitted')}</option>
+                <option value="accepted">{t('claims.status_accepted')}</option>
+                <option value="denied">{t('claims.status_denied')}</option>
+                <option value="paid">{t('claims.status_paid')}</option>
+                <option value="appealed">{t('claims.status_appealed')}</option>
+                <option value="partial">{t('claims.status_partial')}</option>
               </select>
             </div>
 
@@ -838,7 +840,7 @@ export default function ClaimsPage() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
               }}>
-                Allowed Amount (SSP)
+                {t('claims.labelAllowedAmount')}
               </label>
               <input
                 type="number"
@@ -872,7 +874,7 @@ export default function ClaimsPage() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
               }}>
-                Paid Amount (SSP)
+                {t('claims.labelPaidAmount')}
               </label>
               <input
                 type="number"
@@ -907,7 +909,7 @@ export default function ClaimsPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                 }}>
-                  Denial Reason
+                  {t('claims.labelDenialReason')}
                 </label>
                 <input
                   type="text"
@@ -918,7 +920,7 @@ export default function ClaimsPage() {
                       denialReason: e.target.value,
                     })
                   }
-                  placeholder="Enter reason for denial"
+                  placeholder={t('claims.denialReasonPlaceholder')}
                   style={{
                     width: '100%',
                     padding: '10px 12px',
@@ -943,14 +945,14 @@ export default function ClaimsPage() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
               }}>
-                Notes
+                {t('claims.labelNotes')}
               </label>
               <textarea
                 value={adjForm.notes}
                 onChange={(e) =>
                   setAdjForm({ ...adjForm, notes: e.target.value })
                 }
-                placeholder="Add internal notes about this adjudication..."
+                placeholder={t('claims.notesPlaceholder')}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -992,7 +994,7 @@ export default function ClaimsPage() {
                   e.currentTarget.style.backgroundColor = 'var(--overlay-subtle)';
                 }}
               >
-                Cancel
+                {t('action.cancel')}
               </button>
               <button
                 onClick={handleSaveAdjudication}
@@ -1016,7 +1018,7 @@ export default function ClaimsPage() {
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                Save Adjudication
+                {t('claims.saveAdjudication')}
               </button>
             </div>
           </div>

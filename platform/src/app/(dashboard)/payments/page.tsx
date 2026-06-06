@@ -6,6 +6,7 @@ import {
   Search, X, Wallet, Activity, AlertCircle, ChevronRight, ExternalLink, ArrowRight, Receipt, Shield, Clock,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { getMethodConfig } from '@/lib/payment-method-config';
 import type { PaymentDoc, ClaimDoc, PaymentPlanDoc } from '@/lib/db-types-payments';
 import type { BillingDoc } from '@/lib/db-types-billing';
@@ -33,6 +34,7 @@ interface PaymentsData {
 }
 
 export default function PaymentsPage() {
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const [data, setData] = useState<PaymentsData>({ payments: [], claims: [], plans: [], bills: [] });
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,7 @@ export default function PaymentsPage() {
       setData({ payments: payments || [], claims: claims || [], plans: plans || [], bills: bills || [] });
     } catch (err) {
       console.error('Error loading payments data:', err);
-      setError('Failed to load billing data');
+      setError(t('payments.errorLoad'));
     } finally {
       setLoading(false);
     }
@@ -148,11 +150,11 @@ export default function PaymentsPage() {
   if (loading) {
     return (
       <>
-        <TopBar title="Bills" />
+        <TopBar title={t('payments.title')} />
         <main className="page-container page-enter">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320, color: 'var(--text-muted)' }}>
             <Activity size={44} style={{ marginRight: 8, animation: 'spin 1s linear infinite' }} />
-            <span>Loading billing data...</span>
+            <span>{t('payments.loading')}</span>
           </div>
         </main>
       </>
@@ -161,7 +163,7 @@ export default function PaymentsPage() {
 
   return (
     <>
-      <TopBar title="Bills" />
+      <TopBar title={t('payments.title')} />
       <main className="page-container page-enter">
         {error && (
           <div style={{
@@ -177,11 +179,11 @@ export default function PaymentsPage() {
         {/* Page header */}
         <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>Bills</h1>
+            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>{t('payments.title')}</h1>
             <p className="text-[12px]" style={{ color: 'var(--text-muted)', marginTop: 2 }}>
-              {filtered.length} {filtered.length === 1 ? 'patient' : 'patients'}
+              {filtered.length} {filtered.length === 1 ? t('payments.patient') : t('payments.patients')}
               {filtered.filter(l => l.outstanding > 0).length > 0 && (
-                <> · <span style={{ color: '#C44536', fontWeight: 600 }}>{filtered.filter(l => l.outstanding > 0).length} with outstanding balance</span></>
+                <> · <span style={{ color: '#C44536', fontWeight: 600 }}>{t('payments.withOutstandingBalance', { count: filtered.filter(l => l.outstanding > 0).length })}</span></>
               )}
             </p>
           </div>
@@ -189,7 +191,7 @@ export default function PaymentsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             <input
               className="pl-9 search-icon-input w-full"
-              placeholder="Search by patient name or hospital number…"
+              placeholder={t('payments.searchPlaceholder')}
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ background: 'var(--overlay-subtle)' }}
@@ -202,7 +204,7 @@ export default function PaymentsPage() {
           {filtered.length === 0 ? (
             <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
               <Wallet className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
-              {search ? 'No patients match your search.' : 'No billing activity recorded yet.'}
+              {search ? t('payments.noPatientsMatch') : t('payments.noBillingActivity')}
             </div>
           ) : (
             <div>
@@ -221,7 +223,7 @@ export default function PaymentsPage() {
                       style={{
                         background: owing
                           ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)'
-                          : 'linear-gradient(135deg, #1B9AAA 0%, #1A3A3A 100%)',
+                          : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)',
                       }}
                     >
                       {initials || '?'}
@@ -230,28 +232,28 @@ export default function PaymentsPage() {
                       <div className="flex items-baseline gap-2 flex-wrap">
                         <div className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{line.patientName}</div>
                         {line.hospitalNumber && (
-                          <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(27, 154, 170, 0.10)', color: '#1B9AAA', fontWeight: 600 }}>
+                          <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.10)', color: '#3b82f6', fontWeight: 600 }}>
                             {line.hospitalNumber}
                           </span>
                         )}
                       </div>
                       <div className="text-[11px] mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {line.paymentCount > 0 && <span>{line.paymentCount} {line.paymentCount === 1 ? 'payment' : 'payments'}</span>}
-                        {line.openClaims > 0 && <span>· {line.openClaims} open {line.openClaims === 1 ? 'claim' : 'claims'}</span>}
-                        {line.activePlans > 0 && <span>· {line.activePlans} active plan{line.activePlans === 1 ? '' : 's'}</span>}
-                        {line.lastActivity && <span>· last {new Date(line.lastActivity).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                        {line.paymentCount > 0 && <span>{line.paymentCount} {line.paymentCount === 1 ? t('payments.payment') : t('payments.payments')}</span>}
+                        {line.openClaims > 0 && <span>· {line.openClaims === 1 ? t('payments.openClaim', { count: line.openClaims }) : t('payments.openClaims', { count: line.openClaims })}</span>}
+                        {line.activePlans > 0 && <span>· {line.activePlans === 1 ? t('payments.activePlan', { count: line.activePlans }) : t('payments.activePlans', { count: line.activePlans })}</span>}
+                        {line.lastActivity && <span>· {t('payments.lastActivity', { date: new Date(line.lastActivity).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) })}</span>}
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
                       {owing ? (
                         <>
                           <div className="font-bold text-sm" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{fmt(line.outstanding)}</div>
-                          <div className="text-[10px] font-bold uppercase" style={{ color: '#C44536' }}>Outstanding</div>
+                          <div className="text-[10px] font-bold uppercase" style={{ color: '#C44536' }}>{t('billing.kpiOutstanding')}</div>
                         </>
                       ) : (
                         <>
                           <div className="font-bold text-sm" style={{ color: '#15795C', fontVariantNumeric: 'tabular-nums' }}>{fmt(line.totalCollected)}</div>
-                          <div className="text-[10px] font-bold uppercase" style={{ color: '#15795C' }}>Paid</div>
+                          <div className="text-[10px] font-bold uppercase" style={{ color: '#15795C' }}>{t('payments.paid')}</div>
                         </>
                       )}
                     </div>
@@ -289,6 +291,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
   bills: BillingDoc[];
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   // Lock body scroll while drawer is open
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -311,7 +314,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
           .filter(d => d && d.type === 'saved_payment_method' && d.patientId === line.patientId);
         setMethods(docs.map(d => ({
           id: d._id,
-          label: d.label || (d.methodType || 'Method'),
+          label: d.label || (d.methodType || t('payments.methodFallback')),
           type: d.methodType || 'unknown',
           brand: d.cardBrand,
           isDefault: !!d.isDefault,
@@ -350,7 +353,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
               style={{
                 background: owing
                   ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)'
-                  : 'linear-gradient(135deg, #1B9AAA 0%, #1A3A3A 100%)',
+                  : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)',
               }}
             >
               {initials || '?'}
@@ -358,7 +361,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
             <div>
               <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{line.patientName}</h2>
               {line.hospitalNumber && (
-                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(27, 154, 170, 0.10)', color: '#1B9AAA', fontWeight: 600 }}>
+                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.10)', color: '#3b82f6', fontWeight: 600 }}>
                   {line.hospitalNumber}
                 </span>
               )}
@@ -373,29 +376,29 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
         <div className="px-5 py-4" style={{
           background: owing
             ? 'linear-gradient(135deg, rgba(196, 69, 54, 0.08) 0%, rgba(228, 168, 75, 0.06) 100%)'
-            : 'linear-gradient(135deg, rgba(27, 158, 119, 0.08) 0%, rgba(27, 154, 170, 0.04) 100%)',
+            : 'linear-gradient(135deg, rgba(27, 158, 119, 0.08) 0%, rgba(59, 130, 246, 0.04) 100%)',
           borderBottom: '1px solid var(--border-light)',
         }}>
           <div className="flex items-end justify-between gap-3 flex-wrap">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: owing ? '#8B2E24' : '#15795C' }}>
-                {owing ? 'Outstanding Balance' : 'Account Status'}
+                {owing ? t('billing.outstandingBalance') : t('billing.accountStatus')}
               </div>
               <div className="text-2xl font-extrabold" style={{ letterSpacing: -0.5, color: owing ? '#8B2E24' : '#15795C', fontVariantNumeric: 'tabular-nums' }}>
-                {owing ? fmt(line.outstanding) : 'Paid in Full'}
+                {owing ? fmt(line.outstanding) : t('billing.paidInFull')}
               </div>
             </div>
             <div className="text-right text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              <div>Charged: <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{fmt(line.totalCharged)}</span></div>
-              <div>Collected: <span className="font-mono" style={{ color: '#15795C' }}>{fmt(line.totalCollected)}</span></div>
+              <div>{t('payments.charged')}: <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{fmt(line.totalCharged)}</span></div>
+              <div>{t('payments.collected')}: <span className="font-mono" style={{ color: '#15795C' }}>{fmt(line.totalCollected)}</span></div>
             </div>
           </div>
         </div>
 
         {/* Saved payment methods */}
-        <Section title="Payment Methods" icon={<Shield className="w-4 h-4" />} count={methods.length}>
+        <Section title={t('payments.paymentMethods')} icon={<Shield className="w-4 h-4" />} count={methods.length}>
           {methods.length === 0 ? (
-            <Empty>No saved payment methods on file.</Empty>
+            <Empty>{t('payments.noSavedMethods')}</Empty>
           ) : (
             <div className="space-y-2">
               {methods.map(m => (
@@ -412,8 +415,8 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
                     {m.brand && <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{m.brand}</div>}
                   </div>
                   {m.isDefault && (
-                    <span className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(27, 154, 170, 0.14)', color: '#15795C', border: '1px solid rgba(27, 154, 170, 0.30)' }}>
-                      Default
+                    <span className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.14)', color: '#15795C', border: '1px solid rgba(59, 130, 246, 0.30)' }}>
+                      {t('payments.default')}
                     </span>
                   )}
                 </div>
@@ -423,9 +426,9 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
         </Section>
 
         {/* Bills */}
-        <Section title="Invoices" icon={<Receipt className="w-4 h-4" />} count={bills.length}>
+        <Section title={t('payments.invoices')} icon={<Receipt className="w-4 h-4" />} count={bills.length}>
           {bills.length === 0 ? (
-            <Empty>No invoices on file.</Empty>
+            <Empty>{t('payments.noInvoices')}</Empty>
           ) : (
             <div className="space-y-1.5">
               {bills.map(b => (
@@ -439,7 +442,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
                   <div className="text-right">
                     <div className="text-[12px] font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>{fmt(b.totalAmount)}</div>
                     <div className="text-[10px]" style={{ color: b.balanceDue > 0 ? '#C44536' : '#15795C' }}>
-                      {b.balanceDue > 0 ? `${fmt(b.balanceDue)} due` : 'Paid'}
+                      {b.balanceDue > 0 ? t('payments.amountDue', { amount: fmt(b.balanceDue) }) : t('payments.paid')}
                     </div>
                   </div>
                 </div>
@@ -449,9 +452,9 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
         </Section>
 
         {/* Payment history */}
-        <Section title="Payment History" icon={<Clock className="w-4 h-4" />} count={sortedPayments.length}>
+        <Section title={t('payments.paymentHistory')} icon={<Clock className="w-4 h-4" />} count={sortedPayments.length}>
           {sortedPayments.length === 0 ? (
-            <Empty>No payments recorded yet.</Empty>
+            <Empty>{t('payments.noPaymentsYet')}</Empty>
           ) : (
             <div className="space-y-1.5">
               {sortedPayments.map(p => {
@@ -493,9 +496,9 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
         </Section>
 
         {/* Insurance claims */}
-        <Section title="Insurance Claims" icon={<Shield className="w-4 h-4" />} count={claims.length}>
+        <Section title={t('billing.insuranceClaims')} icon={<Shield className="w-4 h-4" />} count={claims.length}>
           {claims.length === 0 ? (
-            <Empty>No claims submitted for this patient.</Empty>
+            <Empty>{t('payments.noClaims')}</Empty>
           ) : (
             <div className="space-y-1.5">
               {claims.map(c => (
@@ -504,13 +507,13 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
                     <div className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>{c.payerName}</div>
                     <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
                       {c.claimNumber && <span className="font-mono">{c.claimNumber} · </span>}
-                      {c.submittedDate ? `submitted ${c.submittedDate.slice(0, 10)}` : 'draft'}
+                      {c.submittedDate ? t('payments.submittedOn', { date: c.submittedDate.slice(0, 10) }) : t('payments.draft')}
                     </div>
                   </div>
                   <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
-                    background: c.status === 'paid' ? 'rgba(27, 154, 170, 0.14)' : c.status === 'denied' ? 'rgba(196, 69, 54, 0.14)' : 'rgba(228, 168, 75, 0.14)',
+                    background: c.status === 'paid' ? 'rgba(59, 130, 246, 0.14)' : c.status === 'denied' ? 'rgba(196, 69, 54, 0.14)' : 'rgba(228, 168, 75, 0.14)',
                     color: c.status === 'paid' ? '#15795C' : c.status === 'denied' ? '#8B2E24' : '#B8741C',
-                    border: c.status === 'paid' ? '1px solid rgba(27, 154, 170, 0.30)' : c.status === 'denied' ? '1px solid rgba(196, 69, 54, 0.30)' : '1px solid rgba(228, 168, 75, 0.30)',
+                    border: c.status === 'paid' ? '1px solid rgba(59, 130, 246, 0.30)' : c.status === 'denied' ? '1px solid rgba(196, 69, 54, 0.30)' : '1px solid rgba(228, 168, 75, 0.30)',
                   }}>
                     {c.status}
                   </span>
@@ -521,9 +524,9 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
         </Section>
 
         {/* Payment plans */}
-        <Section title="Payment Plans" icon={<Wallet className="w-4 h-4" />} count={plans.length}>
+        <Section title={t('billing.paymentPlans')} icon={<Wallet className="w-4 h-4" />} count={plans.length}>
           {plans.length === 0 ? (
-            <Empty>No payment plans for this patient.</Empty>
+            <Empty>{t('payments.noPaymentPlans')}</Empty>
           ) : (
             <div className="space-y-1.5">
               {plans.map(p => (
@@ -531,15 +534,15 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {fmt(p.monthlyAmount)} / mo · {p.termMonths} months
+                        {t('payments.planMonthly', { amount: fmt(p.monthlyAmount), months: p.termMonths })}
                       </div>
                       <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
-                        {p.startDate.slice(0, 10)} → {p.endDate.slice(0, 10)} · {p.apr === 0 ? 'Interest-free' : `${p.apr}% APR`}
+                        {p.startDate.slice(0, 10)} → {p.endDate.slice(0, 10)} · {p.apr === 0 ? t('payments.interestFree') : t('payments.aprValue', { apr: p.apr })}
                       </div>
                     </div>
                     <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
-                      background: p.status === 'active' ? 'rgba(27, 154, 170, 0.14)' : p.status === 'completed' ? 'rgba(27, 154, 170, 0.14)' : 'rgba(228, 168, 75, 0.14)',
-                      color: p.status === 'active' ? '#15795C' : p.status === 'completed' ? '#1B9AAA' : '#B8741C',
+                      background: p.status === 'active' ? 'rgba(59, 130, 246, 0.14)' : p.status === 'completed' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(228, 168, 75, 0.14)',
+                      color: p.status === 'active' ? '#15795C' : p.status === 'completed' ? '#3b82f6' : '#B8741C',
                     }}>
                       {p.status}
                     </span>
@@ -553,7 +556,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
         {/* Footer actions */}
         <div className="px-5 py-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
           <a href={`/patients/${line.patientId}`} className="btn btn-secondary w-full inline-flex items-center justify-center gap-2">
-            Open patient record <ExternalLink className="w-3.5 h-3.5" /> <ArrowRight className="w-3.5 h-3.5" />
+            {t('payments.openPatientRecord')} <ExternalLink className="w-3.5 h-3.5" /> <ArrowRight className="w-3.5 h-3.5" />
           </a>
         </div>
       </div>

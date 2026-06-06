@@ -8,6 +8,7 @@ import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Baby, Plus, Search, X, ChevronDown, ChevronUp,
   HeartPulse, CheckCircle, AlertTriangle
@@ -19,6 +20,7 @@ export default function BirthsPage() {
   const { currentUser } = useApp();
   const { canRecordVitalEvents } = usePermissions();
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [expandedBirth, setExpandedBirth] = useState<string | null>(null);
@@ -48,25 +50,25 @@ export default function BirthsPage() {
         registeredBy: currentUser?.name || '',
         certificateNumber: form.certificateNumber || `SS-B-${Date.now().toString(36).toUpperCase()}`,
       });
-      showToast('Birth registered successfully!', 'success');
+      showToast(t('births.registeredSuccess'), 'success');
       setShowForm(false);
       setForm({ childFirstName: '', childSurname: '', childGender: 'Male', dateOfBirth: new Date().toISOString().slice(0, 10), placeOfBirth: '', facilityId: '', facilityName: '', motherName: '', motherAge: 0, motherNationality: 'South Sudanese', fatherName: '', fatherNationality: 'South Sudanese', birthWeight: 3000, birthType: 'single', deliveryType: 'normal', attendedBy: '', registeredBy: '', state: '', county: '', certificateNumber: '' });
     } catch {
-      showToast('Failed to register birth. Please try again.', 'error');
+      showToast(t('births.registerFailed'), 'error');
     }
   };
 
   return (
     <>
-      <TopBar title="Birth Registration" />
+      <TopBar title={t('nav.births')} />
       <main className="page-container page-enter">
         <PageHeader
           icon={Baby}
-          title="Birth Registration"
-          subtitle="Civil Registration and Vital Statistics (CRVS)"
+          title={t('nav.births')}
+          subtitle={t('births.subtitle')}
           actions={canRecordVitalEvents && (
             <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Register Birth
+              <Plus className="w-4 h-4" /> {t('births.registerBirth')}
             </button>
           )}
         />

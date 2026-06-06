@@ -28,6 +28,7 @@ import { useToast } from '@/components/Toast';
 import { evaluatePatient } from '@/lib/ai/diagnosis-engine';
 import type { AIEvaluation } from '@/lib/db-types';
 import { saveDraft, loadDraft, dropDraft } from '@/lib/draft-storage';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 // Adapt ICD-11 entries to the {code, name} shape this page consumes.
 const icdCodes = COMMON_ICD11_CODES.map(c => ({ code: c.code, name: c.title }));
@@ -72,6 +73,7 @@ export default function ConsultationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
+  const { t } = useTranslation();
 
   // PouchDB hooks
   const { patients } = usePatients();
@@ -268,7 +270,7 @@ export default function ConsultationPage() {
   if (currentUser && currentUser.role !== 'doctor' && currentUser.role !== 'clinical_officer') {
     return (
       <>
-        <TopBar title="New Consultation" />
+        <TopBar title={t('action.newConsultation')} />
         <main className="page-container flex items-center justify-center">
           <div className="text-center max-w-md">
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{
@@ -278,14 +280,14 @@ export default function ConsultationPage() {
               <ShieldAlert className="w-8 h-8" style={{ color: 'var(--color-danger)' }} />
             </div>
             <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-              Access Restricted
+              {t('consultation.accessRestricted')}
             </h2>
             <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-              Only doctors and clinical officers can create consultations.
+              {t('consultation.accessRestrictedDesc')}
             </p>
             <button onClick={() => router.back()} className="btn btn-primary">
               <ArrowLeft className="w-4 h-4" />
-              Go Back
+              {t('consultation.goBack')}
             </button>
           </div>
         </main>
@@ -370,7 +372,7 @@ export default function ConsultationPage() {
 
     // Validate chief complaint before saving
     if (!chiefComplaint || chiefComplaint.trim().length < 3) {
-      showToast('Chief complaint is required (minimum 3 characters)', 'error');
+      showToast(t('consultation.chiefComplaintRequired'), 'error');
       return;
     }
 
@@ -379,11 +381,11 @@ export default function ConsultationPage() {
     // the referral) prevents emergency hand-offs from being lost.
     if (addReferral) {
       if (!referralHospital) {
-        showToast('Select a referral hospital, or uncheck "Add referral"', 'error');
+        showToast(t('consultation.selectReferralHospital'), 'error');
         return;
       }
       if (!referralReason.trim()) {
-        showToast('Referral reason is required', 'error');
+        showToast(t('consultation.referralReasonRequired'), 'error');
         return;
       }
     }
@@ -555,7 +557,7 @@ export default function ConsultationPage() {
           // distinct toast so the clinician knows to re-create it manually
           // from the referrals page.
           console.warn('Failed to create referral from consultation', e);
-          showToast('Consultation saved, but referral could not be created — please retry from the Referrals page.', 'error');
+          showToast(t('consultation.referralCreateFailed'), 'error');
         }
       }
 
@@ -588,11 +590,11 @@ export default function ConsultationPage() {
         // ignore
       }
 
-      showToast('Consultation saved successfully!', 'success');
+      showToast(t('consultation.savedSuccess'), 'success');
       router.push(`/patients/${selectedPatient}`);
     } catch (err) {
       console.error('Failed to save consultation:', err);
-      showToast('Failed to save consultation. Please try again.', 'error');
+      showToast(t('consultation.saveFailed'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -639,9 +641,9 @@ export default function ConsultationPage() {
       if (parsed.referralUrgency != null) setReferralUrgency(parsed.referralUrgency);
       if (parsed.referralReason != null) setReferralReason(parsed.referralReason);
       setDraftSavedAt(parsed.savedAt || null);
-      showToast('Draft restored', 'success');
+      showToast(t('consultation.draftRestored'), 'success');
     } catch {
-      showToast('Could not restore draft', 'error');
+      showToast(t('consultation.draftRestoreFailed'), 'error');
     } finally {
       setDraftRestored(true);
       setRestorePromptFor(null);
@@ -848,7 +850,7 @@ export default function ConsultationPage() {
     }));
 
     setScribeOpen(false);
-    showToast('Scribe data applied to consultation fields — review before saving.', 'success');
+    showToast(t('consultation.scribeApplied'), 'success');
   };
 
   const acceptAIDiagnosis = (icd10Code: string, name: string, severity?: 'mild' | 'moderate' | 'severe') => {
@@ -863,17 +865,17 @@ export default function ConsultationPage() {
   };
 
   const sectionHeaders: { icon: React.ElementType; label: string }[] = [
-    { icon: ClipboardList, label: 'Chief Complaint' },      // 0
-    { icon: Thermometer, label: 'Vital Signs' },             // 1
-    { icon: Stethoscope, label: 'Physical Examination' },    // 2
-    { icon: Brain, label: 'AI Clinical Evaluation' },        // 3
-    { icon: AlertTriangle, label: 'Diagnosis' },             // 4
-    { icon: Pill, label: 'Prescriptions' },                  // 5
-    { icon: FlaskConical, label: 'Lab Orders' },             // 6
-    { icon: FileText, label: 'Treatment Plan' },             // 7
-    { icon: Paperclip, label: 'Attachments / Scans' },      // 8
-    { icon: Calendar, label: 'Follow-up' },                  // 9
-    { icon: Building2, label: 'Referral' },                  // 10
+    { icon: ClipboardList, label: t('consultation.sectionChiefComplaint') },      // 0
+    { icon: Thermometer, label: t('consultation.sectionVitalSigns') },             // 1
+    { icon: Stethoscope, label: t('consultation.sectionPhysicalExam') },    // 2
+    { icon: Brain, label: t('consultation.sectionAiEvaluation') },        // 3
+    { icon: AlertTriangle, label: t('consultation.sectionDiagnosis') },             // 4
+    { icon: Pill, label: t('consultation.sectionPrescriptions') },                  // 5
+    { icon: FlaskConical, label: t('consultation.sectionLabOrders') },             // 6
+    { icon: FileText, label: t('consultation.sectionTreatmentPlan') },             // 7
+    { icon: Paperclip, label: t('consultation.sectionAttachments') },      // 8
+    { icon: Calendar, label: t('consultation.sectionFollowUp') },                  // 9
+    { icon: Building2, label: t('consultation.sectionReferral') },                  // 10
   ];
 
   const SectionHeader = ({ index }: { index: number }) => {
@@ -901,10 +903,10 @@ export default function ConsultationPage() {
 
   return (
     <>
-      <TopBar title="New Consultation" />
+      <TopBar title={t('action.newConsultation')} />
       <main className="page-container page-enter">
           <button onClick={() => router.push('/patients')} className="flex items-center gap-1.5 text-sm mb-4" style={{ color: 'var(--accent-primary)' }}>
-            <ArrowLeft className="w-4 h-4" /> Back to Patients
+            <ArrowLeft className="w-4 h-4" /> {t('consultation.backToPatients')}
           </button>
 
           {/* Draft restore banner */}
@@ -921,31 +923,31 @@ export default function ConsultationPage() {
               </div>
               <div className="flex-1 min-w-[180px]">
                 <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Unsaved consultation draft found
+                  {t('consultation.draftFound')}
                 </p>
                 <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                  Last edited {new Date(restorePromptFor.savedAt).toLocaleString()}
+                  {t('consultation.lastEdited', { time: new Date(restorePromptFor.savedAt).toLocaleString() })}
                 </p>
               </div>
               <button
                 onClick={() => applyDraft(restorePromptFor.key)}
                 className="btn btn-primary btn-sm"
               >
-                Restore draft
+                {t('consultation.restoreDraft')}
               </button>
               <button
                 onClick={() => discardDraft(restorePromptFor.key)}
                 className="btn btn-secondary btn-sm"
               >
-                Discard
+                {t('consultation.discard')}
               </button>
             </div>
           )}
 
           <PageHeader
             icon={Stethoscope}
-            title="New Medical Consultation"
-            subtitle={draftSavedAt && !restorePromptFor ? `Draft auto-saved at ${new Date(draftSavedAt).toLocaleTimeString()}` : 'Record vitals, exam findings, diagnoses, and plan'}
+            title={t('consultation.pageTitle')}
+            subtitle={draftSavedAt && !restorePromptFor ? t('consultation.draftAutoSavedAt', { time: new Date(draftSavedAt).toLocaleTimeString() }) : t('consultation.pageSubtitle')}
             actions={
               <button
                 onClick={() => setScribeOpen(!scribeOpen)}
@@ -957,7 +959,7 @@ export default function ConsultationPage() {
                 }}
               >
                 <Mic className="w-4 h-4" />
-                {scribeOpen ? 'Close Scribe' : 'AI Scribe'}
+                {scribeOpen ? t('consultation.closeScribe') : t('consultation.aiScribe')}
               </button>
             }
           />
@@ -978,30 +980,30 @@ export default function ConsultationPage() {
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.1)' }}>
                     <AlertTriangle className="w-4 h-4" style={{ color: '#EF4444' }} />
                   </div>
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Patients Waiting ({pendingTriages.length})</span>
-                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Sorted by triage priority</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('consultation.patientsWaiting', { count: pendingTriages.length })}</span>
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('consultation.sortedByTriagePriority')}</span>
                 </div>
                 <div className="space-y-1.5">
-                  {pendingTriages.slice(0, 6).map(t => {
-                    const pColor = t.priority === 'RED' ? '#EF4444' : t.priority === 'YELLOW' ? 'var(--color-warning)' : 'var(--color-success)';
+                  {pendingTriages.slice(0, 6).map(triage => {
+                    const pColor = triage.priority === 'RED' ? '#EF4444' : triage.priority === 'YELLOW' ? 'var(--color-warning)' : 'var(--color-success)';
                     return (
                       <button
-                        key={t._id}
-                        onClick={() => { setSelectedPatient(t.patientId); setPatientSearch(''); }}
+                        key={triage._id}
+                        onClick={() => { setSelectedPatient(triage.patientId); setPatientSearch(''); }}
                         className="w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-all hover:bg-[var(--accent-light)]"
-                        style={{ background: t.priority === 'RED' ? 'rgba(239,68,68,0.04)' : 'var(--overlay-subtle)', border: `1px solid ${t.priority === 'RED' ? 'rgba(239,68,68,0.15)' : 'var(--border-light)'}` }}
+                        style={{ background: triage.priority === 'RED' ? 'rgba(239,68,68,0.04)' : 'var(--overlay-subtle)', border: `1px solid ${triage.priority === 'RED' ? 'rgba(239,68,68,0.15)' : 'var(--border-light)'}` }}
                       >
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: pColor, color: '#fff' }}>
-                          <span className="text-[10px] font-black">{t.priority}</span>
+                          <span className="text-[10px] font-black">{triage.priority}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{t.patientName}</p>
+                          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{triage.patientName}</p>
                           <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
-                            {t.chiefComplaint || 'ETAT Assessment'} · {t.hospitalNumber} · Triaged {new Date(t.triagedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                            {triage.chiefComplaint || t('consultation.etatAssessment')} · {triage.hospitalNumber} · {t('consultation.triagedAt', { time: new Date(triage.triagedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })}
                           </p>
                         </div>
                         <span className="text-[10px] font-semibold flex-shrink-0 px-2 py-1 rounded-md text-white" style={{ background: 'var(--accent-primary)' }}>
-                          Start Consultation
+                          {t('consultation.startConsultation')}
                         </span>
                       </button>
                     );
@@ -1017,7 +1019,7 @@ export default function ConsultationPage() {
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(43,111,224,0.10)' }}>
                 <UserSearch className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               </div>
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Select Patient</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('consultation.selectPatient')}</span>
             </div>
 
             {selectedPatientData ? (
@@ -1035,7 +1037,7 @@ export default function ConsultationPage() {
                   </div>
                 </div>
                 <button onClick={() => { setSelectedPatient(null); setPatientSearch(''); }} className="btn btn-secondary btn-sm">
-                  Change
+                  {t('consultation.change')}
                 </button>
               </div>
             ) : (
@@ -1043,7 +1045,7 @@ export default function ConsultationPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
                 <input
                   type="search"
-                  placeholder="Search by patient name or hospital number..."
+                  placeholder={t('consultation.searchPatientPlaceholder')}
                   value={patientSearch}
                   onChange={e => { setPatientSearch(e.target.value); setShowPatientDropdown(true); }}
                   onFocus={() => setShowPatientDropdown(true)}
@@ -1100,12 +1102,12 @@ export default function ConsultationPage() {
               <SectionHeader index={0} />
               {openSections[0] && (
                 <div className="p-5">
-                  <label>Chief Complaint / Presenting Symptoms</label>
+                  <label>{t('consultation.chiefComplaintLabel')}</label>
                   <textarea
                     value={chiefComplaint}
                     onChange={e => setChiefComplaint(e.target.value)}
                     rows={3}
-                    placeholder="Describe the patient's main complaint, duration, and associated symptoms..."
+                    placeholder={t('consultation.chiefComplaintPlaceholder')}
                   />
                 </div>
               )}
@@ -1118,55 +1120,55 @@ export default function ConsultationPage() {
                 <div className="p-5">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label>Temperature (°C)</label>
+                      <label>{t('consultation.vitalTemperature')}</label>
                       <input type="number" step="0.1" value={vitals.temperature}
                         onChange={e => setVitals(v => ({ ...v, temperature: e.target.value }))}
                         placeholder="e.g. 37.0" />
                     </div>
                     <div>
-                      <label>BP Systolic (mmHg)</label>
+                      <label>{t('consultation.vitalSystolic')}</label>
                       <input type="number" value={vitals.systolic}
                         onChange={e => setVitals(v => ({ ...v, systolic: e.target.value }))}
                         placeholder="e.g. 120" />
                     </div>
                     <div>
-                      <label>BP Diastolic (mmHg)</label>
+                      <label>{t('consultation.vitalDiastolic')}</label>
                       <input type="number" value={vitals.diastolic}
                         onChange={e => setVitals(v => ({ ...v, diastolic: e.target.value }))}
                         placeholder="e.g. 80" />
                     </div>
                     <div>
-                      <label>Pulse Rate (bpm)</label>
+                      <label>{t('consultation.vitalPulse')}</label>
                       <input type="number" value={vitals.pulse}
                         onChange={e => setVitals(v => ({ ...v, pulse: e.target.value }))}
                         placeholder="e.g. 72" />
                     </div>
                     <div>
-                      <label>Respiratory Rate (/min)</label>
+                      <label>{t('consultation.vitalRespRate')}</label>
                       <input type="number" value={vitals.respRate}
                         onChange={e => setVitals(v => ({ ...v, respRate: e.target.value }))}
                         placeholder="e.g. 18" />
                     </div>
                     <div>
-                      <label>O2 Saturation (%)</label>
+                      <label>{t('consultation.vitalO2Sat')}</label>
                       <input type="number" value={vitals.o2Sat}
                         onChange={e => setVitals(v => ({ ...v, o2Sat: e.target.value }))}
                         placeholder="e.g. 98" />
                     </div>
                     <div>
-                      <label>Weight (kg)</label>
+                      <label>{t('consultation.vitalWeight')}</label>
                       <input type="number" step="0.1" value={vitals.weight}
                         onChange={e => setVitals(v => ({ ...v, weight: e.target.value }))}
                         placeholder="e.g. 65.0" />
                     </div>
                     <div>
-                      <label>Height (cm)</label>
+                      <label>{t('consultation.vitalHeight')}</label>
                       <input type="number" step="0.1" value={vitals.height}
                         onChange={e => setVitals(v => ({ ...v, height: e.target.value }))}
                         placeholder="e.g. 170" />
                     </div>
                     <div>
-                      <label>MUAC (cm)</label>
+                      <label>{t('consultation.vitalMuac')}</label>
                       <input type="number" step="0.1" value={vitals.muac}
                         onChange={e => setVitals(v => ({ ...v, muac: e.target.value }))}
                         placeholder="e.g. 14.5" />
@@ -1174,7 +1176,7 @@ export default function ConsultationPage() {
                   </div>
                   {vitals.weight && vitals.height && (
                     <div className="mt-3 p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                      <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Calculated BMI: </span>
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('consultation.calculatedBmi')} </span>
                       <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                         {parseFloat(vitals.height) > 0 ? (parseFloat(vitals.weight) / ((parseFloat(vitals.height) / 100) ** 2)).toFixed(1) : 'N/A'}
                       </span>
@@ -1190,11 +1192,11 @@ export default function ConsultationPage() {
               {openSections[2] && (
                 <div className="p-5 space-y-4">
                   {([
-                    { key: 'general', label: 'General Appearance', placeholder: 'Alert, oriented, well/ill-appearing, nutritional status...' },
-                    { key: 'cardiovascular', label: 'Cardiovascular', placeholder: 'Heart sounds, murmurs, peripheral pulses, edema...' },
-                    { key: 'respiratory', label: 'Respiratory', placeholder: 'Chest expansion, breath sounds, adventitious sounds...' },
-                    { key: 'abdominal', label: 'Abdominal', placeholder: 'Tenderness, distension, organomegaly, bowel sounds...' },
-                    { key: 'neurological', label: 'Neurological', placeholder: 'Consciousness level, orientation, cranial nerves, reflexes...' },
+                    { key: 'general', label: t('consultation.examGeneral'), placeholder: t('consultation.examGeneralPlaceholder') },
+                    { key: 'cardiovascular', label: t('consultation.examCardiovascular'), placeholder: t('consultation.examCardiovascularPlaceholder') },
+                    { key: 'respiratory', label: t('consultation.examRespiratory'), placeholder: t('consultation.examRespiratoryPlaceholder') },
+                    { key: 'abdominal', label: t('consultation.examAbdominal'), placeholder: t('consultation.examAbdominalPlaceholder') },
+                    { key: 'neurological', label: t('consultation.examNeurological'), placeholder: t('consultation.examNeurologicalPlaceholder') },
                   ] as const).map(field => (
                     <div key={field.key}>
                       <label>{field.label}</label>
@@ -1226,17 +1228,17 @@ export default function ConsultationPage() {
                       {aiLoading ? (
                         <span className="flex items-center gap-2">
                           <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4 31.4" strokeLinecap="round"/></svg>
-                          Analyzing...
+                          {t('consultation.analyzing')}
                         </span>
                       ) : (
                         <span className="flex items-center gap-2">
                           <Sparkles className="w-4 h-4" />
-                          Analyze Patient Data
+                          {t('consultation.analyzePatientData')}
                         </span>
                       )}
                     </button>
                     {!chiefComplaint && (
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Enter a chief complaint first</span>
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('consultation.enterChiefComplaintFirst')}</span>
                     )}
                   </div>
 
@@ -1250,7 +1252,7 @@ export default function ConsultationPage() {
                         <div className="flex items-center gap-2 mb-1">
                           <ShieldAlert className="w-4 h-4" style={{ color: aiEvaluation.severityAssessment.includes('HIGH') ? 'var(--tamamhealth-red)' : aiEvaluation.severityAssessment.includes('MODERATE') ? 'var(--color-warning)' : 'var(--accent-primary)' }} />
                           <span className="text-xs font-bold uppercase tracking-wider" style={{ color: aiEvaluation.severityAssessment.includes('HIGH') ? '#F87171' : aiEvaluation.severityAssessment.includes('MODERATE') ? 'var(--color-warning)' : 'var(--accent-primary)' }}>
-                            Severity Assessment
+                            {t('consultation.severityAssessment')}
                           </span>
                         </div>
                         <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{aiEvaluation.severityAssessment}</p>
@@ -1261,7 +1263,7 @@ export default function ConsultationPage() {
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <Activity className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
-                            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Vital Sign Alerts</span>
+                            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('consultation.vitalSignAlerts')}</span>
                           </div>
                           <div className="space-y-1.5">
                             {aiEvaluation.vitalSignAlerts.map((alert, i) => (
@@ -1279,7 +1281,7 @@ export default function ConsultationPage() {
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <Brain className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Suggested Diagnoses</span>
+                            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('consultation.suggestedDiagnoses')}</span>
                           </div>
                           <div className="space-y-2">
                             {aiEvaluation.suggestedDiagnoses.map((dx) => {
@@ -1311,7 +1313,7 @@ export default function ConsultationPage() {
                                       </div>
                                       {isAccepted ? (
                                         <span className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
-                                          <Check className="w-3 h-3" /> Added
+                                          <Check className="w-3 h-3" /> {t('consultation.added')}
                                         </span>
                                       ) : (
                                         <button
@@ -1321,7 +1323,7 @@ export default function ConsultationPage() {
                                           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(43,111,224,0.20)'; }}
                                           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(43,111,224,0.10)'; }}
                                         >
-                                          <Plus className="w-3 h-3" /> Add
+                                          <Plus className="w-3 h-3" /> {t('consultation.add')}
                                         </button>
                                       )}
                                     </div>
@@ -1329,7 +1331,7 @@ export default function ConsultationPage() {
                                   <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>{dx.reasoning}</p>
                                   {dx.suggestedTreatment && (
                                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                      <span className="font-semibold">Tx:</span> {dx.suggestedTreatment}
+                                      <span className="font-semibold">{t('consultation.txLabel')}</span> {dx.suggestedTreatment}
                                     </p>
                                   )}
                                 </div>
@@ -1344,7 +1346,7 @@ export default function ConsultationPage() {
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <TestTubes className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Recommended Tests</span>
+                            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('consultation.recommendedTests')}</span>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {aiEvaluation.recommendedTests.map(test => {
@@ -1373,10 +1375,10 @@ export default function ConsultationPage() {
 
                       {/* Clinical Notes */}
                       <div className="p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                        <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>AI Reasoning Summary</p>
+                        <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('consultation.aiReasoningSummary')}</p>
                         <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{aiEvaluation.clinicalNotes}</p>
                         <p className="text-[10px] mt-2 italic" style={{ color: 'var(--text-muted)' }}>
-                          Evaluated at {new Date(aiEvaluation.evaluatedAt).toLocaleTimeString()} — WHO/IMCI guideline-based analysis
+                          {t('consultation.evaluatedAt', { time: new Date(aiEvaluation.evaluatedAt).toLocaleTimeString() })}
                         </p>
                       </div>
                     </div>
@@ -1386,8 +1388,8 @@ export default function ConsultationPage() {
                     <div className="text-center py-4">
                       <Brain className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        Enter patient data above, then click &quot;Analyze&quot; for AI-assisted clinical evaluation.
-                        <br />Runs locally — no internet required.
+                        {t('consultation.aiEmptyState')}
+                        <br />{t('consultation.aiRunsLocally')}
                       </p>
                     </div>
                   )}
@@ -1402,12 +1404,12 @@ export default function ConsultationPage() {
                 <div className="p-5">
                   {/* ICD-10 Search */}
                   <div className="relative mb-4">
-                    <label>Search ICD-10 Code or Diagnosis</label>
+                    <label>{t('consultation.searchIcdLabel')}</label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
                       <input
                         type="search"
-                        placeholder="Search by code (e.g. B50) or name (e.g. Malaria)..."
+                        placeholder={t('consultation.searchIcdPlaceholder')}
                         value={diagSearch}
                         onChange={e => { setDiagSearch(e.target.value); setShowDiagDropdown(true); }}
                         onFocus={() => setShowDiagDropdown(true)}
@@ -1445,8 +1447,8 @@ export default function ConsultationPage() {
                             className="text-xs"
                             style={{ width: '120px', padding: '6px 30px 6px 10px', fontSize: '0.75rem' }}
                           >
-                            <option value="primary">Primary</option>
-                            <option value="secondary">Secondary</option>
+                            <option value="primary">{t('consultation.diagPrimary')}</option>
+                            <option value="secondary">{t('consultation.diagSecondary')}</option>
                           </select>
                           <select
                             value={d.certainty}
@@ -1454,8 +1456,8 @@ export default function ConsultationPage() {
                             className="text-xs"
                             style={{ width: '120px', padding: '6px 30px 6px 10px', fontSize: '0.75rem' }}
                           >
-                            <option value="confirmed">Confirmed</option>
-                            <option value="suspected">Suspected</option>
+                            <option value="confirmed">{t('consultation.diagConfirmed')}</option>
+                            <option value="suspected">{t('consultation.diagSuspected')}</option>
                           </select>
                           <select
                             value={d.severity}
@@ -1463,9 +1465,9 @@ export default function ConsultationPage() {
                             className="text-xs"
                             style={{ width: '110px', padding: '6px 30px 6px 10px', fontSize: '0.75rem' }}
                           >
-                            <option value="mild">Mild</option>
-                            <option value="moderate">Moderate</option>
-                            <option value="severe">Severe</option>
+                            <option value="mild">{t('consultation.diagMild')}</option>
+                            <option value="moderate">{t('consultation.diagModerate')}</option>
+                            <option value="severe">{t('consultation.diagSevere')}</option>
                           </select>
                           <button onClick={() => removeDiagnosis(i)} className="p-1 rounded transition-colors flex-shrink-0" style={{ background: 'transparent' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(229,46,66,0.15)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                             <X className="w-4 h-4" style={{ color: 'var(--tamamhealth-red)' }} />
@@ -1474,7 +1476,7 @@ export default function ConsultationPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm py-3" style={{ color: 'var(--text-muted)' }}>No diagnoses added yet. Search above to add ICD-10 codes.</p>
+                    <p className="text-sm py-3" style={{ color: 'var(--text-muted)' }}>{t('consultation.noDiagnoses')}</p>
                   )}
                 </div>
               )}
@@ -1487,12 +1489,12 @@ export default function ConsultationPage() {
                 <div className="p-5">
                   {/* Medication Search */}
                   <div className="relative mb-4">
-                    <label>Search Medication</label>
+                    <label>{t('consultation.searchMedicationLabel')}</label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
                       <input
                         type="search"
-                        placeholder="Search by medication name or category..."
+                        placeholder={t('consultation.searchMedicationPlaceholder')}
                         value={rxMedSearch}
                         onChange={e => { setRxMedSearch(e.target.value); setShowRxDropdown(true); }}
                         onFocus={() => setShowRxDropdown(true)}
@@ -1533,42 +1535,42 @@ export default function ConsultationPage() {
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div>
-                              <label>Dose</label>
+                              <label>{t('consultation.rxDose')}</label>
                               <input type="text" value={rx.dose}
                                 onChange={e => updatePrescription(i, 'dose', e.target.value)}
                                 placeholder="e.g. 500mg" />
                             </div>
                             <div>
-                              <label>Route</label>
+                              <label>{t('consultation.rxRoute')}</label>
                               <select value={rx.route} onChange={e => updatePrescription(i, 'route', e.target.value)}>
                                 {routeOptions.map(r => <option key={r} value={r}>{r}</option>)}
                               </select>
                             </div>
                             <div>
-                              <label>Frequency</label>
+                              <label>{t('consultation.rxFrequency')}</label>
                               <select value={rx.frequency} onChange={e => updatePrescription(i, 'frequency', e.target.value)}>
-                                <option value="">Select frequency</option>
+                                <option value="">{t('consultation.rxSelectFrequency')}</option>
                                 {frequencyOptions.map(f => <option key={f} value={f}>{f}</option>)}
                               </select>
                             </div>
                             <div>
-                              <label>Duration</label>
+                              <label>{t('consultation.rxDuration')}</label>
                               <input type="text" value={rx.duration}
                                 onChange={e => updatePrescription(i, 'duration', e.target.value)}
                                 placeholder="e.g. 7 days" />
                             </div>
                           </div>
                           <div className="mt-3">
-                            <label>Instructions</label>
+                            <label>{t('consultation.rxInstructions')}</label>
                             <input type="text" value={rx.instructions}
                               onChange={e => updatePrescription(i, 'instructions', e.target.value)}
-                              placeholder="e.g. Take with food, complete full course..." />
+                              placeholder={t('consultation.rxInstructionsPlaceholder')} />
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm py-3" style={{ color: 'var(--text-muted)' }}>No prescriptions added yet. Search above to add medications.</p>
+                    <p className="text-sm py-3" style={{ color: 'var(--text-muted)' }}>{t('consultation.noPrescriptions')}</p>
                   )}
                 </div>
               )}
@@ -1579,7 +1581,7 @@ export default function ConsultationPage() {
               <SectionHeader index={6} />
               {openSections[6] && (
                 <div className="p-5">
-                  <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>Select tests to order for this patient.</p>
+                  <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>{t('consultation.selectTestsHint')}</p>
                   <div className="grid grid-cols-2 gap-3">
                     {labTests.map(test => (
                       <label
@@ -1607,7 +1609,7 @@ export default function ConsultationPage() {
                   {Object.values(labOrders).some(v => v) && (
                     <div className="mt-4 p-3 rounded-lg" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-primary)' }}>
                       <p className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
-                        {Object.values(labOrders).filter(v => v).length} test(s) selected for ordering.
+                        {t('consultation.testsSelectedForOrdering', { count: Object.values(labOrders).filter(v => v).length })}
                       </p>
                     </div>
                   )}
@@ -1620,12 +1622,12 @@ export default function ConsultationPage() {
               <SectionHeader index={7} />
               {openSections[7] && (
                 <div className="p-5">
-                  <label>Treatment Plan / Clinical Notes</label>
+                  <label>{t('consultation.treatmentPlanLabel')}</label>
                   <textarea
                     value={treatmentPlan}
                     onChange={e => setTreatmentPlan(e.target.value)}
                     rows={4}
-                    placeholder="Describe the treatment plan, patient education, lifestyle recommendations, warning signs to watch for..."
+                    placeholder={t('consultation.treatmentPlanPlaceholder')}
                   />
                 </div>
               )}
@@ -1637,7 +1639,7 @@ export default function ConsultationPage() {
               {openSections[8] && (
                 <div className="p-5">
                   <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-                    Upload scans, X-rays, lab reports, or other documents for this consultation.
+                    {t('consultation.attachmentsHint')}
                   </p>
                   <FileUpload
                     attachments={consultAttachments}
@@ -1657,13 +1659,13 @@ export default function ConsultationPage() {
                 <div className="p-5">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label>Follow-up Date</label>
+                      <label>{t('consultation.followUpDate')}</label>
                       <input type="date" value={followUpDate} onChange={e => setFollowUpDate(e.target.value)} />
                     </div>
                     <div>
-                      <label>Reason for Follow-up</label>
+                      <label>{t('consultation.followUpReason')}</label>
                       <input type="text" value={followUpReason} onChange={e => setFollowUpReason(e.target.value)}
-                        placeholder="e.g. Review lab results, medication check..." />
+                        placeholder={t('consultation.followUpReasonPlaceholder')} />
                     </div>
                   </div>
                 </div>
@@ -1683,43 +1685,43 @@ export default function ConsultationPage() {
                       className="w-4 h-4 rounded"
                       style={{ accentColor: 'var(--accent-primary)' }}
                     />
-                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Add referral to another facility</span>
+                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t('consultation.addReferral')}</span>
                   </label>
 
                   {addReferral && (
                     <div className="space-y-4 p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label>Referral Hospital</label>
+                          <label>{t('consultation.referralHospital')}</label>
                           <select value={referralHospital} onChange={e => setReferralHospital(e.target.value)}>
-                            <option value="">Select hospital</option>
+                            <option value="">{t('consultation.selectHospital')}</option>
                             {hospitals.map(h => (
                               <option key={h._id} value={h._id}>{h.name} ({h.state})</option>
                             ))}
                           </select>
                         </div>
                         <div>
-                          <label>Urgency</label>
+                          <label>{t('consultation.urgency')}</label>
                           <select value={referralUrgency} onChange={e => setReferralUrgency(e.target.value)}>
-                            <option value="routine">Routine</option>
-                            <option value="urgent">Urgent</option>
-                            <option value="emergency">Emergency</option>
+                            <option value="routine">{t('consultation.urgencyRoutine')}</option>
+                            <option value="urgent">{t('consultation.urgencyUrgent')}</option>
+                            <option value="emergency">{t('consultation.urgencyEmergency')}</option>
                           </select>
                         </div>
                       </div>
                       <div>
-                        <label>Reason for Referral</label>
+                        <label>{t('consultation.reasonForReferral')}</label>
                         <textarea
                           value={referralReason}
                           onChange={e => setReferralReason(e.target.value)}
                           rows={2}
-                          placeholder="Describe the reason for referral, what services are needed..."
+                          placeholder={t('consultation.reasonForReferralPlaceholder')}
                         />
                       </div>
                       {referralUrgency === 'emergency' && (
                         <div className="p-3 rounded-lg" style={{ background: 'rgba(229,46,66,0.12)', border: '1px solid var(--tamamhealth-red)' }}>
                           <p className="text-xs font-medium" style={{ color: '#F87171' }}>
-                            Emergency referral: Ensure patient transport and receiving facility notification are arranged immediately.
+                            {t('consultation.emergencyReferralWarning')}
                           </p>
                         </div>
                       )}
@@ -1732,10 +1734,10 @@ export default function ConsultationPage() {
             {/* Submit */}
             <div className="flex items-center justify-between pt-4 pb-8">
               <button onClick={() => router.push('/patients')} className="btn btn-secondary">
-                <ArrowLeft className="w-4 h-4" /> Cancel
+                <ArrowLeft className="w-4 h-4" /> {t('action.cancel')}
               </button>
               <button onClick={handleSubmit} disabled={isSaving || !selectedPatient} className="btn btn-primary btn-lg" style={{ opacity: isSaving ? 0.7 : 1 }}>
-                {isSaving ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Saving...</> : <><Save className="w-4 h-4" /> Save Consultation</>}
+                {isSaving ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('consultation.saving')}</> : <><Save className="w-4 h-4" /> {t('consultation.saveConsultation')}</>}
               </button>
             </div>
           </div>
@@ -1763,12 +1765,12 @@ export default function ConsultationPage() {
                     </div>
                     <div className="space-y-2">
                       {[
-                        { label: 'Gender', value: selectedPatientData.gender },
-                        { label: 'Age', value: selectedPatientData.estimatedAge ? `~${selectedPatientData.estimatedAge}y` : selectedPatientData.dateOfBirth ? `${new Date().getFullYear() - new Date(selectedPatientData.dateOfBirth).getFullYear()}y` : 'Unknown' },
-                        { label: 'Blood Type', value: selectedPatientData.bloodType || 'Unknown' },
-                        { label: 'State', value: selectedPatientData.state },
-                        { label: 'Tribe', value: selectedPatientData.tribe },
-                        { label: 'Phone', value: selectedPatientData.phone || 'N/A' },
+                        { label: t('patient.gender'), value: selectedPatientData.gender },
+                        { label: t('patient.age'), value: selectedPatientData.estimatedAge ? `~${selectedPatientData.estimatedAge}y` : selectedPatientData.dateOfBirth ? `${new Date().getFullYear() - new Date(selectedPatientData.dateOfBirth).getFullYear()}y` : t('consultation.unknown') },
+                        { label: t('patient.bloodType'), value: selectedPatientData.bloodType || t('consultation.unknown') },
+                        { label: t('consultation.state'), value: selectedPatientData.state },
+                        { label: t('patient.tribe'), value: selectedPatientData.tribe },
+                        { label: t('patient.phone'), value: selectedPatientData.phone || t('consultation.na') },
                       ].map(item => (
                         <div key={item.label} className="flex justify-between text-xs py-1" style={{ borderBottom: '1px solid var(--border-light)' }}>
                           <span style={{ color: 'var(--text-muted)' }}>{item.label}</span>
@@ -1783,7 +1785,7 @@ export default function ConsultationPage() {
                     <div className="card-elevated p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <AlertTriangle className="w-4 h-4" style={{ color: 'var(--tamamhealth-red)' }} />
-                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--tamamhealth-red)' }}>Allergies</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--tamamhealth-red)' }}>{t('patient.allergies')}</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {selectedPatientData.allergies.map((a: string) => (
@@ -1802,7 +1804,7 @@ export default function ConsultationPage() {
                     <div className="card-elevated p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <Stethoscope className="w-4 h-4" style={{ color: 'var(--tamamhealth-amber)' }} />
-                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--tamamhealth-amber)' }}>Chronic Conditions</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--tamamhealth-amber)' }}>{t('patient.chronicConditions')}</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {selectedPatientData.chronicConditions.map((c: string) => (
@@ -1818,7 +1820,7 @@ export default function ConsultationPage() {
 
                   {/* Consultation progress */}
                   <div className="card-elevated p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Consultation Progress</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('consultation.progress')}</p>
                     <div className="space-y-2">
                       {sectionHeaders.map((s, i) => {
                         const Icon = s.icon;
@@ -1840,7 +1842,7 @@ export default function ConsultationPage() {
                               border: `1px solid ${filled ? 'var(--accent-primary)' : 'var(--border-light)'}`,
                             }}>
                               {filled ? (
-                                <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="#1B9AAA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                               ) : (
                                 <Icon className="w-2.5 h-2.5" style={{ color: 'var(--text-muted)' }} />
                               )}
@@ -1855,8 +1857,8 @@ export default function ConsultationPage() {
               ) : (
                 <div className="card-elevated p-6 text-center">
                   <UserSearch className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
-                  <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>No patient selected</p>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Search and select a patient to begin the consultation.</p>
+                  <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>{t('consultation.noPatientSelected')}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('consultation.noPatientSelectedHint')}</p>
                 </div>
               )}
             </div>

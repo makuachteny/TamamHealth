@@ -10,6 +10,7 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useBodyScrollLock } from '@/lib/hooks/useBodyScrollLock';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   HeartPulse, Search, Plus, X, Users, AlertTriangle,
   Calendar, ChevronRight, ExternalLink, CheckCircle,
@@ -28,6 +29,7 @@ const riskColors = {
 };
 
 export default function ANCPage() {
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const { visits, stats, loading, register } = useANC();
   const { patients } = usePatients();
@@ -161,12 +163,12 @@ export default function ANCPage() {
   if (loading) {
     return (
       <>
-        <TopBar title="Antenatal Care" />
+        <TopBar title={t('anc.title')} />
         <main className="page-container page-enter">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading ANC records...</p>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('anc.loadingRecords')}</p>
             </div>
           </div>
         </main>
@@ -176,15 +178,15 @@ export default function ANCPage() {
 
   return (
     <>
-      <TopBar title="Antenatal Care" />
+      <TopBar title={t('anc.title')} />
       <main className="page-container page-enter">
         <PageHeader
           icon={HeartPulse}
-          title="Antenatal Care"
-          subtitle="Maternal health monitoring · WHO 8-contact ANC model"
+          title={t('anc.title')}
+          subtitle={t('anc.subtitle')}
           actions={canRecordVitalEvents && (
             <button onClick={() => setShowModal(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> Register Visit
+              <Plus className="w-4 h-4" /> {t('anc.registerVisit')}
             </button>
           )}
         />
@@ -193,10 +195,10 @@ export default function ANCPage() {
         {stats && (
           <div className="kpi-grid mb-6">
             {[
-              { label: 'Mothers Enrolled', value: stats.totalMothers.toString(), color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)', icon: Users },
-              { label: 'ANC4+ Rate', value: `${stats.anc4PlusRate}%`, color: '#22C55E', bg: 'rgba(34,197,94,0.12)', icon: CheckCircle },
-              { label: 'High Risk', value: stats.highRiskCount.toString(), color: '#EF4444', bg: 'rgba(229,46,66,0.12)', icon: AlertTriangle },
-              { label: 'This Month', value: stats.thisMonthVisits.toString(), color: '#6366F1', bg: 'rgba(99,102,241,0.12)', icon: Calendar },
+              { label: t('anc.mothersEnrolled'), value: stats.totalMothers.toString(), color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)', icon: Users },
+              { label: t('anc.anc4PlusRate'), value: `${stats.anc4PlusRate}%`, color: '#22C55E', bg: 'rgba(34,197,94,0.12)', icon: CheckCircle },
+              { label: t('anc.highRisk'), value: stats.highRiskCount.toString(), color: '#EF4444', bg: 'rgba(229,46,66,0.12)', icon: AlertTriangle },
+              { label: t('anc.thisMonth'), value: stats.thisMonthVisits.toString(), color: '#6366F1', bg: 'rgba(99,102,241,0.12)', icon: Calendar },
             ].map(stat => (
               <div key={stat.label} className="kpi">
                 <div className="icon-box-sm" style={{ background: stat.bg }}>
@@ -217,19 +219,19 @@ export default function ANCPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <HeartPulse className="w-4 h-4" style={{ color: '#EC4899' }} />
-                <h3 className="font-semibold text-sm">ANC Continuum of Care</h3>
+                <h3 className="font-semibold text-sm">{t('anc.continuumTitle')}</h3>
               </div>
               <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>
-                WHO 8-contact model
+                {t('anc.who8ContactModel')}
               </span>
             </div>
             <div className="space-y-2">
               {([
-                { key: 'anc1', label: 'ANC1 (≥1 visit)', count: stats.continuum.anc1 },
-                { key: 'anc2', label: 'ANC2 (≥2 visits)', count: stats.continuum.anc2 },
-                { key: 'anc3', label: 'ANC3 (≥3 visits)', count: stats.continuum.anc3 },
-                { key: 'anc4', label: 'ANC4+ (≥4 visits) ★ WHO target', count: stats.continuum.anc4 },
-                { key: 'anc5plus', label: 'ANC5+ (≥5 visits)', count: stats.continuum.anc5plus },
+                { key: 'anc1', label: t('anc.anc1Label'), count: stats.continuum.anc1 },
+                { key: 'anc2', label: t('anc.anc2Label'), count: stats.continuum.anc2 },
+                { key: 'anc3', label: t('anc.anc3Label'), count: stats.continuum.anc3 },
+                { key: 'anc4', label: t('anc.anc4Label'), count: stats.continuum.anc4 },
+                { key: 'anc5plus', label: t('anc.anc5plusLabel'), count: stats.continuum.anc5plus },
               ] as const).map((step, i) => {
                 const pct = stats.totalMothers > 0 ? Math.round((step.count / stats.totalMothers) * 100) : 0;
                 const dropoff = i > 0 ? Math.max(0, ([stats.continuum.anc1, stats.continuum.anc2, stats.continuum.anc3, stats.continuum.anc4, stats.continuum.anc5plus][i - 1]) - step.count) : 0;
@@ -246,7 +248,7 @@ export default function ANCPage() {
                       </div>
                     </div>
                     {i > 0 && dropoff > 0 ? (
-                      <span className="text-[10px] font-mono w-16 text-right" style={{ color: 'var(--color-danger)' }}>−{dropoff} drop</span>
+                      <span className="text-[10px] font-mono w-16 text-right" style={{ color: 'var(--color-danger)' }}>{t('anc.dropCount', { count: dropoff })}</span>
                     ) : (
                       <span className="text-[10px] w-16" />
                     )}
@@ -255,7 +257,7 @@ export default function ANCPage() {
               })}
             </div>
             <p className="text-[10px] mt-3 pt-3 border-t" style={{ color: 'var(--text-muted)', borderColor: 'var(--border-light)' }}>
-              Tracks how many enrolled mothers progress through each ANC contact. Drop-off between ANC1 and ANC4 highlights where intervention is needed to reach the WHO ≥4 contacts target.
+              {t('anc.continuumNote')}
             </p>
           </div>
         )}
@@ -267,7 +269,7 @@ export default function ANCPage() {
             <input
               type="search"
               className="search-icon-input"
-              placeholder="Search by mother name..."
+              placeholder={t('anc.searchMotherPlaceholder')}
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -277,10 +279,10 @@ export default function ANCPage() {
             onChange={e => setRiskFilter(e.target.value)}
             style={{ width: '180px' }}
           >
-            <option value="all">All Risk Levels</option>
-            <option value="high">High Risk</option>
-            <option value="moderate">Moderate Risk</option>
-            <option value="low">Low Risk</option>
+            <option value="all">{t('anc.allRiskLevels')}</option>
+            <option value="high">{t('anc.riskHigh')}</option>
+            <option value="moderate">{t('anc.riskModerate')}</option>
+            <option value="low">{t('anc.riskLow')}</option>
           </select>
         </div>
 
@@ -290,7 +292,7 @@ export default function ANCPage() {
             <div className="p-4 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
               <HeartPulse className="w-4 h-4" style={{ color: '#EC4899' }} />
               <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                Mothers Enrolled ({filteredMothers.length})
+                {t('anc.mothersEnrolledCount', { count: filteredMothers.length })}
               </h3>
             </div>
 
@@ -316,7 +318,7 @@ export default function ANCPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{latest.motherName}</p>
                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        Age {latest.motherAge} · G{latest.gravida}P{latest.parity} · {latest.gestationalAge} weeks · {latest.facilityName}
+                        {t('anc.motherMeta', { age: latest.motherAge, gravida: latest.gravida, parity: latest.parity, weeks: latest.gestationalAge, facility: latest.facilityName })}
                       </p>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">

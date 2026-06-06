@@ -149,6 +149,7 @@ export { DuotonePhoneOff as PhoneOff } from '@/components/icons';
 export { DuotonePieChart as PieChart } from '@/components/icons';
 export { DuotonePlay as Play } from '@/components/icons';
 export { DuotoneRadio as Radio } from '@/components/icons';
+export { DuotoneRadio as Megaphone } from '@/components/icons';
 export { DuotoneRefresh as RefreshCcw } from '@/components/icons';
 export { DuotoneRefresh as RefreshCw } from '@/components/icons';
 export { DuotoneRotate as RotateCcw } from '@/components/icons';

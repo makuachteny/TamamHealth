@@ -38,6 +38,7 @@ import {
   FlaskConical, Syringe,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type {
   HospitalDoc, UserDoc, UserRole, AppointmentDoc, PrescriptionDoc,
   ImmunizationDoc, LabResultDoc, StaffScheduleDoc, PharmacyInventoryDoc,
@@ -60,15 +61,15 @@ type TabId =
   | 'overview' | 'staff' | 'wards' | 'equipment' | 'inventory'
   | 'schedules' | 'performance' | 'settings';
 
-const TABS: { id: TabId; label: string; icon: typeof Building2 }[] = [
-  { id: 'overview',    label: 'Overview',     icon: Building2 },
-  { id: 'staff',       label: 'Staff',        icon: Users },
-  { id: 'wards',       label: 'Wards',        icon: BedDouble },
-  { id: 'equipment',   label: 'Equipment',    icon: Package },
-  { id: 'inventory',   label: 'Inventory',    icon: Pill },
-  { id: 'schedules',   label: 'Schedules',    icon: Calendar },
-  { id: 'performance', label: 'Performance',  icon: Activity },
-  { id: 'settings',    label: 'Settings',     icon: Settings },
+const TABS: { id: TabId; labelKey: string; icon: typeof Building2 }[] = [
+  { id: 'overview',    labelKey: 'tab.overview',           icon: Building2 },
+  { id: 'staff',       labelKey: 'hospitals.tabStaff',       icon: Users },
+  { id: 'wards',       labelKey: 'hospitals.tabWards',       icon: BedDouble },
+  { id: 'equipment',   labelKey: 'hospitals.tabEquipment',   icon: Package },
+  { id: 'inventory',   labelKey: 'hospitals.tabInventory',   icon: Pill },
+  { id: 'schedules',   labelKey: 'hospitals.tabSchedules',   icon: Calendar },
+  { id: 'performance', labelKey: 'hospitals.tabPerformance', icon: Activity },
+  { id: 'settings',    labelKey: 'hospitals.tabSettings',    icon: Settings },
 ];
 
 // ── Page ────────────────────────────────────────────────────────────────────
@@ -76,6 +77,7 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
   const { hospitalId } = params;
   const router = useRouter();
   const { currentUser } = useApp();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<TabId>('overview');
 
   // Hospital itself (always loaded — Overview tab needs it, and Settings does too).
@@ -115,30 +117,30 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
         const h = await getHospitalById(hospitalId);
         if (!alive) return;
         if (!h) {
-          setHospitalError('Hospital not found');
+          setHospitalError(t('hospitals.errorNotFound'));
         } else if (currentUser && currentUser.role !== 'super_admin' &&
                    currentUser.role !== 'government' &&
                    currentUser.orgId && h.orgId && h.orgId !== currentUser.orgId) {
           // Defence-in-depth: block cross-org access even though the data-scope
           // filter on every other service call already enforces this.
-          setHospitalError('You do not have access to this facility');
+          setHospitalError(t('hospitals.errorNoAccess'));
         } else {
           setHospital(h);
         }
       } catch {
-        if (alive) setHospitalError('Failed to load hospital');
+        if (alive) setHospitalError(t('hospitals.errorLoadHospital'));
       } finally {
         if (alive) setHospitalLoading(false);
       }
     })();
     return () => { alive = false; };
-  }, [hospitalId, currentUser]);
+  }, [hospitalId, currentUser, t]);
 
   // Block render until role check completes.
   if (!currentUser) {
     return (
       <>
-        <TopBar title="Manage Facility" />
+        <TopBar title={t('hospitals.manageFacility')} />
         <main className="page-container flex items-center justify-center">
           <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
         </main>
@@ -153,7 +155,7 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
   if (hospitalLoading) {
     return (
       <>
-        <TopBar title="Manage Facility" />
+        <TopBar title={t('hospitals.manageFacility')} />
         <main className="page-container flex items-center justify-center">
           <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
         </main>
@@ -163,15 +165,15 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
   if (hospitalError || !hospital) {
     return (
       <>
-        <TopBar title="Manage Facility" />
+        <TopBar title={t('hospitals.manageFacility')} />
         <main className="page-container page-enter">
           <div className="card-elevated p-8 text-center max-w-md mx-auto mt-16">
             <Building2 className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
             <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
-              {hospitalError || 'Hospital not found'}
+              {hospitalError || t('hospitals.errorNotFound')}
             </h2>
             <Link href="/hospitals" className="btn btn-secondary btn-sm mt-4 inline-flex items-center gap-1.5">
-              <ArrowLeft className="w-3.5 h-3.5" /> Back to Hospital Network
+              <ArrowLeft className="w-3.5 h-3.5" /> {t('hospitals.backToNetwork')}
             </Link>
           </div>
         </main>
@@ -183,7 +185,7 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
 
   return (
     <>
-      <TopBar title={`Manage · ${hospital.name}`} />
+      <TopBar title={t('hospitals.manageTitle', { name: hospital.name })} />
       <main className="page-container page-enter">
         <PageHeader
           icon={Building2}
@@ -191,22 +193,22 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
           subtitle={`${hospital.facilityType?.replace(/_/g, ' ')} · ${hospital.state}${hospital.county ? ` · ${hospital.county}` : ''}`}
           actions={
             <Link href="/hospitals" className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-              <ArrowLeft style={{ width: 13, height: 13 }} /> Hospital Network
+              <ArrowLeft style={{ width: 13, height: 13 }} /> {t('hospitals.hospitalNetwork')}
             </Link>
           }
         />
 
         {/* Tab bar */}
         <div className="flex gap-2 mb-4 flex-wrap">
-          {TABS.map(t => (
+          {TABS.map(tabItem => (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`btn btn-sm ${tab === t.id ? 'btn-primary' : 'btn-secondary'}`}
+              key={tabItem.id}
+              onClick={() => setTab(tabItem.id)}
+              className={`btn btn-sm ${tab === tabItem.id ? 'btn-primary' : 'btn-secondary'}`}
               style={{ gap: 6 }}
             >
-              <t.icon style={{ width: 13, height: 13 }} />
-              {t.label}
+              <tabItem.icon style={{ width: 13, height: 13 }} />
+              {t(tabItem.labelKey)}
             </button>
           ))}
         </div>
@@ -233,11 +235,12 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
 }
 
 // ─── Shared little pieces ────────────────────────────────────────────────────
-function LoadingBlock({ label = 'Loading...' }: { label?: string }) {
+function LoadingBlock({ label }: { label?: string }) {
+  const { t } = useTranslation();
   return (
     <div className="card-elevated" style={{ padding: 40, textAlign: 'center' }}>
       <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
-      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label}</p>
+      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label ?? t('status.loading')}</p>
     </div>
   );
 }
@@ -261,11 +264,12 @@ function EmptyBlock({ icon: Icon, label }: { icon: typeof Building2; label: stri
 }
 
 function StatusPill({ status }: { status: string }) {
+  const { t } = useTranslation();
   const map: Record<string, { bg: string; color: string; label: string }> = {
-    functional: { bg: 'rgba(74,222,128,0.12)', color: 'var(--color-success)', label: 'Functional' },
-    partially_functional: { bg: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)', label: 'Partially Functional' },
-    non_functional: { bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)', label: 'Non-Functional' },
-    closed: { bg: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)', label: 'Closed' },
+    functional: { bg: 'rgba(74,222,128,0.12)', color: 'var(--color-success)', label: t('hospitals.statusFunctional') },
+    partially_functional: { bg: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)', label: t('hospitals.statusPartiallyFunctional') },
+    non_functional: { bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)', label: t('hospitals.statusNonFunctional') },
+    closed: { bg: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)', label: t('hospitals.statusClosed') },
   };
   const tok = map[status] || map.closed;
   return (
@@ -277,22 +281,24 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-function formatRelative(iso?: string) {
+function formatRelative(iso?: string, t?: (key: string, vars?: Record<string, string | number>) => string) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '—';
   const min = Math.floor((Date.now() - d.getTime()) / 60000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min}m ago`;
+  if (min < 1) return t ? t('hospitals.timeJustNow') : 'just now';
+  if (min < 60) return t ? t('hospitals.timeMinutesAgo', { count: min }) : `${min}m ago`;
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  return `${Math.floor(hr / 24)}d ago`;
+  if (hr < 24) return t ? t('hospitals.timeHoursAgo', { count: hr }) : `${hr}h ago`;
+  const days = Math.floor(hr / 24);
+  return t ? t('hospitals.timeDaysAgo', { count: days }) : `${days}d ago`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  OVERVIEW TAB
 // ═══════════════════════════════════════════════════════════════════════════
 function OverviewTab({ hospital }: { hospital: HospitalDoc }) {
+  const { t } = useTranslation();
   const totalStaff = (hospital.doctors || 0) + (hospital.clinicalOfficers || 0) +
                      (hospital.nurses || 0) + (hospital.labTechnicians || 0) +
                      (hospital.pharmacists || 0);
@@ -304,15 +310,15 @@ function OverviewTab({ hospital }: { hospital: HospitalDoc }) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Identity */}
       <div className="card-elevated" style={{ padding: 16 }}>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Identity</h3>
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>{t('hospitals.identity')}</h3>
         <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
-          <Row label="Name" value={hospital.name} />
-          <Row label="Type" value={hospital.facilityType?.replace(/_/g, ' ')} />
-          <Row label="Ownership" value={hospital.ownership || '—'} />
-          <Row label="State" value={hospital.state || '—'} />
-          <Row label="County" value={hospital.county || '—'} />
-          <Row label="Town" value={hospital.town || '—'} />
-          <Row label="GPS" value={
+          <Row label={t('hospitals.fieldName')} value={hospital.name} />
+          <Row label={t('hospitals.fieldType')} value={hospital.facilityType?.replace(/_/g, ' ')} />
+          <Row label={t('hospitals.fieldOwnership')} value={hospital.ownership || '—'} />
+          <Row label={t('hospitals.fieldState')} value={hospital.state || '—'} />
+          <Row label={t('hospitals.fieldCounty')} value={hospital.county || '—'} />
+          <Row label={t('hospitals.fieldTown')} value={hospital.town || '—'} />
+          <Row label={t('hospitals.fieldGps')} value={
             hospital.lat != null && hospital.lng != null
               ? `${hospital.lat.toFixed(4)}°N, ${hospital.lng.toFixed(4)}°E`
               : '—'
@@ -322,32 +328,32 @@ function OverviewTab({ hospital }: { hospital: HospitalDoc }) {
 
       {/* Status + Sync */}
       <div className="card-elevated" style={{ padding: 16 }}>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Status</h3>
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>{t('hospitals.statusHeading')}</h3>
         <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Operating status</span>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t('hospitals.operatingStatus')}</span>
             <StatusPill status={hospital.operationalStatus || 'closed'} />
           </div>
-          <Row label="Sync" value={hospital.syncStatus || '—'} />
-          <Row label="Last sync" value={
+          <Row label={t('hospitals.fieldSync')} value={hospital.syncStatus || '—'} />
+          <Row label={t('hospitals.fieldLastSync')} value={
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <Clock style={{ width: 11, height: 11 }} /> {formatRelative(hospital.lastSync)}
+              <Clock style={{ width: 11, height: 11 }} /> {formatRelative(hospital.lastSync, t)}
             </span>
           } />
-          <Row label="Today's visits" value={hospital.todayVisits?.toLocaleString() ?? '0'} />
-          <Row label="Registered patients" value={hospital.patientCount?.toLocaleString() ?? '0'} />
+          <Row label={t('hospitals.fieldTodaysVisits')} value={hospital.todayVisits?.toLocaleString() ?? '0'} />
+          <Row label={t('hospitals.fieldRegisteredPatients')} value={hospital.patientCount?.toLocaleString() ?? '0'} />
         </div>
       </div>
 
       {/* Beds */}
       <div className="card-elevated" style={{ padding: 16 }}>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Bed Capacity</h3>
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>{t('hospitals.bedCapacity')}</h3>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
           <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
             {hospital.totalBeds || 0}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Occupancy (estimated)</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('hospitals.occupancyEstimated')}</div>
             <div style={{ height: 6, borderRadius: 3, background: 'var(--overlay-subtle)', marginTop: 4, overflow: 'hidden' }}>
               <div style={{
                 width: `${Math.min(100, occupancyPct)}%`, height: '100%',
@@ -358,31 +364,31 @@ function OverviewTab({ hospital }: { hospital: HospitalDoc }) {
           </div>
         </div>
         <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
-          <Row label="ICU" value={hospital.icuBeds || 0} />
-          <Row label="Maternity" value={hospital.maternityBeds || 0} />
-          <Row label="Pediatric" value={hospital.pediatricBeds || 0} />
+          <Row label={t('hospitals.bedsIcu')} value={hospital.icuBeds || 0} />
+          <Row label={t('hospitals.bedsMaternity')} value={hospital.maternityBeds || 0} />
+          <Row label={t('hospitals.bedsPediatric')} value={hospital.pediatricBeds || 0} />
         </div>
       </div>
 
       {/* Staff snapshot */}
       <div className="card-elevated" style={{ padding: 16 }}>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Key Staff ({totalStaff})</h3>
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>{t('hospitals.keyStaff', { count: totalStaff })}</h3>
         <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
-          <Row label="Doctors" value={hospital.doctors || 0} />
-          <Row label="Clinical Officers" value={hospital.clinicalOfficers || 0} />
-          <Row label="Nurses" value={hospital.nurses || 0} />
-          <Row label="Lab Technicians" value={hospital.labTechnicians || 0} />
-          <Row label="Pharmacists" value={hospital.pharmacists || 0} />
+          <Row label={t('hospitals.staffDoctors')} value={hospital.doctors || 0} />
+          <Row label={t('hospitals.staffClinicalOfficers')} value={hospital.clinicalOfficers || 0} />
+          <Row label={t('hospitals.staffNurses')} value={hospital.nurses || 0} />
+          <Row label={t('hospitals.staffLabTechnicians')} value={hospital.labTechnicians || 0} />
+          <Row label={t('hospitals.staffPharmacists')} value={hospital.pharmacists || 0} />
         </div>
       </div>
 
       {/* Contacts (uses HospitalDoc fields if present; otherwise placeholder) */}
       <div className="card-elevated lg:col-span-2" style={{ padding: 16 }}>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Contacts</h3>
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>{t('hospitals.contacts')}</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-          <Row label="Phone" value={(hospital as unknown as { phone?: string }).phone || '—'} />
-          <Row label="Email" value={(hospital as unknown as { email?: string }).email || '—'} />
-          <Row label="Address" value={
+          <Row label={t('hospitals.fieldPhone')} value={(hospital as unknown as { phone?: string }).phone || '—'} />
+          <Row label={t('hospitals.fieldEmail')} value={(hospital as unknown as { email?: string }).email || '—'} />
+          <Row label={t('hospitals.fieldAddress')} value={
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               <MapPin style={{ width: 11, height: 11 }} /> {[hospital.town, hospital.county, hospital.state].filter(Boolean).join(', ') || '—'}
             </span>
@@ -406,6 +412,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 //  STAFF TAB
 // ═══════════════════════════════════════════════════════════════════════════
 function StaffTab({ scope, hospitalId }: { scope: DataScope | undefined; hospitalId: string }) {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<UserDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -425,13 +432,13 @@ function StaffTab({ scope, hospitalId }: { scope: DataScope | undefined; hospita
         const here = all.filter(u => u.hospitalId === hospitalId);
         if (alive) setUsers(here);
       } catch {
-        if (alive) setError('Failed to load staff');
+        if (alive) setError(t('hospitals.errorLoadStaff'));
       } finally {
         if (alive) setLoading(false);
       }
     })();
     return () => { alive = false; };
-  }, [scope, hospitalId]);
+  }, [scope, hospitalId, t]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -449,9 +456,9 @@ function StaffTab({ scope, hospitalId }: { scope: DataScope | undefined; hospita
     return m;
   }, [users]);
 
-  if (loading) return <LoadingBlock label="Loading staff..." />;
+  if (loading) return <LoadingBlock label={t('hospitals.loadingStaff')} />;
   if (error) return <ErrorBlock message={error} />;
-  if (users.length === 0) return <EmptyBlock icon={Users} label="No staff assigned to this facility yet." />;
+  if (users.length === 0) return <EmptyBlock icon={Users} label={t('hospitals.emptyStaff')} />;
 
   return (
     <div className="card-elevated" style={{ overflow: 'hidden' }}>
@@ -460,7 +467,7 @@ function StaffTab({ scope, hospitalId }: { scope: DataScope | undefined; hospita
           <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: 'var(--text-muted)' }} />
           <input
             type="text"
-            placeholder="Search name or username..."
+            placeholder={t('hospitals.searchNameUsername')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ paddingLeft: 30, width: 240 }}
@@ -475,24 +482,24 @@ function StaffTab({ scope, hospitalId }: { scope: DataScope | undefined; hospita
             padding: '5px 12px', fontSize: 12, minHeight: 30,
           }}
         >
-          <option value="all">All roles</option>
+          <option value="all">{t('hospitals.allRoles')}</option>
           {Object.keys(roleCounts).map(r => (
             <option key={r} value={r}>{r.replace(/_/g, ' ')} ({roleCounts[r]})</option>
           ))}
         </select>
         <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
-          {filtered.length} of {users.length}
+          {t('hospitals.countOf', { shown: filtered.length, total: users.length })}
         </span>
       </div>
       <div style={{ overflow: 'auto' }}>
         <table className="data-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Username</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Last login</th>
+              <th>{t('hospitals.colName')}</th>
+              <th>{t('hospitals.colUsername')}</th>
+              <th>{t('hospitals.colRole')}</th>
+              <th>{t('hospitals.colStatus')}</th>
+              <th>{t('hospitals.colLastLogin')}</th>
             </tr>
           </thead>
           <tbody>
@@ -506,7 +513,7 @@ function StaffTab({ scope, hospitalId }: { scope: DataScope | undefined; hospita
                       <div style={{
                         width: 28, height: 28, borderRadius: 8,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'linear-gradient(135deg, #1B9AAA 0%, #1A3A3A 100%)',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)',
                         color: '#fff', fontSize: 11, fontWeight: 700,
                       }}>{initials || '?'}</div>
                       <span style={{ fontWeight: 600, fontSize: 13 }}>{u.name}</span>
@@ -522,18 +529,18 @@ function StaffTab({ scope, hospitalId }: { scope: DataScope | undefined; hospita
                     {u.isActive ? (
                       <span style={{ fontSize: 11, color: 'var(--color-success)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--color-success)' }} />
-                        Active
+                        {t('hospitals.statusActive')}
                       </span>
                     ) : (
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Disabled</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('hospitals.statusDisabled')}</span>
                     )}
                   </td>
-                  <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatRelative(last)}</td>
+                  <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatRelative(last, t)}</td>
                 </tr>
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No matches.</td></tr>
+              <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>{t('hospitals.noMatches')}</td></tr>
             )}
           </tbody>
         </table>
@@ -555,6 +562,7 @@ function WardsTab({ scope, hospitalId, hospital }: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
+  const { t } = useTranslation();
 
   const load = useCallback(async () => {
     if (!scope) return;
@@ -568,16 +576,16 @@ function WardsTab({ scope, hospitalId, hospital }: {
       setWards(w.filter(x => x.facilityId === hospitalId));
       setAdmissions(a.filter(x => x.facilityId === hospitalId));
     } catch {
-      setError('Failed to load wards');
+      setError(t('hospitals.errorLoadWards'));
     } finally {
       setLoading(false);
     }
-  }, [scope, hospitalId]);
+  }, [scope, hospitalId, t]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleQuickCreate = async () => {
-    const name = window.prompt('New ward name (e.g. "Maternity Ward A"):');
+    const name = window.prompt(t('hospitals.newWardPrompt'));
     if (!name?.trim()) return;
     try {
       const { createWard } = await import('@/lib/services/ward-service');
@@ -591,41 +599,41 @@ function WardsTab({ scope, hospitalId, hospital }: {
         isActive: true,
         orgId: hospital.orgId,
       });
-      showToast(`Ward "${name}" created`, 'success');
+      showToast(t('hospitals.toastWardCreated', { name }), 'success');
       load();
     } catch {
-      showToast('Failed to create ward', 'error');
+      showToast(t('hospitals.toastWardCreateFailed'), 'error');
     }
   };
 
-  if (loading) return <LoadingBlock label="Loading wards..." />;
+  if (loading) return <LoadingBlock label={t('hospitals.loadingWards')} />;
   if (error) return <ErrorBlock message={error} />;
 
   return (
     <div className="card-elevated" style={{ overflow: 'hidden' }}>
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-          {wards.length} ward{wards.length === 1 ? '' : 's'} · {admissions.length} active admission{admissions.length === 1 ? '' : 's'}
+          {t('hospitals.wardsSummary', { wards: wards.length, admissions: admissions.length })}
         </span>
         <button onClick={handleQuickCreate} className="btn btn-primary btn-sm" style={{ gap: 4 }}>
-          <Plus style={{ width: 13, height: 13 }} /> New Ward
+          <Plus style={{ width: 13, height: 13 }} /> {t('hospitals.newWard')}
         </button>
       </div>
       {wards.length === 0 ? (
         <div style={{ padding: 32, textAlign: 'center' }}>
           <BedDouble className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
-          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No wards yet. Click <strong>New Ward</strong> to add one.</p>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('hospitals.emptyWards')}</p>
         </div>
       ) : (
         <table className="data-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Total Beds</th>
-              <th>Occupied</th>
-              <th>Available</th>
-              <th>Active Admissions</th>
+              <th>{t('hospitals.colName')}</th>
+              <th>{t('hospitals.colType')}</th>
+              <th>{t('hospitals.colTotalBeds')}</th>
+              <th>{t('hospitals.colOccupied')}</th>
+              <th>{t('hospitals.colAvailable')}</th>
+              <th>{t('hospitals.colActiveAdmissions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -653,6 +661,7 @@ function WardsTab({ scope, hospitalId, hospital }: {
 //  EQUIPMENT TAB
 // ═══════════════════════════════════════════════════════════════════════════
 function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hospitalId: string }) {
+  const { t } = useTranslation();
   const [assets, setAssets] = useState<AssetDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -668,13 +677,13 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
         const all = await getAllAssets(scope);
         if (alive) setAssets(all.filter(a => a.facilityId === hospitalId));
       } catch {
-        if (alive) setError('Failed to load equipment');
+        if (alive) setError(t('hospitals.errorLoadEquipment'));
       } finally {
         if (alive) setLoading(false);
       }
     })();
     return () => { alive = false; };
-  }, [scope, hospitalId]);
+  }, [scope, hospitalId, t]);
 
   const statusColors: Record<string, string> = {
     operational: 'var(--color-success)',
@@ -688,9 +697,9 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
     statusFilter === 'all' ? assets : assets.filter(a => a.status === statusFilter),
   [assets, statusFilter]);
 
-  if (loading) return <LoadingBlock label="Loading equipment..." />;
+  if (loading) return <LoadingBlock label={t('hospitals.loadingEquipment')} />;
   if (error) return <ErrorBlock message={error} />;
-  if (assets.length === 0) return <EmptyBlock icon={Package} label="No assets registered for this facility." />;
+  if (assets.length === 0) return <EmptyBlock icon={Package} label={t('hospitals.emptyEquipment')} />;
 
   return (
     <div className="card-elevated" style={{ overflow: 'hidden' }}>
@@ -704,26 +713,26 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
             padding: '5px 12px', fontSize: 12, minHeight: 30,
           }}
         >
-          <option value="all">All statuses</option>
-          <option value="operational">Operational</option>
-          <option value="needs_service">Needs Service</option>
-          <option value="under_repair">Under Repair</option>
-          <option value="decommissioned">Decommissioned</option>
-          <option value="lost_or_stolen">Lost / Stolen</option>
+          <option value="all">{t('hospitals.allStatuses')}</option>
+          <option value="operational">{t('hospitals.equipOperational')}</option>
+          <option value="needs_service">{t('hospitals.equipNeedsService')}</option>
+          <option value="under_repair">{t('hospitals.equipUnderRepair')}</option>
+          <option value="decommissioned">{t('hospitals.equipDecommissioned')}</option>
+          <option value="lost_or_stolen">{t('hospitals.equipLostStolen')}</option>
         </select>
         <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
-          {filtered.length} of {assets.length}
+          {t('hospitals.countOf', { shown: filtered.length, total: assets.length })}
         </span>
       </div>
       <table className="data-table">
         <thead>
           <tr>
-            <th>Asset</th>
-            <th>Category</th>
-            <th>Tag</th>
-            <th>Status</th>
-            <th>Condition</th>
-            <th>Last Service</th>
+            <th>{t('hospitals.colAsset')}</th>
+            <th>{t('hospitals.colCategory')}</th>
+            <th>{t('hospitals.colTag')}</th>
+            <th>{t('hospitals.colStatus')}</th>
+            <th>{t('hospitals.colCondition')}</th>
+            <th>{t('hospitals.colLastService')}</th>
           </tr>
         </thead>
         <tbody>
@@ -746,7 +755,7 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
                 </span>
               </td>
               <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{a.condition}</td>
-              <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatRelative(a.lastServicedAt)}</td>
+              <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatRelative(a.lastServicedAt, t)}</td>
             </tr>
           ))}
         </tbody>
@@ -759,6 +768,7 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
 //  INVENTORY TAB
 // ═══════════════════════════════════════════════════════════════════════════
 function InventoryTab({ scope, hospitalId }: { scope: DataScope | undefined; hospitalId: string }) {
+  const { t } = useTranslation();
   const [items, setItems] = useState<PharmacyInventoryDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -773,29 +783,29 @@ function InventoryTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
         const all = await getAllInventory(scope);
         if (alive) setItems(all.filter(x => x.hospitalId === hospitalId));
       } catch {
-        if (alive) setError('Failed to load inventory');
+        if (alive) setError(t('hospitals.errorLoadInventory'));
       } finally {
         if (alive) setLoading(false);
       }
     })();
     return () => { alive = false; };
-  }, [scope, hospitalId]);
+  }, [scope, hospitalId, t]);
 
-  if (loading) return <LoadingBlock label="Loading inventory..." />;
+  if (loading) return <LoadingBlock label={t('hospitals.loadingInventory')} />;
   if (error) return <ErrorBlock message={error} />;
-  if (items.length === 0) return <EmptyBlock icon={Pill} label="No pharmacy inventory recorded for this facility." />;
+  if (items.length === 0) return <EmptyBlock icon={Pill} label={t('hospitals.emptyInventory')} />;
 
   return (
     <div className="card-elevated" style={{ overflow: 'hidden' }}>
       <table className="data-table">
         <thead>
           <tr>
-            <th>Medication</th>
-            <th>Category</th>
-            <th>Stock</th>
-            <th>Status</th>
-            <th>Expiry</th>
-            <th>Batch</th>
+            <th>{t('hospitals.colMedication')}</th>
+            <th>{t('hospitals.colCategory')}</th>
+            <th>{t('hospitals.colStock')}</th>
+            <th>{t('hospitals.colStatus')}</th>
+            <th>{t('hospitals.colExpiry')}</th>
+            <th>{t('hospitals.colBatch')}</th>
           </tr>
         </thead>
         <tbody>
@@ -803,14 +813,14 @@ function InventoryTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
             const ratio = i.reorderLevel ? i.stockLevel / i.reorderLevel : 1;
             const expired = i.expiryDate && i.expiryDate < new Date().toISOString().slice(0, 10);
             const status: { label: string; bg: string; color: string } = expired
-              ? { label: 'Expired', bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }
+              ? { label: t('hospitals.stockExpired'), bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }
               : i.stockLevel <= 0
-                ? { label: 'Out', bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }
+                ? { label: t('hospitals.stockOut'), bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }
                 : ratio < 0.3
-                  ? { label: 'Critical', bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }
+                  ? { label: t('hospitals.stockCritical'), bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }
                   : ratio < 1
-                    ? { label: 'Low', bg: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)' }
-                    : { label: 'OK', bg: 'rgba(74,222,128,0.12)', color: 'var(--color-success)' };
+                    ? { label: t('hospitals.stockLow'), bg: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)' }
+                    : { label: t('hospitals.stockOk'), bg: 'rgba(74,222,128,0.12)', color: 'var(--color-success)' };
             return (
               <tr key={i._id}>
                 <td style={{ fontWeight: 600 }}>{i.medicationName}</td>
@@ -836,6 +846,7 @@ function InventoryTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
 //  SCHEDULES TAB
 // ═══════════════════════════════════════════════════════════════════════════
 function SchedulesTab({ hospitalId }: { hospitalId: string }) {
+  const { t } = useTranslation();
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
   const [schedules, setSchedules] = useState<StaffScheduleDoc[]>([]);
@@ -851,18 +862,18 @@ function SchedulesTab({ hospitalId }: { hospitalId: string }) {
         const s = await getSchedulesByDate(date, hospitalId);
         if (alive) setSchedules(s);
       } catch {
-        if (alive) setError('Failed to load schedules');
+        if (alive) setError(t('hospitals.errorLoadSchedules'));
       } finally {
         if (alive) setLoading(false);
       }
     })();
     return () => { alive = false; };
-  }, [date, hospitalId]);
+  }, [date, hospitalId, t]);
 
   return (
     <div className="card-elevated" style={{ overflow: 'hidden' }}>
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: 10, alignItems: 'center' }}>
-        <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Date</label>
+        <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('hospitals.dateLabel')}</label>
         <input
           type="date"
           value={date}
@@ -874,26 +885,26 @@ function SchedulesTab({ hospitalId }: { hospitalId: string }) {
           }}
         />
         <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
-          {schedules.length} shift{schedules.length === 1 ? '' : 's'}
+          {t('hospitals.shiftsCount', { count: schedules.length })}
         </span>
       </div>
-      {loading ? <LoadingBlock label="Loading schedules..." />
+      {loading ? <LoadingBlock label={t('hospitals.loadingSchedules')} />
        : error ? <ErrorBlock message={error} />
        : schedules.length === 0 ? (
          <div style={{ padding: 32, textAlign: 'center' }}>
            <Calendar className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
-           <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No shifts scheduled for this date.</p>
+           <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('hospitals.emptySchedules')}</p>
          </div>
        ) : (
         <table className="data-table">
           <thead>
             <tr>
-              <th>Staff</th>
-              <th>Role</th>
-              <th>Shift</th>
-              <th>Time</th>
-              <th>Department</th>
-              <th>Status</th>
+              <th>{t('hospitals.colStaff')}</th>
+              <th>{t('hospitals.colRole')}</th>
+              <th>{t('hospitals.colShift')}</th>
+              <th>{t('hospitals.colTime')}</th>
+              <th>{t('hospitals.colDepartment')}</th>
+              <th>{t('hospitals.colStatus')}</th>
             </tr>
           </thead>
           <tbody>
@@ -922,6 +933,7 @@ function SchedulesTab({ hospitalId }: { hospitalId: string }) {
 //  PERFORMANCE TAB
 // ═══════════════════════════════════════════════════════════════════════════
 function PerformanceTab({ scope, hospitalId }: { scope: DataScope | undefined; hospitalId: string }) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [kpis, setKpis] = useState({
@@ -1011,25 +1023,25 @@ function PerformanceTab({ scope, hospitalId }: { scope: DataScope | undefined; h
           });
         }
       } catch {
-        if (alive) setError('Failed to load performance data');
+        if (alive) setError(t('hospitals.errorLoadPerformance'));
       } finally {
         if (alive) setLoading(false);
       }
     })();
     return () => { alive = false; };
-  }, [scope, hospitalId]);
+  }, [scope, hospitalId, t]);
 
-  if (loading) return <LoadingBlock label="Loading performance..." />;
+  if (loading) return <LoadingBlock label={t('hospitals.loadingPerformance')} />;
   if (error) return <ErrorBlock message={error} />;
 
   const cards: { label: string; value: number | string; icon: typeof Calendar; tint: string }[] = [
-    { label: "Today's Visits",        value: kpis.visitsToday,                  icon: Calendar,    tint: '#1B9AAA' },
-    { label: 'Active Admissions',     value: kpis.activeAdmissions,             icon: BedDouble,   tint: '#A78BFA' },
-    { label: 'Discharges Today',      value: kpis.dischargesToday,              icon: CheckCircle, tint: '#10B981' },
-    { label: 'Transfers Today',       value: kpis.transfersToday,               icon: ArrowLeft,   tint: '#3B82F6' },
-    { label: 'Avg Lab TAT (hrs)',     value: kpis.labTatHours || '—',           icon: FlaskConical, tint: '#F59E0B' },
-    { label: 'Rx Dispensed Today',    value: kpis.prescriptionsDispensedToday,  icon: Pill,        tint: '#EC4899' },
-    { label: 'Immunizations Today',   value: kpis.immunizationsToday,           icon: Syringe,     tint: '#14B8A6' },
+    { label: t('hospitals.kpiVisitsToday'),       value: kpis.visitsToday,                  icon: Calendar,    tint: '#3b82f6' },
+    { label: t('hospitals.kpiActiveAdmissions'),  value: kpis.activeAdmissions,             icon: BedDouble,   tint: '#A78BFA' },
+    { label: t('hospitals.kpiDischargesToday'),   value: kpis.dischargesToday,              icon: CheckCircle, tint: '#10B981' },
+    { label: t('hospitals.kpiTransfersToday'),    value: kpis.transfersToday,               icon: ArrowLeft,   tint: '#3B82F6' },
+    { label: t('hospitals.kpiAvgLabTat'),         value: kpis.labTatHours || '—',           icon: FlaskConical, tint: '#F59E0B' },
+    { label: t('hospitals.kpiRxDispensedToday'),  value: kpis.prescriptionsDispensedToday,  icon: Pill,        tint: '#EC4899' },
+    { label: t('hospitals.kpiImmunizationsToday'), value: kpis.immunizationsToday,          icon: Syringe,     tint: '#14B8A6' },
   ];
 
   return (
@@ -1058,6 +1070,7 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
   onSaved: (h: HospitalDoc) => void;
 }) {
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const [name, setName] = useState(hospital.name || '');
   const [phone, setPhone] = useState((hospital as unknown as { phone?: string }).phone || '');
   const [email, setEmail] = useState((hospital as unknown as { email?: string }).email || '');
@@ -1093,16 +1106,16 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
       } as Partial<HospitalDoc>);
       if (updated) {
         onSaved(updated);
-        showToast('Facility updated', 'success');
+        showToast(t('hospitals.toastFacilityUpdated'), 'success');
       } else {
-        setErr('Update failed');
+        setErr(t('hospitals.updateFailed'));
       }
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Update failed');
+      setErr(e instanceof Error ? e.message : t('hospitals.updateFailed'));
     } finally {
       setSaving(false);
     }
-  }, [canWrite, hospital._id, hospital.name, name, operationalStatus, services, phone, email, onSaved, showToast]);
+  }, [canWrite, hospital._id, hospital.name, name, operationalStatus, services, phone, email, onSaved, showToast, t]);
 
   const toggleService = (key: keyof typeof services) => {
     setServices(s => ({ ...s, [key]: !s[key] }));
@@ -1114,16 +1127,16 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
         <div className="card-elevated lg:col-span-2" style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(252,211,77,0.10)' }}>
           <AlertTriangle style={{ width: 16, height: 16, color: 'var(--color-warning)' }} />
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            You can view these settings but not edit them. Only org admins and super admins can save changes.
+            {t('hospitals.readOnlyNotice')}
           </span>
         </div>
       )}
 
       {/* Profile */}
       <div className="card-elevated" style={{ padding: 16 }}>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Profile</h3>
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>{t('hospitals.profile')}</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Field label="Facility name">
+          <Field label={t('hospitals.fieldFacilityName')}>
             <input
               disabled={!canWrite}
               value={name}
@@ -1131,7 +1144,7 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
               style={inputStyle(canWrite)}
             />
           </Field>
-          <Field label="Phone">
+          <Field label={t('hospitals.fieldPhone')}>
             <input
               disabled={!canWrite}
               value={phone}
@@ -1139,7 +1152,7 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
               style={inputStyle(canWrite)}
             />
           </Field>
-          <Field label="Email">
+          <Field label={t('hospitals.fieldEmail')}>
             <input
               type="email"
               disabled={!canWrite}
@@ -1148,17 +1161,17 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
               style={inputStyle(canWrite)}
             />
           </Field>
-          <Field label="Operating status">
+          <Field label={t('hospitals.operatingStatus')}>
             <select
               disabled={!canWrite}
               value={operationalStatus}
               onChange={e => setOperationalStatus(e.target.value)}
               style={inputStyle(canWrite)}
             >
-              <option value="functional">Functional</option>
-              <option value="partially_functional">Partially Functional</option>
-              <option value="non_functional">Non-Functional</option>
-              <option value="closed">Closed</option>
+              <option value="functional">{t('hospitals.statusFunctional')}</option>
+              <option value="partially_functional">{t('hospitals.statusPartiallyFunctional')}</option>
+              <option value="non_functional">{t('hospitals.statusNonFunctional')}</option>
+              <option value="closed">{t('hospitals.statusClosed')}</option>
             </select>
           </Field>
         </div>
@@ -1166,17 +1179,17 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
 
       {/* Services Offered */}
       <div className="card-elevated" style={{ padding: 16 }}>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Services Offered</h3>
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>{t('hospitals.servicesOffered')}</h3>
         <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
           {[
-            { key: 'epi', label: 'EPI (Immunization)' },
-            { key: 'anc', label: 'Antenatal Care' },
-            { key: 'delivery', label: 'Delivery Services' },
-            { key: 'hiv', label: 'HIV/AIDS' },
-            { key: 'tb', label: 'Tuberculosis' },
-            { key: 'emergencySurgery', label: 'Emergency Surgery' },
-            { key: 'laboratory', label: 'Laboratory' },
-            { key: 'pharmacy', label: 'Pharmacy' },
+            { key: 'epi', label: t('hospitals.serviceEpi') },
+            { key: 'anc', label: t('hospitals.serviceAnc') },
+            { key: 'delivery', label: t('hospitals.serviceDelivery') },
+            { key: 'hiv', label: t('hospitals.serviceHiv') },
+            { key: 'tb', label: t('hospitals.serviceTb') },
+            { key: 'emergencySurgery', label: t('hospitals.serviceEmergencySurgery') },
+            { key: 'laboratory', label: t('hospitals.serviceLaboratory') },
+            { key: 'pharmacy', label: t('hospitals.servicePharmacy') },
           ].map(svc => (
             <div key={svc.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{svc.label}</span>
@@ -1214,7 +1227,7 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
           style={{ gap: 6 }}
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          {saving ? 'Saving...' : 'Save Changes'}
+          {saving ? t('hospitals.saving') : t('hospitals.saveChanges')}
         </button>
       </div>
     </div>

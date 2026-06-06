@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   BarChart3, Users, FlaskConical, ArrowRightLeft, Building2, TrendingUp,
   Activity,
@@ -60,6 +61,7 @@ const RechartsBarChart = dynamic(
 
 export default function OrgAnalyticsPage() {
   const { currentUser } = useApp();
+  const { t } = useTranslation();
   const [hospitals, setHospitals] = useState<HospitalDoc[]>([]);
   const [patients, setPatients] = useState<PatientDoc[]>([]);
   const [labResults, setLabResults] = useState<LabResultDoc[]>([]);
@@ -116,7 +118,7 @@ export default function OrgAnalyticsPage() {
 
   const statCards = [
     {
-      label: 'Total Patients',
+      label: t('orgAnalytics.totalPatients'),
       value: patients.length,
       icon: Users,
       color: brandColor,
@@ -124,27 +126,27 @@ export default function OrgAnalyticsPage() {
       trendUp: true,
     },
     {
-      label: 'Lab Results',
+      label: t('orgAnalytics.labResults'),
       value: labResults.length,
       icon: FlaskConical,
       color: '#06B6D4',
-      trend: `${labResults.filter(l => l.status === 'completed').length} completed`,
+      trend: t('orgAnalytics.trendCompleted', { count: labResults.filter(l => l.status === 'completed').length }),
       trendUp: true,
     },
     {
-      label: 'Active Referrals',
+      label: t('referralChain.activeReferrals'),
       value: activeReferrals,
       icon: ArrowRightLeft,
       color: 'var(--color-warning)',
-      trend: `${referrals.length} total`,
+      trend: t('orgAnalytics.totalCount', { count: referrals.length }),
       trendUp: false,
     },
     {
-      label: 'Facilities',
+      label: t('orgAnalytics.facilities'),
       value: hospitals.length,
       icon: Building2,
       color: 'var(--accent-primary)',
-      trend: 'Across org',
+      trend: t('orgAnalytics.acrossOrg'),
       trendUp: true,
     },
   ];
@@ -163,7 +165,7 @@ export default function OrgAnalyticsPage() {
   if (loading) {
     return (
       <div className="flex-1 flex flex-col">
-        <TopBar title="Organization Analytics" />
+        <TopBar title={t('orgAnalytics.topBarTitle')} />
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
         </div>
@@ -173,13 +175,13 @@ export default function OrgAnalyticsPage() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title="Organization Analytics" />
+      <TopBar title={t('orgAnalytics.topBarTitle')} />
 
       <div className="page-container page-enter">
         <PageHeader
           icon={BarChart3}
-          title="Analytics"
-          subtitle={`Organization-wide data insights for ${currentUser?.organization?.name || 'your organization'}`}
+          title={t('orgAnalytics.title')}
+          subtitle={t('orgAnalytics.subtitle', { org: currentUser?.organization?.name || t('orgAnalytics.yourOrganization') })}
         />
 
         {/* Stat Cards */}
@@ -226,7 +228,7 @@ export default function OrgAnalyticsPage() {
             <div className="flex items-center gap-2 mb-4">
               <Activity className="w-5 h-5" style={{ color: brandColor }} />
               <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Patients per Hospital
+                {t('orgAnalytics.patientsPerHospital')}
               </h2>
             </div>
 
@@ -234,7 +236,7 @@ export default function OrgAnalyticsPage() {
               <RechartsBarChart data={patientsPerHospital} brandColor={brandColor} />
             ) : (
               <div className="h-[300px] flex items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                No hospital data available.
+                {t('orgAnalytics.noHospitalData')}
               </div>
             )}
           </div>
@@ -246,19 +248,19 @@ export default function OrgAnalyticsPage() {
               <div className="flex items-center gap-2 mb-4">
                 <FlaskConical className="w-5 h-5" style={{ color: '#06B6D4' }} />
                 <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Lab Results
+                  {t('orgAnalytics.labResults')}
                 </h2>
               </div>
 
               <div className="space-y-3">
-                <ProgressRow label="Completed" count={labCompleted} total={labTotal} color="#1B9AAA" />
-                <ProgressRow label="In Progress" count={labInProgress} total={labTotal} color="#F59E0B" />
-                <ProgressRow label="Pending" count={labPending} total={labTotal} color="#E52E42" />
+                <ProgressRow label={t('orgAnalytics.statusCompleted')} count={labCompleted} total={labTotal} color="#3b82f6" />
+                <ProgressRow label={t('orgAnalytics.statusInProgress')} count={labInProgress} total={labTotal} color="#F59E0B" />
+                <ProgressRow label={t('orgAnalytics.statusPending')} count={labPending} total={labTotal} color="#E52E42" />
               </div>
 
               <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-light)' }}>
                 <div className="flex justify-between">
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Total</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('orgAnalytics.total')}</span>
                   <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{labResults.length}</span>
                 </div>
               </div>
@@ -269,7 +271,7 @@ export default function OrgAnalyticsPage() {
               <div className="flex items-center gap-2 mb-4">
                 <Building2 className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
                 <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Top Facilities (Today)
+                  {t('orgAnalytics.topFacilitiesToday')}
                 </h2>
               </div>
 
@@ -295,12 +297,12 @@ export default function OrgAnalyticsPage() {
                         </span>
                       </div>
                       <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                        {h.todayVisits || 0} visits
+                        {t('orgAnalytics.visitsCount', { count: h.todayVisits || 0 })}
                       </span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm py-2 text-center" style={{ color: 'var(--text-muted)' }}>No facilities.</p>
+                  <p className="text-sm py-2 text-center" style={{ color: 'var(--text-muted)' }}>{t('orgAnalytics.noFacilities')}</p>
                 )}
               </div>
             </div>
@@ -312,10 +314,10 @@ export default function OrgAnalyticsPage() {
           <div className="flex items-center gap-2 mb-4">
             <ArrowRightLeft className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
             <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Recent Referrals
+              {t('government.recentReferrals')}
             </h2>
             <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: `${brandColor}10`, color: brandColor }}>
-              {referrals.length} total
+              {t('orgAnalytics.totalCount', { count: referrals.length })}
             </span>
           </div>
 
@@ -323,18 +325,18 @@ export default function OrgAnalyticsPage() {
             <table className="w-full">
               <thead>
                 <tr>
-                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Patient</th>
-                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>From</th>
-                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>To</th>
-                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Status</th>
-                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Date</th>
+                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgAnalytics.colPatient')}</th>
+                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgAnalytics.colFrom')}</th>
+                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgAnalytics.colTo')}</th>
+                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgAnalytics.colStatus')}</th>
+                  <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgAnalytics.colDate')}</th>
                 </tr>
               </thead>
               <tbody>
                 {referrals.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                      No referrals found.
+                      {t('orgAnalytics.noReferrals')}
                     </td>
                   </tr>
                 ) : (

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { Upload, X, FileText, Image as ImageIcon, Eye, AlertTriangle } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { Attachment } from '@/data/mock';
 import { validateAttachment, MAX_FILE_SIZE_BYTES } from '@/lib/validation';
 
@@ -14,6 +15,7 @@ interface FileUploadProps {
 }
 
 export default function FileUpload({ attachments, onAdd, onRemove, uploaderName, maxFiles = 10 }: FileUploadProps) {
+  const { t } = useTranslation();
   const [dragOver, setDragOver] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
@@ -26,7 +28,7 @@ export default function FileUpload({ attachments, onAdd, onRemove, uploaderName,
       return;
     }
     if (attachments.length >= maxFiles) {
-      setErrors(prev => [...prev, `Maximum ${maxFiles} files allowed`]);
+      setErrors(prev => [...prev, t('fileUpload.maxFilesError', { count: maxFiles })]);
       return;
     }
 
@@ -50,13 +52,13 @@ export default function FileUpload({ attachments, onAdd, onRemove, uploaderName,
       // — a `try` around `readAsDataURL` would silently swallow real read
       // errors. Hook the error event so the user actually sees the failure.
       reader.onerror = () => {
-        setErrors(prev => [...prev, `Failed to read file "${file.name}"`]);
+        setErrors(prev => [...prev, t('fileUpload.readError', { name: file.name })]);
       };
       reader.readAsDataURL(file);
     } catch {
-      setErrors(prev => [...prev, `Failed to read file "${file.name}"`]);
+      setErrors(prev => [...prev, t('fileUpload.readError', { name: file.name })]);
     }
-  }, [attachments.length, maxFiles, onAdd, uploaderName]);
+  }, [attachments.length, maxFiles, onAdd, uploaderName, t]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -97,10 +99,10 @@ export default function FileUpload({ attachments, onAdd, onRemove, uploaderName,
       >
         <Upload className="w-8 h-8 mx-auto mb-2" style={{ color: dragOver ? 'var(--tamamhealth-blue)' : 'var(--text-muted)' }} />
         <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
-          Drop files here or click to browse
+          {t('fileUpload.dropPrompt')}
         </p>
         <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-          JPEG, PNG, PDF, DICOM &middot; Max {formatSize(MAX_FILE_SIZE_BYTES)} per file &middot; {attachments.length}/{maxFiles} files
+          {t('fileUpload.constraints', { maxSize: formatSize(MAX_FILE_SIZE_BYTES), used: attachments.length, max: maxFiles })}
         </p>
         <input
           ref={fileInputRef}
@@ -161,7 +163,7 @@ export default function FileUpload({ attachments, onAdd, onRemove, uploaderName,
                 onClick={(e) => { e.stopPropagation(); setPreviewAttachment(att); }}
                 className="p-1.5 rounded transition-colors flex-shrink-0"
                 style={{ background: 'var(--accent-light)' }}
-                title="Preview"
+                title={t('fileUpload.preview')}
               >
                 <Eye className="w-3.5 h-3.5" style={{ color: 'var(--tamamhealth-blue)' }} />
               </button>
@@ -169,7 +171,7 @@ export default function FileUpload({ attachments, onAdd, onRemove, uploaderName,
                 onClick={(e) => { e.stopPropagation(); onRemove(att.id); }}
                 className="p-1.5 rounded transition-colors flex-shrink-0"
                 style={{ background: 'rgba(229,46,66,0.12)' }}
-                title="Remove"
+                title={t('fileUpload.remove')}
               >
                 <X className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
               </button>
@@ -218,7 +220,7 @@ export default function FileUpload({ attachments, onAdd, onRemove, uploaderName,
               ) : (
                 <div className="text-center py-12">
                   <FileText className="w-16 h-16 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Preview not available for this file type</p>
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('referrals.previewNotAvailable')}</p>
                 </div>
               )}
             </div>

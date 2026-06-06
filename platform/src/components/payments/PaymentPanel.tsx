@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Banknote, Smartphone, CreditCard, Building2, Shield, CheckCircle2, Loader2, Printer, Mail } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { PaymentDoc } from '@/lib/db-types-payments';
 
 interface PaymentPanelProps {
@@ -21,6 +22,7 @@ export default function PaymentPanel({
   patientId, patientName, encounterId, amountDue, currency = 'SSP', onSuccess, onCancel
 }: PaymentPanelProps) {
   const { currentUser } = useApp();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<TabType>('cash');
   const [amount, setAmount] = useState(amountDue > 0 ? amountDue.toString() : '');
 
@@ -72,49 +74,49 @@ export default function PaymentPanel({
   const handleSubmit = async () => {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
-      setError('Enter a valid amount');
+      setError(t('payments.errorValidAmount'));
       return;
     }
 
     // Validate tab-specific required fields
     if (tab === 'mobile' && !phone) {
-      setError('Phone number is required');
+      setError(t('payments.errorPhoneRequired'));
       return;
     }
     if (tab === 'mobile' && !mobileReference) {
-      setError('Transaction reference is required');
+      setError(t('payments.errorTransactionRefRequired'));
       return;
     }
     if (tab === 'card' && !cardLast4) {
-      setError('Last 4 digits are required');
+      setError(t('payments.errorLast4Required'));
       return;
     }
     if (tab === 'bank' && !bankName) {
-      setError('Bank name is required');
+      setError(t('payments.errorBankNameRequired'));
       return;
     }
     if (tab === 'bank' && !transferReference) {
-      setError('Transfer reference is required');
+      setError(t('payments.errorTransferRefRequired'));
       return;
     }
     if (tab === 'bank' && !transferDate) {
-      setError('Transfer date is required');
+      setError(t('payments.errorTransferDateRequired'));
       return;
     }
     if (tab === 'insurance' && !payerName) {
-      setError('Payer name is required');
+      setError(t('payments.errorPayerNameRequired'));
       return;
     }
     if (tab === 'insurance' && !claimReference) {
-      setError('Claim reference is required');
+      setError(t('payments.errorClaimRefRequired'));
       return;
     }
     if (tab === 'insurance' && insuranceWaiverMode === 'waiver' && !waiverReason) {
-      setError('Waiver reason is required');
+      setError(t('payments.errorWaiverReasonRequired'));
       return;
     }
     if (tab === 'insurance' && insuranceWaiverMode === 'waiver' && !approvedBy) {
-      setError('Approved by field is required');
+      setError(t('payments.errorApprovedByRequired'));
       return;
     }
 
@@ -170,7 +172,7 @@ export default function PaymentPanel({
       setPaymentDoc(pmt);
       setSuccess(true);
     } catch (err) {
-      setError('Payment failed. Please try again.');
+      setError(t('payments.errorPaymentFailed'));
       console.error(err);
     } finally {
       setProcessing(false);
@@ -206,7 +208,7 @@ export default function PaymentPanel({
           {/* Success header with green gradient */}
           <div style={{
             padding: '28px 20px', textAlign: 'center',
-            background: 'linear-gradient(135deg, rgba(27, 154, 170,0.12), rgba(27, 154, 170,0.04))',
+            background: 'linear-gradient(135deg, rgba(59, 130, 246,0.12), rgba(59, 130, 246,0.04))',
             borderBottom: '1px solid var(--border-medium)',
           }}>
             <div style={{
@@ -215,7 +217,7 @@ export default function PaymentPanel({
             }}>
               <CheckCircle2 size={56} style={{ color: 'var(--color-success)' }} />
             </div>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>Payment Recorded</h3>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{t('payments.paymentRecorded')}</h3>
             <p style={{ margin: '6px 0 0', fontSize: 26, fontWeight: 800, color: 'var(--color-success)' }}>
               {parseFloat(amount).toLocaleString()} {currency}
             </p>
@@ -226,10 +228,10 @@ export default function PaymentPanel({
           <div style={{ padding: '16px 20px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                { label: 'Receipt #', value: paymentDoc.reference || paymentDoc._id },
-                { label: 'Date', value: new Date(paymentDoc.processedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) },
-                { label: 'Method', value: tab === 'cash' ? 'Cash' : tab === 'mobile' ? (mobileProvider === 'mpesa' ? 'M-Pesa' : mobileProvider === 'airtel' ? 'Airtel Money' : 'MTN MoMo') : tab === 'card' ? 'Card' : tab === 'bank' ? 'Bank Transfer' : insuranceWaiverMode === 'insurance' ? 'Insurance' : 'Waiver' },
-                { label: 'Processed By', value: paymentDoc.processedByName },
+                { label: t('payments.receiptNumberLabel'), value: paymentDoc.reference || paymentDoc._id },
+                { label: t('payments.dateLabel'), value: new Date(paymentDoc.processedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) },
+                { label: t('payments.methodLabel'), value: tab === 'cash' ? t('payments.methodCash') : tab === 'mobile' ? (mobileProvider === 'mpesa' ? t('payments.methodMpesa') : mobileProvider === 'airtel' ? t('payments.methodAirtelMoney') : t('payments.methodMtnMomo')) : tab === 'card' ? t('payments.methodCard') : tab === 'bank' ? t('payments.methodBankTransfer') : insuranceWaiverMode === 'insurance' ? t('billing.insurance') : t('payments.methodWaiver') },
+                { label: t('payments.processedByLabel'), value: paymentDoc.processedByName },
               ].map(row => (
                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                   <span style={{ color: 'var(--text-muted)' }}>{row.label}</span>
@@ -246,14 +248,14 @@ export default function PaymentPanel({
               background: 'transparent', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
-              <Printer size={14} /> Print Receipt
+              <Printer size={14} /> {t('payments.printReceipt')}
             </button>
             <button onClick={() => setShowEmailInput(!showEmailInput)} style={{
               flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid var(--border-medium)',
               background: 'transparent', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
-              <Mail size={14} /> {emailSent ? 'Sent!' : 'Email Receipt'}
+              <Mail size={14} /> {emailSent ? t('payments.sent') : t('payments.emailReceipt')}
             </button>
           </div>
 
@@ -269,15 +271,15 @@ export default function PaymentPanel({
                 background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600,
                 cursor: emailSending ? 'not-allowed' : 'pointer', opacity: emailSending ? 0.7 : 1,
               }}>
-                {emailSending ? 'Sending...' : 'Send'}
+                {emailSending ? t('payments.sending') : t('payments.send')}
               </button>
             </div>
           )}
 
           {emailSent && (
             <div style={{ padding: '0 20px 12px' }}>
-              <div style={{ fontSize: 12, color: '#1B9AAA', padding: '6px 12px', background: 'rgba(27, 154, 170,0.08)', borderRadius: 8, textAlign: 'center' }}>
-                Receipt sent to {emailAddress}
+              <div style={{ fontSize: 12, color: '#3b82f6', padding: '6px 12px', background: 'rgba(59, 130, 246,0.08)', borderRadius: 8, textAlign: 'center' }}>
+                {t('payments.receiptSentTo', { email: emailAddress })}
               </div>
             </div>
           )}
@@ -288,7 +290,7 @@ export default function PaymentPanel({
               width: '100%', padding: '12px 0', borderRadius: 10, border: 'none',
               background: 'var(--accent)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
             }}>
-              Done
+              {t('payments.done')}
             </button>
           </div>
         </div>
@@ -297,11 +299,11 @@ export default function PaymentPanel({
   }
 
   const tabs: { key: TabType; label: string; icon: typeof Banknote }[] = [
-    { key: 'cash', label: 'Cash', icon: Banknote },
-    { key: 'mobile', label: 'Mobile Money', icon: Smartphone },
-    { key: 'card', label: 'Card', icon: CreditCard },
-    { key: 'bank', label: 'Bank Transfer', icon: Building2 },
-    { key: 'insurance', label: 'Insurance / Waiver', icon: Shield },
+    { key: 'cash', label: t('payments.methodCash'), icon: Banknote },
+    { key: 'mobile', label: t('payments.methodMobileMoney'), icon: Smartphone },
+    { key: 'card', label: t('payments.methodCard'), icon: CreditCard },
+    { key: 'bank', label: t('payments.methodBankTransfer'), icon: Building2 },
+    { key: 'insurance', label: t('payments.methodInsuranceWaiver'), icon: Shield },
   ];
 
   return (
@@ -310,7 +312,7 @@ export default function PaymentPanel({
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border-medium)' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Collect Payment</h3>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{t('billing.collectPayment')}</h3>
             <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>{patientName}</p>
           </div>
           <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
@@ -320,23 +322,23 @@ export default function PaymentPanel({
 
         {/* Amount Due */}
         <div style={{ padding: '16px 20px', background: 'var(--bg-secondary)', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Amount Due</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('payments.amountDueLabel')}</div>
           <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>{amountDue.toLocaleString()} {currency}</div>
         </div>
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-medium)', overflowX: 'auto' }}>
-          {tabs.map(t => {
-            const Icon = t.icon;
-            const active = tab === t.key;
+          {tabs.map(tabItem => {
+            const Icon = tabItem.icon;
+            const active = tab === tabItem.key;
             return (
-              <button key={t.key} onClick={() => setTab(t.key)} style={{
+              <button key={tabItem.key} onClick={() => setTab(tabItem.key)} style={{
                 flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 padding: '10px 12px', border: 'none', borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
                 background: 'none', cursor: 'pointer', fontSize: 12, fontWeight: active ? 600 : 400,
                 color: active ? 'var(--accent)' : 'var(--text-muted)', whiteSpace: 'nowrap',
               }}>
-                <Icon size={14} /> <span>{t.label}</span>
+                <Icon size={14} /> <span>{tabItem.label}</span>
               </button>
             );
           })}
@@ -346,7 +348,7 @@ export default function PaymentPanel({
         <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Amount */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Amount ({currency})</label>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.amountWithCurrency', { currency })}</label>
             <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
               style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 16, fontWeight: 600, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
             />
@@ -355,8 +357,8 @@ export default function PaymentPanel({
           {/* Tab-specific fields */}
           {tab === 'cash' && (
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Receipt Number (optional)</label>
-              <input type="text" value={receiptNumber} onChange={e => setReceiptNumber(e.target.value)} placeholder="e.g. REC-001"
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.receiptNumberOptional')}</label>
+              <input type="text" value={receiptNumber} onChange={e => setReceiptNumber(e.target.value)} placeholder={t('payments.receiptNumberPlaceholder')}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
               />
             </div>
@@ -365,7 +367,7 @@ export default function PaymentPanel({
           {tab === 'mobile' && (
             <>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Provider</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.provider')}</label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {(['mpesa', 'airtel', 'mtn_momo'] as const).map(p => (
                     <button key={p} onClick={() => setMobileProvider(p)} style={{
@@ -374,20 +376,20 @@ export default function PaymentPanel({
                       background: mobileProvider === p ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent',
                       color: mobileProvider === p ? 'var(--accent)' : 'var(--text-muted)',
                     }}>
-                      {p === 'mpesa' ? 'M-Pesa' : p === 'airtel' ? 'Airtel' : 'MTN MoMo'}
+                      {p === 'mpesa' ? t('payments.methodMpesa') : p === 'airtel' ? t('payments.methodAirtel') : t('payments.methodMtnMomo')}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Phone Number</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.phoneNumber')}</label>
                 <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+211 9XX XXX XXX"
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Transaction Reference</label>
-                <input type="text" value={mobileReference} onChange={e => setMobileReference(e.target.value)} placeholder="M-Pesa / Airtel transaction ID"
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.transactionReference')}</label>
+                <input type="text" value={mobileReference} onChange={e => setMobileReference(e.target.value)} placeholder={t('payments.transactionReferencePlaceholder')}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                 />
               </div>
@@ -397,19 +399,19 @@ export default function PaymentPanel({
           {tab === 'card' && (
             <>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Last 4 Digits</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.last4Digits')}</label>
                 <input type="text" value={cardLast4} onChange={e => setCardLast4(e.target.value)} placeholder="1234" maxLength={4}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Authorization Code</label>
-                <input type="text" value={authCode} onChange={e => setAuthCode(e.target.value)} placeholder="Auth code from terminal"
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.authorizationCode')}</label>
+                <input type="text" value={authCode} onChange={e => setAuthCode(e.target.value)} placeholder={t('payments.authorizationCodePlaceholder')}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                 />
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'color-mix(in srgb, var(--accent) 5%, transparent)', padding: '8px 12px', borderRadius: 6 }}>
-                Processed via Flutterwave
+                {t('payments.processedViaFlutterwave')}
               </div>
             </>
           )}
@@ -417,19 +419,19 @@ export default function PaymentPanel({
           {tab === 'bank' && (
             <>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Bank Name</label>
-                <input type="text" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. Commercial Bank of South Sudan"
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.bankName')}</label>
+                <input type="text" value={bankName} onChange={e => setBankName(e.target.value)} placeholder={t('payments.bankNamePlaceholder')}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Transfer Reference</label>
-                <input type="text" value={transferReference} onChange={e => setTransferReference(e.target.value)} placeholder="Bank transaction / slip number"
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.transferReference')}</label>
+                <input type="text" value={transferReference} onChange={e => setTransferReference(e.target.value)} placeholder={t('payments.transferReferencePlaceholder')}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Date of Transfer</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.dateOfTransfer')}</label>
                 <input type="date" value={transferDate} onChange={e => setTransferDate(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                 />
@@ -440,7 +442,7 @@ export default function PaymentPanel({
           {tab === 'insurance' && (
             <>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, display: 'block' }}>Type</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, display: 'block' }}>{t('payments.type')}</label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {(['insurance', 'waiver'] as const).map(mode => (
                     <button key={mode} onClick={() => setInsuranceWaiverMode(mode)} style={{
@@ -449,7 +451,7 @@ export default function PaymentPanel({
                       background: insuranceWaiverMode === mode ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent',
                       color: insuranceWaiverMode === mode ? 'var(--accent)' : 'var(--text-muted)',
                     }}>
-                      {mode === 'insurance' ? 'Insurance' : 'Waiver'}
+                      {mode === 'insurance' ? t('billing.insurance') : t('payments.methodWaiver')}
                     </button>
                   ))}
                 </div>
@@ -458,14 +460,14 @@ export default function PaymentPanel({
               {insuranceWaiverMode === 'insurance' ? (
                 <>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Payer Name</label>
-                    <input type="text" value={payerName} onChange={e => setPayerName(e.target.value)} placeholder="e.g. NHIS, AAR Insurance"
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.payerName')}</label>
+                    <input type="text" value={payerName} onChange={e => setPayerName(e.target.value)} placeholder={t('payments.payerNamePlaceholder')}
                       style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Claim Reference</label>
-                    <input type="text" value={claimReference} onChange={e => setClaimReference(e.target.value)} placeholder="Claim ID / reference number"
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.claimReference')}</label>
+                    <input type="text" value={claimReference} onChange={e => setClaimReference(e.target.value)} placeholder={t('payments.claimReferencePlaceholder')}
                       style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                     />
                   </div>
@@ -473,14 +475,14 @@ export default function PaymentPanel({
               ) : (
                 <>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Reason for Waiver</label>
-                    <input type="text" value={waiverReason} onChange={e => setWaiverReason(e.target.value)} placeholder="e.g. Financial hardship, charity case"
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.reasonForWaiver')}</label>
+                    <input type="text" value={waiverReason} onChange={e => setWaiverReason(e.target.value)} placeholder={t('payments.reasonForWaiverPlaceholder')}
                       style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Approved By</label>
-                    <input type="text" value={approvedBy} onChange={e => setApprovedBy(e.target.value)} placeholder="Staff name / ID"
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.approvedBy')}</label>
+                    <input type="text" value={approvedBy} onChange={e => setApprovedBy(e.target.value)} placeholder={t('payments.approvedByPlaceholder')}
                       style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                     />
                   </div>
@@ -491,8 +493,8 @@ export default function PaymentPanel({
 
           {/* Notes field (available on all tabs) */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Notes (optional)</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Add any additional notes about this payment"
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('nurse.notesOptional')}</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={t('payments.notesPlaceholder')}
               style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 13, background: 'var(--bg-secondary)', color: 'var(--text-primary)', minHeight: 60, fontFamily: 'inherit', resize: 'vertical' }}
             />
           </div>
@@ -505,13 +507,13 @@ export default function PaymentPanel({
           <button onClick={onCancel} style={{
             flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid var(--border-medium)',
             background: 'transparent', color: 'var(--text-muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-          }}>Cancel</button>
+          }}>{t('action.cancel')}</button>
           <button onClick={handleSubmit} disabled={processing} style={{
             flex: 2, padding: '12px 0', borderRadius: 10, border: 'none',
             background: 'var(--accent)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: processing ? 'not-allowed' : 'pointer',
             opacity: processing ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}>
-            {processing ? <><Loader2 size={14} className="animate-spin" /> Processing...</> : `Record ${parseFloat(amount).toLocaleString()} ${currency}`}
+            {processing ? <><Loader2 size={14} className="animate-spin" /> {t('payments.processing')}</> : t('payments.recordAmount', { amount: parseFloat(amount).toLocaleString(), currency })}
           </button>
         </div>
       </div>

@@ -23,6 +23,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   DuotoneCheck as Check,
   DuotoneAlert as AlertTriangle,
@@ -65,6 +66,7 @@ function ToneIcon({ tone }: { tone: Tone }) {
 
 export default function ConnectivityNotice() {
   const { isAuthenticated, isOnline, isNetworkUp, syncPaused, syncStatus } = useApp();
+  const { t } = useTranslation();
   const [notice, setNotice] = useState<Notice | null>(null);
   const [exiting, setExiting] = useState(false);
 
@@ -120,15 +122,15 @@ export default function ConnectivityNotice() {
 
     if (pausedFlipped && isNetworkUp) {
       if (syncPaused) {
-        show('warning', 'Sync paused.', "You'll continue working locally.");
+        show('warning', t('connectivity.syncPaused'), t('connectivity.syncPausedBody'));
       } else {
-        show('success', 'Sync resumed.', 'Syncing now…');
+        show('success', t('connectivity.syncResumed'), t('connectivity.syncingNow'));
       }
     } else if (onlineFlipped) {
       if (isOnline) {
-        show('success', 'You are back online.', 'Syncing now…');
+        show('success', t('connectivity.backOnline'), t('connectivity.syncingNow'));
       } else if (!isNetworkUp) {
-        show('warning', 'You are offline.', 'Changes will sync when you reconnect.');
+        show('warning', t('connectivity.offline'), t('connectivity.offlineBody'));
       }
     }
 
@@ -147,10 +149,14 @@ export default function ConnectivityNotice() {
       if (syncStatus) {
         for (const s of Object.values(syncStatus.databases)) {
           if (s.state === 'error' && s.error) { msg = s.error; break; }
-          if (s.state === 'denied') { msg = 'Authentication denied'; break; }
+          if (s.state === 'denied') { msg = t('connectivity.authDenied'); break; }
         }
       }
-      show('danger', `Sync error${msg ? `: ${msg}` : ''}.`, 'Retrying…');
+      show(
+        'danger',
+        msg ? t('connectivity.syncErrorDetail', { msg }) : t('connectivity.syncError'),
+        t('connectivity.retrying'),
+      );
     }
     prevSyncErrState.current = state;
   }, [syncStatus, isAuthenticated]);
@@ -194,7 +200,7 @@ export default function ConnectivityNotice() {
         <button
           type="button"
           onClick={dismiss}
-          aria-label="Dismiss notification"
+          aria-label={t('common.dismissNotification')}
           className="p-1.5 rounded hover:bg-white/20 transition-colors flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
         >
           <X className="w-3.5 h-3.5" />

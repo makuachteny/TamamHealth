@@ -39,7 +39,7 @@ export default function MarketingNav() {
             <TamamHealthLogoNav />
             <span className="mk-nav-logo-wordmark">
               <span className="mk-nav-logo-text">
-                Tamam<span style={{ color: "#5EC38A" }}>Health</span>
+                Tamam<span style={{ color: "#0d8844" }}>Health</span>
               </span>
               <span className="mk-nav-logo-tagline">Digital Records System</span>
             </span>
@@ -218,28 +218,31 @@ export default function MarketingNav() {
 
 /* ── Inline SVG Icons ──────────────────────────────────────────── */
 function TamamHealthLogoNav() {
+  // Tamam Healthcare System dot-cluster mark (brand green).
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" width="36" height="36">
-      <circle cx="60" cy="60" r="58" fill="#1E4D4A"/>
-      <circle cx="60" cy="60" r="54" fill="#1A3A3A"/>
-      <circle cx="60" cy="60" r="50" fill="none" stroke="url(#navLogoRingGrad)" strokeWidth="3"/>
-      <polygon points="60,18 65,38 86,38 69,49 75,68 60,56 45,68 51,49 34,38 55,38" fill="#E4A84B" opacity="0.15"/>
-      <rect x="48" y="30" width="24" height="60" rx="4" fill="white"/>
-      <rect x="30" y="48" width="60" height="24" rx="4" fill="white"/>
-      <rect x="52" y="34" width="16" height="52" rx="2" fill="#2D9B6A"/>
-      <rect x="34" y="52" width="52" height="16" rx="2" fill="#2D9B6A"/>
-      <circle cx="60" cy="60" r="10" fill="#E4A84B"/>
-      <polygon points="60,52 62.2,57.6 68,57.6 63.4,61.2 65.2,67 60,63.6 54.8,67 56.6,61.2 52,57.6 57.8,57.6" fill="#1A3A3A"/>
-      <path d="M30,88 Q60,96 90,88" stroke="#111" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-      <path d="M32,92 Q60,100 88,92" stroke="#E52E42" strokeWidth="2" fill="none" strokeLinecap="round"/>
-      <path d="M35,96 Q60,103 85,96" stroke="#2D9B6A" strokeWidth="2" fill="none" strokeLinecap="round"/>
-      <defs>
-        <linearGradient id="navLogoRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#E4A84B"/>
-          <stop offset="50%" stopColor="#2D9B6A"/>
-          <stop offset="100%" stopColor="#2E9E7E"/>
-        </linearGradient>
-      </defs>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="90 -11 316 316" width="36" height="36" role="img" aria-label="Tamam Healthcare System">
+      <g fill="#0d8844">
+        <circle cx="127.67" cy="28.84" r="28.84"/>
+        <circle cx="218.69" cy="46.28" r="28.84"/>
+        <circle cx="296.1" cy="97.22" r="28.84"/>
+        <circle cx="348.12" cy="173.91" r="28.84"/>
+        <circle cx="366.84" cy="264.67" r="28.84"/>
+        <circle cx="130.25" cy="103.54" r="24.99"/>
+        <circle cx="192.48" cy="116.29" r="24.99"/>
+        <circle cx="245.1" cy="151.87" r="24.99"/>
+        <circle cx="280.09" cy="204.88" r="24.99"/>
+        <circle cx="292.14" cy="267.26" r="24.99"/>
+        <circle cx="129.41" cy="171.67" r="14.53"/>
+        <circle cx="165.64" cy="178.9" r="14.53"/>
+        <circle cx="196.34" cy="199.45" r="14.53"/>
+        <circle cx="216.83" cy="230.18" r="14.53"/>
+        <circle cx="224.01" cy="266.42" r="14.53"/>
+        <circle cx="129.38" cy="213.9" r="8.05"/>
+        <circle cx="149.44" cy="217.9" r="8.05"/>
+        <circle cx="166.45" cy="229.28" r="8.05"/>
+        <circle cx="177.81" cy="246.31" r="8.05"/>
+        <circle cx="181.78" cy="266.38" r="8.05"/>
+      </g>
     </svg>
   );
 }

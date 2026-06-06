@@ -71,7 +71,7 @@ export function VitalCard({
         <div
           style={{
             width: 32, height: 32, borderRadius: 9,
-            background: severity === 'normal' ? 'rgba(27, 154, 170, 0.12)' : tokens.badge,
+            background: severity === 'normal' ? 'rgba(59, 130, 246, 0.12)' : tokens.badge,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >

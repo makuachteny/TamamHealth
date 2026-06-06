@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import TopBar from '@/components/TopBar';
@@ -11,8 +11,10 @@ import {
   FileText, Globe, Pill,
   ArrowUpRight, SendHorizontal,
   X, ClipboardList, TestTube, Clock,
-  CheckCircle2, Search
+  CheckCircle2, Search,
+  BarChart3, TrendingUp, PieChart as PieChartIcon
 } from '@/components/icons/lucide';
+import EmptyState from '@/components/EmptyState';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -26,11 +28,11 @@ import { useANC } from '@/lib/hooks/useANC';
 import { useBirths } from '@/lib/hooks/useBirths';
 import { getDefaultDashboard } from '@/lib/permissions';
 import ReferralChainTracker from '@/components/ReferralChainTracker';
+import SuperintendentDashboard from '@/components/dashboards/SuperintendentDashboard';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', 'Lab', 'Pharmacy', 'ICU'];
 
-const DOCTORS = ['Dr. Wani James', 'Dr. Akol Deng', 'Dr. Ladu Morris', 'Dr. Achol Mabior', 'Dr. TamamHealth Philip'];
-const NURSES = ['Nurse Ayen', 'Nurse Nyamal', 'Nurse Rose', 'Nurse Abuk', 'Nurse Dorothy'];
 
 // In production we suppress fabricated demo numbers (e.g. 55%/12% gender splits,
 // "Week N" trend points) so users do not see invented statistics presented as
@@ -275,7 +277,8 @@ function TemplateIcon({ icon, color }: { icon: string; color: string }) {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { currentUser, globalSearch } = useApp();
+  const { t } = useTranslation();
+  const { currentUser } = useApp();
   const { patients } = usePatients();
   const { referrals } = useReferrals();
   const { alerts: diseaseAlerts } = useSurveillance();
@@ -283,6 +286,14 @@ export default function DashboardPage() {
   const { stats: ancStats } = useANC();
   const { stats: birthStats } = useBirths();
   const [activeTab, setActiveTab] = useState('satisfaction');
+
+  // Patients a nurse has assigned to this clinician for care.
+  const myAssigned = useMemo(
+    () => patients
+      .filter(p => p.assignedDoctor && p.assignedDoctor === currentUser?._id)
+      .sort((a, b) => (b.assignedAt ?? '').localeCompare(a.assignedAt ?? '')),
+    [patients, currentUser?._id],
+  );
 
   // Disease trend explorer
   const [diseaseSearch, setDiseaseSearch] = useState('');
@@ -305,9 +316,18 @@ export default function DashboardPage() {
   const [selectedLabTests, setSelectedLabTests] = useState<Set<string>>(new Set());
   const [labOrderSuccess, setLabOrderSuccess] = useState(false);
 
-  // Redirect non-doctor/CO roles to their own dashboards
+  // `/dashboard` is shared. Doctors/clinical officers get the clinical view
+  // below; the medical superintendent gets the admin-oriented view rendered
+  // separately. The superintendent's defaultDashboard IS `/dashboard`, so it
+  // must be excluded from the redirect or it would bounce to itself (the
+  // blank-page / redirect-loop bug). Every other role is sent to its home.
   useEffect(() => {
-    if (currentUser && currentUser.role !== 'doctor' && currentUser.role !== 'clinical_officer') {
+    if (
+      currentUser &&
+      currentUser.role !== 'doctor' &&
+      currentUser.role !== 'clinical_officer' &&
+      currentUser.role !== 'medical_superintendent'
+    ) {
       router.push(getDefaultDashboard(currentUser.role));
     }
   }, [currentUser, router]);
@@ -392,22 +412,14 @@ export default function DashboardPage() {
     }, 2000);
   }, [labPatientId, selectedLabTests]);
 
-  if (!currentUser || (currentUser.role !== 'doctor' && currentUser.role !== 'clinical_officer')) return null;
+  if (!currentUser) return null;
+  // Medical superintendent → admin-oriented hospital dashboard.
+  if (currentUser.role === 'medical_superintendent') return <SuperintendentDashboard />;
+  // Anyone else who isn't a doctor/clinical officer is mid-redirect (above).
+  if (currentUser.role !== 'doctor' && currentUser.role !== 'clinical_officer') return null;
 
   const hospital = currentUser.hospital;
 
-  const recentPatients = [...patients]
-    .sort((a, b) => {
-      const ta = new Date(a.registeredAt || a.registrationDate || 0).getTime();
-      const tb = new Date(b.registeredAt || b.registrationDate || 0).getTime();
-      return tb - ta;
-    })
-    .filter(p =>
-      !globalSearch ||
-      `${p.firstName} ${p.surname}`.toLowerCase().includes(globalSearch.toLowerCase()) ||
-      p.hospitalNumber.toLowerCase().includes(globalSearch.toLowerCase())
-    )
-    .slice(0, 6);
   const activeAlerts = diseaseAlerts.filter(a => a.alertLevel === 'emergency' || a.alertLevel === 'warning');
   const pendingReferrals = referrals.filter(r => r.status === 'sent' || r.status === 'received');
 
@@ -438,33 +450,33 @@ export default function DashboardPage() {
     : [];
   const satisfactionRate = IS_DEMO ? 76 : 0;
 
-  // Recently admitted patients table data. Ward/doctor/nurse assignment is
-  // sampled from a fixed roster in demo mode for visual richness; in
-  // production we leave the columns blank rather than invent a clinical team
-  // from a hardcoded list.
-  const admittedPatients = recentPatients.map((p, i) => ({
+  // Worklist table data: patients assigned to the signed-in clinician.
+  // The assigning provider (often a nurse) and assignment time come from the
+  // patient record; ward/division are sampled in demo mode for visual richness
+  // and left blank in production rather than inventing a clinical team.
+  const assignedRows = myAssigned.map((p, i) => ({
     _id: p._id,
     name: `${p.firstName} ${p.surname}`,
     age: p.estimatedAge || (p.dateOfBirth ? new Date().getFullYear() - new Date(p.dateOfBirth).getFullYear() : 25 + i * 3),
     gender: p.gender?.[0] || (IS_DEMO ? (i % 2 === 0 ? 'M' : 'F') : ''),
     id: p.hospitalNumber,
-    admittedAt: p.registeredAt || p.registrationDate,
-    ward: IS_DEMO ? DEPARTMENTS[i % DEPARTMENTS.length] + '-' + (Math.floor(Math.random() * 15) + 1) : '',
-    doctor: IS_DEMO ? DOCTORS[i % DOCTORS.length] : '',
-    nurse: IS_DEMO ? NURSES[i % NURSES.length] : '',
+    admittedAt: p.assignedAt || p.registeredAt || p.registrationDate,
+    ward: IS_DEMO ? DEPARTMENTS[i % DEPARTMENTS.length] + '-' + (i + 1) : '',
+    doctor: currentUser?.name || '',
+    nurse: p.assignedByName || '',
     division: IS_DEMO ? DEPARTMENTS[i % DEPARTMENTS.length] : '',
-    critical: IS_DEMO && (i === 0 || i === 4),
+    critical: false,
   }));
 
   // Bed occupancy bar chart. The ICU/Maternity/Pediatric defaults (8/30/20)
   // are demo placeholders for unfurnished hospital records — in production we
   // only render counts the hospital itself has reported.
   const bedChartData = [
-    { status: 'ICU', beds: hospital?.icuBeds ?? (IS_DEMO ? 8 : 0), color: 'var(--color-danger)' },
-    { status: 'Maternity', beds: hospital?.maternityBeds ?? (IS_DEMO ? 30 : 0), color: '#EC4899' },
-    { status: 'Pediatric', beds: hospital?.pediatricBeds ?? (IS_DEMO ? 20 : 0), color: '#5CB8A8' },
-    { status: 'General', beds: Math.max(0, bedTotal - (hospital?.icuBeds || 0) - (hospital?.maternityBeds || 0) - (hospital?.pediatricBeds || 0)), color: 'var(--color-success)' },
-    { status: 'Available', beds: Math.max(0, bedTotal - bedOccupancy), color: 'var(--text-muted)' },
+    { status: t('dashboard.bedIcu'), beds: hospital?.icuBeds ?? (IS_DEMO ? 8 : 0), color: 'var(--color-danger)' },
+    { status: t('dashboard.bedMaternity'), beds: hospital?.maternityBeds ?? (IS_DEMO ? 30 : 0), color: '#EC4899' },
+    { status: t('dashboard.bedPediatric'), beds: hospital?.pediatricBeds ?? (IS_DEMO ? 20 : 0), color: '#5CB8A8' },
+    { status: t('dashboard.bedGeneral'), beds: Math.max(0, bedTotal - (hospital?.icuBeds || 0) - (hospital?.maternityBeds || 0) - (hospital?.pediatricBeds || 0)), color: 'var(--color-success)' },
+    { status: t('dashboard.bedAvailable'), beds: Math.max(0, bedTotal - bedOccupancy), color: 'var(--text-muted)' },
   ];
 
   // Weekly in/out-patient trend — derived from a fixed ratio of the seeded
@@ -486,7 +498,7 @@ export default function DashboardPage() {
 
   // ── Disease catalog with monthly trend data ──
   const DISEASE_COLORS: Record<string, string> = {
-    'Malaria': '#EF4444', 'Pneumonia': '#F59E0B', 'Diarrheal': '#1B9AAA', 'HIV/AIDS': '#8B5CF6',
+    'Malaria': '#EF4444', 'Pneumonia': '#F59E0B', 'Diarrheal': '#3b82f6', 'HIV/AIDS': '#8B5CF6',
     'Tuberculosis': '#6366F1', 'Typhoid': '#EC4899', 'Measles': '#14B8A6', 'Cholera': '#06B6D4',
     'Hypertension': '#F97316', 'Diabetes': '#A855F7', 'Malnutrition': '#EAB308', 'Meningitis': '#DC2626',
     'Hepatitis B': '#059669', 'Sickle Cell': '#D946EF', 'Leishmaniasis': '#0EA5E9', 'Epilepsy': '#5A7370',
@@ -593,7 +605,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <TopBar title="Dashboard" />
+      <TopBar title={t('nav.dashboard')} />
       <main className="page-container page-enter">
 
         {/* Clinical alerts moved to a dedicated /alerts page. */}
@@ -601,21 +613,21 @@ export default function DashboardPage() {
         {/* ═══ TOP ROW: KPI Cards ═══ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
 
-          {/* ── Admitted Patients (headline = total active staff, swapped) ── */}
+          {/* ── Admitted Patients ── */}
           <div className="dash-card" style={{ padding: '14px 16px' }}>
             <div className="kpi-card-header" style={{ justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
                   <Users className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
                 </div>
-                <span className="kpi-card-title">Admitted Patients</span>
+                <span className="kpi-card-title">{t('dashboard.admittedPatients')}</span>
               </div>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-success)', display: 'inline-flex', alignItems: 'center', gap: 2 }}><ArrowUpRight className="w-3 h-3" />2%</span>
             </div>
-            <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800, letterSpacing: '-0.03em' }}>{totalDoctors + totalNurses}</div>
+            <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800, letterSpacing: '-0.03em' }}>{patients.length || 0}</div>
             <hr className="section-divider" />
             <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-              {[{ n: maleCount, l: 'Male', c: '#4A99C9' }, { n: femaleCount, l: 'Female', c: '#EC4899' }].map(g => (
+              {[{ n: maleCount, l: t('patient.male'), c: '#4A99C9' }, { n: femaleCount, l: t('patient.female'), c: '#EC4899' }].map(g => (
                 <div key={g.l} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <User className="w-4 h-4" style={{ color: g.c }} />
                   <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}><span className="stat-value" style={{ fontWeight: 700, color: 'var(--text-primary)', marginRight: 3 }}>{g.n}</span>{g.l}</span>
@@ -624,9 +636,9 @@ export default function DashboardPage() {
             </div>
             <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 10, display: 'flex', gap: 0 }}>
               {[
-                { v: waitingCount, l: 'Waiting', c: 'var(--color-warning)' },
-                { v: dischargeCount, l: 'Discharge', c: 'var(--color-success)' },
-                { v: transferCount, l: 'Transfer', c: 'var(--accent-primary)' },
+                { v: waitingCount, l: t('dashboard.waiting'), c: 'var(--color-warning)' },
+                { v: dischargeCount, l: t('dashboard.discharge'), c: 'var(--color-success)' },
+                { v: transferCount, l: t('dashboard.transfer'), c: 'var(--accent-primary)' },
               ].map((s, i) => (
                 <div key={s.l} style={{ flex: 1, textAlign: 'center', borderRight: i < 2 ? '1px solid var(--border-light)' : 'none' }}>
                   <div className="stat-value" style={{ fontSize: 16, fontWeight: 700, color: s.c }}>{s.v}</div>
@@ -636,22 +648,22 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ── Active Staff (headline = total patients, swapped) ── */}
+          {/* ── Active Staff ── */}
           <div className="dash-card" style={{ padding: '14px 16px' }}>
             <div className="kpi-card-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
                   <Users className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
                 </div>
-                <span className="kpi-card-title">Active Staff</span>
+                <span className="kpi-card-title">{t('dashboard.activeStaff')}</span>
               </div>
             </div>
-            <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800, letterSpacing: '-0.03em' }}>{patients.length || 0}</div>
+            <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800, letterSpacing: '-0.03em' }}>{totalDoctors + totalNurses}</div>
             <hr className="section-divider" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {[
-                { Icon: Stethoscope, label: 'Doctors', count: totalDoctors, color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
-                { Icon: HeartPulse, label: 'Nursing', count: totalNurses, color: '#D96E59', bg: 'rgba(217, 110, 89, 0.14)' },
+                { Icon: Stethoscope, label: t('dashboard.doctors'), count: totalDoctors, color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
+                { Icon: HeartPulse, label: t('dashboard.nursing'), count: totalNurses, color: '#D96E59', bg: 'rgba(217, 110, 89, 0.14)' },
               ].map((r, i) => (
                 <div
                   key={r.label}
@@ -696,15 +708,15 @@ export default function DashboardPage() {
                 <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
                   <ClipboardList className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
                 </div>
-                <span className="kpi-card-title">Quick Overview</span>
+                <span className="kpi-card-title">{t('dashboard.quickOverview')}</span>
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {[
-                { Icon: SendHorizontal, label: 'Pending Referrals', value: pendingReferrals.length, color: '#B8741C', bg: 'rgba(228, 168, 75, 0.16)', alarm: false, href: '/referrals' },
-                { Icon: AlertTriangle, label: 'Active Alerts', value: activeAlerts.length, color: '#C44536', bg: 'rgba(196, 69, 54, 0.14)', alarm: activeAlerts.length > 0, href: '/alerts' },
-                { Icon: Syringe, label: 'Immunizations', value: immStats?.totalVaccinations || 0, color: 'var(--accent-primary)', bg: 'var(--accent-light)', alarm: false, href: '/immunizations' },
-                { Icon: Baby, label: 'ANC / Births', value: `${ancStats?.totalVisits || 0} / ${birthStats?.total || 0}`, color: '#D96E59', bg: 'rgba(217, 110, 89, 0.16)', alarm: false, href: '/anc' },
+                { Icon: SendHorizontal, label: t('dashboard.pendingReferrals'), value: pendingReferrals.length, color: '#B8741C', bg: 'rgba(228, 168, 75, 0.16)', alarm: false, href: '/referrals' },
+                { Icon: AlertTriangle, label: t('dashboard.activeAlerts'), value: activeAlerts.length, color: '#C44536', bg: 'rgba(196, 69, 54, 0.14)', alarm: activeAlerts.length > 0, href: '/alerts' },
+                { Icon: Syringe, label: t('nav.immunizations'), value: immStats?.totalVaccinations || 0, color: 'var(--accent-primary)', bg: 'var(--accent-light)', alarm: false, href: '/immunizations' },
+                { Icon: Baby, label: t('dashboard.ancBirths'), value: `${ancStats?.totalVisits || 0} / ${birthStats?.total || 0}`, color: '#D96E59', bg: 'rgba(217, 110, 89, 0.16)', alarm: false, href: '/anc' },
               ].map((item, i) => (
                 <button
                   key={item.label}
@@ -748,10 +760,16 @@ export default function DashboardPage() {
                   color: activeTab === tab ? 'var(--accent-primary)' : 'var(--text-muted)',
                   borderBottom: activeTab === tab ? '2px solid var(--accent-primary)' : '2px solid transparent',
                 }}>
-                  {tab === 'satisfaction' ? 'Score' : tab === 'equipment' ? 'Equip' : tab === 'department' ? 'Dept' : 'Wait'}
+                  {tab === 'satisfaction' ? t('dashboard.tabScore') : tab === 'equipment' ? t('dashboard.tabEquip') : tab === 'department' ? t('dashboard.tabDept') : t('dashboard.tabWait')}
                 </button>
               ))}
             </div>
+            {tabContent.data.length === 0 || tabContent.data.every(d => !d.value) ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 108 }}>
+                <PieChartIcon className="w-6 h-6" style={{ color: 'var(--text-muted)' }} />
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No data yet</span>
+              </div>
+            ) : (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
               <div style={{ flexShrink: 0, position: 'relative', width: 108, height: 108 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -777,20 +795,17 @@ export default function DashboardPage() {
                 ))}
               </div>
             </div>
+            )}
           </div>
         </div>
 
-        {/* ═══ RECENTLY ADMITTED PATIENTS TABLE ═══ */}
+        {/* ═══ PATIENTS ASSIGNED TO YOU TABLE ═══ */}
         <div className="dash-card mb-6 overflow-hidden">
           <div className="flex items-center justify-between p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Recently Admitted Patients</h3>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Patients assigned to you</h3>
             <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1.5 text-[10px]">
-                <span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-danger)' }} />
-                <span style={{ color: 'var(--text-muted)' }}>Critical</span>
-              </span>
               <button onClick={() => router.push('/patients')} className="text-[11px] font-medium flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
-                Details <ChevronRight className="w-3 h-3" />
+                {t('dashboard.details')} <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>
@@ -798,7 +813,7 @@ export default function DashboardPage() {
             <table className="w-full">
               <thead>
                 <tr>
-                  {['Patient Name', 'Patient ID', 'Admitted', 'Ward-Room No.', 'Assigned Doctor', 'Assigned Nurse', 'Division'].map(h => (
+                  {[t('patient.name'), t('dashboard.patientId'), t('dashboard.admitted'), t('dashboard.wardRoomNo'), t('dashboard.assignedDoctor'), t('dashboard.assignedNurse'), t('dashboard.division')].map(h => (
                     <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
                       {h}
                     </th>
@@ -806,7 +821,14 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {admittedPatients.map((p) => (
+                {assignedRows.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                      No patients are assigned to you right now.
+                    </td>
+                  </tr>
+                )}
+                {assignedRows.map((p) => (
                   <tr
                     key={p._id}
                     role="button"
@@ -815,7 +837,7 @@ export default function DashboardPage() {
                     onClick={() => router.push(`/patients/${p._id}`)}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${p._id}`); } }}
                     style={{ borderBottom: '1px solid var(--border-light)' }}
-                    title="View patient record"
+                    title={t('dashboard.viewPatientRecord')}
                   >
                     <td className="px-4 py-2.5">
                       <span className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{p.name}</span>
@@ -854,13 +876,13 @@ export default function DashboardPage() {
           <div className="glass-section">
             <div className="glass-section-header">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Disease Trends</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dashboard.diseaseTrends')}</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
-                  {selectedDiseases.size} selected
+                  {t('dashboard.selectedCount', { count: selectedDiseases.size })}
                 </span>
               </div>
               <button onClick={() => router.push('/surveillance')} className="text-[10px] font-medium flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
-                Surveillance <ChevronRight className="w-3 h-3" />
+                {t('dashboard.surveillance')} <ChevronRight className="w-3 h-3" />
               </button>
             </div>
 
@@ -872,7 +894,7 @@ export default function DashboardPage() {
                   value={diseaseSearch}
                   onChange={e => { setDiseaseSearch(e.target.value); setShowDiseaseDropdown(true); }}
                   onFocus={() => setShowDiseaseDropdown(true)}
-                  placeholder="Search diseases (Malaria, TB, Cholera...)"
+                  placeholder={t('dashboard.searchDiseasesPlaceholder')}
                   className="text-sm"
                   style={{ paddingLeft: 32, padding: '7px 12px 7px 32px' }}
                 />
@@ -908,7 +930,7 @@ export default function DashboardPage() {
                       );
                     })}
                     {filteredDiseaseList.length === 0 && (
-                      <p className="px-3 py-2 text-xs" style={{ color: 'var(--text-muted)' }}>No diseases found</p>
+                      <p className="px-3 py-2 text-xs" style={{ color: 'var(--text-muted)' }}>{t('dashboard.noDiseasesFound')}</p>
                     )}
                   </div>
                 )}
@@ -959,12 +981,12 @@ export default function DashboardPage() {
                       <span className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>{d.value}</span>
                     </div>
                   ))}
-                  <span className="text-[10px] ml-auto" style={{ color: 'var(--text-muted)' }}>Total: {totalCases}</span>
+                  <span className="text-[10px] ml-auto" style={{ color: 'var(--text-muted)' }}>{t('dashboard.total')}: {totalCases}</span>
                 </div>
               </div>
             ) : (
               <div className="px-4 pb-4 text-center py-8">
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Select diseases above to visualize trends</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('dashboard.selectDiseasesHint')}</p>
               </div>
             )}
 
@@ -977,13 +999,13 @@ export default function DashboardPage() {
                   background: 'rgba(229,46,66,0.06)',
                   border: '1px solid rgba(229,46,66,0.18)',
                 }}
-                title="Open surveillance module"
+                title={t('dashboard.openSurveillanceModule')}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
                     <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-danger)' }}>
-                      {activeAlerts.length} Active Disease Alert{activeAlerts.length > 1 ? 's' : ''}
+                      {t('dashboard.activeDiseaseAlerts', { count: activeAlerts.length })}
                     </span>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
@@ -992,9 +1014,9 @@ export default function DashboardPage() {
                   {activeAlerts.slice(0, 2).map((a, i) => (
                     <div key={i} className="flex items-center justify-between text-[11px]">
                       <span style={{ color: 'var(--text-primary)' }}>
-                        <span className="font-semibold">{a.disease || 'Unknown disease'}</span>
+                        <span className="font-semibold">{a.disease || t('dashboard.unknownDisease')}</span>
                         {a.county || a.state ? ` · ${a.county || a.state}` : ''}
-                        {typeof a.cases === 'number' ? ` · ${a.cases} cases` : ''}
+                        {typeof a.cases === 'number' ? ` · ${t('dashboard.casesCount', { count: a.cases })}` : ''}
                       </span>
                       <span
                         className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase"
@@ -1009,7 +1031,7 @@ export default function DashboardPage() {
                   ))}
                   {activeAlerts.length > 2 && (
                     <p className="text-[10px] pt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      +{activeAlerts.length - 2} more — open surveillance for full triage
+                      {t('dashboard.moreAlertsTriage', { count: activeAlerts.length - 2 })}
                     </p>
                   )}
                 </div>
@@ -1021,36 +1043,47 @@ export default function DashboardPage() {
           <div className="glass-section">
             <div className="glass-section-header">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Bed Occupancy</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dashboard.bedOccupancy')}</span>
                 <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>({bedOccupancy}/{bedTotal})</span>
               </div>
               <button onClick={() => router.push('/hospitals')} className="text-[10px] font-medium flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
-                Details <ChevronRight className="w-3 h-3" />
+                {t('dashboard.details')} <ChevronRight className="w-3 h-3" />
               </button>
             </div>
             <div className="p-4">
+              {bedChartData.every(d => !d.beds) ? (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <EmptyState icon={BarChart3} title="No data yet" message="No bed occupancy records for this facility." />
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={bedChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                   <XAxis dataKey="status" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="beds" name="Beds" radius={[6, 6, 0, 0]} barSize={32}>
+                  <Bar dataKey="beds" name={t('dashboard.beds')} radius={[6, 6, 0, 0]} barSize={32}>
                     {bedChartData.map((entry, i) => (
                       <Cell key={i} fill={entry.color} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </div>
           </div>
 
           {/* In Patient-Out Patient Rate Line Chart */}
           <div className="glass-section">
             <div className="glass-section-header">
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>In Patient-Out Patient Rate</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dashboard.inOutPatientRate')}</span>
             </div>
             <div className="p-4">
+              {inOutData.every(d => !d['In Patients'] && !d['Out Patients']) ? (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <EmptyState icon={TrendingUp} title="No data yet" message="No in/out-patient records for this period." />
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={inOutData} margin={{ top: 5, right: 15, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
@@ -1062,6 +1095,7 @@ export default function DashboardPage() {
                   <Line type="monotone" dataKey="Out Patients" stroke="#FCD34D" strokeWidth={2} dot={{ r: 4, fill: 'var(--color-warning)' }} />
                 </LineChart>
               </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>
@@ -1082,17 +1116,17 @@ export default function DashboardPage() {
 
           {/* Quick Actions */}
           <div className="lg:col-span-2 dash-card p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Quick Actions</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('dashboard.quickActions')}</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
-                { label: 'New Patient', icon: Users, action: () => router.push('/patients/new'), color: 'var(--accent-primary)', bg: 'rgba(27, 154, 170,0.10)' },
-                { label: 'New Consultation', icon: ClipboardList, action: () => setSoapModalOpen(true), color: 'var(--accent-primary)', bg: 'rgba(27, 154, 170,0.10)' },
-                { label: 'Quick Prescribe', icon: Pill, action: () => setPrescribeModalOpen(true), color: '#0D9488', bg: 'rgba(13,148,136,0.10)' },
-                { label: 'Quick Lab Order', icon: TestTube, action: () => setLabModalOpen(true), color: '#7C3AED', bg: 'rgba(124,58,237,0.10)' },
-                { label: 'Immunization', icon: Syringe, action: () => router.push('/immunizations'), color: '#059669', bg: 'rgba(5,150,105,0.10)' },
-                { label: 'ANC Visit', icon: HeartPulse, action: () => router.push('/anc'), color: '#EC4899', bg: 'rgba(236,72,153,0.10)' },
-                { label: 'Birth Reg.', icon: Baby, action: () => router.push('/births'), color: 'var(--accent-primary)', bg: 'rgba(27, 154, 170,0.10)' },
-                { label: 'Referral', icon: SendHorizontal, action: () => router.push('/referrals'), color: '#F59E0B', bg: 'rgba(245,158,11,0.10)' },
+                { label: t('dashboard.newPatient'), icon: Users, action: () => router.push('/patients/new'), color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.10)' },
+                { label: t('action.newConsultation'), icon: ClipboardList, action: () => setSoapModalOpen(true), color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.10)' },
+                { label: t('dashboard.quickPrescribe'), icon: Pill, action: () => setPrescribeModalOpen(true), color: '#0D9488', bg: 'rgba(13,148,136,0.10)' },
+                { label: t('dashboard.quickLabOrder'), icon: TestTube, action: () => setLabModalOpen(true), color: '#7C3AED', bg: 'rgba(124,58,237,0.10)' },
+                { label: t('dashboard.immunization'), icon: Syringe, action: () => router.push('/immunizations'), color: '#059669', bg: 'rgba(5,150,105,0.10)' },
+                { label: t('dashboard.ancVisit'), icon: HeartPulse, action: () => router.push('/anc'), color: '#EC4899', bg: 'rgba(236,72,153,0.10)' },
+                { label: t('dashboard.birthReg'), icon: Baby, action: () => router.push('/births'), color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.10)' },
+                { label: t('nav.referrals'), icon: SendHorizontal, action: () => router.push('/referrals'), color: '#F59E0B', bg: 'rgba(245,158,11,0.10)' },
               ].map(action => (
                 <button
                   key={action.label}
@@ -1114,36 +1148,36 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Globe className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>DHIS2 Status</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('dashboard.dhis2Status')}</p>
               </div>
               <button onClick={() => router.push('/dhis2-export')} className="text-[10px] font-medium flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
-                Open <ArrowUpRight className="w-3 h-3" />
+                {t('dashboard.open')} <ArrowUpRight className="w-3 h-3" />
               </button>
             </div>
             <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Connection</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{t('dashboard.connection')}</span>
                 <span className="flex items-center gap-1 text-[10px] font-bold" style={{ color: 'var(--color-success)' }}>
                   <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-success)' }} />
-                  Active
+                  {t('dashboard.active')}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Data Sync</span>
-                <span className="text-xs font-bold" style={{ color: 'var(--accent-primary)' }}>8/10 Elements</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{t('dashboard.dataSync')}</span>
+                <span className="text-xs font-bold" style={{ color: 'var(--accent-primary)' }}>{t('dashboard.dataSyncElements', { synced: 8, total: 10 })}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Last Sync</span>
-                <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>08:00 Today</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{t('dashboard.lastSync')}</span>
+                <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{t('dashboard.lastSyncTime', { time: '08:00' })}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Reports Pending</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{t('dashboard.reportsPending')}</span>
                 <span className="text-xs font-bold" style={{ color: 'var(--color-warning)' }}>3</span>
               </div>
             </div>
             <div className="mt-3 p-2 rounded-lg text-center" style={{
-              background: 'rgba(27, 154, 170,0.06)',
-              border: '1px solid rgba(27, 154, 170,0.1)',
+              background: 'rgba(59, 130, 246,0.06)',
+              border: '1px solid rgba(59, 130, 246,0.1)',
             }}>
               <span className="text-[9px] font-medium" style={{ color: 'var(--text-muted)' }}>
                 hmis.southsudan.health
@@ -1155,11 +1189,11 @@ export default function DashboardPage() {
         {/* ═══════════════════════════════════════════════
             SOAP NOTE MODAL
         ═══════════════════════════════════════════════ */}
-        <ModalOverlay open={soapModalOpen} onClose={() => { setSoapModalOpen(false); setSelectedTemplate(null); setSoapForm({ subjective: '', objective: '', assessment: '', plan: '' }); setSoapPatientId(''); }} title="New Consultation - SOAP Note">
+        <ModalOverlay open={soapModalOpen} onClose={() => { setSoapModalOpen(false); setSelectedTemplate(null); setSoapForm({ subjective: '', objective: '', assessment: '', plan: '' }); setSoapPatientId(''); }} title={t('dashboard.newConsultationSoap')}>
           {/* Patient selector */}
           <div className="mb-4">
             <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--text-muted)' }}>
-              Select Patient
+              {t('dashboard.selectPatient')}
             </label>
             <select
               value={soapPatientId}
@@ -1167,7 +1201,7 @@ export default function DashboardPage() {
               className="w-full p-2.5 rounded-xl text-[13px]"
               style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
             >
-              <option value="">-- Select Patient --</option>
+              <option value="">{t('dashboard.selectPatientOption')}</option>
               {patients.slice(0, 20).map(p => (
                 <option key={p._id} value={p._id}>
                   {p.firstName} {p.surname} ({p.hospitalNumber})
@@ -1179,7 +1213,7 @@ export default function DashboardPage() {
           {/* Template selector */}
           <div className="mb-4">
             <label className="text-[11px] font-semibold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-muted)' }}>
-              Choose Template
+              {t('dashboard.chooseTemplate')}
             </label>
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {SOAP_TEMPLATES.map(t => (
@@ -1206,7 +1240,7 @@ export default function DashboardPage() {
                 <span className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-white" style={{ background: field === 'subjective' ? 'var(--accent-primary)' : field === 'objective' ? 'var(--color-success)' : field === 'assessment' ? 'var(--color-warning)' : '#A855F7' }}>
                   {field[0].toUpperCase()}
                 </span>
-                {field === 'subjective' ? 'Subjective' : field === 'objective' ? 'Objective' : field === 'assessment' ? 'Assessment' : 'Plan'}
+                {field === 'subjective' ? t('dashboard.soapSubjective') : field === 'objective' ? t('dashboard.soapObjective') : field === 'assessment' ? t('dashboard.soapAssessment') : t('dashboard.soapPlan')}
               </label>
               <textarea
                 value={soapForm[field]}
@@ -1214,7 +1248,7 @@ export default function DashboardPage() {
                 rows={field === 'plan' || field === 'objective' ? 5 : 3}
                 className="w-full p-2.5 rounded-xl text-[12px] resize-y"
                 style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
-                placeholder={`Enter ${field} notes...`}
+                placeholder={t('dashboard.enterFieldNotes', { field })}
               />
             </div>
           ))}
@@ -1225,16 +1259,16 @@ export default function DashboardPage() {
               className="px-4 py-2 rounded-xl text-[12px] font-medium"
               style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
             >
-              Cancel
+              {t('action.cancel')}
             </button>
             <button
               onClick={handleSoapSave}
               disabled={!soapPatientId}
-              title={!soapPatientId ? 'Select a patient first' : undefined}
+              title={!soapPatientId ? t('dashboard.selectPatientFirst') : undefined}
               className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white disabled:opacity-50"
               style={{ background: soapPatientId ? 'var(--accent-primary)' : 'var(--text-muted)', cursor: soapPatientId ? 'pointer' : 'not-allowed' }}
             >
-              Open in Consultation
+              {t('dashboard.openInConsultation')}
             </button>
           </div>
         </ModalOverlay>
@@ -1242,18 +1276,18 @@ export default function DashboardPage() {
         {/* ═══════════════════════════════════════════════
             PRESCRIPTION MODAL
         ═══════════════════════════════════════════════ */}
-        <ModalOverlay open={prescribeModalOpen} onClose={() => { setPrescribeModalOpen(false); setPrescriptionItems([]); setPrescribePatientId(''); setPrescriptionSuccess(false); }} title="Quick Prescribe">
+        <ModalOverlay open={prescribeModalOpen} onClose={() => { setPrescribeModalOpen(false); setPrescriptionItems([]); setPrescribePatientId(''); setPrescriptionSuccess(false); }} title={t('dashboard.quickPrescribe')}>
           {prescriptionSuccess ? (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
               <CheckCircle2 className="w-12 h-12" style={{ color: 'var(--color-success)' }} />
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Prescription Created Successfully</p>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dashboard.prescriptionCreated')}</p>
             </div>
           ) : (
             <>
               {/* Patient selector */}
               <div className="mb-4">
                 <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                  Select Patient
+                  {t('dashboard.selectPatient')}
                 </label>
                 <select
                   value={prescribePatientId}
@@ -1261,7 +1295,7 @@ export default function DashboardPage() {
                   className="w-full p-2.5 rounded-xl text-[13px]"
                   style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                 >
-                  <option value="">-- Select Patient --</option>
+                  <option value="">{t('dashboard.selectPatientOption')}</option>
                   {patients.slice(0, 20).map(p => (
                     <option key={p._id} value={p._id}>
                       {p.firstName} {p.surname} ({p.hospitalNumber})
@@ -1273,7 +1307,7 @@ export default function DashboardPage() {
               {/* Preset buttons */}
               <div className="mb-4">
                 <label className="text-[11px] font-semibold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-muted)' }}>
-                  Preset Combos (click to add)
+                  {t('dashboard.presetCombos')}
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {PRESCRIPTION_PRESETS.map(preset => (
@@ -1303,7 +1337,7 @@ export default function DashboardPage() {
               {prescriptionItems.length > 0 && (
                 <div className="mb-4">
                   <label className="text-[11px] font-semibold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-muted)' }}>
-                    Prescription Items ({prescriptionItems.length})
+                    {t('dashboard.prescriptionItems', { count: prescriptionItems.length })}
                   </label>
                   <div className="space-y-2">
                     {prescriptionItems.map((item, i) => (
@@ -1336,7 +1370,7 @@ export default function DashboardPage() {
                   className="px-4 py-2 rounded-xl text-[12px] font-medium"
                   style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
                 >
-                  Cancel
+                  {t('action.cancel')}
                 </button>
                 <button
                   onClick={handleSubmitPrescription}
@@ -1344,7 +1378,7 @@ export default function DashboardPage() {
                   className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white disabled:opacity-40"
                   style={{ background: '#A855F7' }}
                 >
-                  Create Prescription ({prescriptionItems.length} items)
+                  {t('dashboard.createPrescription', { count: prescriptionItems.length })}
                 </button>
               </div>
             </>
@@ -1354,19 +1388,19 @@ export default function DashboardPage() {
         {/* ═══════════════════════════════════════════════
             LAB ORDER MODAL
         ═══════════════════════════════════════════════ */}
-        <ModalOverlay open={labModalOpen} onClose={() => { setLabModalOpen(false); setSelectedLabTests(new Set()); setLabPatientId(''); setLabOrderSuccess(false); }} title="Quick Lab Order">
+        <ModalOverlay open={labModalOpen} onClose={() => { setLabModalOpen(false); setSelectedLabTests(new Set()); setLabPatientId(''); setLabOrderSuccess(false); }} title={t('dashboard.quickLabOrder')}>
           {labOrderSuccess ? (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
               <CheckCircle2 className="w-12 h-12" style={{ color: 'var(--color-success)' }} />
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Lab Order Submitted Successfully</p>
-              <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{selectedLabTests.size} test(s) ordered</p>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dashboard.labOrderSubmitted')}</p>
+              <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{t('dashboard.testsOrdered', { count: selectedLabTests.size })}</p>
             </div>
           ) : (
             <>
               {/* Patient selector */}
               <div className="mb-4">
                 <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                  Select Patient
+                  {t('dashboard.selectPatient')}
                 </label>
                 <select
                   value={labPatientId}
@@ -1374,7 +1408,7 @@ export default function DashboardPage() {
                   className="w-full p-2.5 rounded-xl text-[13px]"
                   style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                 >
-                  <option value="">-- Select Patient --</option>
+                  <option value="">{t('dashboard.selectPatientOption')}</option>
                   {patients.slice(0, 20).map(p => (
                     <option key={p._id} value={p._id}>
                       {p.firstName} {p.surname} ({p.hospitalNumber})
@@ -1386,7 +1420,7 @@ export default function DashboardPage() {
               {/* Lab test checkboxes */}
               <div className="mb-4">
                 <label className="text-[11px] font-semibold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-muted)' }}>
-                  Select Tests
+                  {t('dashboard.selectTests')}
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {COMMON_LAB_TESTS.map(test => {
@@ -1397,8 +1431,8 @@ export default function DashboardPage() {
                         onClick={() => handleToggleLabTest(test.id)}
                         className="flex items-center gap-3 p-2.5 rounded-xl text-left transition-all"
                         style={{
-                          background: isSelected ? 'rgba(27, 154, 170,0.08)' : 'var(--bg-secondary)',
-                          border: isSelected ? '2px solid #1B9AAA' : '1px solid var(--border-light)',
+                          background: isSelected ? 'rgba(59, 130, 246,0.08)' : 'var(--bg-secondary)',
+                          border: isSelected ? '2px solid #3b82f6' : '1px solid var(--border-light)',
                         }}
                       >
                         <div
@@ -1414,7 +1448,7 @@ export default function DashboardPage() {
                           <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{test.name}</p>
                           <div className="flex items-center gap-2">
                             <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{test.specimen}</span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(27, 154, 170,0.06)', color: 'var(--accent-primary)' }}>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(59, 130, 246,0.06)', color: 'var(--accent-primary)' }}>
                               {test.category}
                             </span>
                           </div>
@@ -1427,9 +1461,9 @@ export default function DashboardPage() {
 
               {/* Selected summary */}
               {selectedLabTests.size > 0 && (
-                <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(27, 154, 170,0.04)', border: '1px solid rgba(27, 154, 170,0.12)' }}>
+                <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(59, 130, 246,0.04)', border: '1px solid rgba(59, 130, 246,0.12)' }}>
                   <p className="text-[11px] font-medium mb-1" style={{ color: 'var(--accent-primary)' }}>
-                    {selectedLabTests.size} test(s) selected:
+                    {t('dashboard.testsSelected', { count: selectedLabTests.size })}
                   </p>
                   <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
                     {COMMON_LAB_TESTS.filter(t => selectedLabTests.has(t.id)).map(t => t.name).join(', ')}
@@ -1443,7 +1477,7 @@ export default function DashboardPage() {
                   className="px-4 py-2 rounded-xl text-[12px] font-medium"
                   style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
                 >
-                  Cancel
+                  {t('action.cancel')}
                 </button>
                 <button
                   onClick={handleSubmitLabOrder}
@@ -1453,7 +1487,7 @@ export default function DashboardPage() {
                 >
                   <span className="flex items-center gap-1.5">
                     <TestTube className="w-3.5 h-3.5" />
-                    Order {selectedLabTests.size} Test(s)
+                    {t('dashboard.orderTests', { count: selectedLabTests.size })}
                   </span>
                 </button>
               </div>

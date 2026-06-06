@@ -90,7 +90,7 @@ export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'color' | 'ref'
 
 // Category accent colors — kept for library showcase tooling.
 export const CATEGORY_ACCENTS: Record<string, string> = {
-  clinical: '#1B9AAA',
+  clinical: '#3b82f6',
   services: '#E4A84B',
   'vital-events': '#D96E59',
   vitals: '#C44536',
@@ -105,31 +105,31 @@ export const CATEGORY_ACCENTS: Record<string, string> = {
 // the usual red/amber conventions.
 // ───────────────────────────────────────────────────────────────────────────
 const GRAY = '#5A7370';
-const DARK = '#1A3A3A';
+const DARK = '#1e3a8a';
 
 const ICON_COLORS: Record<IconName, string> = {
   // Clinical — teal/green family
   chart: '#6B5CC2',           // analytics purple
-  patient: '#1B9AAA',         // clinical teal
-  stethoscope: '#1B9AAA',
-  referral: '#1B9AAA',
-  message: '#1B9AAA',         // communication blue
+  patient: '#3b82f6',         // clinical teal
+  stethoscope: '#3b82f6',
+  referral: '#3b82f6',
+  message: '#3b82f6',         // communication blue
   calendar: '#E4A84B',        // amber (time/schedule)
   timeline: '#8E6DD1',
   record: GRAY,
-  consultation: '#1B9AAA',
+  consultation: '#3b82f6',
   triage: '#C44536',          // emergency red
 
   // Services
   flask: '#E4A84B',           // lab amber
   pill: '#8B5CF6',            // medicine purple
   wallet: '#B8741C',          // money bronze
-  prescription: '#1B9AAA',
-  claim: '#1B9AAA',
+  prescription: '#3b82f6',
+  claim: '#3b82f6',
   receipt: GRAY,
   creditCard: '#3D5854',
   mobileMoney: '#B8741C',
-  diagnosis: '#1B9AAA',
+  diagnosis: '#3b82f6',
 
   // Vital events
   vaccine: '#0EA5A4',         // vaccine teal
@@ -161,13 +161,13 @@ const ICON_COLORS: Record<IconName, string> = {
   chevronDown: GRAY,
   chevronUp: GRAY,
   qr: DARK,
-  phone: '#1B9AAA',
+  phone: '#3b82f6',
   mapPin: '#C44536',           // red pin
   clock: '#E4A84B',
   edit: GRAY,
   printer: GRAY,
-  download: '#1B9AAA',
-  shield: '#1B9AAA',
+  download: '#3b82f6',
+  shield: '#3b82f6',
   sparkle: '#8B5CF6',         // AI purple
   check: '#1F9D6F',           // success green
   close: '#C44536',
@@ -175,12 +175,12 @@ const ICON_COLORS: Record<IconName, string> = {
   bell: '#E4A84B',
   moon: '#6B5CC2',            // night
   sun: '#E4A84B',
-  globe: '#1B9AAA',
+  globe: '#3b82f6',
   settings: GRAY,
   logout: GRAY,
-  user: '#1B9AAA',
+  user: '#3b82f6',
   arrowRight: GRAY,
-  arrowRightLeft: '#1B9AAA',
+  arrowRightLeft: '#3b82f6',
   plus: GRAY,
   video: '#C44536',            // rec red
   bug: '#C44536',
@@ -188,11 +188,11 @@ const ICON_COLORS: Record<IconName, string> = {
   server: GRAY,
   barChart: '#6B5CC2',
   palette: '#D96E59',
-  users: '#1B9AAA',
-  gauge: '#1B9AAA',
-  layoutDashboard: '#1B9AAA',
+  users: '#3b82f6',
+  gauge: '#3b82f6',
+  layoutDashboard: '#3b82f6',
   fileText: GRAY,
-  home: '#1B9AAA',
+  home: '#3b82f6',
 
   // Extended UI
   apple: '#C44536',
@@ -200,65 +200,65 @@ const ICON_COLORS: Record<IconName, string> = {
   arrowDownLeft: GRAY,
   arrowDownRight: GRAY,
   arrowUpDown: GRAY,
-  arrowUpRight: '#1B9AAA',
+  arrowUpRight: '#3b82f6',
   ban: '#C44536',
   bandage: '#D96E59',
   banknote: '#1F9D6F',
-  bedDouble: '#1B9AAA',
+  bedDouble: '#3b82f6',
   bellOff: GRAY,
   brain: '#B7718E',           // mauve
   camera: DARK,
-  code: '#1B9AAA',
+  code: '#3b82f6',
   copy: GRAY,
-  cpu: '#1B9AAA',
+  cpu: '#3b82f6',
   dollarSign: '#1F9D6F',      // money green
-  externalLink: '#1B9AAA',
-  eye: '#1B9AAA',
+  externalLink: '#3b82f6',
+  eye: '#3b82f6',
   eyeOff: GRAY,
   fileJson: '#E4A84B',
   fileSpreadsheet: '#1F9D6F',
-  fileUp: '#1B9AAA',
+  fileUp: '#3b82f6',
   flag: '#C44536',
   folderOpen: '#E4A84B',
   gift: '#D96E59',
-  gitBranch: '#1B9AAA',
-  gitCompare: '#1B9AAA',
+  gitBranch: '#3b82f6',
+  gitCompare: '#3b82f6',
   hardDrive: GRAY,
-  helpCircle: '#1B9AAA',
+  helpCircle: '#3b82f6',
   history: GRAY,
   image: '#D96E59',
-  info: '#1B9AAA',
+  info: '#3b82f6',
   keyRound: '#E4A84B',
   keyboard: GRAY,
-  languages: '#1B9AAA',
-  layers: '#1B9AAA',
-  lineChart: '#1B9AAA',
+  languages: '#3b82f6',
+  layers: '#3b82f6',
+  lineChart: '#3b82f6',
   list: GRAY,
-  loader: '#1B9AAA',
+  loader: '#3b82f6',
   lock: DARK,
-  logIn: '#1B9AAA',
-  mail: '#1B9AAA',
+  logIn: '#3b82f6',
+  mail: '#3b82f6',
   maximize: GRAY,
   mic: '#C44536',
   micOff: GRAY,
   microscope: '#8B5CF6',
   minus: GRAY,
-  monitorSmartphone: '#1B9AAA',
+  monitorSmartphone: '#3b82f6',
   moreVertical: GRAY,
-  navigation: '#1B9AAA',
-  network: '#1B9AAA',
+  navigation: '#3b82f6',
+  network: '#3b82f6',
   package: '#E4A84B',
   paperclip: GRAY,
   pause: GRAY,
   phoneOff: '#C44536',
   pieChart: '#6B5CC2',
-  play: '#1B9AAA',
-  radio: '#1B9AAA',
-  refresh: '#1B9AAA',
+  play: '#3b82f6',
+  radio: '#3b82f6',
+  refresh: '#3b82f6',
   rotate: GRAY,
-  save: '#1B9AAA',
-  send: '#1B9AAA',
-  sendHorizontal: '#1B9AAA',
+  save: '#3b82f6',
+  send: '#3b82f6',
+  sendHorizontal: '#3b82f6',
   shoppingCart: '#E4A84B',
   signal: '#1F9D6F',
   sliders: GRAY,
@@ -269,16 +269,16 @@ const ICON_COLORS: Record<IconName, string> = {
   thumbsUp: '#1F9D6F',
   timer: '#E4A84B',
   toggleLeft: GRAY,
-  toggleRight: '#1B9AAA',
+  toggleRight: '#3b82f6',
   trash: '#C44536',
   trendingDown: '#C44536',
   trendingUp: '#1F9D6F',
   truck: '#E4A84B',
-  upload: '#1B9AAA',
+  upload: '#3b82f6',
   userX: '#C44536',
   utensils: '#E4A84B',
   utensilsCrossed: '#C44536',
-  wind: '#1B9AAA',
+  wind: '#3b82f6',
   zap: '#E4A84B',
   zapOff: GRAY,
 };

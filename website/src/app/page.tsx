@@ -579,7 +579,7 @@ export default function MarketingHome() {
       {/* ── FUND OUR PILOT BANNER ───────────────────────────── */}
       <section style={{
         padding: "64px 0",
-        background: "linear-gradient(135deg, #1A3A3A 0%, #1E4D4A 50%, #1A3A3A 100%)",
+        background: "linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #1E3A8A 100%)",
       }}>
         <div className="mk-container">
           <Reveal>

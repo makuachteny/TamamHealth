@@ -26,6 +26,7 @@ import { useWards } from '@/lib/hooks/useWards';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useToast } from '@/components/Toast';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { PrescriptionDoc, MedicationAdministration } from '@/lib/db-types';
 
 /**
@@ -86,6 +87,14 @@ const STATUS_TINT: Record<MedicationAdministration['status'], { bg: string; colo
   corrected: { bg: 'rgba(124,58,237,0.12)',  color: '#6D28D9',                ring: 'rgba(124,58,237,0.26)', label: 'Corrected' },
 };
 
+const STATUS_LABEL_KEY: Record<MedicationAdministration['status'], string> = {
+  given: 'mar.statusGiven',
+  missed: 'mar.statusMissed',
+  refused: 'mar.statusRefused',
+  held: 'mar.statusHeld',
+  corrected: 'mar.statusCorrected',
+};
+
 interface CellProps {
   rx: PrescriptionDoc;
   day: string;
@@ -94,6 +103,7 @@ interface CellProps {
 }
 
 function MARCell({ rx, day, time, onRecord }: CellProps) {
+  const { t } = useTranslation();
   const adm = findAdministration(rx, day, time);
   const scheduledFor = buildScheduledFor(day, time);
 
@@ -109,10 +119,10 @@ function MARCell({ rx, day, time, onRecord }: CellProps) {
           border: `1px solid ${tint.ring}`,
           minHeight: 52,
         }}
-        title={`${adm.status} by ${adm.administeredByName} at ${new Date(adm.recordedAt).toLocaleTimeString()}`}
+        title={t('mar.cellTooltip', { status: t(STATUS_LABEL_KEY[adm.status]), name: adm.administeredByName, time: new Date(adm.recordedAt).toLocaleTimeString() })}
       >
         <div className="text-[10.5px] font-bold uppercase" style={{ letterSpacing: '0.04em' }}>
-          {tint.label}
+          {t(STATUS_LABEL_KEY[adm.status])}
         </div>
         <div className="text-[10.5px] truncate" style={{ color: 'var(--text-muted)' }}>
           {adm.administeredByName}
@@ -133,7 +143,7 @@ function MARCell({ rx, day, time, onRecord }: CellProps) {
         fontWeight: 600,
         minHeight: 52,
       }}
-      aria-label="Record administration"
+      aria-label={t('mar.recordAdministration')}
     >
       +
     </button>
@@ -141,6 +151,7 @@ function MARCell({ rx, day, time, onRecord }: CellProps) {
 }
 
 export default function MARPage() {
+  const { t } = useTranslation();
   const params = useParams();
   const admissionId = params?.admissionId as string;
   const router = useRouter();
@@ -227,11 +238,11 @@ export default function MARPage() {
         reason: modalReason.trim() || undefined,
         notes: modalNotes.trim() || undefined,
       });
-      showToast('Administration recorded', 'success');
+      showToast(t('mar.administrationRecorded'), 'success');
       closeModal();
     } catch (err) {
       console.error(err);
-      showToast('Failed to record administration', 'error');
+      showToast(t('mar.administrationFailed'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -240,14 +251,14 @@ export default function MARPage() {
   if (!admission) {
     return (
       <>
-        <TopBar title="MAR" />
+        <TopBar title={t('mar.title')} />
         <main className="page-container">
           <div className="card-elevated p-6 text-center">
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Admission not found, or the patient is not currently admitted.
+              {t('mar.admissionNotFound')}
             </p>
             <button onClick={() => router.push('/wards')} className="btn btn-primary mt-3">
-              Return to wards
+              {t('mar.returnToWards')}
             </button>
           </div>
         </main>
@@ -257,14 +268,14 @@ export default function MARPage() {
 
   return (
     <>
-      <TopBar title="MAR" />
+      <TopBar title={t('mar.title')} />
       <main className="page-container">
         {/* Page header card */}
         <div className="card-elevated p-5 flex items-start justify-between flex-wrap gap-4 mb-4">
           <div className="flex items-start gap-3 min-w-0">
             <button
               onClick={() => router.back()}
-              aria-label="Back"
+              aria-label={t('action.back')}
               className="mt-0.5 p-1.5 rounded hover:bg-gray-100 shrink-0"
             >
               <ArrowLeft className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
@@ -274,7 +285,7 @@ export default function MARPage() {
             </div>
             <div className="min-w-0">
               <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                Medication Administration Record
+                {t('mar.heading')}
               </h1>
               <div className="mt-1 text-sm flex items-center flex-wrap gap-x-3 gap-y-1" style={{ color: 'var(--text-secondary)' }}>
                 <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -285,7 +296,7 @@ export default function MARPage() {
                   {admission.wardName}{admission.bedNumber ? ` · ${admission.bedNumber}` : ''}
                 </span>
                 <span style={{ color: 'var(--text-muted)' }}>
-                  Attending: {admission.attendingPhysicianName}
+                  {t('mar.attending', { name: admission.attendingPhysicianName })}
                 </span>
               </div>
             </div>
@@ -293,7 +304,7 @@ export default function MARPage() {
           <div className="flex items-center gap-2">
             <label className="text-[11px] font-bold uppercase" style={{
               color: 'var(--text-muted)', letterSpacing: '0.06em',
-            }}>Day</label>
+            }}>{t('mar.day')}</label>
             <input
               type="date"
               value={day}
@@ -304,7 +315,7 @@ export default function MARPage() {
               onClick={() => typeof window !== 'undefined' && window.print()}
               className="btn btn-secondary inline-flex items-center gap-1.5"
             >
-              <Printer className="w-4 h-4" /> Print
+              <Printer className="w-4 h-4" /> {t('action.print')}
             </button>
           </div>
         </div>
@@ -327,7 +338,7 @@ export default function MARPage() {
                   <div className="text-[10.5px] font-bold uppercase" style={{
                     color: 'var(--tamamhealth-red)', letterSpacing: '0.06em',
                   }}>
-                    Allergies
+                    {t('patient.allergies')}
                   </div>
                   <div className="text-sm font-semibold mt-0.5" style={{ color: 'var(--tamamhealth-red-text)' }}>
                     {allergies.join(', ')}
@@ -350,10 +361,10 @@ export default function MARPage() {
                   <div className="text-[10.5px] font-bold uppercase" style={{
                     color: 'var(--color-warning)', letterSpacing: '0.06em',
                   }}>
-                    Isolation required
+                    {t('mar.isolationRequired')}
                   </div>
                   <div className="text-sm font-medium mt-0.5">
-                    {admission.isolationReason || 'PPE before entry'}
+                    {admission.isolationReason || t('mar.ppeBeforeEntry')}
                   </div>
                 </div>
               </div>
@@ -368,10 +379,10 @@ export default function MARPage() {
               <Pill className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
             </div>
             <p className="text-sm font-semibold mt-3" style={{ color: 'var(--text-secondary)' }}>
-              No active prescriptions for this admission.
+              {t('mar.noPrescriptions')}
             </p>
             <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-              Order a medication from the consultation page to populate the MAR.
+              {t('mar.noPrescriptionsHint')}
             </p>
           </div>
         ) : (
@@ -392,7 +403,7 @@ export default function MARPage() {
                         letterSpacing: '0.06em',
                       }}
                     >
-                      Medication
+                      {t('mar.colMedication')}
                     </th>
                     {columns.map(t => (
                       <th
@@ -437,7 +448,7 @@ export default function MARPage() {
                               {rx.duration && <> · {rx.duration}</>}
                             </div>
                             <div className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                              by {rx.prescribedBy}
+                              {t('mar.prescribedBy', { name: rx.prescribedBy })}
                             </div>
                           </div>
                         </div>
@@ -471,10 +482,10 @@ export default function MARPage() {
                   border: `1px solid ${STATUS_TINT[s].ring}`,
                 }}
               />
-              {STATUS_TINT[s].label}
+              {t(STATUS_LABEL_KEY[s])}
             </span>
           ))}
-          <span style={{ color: 'var(--text-muted)' }}>· Click any cell to record an administration.</span>
+          <span style={{ color: 'var(--text-muted)' }}>{t('mar.legendHint')}</span>
         </div>
 
         {/* Record-administration modal */}
@@ -500,19 +511,19 @@ export default function MARPage() {
                   <div className="min-w-0">
                     <div className="text-[10.5px] font-bold uppercase" style={{
                       color: 'var(--text-muted)', letterSpacing: '0.06em',
-                    }}>Administer</div>
+                    }}>{t('mar.administer')}</div>
                     <h3 className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
                       {modalRx.medication}
                     </h3>
                     <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {modalRx.dose} · {modalRx.route} · scheduled{' '}
+                      {modalRx.dose} · {modalRx.route} · {t('mar.scheduled')}{' '}
                       <span style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {new Date(modalScheduledFor).toLocaleString()}
                       </span>
                     </p>
                   </div>
                 </div>
-                <button onClick={closeModal} aria-label="Close" className="p-1 rounded hover:bg-gray-100 shrink-0">
+                <button onClick={closeModal} aria-label={t('action.close')} className="p-1 rounded hover:bg-gray-100 shrink-0">
                   <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
                 </button>
               </header>
@@ -521,7 +532,7 @@ export default function MARPage() {
                 <div>
                   <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
                     color: 'var(--text-muted)', letterSpacing: '0.06em',
-                  }}>Status</label>
+                  }}>{t('mar.status')}</label>
                   <div className="grid grid-cols-4 gap-1.5">
                     {(['given', 'missed', 'refused', 'held'] as const).map(s => {
                       const tint = STATUS_TINT[s];
@@ -538,7 +549,7 @@ export default function MARPage() {
                             letterSpacing: '0.06em',
                           }}
                         >
-                          {tint.label}
+                          {t(STATUS_LABEL_KEY[s])}
                         </button>
                       );
                     })}
@@ -550,14 +561,14 @@ export default function MARPage() {
                     <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
                       color: 'var(--text-muted)', letterSpacing: '0.06em',
                     }}>
-                      Reason {modalStatus === 'refused' ? '(patient refusal)' : modalStatus === 'held' ? '(why held)' : '(why missed)'}
+                      {t('mar.reason')} {modalStatus === 'refused' ? t('mar.reasonRefused') : modalStatus === 'held' ? t('mar.reasonHeld') : t('mar.reasonMissed')}
                     </label>
                     <input
                       type="text"
                       value={modalReason}
                       onChange={(e) => setModalReason(e.target.value)}
                       className="w-full"
-                      placeholder="Required"
+                      placeholder={t('mar.required')}
                     />
                   </div>
                 )}
@@ -566,8 +577,8 @@ export default function MARPage() {
                   <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
                     color: 'var(--text-muted)', letterSpacing: '0.06em',
                   }}>
-                    Witness <span style={{ color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0 }}>
-                      — required for controlled substances
+                    {t('mar.witness')} <span style={{ color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0 }}>
+                      {t('mar.witnessHint')}
                     </span>
                   </label>
                   <input
@@ -575,20 +586,20 @@ export default function MARPage() {
                     value={modalWitness}
                     onChange={(e) => setModalWitness(e.target.value)}
                     className="w-full"
-                    placeholder="Witness name"
+                    placeholder={t('mar.witnessName')}
                   />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
                     color: 'var(--text-muted)', letterSpacing: '0.06em',
-                  }}>Notes</label>
+                  }}>{t('mar.notes')}</label>
                   <textarea
                     value={modalNotes}
                     onChange={(e) => setModalNotes(e.target.value)}
                     rows={2}
                     className="w-full"
-                    placeholder="Site, response, patient comments…"
+                    placeholder={t('mar.notesPlaceholder')}
                   />
                 </div>
               </div>
@@ -598,17 +609,17 @@ export default function MARPage() {
                 style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}
               >
                 <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
-                  Recorded as <strong style={{ color: 'var(--text-primary)' }}>{currentUser?.name}</strong>
+                  {t('mar.recordedAs')} <strong style={{ color: 'var(--text-primary)' }}>{currentUser?.name}</strong>
                 </p>
                 <div className="flex items-center gap-2">
-                  <button onClick={closeModal} className="btn btn-secondary">Cancel</button>
+                  <button onClick={closeModal} className="btn btn-secondary">{t('action.cancel')}</button>
                   <button
                     onClick={handleSubmit}
                     disabled={submitting || (modalStatus !== 'given' && !modalReason.trim())}
                     className="btn btn-primary inline-flex items-center gap-1.5"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    {submitting ? 'Saving…' : 'Record'}
+                    {submitting ? t('mar.saving') : t('mar.record')}
                   </button>
                 </div>
               </footer>

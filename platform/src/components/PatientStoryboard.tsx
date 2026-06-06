@@ -24,6 +24,7 @@ import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useWards } from '@/lib/hooks/useWards';
 import { formatDateTime } from '@/lib/format-utils';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface PatientStoryboardProps {
   patientId: string;
@@ -92,6 +93,7 @@ function Section({ icon: Icon, iconBg, iconColor, title, children, alarm }: Sect
 }
 
 export default function PatientStoryboard({ patientId, embedded }: PatientStoryboardProps) {
+  const { t } = useTranslation();
   const { patients } = usePatients();
   const { active: activeProblems } = useProblems(patientId);
   const { results: allLabs } = useLabResults();
@@ -136,11 +138,11 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
   if (!patient) {
     return (
       <aside
-        aria-label="Patient context"
+        aria-label={t('storyboard.patientContext')}
         className="hidden xl:flex flex-col w-72 shrink-0 px-3 py-4 text-xs"
         style={{ color: 'var(--text-muted)' }}
       >
-        Loading patient context…
+        {t('storyboard.loadingPatientContext')}
       </aside>
     );
   }
@@ -151,7 +153,7 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
 
   return (
     <aside
-      aria-label={`Patient context for ${fullName}`}
+      aria-label={t('storyboard.patientContextFor', { name: fullName })}
       className={
         embedded
           ? 'flex flex-col gap-3'
@@ -202,11 +204,11 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
         icon={ShieldAlert}
         iconBg={allergies.length ? 'rgba(196,69,54,0.16)' : 'rgba(0,0,0,0.04)'}
         iconColor={allergies.length ? 'var(--tamamhealth-red)' : 'var(--text-muted)'}
-        title="Allergies"
+        title={t('patient.allergies')}
         alarm={allergies.length > 0}
       >
         {allergies.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)' }}>None known</div>
+          <div style={{ color: 'var(--text-muted)' }}>{t('patient.noneKnown')}</div>
         ) : (
           <div className="flex flex-wrap gap-1">
             {allergies.map(a => (
@@ -232,12 +234,12 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
           icon={AlertTriangle}
           iconBg="rgba(228,168,75,0.18)"
           iconColor="var(--color-warning)"
-          title="Precautions"
+          title={t('storyboard.precautions')}
         >
           <div className="data-row-divider-sm">
             {latestTriage?.priority && (
               <div className="flex items-center justify-between">
-                <span style={{ color: 'var(--text-muted)' }}>Triage</span>
+                <span style={{ color: 'var(--text-muted)' }}>{t('storyboard.triage')}</span>
                 <span
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
                   style={{ background: `${triageColor}1F`, color: triageColor }}
@@ -248,9 +250,9 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
             )}
             {admission?.isolationRequired && (
               <div className="flex items-center justify-between gap-2">
-                <span style={{ color: 'var(--text-muted)' }}>Isolation</span>
+                <span style={{ color: 'var(--text-muted)' }}>{t('storyboard.isolation')}</span>
                 <span className="font-medium text-right truncate" style={{ color: 'var(--text-primary)' }}>
-                  {admission.isolationReason || 'Required'}
+                  {admission.isolationReason || t('mar.required')}
                 </span>
               </div>
             )}
@@ -264,14 +266,14 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
           icon={Heart}
           iconBg="rgba(236,72,153,0.14)"
           iconColor="#EC4899"
-          title="Pregnant"
+          title={t('storyboard.pregnant')}
         >
           <Link
             href={`/anc?patientId=${patient._id}`}
             className="inline-flex items-center gap-1 text-[12px] font-semibold hover:underline"
             style={{ color: '#EC4899' }}
           >
-            View ANC visits <ChevronRight className="w-3 h-3" />
+            {t('storyboard.viewAncVisits')} <ChevronRight className="w-3 h-3" />
           </Link>
         </Section>
       )}
@@ -282,17 +284,17 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
           icon={BedDouble}
           iconBg="var(--accent-light)"
           iconColor="var(--accent-primary)"
-          title="Admitted"
+          title={t('dashboard.admitted')}
         >
           <div className="data-row-divider-sm">
             <div className="flex justify-between gap-2">
-              <span style={{ color: 'var(--text-muted)' }}>Ward</span>
+              <span style={{ color: 'var(--text-muted)' }}>{t('storyboard.ward')}</span>
               <span className="font-semibold text-right" style={{ color: 'var(--text-primary)' }}>
                 {admission.wardName}{admission.bedNumber ? ` · ${admission.bedNumber}` : ''}
               </span>
             </div>
             <div className="flex justify-between gap-2">
-              <span style={{ color: 'var(--text-muted)' }}>Attending</span>
+              <span style={{ color: 'var(--text-muted)' }}>{t('storyboard.attending')}</span>
               <span className="font-medium text-right truncate" style={{ color: 'var(--text-primary)' }}>
                 {admission.attendingPhysicianName}
               </span>
@@ -303,7 +305,7 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
             className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold hover:underline"
             style={{ color: 'var(--accent-primary)' }}
           >
-            Open MAR <ChevronRight className="w-3 h-3" />
+            {t('storyboard.openMar')} <ChevronRight className="w-3 h-3" />
           </Link>
         </Section>
       )}
@@ -313,10 +315,10 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
         icon={Activity}
         iconBg="rgba(124,58,237,0.12)"
         iconColor="#7C3AED"
-        title={`Problems · ${activeProblems.length || chronicFromPatient.length}`}
+        title={t('storyboard.problemsCount', { count: activeProblems.length || chronicFromPatient.length })}
       >
         {activeProblems.length === 0 && chronicFromPatient.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)' }}>None recorded</div>
+          <div style={{ color: 'var(--text-muted)' }}>{t('storyboard.noneRecorded')}</div>
         ) : (
           <ul className="space-y-1.5">
             {activeProblems.slice(0, 5).map(p => (
@@ -353,10 +355,10 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
         icon={Pill}
         iconBg="rgba(20,184,166,0.14)"
         iconColor="#14B8A6"
-        title={`Current Meds · ${currentMeds.length}`}
+        title={t('storyboard.currentMedsCount', { count: currentMeds.length })}
       >
         {currentMeds.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)' }}>None active</div>
+          <div style={{ color: 'var(--text-muted)' }}>{t('storyboard.noneActive')}</div>
         ) : (
           <ul className="data-row-divider-sm">
             {currentMeds.slice(0, 5).map(rx => (
@@ -377,7 +379,7 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
           icon={FlaskConical}
           iconBg="rgba(196,69,54,0.16)"
           iconColor="var(--tamamhealth-red)"
-          title="Critical Labs"
+          title={t('storyboard.criticalLabs')}
           alarm
         >
           <ul className="data-row-divider-sm">
@@ -403,15 +405,15 @@ export default function PatientStoryboard({ patientId, embedded }: PatientStoryb
         icon={Stethoscope}
         iconBg="var(--accent-light)"
         iconColor="var(--accent-primary)"
-        title="Last Visit"
+        title={t('frontDesk.lastVisit')}
       >
         <div className="leading-snug">
           <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {patient.lastVisitDate || 'No prior visits'}
+            {patient.lastVisitDate || t('storyboard.noPriorVisits')}
           </div>
           {patient.lastConsultedBy && (
             <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              by {patient.lastConsultedBy}
+              {t('storyboard.consultedBy', { name: patient.lastConsultedBy })}
             </div>
           )}
         </div>

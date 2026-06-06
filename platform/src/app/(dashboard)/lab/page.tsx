@@ -10,6 +10,7 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface ResultDraft {
   orderId: string;
@@ -46,6 +47,7 @@ export default function LabPage() {
   const { patients } = usePatients();
   const { canEnterLabResults, canOrderLabs } = usePermissions();
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const router = useRouter();
   const [resultDraft, setResultDraft] = useState<ResultDraft | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -62,11 +64,11 @@ export default function LabPage() {
   const handleCreateOrders = async () => {
     const patient = patients.find(p => p._id === orderPatientId);
     if (!patient) {
-      showToast('Please choose a patient', 'error');
+      showToast(t('lab.choosePatient'), 'error');
       return;
     }
     if (orderTests.length === 0) {
-      showToast('Select at least one test', 'error');
+      showToast(t('lab.selectAtLeastOneTest'), 'error');
       return;
     }
     try {
@@ -99,7 +101,7 @@ export default function LabPage() {
       await logAudit('LAB_ORDER_CREATED', currentUser?._id, currentUser?.username,
         `Ordered ${orderTests.length} test(s) for ${patient.firstName} ${patient.surname}: ${orderTests.join(', ')}`
       ).catch(() => {});
-      showToast(`${orderTests.length} lab order(s) created`, 'success');
+      showToast(t('lab.ordersCreated', { count: orderTests.length }), 'success');
       setShowOrderModal(false);
       setOrderPatientId('');
       setLabOrderPatientSearch('');
@@ -109,7 +111,7 @@ export default function LabPage() {
       await reloadLabs();
     } catch (err) {
       console.error(err);
-      showToast('Failed to create lab order', 'error');
+      showToast(t('lab.createOrderFailed'), 'error');
     } finally {
       setOrderSubmitting(false);
     }
@@ -215,7 +217,7 @@ export default function LabPage() {
           });
         } catch (err) {
           console.error('[lab] failed to send critical-result alert', err);
-          showToast('Saved — but failed to notify doctor; please call them', 'error');
+          showToast(t('lab.savedNotifyFailed'), 'error');
         }
       }
 
@@ -237,15 +239,15 @@ export default function LabPage() {
 
   return (
     <>
-      <TopBar title="Laboratory" />
+      <TopBar title={t('lab.laboratory')} />
       <main className="page-container page-enter">
           <PageHeader
             icon={FlaskConical}
-            title="Laboratory Information System"
-            subtitle="Manage lab orders, track specimens, and view results"
+            title={t('lab.infoSystem')}
+            subtitle={t('lab.infoSystemSubtitle')}
             actions={canOrderLabs && (
               <button onClick={() => setShowOrderModal(true)} className="btn btn-primary">
-                <Plus className="w-4 h-4" /> New Order
+                <Plus className="w-4 h-4" /> {t('lab.newOrder')}
               </button>
             )}
           />
@@ -253,7 +255,7 @@ export default function LabPage() {
           {labLoading && (
             <div className="card-elevated p-4 mb-4 flex items-center gap-3" style={{ background: 'var(--overlay-subtle)' }}>
               <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading lab orders…</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('lab.loadingOrders')}</span>
             </div>
           )}
 
@@ -274,7 +276,13 @@ export default function LabPage() {
                 </div>
                 <div className="kpi__body">
                   <div className="kpi__value">{s.value}</div>
-                  <div className="kpi__label">{s.label}</div>
+                  <div className="kpi__label">{
+                    s.label === 'Pending Orders' ? t('lab.pendingOrders')
+                    : s.label === 'In Progress' ? t('lab.inProgress')
+                    : s.label === 'Completed Today' ? t('lab.completedToday')
+                    : s.label === 'Abnormal Results' ? t('lab.abnormalResults')
+                    : s.label
+                  }</div>
                 </div>
               </div>
             ))}
@@ -286,15 +294,15 @@ export default function LabPage() {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  <h3 className="font-semibold text-sm">Turnaround Time</h3>
+                  <h3 className="font-semibold text-sm">{t('lab.turnaroundTime')}</h3>
                 </div>
                 <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>
-                  Avg {tatStats.avgHours.toFixed(1)}h · n={tatStats.totalCompleted}
+                  {t('lab.tatAvgSummary', { avg: tatStats.avgHours.toFixed(1), count: tatStats.totalCompleted })}
                 </span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Distribution</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('lab.distribution')}</p>
                   <div className="space-y-1.5">
                     {Object.entries(tatStats.buckets).map(([label, count]) => {
                       const pct = tatStats.totalCompleted > 0 ? Math.round((count / tatStats.totalCompleted) * 100) : 0;
@@ -315,10 +323,10 @@ export default function LabPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Slowest tests (median TAT)</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('lab.slowestTests')}</p>
                   <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
                     {tatStats.medianByTest.length === 0 ? (
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No completed tests yet.</p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('lab.noCompletedTests')}</p>
                     ) : tatStats.medianByTest.map(t => {
                       const hoursLabel = t.median < 1 ? `${Math.round(t.median * 60)}m` : t.median < 24 ? `${t.median.toFixed(1)}h` : `${(t.median / 24).toFixed(1)}d`;
                       const color = t.median < 4 ? '#0D9488' : t.median < 24 ? 'var(--color-warning)' : 'var(--color-danger)';
@@ -344,14 +352,14 @@ export default function LabPage() {
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                <input type="search" placeholder="Search by patient or test name..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 search-icon-input" style={{ background: 'var(--overlay-subtle)' }} />
+                <input type="search" placeholder={t('lab.searchByPatientOrTest')} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 search-icon-input" style={{ background: 'var(--overlay-subtle)' }} />
               </div>
               <div className="flex gap-1">
                 {[
-                  { id: 'all', label: 'All' },
-                  { id: 'pending', label: 'Pending' },
-                  { id: 'in_progress', label: 'In Progress' },
-                  { id: 'completed', label: 'Completed' },
+                  { id: 'all', label: t('lab.filterAll') },
+                  { id: 'pending', label: t('lab.filterPending') },
+                  { id: 'in_progress', label: t('lab.inProgress') },
+                  { id: 'completed', label: t('referral.completed') },
                 ].map(f => (
                   <button key={f.id} onClick={() => setFilter(f.id)}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
@@ -387,7 +395,7 @@ export default function LabPage() {
                   onClick={() => !submitting && setResultDraft(null)}
                   className="absolute"
                   style={{ top: 14, right: 14, width: 30, height: 30, borderRadius: 6, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}
-                  title="Close"
+                  title={t('action.close')}
                   disabled={submitting}
                 >
                   <X className="w-4 h-4" />
@@ -398,20 +406,20 @@ export default function LabPage() {
                     <FlaskConical className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Enter Lab Result</h3>
+                    <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.enterLabResult')}</h3>
                     <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{resultDraft.testName} · {resultDraft.patientName}</p>
                   </div>
                 </div>
 
                 <div className="space-y-3 mt-5">
                   <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>Result *</label>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>{t('lab.resultRequired')}</label>
                     <input
                       type="text"
                       autoFocus
                       value={resultDraft.result}
                       onChange={(e) => setResultDraft({ ...resultDraft, result: e.target.value })}
-                      placeholder="e.g. 12.4"
+                      placeholder={t('lab.resultExamplePlaceholder')}
                       className="w-full p-2.5 rounded-lg outline-none text-sm"
                       style={{
                         background: 'var(--overlay-subtle)',
@@ -423,23 +431,23 @@ export default function LabPage() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>Unit</label>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>{t('lab.unit')}</label>
                       <input
                         type="text"
                         value={resultDraft.unit}
                         onChange={(e) => setResultDraft({ ...resultDraft, unit: e.target.value })}
-                        placeholder="e.g. mg/dL"
+                        placeholder={t('lab.unitExamplePlaceholder')}
                         className="w-full p-2.5 rounded-lg outline-none text-sm"
                         style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>Reference Range</label>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-muted)' }}>{t('lab.referenceRange')}</label>
                       <input
                         type="text"
                         value={resultDraft.referenceRange}
                         onChange={(e) => setResultDraft({ ...resultDraft, referenceRange: e.target.value })}
-                        placeholder="e.g. 7-10"
+                        placeholder={t('lab.referenceExamplePlaceholder')}
                         className="w-full p-2.5 rounded-lg outline-none text-sm"
                         style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                       />
@@ -453,7 +461,7 @@ export default function LabPage() {
                         checked={resultDraft.abnormal}
                         onChange={(e) => setResultDraft({ ...resultDraft, abnormal: e.target.checked, critical: e.target.checked ? resultDraft.critical : false })}
                       />
-                      Abnormal
+                      {t('lab.abnormal')}
                     </label>
                     <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-secondary)', opacity: resultDraft.abnormal ? 1 : 0.5 }}>
                       <input
@@ -462,7 +470,7 @@ export default function LabPage() {
                         disabled={!resultDraft.abnormal}
                         onChange={(e) => setResultDraft({ ...resultDraft, critical: e.target.checked })}
                       />
-                      Critical
+                      {t('lab.criticalLabel')}
                     </label>
                   </div>
                 </div>
@@ -473,7 +481,7 @@ export default function LabPage() {
                     disabled={submitting}
                     className="btn btn-secondary btn-sm"
                   >
-                    Cancel
+                    {t('action.cancel')}
                   </button>
                   <button
                     onClick={submitResult}
@@ -481,7 +489,7 @@ export default function LabPage() {
                     className="btn btn-primary btn-sm"
                     style={{ opacity: submitting || !resultDraft.result.trim() ? 0.6 : 1 }}
                   >
-                    {submitting ? 'Saving…' : 'Save Result'}
+                    {submitting ? t('lab.saving') : t('lab.saveResult')}
                   </button>
                 </div>
               </div>
@@ -508,16 +516,16 @@ export default function LabPage() {
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(229,46,66,0.12)' }}>
                     <AlertTriangle className="w-5 h-5" style={{ color: 'var(--color-danger)' }} />
                   </div>
-                  <h3 className="text-base font-semibold" style={{ color: 'var(--color-danger)' }}>Confirm critical result</h3>
+                  <h3 className="text-base font-semibold" style={{ color: 'var(--color-danger)' }}>{t('lab.confirmCriticalResult')}</h3>
                 </div>
                 <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
-                  Critical results trigger a high-priority alert to the ordering doctor. Please verify the values below before confirming.
+                  {t('lab.confirmCriticalResultDesc')}
                 </p>
                 <div className="rounded-lg p-3 space-y-1.5 mb-4" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>Patient</span><span className="font-medium">{resultDraft.patientName}</span></div>
-                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>Test</span><span className="font-medium">{resultDraft.testName}</span></div>
-                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>Value</span><span className="font-bold" style={{ color: 'var(--color-danger)' }}>{resultDraft.result}{resultDraft.unit ? ` ${resultDraft.unit}` : ''}</span></div>
-                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>Reference range</span><span className="font-medium">{resultDraft.referenceRange || '—'}</span></div>
+                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</span><span className="font-medium">{resultDraft.patientName}</span></div>
+                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>{t('lab.testName')}</span><span className="font-medium">{resultDraft.testName}</span></div>
+                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>{t('lab.value')}</span><span className="font-bold" style={{ color: 'var(--color-danger)' }}>{resultDraft.result}{resultDraft.unit ? ` ${resultDraft.unit}` : ''}</span></div>
+                  <div className="flex justify-between text-xs"><span style={{ color: 'var(--text-muted)' }}>{t('lab.referenceRange')}</span><span className="font-medium">{resultDraft.referenceRange || '—'}</span></div>
                 </div>
                 <div className="flex items-center justify-end gap-2">
                   <button
@@ -525,7 +533,7 @@ export default function LabPage() {
                     disabled={submitting}
                     className="btn btn-secondary btn-sm"
                   >
-                    Cancel
+                    {t('action.cancel')}
                   </button>
                   <button
                     onClick={persistResult}
@@ -533,7 +541,7 @@ export default function LabPage() {
                     className="btn btn-sm"
                     style={{ background: 'var(--color-danger)', color: 'white', opacity: submitting ? 0.6 : 1 }}
                   >
-                    {submitting ? 'Saving…' : 'Confirm critical result'}
+                    {submitting ? t('lab.saving') : t('lab.confirmCriticalResult')}
                   </button>
                 </div>
               </div>
@@ -545,14 +553,14 @@ export default function LabPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Patient</th>
-                  <th>Test</th>
-                  <th>Specimen</th>
-                  <th>Status</th>
-                  <th>Result</th>
-                  <th>Ordered By</th>
-                  <th>Time</th>
-                  {canEnterLabResults && <th>Action</th>}
+                  <th>{t('lab.patient')}</th>
+                  <th>{t('lab.testName')}</th>
+                  <th>{t('lab.specimen')}</th>
+                  <th>{t('lab.status')}</th>
+                  <th>{t('lab.result')}</th>
+                  <th>{t('lab.orderedByLabel')}</th>
+                  <th>{t('lab.time')}</th>
+                  {canEnterLabResults && <th>{t('lab.action')}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -570,14 +578,14 @@ export default function LabPage() {
                         order.status === 'in_progress' ? 'badge-syncing' :
                         'badge-normal'
                       }`}>
-                        {order.status === 'in_progress' ? 'Processing' : order.status === 'pending' ? 'Pending' : 'Completed'}
+                        {order.status === 'in_progress' ? t('lab.statusProcessing') : order.status === 'pending' ? t('lab.filterPending') : t('referral.completed')}
                       </span>
                     </td>
                     <td>
                       {order.result ? (
                         <div>
                           <p className="text-sm" style={{ color: order.abnormal ? 'var(--color-danger)' : 'inherit', fontWeight: order.abnormal ? 600 : 400 }}>{order.result}</p>
-                          {order.abnormal && <span className="badge badge-emergency text-[9px] mt-0.5">Abnormal</span>}
+                          {order.abnormal && <span className="badge badge-emergency text-[9px] mt-0.5">{t('lab.abnormal')}</span>}
                         </div>
                       ) : (
                         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
@@ -587,14 +595,14 @@ export default function LabPage() {
                     <td>
                       <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{order.orderedAt}</p>
                       {order.completedAt && (
-                        <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Done: {order.completedAt}</p>
+                        <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('lab.donePrefix', { time: order.completedAt })}</p>
                       )}
                     </td>
                     {canEnterLabResults && (
                       <td onClick={(e) => e.stopPropagation()}>
                         {order.status === 'pending' && (
                           <button className="btn btn-primary btn-sm" style={{ padding: '4px 12px', fontSize: '0.75rem' }}
-                            onClick={() => updateLabResult(order._id, { status: 'in_progress' })}>Accept</button>
+                            onClick={() => updateLabResult(order._id, { status: 'in_progress' })}>{t('lab.accept')}</button>
                         )}
                         {order.status === 'in_progress' && (
                           <button className="btn btn-primary btn-sm" style={{ padding: '4px 12px', fontSize: '0.75rem', background: 'var(--accent-primary)' }}
@@ -609,7 +617,7 @@ export default function LabPage() {
                               critical: false,
                             })}
                           >
-                            Enter Result
+                            {t('lab.enterResult')}
                           </button>
                         )}
                       </td>
@@ -627,7 +635,7 @@ export default function LabPage() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <FlaskConical className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-                    <h3 className="text-base font-semibold">New Lab Order</h3>
+                    <h3 className="text-base font-semibold">{t('lab.newLabOrder')}</h3>
                   </div>
                   <button onClick={() => setShowOrderModal(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
                     <X className="w-4 h-4" />
@@ -635,14 +643,14 @@ export default function LabPage() {
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Patient</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</label>
                     {(() => {
                       const selectedPatient = orderPatientId ? patients.find(p => p._id === orderPatientId) : null;
                       if (selectedPatient) {
                         return (
                           <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                             <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                              Selected: <span className="font-medium">{selectedPatient.firstName} {selectedPatient.surname}</span>
+                              {t('lab.selectedLabel')} <span className="font-medium">{selectedPatient.firstName} {selectedPatient.surname}</span>
                               <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>({selectedPatient.hospitalNumber})</span>
                             </span>
                             <button
@@ -651,7 +659,7 @@ export default function LabPage() {
                               className="text-xs underline"
                               style={{ color: 'var(--accent-primary)' }}
                             >
-                              change
+                              {t('lab.change')}
                             </button>
                           </div>
                         );
@@ -671,7 +679,7 @@ export default function LabPage() {
                             type="search"
                             value={labOrderPatientSearch}
                             onChange={e => setLabOrderPatientSearch(e.target.value)}
-                            placeholder="Search by name, hospital number, or phone…"
+                            placeholder={t('lab.searchPatientPlaceholder')}
                             className="w-full p-2.5 rounded-lg outline-none text-sm"
                             style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                           />
@@ -692,14 +700,14 @@ export default function LabPage() {
                             </div>
                           )}
                           {q.length >= 1 && matches.length === 0 && (
-                            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>No patients match — try a different search.</p>
+                            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{t('lab.noPatientsMatch')}</p>
                           )}
                         </div>
                       );
                     })()}
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: 'var(--text-muted)' }}>Tests ({orderTests.length} selected)</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: 'var(--text-muted)' }}>{t('lab.testsSelectedLabel', { count: orderTests.length })}</label>
                     <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                       {LAB_TESTS_CATALOG.map(t => {
                         const checked = orderTests.includes(t.name);
@@ -724,23 +732,23 @@ export default function LabPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Priority</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('lab.priority')}</label>
                       <select value={orderPriority} onChange={e => setOrderPriority(e.target.value as 'routine' | 'urgent' | 'stat')}>
-                        <option value="routine">Routine</option>
-                        <option value="urgent">Urgent</option>
-                        <option value="stat">STAT (immediate)</option>
+                        <option value="routine">{t('appointments.priorityRoutine')}</option>
+                        <option value="urgent">{t('appointments.priorityUrgent')}</option>
+                        <option value="stat">{t('lab.priorityStat')}</option>
                       </select>
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Clinical Notes</label>
-                    <textarea rows={2} value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder="Suspected diagnosis, relevant symptoms..." />
+                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('referral.notes')}</label>
+                    <textarea rows={2} value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder={t('lab.clinicalNotesPlaceholder')} />
                   </div>
                 </div>
                 <div className="flex gap-2 mt-5">
-                  <button onClick={() => setShowOrderModal(false)} className="btn btn-secondary flex-1" disabled={orderSubmitting}>Cancel</button>
+                  <button onClick={() => setShowOrderModal(false)} className="btn btn-secondary flex-1" disabled={orderSubmitting}>{t('action.cancel')}</button>
                   <button onClick={handleCreateOrders} className="btn btn-primary flex-1" disabled={orderSubmitting}>
-                    {orderSubmitting ? 'Creating…' : `Order ${orderTests.length} Test${orderTests.length === 1 ? '' : 's'}`}
+                    {orderSubmitting ? t('lab.creating') : t('dashboard.orderTests', { count: orderTests.length })}
                   </button>
                 </div>
               </div>

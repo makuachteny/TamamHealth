@@ -39,6 +39,8 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_problems',              direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_triage',                direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_appointments',          direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_availability',          direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_announcements',         direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_telehealth',            direction: 'both', orgScoped: true },
 
   // ----- Operational / facility -----

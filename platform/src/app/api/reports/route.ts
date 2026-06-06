@@ -14,7 +14,7 @@ import {
 } from '@/lib/api-auth';
 import type { UserRole } from '@/lib/db-types';
 const REPORT_ROLES: UserRole[] = [
-  'super_admin', 'org_admin', 'government', 'medical_superintendent',
+  'super_admin', 'org_admin', 'government', 'county_health_director', 'medical_superintendent',
   'hrio', 'data_entry_clerk', 'payam_supervisor',
 ];
 function escapeCSV(val: string | number | boolean | null | undefined): string {

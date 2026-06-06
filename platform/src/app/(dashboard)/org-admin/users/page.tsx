@@ -4,15 +4,36 @@ import { useEffect, useState, useCallback } from 'react';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Users, Plus, MoreVertical, KeyRound,
   UserX, X, Eye, EyeOff, ChevronDown, AlertCircle,
+  Copy, Check, RefreshCw, ShieldCheck,
 } from '@/components/icons/lucide';
+
+/**
+ * Generate a strong, readable temporary password. Avoids look-alike
+ * characters (0/O, 1/l/I) so it can be relayed verbally or on paper without
+ * ambiguity. The user must change it at first login (mustChangePassword).
+ */
+function generateTempPassword(length = 14): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const out: string[] = [];
+  const rand = (n: number) =>
+    typeof crypto !== 'undefined' && crypto.getRandomValues
+      ? crypto.getRandomValues(new Uint32Array(1))[0] % n
+      : Math.floor(Math.random() * n);
+  for (let i = 0; i < length; i++) out.push(alphabet[rand(alphabet.length)]);
+  return out.join('');
+}
+
+const MIN_PASSWORD_LENGTH = 8;
 import type { UserDoc, HospitalDoc, UserRole } from '@/lib/db-types';
 import type { DataScope } from '@/lib/services/data-scope';
 
 export default function OrgUsersPage() {
   const { currentUser, globalSearch } = useApp();
+  const { t } = useTranslation();
   const [users, setUsers] = useState<UserDoc[]>([]);
   const [hospitals, setHospitals] = useState<HospitalDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +59,12 @@ export default function OrgUsersPage() {
   const [resetPassword, setResetPassword] = useState('');
   const [resetting, setResetting] = useState(false);
 
-  const brandColor = currentUser?.branding?.primaryColor || '#7C3AED';
+  // Credential hand-off panel — shown after create/reset so the admin can copy
+  // the temporary password to give to the new user.
+  const [handoff, setHandoff] = useState<{ username: string; password: string; kind: 'created' | 'reset' } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const brandColor = currentUser?.branding?.primaryColor || '#3b82f6';
 
   const loadData = useCallback(async () => {
     if (!currentUser?.orgId) return;
@@ -79,15 +105,15 @@ export default function OrgUsersPage() {
   const handleCreate = async () => {
     setError('');
     if (!formUsername.trim() || !formPassword.trim() || !formName.trim()) {
-      setError('Username, password, and name are required.');
+      setError(t('orgUsers.errorRequiredFields'));
       return;
     }
     if (needsHospital && !formHospitalId) {
-      setError('Please select a hospital for this role.');
+      setError(t('orgUsers.errorSelectHospital'));
       return;
     }
-    if (formPassword.length < 4) {
-      setError('Password must be at least 4 characters.');
+    if (formPassword.length < MIN_PASSWORD_LENGTH) {
+      setError(t('orgUsers.errorPasswordLength'));
       return;
     }
 
@@ -95,10 +121,12 @@ export default function OrgUsersPage() {
     try {
       const { createUser } = await import('@/lib/services/user-service');
       const selectedHospital = hospitals.find(h => h._id === formHospitalId);
+      const newUsername = formUsername.trim().toLowerCase();
+      const tempPassword = formPassword;
       await createUser(
         {
-          username: formUsername.trim().toLowerCase(),
-          password: formPassword,
+          username: newUsername,
+          password: tempPassword,
           name: formName.trim(),
           role: formRole,
           hospitalId: needsHospital ? formHospitalId : undefined,
@@ -108,18 +136,19 @@ export default function OrgUsersPage() {
         currentUser?._id,
         currentUser?.username
       );
-      setSuccess(`User "${formUsername}" created successfully.`);
       setShowCreateModal(false);
+      // Surface the credentials so the admin can hand them off. The new user
+      // will be forced to change this temporary password at first login.
+      setHandoff({ username: newUsername, password: tempPassword, kind: 'created' });
       setFormUsername('');
       setFormPassword('');
       setFormName('');
       setFormRole('doctor');
       setFormHospitalId('');
       await loadData();
-      setTimeout(() => setSuccess(''), 4000);
     } catch (err: unknown) {
       const e = err as Error;
-      setError(e.message || 'Failed to create user.');
+      setError(e.message || t('orgUsers.errorCreateFailed'));
     } finally {
       setCreating(false);
     }
@@ -129,34 +158,37 @@ export default function OrgUsersPage() {
     try {
       const { deactivateUser } = await import('@/lib/services/user-service');
       await deactivateUser(userId, currentUser?._id, currentUser?.username);
-      setSuccess('User deactivated.');
+      setSuccess(t('orgUsers.successUserDeactivated'));
       setActionMenu(null);
       await loadData();
       setTimeout(() => setSuccess(''), 4000);
     } catch (err: unknown) {
       const e = err as Error;
-      setError(e.message || 'Failed to deactivate user.');
+      setError(e.message || t('orgUsers.errorDeactivateFailed'));
       setTimeout(() => setError(''), 4000);
     }
   };
 
   const handleResetPassword = async () => {
     if (!showResetModal || !resetPassword.trim()) return;
-    if (resetPassword.length < 4) {
-      setError('Password must be at least 4 characters.');
+    if (resetPassword.length < MIN_PASSWORD_LENGTH) {
+      setError(t('orgUsers.errorPasswordLength'));
       return;
     }
     setResetting(true);
     try {
       const { resetPassword: resetPw } = await import('@/lib/services/user-service');
-      await resetPw(showResetModal, resetPassword, currentUser?._id, currentUser?.username);
-      setSuccess('Password reset successfully.');
+      const targetUser = users.find(u => u._id === showResetModal);
+      const tempPassword = resetPassword;
+      await resetPw(showResetModal, tempPassword, currentUser?._id, currentUser?.username);
       setShowResetModal(null);
       setResetPassword('');
-      setTimeout(() => setSuccess(''), 4000);
+      if (targetUser) {
+        setHandoff({ username: targetUser.username, password: tempPassword, kind: 'reset' });
+      }
     } catch (err: unknown) {
       const e = err as Error;
-      setError(e.message || 'Failed to reset password.');
+      setError(e.message || t('orgUsers.errorResetFailed'));
     } finally {
       setResetting(false);
     }
@@ -164,23 +196,25 @@ export default function OrgUsersPage() {
 
   const roleLabel = (role: string) => {
     const map: Record<string, string> = {
-      super_admin: 'Super Admin',
-      org_admin: 'Org Admin',
-      doctor: 'Doctor',
-      clinical_officer: 'Clinical Officer',
-      nurse: 'Nurse',
-      lab_tech: 'Lab Tech',
-      pharmacist: 'Pharmacist',
-      front_desk: 'Front Desk',
-      government: 'Government',
-      boma_health_worker: 'BHW',
-      payam_supervisor: 'Payam Supervisor',
-      data_entry_clerk: 'Data Entry Clerk',
-      medical_superintendent: 'Med. Superintendent',
-      hrio: 'Health Records Officer',
-      community_health_volunteer: 'CHV',
-      nutritionist: 'Nutritionist',
-      radiologist: 'Radiologist',
+      super_admin: t('orgUsers.roleSuperAdmin'),
+      org_admin: t('orgUsers.roleOrgAdmin'),
+      doctor: t('orgUsers.roleDoctor'),
+      clinical_officer: t('orgUsers.roleClinicalOfficer'),
+      nurse: t('orgUsers.roleNurse'),
+      lab_tech: t('orgUsers.roleLabTech'),
+      pharmacist: t('orgUsers.rolePharmacist'),
+      front_desk: t('orgUsers.roleFrontDesk'),
+      government: t('orgUsers.roleGovernment'),
+      boma_health_worker: t('orgUsers.roleBomaHealthWorker'),
+      payam_supervisor: t('orgUsers.rolePayamSupervisor'),
+      data_entry_clerk: t('orgUsers.roleDataEntryClerk'),
+      medical_superintendent: t('orgUsers.roleMedicalSuperintendent'),
+      hrio: t('orgUsers.roleHrio'),
+      community_health_volunteer: t('orgUsers.roleCommunityHealthVolunteer'),
+      nutritionist: t('orgUsers.roleNutritionist'),
+      radiologist: t('orgUsers.roleRadiologist'),
+      hospital_manager: t('orgUsers.roleHospitalManager'),
+      medical_biller: t('orgUsers.roleMedicalBiller'),
     };
     return map[role] || role;
   };
@@ -204,6 +238,8 @@ export default function OrgUsersPage() {
       community_health_volunteer: '#16A34A',
       nutritionist: '#EA580C',
       radiologist: '#7C3AED',
+      hospital_manager: '#1E3A8A',
+      medical_biller: '#3b82f6',
     };
     return map[role] || '#6B7280';
   };
@@ -228,7 +264,7 @@ export default function OrgUsersPage() {
   if (loading) {
     return (
       <div className="flex-1 flex flex-col">
-        <TopBar title="User Management" />
+        <TopBar title={t('orgUsers.pageTitle')} />
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: brandColor }} />
         </div>
@@ -238,7 +274,7 @@ export default function OrgUsersPage() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title="User Management" />
+      <TopBar title={t('orgUsers.pageTitle')} />
 
       <div className="page-container page-enter">
         {/* Success/Error banners */}
@@ -255,8 +291,8 @@ export default function OrgUsersPage() {
 
         <PageHeader
           icon={Users}
-          title="Users"
-          subtitle={`${users.length} total users in your organization`}
+          title={t('orgUsers.heading')}
+          subtitle={t('orgUsers.subtitle', { count: users.length })}
           actions={
             <button
               onClick={() => { setError(''); setShowCreateModal(true); }}
@@ -264,7 +300,7 @@ export default function OrgUsersPage() {
               style={{ background: brandColor }}
             >
               <Plus className="w-4 h-4" />
-              Create User
+              {t('orgUsers.createUser')}
             </button>
           }
         />
@@ -282,7 +318,7 @@ export default function OrgUsersPage() {
                 color: 'var(--text-primary)',
               }}
             >
-              <option value="all">All Roles</option>
+              <option value="all">{t('orgUsers.allRoles')}</option>
               {availableRoles.map(r => (
                 <option key={r} value={r}>{roleLabel(r)}</option>
               ))}
@@ -300,14 +336,14 @@ export default function OrgUsersPage() {
                 color: 'var(--text-primary)',
               }}
             >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="all">{t('orgUsers.allStatus')}</option>
+              <option value="active">{t('orgUsers.statusActive')}</option>
+              <option value="inactive">{t('orgUsers.statusInactive')}</option>
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
           </div>
           <span className="text-xs ml-auto" style={{ color: 'var(--text-muted)' }}>
-            Showing {filteredUsers.length} of {users.length}
+            {t('orgUsers.showingCount', { shown: filteredUsers.length, total: users.length })}
           </span>
         </div>
 
@@ -316,19 +352,19 @@ export default function OrgUsersPage() {
           <table className="w-full">
             <thead>
               <tr>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Name</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Username</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Role</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Hospital</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Status</th>
-                <th className="text-right px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>Actions</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colName')}</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colUsername')}</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colRole')}</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colHospital')}</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colStatus')}</th>
+                <th className="text-right px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colActions')}</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                    No users found.
+                    {t('orgUsers.noUsersFound')}
                   </td>
                 </tr>
               ) : (
@@ -368,7 +404,7 @@ export default function OrgUsersPage() {
                           color: user.isActive ? 'var(--accent-primary)' : 'var(--color-danger)',
                         }}
                       >
-                        {user.isActive ? 'Active' : 'Inactive'}
+                        {user.isActive ? t('orgUsers.statusActive') : t('orgUsers.statusInactive')}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right relative">
@@ -399,7 +435,7 @@ export default function OrgUsersPage() {
                             style={{ color: 'var(--text-primary)' }}
                           >
                             <KeyRound className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />
-                            Reset Password
+                            {t('orgUsers.resetPassword')}
                           </button>
                           {user.isActive && user._id !== currentUser?._id && (
                             <button
@@ -408,7 +444,7 @@ export default function OrgUsersPage() {
                               style={{ color: 'var(--color-danger)' }}
                             >
                               <UserX className="w-3.5 h-3.5" />
-                              Deactivate
+                              {t('orgUsers.deactivate')}
                             </button>
                           )}
                         </div>
@@ -435,7 +471,7 @@ export default function OrgUsersPage() {
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Create New User</h2>
+              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{t('orgUsers.createNewUser')}</h2>
               <button onClick={() => setShowCreateModal(false)} className="p-1 rounded-lg hover:opacity-80">
                 <X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
               </button>
@@ -451,12 +487,12 @@ export default function OrgUsersPage() {
             <div className="space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Full Name</label>
+                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgUsers.fieldFullName')}</label>
                 <input
                   type="text"
                   value={formName}
                   onChange={e => setFormName(e.target.value)}
-                  placeholder="e.g. Dr. Achol Mayen"
+                  placeholder={t('orgUsers.fullNamePlaceholder')}
                   className="w-full px-3 py-2 rounded-lg text-sm"
                   style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                 />
@@ -464,12 +500,12 @@ export default function OrgUsersPage() {
 
               {/* Username */}
               <div>
-                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Username</label>
+                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgUsers.fieldUsername')}</label>
                 <input
                   type="text"
                   value={formUsername}
                   onChange={e => setFormUsername(e.target.value)}
-                  placeholder="e.g. achol.mayen"
+                  placeholder={t('orgUsers.usernamePlaceholder')}
                   className="w-full px-3 py-2 rounded-lg text-sm"
                   style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                 />
@@ -477,13 +513,23 @@ export default function OrgUsersPage() {
 
               {/* Password */}
               <div>
-                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Password</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgUsers.fieldPassword')}</label>
+                  <button
+                    type="button"
+                    onClick={() => { setFormPassword(generateTempPassword()); setShowPassword(true); }}
+                    className="flex items-center gap-1 text-xs font-semibold"
+                    style={{ color: 'var(--accent-text)' }}
+                  >
+                    <RefreshCw className="w-3 h-3" /> Generate
+                  </button>
+                </div>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={formPassword}
                     onChange={e => setFormPassword(e.target.value)}
-                    placeholder="Minimum 4 characters"
+                    placeholder={t('orgUsers.passwordPlaceholder')}
                     className="w-full px-3 py-2 pr-10 rounded-lg text-sm"
                     style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                   />
@@ -499,11 +545,14 @@ export default function OrgUsersPage() {
                     )}
                   </button>
                 </div>
+                <p className="mt-1.5 text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                  <ShieldCheck className="w-3 h-3" /> Temporary — the user must set their own password at first login.
+                </p>
               </div>
 
               {/* Role */}
               <div>
-                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Role</label>
+                <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgUsers.fieldRole')}</label>
                 <div className="relative">
                   <select
                     value={formRole}
@@ -522,7 +571,7 @@ export default function OrgUsersPage() {
               {/* Hospital (conditional) */}
               {needsHospital && (
                 <div>
-                  <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Assigned Hospital</label>
+                  <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgUsers.fieldAssignedHospital')}</label>
                   <div className="relative">
                     <select
                       value={formHospitalId}
@@ -530,7 +579,7 @@ export default function OrgUsersPage() {
                       className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm"
                       style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
                     >
-                      <option value="">Select a hospital...</option>
+                      <option value="">{t('orgUsers.selectHospitalOption')}</option>
                       {hospitals.map(h => (
                         <option key={h._id} value={h._id}>{h.name}</option>
                       ))}
@@ -547,7 +596,7 @@ export default function OrgUsersPage() {
                 className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
                 style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
               >
-                Cancel
+                {t('action.cancel')}
               </button>
               <button
                 onClick={handleCreate}
@@ -560,9 +609,68 @@ export default function OrgUsersPage() {
                 ) : (
                   <Plus className="w-4 h-4" />
                 )}
-                Create User
+                {t('orgUsers.createUser')}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Credential hand-off panel — shown after create or reset */}
+      {handoff && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={() => { setHandoff(null); setCopied(false); }}
+        >
+          <div
+            className="w-full max-w-md mx-4 rounded-xl shadow-2xl p-6"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
+                <Check className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {handoff.kind === 'created' ? 'User created' : 'Password reset'}
+                </h2>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  Share these credentials securely. The user must change the password at first login.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-lg p-3 mb-3 space-y-2" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Username</span>
+                <span className="text-sm font-mono" style={{ color: 'var(--text-primary)' }}>{handoff.username}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Temporary password</span>
+                <span className="text-sm font-mono" style={{ color: 'var(--text-primary)' }}>{handoff.password}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(`Username: ${handoff.username}\nTemporary password: ${handoff.password}`);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                } catch { /* clipboard unavailable — user can read the values above */ }
+              }}
+              className="btn btn-secondary w-full justify-center mb-2"
+            >
+              {copied ? <><Check className="w-4 h-4" /> Copied</> : <><Copy className="w-4 h-4" /> Copy credentials</>}
+            </button>
+            <button
+              onClick={() => { setHandoff(null); setCopied(false); }}
+              className="btn btn-primary w-full justify-center"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}
@@ -582,7 +690,7 @@ export default function OrgUsersPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
-                <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Reset Password</h2>
+                <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('orgUsers.resetPassword')}</h2>
               </div>
               <button onClick={() => setShowResetModal(null)} className="p-1">
                 <X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
@@ -596,15 +704,25 @@ export default function OrgUsersPage() {
             )}
 
             <p className="text-sm mb-3" style={{ color: 'var(--text-muted)' }}>
-              Enter a new password for user: <strong style={{ color: 'var(--text-primary)' }}>{users.find(u => u._id === showResetModal)?.username}</strong>
+              {t('orgUsers.resetPasswordPrompt')} <strong style={{ color: 'var(--text-primary)' }}>{users.find(u => u._id === showResetModal)?.username}</strong>
             </p>
 
-            <div className="relative mb-4">
+            <div className="flex justify-end mb-1.5">
+              <button
+                type="button"
+                onClick={() => { setResetPassword(generateTempPassword()); setShowPassword(true); }}
+                className="flex items-center gap-1 text-xs font-semibold"
+                style={{ color: 'var(--accent-text)' }}
+              >
+                <RefreshCw className="w-3 h-3" /> Generate
+              </button>
+            </div>
+            <div className="relative mb-2">
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={resetPassword}
                 onChange={e => setResetPassword(e.target.value)}
-                placeholder="New password (min 4 chars)"
+                placeholder={t('orgUsers.newPasswordPlaceholder')}
                 className="w-full px-3 py-2 pr-10 rounded-lg text-sm"
                 style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
               />
@@ -627,7 +745,7 @@ export default function OrgUsersPage() {
                 className="px-3 py-1.5 rounded-lg text-sm"
                 style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
               >
-                Cancel
+                {t('action.cancel')}
               </button>
               <button
                 onClick={handleResetPassword}
@@ -635,7 +753,7 @@ export default function OrgUsersPage() {
                 className="px-3 py-1.5 rounded-lg text-sm font-medium text-white disabled:opacity-50"
                 style={{ background: 'var(--color-warning)' }}
               >
-                {resetting ? 'Resetting...' : 'Reset Password'}
+                {resetting ? t('orgUsers.resetting') : t('orgUsers.resetPassword')}
               </button>
             </div>
           </div>

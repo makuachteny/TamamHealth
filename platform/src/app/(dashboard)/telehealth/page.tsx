@@ -16,6 +16,7 @@ import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { TelehealthType, TelehealthStatus, TelehealthSessionDoc } from '@/lib/db-types';
 
 /* ─── Config ─── */
@@ -61,6 +62,7 @@ export default function TelehealthPage() {
   const { patients } = usePatients();
   const { currentUser, globalSearch } = useApp();
   const { showToast } = useToast();
+  const { t } = useTranslation();
 
   const [view, setView] = useState<'calendar' | 'list'>('calendar');
   const [showNewForm, setShowNewForm] = useState(false);
@@ -157,9 +159,9 @@ export default function TelehealthPage() {
   const resetForm = () => { setFormPatient(''); setFormComplaint(''); setFormFee(''); setFormDate(new Date().toISOString().slice(0, 10)); setFormTime('09:00'); setFormType('video'); };
 
   const handleCreate = async () => {
-    if (!formPatient || !formDate || !formTime || !formComplaint) { showToast('Fill required fields', 'error'); return; }
+    if (!formPatient || !formDate || !formTime || !formComplaint) { showToast(t('telehealth.toastFillRequired'), 'error'); return; }
     const patient = patients.find(p => p._id === formPatient);
-    if (!patient) { showToast('Select a patient', 'error'); return; }
+    if (!patient) { showToast(t('telehealth.toastSelectPatient'), 'error'); return; }
     setSubmitting(true);
     try {
       await create({
@@ -174,16 +176,16 @@ export default function TelehealthPage() {
         currency: 'USD', paymentStatus: formFee ? 'pending' : undefined,
         state: '', orgId: currentUser?.orgId,
       });
-      showToast('Session scheduled', 'success'); setShowNewForm(false); resetForm();
-    } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); }
+      showToast(t('telehealth.toastScheduled'), 'success'); setShowNewForm(false); resetForm();
+    } catch (err) { showToast(err instanceof Error ? err.message : t('telehealth.toastFailed'), 'error'); }
     finally { setSubmitting(false); }
   };
 
   const handleJoin = useCallback(async (s: TelehealthSessionDoc) => {
     if (!s.patientConsentGiven) await update(s._id, { patientConsentGiven: true, consentTimestamp: new Date().toISOString() });
     await updateStatus(s._id, 'in_session');
-    showToast(`Session started — Room: ${s.roomId}`, 'success');
-  }, [update, updateStatus, showToast]);
+    showToast(t('telehealth.toastSessionStarted', { roomId: s.roomId }), 'success');
+  }, [update, updateStatus, showToast, t]);
 
   const prevMonth = () => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); };
   const nextMonth = () => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); };
@@ -195,11 +197,11 @@ export default function TelehealthPage() {
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <PageHeader
           icon={Video}
-          title="Telehealth"
-          subtitle="Virtual consultations · ISO 13131 compliant"
+          title={t('nav.telehealth')}
+          subtitle={t('telehealth.subtitle')}
           actions={
             <button onClick={() => setShowNewForm(true)} className="btn btn-primary" style={{ gap: 6 }}>
-              <Plus size={16} /> New Session
+              <Plus size={16} /> {t('telehealth.newSession')}
             </button>
           }
         />
@@ -208,12 +210,12 @@ export default function TelehealthPage() {
         {stats && (
           <div className="stat-grid" style={{ marginBottom: 20 }}>
             {[
-              { label: "Today's Sessions", value: stats.todayTotal, icon: Calendar, color: 'var(--accent-primary)' },
-              { label: 'Active Now', value: stats.todayActive, icon: Video, color: 'var(--color-success)' },
-              { label: 'Completed', value: stats.completedTotal, icon: CheckCircle2, color: 'var(--color-success)' },
-              { label: 'Avg Duration', value: `${stats.avgDuration}m`, icon: Clock, color: 'var(--color-warning)' },
-              { label: 'Avg Rating', value: stats.avgRating > 0 ? `${stats.avgRating}/5` : '—', icon: Star, color: 'var(--color-warning)' },
-              { label: 'Telehealth Bookings', value: telehealthAppointments.length, icon: UserPlus, color: '#7C3AED' },
+              { label: t('telehealth.statTodaySessions'), value: stats.todayTotal, icon: Calendar, color: 'var(--accent-primary)' },
+              { label: t('telehealth.statActiveNow'), value: stats.todayActive, icon: Video, color: 'var(--color-success)' },
+              { label: t('referral.completed'), value: stats.completedTotal, icon: CheckCircle2, color: 'var(--color-success)' },
+              { label: t('telehealth.statAvgDuration'), value: `${stats.avgDuration}m`, icon: Clock, color: 'var(--color-warning)' },
+              { label: t('telehealth.statAvgRating'), value: stats.avgRating > 0 ? `${stats.avgRating}/5` : '—', icon: Star, color: 'var(--color-warning)' },
+              { label: t('telehealth.statBookings'), value: telehealthAppointments.length, icon: UserPlus, color: '#7C3AED' },
             ].map((c, i) => (
               <div key={i} className="card-elevated" style={{ padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -235,12 +237,12 @@ export default function TelehealthPage() {
                 background: view === v ? 'var(--accent-primary)' : 'var(--bg-card)',
                 color: view === v ? '#fff' : 'var(--text-secondary)',
               }}>
-                {v === 'calendar' ? 'Calendar' : 'List'}
+                {v === 'calendar' ? t('telehealth.viewCalendar') : t('telehealth.viewList')}
               </button>
             ))}
           </div>
           <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary" style={{ gap: 6 }}>
-            <Filter size={14} /> Filters
+            <Filter size={14} /> {t('patients.filters')}
           </button>
           <div style={{ flex: 1 }} />
         </div>
@@ -250,11 +252,11 @@ export default function TelehealthPage() {
           <div className="card-elevated" style={{ padding: 12, marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search patients, providers..." style={{ paddingLeft: 32 }} />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('telehealth.searchPlaceholder')} style={{ paddingLeft: 32 }} />
             </div>
             {selectedDate && (
               <button onClick={() => setSelectedDate(null)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-                <X size={12} /> Clear date
+                <X size={12} /> {t('telehealth.clearDate')}
               </button>
             )}
           </div>
@@ -266,7 +268,7 @@ export default function TelehealthPage() {
         }}>
           <Shield size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            <strong style={{ color: 'var(--accent-primary)' }}>ISO 13131</strong> &middot; Patient consent required &middot; End-to-end encrypted &middot; Quality monitored
+            <strong style={{ color: 'var(--accent-primary)' }}>ISO 13131</strong> &middot; {t('telehealth.complianceBanner')}
           </span>
         </div>
 
@@ -279,7 +281,7 @@ export default function TelehealthPage() {
                 <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', minWidth: 160, textAlign: 'center' }}>{MONTHS[calMonth]} {calYear}</h3>
                 <button onClick={nextMonth} style={calBtn}><ChevronRight size={16} /></button>
               </div>
-              <button onClick={goToday} className="btn btn-secondary btn-sm">Today</button>
+              <button onClick={goToday} className="btn btn-secondary btn-sm">{t('time.today')}</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
               {WEEKDAYS.map(d => (
@@ -318,7 +320,7 @@ export default function TelehealthPage() {
               })}
             </div>
             <div style={{ display: 'flex', gap: 16, padding: '10px 20px', borderTop: '1px solid var(--border-medium)' }}>
-              {[{ c: 'var(--color-success)', l: 'Telehealth' }, { c: 'var(--accent-primary)', l: 'Appointments' }, { c: 'var(--color-warning)', l: 'Active' }].map(x => (
+              {[{ c: 'var(--color-success)', l: t('nav.telehealth') }, { c: 'var(--accent-primary)', l: t('nav.appointments') }, { c: 'var(--color-warning)', l: t('nurse.active') }].map(x => (
                 <span key={x.l} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-muted)' }}>
                   <span style={{ width: 5, height: 5, borderRadius: '50%', background: x.c }} />{x.l}
                 </span>
@@ -333,7 +335,7 @@ export default function TelehealthPage() {
             <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
               {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </h3>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{filtered.length} sessions &middot; {filteredAppts.length} appointments</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('telehealth.sessionsAppointmentsCount', { sessions: filtered.length, appointments: filteredAppts.length })}</span>
           </div>
         )}
 
@@ -341,7 +343,7 @@ export default function TelehealthPage() {
         {filteredAppts.length > 0 && (
           <div className="card-elevated" style={{ padding: '12px 14px', marginBottom: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-              Telehealth Appointments ({filteredAppts.length})
+              {t('telehealth.telehealthAppointments', { count: filteredAppts.length })}
             </div>
             {filteredAppts.map(a => (
               <div key={a._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: '1px solid var(--border-medium)' }}>
@@ -360,9 +362,9 @@ export default function TelehealthPage() {
             {filtered.length === 0 && filteredAppts.length === 0 ? (
               <div className="card-elevated" style={{ textAlign: 'center', padding: 48 }}>
                 <Video size={52} style={{ color: 'var(--text-muted)', opacity: 0.3, margin: '0 auto 12px' }} />
-                <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>No sessions {selectedDate ? 'on this date' : 'found'}</p>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>{selectedDate ? t('telehealth.noSessionsOnDate') : t('telehealth.noSessionsFound')}</p>
                 <button onClick={() => setShowNewForm(true)} className="btn btn-primary btn-sm" style={{ background: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
-                  <Plus size={14} /> Schedule Session
+                  <Plus size={14} /> {t('telehealth.scheduleSession')}
                 </button>
               </div>
             ) : (
@@ -390,7 +392,7 @@ export default function TelehealthPage() {
                               onClick={(e) => e.stopPropagation()}
                               style={{ color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: 3 }}
                               className="hover:underline"
-                              title="View patient record"
+                              title={t('dashboard.viewPatientRecord')}
                             >
                               {session.patientName}
                               <ExternalLink size={11} style={{ opacity: 0.55 }} />
@@ -399,10 +401,10 @@ export default function TelehealthPage() {
                             session.patientName
                           )}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tc.label} &middot; {session.chiefComplaint.slice(0, 40)}{session.chiefComplaint.length > 40 ? '...' : ''}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t(`telehealth.type_${session.sessionType}`)} &middot; {session.chiefComplaint.slice(0, 40)}{session.chiefComplaint.length > 40 ? '...' : ''}</div>
                       </div>
                       {session.status === 'in_session' && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--color-success)', animation: 'pulse 2s infinite' }} />}
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4, color: sc.color, background: sc.bg }}>{sc.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4, color: sc.color, background: sc.bg }}>{t(`telehealth.status_${session.status}`)}</span>
                       {session.patientConsentGiven && <Lock size={12} style={{ color: 'var(--color-success)' }} />}
                       {isExp ? <ChevronUp size={14} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />}
                     </div>
@@ -410,38 +412,38 @@ export default function TelehealthPage() {
                     {isExp && (
                       <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border-medium)', paddingTop: 12 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', alignItems: 'stretch', gap: 14, marginBottom: 12 }}>
-                          <Detail l="Complaint" v={session.chiefComplaint} />
-                          <Detail l="Provider" v={`${session.providerName} (${session.providerRole})`} />
-                          <Detail l="Room" v={session.roomId} mono />
-                          {session.clinicalNotes && <Detail l="Notes" v={session.clinicalNotes} />}
-                          {session.diagnosis && <Detail l="Diagnosis" v={`${session.diagnosis}${session.icd10Code ? ` (${session.icd10Code})` : ''}`} />}
+                          <Detail l={t('telehealth.detailComplaint')} v={session.chiefComplaint} />
+                          <Detail l={t('appointments.detailProvider')} v={`${session.providerName} (${session.providerRole})`} />
+                          <Detail l={t('telehealth.detailRoom')} v={session.roomId} mono />
+                          {session.clinicalNotes && <Detail l={t('nurse.notes')} v={session.clinicalNotes} />}
+                          {session.diagnosis && <Detail l={t('telehealth.detailDiagnosis')} v={`${session.diagnosis}${session.icd10Code ? ` (${session.icd10Code})` : ''}`} />}
                           {session.consultationFee !== undefined && (
-                            <Detail l="Fee" v={`${session.currency} ${session.consultationFee}`} badge={session.paymentStatus ? paymentLabels[session.paymentStatus] : undefined} />
+                            <Detail l={t('telehealth.detailFee')} v={`${session.currency} ${session.consultationFee}`} badge={session.paymentStatus ? { color: paymentLabels[session.paymentStatus].color, label: t(`telehealth.payment_${session.paymentStatus}`) } : undefined} />
                           )}
-                          <Detail l="Consent" v={session.patientConsentGiven ? 'Given' : 'Pending'} color={session.patientConsentGiven ? 'var(--color-success)' : 'var(--color-danger)'} />
-                          {session.patientRating && <Detail l="Rating" v={`${session.patientRating}/5`} color="#F59E0B" />}
+                          <Detail l={t('telehealth.detailConsent')} v={session.patientConsentGiven ? t('telehealth.consentGiven') : t('telehealth.consentPending')} color={session.patientConsentGiven ? 'var(--color-success)' : 'var(--color-danger)'} />
+                          {session.patientRating && <Detail l={t('telehealth.detailRating')} v={`${session.patientRating}/5`} color="#F59E0B" />}
                         </div>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {session.status === 'scheduled' && <>
-                            <Btn c="#D97706" onClick={() => updateStatus(session._id, 'waiting_room')}><Clock size={13} /> Waiting</Btn>
-                            <Btn c="#EF4444" onClick={() => updateStatus(session._id, 'cancelled', { cancelledReason: 'Cancelled', cancelledBy: currentUser?.name })}><X size={13} /> Cancel</Btn>
+                            <Btn c="#D97706" onClick={() => updateStatus(session._id, 'waiting_room')}><Clock size={13} /> {t('telehealth.btnWaiting')}</Btn>
+                            <Btn c="#EF4444" onClick={() => updateStatus(session._id, 'cancelled', { cancelledReason: 'Cancelled', cancelledBy: currentUser?.name })}><X size={13} /> {t('action.cancel')}</Btn>
                           </>}
                           {(session.status === 'scheduled' || session.status === 'waiting_room') && (
                             <button onClick={() => handleJoin(session)} className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff', border: 'none', gap: 4 }}>
-                              <Video size={13} /> Join
+                              <Video size={13} /> {t('telehealth.btnJoin')}
                             </button>
                           )}
                           {session.status === 'in_session' && <>
-                            <button onClick={() => { updateStatus(session._id, 'completed'); showToast('Completed', 'success'); }} className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff', border: 'none', gap: 4 }}>
-                              <PhoneOff size={13} /> End
+                            <button onClick={() => { updateStatus(session._id, 'completed'); showToast(t('telehealth.toastCompleted'), 'success'); }} className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff', border: 'none', gap: 4 }}>
+                              <PhoneOff size={13} /> {t('telehealth.btnEnd')}
                             </button>
-                            <Btn c="#D97706" onClick={() => update(session._id, { connectionDrops: session.connectionDrops + 1 })}><WifiOff size={13} /> Drop</Btn>
+                            <Btn c="#D97706" onClick={() => update(session._id, { connectionDrops: session.connectionDrops + 1 })}><WifiOff size={13} /> {t('telehealth.btnDrop')}</Btn>
                           </>}
                           {(session.status === 'in_session' || session.status === 'completed') && (
-                            <Btn c="#1B9AAA" onClick={() => { setNotesId(session._id); setNotesText(session.clinicalNotes || ''); setNotesDx(session.diagnosis || ''); setNotesIcd(session.icd10Code || ''); }}><FileText size={13} /> Notes</Btn>
+                            <Btn c="#3b82f6" onClick={() => { setNotesId(session._id); setNotesText(session.clinicalNotes || ''); setNotesDx(session.diagnosis || ''); setNotesIcd(session.icd10Code || ''); }}><FileText size={13} /> {t('nurse.notes')}</Btn>
                           )}
-                          {session.status === 'completed' && !session.patientRating && <Btn c="#F59E0B" onClick={() => setRatingId(session._id)}><Star size={13} /> Rate</Btn>}
-                          {session.status === 'completed' && session.paymentStatus === 'pending' && <Btn c="#10B981" onClick={() => update(session._id, { paymentStatus: 'paid' })}><DollarSign size={13} /> Paid</Btn>}
+                          {session.status === 'completed' && !session.patientRating && <Btn c="#F59E0B" onClick={() => setRatingId(session._id)}><Star size={13} /> {t('telehealth.btnRate')}</Btn>}
+                          {session.status === 'completed' && session.paymentStatus === 'pending' && <Btn c="#10B981" onClick={() => update(session._id, { paymentStatus: 'paid' })}><DollarSign size={13} /> {t('telehealth.payment_paid')}</Btn>}
                         </div>
                       </div>
                     )}
@@ -453,42 +455,42 @@ export default function TelehealthPage() {
         )}
 
         {/* ═══ Modals ═══ */}
-        {showNewForm && <Modal title="Schedule Telehealth Session" onClose={() => { setShowNewForm(false); resetForm(); }}>
+        {showNewForm && <Modal title={t('telehealth.scheduleModalTitle')} onClose={() => { setShowNewForm(false); resetForm(); }}>
           <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 'var(--card-radius)', padding: 10, marginBottom: 14, fontSize: 12, color: '#92400E', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
             <Shield size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-            <span>Patient consent required before session. All sessions documented per ISO 13131.</span>
+            <span>{t('telehealth.consentNotice')}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div><label>Patient *</label><select value={formPatient} onChange={e => setFormPatient(e.target.value)}><option value="">Select patient...</option>{patients.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.surname}</option>)}</select></div>
+            <div><label>{t('telehealth.formPatient')}</label><select value={formPatient} onChange={e => setFormPatient(e.target.value)}><option value="">{t('telehealth.selectPatientOption')}</option>{patients.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.surname}</option>)}</select></div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', alignItems: 'stretch', gap: 10 }}>
-              <div><label>Date *</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
-              <div><label>Time *</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-              <div><label>Type</label><select value={formType} onChange={e => setFormType(e.target.value as TelehealthType)}><option value="video">Video</option><option value="audio">Audio</option><option value="chat">Chat</option></select></div>
+              <div><label>{t('telehealth.formDate')}</label><input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} min={today} /></div>
+              <div><label>{t('telehealth.formTime')}</label><select value={formTime} onChange={e => setFormTime(e.target.value)}>{timeSlots.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+              <div><label>{t('telehealth.formType')}</label><select value={formType} onChange={e => setFormType(e.target.value as TelehealthType)}><option value="video">{t('telehealth.type_video')}</option><option value="audio">{t('telehealth.type_audio')}</option><option value="chat">{t('telehealth.type_chat')}</option></select></div>
             </div>
-            <div><label>Complaint *</label><textarea value={formComplaint} onChange={e => setFormComplaint(e.target.value)} rows={2} placeholder="Reason for consultation..." /></div>
-            <div><label>Fee (USD, optional)</label><input type="number" value={formFee} onChange={e => setFormFee(e.target.value)} placeholder="0.00" /></div>
+            <div><label>{t('telehealth.formComplaint')}</label><textarea value={formComplaint} onChange={e => setFormComplaint(e.target.value)} rows={2} placeholder={t('telehealth.complaintPlaceholder')} /></div>
+            <div><label>{t('telehealth.formFee')}</label><input type="number" value={formFee} onChange={e => setFormFee(e.target.value)} placeholder="0.00" /></div>
             <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-              <button onClick={() => { setShowNewForm(false); resetForm(); }} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
-              <button onClick={handleCreate} disabled={submitting} className="btn btn-primary" style={{ flex: 1, background: 'var(--color-success)', borderColor: 'var(--color-success)', opacity: submitting ? 0.6 : 1 }}>{submitting ? 'Scheduling...' : 'Schedule'}</button>
+              <button onClick={() => { setShowNewForm(false); resetForm(); }} className="btn btn-secondary" style={{ flex: 1 }}>{t('action.cancel')}</button>
+              <button onClick={handleCreate} disabled={submitting} className="btn btn-primary" style={{ flex: 1, background: 'var(--color-success)', borderColor: 'var(--color-success)', opacity: submitting ? 0.6 : 1 }}>{submitting ? t('telehealth.scheduling') : t('telehealth.schedule')}</button>
             </div>
           </div>
         </Modal>}
 
-        {notesId && <Modal title="Clinical Notes" onClose={() => setNotesId(null)}>
+        {notesId && <Modal title={t('referral.notes')} onClose={() => setNotesId(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div><label>Notes</label><textarea value={notesText} onChange={e => setNotesText(e.target.value)} rows={3} placeholder="SOAP notes..." /></div>
+            <div><label>{t('nurse.notes')}</label><textarea value={notesText} onChange={e => setNotesText(e.target.value)} rows={3} placeholder={t('telehealth.soapNotesPlaceholder')} /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div><label>Diagnosis</label><input value={notesDx} onChange={e => setNotesDx(e.target.value)} placeholder="e.g., Malaria" /></div>
-              <div><label>ICD-10</label><input value={notesIcd} onChange={e => setNotesIcd(e.target.value)} placeholder="e.g., B50" /></div>
+              <div><label>{t('telehealth.detailDiagnosis')}</label><input value={notesDx} onChange={e => setNotesDx(e.target.value)} placeholder={t('telehealth.diagnosisPlaceholder')} /></div>
+              <div><label>{t('telehealth.icd10')}</label><input value={notesIcd} onChange={e => setNotesIcd(e.target.value)} placeholder={t('telehealth.icd10Placeholder')} /></div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setNotesId(null)} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
-              <button onClick={() => { addNotes(notesId, notesText, notesDx || undefined, notesIcd || undefined); showToast('Saved', 'success'); setNotesId(null); }} className="btn btn-primary" style={{ flex: 1 }}>Save</button>
+              <button onClick={() => setNotesId(null)} className="btn btn-secondary" style={{ flex: 1 }}>{t('action.cancel')}</button>
+              <button onClick={() => { addNotes(notesId, notesText, notesDx || undefined, notesIcd || undefined); showToast(t('telehealth.toastSaved'), 'success'); setNotesId(null); }} className="btn btn-primary" style={{ flex: 1 }}>{t('action.save')}</button>
             </div>
           </div>
         </Modal>}
 
-        {ratingId && <Modal title="Rate Session" onClose={() => setRatingId(null)} sm>
+        {ratingId && <Modal title={t('telehealth.rateModalTitle')} onClose={() => setRatingId(null)} sm>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 14 }}>
             {[1, 2, 3, 4, 5].map(n => (
               <button key={n} onClick={() => setRatingVal(n)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
@@ -496,10 +498,10 @@ export default function TelehealthPage() {
               </button>
             ))}
           </div>
-          <textarea value={ratingFb} onChange={e => setRatingFb(e.target.value)} rows={2} placeholder="Optional feedback..." style={{ marginBottom: 10 }} />
+          <textarea value={ratingFb} onChange={e => setRatingFb(e.target.value)} rows={2} placeholder={t('telehealth.feedbackPlaceholder')} style={{ marginBottom: 10 }} />
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => setRatingId(null)} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
-            <button onClick={() => { rate(ratingId, ratingVal, ratingFb || undefined); showToast('Rated', 'success'); setRatingId(null); setRatingFb(''); }} className="btn btn-primary" style={{ flex: 1, background: 'var(--color-warning)', borderColor: 'var(--color-warning)' }}>Submit</button>
+            <button onClick={() => setRatingId(null)} className="btn btn-secondary" style={{ flex: 1 }}>{t('action.cancel')}</button>
+            <button onClick={() => { rate(ratingId, ratingVal, ratingFb || undefined); showToast(t('telehealth.toastRated'), 'success'); setRatingId(null); setRatingFb(''); }} className="btn btn-primary" style={{ flex: 1, background: 'var(--color-warning)', borderColor: 'var(--color-warning)' }}>{t('action.submit')}</button>
           </div>
         </Modal>}
 

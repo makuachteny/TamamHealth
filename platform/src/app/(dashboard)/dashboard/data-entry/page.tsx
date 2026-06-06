@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useToast } from '@/components/Toast';
 import {
@@ -96,6 +97,7 @@ export default function DataEntryDashboard() {
   const { currentUser } = useApp();
   const { hospitals } = useHospitals();
   const { showToast } = useToast();
+  const { t } = useTranslation();
 
   const today = new Date().toISOString().slice(0, 10);
   const [showForm, setShowForm] = useState(false);
@@ -132,10 +134,10 @@ export default function DataEntryDashboard() {
       const updated = [census, ...existing.filter((r: CensusData) => r.date !== census.date)].slice(0, 30);
       localStorage.setItem(key, JSON.stringify(updated));
       setSavedReports(updated);
-      showToast('Census report saved successfully', 'success');
+      showToast(t('dataEntry.toastSaved'), 'success');
       setShowForm(false);
     } catch {
-      showToast('Failed to save report', 'error');
+      showToast(t('dataEntry.toastSaveFailed'), 'error');
     } finally {
       setSaving(false);
     }
@@ -232,7 +234,7 @@ export default function DataEntryDashboard() {
 
   return (
     <>
-      <TopBar title="Data Entry Dashboard" />
+      <TopBar title={t('dataEntry.title')} />
       <main className="page-container page-enter">
 
         {/* Facility banner */}
@@ -257,7 +259,7 @@ export default function DataEntryDashboard() {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold"
                   style={{ background: ACCENT, color: '#fff', border: 'none', cursor: 'pointer' }}
                 >
-                  <Plus className="w-3.5 h-3.5" /> New Census
+                  <Plus className="w-3.5 h-3.5" /> {t('dataEntry.newCensus')}
                 </button>
               </div>
             </div>
@@ -267,10 +269,10 @@ export default function DataEntryDashboard() {
         {/* KPI strip from latest report */}
         <div className="kpi-grid mb-4">
           {[
-            { label: 'Facility Score', value: facilityStats ? `${facilityStats.pct}%` : '--', icon: BarChart3, color: facilityStats && facilityStats.pct >= 80 ? 'var(--color-success)' : 'var(--color-warning)' },
-            { label: 'Bed Occupancy', value: latest ? `${bedOccupancy}%` : '--', icon: BedDouble, color: bedOccupancy > 90 ? 'var(--color-danger)' : bedOccupancy > 70 ? 'var(--color-warning)' : 'var(--color-success)' },
-            { label: 'Medicine Avail.', value: latest ? `${medAvailability}%` : '--', icon: Pill, color: medAvailability >= 80 ? 'var(--color-success)' : medAvailability >= 50 ? 'var(--color-warning)' : 'var(--color-danger)' },
-            { label: 'Reports Filed', value: savedReports.length, icon: FileText, color: ACCENT },
+            { label: t('dataEntry.kpiFacilityScore'), value: facilityStats ? `${facilityStats.pct}%` : '--', icon: BarChart3, color: facilityStats && facilityStats.pct >= 80 ? 'var(--color-success)' : 'var(--color-warning)' },
+            { label: t('dashboard.bedOccupancy'), value: latest ? `${bedOccupancy}%` : '--', icon: BedDouble, color: bedOccupancy > 90 ? 'var(--color-danger)' : bedOccupancy > 70 ? 'var(--color-warning)' : 'var(--color-success)' },
+            { label: t('dataEntry.kpiMedicineAvail'), value: latest ? `${medAvailability}%` : '--', icon: Pill, color: medAvailability >= 80 ? 'var(--color-success)' : medAvailability >= 50 ? 'var(--color-warning)' : 'var(--color-danger)' },
+            { label: t('dataEntry.kpiReportsFiled'), value: savedReports.length, icon: FileText, color: ACCENT },
           ].map(k => (
             <div key={k.label} className="kpi">
               <div className="kpi__icon" style={{ background: `${k.color}15` }}>
@@ -286,17 +288,17 @@ export default function DataEntryDashboard() {
 
         {/* Quick actions */}
         <div className="dash-card mb-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Data Collection</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('dataEntry.dataCollection')}</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
-              { label: 'Daily Census', icon: ClipboardCheck, color: 'var(--accent-primary)', action: () => setShowForm(true) },
-              { label: 'Facility Assessment', icon: Building2, color: 'var(--accent-primary)', action: () => router.push('/facility-assessments') },
-              { label: 'Data Quality', icon: Database, color: 'var(--accent-primary)', action: () => router.push('/data-quality') },
-              { label: 'Vital Statistics', icon: Heart, color: 'var(--accent-primary)', action: () => router.push('/vital-statistics') },
-              { label: 'Immunizations', icon: Syringe, color: 'var(--accent-primary)', action: () => router.push('/immunizations') },
-              { label: 'Antenatal Care', icon: HeartPulse, color: 'var(--accent-primary)', action: () => router.push('/anc') },
-              { label: 'Births', icon: Baby, color: 'var(--accent-primary)', action: () => router.push('/births') },
-              { label: 'Deaths', icon: Skull, color: 'var(--accent-primary)', action: () => router.push('/deaths') },
+              { label: t('dataEntry.dailyCensus'), icon: ClipboardCheck, color: 'var(--accent-primary)', action: () => setShowForm(true) },
+              { label: t('dataEntry.facilityAssessment'), icon: Building2, color: 'var(--accent-primary)', action: () => router.push('/facility-assessments') },
+              { label: t('dataEntry.dataQuality'), icon: Database, color: 'var(--accent-primary)', action: () => router.push('/data-quality') },
+              { label: t('dataEntry.vitalStatistics'), icon: Heart, color: 'var(--accent-primary)', action: () => router.push('/vital-statistics') },
+              { label: t('nav.immunizations'), icon: Syringe, color: 'var(--accent-primary)', action: () => router.push('/immunizations') },
+              { label: t('nav.anc'), icon: HeartPulse, color: 'var(--accent-primary)', action: () => router.push('/anc') },
+              { label: t('dataEntry.births'), icon: Baby, color: 'var(--accent-primary)', action: () => router.push('/births') },
+              { label: t('dataEntry.deaths'), icon: Skull, color: 'var(--accent-primary)', action: () => router.push('/deaths') },
             ].map(a => (
               <button key={a.label} onClick={a.action}
                 className="flex flex-col items-center gap-2 p-3 rounded-lg transition-all active:scale-95"
@@ -319,20 +321,20 @@ export default function DataEntryDashboard() {
               <div className="glass-section-header">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Patient Census</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.patientCensus')}</span>
                 </div>
                 <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{latest.date}</span>
               </div>
               <div className="p-4 space-y-2">
                 {[
-                  { label: 'Inpatients', value: latest.inpatientsTotal, color: 'var(--accent-primary)' },
-                  { label: 'OPD Visits', value: latest.opdVisitsToday, color: 'var(--accent-primary)' },
-                  { label: 'Emergency', value: latest.emergencyVisits, color: 'var(--color-danger)' },
-                  { label: 'Maternity', value: latest.maternityAdmissions, color: 'var(--accent-primary)' },
-                  { label: 'Newborns', value: latest.newborns, color: 'var(--accent-primary)' },
-                  { label: 'Discharges', value: latest.discharges, color: 'var(--accent-primary)' },
-                  { label: 'Deaths', value: latest.deaths, color: 'var(--color-danger)' },
-                  { label: 'Referrals Out', value: latest.referralsOut, color: 'var(--accent-primary)' },
+                  { label: t('dataEntry.inpatients'), value: latest.inpatientsTotal, color: 'var(--accent-primary)' },
+                  { label: t('dataEntry.opdVisits'), value: latest.opdVisitsToday, color: 'var(--accent-primary)' },
+                  { label: t('encounters.emergency'), value: latest.emergencyVisits, color: 'var(--color-danger)' },
+                  { label: t('dashboard.bedMaternity'), value: latest.maternityAdmissions, color: 'var(--accent-primary)' },
+                  { label: t('dataEntry.newborns'), value: latest.newborns, color: 'var(--accent-primary)' },
+                  { label: t('dataEntry.discharges'), value: latest.discharges, color: 'var(--accent-primary)' },
+                  { label: t('dataEntry.deaths'), value: latest.deaths, color: 'var(--color-danger)' },
+                  { label: t('dataEntry.referralsOut'), value: latest.referralsOut, color: 'var(--accent-primary)' },
                 ].map(row => (
                   <div key={row.label} className="flex items-center justify-between py-1" style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
@@ -347,15 +349,15 @@ export default function DataEntryDashboard() {
               <div className="glass-section-header">
                 <div className="flex items-center gap-2">
                   <BedDouble className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Beds & Staff</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.bedsAndStaff')}</span>
                 </div>
               </div>
               <div className="p-4 space-y-3">
                 {[
-                  { label: 'General Beds', occupied: latest.occupiedBeds, total: latest.totalBeds, color: 'var(--accent-primary)' },
-                  { label: 'ICU', occupied: latest.icuOccupied, total: latest.icuBeds, color: 'var(--color-danger)' },
-                  { label: 'Maternity', occupied: latest.maternityOccupied, total: latest.maternityBeds, color: '#EC4899' },
-                  { label: 'Pediatric', occupied: latest.pediatricOccupied, total: latest.pediatricBeds, color: '#2563EB' },
+                  { label: t('dataEntry.generalBeds'), occupied: latest.occupiedBeds, total: latest.totalBeds, color: 'var(--accent-primary)' },
+                  { label: t('dashboard.bedIcu'), occupied: latest.icuOccupied, total: latest.icuBeds, color: 'var(--color-danger)' },
+                  { label: t('dashboard.bedMaternity'), occupied: latest.maternityOccupied, total: latest.maternityBeds, color: '#EC4899' },
+                  { label: t('dashboard.bedPediatric'), occupied: latest.pediatricOccupied, total: latest.pediatricBeds, color: '#3b82f6' },
                 ].map(bed => {
                   const pct = bed.total > 0 ? Math.round((bed.occupied / bed.total) * 100) : 0;
                   return (
@@ -371,15 +373,15 @@ export default function DataEntryDashboard() {
                   );
                 })}
                 <div style={{ borderTop: '1px solid var(--border-medium)', paddingTop: 8, marginTop: 4 }}>
-                  <div className="text-[10px] font-semibold uppercase mb-2" style={{ color: 'var(--text-muted)' }}>Staff Present</div>
+                  <div className="text-[10px] font-semibold uppercase mb-2" style={{ color: 'var(--text-muted)' }}>{t('dataEntry.staffPresent')}</div>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { label: 'Doctors', value: latest.doctorsPresent },
-                      { label: 'Nurses', value: latest.nursesPresent },
-                      { label: 'COs', value: latest.clinicalOfficers },
-                      { label: 'Lab', value: latest.labTechs },
-                      { label: 'Pharma', value: latest.pharmacists },
-                      { label: 'Support', value: latest.supportStaff },
+                      { label: t('dashboard.doctors'), value: latest.doctorsPresent },
+                      { label: t('dataEntry.nurses'), value: latest.nursesPresent },
+                      { label: t('dataEntry.cos'), value: latest.clinicalOfficers },
+                      { label: t('dataEntry.lab'), value: latest.labTechs },
+                      { label: t('dataEntry.pharma'), value: latest.pharmacists },
+                      { label: t('dataEntry.support'), value: latest.supportStaff },
                     ].map(s => (
                       <div key={s.label} className="text-center p-1.5 rounded" style={{ background: 'var(--overlay-subtle)' }}>
                         <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{s.value}</div>
@@ -396,17 +398,17 @@ export default function DataEntryDashboard() {
               <div className="glass-section-header">
                 <div className="flex items-center gap-2">
                   <Thermometer className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Equipment & Supplies</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.equipmentSupplies')}</span>
                 </div>
               </div>
               <div className="p-4 space-y-2">
                 {[
-                  { label: 'Thermometers', value: latest.functionalThermometers, icon: Thermometer },
-                  { label: 'BP Monitors', value: latest.functionalBPMonitors, icon: Heart },
-                  { label: 'Stethoscopes', value: latest.functionalStethoscopes, icon: Stethoscope },
-                  { label: 'Pulse Oximeters', value: latest.functionalOximeters, icon: Zap },
-                  { label: 'Wheelchairs', value: latest.wheelchairsAvailable, icon: Truck },
-                  { label: 'PPE Sets', value: latest.ppeSetsAvailable, icon: ShieldCheck },
+                  { label: t('dataEntry.thermometers'), value: latest.functionalThermometers, icon: Thermometer },
+                  { label: t('dataEntry.bpMonitors'), value: latest.functionalBPMonitors, icon: Heart },
+                  { label: t('dataEntry.stethoscopes'), value: latest.functionalStethoscopes, icon: Stethoscope },
+                  { label: t('dataEntry.pulseOximeters'), value: latest.functionalOximeters, icon: Zap },
+                  { label: t('dataEntry.wheelchairs'), value: latest.wheelchairsAvailable, icon: Truck },
+                  { label: t('dataEntry.ppeSets'), value: latest.ppeSetsAvailable, icon: ShieldCheck },
                 ].map(eq => (
                   <div key={eq.label} className="flex items-center justify-between py-1" style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <div className="flex items-center gap-2">
@@ -418,8 +420,8 @@ export default function DataEntryDashboard() {
                 ))}
                 <div style={{ borderTop: '1px solid var(--border-medium)', paddingTop: 8, marginTop: 4 }}>
                   {[
-                    { label: 'Medicine Availability', pct: medAvailability, color: 'var(--color-success)' },
-                    { label: 'Handwash Stations', pct: handwashRate, color: 'var(--accent-primary)' },
+                    { label: t('dataEntry.medicineAvailability'), pct: medAvailability, color: 'var(--color-success)' },
+                    { label: t('dataEntry.handwashStations'), pct: handwashRate, color: 'var(--accent-primary)' },
                   ].map(m => (
                     <div key={m.label} className="mb-2">
                       <div className="flex justify-between mb-1">
@@ -433,10 +435,10 @@ export default function DataEntryDashboard() {
                   ))}
                   <div className="flex items-center gap-3 mt-2">
                     {[
-                      { label: 'Ambulance', ok: latest.ambulanceOperational },
-                      { label: 'Generator', ok: latest.generatorFunctional },
-                      { label: 'Water', ok: latest.waterAvailable },
-                      { label: 'Waste', ok: latest.wasteDisposalFunctional },
+                      { label: t('dataEntry.ambulance'), ok: latest.ambulanceOperational },
+                      { label: t('dataEntry.generator'), ok: latest.generatorFunctional },
+                      { label: t('dataEntry.water'), ok: latest.waterAvailable },
+                      { label: t('dataEntry.waste'), ok: latest.wasteDisposalFunctional },
                     ].map(s => (
                       <div key={s.label} className="flex items-center gap-1">
                         {s.ok ? <CheckCircle2 className="w-3 h-3" style={{ color: 'var(--color-success)' }} /> : <AlertTriangle className="w-3 h-3" style={{ color: 'var(--color-danger)' }} />}
@@ -451,11 +453,11 @@ export default function DataEntryDashboard() {
         ) : (
           <div className="dash-card p-8 mb-4 text-center">
             <ClipboardCheck className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No census reports yet</p>
-            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>Start your first daily facility census to see data here.</p>
+            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.noReportsYet')}</p>
+            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>{t('dataEntry.noReportsDesc')}</p>
             <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold"
               style={{ background: ACCENT, color: '#fff', border: 'none', cursor: 'pointer' }}>
-              <Plus className="w-3.5 h-3.5" /> Start Daily Census
+              <Plus className="w-3.5 h-3.5" /> {t('dataEntry.startDailyCensus')}
             </button>
           </div>
         )}
@@ -465,7 +467,7 @@ export default function DataEntryDashboard() {
           <div className="dash-card mb-4">
             <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <Clock className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Previous Reports ({savedReports.length})</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.previousReports', { count: savedReports.length })}</span>
             </div>
             <div className="p-3 space-y-1">
               {savedReports.slice(0, 7).map((r, i) => (
@@ -475,9 +477,9 @@ export default function DataEntryDashboard() {
                     <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{r.date}</span>
                   </div>
                   <div className="flex items-center gap-4 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    <span>{r.inpatientsTotal} inpatients</span>
-                    <span>{r.opdVisitsToday} OPD</span>
-                    <span>{r.occupiedBeds}/{r.totalBeds} beds</span>
+                    <span>{t('dataEntry.inpatientsCount', { count: r.inpatientsTotal })}</span>
+                    <span>{t('dataEntry.opdCount', { count: r.opdVisitsToday })}</span>
+                    <span>{t('dataEntry.bedsCount', { occupied: r.occupiedBeds, total: r.totalBeds })}</span>
                   </div>
                 </div>
               ))}
@@ -496,8 +498,8 @@ export default function DataEntryDashboard() {
                 <div className="flex items-center gap-2">
                   <ClipboardCheck className="w-5 h-5" style={{ color: ACCENT }} />
                   <div>
-                    <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Daily Facility Census</h3>
-                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{myHospital?.name || 'Unknown Facility'}</p>
+                    <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.dailyFacilityCensus')}</h3>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{myHospital?.name || t('dataEntry.unknownFacility')}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -511,99 +513,99 @@ export default function DataEntryDashboard() {
               <div className="p-4 space-y-5">
 
                 {/* 1. Patient Census */}
-                {sectionHeader(Users, 'Patient Census', 'var(--accent-primary)')}
+                {sectionHeader(Users, t('dataEntry.patientCensus'), 'var(--accent-primary)')}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {numField('Inpatients Total', 'inpatientsTotal', Users)}
-                  {numField('Male', 'inpatientsMale')}
-                  {numField('Female', 'inpatientsFemale')}
-                  {numField('Children (<5)', 'inpatientsChildren')}
-                  {numField('OPD Visits', 'opdVisitsToday')}
-                  {numField('Emergency', 'emergencyVisits')}
-                  {numField('Maternity Admissions', 'maternityAdmissions')}
-                  {numField('Newborns', 'newborns', Baby)}
-                  {numField('Deaths', 'deaths', Skull)}
-                  {numField('Discharges', 'discharges')}
-                  {numField('Referrals Out', 'referralsOut', ArrowRight)}
-                  {numField('Referrals In', 'referralsIn')}
+                  {numField(t('dataEntry.inpatientsTotal'), 'inpatientsTotal', Users)}
+                  {numField(t('patient.male'), 'inpatientsMale')}
+                  {numField(t('patient.female'), 'inpatientsFemale')}
+                  {numField(t('dataEntry.childrenUnder5'), 'inpatientsChildren')}
+                  {numField(t('dataEntry.opdVisits'), 'opdVisitsToday')}
+                  {numField(t('encounters.emergency'), 'emergencyVisits')}
+                  {numField(t('dataEntry.maternityAdmissions'), 'maternityAdmissions')}
+                  {numField(t('dataEntry.newborns'), 'newborns', Baby)}
+                  {numField(t('dataEntry.deaths'), 'deaths', Skull)}
+                  {numField(t('dataEntry.discharges'), 'discharges')}
+                  {numField(t('dataEntry.referralsOut'), 'referralsOut', ArrowRight)}
+                  {numField(t('dataEntry.referralsIn'), 'referralsIn')}
                 </div>
 
                 {/* 2. Bed Occupancy */}
-                {sectionHeader(BedDouble, 'Bed Occupancy', '#7C3AED')}
+                {sectionHeader(BedDouble, t('dashboard.bedOccupancy'), '#7C3AED')}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {numField('Total Beds', 'totalBeds', BedDouble)}
-                  {numField('Occupied', 'occupiedBeds')}
-                  {numField('ICU Beds', 'icuBeds')}
-                  {numField('ICU Occupied', 'icuOccupied')}
-                  {numField('Maternity Beds', 'maternityBeds')}
-                  {numField('Maternity Occupied', 'maternityOccupied')}
-                  {numField('Pediatric Beds', 'pediatricBeds')}
-                  {numField('Pediatric Occupied', 'pediatricOccupied')}
+                  {numField(t('dataEntry.totalBeds'), 'totalBeds', BedDouble)}
+                  {numField(t('dataEntry.occupied'), 'occupiedBeds')}
+                  {numField(t('dataEntry.icuBeds'), 'icuBeds')}
+                  {numField(t('dataEntry.icuOccupied'), 'icuOccupied')}
+                  {numField(t('dataEntry.maternityBeds'), 'maternityBeds')}
+                  {numField(t('dataEntry.maternityOccupied'), 'maternityOccupied')}
+                  {numField(t('dataEntry.pediatricBeds'), 'pediatricBeds')}
+                  {numField(t('dataEntry.pediatricOccupied'), 'pediatricOccupied')}
                 </div>
 
                 {/* 3. Staff Present */}
-                {sectionHeader(Stethoscope, 'Staff Present Today', 'var(--color-success)')}
+                {sectionHeader(Stethoscope, t('dataEntry.staffPresentToday'), 'var(--color-success)')}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {numField('Doctors', 'doctorsPresent', Stethoscope)}
-                  {numField('Nurses', 'nursesPresent', Users)}
-                  {numField('Clinical Officers', 'clinicalOfficers')}
-                  {numField('Lab Technicians', 'labTechs', FlaskConical)}
-                  {numField('Pharmacists', 'pharmacists', Pill)}
-                  {numField('Support Staff', 'supportStaff')}
+                  {numField(t('dashboard.doctors'), 'doctorsPresent', Stethoscope)}
+                  {numField(t('dataEntry.nurses'), 'nursesPresent', Users)}
+                  {numField(t('dataEntry.clinicalOfficers'), 'clinicalOfficers')}
+                  {numField(t('dataEntry.labTechnicians'), 'labTechs', FlaskConical)}
+                  {numField(t('dataEntry.pharmacists'), 'pharmacists', Pill)}
+                  {numField(t('dataEntry.supportStaff'), 'supportStaff')}
                 </div>
 
                 {/* 4. Equipment */}
-                {sectionHeader(Thermometer, 'Functional Equipment', 'var(--color-warning)')}
+                {sectionHeader(Thermometer, t('dataEntry.functionalEquipment'), 'var(--color-warning)')}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {numField('Thermometers', 'functionalThermometers', Thermometer)}
-                  {numField('BP Monitors', 'functionalBPMonitors')}
-                  {numField('Stethoscopes', 'functionalStethoscopes', Stethoscope)}
-                  {numField('Pulse Oximeters', 'functionalOximeters')}
-                  {numField('Wheelchairs', 'wheelchairsAvailable')}
-                  {numField('PPE Sets', 'ppeSetsAvailable', ShieldCheck)}
+                  {numField(t('dataEntry.thermometers'), 'functionalThermometers', Thermometer)}
+                  {numField(t('dataEntry.bpMonitors'), 'functionalBPMonitors')}
+                  {numField(t('dataEntry.stethoscopes'), 'functionalStethoscopes', Stethoscope)}
+                  {numField(t('dataEntry.pulseOximeters'), 'functionalOximeters')}
+                  {numField(t('dataEntry.wheelchairs'), 'wheelchairsAvailable')}
+                  {numField(t('dataEntry.ppeSets'), 'ppeSetsAvailable', ShieldCheck)}
                 </div>
                 <div className="grid grid-cols-2 gap-x-6">
-                  {boolField('Ambulance Operational', 'ambulanceOperational')}
-                  {boolField('Generator Functional', 'generatorFunctional')}
-                  {boolField('Water Available', 'waterAvailable')}
-                  {boolField('Waste Disposal Functional', 'wasteDisposalFunctional')}
+                  {boolField(t('dataEntry.ambulanceOperational'), 'ambulanceOperational')}
+                  {boolField(t('dataEntry.generatorFunctional'), 'generatorFunctional')}
+                  {boolField(t('dataEntry.waterAvailable'), 'waterAvailable')}
+                  {boolField(t('dataEntry.wasteDisposalFunctional'), 'wasteDisposalFunctional')}
                 </div>
-                {numField('Electricity Hours Today', 'electricityHoursToday', Zap)}
+                {numField(t('dataEntry.electricityHoursToday'), 'electricityHoursToday', Zap)}
 
                 {/* 5. Pharmacy & Lab */}
-                {sectionHeader(Pill, 'Pharmacy & Laboratory', '#EC4899')}
+                {sectionHeader(Pill, t('dataEntry.pharmacyLaboratory'), '#EC4899')}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {numField('Tracer Medicines In Stock', 'tracerMedicinesInStock', Pill)}
-                  {numField('Tracer Medicines Total', 'tracerMedicinesTotal')}
-                  {numField('Lab Tests Done', 'labTestsPerformed', FlaskConical)}
-                  {numField('Lab Tests Pending', 'labTestsPending')}
-                  {numField('Blood Units Available', 'bloodUnitsAvailable', Droplets)}
+                  {numField(t('dataEntry.tracerMedicinesInStock'), 'tracerMedicinesInStock', Pill)}
+                  {numField(t('dataEntry.tracerMedicinesTotal'), 'tracerMedicinesTotal')}
+                  {numField(t('dataEntry.labTestsDone'), 'labTestsPerformed', FlaskConical)}
+                  {numField(t('dataEntry.labTestsPending'), 'labTestsPending')}
+                  {numField(t('dataEntry.bloodUnitsAvailable'), 'bloodUnitsAvailable', Droplets)}
                 </div>
-                {textField('Stock-Out Items', 'stockOutItems', 'List medications currently out of stock...')}
+                {textField(t('dataEntry.stockOutItems'), 'stockOutItems', t('dataEntry.stockOutItemsPlaceholder'))}
 
                 {/* 6. Infection Control */}
-                {sectionHeader(ShieldCheck, 'Infection Control', '#2563EB')}
+                {sectionHeader(ShieldCheck, t('dataEntry.infectionControl'), '#3b82f6')}
                 <div className="grid grid-cols-2 gap-3">
-                  {numField('Handwash Stations', 'handwashStations')}
-                  {numField('Functional Stations', 'handwashFunctional')}
+                  {numField(t('dataEntry.handwashStations'), 'handwashStations')}
+                  {numField(t('dataEntry.functionalStations'), 'handwashFunctional')}
                 </div>
 
                 {/* 7. Notes */}
-                {sectionHeader(FileText, 'Daily Notes', '#5A7370')}
-                {textField('Challenges', 'challenges', 'Any issues faced today...')}
-                {textField('Achievements', 'achievements', 'What went well...')}
-                {textField('Urgent Needs', 'urgentNeeds', 'Critical items needed...')}
+                {sectionHeader(FileText, t('dataEntry.dailyNotes'), '#5A7370')}
+                {textField(t('dataEntry.challenges'), 'challenges', t('dataEntry.challengesPlaceholder'))}
+                {textField(t('dataEntry.achievements'), 'achievements', t('dataEntry.achievementsPlaceholder'))}
+                {textField(t('dataEntry.urgentNeeds'), 'urgentNeeds', t('dataEntry.urgentNeedsPlaceholder'))}
               </div>
 
               {/* Save button */}
               <div className="sticky bottom-0 p-4 rounded-b-lg flex gap-3" style={{ background: 'var(--bg-card-solid)', borderTop: '1px solid var(--border-medium)' }}>
                 <button onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-md text-xs font-semibold"
                   style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                  Cancel
+                  {t('action.cancel')}
                 </button>
                 <button onClick={handleSave} disabled={saving}
                   className="flex-1 py-2.5 rounded-md text-xs font-semibold inline-flex items-center justify-center gap-2"
                   style={{ background: ACCENT, color: '#fff', border: 'none', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
-                  <Save className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save Census Report'}
+                  <Save className="w-3.5 h-3.5" /> {saving ? t('nurse.savingDots') : t('dataEntry.saveCensusReport')}
                 </button>
               </div>
             </div>

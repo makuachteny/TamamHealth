@@ -27,6 +27,45 @@ export interface ServerUser {
   county?: string;
   state?: string;
   isActive: boolean;
+  /** True when the user must set a new password before using the app. */
+  mustChangePassword?: boolean;
+}
+
+/**
+ * Authenticate against the shared users database (CouchDB via the server http
+ * adapter). This is where admin-created users live — the static DEMO_USER_PROFILES
+ * roster only covers seeded demo accounts, so without this lookup a user created
+ * through the admin UI could never log in. Returns null on any miss (unknown
+ * user, wrong password, inactive, or DB unreachable) so the caller can fall
+ * back to a constant-time dummy hash.
+ */
+async function authenticateFromUsersDb(
+  username: string,
+  password: string,
+): Promise<ServerUser | null> {
+  try {
+    const { usersDB } = await import('./db');
+    const db = usersDB();
+    const doc = await db.get(`user-${username}`) as import('./db-types').UserDoc;
+    if (!doc || doc.type !== 'user' || doc.isActive === false) return null;
+    const valid = await bcrypt.compare(password, doc.passwordHash);
+    if (!valid) return null;
+    return {
+      _id: doc._id,
+      username: doc.username,
+      passwordHash: doc.passwordHash,
+      name: doc.name,
+      role: doc.role,
+      hospitalId: doc.hospitalId,
+      hospitalName: doc.hospitalName,
+      orgId: doc.orgId,
+      isActive: doc.isActive,
+      mustChangePassword: doc.mustChangePassword,
+    };
+  } catch {
+    // 404 (no such user) or DB unreachable — treat as an auth miss.
+    return null;
+  }
 }
 
 const profileByUsername = new Map(DEMO_USER_PROFILES.map(p => [p.username, p]));
@@ -50,34 +89,39 @@ export async function authenticateUser(
   username: string,
   password: string,
 ): Promise<ServerUser | null> {
+  // 1) Seeded demo accounts — verified against the generated credentials file.
+  //    Checked first so demo logins keep working even when CouchDB is offline.
   const profile = profileByUsername.get(username);
-  if (!profile) {
-    // Constant-time: still run a hash so a non-existent user takes roughly
-    // the same time as a valid one. Prevents trivial username enumeration.
-    await bcrypt.hash(password, 12);
-    return null;
+  if (profile) {
+    const credentials = await getOrCreateSeedCredentials();
+    const expected = credentials.passwords[username];
+    if (expected) {
+      const hash = await getHash(username, expected);
+      if (await bcrypt.compare(password, hash)) {
+        return {
+          _id: `user-${profile.username}`,
+          username: profile.username,
+          passwordHash: hash,
+          name: profile.name,
+          role: profile.role,
+          hospitalId: profile.hospitalId,
+          hospitalName: profile.hospitalName,
+          orgId: profile.orgId,
+          isActive: true,
+        };
+      }
+    }
+    // Demo username exists but the seed password didn't match. The account may
+    // have been re-created/reset into the users DB (which shadows the seed), so
+    // fall through to the DB lookup before giving up.
   }
 
-  const credentials = await getOrCreateSeedCredentials();
-  const expected = credentials.passwords[username];
-  if (!expected) {
-    await bcrypt.hash(password, 12);
-    return null;
-  }
+  // 2) Admin-created (and reset) users live in the shared users database.
+  const fromDb = await authenticateFromUsersDb(username, password);
+  if (fromDb) return fromDb;
 
-  const hash = await getHash(username, expected);
-  const valid = await bcrypt.compare(password, hash);
-  if (!valid) return null;
-
-  return {
-    _id: `user-${profile.username}`,
-    username: profile.username,
-    passwordHash: hash,
-    name: profile.name,
-    role: profile.role,
-    hospitalId: profile.hospitalId,
-    hospitalName: profile.hospitalName,
-    orgId: profile.orgId,
-    isActive: true,
-  };
+  // 3) No match anywhere — constant-time dummy hash so a non-existent user
+  //    takes roughly as long as a valid one (anti username-enumeration).
+  await bcrypt.hash(password, 12);
+  return null;
 }
