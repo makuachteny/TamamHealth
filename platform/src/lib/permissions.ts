@@ -213,7 +213,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/deaths', label: 'Maternal/Perinatal Deaths', icon: Skull, section: 'CARE' },
       { href: '/referrals', label: 'Referrals', icon: ArrowRightLeft, section: 'CARE' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CARE' },
-      { href: '/lab', label: 'Lab Results', icon: FlaskConical, section: 'MORE' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
       { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
@@ -501,7 +500,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     navItems: [
       { href: '/dashboard/nutrition', label: 'Nutrition Dashboard', icon: LayoutDashboard, section: 'NUTRITION' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'NUTRITION' },
-      { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'PROGRAMS' },
       { href: '/mch-analytics', label: 'MCH Analytics', icon: HeartPulse, section: 'PROGRAMS' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
       { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
@@ -580,6 +578,125 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     gradientTo: '#3b82f6',
     badgeLabel: 'Medical Biller',
   },
+
+  // ───────── Clinical-flow workflow stations (EHR Clinical Flow doc §4) ─────────
+  central_registration_clerk: {
+    label: 'Registration Clerk',
+    defaultDashboard: ROLE_ROUTE_TABLE.central_registration_clerk.defaultDashboard,
+    allowedRoutes: [...ROLE_ROUTE_TABLE.central_registration_clerk.allowed],
+    navItems: [
+      { href: '/patients', label: 'Patient Registry', icon: Users, section: 'RECEPTION' },
+      { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'RECEPTION' },
+      { href: '/referrals', label: 'Referrals', icon: ArrowRightLeft, section: 'RECEPTION' },
+      { href: '/payments', label: 'Checkout Payments', icon: Wallet, section: 'CHECKOUT' },
+      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
+      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
+    ],
+    color: '#3b82f6', gradientFrom: '#1e3a8a', gradientTo: '#3b82f6', badgeLabel: 'Registration',
+  },
+
+  clinic_clerk: {
+    label: 'Clinic Clerk',
+    defaultDashboard: ROLE_ROUTE_TABLE.clinic_clerk.defaultDashboard,
+    allowedRoutes: [...ROLE_ROUTE_TABLE.clinic_clerk.allowed],
+    navItems: [
+      { href: '/patients', label: 'Patients', icon: Users, section: 'CLINIC' },
+      { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINIC' },
+      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
+      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
+    ],
+    color: '#3b82f6', gradientFrom: '#1e3a8a', gradientTo: '#3b82f6', badgeLabel: 'Clinic Clerk',
+  },
+
+  triage_nurse: {
+    label: 'Triage Nurse',
+    defaultDashboard: ROLE_ROUTE_TABLE.triage_nurse.defaultDashboard,
+    allowedRoutes: [...ROLE_ROUTE_TABLE.triage_nurse.allowed],
+    navItems: [
+      { href: '/patients', label: 'Patients', icon: Users, section: 'TRIAGE' },
+      { href: '/wards', label: 'Wards', icon: BedDouble, section: 'TRIAGE' },
+      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
+      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
+    ],
+    color: '#3b82f6', gradientFrom: '#1e3a8a', gradientTo: '#3b82f6', badgeLabel: 'Triage',
+  },
+
+  rooming_nurse: {
+    label: 'Rooming Nurse',
+    defaultDashboard: ROLE_ROUTE_TABLE.rooming_nurse.defaultDashboard,
+    allowedRoutes: [...ROLE_ROUTE_TABLE.rooming_nurse.allowed],
+    navItems: [
+      { href: '/patients', label: 'Patients', icon: Users, section: 'CLINIC' },
+      { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'CARE' },
+      { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'CARE' },
+      { href: '/lab', label: 'Lab', icon: FlaskConical, section: 'MORE' },
+      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
+      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
+    ],
+    color: '#3b82f6', gradientFrom: '#1e3a8a', gradientTo: '#3b82f6', badgeLabel: 'Rooming',
+  },
+
+  clinician: {
+    label: 'Clinician',
+    defaultDashboard: ROLE_ROUTE_TABLE.clinician.defaultDashboard,
+    allowedRoutes: [...ROLE_ROUTE_TABLE.clinician.allowed],
+    navItems: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'CLINICAL' },
+      { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
+      { href: '/consultation', label: 'Consultation', icon: FileText, section: 'CLINICAL' },
+      { href: '/referrals', label: 'Referrals', icon: ArrowRightLeft, section: 'CLINICAL' },
+      { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
+      { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
+      { href: '/telehealth', label: 'Telehealth', icon: Video, section: 'CLINICAL' },
+      { href: '/lab', label: 'Laboratory', icon: FlaskConical, section: 'SERVICES' },
+      { href: '/pharmacy', label: 'Pharmacy', icon: Pill, section: 'SERVICES' },
+      { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'VITAL EVENTS' },
+      { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'VITAL EVENTS' },
+      { href: '/births', label: 'Births', icon: Baby, section: 'VITAL EVENTS' },
+      { href: '/deaths', label: 'Deaths', icon: Skull, section: 'VITAL EVENTS' },
+      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
+    ],
+    color: '#3b82f6', gradientFrom: '#1e3a8a', gradientTo: '#3b82f6', badgeLabel: 'Clinician',
+  },
+
+  records_hmis_officer: {
+    label: 'Records / HMIS Officer',
+    defaultDashboard: ROLE_ROUTE_TABLE.records_hmis_officer.defaultDashboard,
+    allowedRoutes: [...ROLE_ROUTE_TABLE.records_hmis_officer.allowed],
+    navItems: [
+      { href: '/dashboard/data-entry', label: 'Records Dashboard', icon: LayoutDashboard, section: 'RECORDS' },
+      { href: '/patients', label: 'Patient Registry', icon: Users, section: 'RECORDS' },
+      { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'RECORDS' },
+      { href: '/reports', label: 'Reports', icon: BarChart3, section: 'RECORDS' },
+      { href: '/dhis2-export', label: 'DHIS2 Export', icon: Download, section: 'GOVERNANCE' },
+      { href: '/vital-statistics', label: 'Vital Statistics', icon: Heart, section: 'VITAL EVENTS' },
+      { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'GOVERNANCE' },
+      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
+    ],
+    color: '#3b82f6', gradientFrom: '#1e3a8a', gradientTo: '#3b82f6', badgeLabel: 'HMIS',
+  },
+
+  facility_administrator: {
+    label: 'Facility Administrator',
+    defaultDashboard: ROLE_ROUTE_TABLE.facility_administrator.defaultDashboard,
+    allowedRoutes: [...ROLE_ROUTE_TABLE.facility_administrator.allowed],
+    navItems: [
+      { href: '/dashboard', label: 'Hospital Dashboard', icon: LayoutDashboard, section: 'ADMINISTRATION' },
+      { href: '/hospitals', label: 'Hospital Network', icon: HospitalIcon, section: 'ADMINISTRATION' },
+      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'ADMINISTRATION' },
+      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'ADMINISTRATION' },
+      { href: '/equipment', label: 'Assets', icon: Package, section: 'ADMINISTRATION' },
+      { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'ADMINISTRATION' },
+      { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
+      { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
+      { href: '/referrals', label: 'Referrals', icon: ArrowRightLeft, section: 'CLINICAL' },
+      { href: '/payments', label: 'Bills', icon: Wallet, section: 'FINANCE' },
+      { href: '/reports', label: 'Reports', icon: BarChart3, section: 'REPORTING' },
+      { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'REPORTING' },
+      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
+    ],
+    color: '#1e3a8a', gradientFrom: '#172554', gradientTo: '#1e3a8a', badgeLabel: 'Facility Admin',
+  },
 };
 
 export function getRoleConfig(role: UserRole): RoleConfig {
@@ -609,8 +726,9 @@ export const CONFLICT_RESOLUTION_ROLES: UserRole[] = [
   'hrio',
 ];
 
-const PRIVATE_SECTOR_ROLES: UserRole[] = ['org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife', 'lab_tech', 'pharmacist', 'front_desk', 'cashier', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'nutritionist', 'radiologist', 'hospital_manager', 'medical_biller'];
-const ALL_ROLES: UserRole[] = ['super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife', 'lab_tech', 'pharmacist', 'front_desk', 'cashier', 'government', 'county_health_director', 'boma_health_worker', 'payam_supervisor', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'community_health_volunteer', 'nutritionist', 'radiologist', 'hospital_manager', 'medical_biller'];
+const WORKFLOW_ROLES: UserRole[] = ['central_registration_clerk', 'clinic_clerk', 'triage_nurse', 'rooming_nurse', 'clinician', 'records_hmis_officer', 'facility_administrator'];
+const PRIVATE_SECTOR_ROLES: UserRole[] = ['org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife', 'lab_tech', 'pharmacist', 'front_desk', 'cashier', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'nutritionist', 'radiologist', 'hospital_manager', 'medical_biller', ...WORKFLOW_ROLES];
+const ALL_ROLES: UserRole[] = ['super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife', 'lab_tech', 'pharmacist', 'front_desk', 'cashier', 'government', 'county_health_director', 'boma_health_worker', 'payam_supervisor', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'community_health_volunteer', 'nutritionist', 'radiologist', 'hospital_manager', 'medical_biller', ...WORKFLOW_ROLES];
 
 export function getAvailableRoles(orgType: 'public' | 'private', isSuperAdmin = false): UserRole[] {
   if (isSuperAdmin) return ALL_ROLES;

@@ -254,7 +254,7 @@ export default function FrontDeskDashboardPage() {
         </div>
 
         {/* KPI STRIP */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
+        <div className="grid grid-cols-8 gap-3 mb-4">
           {[
             { label: t('frontDesk.totalQueue'), value: queue.length, icon: ClipboardList, color: ACCENT },
             { label: t('frontDesk.waiting'), value: waitingCount, icon: Clock, color: '#FB923C' },
@@ -265,12 +265,12 @@ export default function FrontDeskDashboardPage() {
             { label: t('frontDesk.registered'), value: recentPatients.length, icon: UserPlus, color: '#5CB8A8' },
             { label: t('frontDesk.redPriority'), value: activeTriages.filter(t => t.priority === 'RED').length, icon: Bell, color: '#EF4444' },
           ].map((kpi) => (
-            <div key={kpi.label} className="dash-stat">
-              <div className="flex items-center gap-1.5 mb-1">
-                <kpi.icon className="w-3 h-3" style={{ color: kpi.color }} />
-                <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{kpi.label}</span>
+            <div key={kpi.label} className="dash-stat" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+              <div className="flex items-center gap-2">
+                <kpi.icon className="w-5 h-5" style={{ color: kpi.color }} />
+                <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{kpi.label}</span>
               </div>
-              <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{kpi.value}</p>
+              <p className="text-3xl font-bold" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{kpi.value}</p>
             </div>
           ))}
         </div>

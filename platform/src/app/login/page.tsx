@@ -42,6 +42,14 @@ const ROLE_PROFILE: Record<UserRole, { icon: string; greet: string; tagline: str
   radiologist:                { icon: 'eye',         greet: 'Imaging',                   tagline: 'Read studies and report findings.' },
   hospital_manager:           { icon: 'building',    greet: 'Hospital Management',       tagline: 'Operations, finance, and facility oversight.' },
   medical_biller:             { icon: 'record',      greet: 'Billing & Claims',          tagline: 'Submit claims and manage collections.' },
+  // Clinical-flow workflow stations (EHR Clinical Flow doc §4).
+  central_registration_clerk: { icon: 'user',        greet: 'Registration Clerk',        tagline: 'Register patients, route them, run facility checkout.' },
+  clinic_clerk:               { icon: 'user',        greet: 'Clinic Clerk',              tagline: 'Clinic check-in, queue, and follow-up scheduling.' },
+  triage_nurse:               { icon: 'heart',       greet: 'Triage Nurse',              tagline: 'Assess acuity and route patients safely.' },
+  rooming_nurse:              { icon: 'heart',       greet: 'Rooming Nurse',             tagline: 'Room patients, take vitals, prepare for the clinician.' },
+  clinician:                  { icon: 'stethoscope', greet: 'Welcome, Clinician',        tagline: 'Consult, order, prescribe, and refer.' },
+  records_hmis_officer:       { icon: 'record',      greet: 'Records / HMIS Officer',    tagline: 'Data quality, registers, and DHIS2 reporting.' },
+  facility_administrator:     { icon: 'shield',      greet: 'Facility Administrator',    tagline: 'Users, configuration, and facility oversight.' },
 };
 
 // Demo roster — passwords are fetched at runtime from /api/demo-credentials.
@@ -78,6 +86,16 @@ const demoAccounts: { role: string; roleKey: UserRole; user: string; desc: strin
   // 4 ── Sub-national oversight: data aggregates up payam → county.
   { group: 'Sub-national oversight',       role: 'Payam Supervisor',       roleKey: 'payam_supervisor',           user: 'sup.mary',         desc: 'Kajo-keji PHCC',            hospital: 'phcc-001' },
   { group: 'Sub-national oversight',       role: 'County Health Director', roleKey: 'county_health_director',      user: 'county.lopez',     desc: 'County Health Office',      hospital: '' },
+
+  // 4b ── Clinical workflow stations (EHR Clinical Flow doc §4): the 11-stage
+  //        journey roles. These land on the Patient Flow board.
+  { group: 'Clinical workflow stations',   role: 'Registration Clerk',     roleKey: 'central_registration_clerk', user: 'reg.clerk',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Clinical workflow stations',   role: 'Clinic Clerk',           roleKey: 'clinic_clerk',               user: 'clinic.clerk',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Clinical workflow stations',   role: 'Triage Nurse',           roleKey: 'triage_nurse',               user: 'triage.mary',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Clinical workflow stations',   role: 'Rooming Nurse',          roleKey: 'rooming_nurse',              user: 'rooming.sara',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Clinical workflow stations',   role: 'Clinician',              roleKey: 'clinician',                  user: 'clinician.peter',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Clinical workflow stations',   role: 'Records / HMIS Officer', roleKey: 'records_hmis_officer',       user: 'hmis.john',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Clinical workflow stations',   role: 'Facility Administrator', roleKey: 'facility_administrator',     user: 'facadmin.rita',    desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
 
   // 5 ── National & platform: MoH reporting and platform administration.
   { group: 'National & platform',          role: 'Government',             roleKey: 'government',                  user: 'admin',            desc: 'National MoH oversight',    hospital: '' },

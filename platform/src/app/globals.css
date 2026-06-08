@@ -27,9 +27,9 @@
   --section-spacing: 80px;
   --section-spacing-medium: 56px;
   --section-spacing-small: 40px;
-  --btn-radius: 6px;
-  --card-radius: 12px;
-  --input-radius: 6px;
+  --btn-radius: 10px;
+  --card-radius: 16px;
+  --input-radius: 10px;
   --sidebar-width: 256px;
   --sidebar-collapsed: 72px;
 }
@@ -308,10 +308,16 @@ a, button, input, select, textarea, .card, .card-elevated, .btn, .nav-item, .bad
   background: var(--bg-primary);
 }
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+/* Brand-tinted text selection */
+::selection { background: var(--accent-light); color: var(--accent-text); }
+
+/* Smooth, consistent micro-interactions on interactive elements */
+button, a, .nav-item, .kpi, .card-elevated, [role="button"] { transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1); }
 
 /* ============ Global icon color ============ */
 /* Lucide icons default to theme-aware blue when no inline color is set */
@@ -408,6 +414,7 @@ a.link-accent:hover {
   background: var(--bg-card-solid);
   border: 1px solid var(--border-light);
   border-radius: var(--card-radius);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .card-elevated {
@@ -415,10 +422,13 @@ a.link-accent:hover {
   border: 1px solid var(--border-light);
   border-radius: var(--card-radius);
   box-shadow: var(--card-shadow);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .card-elevated:hover {
-  border-color: var(--border-medium);
+  border-color: var(--card-hover-border);
+  box-shadow: var(--card-shadow-lg);
+  transform: translateY(-2px);
 }
 
 .card-glass {
@@ -569,13 +579,13 @@ small,
 }
 
 .btn-primary {
-  background: var(--accent-primary);
+  background: linear-gradient(180deg, var(--accent-primary), var(--accent-hover));
   color: white;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.15), 0 4px 12px rgba(59, 130, 246, 0.18);
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.20), 0 6px 16px rgba(59, 130, 246, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 .btn-primary:hover {
-  background: var(--accent-hover);
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.20), 0 8px 20px rgba(59, 130, 246, 0.28);
+  background: linear-gradient(180deg, var(--accent-hover), var(--accent-hover));
+  box-shadow: 0 3px 6px rgba(59, 130, 246, 0.24), 0 12px 28px rgba(59, 130, 246, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   transform: translateY(-1px);
 }
 
@@ -694,15 +704,17 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 .nav-item:hover {
   color: var(--nav-text-hover);
   background: var(--nav-hover-bg);
+  transform: translateX(2px);
 }
 .nav-item-active {
   color: var(--nav-active-text) !important;
   background: var(--nav-active-bg) !important;
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(30, 58, 138, 0.25);
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.28);
   border-left: none;
   padding-left: 14px;
 }
+.nav-item-active:hover { transform: none; }
 
 /* ============ Step Indicator ============ */
 .step-dot {
@@ -749,12 +761,13 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   border-radius: var(--card-radius);
   box-shadow: var(--card-shadow);
   cursor: pointer;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
   min-width: 0;
 }
 .kpi:hover {
   border-color: var(--card-hover-border);
-  box-shadow: var(--card-shadow);
+  box-shadow: var(--card-shadow-lg);
+  transform: translateY(-1px);
 }
 .kpi__icon {
   width: 24px;

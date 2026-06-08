@@ -15,7 +15,9 @@ export interface BaseDoc {
   countryId?: string;
 }
 
-export type UserRole = 'super_admin' | 'org_admin' | 'doctor' | 'clinical_officer' | 'nurse' | 'midwife' | 'lab_tech' | 'pharmacist' | 'front_desk' | 'cashier' | 'government' | 'county_health_director' | 'boma_health_worker' | 'payam_supervisor' | 'data_entry_clerk' | 'medical_superintendent' | 'hrio' | 'community_health_volunteer' | 'nutritionist' | 'radiologist' | 'hospital_manager' | 'medical_biller';
+export type UserRole = 'super_admin' | 'org_admin' | 'doctor' | 'clinical_officer' | 'nurse' | 'midwife' | 'lab_tech' | 'pharmacist' | 'front_desk' | 'cashier' | 'government' | 'county_health_director' | 'boma_health_worker' | 'payam_supervisor' | 'data_entry_clerk' | 'medical_superintendent' | 'hrio' | 'community_health_volunteer' | 'nutritionist' | 'radiologist' | 'hospital_manager' | 'medical_biller'
+  // Clinical-flow workflow roles (EHR Clinical Flow doc §4) — capability-gated stations.
+  | 'central_registration_clerk' | 'clinic_clerk' | 'triage_nurse' | 'rooming_nurse' | 'clinician' | 'records_hmis_officer' | 'facility_administrator';
 
 export interface UserDoc extends BaseDoc {
   type: 'user';

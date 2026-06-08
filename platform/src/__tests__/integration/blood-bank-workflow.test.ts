@@ -31,6 +31,10 @@ import {
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 
+// Expiry well in the future so "available" fixtures stay non-expired regardless
+// of the wall clock when the suite runs (avoids time-dependent flakiness).
+const FUTURE = new Date(Date.now() + 120 * 86_400_000).toISOString().slice(0, 10);
+
 type AddUnitInput = Parameters<typeof addUnit>[0];
 type BloodGroup = AddUnitInput['bloodGroup'];
 function makeUnit(bloodGroup: BloodGroup, overrides: Partial<AddUnitInput> = {}): AddUnitInput {
@@ -40,7 +44,7 @@ function makeUnit(bloodGroup: BloodGroup, overrides: Partial<AddUnitInput> = {})
     component: 'whole_blood' as const,
     volume: 450,
     collectionDate: '2026-04-10',
-    expiryDate: '2026-05-20',
+    expiryDate: FUTURE,
     donorName: `Donor ${uuidCounter}`,
     status: 'available' as const,
     facilityId: 'hosp-001',

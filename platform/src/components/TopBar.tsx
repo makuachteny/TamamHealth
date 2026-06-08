@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  DuotoneBell as Bell,
   DuotoneSearch as Search,
   DuotoneMoon as Moon,
   DuotoneSun as Sun,
@@ -219,19 +218,6 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
 
         {/* Sync status — animated pill with popover for pause/resume + sync now */}
         <SyncStatusBadge />
-
-        {/* Notifications */}
-        <button
-          aria-label={t('topbar.notifications')}
-          className={`relative ${iconBtn}`}
-          style={{ background: 'transparent' }}
-        >
-          <Bell className="w-[22px] h-[22px]" />
-          <span className="absolute top-1 right-1 w-2 h-2 rounded-full" aria-hidden="true" style={{
-            background: 'var(--accent-primary)',
-            boxShadow: '0 0 4px var(--accent-light)',
-          }} />
-        </button>
 
         {/* Role badge */}
         {roleConfig && (

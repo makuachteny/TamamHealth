@@ -3,15 +3,15 @@
 /**
  * TopBar quick-actions cluster:
  *   [ + ]  — dropdown: Schedule appointment · Add availability
- *   [ 📣 ] — Announcements panel (compose + list)
- *   [ Messages ] — jump to the messaging inbox
+ *   [ 📣 ] — Announcements panel (compose + list); doubles as the notification
+ *            centre, with an unread badge. Direct messaging lives in the sidebar.
  *
  * Shown globally in the TopBar. "Schedule appointment" deep-links to the
  * appointments page with ?new=1 so its booking form opens automatically.
  */
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Calendar, Clock, Megaphone, MessageSquare } from '@/components/icons/lucide';
+import { Plus, Calendar, Clock, Megaphone } from '@/components/icons/lucide';
 import AvailabilityModal from '@/components/AvailabilityModal';
 import AnnouncementsPanel from '@/components/AnnouncementsPanel';
 
@@ -80,23 +80,6 @@ export default function QuickActions() {
           <AnnouncementsPanel onClose={() => setAnnounceOpen(false)} onUnreadChange={setUnread} />
         )}
       </div>
-
-      {/* Messages */}
-      <button
-        onClick={() => router.push('/messages')}
-        className="btn btn-primary btn-sm hidden sm:inline-flex"
-        style={{ gap: 6 }}
-      >
-        <MessageSquare className="w-4 h-4" /> Messages
-      </button>
-      <button
-        onClick={() => router.push('/messages')}
-        aria-label="Messages"
-        className={`sm:hidden ${iconBtn}`}
-        style={{ background: 'var(--accent-primary)', color: '#fff' }}
-      >
-        <MessageSquare className="w-[20px] h-[20px]" />
-      </button>
 
       {showAvailability && <AvailabilityModal onClose={() => setShowAvailability(false)} />}
     </div>

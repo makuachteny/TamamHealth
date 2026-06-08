@@ -32,7 +32,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/appointments', '/telehealth',
       '/payments', '/payments/claims', '/payments/plans',
       '/wards', '/equipment', '/hr', '/feedback', '/dashboard/hr',
-      '/sync-conflicts',
+      '/sync-conflicts', 
     ],
     defaultDashboard: '/admin',
   },
@@ -56,7 +56,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/settings',
       '/appointments', '/telehealth',
-      '/wards', '/alerts',
+      '/wards', '/alerts', 
     ],
     defaultDashboard: '/dashboard',
   },
@@ -69,7 +69,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/settings', '/my-facility',
       '/appointments',
-      '/wards', '/feedback',
+      '/wards', '/feedback', 
     ],
     defaultDashboard: '/dashboard',
   },
@@ -81,7 +81,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard/nurse', '/patients', '/messages',
       '/lab', '/immunizations', '/anc', '/births', '/deaths',
       '/settings', '/my-facility', '/appointments',
-      '/wards', '/feedback',
+      '/wards', '/feedback', 
     ],
     defaultDashboard: '/dashboard/nurse',
   },
@@ -89,12 +89,13 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   midwife: {
     // ICM scope: antenatal care, conducting deliveries, postnatal & newborn
     // care, obstetric referrals, and maternal/perinatal vital events. Reuses the
-    // nurse station dashboard. No general consultation/prescribing (clinician) or
-    // payment handling.
+    // nurse station dashboard. No general consultation/prescribing (clinician),
+    // no payment handling, and no laboratory operations page — ANC lab results
+    // are reviewed inside the patient/ANC record, not the lab orders queue.
     allowed: [
       '/dashboard/nurse', '/patients', '/messages',
       '/anc', '/births', '/deaths', '/immunizations',
-      '/wards', '/referrals', '/appointments', '/lab',
+      '/wards', '/referrals', '/appointments',
       '/settings', '/my-facility',
     ],
     defaultDashboard: '/dashboard/nurse',
@@ -122,7 +123,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard/front-desk', '/patients', '/referrals', '/messages',
       '/settings', '/my-facility',
       '/appointments',
-      '/feedback',
+      '/feedback', 
     ],
     defaultDashboard: '/dashboard/front-desk',
   },
@@ -204,7 +205,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/appointments', '/telehealth', '/facility-assessments', '/data-quality',
       '/payments', '/payments/claims', '/payments/plans',
       '/wards', '/equipment', '/hr', '/feedback', '/dashboard/hr',
-      '/sync-conflicts',
+      '/sync-conflicts', 
     ],
     defaultDashboard: '/dashboard',
   },
@@ -234,9 +235,11 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   nutritionist: {
     // Nutrition assessment & counselling and MCH nutrition programmes. Vaccine
-    // administration (/immunizations) is a nursing/clinical task, not dietetics.
+    // administration (/immunizations) is a nursing/clinical task, not dietetics;
+    // antenatal clinical care (/anc) is a midwife/nurse/clinician function —
+    // maternal-nutrition data is reviewed via MCH analytics and the patient record.
     allowed: [
-      '/dashboard/nutrition', '/patients', '/messages', '/anc',
+      '/dashboard/nutrition', '/patients', '/messages',
       '/mch-analytics', '/settings', '/my-facility',
     ],
     defaultDashboard: '/dashboard/nutrition',
@@ -262,8 +265,10 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/equipment', '/hr', '/dashboard/hr', '/feedback',
       // Finance oversight
       '/payments', '/payments/claims', '/payments/plans',
-      // Clinical context (read)
-      '/patients', '/wards', '/referrals', '/appointments', '/lab', '/pharmacy', '/messages',
+      // Clinical context (read). Lab/pharmacy are operational service queues run
+      // by lab techs/pharmacists; the manager sees utilisation via reports, not
+      // the live work queues.
+      '/patients', '/wards', '/referrals', '/appointments', '/messages',
       '/settings', '/sync-conflicts',
     ],
     defaultDashboard: '/dashboard/hospital-manager',
@@ -276,6 +281,79 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/patients', '/appointments', '/messages', '/settings',
     ],
     defaultDashboard: '/billing',
+  },
+
+  // ───────── Clinical-flow workflow stations (EHR Clinical Flow doc §4) ─────────
+  central_registration_clerk: {
+    allowed: [
+      '/patients', '/appointments', '/referrals', '/messages',
+      '/settings', '/my-facility', '/dashboard/front-desk', '/payments',
+    ],
+    defaultDashboard: '/dashboard/front-desk',
+  },
+
+  clinic_clerk: {
+    allowed: [
+      '/patients', '/appointments', '/messages',
+      '/settings', '/my-facility', '/dashboard/front-desk',
+    ],
+    defaultDashboard: '/dashboard/front-desk',
+  },
+
+  triage_nurse: {
+    // Triage station: records presenting complaint, vitals, and acuity, then
+    // routes the patient. No lab operations page — orders are placed by the
+    // clinician downstream.
+    allowed: [
+      '/patients', '/messages', '/settings', '/my-facility',
+      '/dashboard/nurse', '/wards',
+    ],
+    defaultDashboard: '/dashboard/nurse',
+  },
+
+  rooming_nurse: {
+    allowed: [
+      '/patients', '/messages', '/settings', '/my-facility',
+      '/dashboard/nurse', '/immunizations', '/anc', '/lab',
+    ],
+    defaultDashboard: '/dashboard/nurse',
+  },
+
+  clinician: {
+    allowed: [
+      '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
+      '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
+      '/appointments', '/telehealth', '/wards', '/alerts', '/settings', '/my-facility',
+    ],
+    defaultDashboard: '/dashboard',
+  },
+
+  records_hmis_officer: {
+    allowed: [
+      '/dashboard/data-entry', '/patients', '/facility-assessments', '/data-quality',
+      '/reports', '/vital-statistics', '/immunizations', '/anc', '/births', '/deaths',
+      '/hospitals', '/messages', '/settings', '/my-facility', '/dhis2-export',
+      '/sync-conflicts', 
+    ],
+    defaultDashboard: '/dashboard/data-entry',
+  },
+
+  facility_administrator: {
+    // Non-clinical facility manager: administration, oversight, finance, HR,
+    // assets, records/data quality, and population reporting. NOT a consulting
+    // clinician — no consultation/telehealth encounter tools and no lab/pharmacy
+    // operations pages (those belong to clinicians, lab techs, and pharmacists).
+    allowed: [
+      '/dashboard', '/patients', '/referrals', '/messages',
+      '/immunizations', '/anc', '/births', '/deaths',
+      '/surveillance', '/reports', '/hospitals', '/settings',
+      '/epidemic-intelligence', '/mch-analytics', '/my-facility',
+      '/appointments', '/facility-assessments', '/data-quality',
+      '/payments', '/payments/claims', '/payments/plans',
+      '/wards', '/equipment', '/hr', '/feedback', '/dashboard/hr',
+      '/sync-conflicts', '/org-admin/users',
+    ],
+    defaultDashboard: '/dashboard',
   },
 };
 

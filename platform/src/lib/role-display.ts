@@ -26,6 +26,13 @@ export const ROLE_TITLE: Record<UserRole, string> = {
   community_health_volunteer: 'CHV',
   hospital_manager: 'Mgr.',
   medical_biller: 'Biller',
+  central_registration_clerk: '',
+  clinic_clerk: '',
+  triage_nurse: 'Triage',
+  rooming_nurse: 'Nurse',
+  clinician: 'Dr.',
+  records_hmis_officer: 'HMIS',
+  facility_administrator: '',
 };
 
 export const ROLE_LABEL: Record<UserRole, string> = {
@@ -51,6 +58,13 @@ export const ROLE_LABEL: Record<UserRole, string> = {
   community_health_volunteer: 'Community Volunteer',
   hospital_manager: 'Hospital Manager',
   medical_biller: 'Medical Biller',
+  central_registration_clerk: 'Registration Clerk',
+  clinic_clerk: 'Clinic Clerk',
+  triage_nurse: 'Triage Nurse',
+  rooming_nurse: 'Rooming Nurse',
+  clinician: 'Clinician',
+  records_hmis_officer: 'Records / HMIS Officer',
+  facility_administrator: 'Facility Administrator',
 };
 
 /** Roles that count as "physician" for filtering. */
@@ -59,6 +73,7 @@ export const PHYSICIAN_ROLES: UserRole[] = [
   'clinical_officer',
   'medical_superintendent',
   'radiologist',
+  'clinician',
 ];
 
 /** Roles that count as messageable clinical staff (doctors + everyone who treats patients). */
@@ -66,6 +81,8 @@ export const CLINICAL_ROLES: UserRole[] = [
   ...PHYSICIAN_ROLES,
   'nurse',
   'midwife',
+  'triage_nurse',
+  'rooming_nurse',
   'pharmacist',
   'lab_tech',
   'nutritionist',

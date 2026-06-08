@@ -34,6 +34,13 @@ const ROLE_LABELS: Record<UserRole, string> = {
   radiologist: 'Radiologist',
   hospital_manager: 'Hospital Manager',
   medical_biller: 'Medical Biller',
+  central_registration_clerk: 'Registration Clerk',
+  clinic_clerk: 'Clinic Clerk',
+  triage_nurse: 'Triage Nurse',
+  rooming_nurse: 'Rooming Nurse',
+  clinician: 'Clinician',
+  records_hmis_officer: 'Records / HMIS Officer',
+  facility_administrator: 'Facility Administrator',
 };
 
 const ROLE_COLORS: Record<string, string> = {

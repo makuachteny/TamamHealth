@@ -26,6 +26,10 @@ import {
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 
+// Expiry well in the future so "available" fixtures stay non-expired regardless
+// of the wall clock when the suite runs (avoids time-dependent flakiness).
+const FUTURE = new Date(Date.now() + 120 * 86_400_000).toISOString().slice(0, 10);
+
 type AddUnitInput = Parameters<typeof addUnit>[0];
 function validUnit(overrides: Partial<AddUnitInput> = {}): AddUnitInput {
   return {
@@ -34,7 +38,7 @@ function validUnit(overrides: Partial<AddUnitInput> = {}): AddUnitInput {
     component: 'whole_blood' as const,
     volume: 450,
     collectionDate: '2026-04-01',
-    expiryDate: '2026-05-15',
+    expiryDate: FUTURE,
     donorId: 'donor-001',
     donorName: 'John Deng',
     status: 'available' as const,
@@ -79,8 +83,8 @@ describe('Blood Bank Service', () => {
   });
 
   test('getAvailableUnits returns only available non-expired units', async () => {
-    await addUnit(validUnit({ status: 'available', expiryDate: '2026-06-01' }));
-    await addUnit(validUnit({ status: 'reserved', expiryDate: '2026-06-01', unitId: 'U2' }));
+    await addUnit(validUnit({ status: 'available', expiryDate: FUTURE }));
+    await addUnit(validUnit({ status: 'reserved', expiryDate: FUTURE, unitId: 'U2' }));
     // Expired unit
     await addUnit(validUnit({ status: 'available', expiryDate: '2020-01-01', unitId: 'U3' }));
 
@@ -189,10 +193,10 @@ describe('Blood Bank Service', () => {
   });
 
   test('getBloodInventorySummary returns complete breakdown', async () => {
-    await addUnit(validUnit({ bloodGroup: 'O+', status: 'available', expiryDate: '2026-06-01' }));
-    await addUnit(validUnit({ bloodGroup: 'O+', status: 'reserved', expiryDate: '2026-06-01', unitId: 'U2' }));
-    await addUnit(validUnit({ bloodGroup: 'A+', status: 'available', expiryDate: '2026-06-01', unitId: 'U3' }));
-    await addUnit(validUnit({ bloodGroup: 'O-', status: 'transfused', expiryDate: '2026-06-01', unitId: 'U4' }));
+    await addUnit(validUnit({ bloodGroup: 'O+', status: 'available', expiryDate: FUTURE }));
+    await addUnit(validUnit({ bloodGroup: 'O+', status: 'reserved', expiryDate: FUTURE, unitId: 'U2' }));
+    await addUnit(validUnit({ bloodGroup: 'A+', status: 'available', expiryDate: FUTURE, unitId: 'U3' }));
+    await addUnit(validUnit({ bloodGroup: 'O-', status: 'transfused', expiryDate: FUTURE, unitId: 'U4' }));
     // Expired unit
     await addUnit(validUnit({ bloodGroup: 'B+', status: 'available', expiryDate: '2020-01-01', unitId: 'U5' }));
 

@@ -76,6 +76,34 @@ notify, clinicians/midwives certify, HRIO/data-entry register.
 - hrio — added DHIS2 export (HRIOs own HMIS reporting).
 - midwife & cashier wired through every relevant API guard so they actually function.
 
+## Least-privilege revision (African/LMIC scope-of-practice pass)
+
+Each cadre's menu was trimmed to only the pages it actually operates, grounded in
+documented scope of practice. The capability layer (`usePermissions.ts`) already
+denied the underlying actions for these roles — these changes remove the dead
+nav/route entries so the UI matches what the role can do.
+
+- **midwife** — removed the Laboratory operations page. Midwives conduct deliveries,
+  provide ANC/postnatal/newborn care, and refer (ICM scope); ANC lab results are
+  reviewed inside the patient/ANC record, not the lab orders queue. Midwives never
+  had lab-ordering capability, so this only removes a page they couldn't use.
+- **triage_nurse** — removed the Laboratory page. Triage records presenting complaint,
+  vitals, and acuity, then routes the patient; orders are placed by the clinician.
+- **nutritionist** — removed Antenatal Care. Antenatal clinical care is a
+  midwife/nurse/clinician function; maternal-nutrition data is reviewed via MCH
+  analytics and the patient record. (Vaccine administration was already removed.)
+- **hospital_manager** — removed Laboratory and Pharmacy work queues. A manager sees
+  service utilisation through reports, not the live operational queues run by lab
+  techs and pharmacists.
+- **facility_administrator** — removed Consultation, Telehealth, Laboratory, and
+  Pharmacy. This is a non-clinical facility manager (administration, finance, HR,
+  assets, records, reporting), not a consulting clinician.
+
+CHW/BHW scope was verified against the South Sudan Boma Health Initiative package
+(iCCM for child illness, malnutrition screening, immunisation promotion, birth/death
+and maternal-death reporting, disease surveillance) and left unchanged — it already
+matches.
+
 ## Where this is enforced
 
 1. **Page navigation** — Edge middleware via `ROLE_ROUTE_TABLE` (`role-routes.ts`).

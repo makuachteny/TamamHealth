@@ -910,7 +910,7 @@ export default function ReferralsPage() {
           </div>
 
           {/* Referrals List */}
-          <div className="data-row-divider-sm">
+          <div className="space-y-3">
             {filteredReferrals.length === 0 ? (
               <div className="card-elevated">
                 <EmptyState
