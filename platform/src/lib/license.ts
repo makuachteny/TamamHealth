@@ -2,7 +2,7 @@
  * TamamHealth License Validation — runtime license key verification.
  *
  * License keys are HMAC-SHA256 signed and verified offline (no network needed).
- * Format: TamamHealth-<org-slug>-<YYYYMMDD>-<plan>-<signature>
+ * Format: TAMAMHEALTH-<org-slug>-<YYYYMMDD>-<plan>-<signature>
  */
 
 import { createHmac } from 'crypto';
@@ -22,7 +22,7 @@ export type LicenseInfo = {
  * Works fully offline — no network call.
  */
 export function verifyLicenseKey(key: string | undefined): LicenseInfo | null {
-  if (!key || !key.startsWith('TamamHealth-')) return null;
+  if (!key || !/^TAMAMHEALTH-/i.test(key)) return null;
 
   const parts = key.split('-');
   if (parts.length < 5) return null;

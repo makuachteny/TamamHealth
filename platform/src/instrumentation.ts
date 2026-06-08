@@ -94,7 +94,7 @@ export async function register() {
       console.warn('');
       console.warn('  ============================================================');
       console.warn('  WARNING: No valid TamamHealth license key found.');
-      console.warn('  Set TamamHealth_LICENSE_KEY in your .env.local file.');
+      console.warn('  Set TAMAMHEALTH_LICENSE_KEY in your .env.local file.');
       console.warn('  Run "npm run setup" to configure your license.');
       console.warn('  Contact hello@tamamhealth.org to obtain a license.');
       console.warn('  ============================================================');
