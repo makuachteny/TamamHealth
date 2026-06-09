@@ -131,10 +131,12 @@ async function getOrCreateKey(): Promise<CryptoKey | null> {
   if (existing) {
     try {
       const raw = bytesFromBase64Url(existing);
-      // Web Crypto wants a BufferSource; pass the underlying ArrayBuffer slice.
+      // Pass the Uint8Array view directly — it's a valid BufferSource.
+      // (Slicing raw.buffer creates an ArrayBuffer in the jsdom realm under
+      // jest, which Node's webcrypto rejects with a cross-realm brand check.)
       return await crypto.subtle.importKey(
         'raw',
-        raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer,
+        raw as unknown as ArrayBuffer,
         { name: 'AES-GCM', length: 256 },
         false,
         ['encrypt', 'decrypt'],
