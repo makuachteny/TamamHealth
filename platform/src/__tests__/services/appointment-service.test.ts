@@ -9,6 +9,7 @@ jest.mock('uuid', () => ({ v4: () => `${String(++uuidCounter).padStart(8, '0')}-
 jest.mock('@/lib/db', () => require('../helpers/test-db').createDBMock());
 
 import { teardownTestDBs } from '../helpers/test-db';
+import { jubaDate } from '@/lib/time-juba';
 import {
   createAppointment,
   getAppointmentsByDate,
@@ -26,9 +27,9 @@ import {
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 
-const today = new Date().toISOString().slice(0, 10);
-const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+const today = jubaDate();
+const tomorrow = jubaDate(Date.now() + 86400000);
+const yesterday = jubaDate(Date.now() - 86400000);
 
 type AppointmentInput = Parameters<typeof createAppointment>[0];
 function validAppointment(overrides: Partial<AppointmentInput> = {}): AppointmentInput {
@@ -154,7 +155,7 @@ describe('Appointment Service', () => {
   test('retrieves appointments by patient', async () => {
     await createAppointment(validAppointment());
     await createAppointment(validAppointment({
-      appointmentDate: new Date(Date.now() + 172800000).toISOString().slice(0, 10),
+      appointmentDate: jubaDate(Date.now() + 172800000),
       appointmentTime: '14:00',
       reason: 'Lab results review',
     }));
@@ -221,7 +222,7 @@ describe('Appointment Service', () => {
 
   test('reschedules appointment', async () => {
     const apt = await createAppointment(validAppointment());
-    const newDate = new Date(Date.now() + 259200000).toISOString().slice(0, 10);
+    const newDate = jubaDate(Date.now() + 259200000);
     const rescheduled = await rescheduleAppointment(apt._id, newDate, '15:00');
     expect(rescheduled).not.toBeNull();
     expect(rescheduled!.appointmentDate).toBe(newDate);

@@ -9,6 +9,7 @@ jest.mock('uuid', () => ({ v4: () => `${String(++uuidCounter).padStart(8, '0')}-
 jest.mock('@/lib/db', () => require('../helpers/test-db').createDBMock());
 
 import { teardownTestDBs } from '../helpers/test-db';
+import { jubaDate } from '@/lib/time-juba';
 import {
   createBomaVisit,
   getAllBomaVisits,
@@ -25,7 +26,7 @@ import {
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 
-const today = new Date().toISOString().slice(0, 10);
+const today = jubaDate();
 
 type BomaVisitInput = Parameters<typeof createBomaVisit>[0];
 function validBomaVisit(overrides: Partial<BomaVisitInput> = {}): BomaVisitInput {
@@ -45,7 +46,7 @@ function validBomaVisit(overrides: Partial<BomaVisitInput> = {}): BomaVisitInput
     treatmentGiven: 'ACT (Artemether-Lumefantrine)',
     outcome: 'follow_up' as const,
     followUpRequired: true,
-    nextFollowUp: new Date(Date.now() + 259200000).toISOString().slice(0, 10),
+    nextFollowUp: jubaDate(Date.now() + 259200000),
     reviewStatus: 'pending' as const,
     state: 'Central Equatoria',
     county: 'Juba',
@@ -92,7 +93,7 @@ describe('Boma Visit Service', () => {
   test('retrieves visits by patient geocode', async () => {
     await createBomaVisit(validBomaVisit());
     await createBomaVisit(validBomaVisit({
-      visitDate: new Date(Date.now() - 604800000).toISOString().slice(0, 10),
+      visitDate: jubaDate(Date.now() - 604800000),
       chiefComplaint: 'Follow-up for malaria',
     }));
 
