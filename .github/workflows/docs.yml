@@ -1,0 +1,50 @@
+# Builds the TypeDoc API documentation for the platform and uploads it as a
+# build artifact (downloadable from the Actions run page for 30 days).
+#
+# Artifact-based rather than GitHub Pages because the repository is private
+# on a plan without private-repo Pages. If the repo goes public or moves to
+# a paid plan, swap the upload step for actions/deploy-pages.
+name: docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'platform/src/lib/**'
+      - 'platform/typedoc.json'
+      - 'platform/package*.json'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-docs:
+    name: platform · typedoc
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: platform/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build API docs
+        run: npm run docs:api
+
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-api-docs
+          path: platform/docs-api
+          retention-days: 30
