@@ -28,6 +28,12 @@ Clinicians' devices keep working **offline** even if this server is down —
 they sync up whenever it comes back. The server is the durable copy, not a
 gatekeeper.
 
+> **Fingerprint scanners (optional):** facilities using USB fingerprint
+> scanners run the small `fingerprint-bridge` service on the **registration
+> desk PC** itself (not on this server) — see `fingerprint-bridge/README.md`.
+> If the bridge or scanner is down, staff fall back to name / hospital-number /
+> QR lookup; nothing else is affected.
+
 ## 2. Fresh install
 
 ### Prerequisites

@@ -1,0 +1,17 @@
+{
+  "name": "tamamhealth-fingerprint-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local hardware bridge that exposes USB fingerprint scanners to the TamamHealth browser app over a localhost HTTP API. Vendor SDKs are wrapped behind a small adapter interface; ships with a mock driver for development and demos.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs",
+    "test": "node --test index.test.mjs",
+    "check": "node --check index.mjs"
+  },
+  "license": "UNLICENSED"
+}
