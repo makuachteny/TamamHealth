@@ -10,6 +10,8 @@ import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { states } from '@/data/mock';
 import QRScanner from '@/components/QRScanner';
+import FingerprintIdentifyModal from '@/components/FingerprintIdentifyModal';
+import { isFingerprintEnabled } from '@/lib/services/fingerprint-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
 // Pagination cap — capped to keep DOM-node count manageable on low-end devices.
@@ -35,6 +37,7 @@ export default function PatientsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showFindPatient, setShowFindPatient] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showFingerprintIdentify, setShowFingerprintIdentify] = useState(false);
   const [lookupId, setLookupId] = useState('');
   const [lookupError, setLookupError] = useState('');
   // Cap how many rows are rendered at once. "Load more" extends the window
@@ -372,7 +375,7 @@ export default function PatientsPage() {
       </main>
 
       {/* Find Patient Modal — Hospital ID lookup + QR scan */}
-      {showFindPatient && !showQRScanner && (
+      {showFindPatient && !showQRScanner && !showFingerprintIdentify && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
           <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'var(--card-bg, var(--bg-card))' }}>
             <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
@@ -433,9 +436,38 @@ export default function PatientsPage() {
                 </div>
                 <ArrowRight className="w-4 h-4 ml-auto" style={{ color: 'var(--text-muted)' }} />
               </button>
+
+              {/* Fingerprint identification (feature-flagged, needs local bridge) */}
+              {isFingerprintEnabled() && (
+                <button
+                  onClick={() => setShowFingerprintIdentify(true)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-[var(--accent-light)]"
+                  style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
+                >
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
+                    <ScanLine className="w-5 h-5" style={{ color: 'var(--tamamhealth-blue)' }} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('fingerprint.identifyTitle')}</p>
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('fingerprint.identifyOptionDesc')}</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 ml-auto" style={{ color: 'var(--text-muted)' }} />
+                </button>
+              )}
             </div>
           </div>
         </div>
+      )}
+
+      {showFingerprintIdentify && (
+        <FingerprintIdentifyModal
+          onSelect={(patientId) => {
+            setShowFingerprintIdentify(false);
+            setShowFindPatient(false);
+            router.push(`/patients/${patientId}`);
+          }}
+          onClose={() => setShowFingerprintIdentify(false)}
+        />
       )}
 
       {showQRScanner && (

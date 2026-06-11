@@ -36,6 +36,10 @@
  *   - tamamhealth_announcements       Staff broadcast notices. Facility-
  *                                     operational, not a national analytics
  *                                     target.
+ *   - tamamhealth_biometric_templates Fingerprint minutiae templates. Highly
+ *                                     sensitive biometric identifiers used
+ *                                     only for in-org patient identification;
+ *                                     must never flow to national analytics.
  *
  * All remaining databases land in DB_TABLE_MAP below; a missing entry causes a
  * 400 from this route, so the sync-worker surfaces a hard failure rather than

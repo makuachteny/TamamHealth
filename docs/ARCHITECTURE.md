@@ -91,6 +91,7 @@ Sync directions (`sync-config.ts`):
 | `tamamhealth_telehealth` | `telehealth_session` | appointmentId; patientId; providerId | both | yes | `telehealth_sessions` |
 | `tamamhealth_messages` | `message` | patient or staff recipient; fromDoctorId → users | both | yes | `messages` |
 | `tamamhealth_announcements` | `announcement` | authorId → users; targetRoles[] | both | yes | — |
+| `tamamhealth_biometric_templates` | `biometric_template` | patientId; consent-gated; minutiae templates only (no images); captured/matched via local `fingerprint-bridge` | both | yes | — |
 
 ### Vital events & public health (CRVS / MCH / community)
 

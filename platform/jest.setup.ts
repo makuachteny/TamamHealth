@@ -14,7 +14,8 @@ if (typeof globalThis.setImmediate === 'undefined') {
 // Polyfill fetch for pouchdb-browser in jsdom (Node 18+ has native fetch)
 if (typeof globalThis.fetch === 'undefined') {
   Object.assign(globalThis, {
-    // @ts-expect-error node-fetch has no declarations; only used as polyfill in test
+    // @ts-ignore -- node-fetch may or may not have declarations depending on
+    // the install (v2 has none); only used as a test polyfill either way.
     fetch: (...args: Parameters<typeof fetch>) => import('node-fetch').then(m => (m.default as any)(...args)),
     Headers: class Headers {},
     Request: class Request {},

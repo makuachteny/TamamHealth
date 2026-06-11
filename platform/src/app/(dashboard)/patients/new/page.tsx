@@ -6,11 +6,13 @@ import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import { Check, ArrowLeft, ArrowRight, Users } from '@/components/icons/lucide';
 import PhotoCapture from '@/components/PhotoCapture';
+import FingerprintCapture, { type CapturedFingerprint } from '@/components/FingerprintCapture';
 import { statesAndCounties, states, tribes, languages, bloodTypes } from '@/data/mock';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { enrollFingerprint } from '@/lib/services/fingerprint-service';
 
 export default function NewPatientPage() {
   const { t } = useTranslation();
@@ -33,6 +35,9 @@ export default function NewPatientPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  // Fingerprint templates captured during registration (consent-gated inside
+  // the component). Persisted AFTER the patient doc exists, in handleSubmit.
+  const [fingerprints, setFingerprints] = useState<CapturedFingerprint[]>([]);
 
   const update = (field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -135,6 +140,30 @@ export default function NewPatientPage() {
         lastVisitHospital: currentUser?.hospitalId || '',
         isActive: true,
       });
+      // Persist fingerprint enrollments now that the patient _id exists.
+      // Best-effort: a biometric failure must never roll back registration.
+      if (fingerprints.length > 0 && result?._id) {
+        try {
+          for (const fp of fingerprints) {
+            await enrollFingerprint({
+              patientId: result._id,
+              patientName: `${form.firstName.trim()} ${form.surname.trim()}`,
+              finger: fp.finger,
+              template: fp.template,
+              format: fp.format,
+              quality: fp.quality,
+              driver: fp.driver,
+              consentRecordedBy: currentUser?.name || currentUser?.username || 'unknown',
+              enrolledBy: currentUser?.username,
+              hospitalId: currentUser?.hospitalId,
+              orgId: result.orgId,
+            });
+          }
+        } catch (fpErr) {
+          console.error('Fingerprint enrollment failed:', fpErr);
+          showToast(t('fingerprint.enrollFailed'), 'error');
+        }
+      }
       showToast(t('patientNew.toastRegistered', { firstName: form.firstName, surname: form.surname }), 'success');
       // BHW flow: go straight to boma dashboard with patient pre-selected for symptoms
       if (currentUser?.role === 'boma_health_worker' && result?._id) {
@@ -404,6 +433,7 @@ export default function NewPatientPage() {
                     {t('patientNew.medicalWarning')}
                   </p>
                 </div>
+                <FingerprintCapture value={fingerprints} onChange={setFingerprints} />
               </div>
             )}
 

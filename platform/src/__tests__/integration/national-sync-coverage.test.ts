@@ -33,6 +33,7 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
   'tamamhealth_saved_payment_methods', // PCI tokens — never leave the clinic
   'tamamhealth_availability',          // provider booking windows — facility-operational, not national analytics
   'tamamhealth_announcements',         // staff notices — facility-operational, not national analytics
+  'tamamhealth_biometric_templates',   // biometric identifiers — in-org identification only, never national
 ]);
 
 // Local-only databases that never participate in sync at all.

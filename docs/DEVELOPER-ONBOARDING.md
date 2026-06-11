@@ -69,6 +69,7 @@ TamamHealth/
 ├── website/           # Marketing site (Next.js)
 ├── mobile/            # React Native client (early)
 ├── sync-worker/       # CouchDB _changes → /api/sync poller (analytics)
+├── fingerprint-bridge/ # Localhost HTTP bridge for USB fingerprint scanners
 ├── country-node/      # National aggregation tier (skeleton)
 ├── regional-exchange/ # Cross-border tier (skeleton)
 ├── scripts/           # Backups, preflight, CouchDB dumps
