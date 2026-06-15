@@ -1,0 +1,28 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "TamamHealth Platform API",
+  "entryPoints": [
+    "src/lib/services",
+    "src/lib/db.ts",
+    "src/lib/db-types.ts",
+    "src/lib/db-types-asset.ts",
+    "src/lib/db-types-billing.ts",
+    "src/lib/db-types-feedback.ts",
+    "src/lib/db-types-hr.ts",
+    "src/lib/db-types-payments.ts",
+    "src/lib/db-types-ward.ts",
+    "src/lib/sync/sync-config.ts",
+    "src/lib/permissions.ts",
+    "src/lib/time-juba.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "out": "docs-api",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "skipErrorChecking": true,
+  "readme": "none",
+  "navigationLinks": {
+    "Architecture": "https://github.com/makuachteny/TamamHealth/blob/main/docs/ARCHITECTURE.md",
+    "Principles": "https://github.com/makuachteny/TamamHealth/blob/main/docs/PRINCIPLES.md"
+  }
+}

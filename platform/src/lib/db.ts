@@ -188,6 +188,8 @@ export const controlledSubstanceLogDB = () => getDB('tamamhealth_controlled_subs
 export const problemsDB = () => getDB('tamamhealth_problems');
 // In-progress / paused clinical encounters (consultation workflow state machine).
 export const encountersDB = () => getDB('tamamhealth_encounters');
+// Fingerprint minutiae templates (no raw images) — see db-types-biometrics.ts
+export const biometricTemplatesDB = () => getDB('tamamhealth_biometric_templates');
 
 // Sync + conflict databases (Phase 1 closeout)
 export const syncEventsDB = () => getDB('tamamhealth_sync_events');
@@ -263,7 +265,7 @@ export async function resetAllDatabases(): Promise<void> {
     'tamamhealth_claims', 'tamamhealth_adjustments', 'tamamhealth_payments', 'tamamhealth_refunds',
     'tamamhealth_saved_payment_methods', 'tamamhealth_payment_plans', 'tamamhealth_invoices', 'tamamhealth_ledger',
     'tamamhealth_sync_events', 'tamamhealth_conflict_queue',
-    'tamamhealth_problems', 'tamamhealth_encounters',
+    'tamamhealth_problems', 'tamamhealth_encounters', 'tamamhealth_biometric_templates',
     // Operational DBs that were created + synced but previously missed here,
     // leaving stale data behind on reset/re-seed.
     'tamamhealth_availability', 'tamamhealth_announcements',
