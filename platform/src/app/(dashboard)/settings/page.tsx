@@ -6,12 +6,19 @@ import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useHospitals } from '@/lib/hooks/useHospitals';
+import { usePermissions } from '@/lib/hooks/usePermissions';
+import { useTranslation } from '@/lib/i18n/useTranslation';
+import { SUPPORTED_LOCALES } from '@/lib/i18n';
 import { useToast } from '@/components/Toast';
 import { statesAndCounties } from '@/data/mock';
 import type { UserRole } from '@/lib/db-types';
+import FilterBar from '@/components/filters/FilterBar';
+import SearchInput from '@/components/filters/SearchInput';
+import FilterSelect from '@/components/filters/FilterSelect';
 import {
   Users, Building2, Plus, Search, Edit3, KeyRound, UserX, UserCheck,
-  X, Eye, EyeOff, RefreshCw, Check
+  X, Eye, EyeOff, RefreshCw, Check,
+  Settings as SettingsIcon, Globe, Moon, Sun, Lock, Save, User as UserIcon,
 } from '@/components/icons/lucide';
 
 const ROLES: { value: UserRole; label: string }[] = [
@@ -20,7 +27,7 @@ const ROLES: { value: UserRole; label: string }[] = [
   { value: 'nurse', label: 'Nurse' },
   { value: 'lab_tech', label: 'Lab Technician' },
   { value: 'pharmacist', label: 'Pharmacist' },
-  { value: 'front_desk', label: 'Front Desk' },
+  { value: 'front_desk', label: 'Medical Receptionist' },
   { value: 'government', label: 'Government Admin' },
 ];
 
@@ -50,15 +57,61 @@ function generatePassword(): string {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser, theme, toggleTheme } = useApp();
   const { users, loading: usersLoading, create: createUser, update: updateUser, resetPassword, deactivate } = useUsers();
   const { hospitals, loading: hospitalsLoading, create: createHospital, reload: reloadHospitals } = useHospitals();
+  const { canManageUsers } = usePermissions();
+  const { locale, setLocale } = useTranslation();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'hospitals'>('users');
+  const [activeTab, setActiveTab] = useState<'preferences' | 'users' | 'hospitals'>('preferences');
+
+  // ── My account / preferences ──
+  const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [pwForm, setPwForm] = useState({ next: '', confirm: '' });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [showSelfPw, setShowSelfPw] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      setProfileForm({ name: currentUser.name || '', phone: (currentUser as { phone?: string }).phone || '' });
+    }
+  }, [currentUser]);
+
+  const handleSaveProfile = async () => {
+    if (!currentUser?._id || !profileForm.name.trim()) { showToast('Name is required', 'error'); return; }
+    setProfileSaving(true);
+    try {
+      await updateUser(currentUser._id, { name: profileForm.name.trim(), phone: profileForm.phone.trim() }, currentUser._id, currentUser.username);
+      showToast('Profile updated', 'success');
+    } catch {
+      showToast('Failed to update profile', 'error');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleChangeOwnPassword = async () => {
+    if (!currentUser?._id) return;
+    if (pwForm.next.length < 6) { showToast('Password must be at least 6 characters', 'error'); return; }
+    if (pwForm.next !== pwForm.confirm) { showToast('Passwords do not match', 'error'); return; }
+    setPwSaving(true);
+    try {
+      await resetPassword(currentUser._id, pwForm.next);
+      setPwForm({ next: '', confirm: '' });
+      showToast('Password changed', 'success');
+    } catch {
+      showToast('Failed to change password', 'error');
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterHospital, setFilterHospital] = useState<string>('all');
+  const [filterFacilityType, setFilterFacilityType] = useState<string>('all');
 
   // User form state
   const [showUserForm, setShowUserForm] = useState(false);
@@ -282,12 +335,15 @@ export default function SettingsPage() {
         {/* Tab bar */}
         <div className="flex gap-2" style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '0' }}>
           {[
-            { key: 'users' as const, label: 'User Management', icon: Users },
-            { key: 'hospitals' as const, label: 'Hospital Management', icon: Building2 },
+            { key: 'preferences' as const, label: 'Preferences', icon: SettingsIcon },
+            ...(canManageUsers ? [
+              { key: 'users' as const, label: 'User Management', icon: Users },
+              { key: 'hospitals' as const, label: 'Hospital Management', icon: Building2 },
+            ] : []),
           ].map(tab => (
             <button
               key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setSearch(''); }}
+              onClick={() => { setActiveTab(tab.key); setSearch(''); setFilterFacilityType('all'); }}
               className="flex items-center gap-2 px-5 py-3 font-medium text-sm transition-colors"
               style={{
                 color: activeTab === tab.key ? 'var(--accent-primary)' : 'var(--text-muted)',
@@ -304,6 +360,130 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
+
+        {/* ═══════════════ PREFERENCES TAB (all users) ═══════════════ */}
+        {activeTab === 'preferences' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Appearance */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Sun className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Appearance</h3>
+              </div>
+              <div className="p-5">
+                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Theme</p>
+                <div className="flex gap-2">
+                  {[
+                    { v: 'light' as const, label: 'Light', Icon: Sun },
+                    { v: 'dark' as const, label: 'Dark', Icon: Moon },
+                  ].map(opt => {
+                    const active = theme === opt.v;
+                    return (
+                      <button
+                        key={opt.v}
+                        onClick={() => { if (theme !== opt.v) toggleTheme(); }}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                        style={active
+                          ? { background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }
+                          : { background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                      >
+                        <opt.Icon className="w-4 h-4" /> {opt.label}
+                        {active && <Check className="w-3.5 h-3.5" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Language */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Globe className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Language</h3>
+              </div>
+              <div className="p-5">
+                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Display language</p>
+                <select
+                  value={locale}
+                  onChange={(e) => setLocale(e.target.value as typeof locale)}
+                  className="w-full"
+                  style={{ background: 'var(--overlay-subtle)' }}
+                  aria-label="Display language"
+                >
+                  {SUPPORTED_LOCALES.map(l => (
+                    <option key={l.code} value={l.code}>{l.nativeName || l.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* My profile */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><UserIcon className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">My profile</h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Full name</label>
+                  <input value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} className="w-full" style={{ background: 'var(--overlay-subtle)' }} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Phone</label>
+                  <input value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))} className="w-full" style={{ background: 'var(--overlay-subtle)' }} />
+                </div>
+                <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  Role: <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>{currentUser?.role}</span>
+                  {currentUser?.username && <> · Username: <span className="font-mono">{currentUser.username}</span></>}
+                </div>
+                <button onClick={handleSaveProfile} disabled={profileSaving} className="btn btn-primary btn-sm">
+                  <Save className="w-4 h-4" /> {profileSaving ? 'Saving…' : 'Save profile'}
+                </button>
+              </div>
+            </div>
+
+            {/* Security — change my password */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Lock className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Security</h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>New password</label>
+                  <div className="relative">
+                    <input
+                      type={showSelfPw ? 'text' : 'password'}
+                      value={pwForm.next}
+                      onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))}
+                      className="w-full pr-9"
+                      style={{ background: 'var(--overlay-subtle)' }}
+                      autoComplete="new-password"
+                    />
+                    <button type="button" onClick={() => setShowSelfPw(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
+                      {showSelfPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Confirm password</label>
+                  <input
+                    type={showSelfPw ? 'text' : 'password'}
+                    value={pwForm.confirm}
+                    onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))}
+                    className="w-full"
+                    style={{ background: 'var(--overlay-subtle)' }}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <button onClick={handleChangeOwnPassword} disabled={pwSaving || !pwForm.next} className="btn btn-secondary btn-sm">
+                  <KeyRound className="w-4 h-4" /> {pwSaving ? 'Updating…' : 'Change password'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ═══════════════ USER MANAGEMENT TAB ═══════════════ */}
         {activeTab === 'users' && (
@@ -409,20 +589,27 @@ export default function SettingsPage() {
         {activeTab === 'hospitals' && (
           <div className="space-y-4">
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1" style={{ minWidth: '200px', maxWidth: '360px' }}>
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                <input
-                  type="text" placeholder="Search hospitals..."
-                  value={search} onChange={e => setSearch(e.target.value)}
-                  style={{ ...inputStyle, paddingLeft: '36px' }}
-                />
-              </div>
-              <div className="flex-1" />
+            <FilterBar>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search hospitals..."
+                aria-label="Search hospitals"
+              />
+              <FilterSelect
+                value={filterFacilityType}
+                onChange={setFilterFacilityType}
+                options={[
+                  { value: 'all', label: 'All Types' },
+                  ...FACILITY_TYPES,
+                ]}
+                aria-label="Filter by facility type"
+              />
+              <FilterBar.Spacer />
               <button onClick={openCreateHospital} style={btnPrimary}>
                 <Plus className="w-4 h-4" /> Add Hospital
               </button>
-            </div>
+            </FilterBar>
 
             {/* Hospitals table */}
             <div style={card}>
@@ -443,8 +630,9 @@ export default function SettingsPage() {
                       <tr><td colSpan={6} className="px-4 py-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading hospitals...</td></tr>
                     ) : hospitals.filter(h => {
                       const q = search.toLowerCase();
-                      if (!q) return true;
-                      return h.name.toLowerCase().includes(q) || h.state.toLowerCase().includes(q);
+                      const matchSearch = !q || h.name.toLowerCase().includes(q) || h.state.toLowerCase().includes(q);
+                      const matchType = filterFacilityType === 'all' || h.facilityType === filterFacilityType;
+                      return matchSearch && matchType;
                     }).map(h => (
                       <tr key={h._id} style={{ borderBottom: '1px solid var(--border-light)' }}
                           className="hover:bg-[rgba(0,119,215,0.03)] transition-colors">

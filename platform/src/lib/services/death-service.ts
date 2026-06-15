@@ -2,17 +2,17 @@ import { deathsDB } from '../db';
 import type { DeathRegistrationDoc } from '../db-types';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 import { updatePatient } from './patient-service';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { jubaYearMonth, jubaIsInMonth } from '../time-juba';
 
 export async function getAllDeaths(scope?: DataScope): Promise<DeathRegistrationDoc[]> {
   const db = deathsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as DeathRegistrationDoc)
-    .filter(d => d && d.type === 'death' && d.isDeleted !== true)
+  const all = (await findByType<DeathRegistrationDoc>(db, 'death'))
+    .filter(d => d && d.isDeleted !== true)
     .sort((a, b) => new Date(b.dateOfDeath || '').getTime() - new Date(a.dateOfDeath || '').getTime());
   return scope ? filterByScope(all, scope) : all;
 }
@@ -36,6 +36,14 @@ export async function createDeath(data: Omit<DeathRegistrationDoc, '_id' | '_rev
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   await logAuditSafe('REGISTER_DEATH', undefined, undefined, `Registered death ${doc._id}: ${data.deceasedFirstName} ${data.deceasedSurname}, cause: ${data.immediateCause || 'unspecified'}`);
+  emitSyncEvent({
+    resourceType: 'death',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
 
   // If this death is linked to an existing patient record, mark that patient as deceased
   // so dashboards, search results, and patient lookups reflect the new status.
@@ -69,6 +77,14 @@ export async function updateDeath(id: string, data: Partial<DeathRegistrationDoc
     };
     const resp = await db.put(updated);
     updated._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'death',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;
@@ -79,7 +95,15 @@ export async function deleteDeath(id: string): Promise<boolean> {
   const db = deathsDB();
   try {
     const doc = await db.get(id);
+    const typed = doc as unknown as DeathRegistrationDoc;
     await db.remove(doc);
+    emitSyncEvent({
+      resourceType: 'death',
+      resourceId: id,
+      operation: 'delete',
+      orgId: typed.orgId,
+      hospitalId: typed.facilityId,
+    });
     return true;
   } catch {
     return false;

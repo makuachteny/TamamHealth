@@ -83,7 +83,6 @@ export default function AdminSystemPage() {
           { key: 'tamamhealth_deaths', label: t('system.dbDeaths') },
           { key: 'tamamhealth_immunizations', label: t('system.dbImmunizations') },
           { key: 'tamamhealth_anc', label: t('system.dbAncVisits') },
-          { key: 'tamamhealth_boma_visits', label: t('system.dbBomaVisits') },
           { key: 'tamamhealth_follow_ups', label: t('system.dbFollowUps') },
           { key: 'tamamhealth_organizations', label: t('system.dbOrganizations') },
           { key: 'tamamhealth_platform_config', label: t('system.dbPlatformConfig') },

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { PatientDoc } from '../db-types';
 import { patientsDB } from '../db';
+import { makeCoalescer } from './live-reload';
 import { useApp } from '../context';
 
 export function usePatients() {
@@ -37,11 +38,13 @@ export function usePatients() {
   // updated, or marked deceased anywhere in the app. Replaces 30s polling.
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) loadPatients(); });
     const changes = patientsDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) loadPatients(); })
+      .on('change', () => reload.trigger())
       .on('error', () => { /* swallow */ });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [loadPatients]);

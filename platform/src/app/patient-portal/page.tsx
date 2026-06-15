@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import Modal from '@/components/Modal';
 import {
   User, Calendar, FileText, FlaskConical, Syringe,
   HeartPulse, Shield, Pill, Scan, FolderOpen,
@@ -185,7 +186,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
 
             {!dbReady && (
               <div className="mb-4 p-3 rounded-lg text-center" style={{
-                background: 'rgba(43,111,224,0.08)', border: '1px solid rgba(43,111,224,0.15)',
+                background: 'rgba(59, 130, 246,0.08)', border: '1px solid rgba(59, 130, 246,0.15)',
               }}>
                 <p className="text-xs" style={{ color: BLUE }}>
                   <svg className="animate-spin w-3 h-3 inline mr-1.5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
@@ -1049,9 +1050,9 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
             {[
               { icon: Calendar, label: t('patientPortal.nextAppointment'), value: upcomingApts.length > 0 ? upcomingApts[0].appointmentDate : t('patientPortal.noneScheduled'), color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
-              { icon: FlaskConical, label: t('patientPortal.pendingLabs'), value: t('patientPortal.pendingCount', { count: pendingLabs }), color: pendingLabs > 0 ? 'var(--color-warning)' : 'var(--color-success)', bg: pendingLabs > 0 ? 'rgba(217,119,6,0.08)' : 'rgba(16,185,129,0.08)' },
+              { icon: FlaskConical, label: t('patientPortal.pendingLabs'), value: t('patientPortal.pendingCount', { count: pendingLabs }), color: pendingLabs > 0 ? 'var(--color-warning)' : 'var(--color-success)', bg: pendingLabs > 0 ? 'rgba(217,119,6,0.08)' : 'rgba(31, 157, 111,0.08)' },
               { icon: Pill, label: t('patientPortal.activeMeds'), value: t('patientPortal.activeCount', { count: activeMeds }), color: '#7C3AED', bg: 'rgba(124,58,237,0.08)' },
-              { icon: CheckCircle2, label: t('patientPortal.completedVisits'), value: t('patientPortal.visitCount', { count: completedApts }), color: 'var(--color-success)', bg: 'rgba(16,185,129,0.08)' },
+              { icon: CheckCircle2, label: t('patientPortal.completedVisits'), value: t('patientPortal.visitCount', { count: completedApts }), color: 'var(--color-success)', bg: 'rgba(31, 157, 111,0.08)' },
             ].map((stat, i) => (
               <div key={i} className="card-elevated" style={{ padding: '14px 14px', borderTop: `3px solid ${stat.color}` }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: stat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
@@ -1131,7 +1132,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   { key: 'temperature', label: t('patientPortal.temperature'), icon: Thermometer, unit: '°C', color: '#F59E0B' },
                   { key: 'weight', label: t('patientPortal.weight'), icon: Weight, unit: 'kg', color: '#6366F1' },
                   { key: 'respiratoryRate', label: t('patientPortal.respRate'), icon: Droplets, unit: '/min', color: '#06B6D4' },
-                  { key: 'oxygenSaturation', label: 'SpO₂', icon: Eye, unit: '%', color: '#10B981' },
+                  { key: 'oxygenSaturation', label: 'SpO₂', icon: Eye, unit: '%', color: '#1F9D6F' },
                 ].filter(v => vitals[v.key]).map(v => (
                   <div key={v.key} style={{ padding: '12px 14px', borderRadius: 10, background: `${v.color}08`, border: `1px solid ${v.color}15`, textAlign: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginBottom: 6 }}>
@@ -1167,7 +1168,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   <AlertRow color="#EF4444" icon={AlertTriangle} text={t('patientPortal.criticalLabAlert')} />
                 )}
                 {(patient.allergies || []).length === 0 && (patient.chronicConditions || []).length === 0 && pendingLabs === 0 && (
-                  <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(31, 157, 111,0.06)', border: '1px solid rgba(31, 157, 111,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <CheckCircle2 size={14} style={{ color: 'var(--color-success)' }} />
                     <span style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 600 }}>{t('patientPortal.noHealthAlerts')}</span>
                   </div>
@@ -1376,7 +1377,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   </button>
                   {expandedId === lab._id && lab.status === 'completed' && (
                     <div style={{ padding: '0 16px 14px', borderTop: '1px solid var(--border-medium)', paddingTop: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 'var(--card-radius)', background: lab.abnormal ? 'rgba(239,68,68,0.04)' : 'rgba(16,185,129,0.04)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 'var(--card-radius)', background: lab.abnormal ? 'rgba(239,68,68,0.04)' : 'rgba(31, 157, 111,0.04)' }}>
                         <div>
                           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('patientPortal.result')}</div>
                           <div className="stat-value" style={{ fontSize: 15, fontWeight: 700, color: lab.abnormal ? 'var(--color-danger)' : 'var(--text-primary)' }}>{lab.result}</div>
@@ -1413,7 +1414,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {prescriptions.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(rx => (
                 <div key={rx._id} className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 8, background: rx.status === 'dispensed' ? 'rgba(16,185,129,0.08)' : 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: rx.status === 'dispensed' ? 'rgba(31, 157, 111,0.08)' : 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Pill size={16} style={{ color: rx.status === 'dispensed' ? 'var(--color-success)' : 'var(--accent-primary)' }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1566,7 +1567,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {immunizations.sort((a, b) => b.dateGiven.localeCompare(a.dateGiven)).map(imm => (
                 <div key={imm._id} className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(16,185,129,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(31, 157, 111,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Syringe size={16} style={{ color: 'var(--color-success)' }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1612,7 +1613,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
 
       {/* Booking Modal */}
       {showBooking && (
-        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setShowBooking(false); }}>
+        <Modal onClose={() => setShowBooking(false)}>
           <div className="modal-panel modal-panel--md">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.requestAppointment')}</h3>
@@ -1641,7 +1642,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
         </div>
       </div>
@@ -1722,7 +1723,7 @@ function InsuranceTab({}: { patient: PatientDoc }) {
 
       {/* Add Insurance Form Modal */}
       {showAddForm && (
-        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setShowAddForm(false); }}>
+        <Modal onClose={() => setShowAddForm(false)}>
           <div className="modal-panel modal-panel--md">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.addInsurance')}</h3>
@@ -1742,7 +1743,7 @@ function InsuranceTab({}: { patient: PatientDoc }) {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
@@ -2306,7 +2307,7 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
     return (
       <div style={{ maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
         <div className="card-elevated" style={{ padding: '40px 28px', borderTop: '4px solid var(--color-success)' }}>
-          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(31, 157, 111,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
             <CheckCircle2 size={56} style={{ color: 'var(--color-success)' }} />
           </div>
           <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>{t('patientPortal.paymentRecorded')}</h3>

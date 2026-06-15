@@ -2,15 +2,14 @@ import { staffSchedulesDB } from '../db';
 import type { StaffScheduleDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 
 export async function getAllSchedules(scope?: DataScope): Promise<StaffScheduleDoc[]> {
   const db = staffSchedulesDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as StaffScheduleDoc)
-    .filter(d => d && d.type === 'staff_schedule')
+  const all = (await findByType<StaffScheduleDoc>(db, 'staff_schedule'))
     .sort((a, b) => {
       const dateA = `${a.shiftDate}T${a.startTime}`;
       const dateB = `${b.shiftDate}T${b.startTime}`;
@@ -60,6 +59,14 @@ export async function createSchedule(
   await logAuditSafe('CREATE_SCHEDULE', undefined, undefined,
     `Schedule ${doc._id}: ${data.userName} (${data.shiftType}) on ${data.shiftDate}`
   );
+  emitSyncEvent({
+    resourceType: 'staff_schedule',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
@@ -74,6 +81,14 @@ export async function updateSchedule(
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_SCHEDULE', undefined, undefined, `Schedule ${id} updated`);
+    emitSyncEvent({
+      resourceType: 'staff_schedule',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;
@@ -90,6 +105,13 @@ export async function deleteSchedule(id: string): Promise<boolean> {
     }
     await db.remove(existing._id, existing._rev);
     await logAuditSafe('DELETE_SCHEDULE', undefined, undefined, `Schedule ${id} deleted`);
+    emitSyncEvent({
+      resourceType: 'staff_schedule',
+      resourceId: id,
+      operation: 'delete',
+      orgId: existing.orgId,
+      hospitalId: existing.facilityId,
+    });
     return true;
   } catch {
     return false;

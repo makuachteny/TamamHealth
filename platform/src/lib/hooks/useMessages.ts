@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { makeCoalescer } from './live-reload';
 import type { MessageDoc } from '../db-types';
 import { messagesDB } from '../db';
 import { useDataScope } from './useDataScope';
@@ -32,11 +33,13 @@ export function useMessages() {
   // Live PouchDB subscription: re-load on any new/edited message.
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) loadMessages(); });
     const changes = messagesDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) loadMessages(); })
+      .on('change', () => reload.trigger())
       .on('error', () => { /* swallow */ });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [loadMessages]);

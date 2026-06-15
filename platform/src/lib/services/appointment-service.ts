@@ -1,17 +1,16 @@
 import { appointmentsDB } from '../db';
+import { findByType } from './db-query';
 import type { AppointmentDoc, AppointmentStatus } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 import { jubaDate } from '../time-juba';
 
 export async function getAllAppointments(scope?: DataScope): Promise<AppointmentDoc[]> {
   const db = appointmentsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as AppointmentDoc)
-    .filter(d => d && d.type === 'appointment')
+  const all = (await findByType<AppointmentDoc>(db, 'appointment'))
     .sort((a, b) => {
       const dateA = `${a.appointmentDate}T${a.appointmentTime}`;
       const dateB = `${b.appointmentDate}T${b.appointmentTime}`;
@@ -26,8 +25,7 @@ export async function getAppointmentsByDate(date: string, scope?: DataScope): Pr
 }
 
 export async function getAppointmentsByPatient(patientId: string): Promise<AppointmentDoc[]> {
-  const all = await getAllAppointments();
-  return all.filter(a => a.patientId === patientId);
+  return findByType<AppointmentDoc>(appointmentsDB(), 'appointment', { patientId }, { indexFields: ['type', 'patientId'] });
 }
 
 export async function getAppointmentsByProvider(providerId: string): Promise<AppointmentDoc[]> {
@@ -86,6 +84,14 @@ export async function createAppointment(
   await logAuditSafe('CREATE_APPOINTMENT', data.bookedBy, data.bookedByName,
     `Appointment ${doc._id}: ${data.patientName} with ${data.providerName} on ${data.appointmentDate} at ${data.appointmentTime}`
   );
+  emitSyncEvent({
+    resourceType: 'appointment',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
@@ -109,6 +115,14 @@ export async function updateAppointmentStatus(
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_APPOINTMENT', undefined, undefined, `Appointment ${id} status changed to ${status}`);
+    emitSyncEvent({
+      resourceType: 'appointment',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;
@@ -126,6 +140,14 @@ export async function updateAppointment(
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_APPOINTMENT', undefined, undefined, `Appointment ${id} updated`);
+    emitSyncEvent({
+      resourceType: 'appointment',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;
@@ -152,6 +174,14 @@ export async function rescheduleAppointment(
     await logAuditSafe('RESCHEDULE_APPOINTMENT', undefined, undefined,
       `Appointment ${id} rescheduled to ${newDate} at ${newTime}`
     );
+    emitSyncEvent({
+      resourceType: 'appointment',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;

@@ -523,7 +523,7 @@ export default function ReportsPage() {
                     style={{
                       borderBottom: '1px solid var(--overlay-light)',
                       background: isTotal
-                        ? 'rgba(43,111,224,0.06)'
+                        ? 'rgba(59, 130, 246,0.06)'
                         : isSection
                           ? 'var(--overlay-light)'
                           : 'transparent',
@@ -571,9 +571,9 @@ export default function ReportsPage() {
         {/* ── Summary stats cards ─────────────────────────────── */}
         <div className="kpi-grid mb-6">
           {[
-            { id: 'totalPatients', label: t('patients.kpiTotalPatients'), value: totalPatients, icon: Users, color: 'var(--tamamhealth-blue)', bg: 'rgba(43,111,224,0.12)' },
+            { id: 'totalPatients', label: t('patients.kpiTotalPatients'), value: totalPatients, icon: Users, color: 'var(--tamamhealth-blue)', bg: 'rgba(59, 130, 246,0.12)' },
             { id: 'totalReferrals', label: t('referrals.statTotal'), value: totalReferrals, icon: BedDouble, color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
-            { id: 'labResults', label: t('reports.statLabResults'), value: totalLabResults, icon: FileText, color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+            { id: 'labResults', label: t('reports.statLabResults'), value: totalLabResults, icon: FileText, color: '#1F9D6F', bg: 'rgba(31, 157, 111,0.12)' },
             { id: 'diseaseAlerts', label: t('reports.statDiseaseAlerts'), value: totalDiseaseAlerts, icon: Activity, color: '#E4A84B', bg: 'rgba(245,158,11,0.12)' },
           ].map(stat => (
             <div key={stat.id} className="kpi">

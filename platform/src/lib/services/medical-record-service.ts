@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { validateMedicalRecord, ValidationError } from '../validation';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
 
 // Track per-database "we already created the patientId index" state. Mango
 // `createIndex` is idempotent server-side but each call still issues a network
@@ -126,10 +127,7 @@ export async function deleteMedicalRecord(id: string): Promise<boolean> {
 
 export async function getRecentRecords(limit: number = 20, scope?: DataScope): Promise<MedicalRecordDoc[]> {
   const db = medicalRecordsDB();
-  const result = await db.allDocs({ include_docs: true });
-  let docs = result.rows
-    .map(r => r.doc as MedicalRecordDoc)
-    .filter(d => d && d.type === 'medical_record');
+  let docs = await findByType<MedicalRecordDoc>(db, 'medical_record');
   if (scope) docs = filterByScope(docs, scope);
   return docs
     .sort((a, b) => (b.visitDate || '').localeCompare(a.visitDate || ''))

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { PrescriptionDoc } from '../db-types';
 import { prescriptionsDB } from '../db';
+import { makeCoalescer } from './live-reload';
 import { useDataScope } from './useDataScope';
 
 export function usePrescriptions() {
@@ -33,11 +34,13 @@ export function usePrescriptions() {
   // dispensed anywhere in the app (consultation page, pharmacy queue, etc.).
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) loadPrescriptions(); });
     const changes = prescriptionsDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) loadPrescriptions(); })
+      .on('change', () => reload.trigger())
       .on('error', (err) => { console.warn('Prescriptions subscription error:', err); });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [loadPrescriptions]);
@@ -65,5 +68,16 @@ export function usePrescriptions() {
     return result;
   }, [loadPrescriptions]);
 
-  return { prescriptions, loading, error, create, dispense, administer, reload: loadPrescriptions };
+  const advance = useCallback(async (
+    id: string,
+    to: import('../clinical-flow/order-lifecycles').PrescriptionStatus,
+    extra?: Partial<import('../db-types').PrescriptionDoc>,
+  ) => {
+    const { advancePrescription } = await import('../services/prescription-service');
+    const result = await advancePrescription(id, to, extra);
+    await loadPrescriptions();
+    return result;
+  }, [loadPrescriptions]);
+
+  return { prescriptions, loading, error, create, dispense, administer, advance, reload: loadPrescriptions };
 }

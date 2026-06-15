@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { validatePatientData, ValidationError } from '../validation';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
 
 /**
  * Generate a geocode ID from boma code and household number.
@@ -19,10 +20,7 @@ export function generateGeocodeId(bomaCode: string, householdNumber: number): st
 
 export async function getAllPatients(scope?: DataScope): Promise<PatientDoc[]> {
   const db = patientsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as PatientDoc)
-    .filter(d => d && d.type === 'patient');
+  const all = await findByType<PatientDoc>(db, 'patient');
   /* istanbul ignore next -- scope filter: tested with and without */
   return scope ? filterByScope(all, scope) : all;
 }

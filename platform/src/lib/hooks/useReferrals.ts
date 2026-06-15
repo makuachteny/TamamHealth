@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { makeCoalescer } from './live-reload';
 import type { ReferralDoc } from '../db-types';
-import type { Attachment } from '@/data/mock';
+import type { Attachment, ReferralOutcome } from '@/data/mock';
 import { referralsDB } from '../db';
 import { useApp } from '../context';
 
@@ -38,11 +39,13 @@ export function useReferrals() {
   // or status-updated anywhere in the app. Replaces 30s polling.
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) loadReferrals(); });
     const changes = referralsDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) loadReferrals(); })
+      .on('change', () => reload.trigger())
       .on('error', () => { /* swallow */ });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [loadReferrals]);
@@ -83,7 +86,13 @@ export function useReferrals() {
     await loadReferrals();
   }, [loadReferrals]);
 
-  return { referrals, loading, error, create, createWithTransfer, updateStatus, updateNotes, accept, reload: loadReferrals };
+  const completeWithOutcome = useCallback(async (id: string, outcome: ReferralOutcome) => {
+    const { completeReferralWithOutcome } = await import('../services/referral-service');
+    await completeReferralWithOutcome(id, outcome);
+    await loadReferrals();
+  }, [loadReferrals]);
+
+  return { referrals, loading, error, create, createWithTransfer, updateStatus, updateNotes, completeWithOutcome, accept, reload: loadReferrals };
 }
 
 export function usePatientReferrals(patientId?: string) {

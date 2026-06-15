@@ -11,8 +11,8 @@ import { withAuditLog } from '@/lib/audit/with-audit';
 import type { UserRole } from '@/lib/db-types';
 const READ_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
-  'front_desk', 'boma_health_worker', 'medical_superintendent', 'hrio',
-  'payam_supervisor', 'data_entry_clerk', 'community_health_volunteer',
+  'front_desk', 'medical_superintendent', 'hrio',
+  'data_entry_clerk',
   'nutritionist', 'radiologist',
 ];
 const WRITE_ROLES: UserRole[] = [

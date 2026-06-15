@@ -1,15 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import type { LabResultDoc } from '@/lib/db-types';
+import { BASIC_LABS, SPECIAL_LABS, LAB_TESTS as labTests, labTier, specimenFor } from '@/lib/clinical-flow/lab-catalog';
+import { estimateDispenseQuantity } from '@/lib/clinical-flow/dispense-quantity';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import {
-  ArrowLeft, Save, ChevronDown, ChevronUp, Search,
+  ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Check, Search,
   Stethoscope, Thermometer, ClipboardList,
   FlaskConical, Pill, Calendar, Building2, FileText,
-  X, AlertTriangle, UserSearch, Brain, Plus, Check,
-  Activity, ShieldAlert, TestTubes, Sparkles, Paperclip,
+  X, AlertTriangle, UserSearch, Brain,
+  ShieldAlert, Paperclip, Clock,
   Mic,
 } from '@/components/icons/lucide';
 import { medications } from '@/data/mock';
@@ -24,9 +27,11 @@ import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useApp } from '@/lib/context';
+import { usePermissions } from '@/lib/hooks/usePermissions';
+import { patientAgeLabel } from '@/lib/patient-utils';
+import PatientName from '@/components/PatientName';
 import { useToast } from '@/components/Toast';
-import { evaluatePatient } from '@/lib/ai/diagnosis-engine';
-import type { AIEvaluation } from '@/lib/db-types';
+import { ROS_SYSTEMS, CHRONIC_CONDITIONS, SMOKING_OPTIONS, ALCOHOL_OPTIONS, SES_OPTIONS } from '@/lib/clinical-history';
 import { saveDraft, loadDraft, dropDraft } from '@/lib/draft-storage';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
@@ -48,18 +53,11 @@ interface PrescriptionEntry {
   frequency: string;
   duration: string;
   instructions: string;
+  /** Emergency/stat treatment before results vs. definitive after diagnosis. */
+  urgency: 'immediate' | 'definitive';
 }
 
-const labTests = [
-  'Malaria RDT',
-  'Full Blood Count',
-  'Blood Glucose',
-  'Urinalysis',
-  'HIV Rapid Test',
-  'CD4 Count',
-  'Liver Function',
-  'Renal Function',
-];
+// Basic panel = ordered broadly; special = doctor-selected targeted investigations.
 
 const routeOptions = ['Oral', 'IV', 'IM', 'SC', 'Topical', 'Rectal', 'Inhaled'];
 
@@ -79,21 +77,44 @@ export default function ConsultationPage() {
   const { patients } = usePatients();
   const { hospitals } = useHospitals();
   const { currentUser } = useApp();
+  const { canConsult } = usePermissions();
   const { triages } = useTriage();
 
   // Section collapse state (11 sections — includes AI section at index 3 and Attachments at index 8)
-  const [openSections, setOpenSections] = useState<boolean[]>([
-    true, false, false, false, false, false, false, false, false, false, false,
-  ]);
+  // In the stepped wizard every section is expanded; the active step controls
+  // which section cards are visible (others are hidden), so sections start open.
+  const [openSections, setOpenSections] = useState<boolean[]>(() => Array(11).fill(true));
+  // Current wizard step (0..4), mapping to the workflow stages below.
+  const [step, setStep] = useState(0);
 
   // AI Clinical Scribe
   const [scribeOpen, setScribeOpen] = useState(false);
 
-  // AI Evaluation state
-  const [aiEvaluation, setAiEvaluation] = useState<AIEvaluation | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [acceptedDiagnoses, setAcceptedDiagnoses] = useState<Set<string>>(new Set());
-  const [acceptedTests, setAcceptedTests] = useState<Set<string>>(new Set());
+  // Structured patient history (clinical history-taking workflow)
+  const [history, setHistory] = useState<{
+    hpi: string;
+    pmhConditions: string[];
+    pmhSurgeries: string;
+    pmhAdmissions: string;
+    pmhTransfusion: boolean;
+    familyHistory: string;
+    shSmoking: 'never' | 'former' | 'current';
+    shAlcohol: 'never' | 'occasional' | 'regular';
+    shSubstance: string;
+    shOccupation: string;
+    shInsurance: boolean;
+    shInsuranceProvider: string;
+    shSES: '' | 'low' | 'middle' | 'high';
+    dhChronicMeds: string;
+    dhAllergies: string;
+    dhNKDA: boolean;
+  }>({
+    hpi: '', pmhConditions: [], pmhSurgeries: '', pmhAdmissions: '', pmhTransfusion: false,
+    familyHistory: '', shSmoking: 'never', shAlcohol: 'never', shSubstance: '', shOccupation: '',
+    shInsurance: false, shInsuranceProvider: '', shSES: '', dhChronicMeds: '', dhAllergies: '', dhNKDA: false,
+  });
+  const [ros, setRos] = useState<Record<string, { status: 'negative' | 'positive'; findings: string }>>({});
+  const [customLab, setCustomLab] = useState('');
 
   // Patient selector
   const [patientSearch, setPatientSearch] = useState('');
@@ -126,6 +147,67 @@ export default function ConsultationPage() {
     }
   }, [searchParams, patients, selectedPatient]);
 
+  // Resume a paused consultation (?encounter=…): rehydrate every field from the
+  // saved encounter snapshot and pull the lab orders that were already placed,
+  // so the clinician picks up exactly where they left off with results in hand.
+  useEffect(() => {
+    const encId = searchParams?.get('encounter');
+    if (!encId || resumeLoadedRef.current) return;
+    resumeLoadedRef.current = true;
+    (async () => {
+      try {
+        const { getEncounter } = await import('@/lib/services/encounter-service');
+        const enc = await getEncounter(encId);
+        if (!enc) return;
+        const s = enc.snapshot as Partial<{
+          consultationStartedAt: string;
+          chiefComplaint: string; complaints: string[];
+          vitals: typeof vitals; physExam: typeof physExam;
+          history: typeof history; ros: typeof ros;
+          diagnoses: DiagnosisEntry[]; prescriptions: PrescriptionEntry[];
+          labOrders: Record<string, boolean>; treatmentPlan: string;
+          followUpDate: string; followUpReason: string;
+          addReferral: boolean; referralHospital: string;
+          referralUrgency: string; referralReason: string;
+        }>;
+        skipNextAutosave.current = true;
+        setEncounterId(enc._id);
+        setSelectedPatient(enc.patientId);
+        setDraftRestored(true); // a resumed encounter supersedes any local draft
+        if (s.consultationStartedAt) setConsultationStartedAt(s.consultationStartedAt);
+        if (s.chiefComplaint != null) setChiefComplaint(s.chiefComplaint);
+        if (Array.isArray(s.complaints)) setComplaints(s.complaints);
+        if (s.vitals) setVitals(s.vitals);
+        if (s.physExam) setPhysExam(s.physExam);
+        if (s.history) setHistory(s.history);
+        if (s.ros) setRos(s.ros);
+        if (Array.isArray(s.diagnoses)) setDiagnoses(s.diagnoses);
+        if (Array.isArray(s.prescriptions)) setPrescriptions(s.prescriptions);
+        if (s.labOrders) setLabOrders(s.labOrders);
+        if (s.treatmentPlan != null) setTreatmentPlan(s.treatmentPlan);
+        if (s.followUpDate != null) setFollowUpDate(s.followUpDate);
+        if (s.followUpReason != null) setFollowUpReason(s.followUpReason);
+        if (typeof s.addReferral === 'boolean') setAddReferral(s.addReferral);
+        if (s.referralHospital != null) setReferralHospital(s.referralHospital);
+        if (s.referralUrgency != null) setReferralUrgency(s.referralUrgency);
+        if (s.referralReason != null) setReferralReason(s.referralReason);
+        // Open the Investigations section so returned results are visible.
+        setOpenSections(prev => { const next = [...prev]; next[6] = true; return next; });
+        if (enc.labOrderIds?.length) {
+          const { labResultsDB } = await import('@/lib/db');
+          const res = await labResultsDB().allDocs<LabResultDoc>({ keys: enc.labOrderIds, include_docs: true });
+          const docs = res.rows
+            .map(r => (r as { doc?: LabResultDoc }).doc)
+            .filter((d): d is LabResultDoc => !!d);
+          setResumedLabResults(docs);
+        }
+      } catch (err) {
+        console.error('Failed to resume encounter', err);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // Look for an existing draft for this patient on mount/patient-change.
   // Surfaces a one-time prompt offering to restore. The draft-storage module
   // handles decryption + lazy TTL expiry; if the per-tab key was lost
@@ -152,7 +234,19 @@ export default function ConsultationPage() {
 
   // Chief Complaint
   const [chiefComplaint, setChiefComplaint] = useState('');
+  // Up to 3 distinct presenting complaints (the doctor's rule: "not more than three").
+  // `chiefComplaint` (string) stays the joined value used everywhere downstream.
+  const [complaints, setComplaints] = useState<string[]>([]);
+  const [complaintInput, setComplaintInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [sendingLabs, setSendingLabs] = useState(false);
+  const [sendingRx, setSendingRx] = useState(false);
+  // Prescriptions already pushed to the pharmacy queue mid-visit, tracked by a
+  // signature so the final "Complete" doesn't create a duplicate pharmacy order.
+  const [sentRxSignatures, setSentRxSignatures] = useState<string[]>([]);
+  // Lab tests already written to the DB during this visit (incl. a previous
+  // failed Complete attempt), so a retry never duplicates an order.
+  const [committedLabTests, setCommittedLabTests] = useState<string[]>([]);
 
   // Vital Signs
   const [vitals, setVitals] = useState({
@@ -208,7 +302,102 @@ export default function ConsultationPage() {
   const [referralReason, setReferralReason] = useState('');
 
   // Medical records hook
-  const { create: createRecord } = useMedicalRecords(selectedPatient || undefined);
+  const { create: createRecord, records: patientRecords } = useMedicalRecords(selectedPatient || undefined);
+  const prefilledForRef = useRef<string | null>(null);
+
+  // Pre-fill the Past Medical History (and known drug allergies) from the
+  // patient's own record + their most recent visit, instead of starting from a
+  // blank hardcoded list. Runs once per patient and only while the history is
+  // still untouched, so it never clobbers a clinician's edits, a restored
+  // draft, or a resumed encounter.
+  useEffect(() => {
+    if (!selectedPatient) return;
+    if (searchParams?.get('encounter')) return; // a resumed encounter owns its history
+    if (prefilledForRef.current === selectedPatient) return;
+    const patient = patients.find(p => p._id === selectedPatient);
+    if (!patient) return; // wait until the patient list has loaded
+    prefilledForRef.current = selectedPatient;
+
+    const isNone = (v: string) => /^none\b|^no known|^nkda$/i.test(v.trim());
+    const matchCatalog = (c: string): string => {
+      const low = c.toLowerCase();
+      const hit = CHRONIC_CONDITIONS.find(cat => {
+        const cl = cat.toLowerCase();
+        return low === cl || low.includes(cl) || cl.includes(low);
+      });
+      return hit || c; // keep the original label if it isn't in the catalog
+    };
+
+    const fromPatient = (patient.chronicConditions || []).filter(c => c && !isNone(c));
+    const latestRecord = patientRecords?.[0];
+    const fromRecord = latestRecord?.pastMedicalHistory?.chronicConditions || [];
+    const conditions = Array.from(new Set([...fromPatient, ...fromRecord].map(matchCatalog)));
+    const allergyList = (patient.allergies || []).filter(a => a && !isNone(a));
+    const hasNoKnownAllergies = (patient.allergies || []).some(isNone) && allergyList.length === 0;
+
+    if (conditions.length === 0 && allergyList.length === 0 && !hasNoKnownAllergies) return;
+
+    setHistory(h => {
+      // Only fill while still at defaults — never overwrite real input.
+      if (h.pmhConditions.length > 0 || h.hpi.trim() || h.dhAllergies.trim() || h.dhNKDA) return h;
+      return {
+        ...h,
+        pmhConditions: conditions,
+        dhAllergies: allergyList.join(', '),
+        dhNKDA: hasNoKnownAllergies,
+      };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPatient, patients, patientRecords]);
+
+  // Today's triage for the selected patient (priority + captured vitals), used
+  // to link the encounter, warn when triage was skipped, and prefill vitals.
+  const todaysTriage = useMemo(() => {
+    if (!selectedPatient) return null;
+    const today = new Date().toISOString().slice(0, 10);
+    return triages.find(tr => tr.patientId === selectedPatient && (tr.triagedAt || '').startsWith(today)) || null;
+  }, [selectedPatient, triages]);
+
+  // Prefill vitals from triage once per patient, only while still untouched, so
+  // the clinician doesn't re-key what the nurse already measured.
+  const vitalsPrefilledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedPatient || !todaysTriage) return;
+    if (searchParams?.get('encounter')) return; // a resumed encounter owns its vitals
+    if (vitalsPrefilledRef.current === selectedPatient) return;
+    vitalsPrefilledRef.current = selectedPatient;
+    setVitals(v => {
+      const anyEntered = Object.values(v).some(x => x !== '');
+      if (anyEntered) return v;
+      return {
+        ...v,
+        temperature: todaysTriage.temperature || v.temperature,
+        pulse: todaysTriage.pulse || v.pulse,
+        respRate: todaysTriage.respiratoryRate || v.respRate,
+        systolic: todaysTriage.systolic || v.systolic,
+        diastolic: todaysTriage.diastolic || v.diastolic,
+        o2Sat: todaysTriage.oxygenSaturation || v.o2Sat,
+        weight: todaysTriage.weight || v.weight,
+      };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPatient, todaysTriage]);
+
+  // Outstanding account balance for the selected patient — shown (non-blocking)
+  // so the clinician is aware of arrears before ordering / at checkout.
+  const [patientBalance, setPatientBalance] = useState<number | null>(null);
+  useEffect(() => {
+    if (!selectedPatient) { setPatientBalance(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getPatientBalance } = await import('@/lib/services/ledger-service');
+        const bal = await getPatientBalance(selectedPatient);
+        if (!cancelled) setPatientBalance(bal);
+      } catch { if (!cancelled) setPatientBalance(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedPatient]);
   // Referral creation hook — used when the doctor checks "Add referral" below.
   // The full transfer-package flow is reused so the receiving facility gets
   // the patient's history, attachments, and clinical context, not just a
@@ -217,7 +406,14 @@ export default function ConsultationPage() {
 
   // Timestamp captured when this consultation session was started (first mount).
   // Stable across renders so we can record the true start time on save.
-  const [consultationStartedAt] = useState(() => new Date().toISOString());
+  const [consultationStartedAt, setConsultationStartedAt] = useState(() => new Date().toISOString());
+
+  // Resume state: when this consultation was opened from a paused encounter
+  // (?encounter=…), we hold its id and the lab orders already placed so we
+  // neither re-order nor re-charge them on finalise, and can show the results.
+  const [encounterId, setEncounterId] = useState<string | null>(null);
+  const [resumedLabResults, setResumedLabResults] = useState<LabResultDoc[]>([]);
+  const resumeLoadedRef = useRef(false);
 
   // Debounced auto-save: every time form state changes, schedule a write
   // ~600ms later. Cancels any pending write so rapid typing only triggers a
@@ -266,8 +462,11 @@ export default function ConsultationPage() {
     referralHospital, referralUrgency, referralReason,
   ]);
 
-  // Only doctors and clinical officers can create consultations
-  if (currentUser && currentUser.role !== 'doctor' && currentUser.role !== 'clinical_officer') {
+  // Only roles with the consultation capability (doctor, clinical officer,
+  // clinician, medical superintendent) can create consultations. Gating on
+  // canConsult keeps this consistent with the capability model and the route
+  // allow-list — front desk and other non-clinical roles are blocked here.
+  if (currentUser && !canConsult) {
     return (
       <>
         <TopBar title={t('action.newConsultation')} />
@@ -354,6 +553,7 @@ export default function ConsultationPage() {
       frequency: '',
       duration: '',
       instructions: '',
+      urgency: 'definitive',
     }]);
     setRxMedSearch('');
     setShowRxDropdown(false);
@@ -365,6 +565,245 @@ export default function ConsultationPage() {
 
   const updatePrescription = (index: number, field: keyof PrescriptionEntry, value: string) => {
     setPrescriptions(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
+  };
+
+  const addComplaint = () => {
+    const v = complaintInput.trim();
+    if (!v || complaints.length >= 3) return;
+    const next = [...complaints, v];
+    setComplaints(next);
+    setChiefComplaint(next.join('; '));
+    setComplaintInput('');
+  };
+  const removeComplaint = (idx: number) => {
+    const next = complaints.filter((_, i) => i !== idx);
+    setComplaints(next);
+    setChiefComplaint(next.join('; '));
+  };
+
+  // Doctor-written specific investigation (per the "special lab" workflow).
+  const addCustomLab = () => {
+    const name = customLab.trim();
+    if (!name) return;
+    setLabOrders(prev => ({ ...prev, [name]: true }));
+    setCustomLab('');
+  };
+
+  // Send the selected investigations to the lab and pause the visit as
+  // "Awaiting labs". The consultation is persisted as an encounter (not a
+  // finalised medical record) so the clinician can resume it from their
+  // dashboard once the results come back — see lib/services/encounter-service.ts.
+  // The full working state of the visit, persisted on the encounter so it can
+  // be resumed verbatim and is the canonical record of what was entered.
+  const buildEncounterSnapshot = (): Record<string, unknown> => ({
+    consultationStartedAt, chiefComplaint, complaints, vitals, physExam,
+    history, ros, diagnoses, prescriptions, labOrders, treatmentPlan,
+    followUpDate, followUpReason, addReferral, referralHospital,
+    referralUrgency, referralReason,
+  });
+
+  // Ensure exactly one EncounterDoc exists for this visit. Created lazily on the
+  // first order/finalise action (status `with_clinician`) so EVERY visit — not
+  // only lab-paused ones — has a canonical encounter. Returns its id, and keeps
+  // the snapshot fresh on subsequent calls.
+  const ensureEncounter = async (): Promise<string | null> => {
+    if (!selectedPatient) return null;
+    const enc = await import('@/lib/services/encounter-service');
+    if (encounterId) {
+      try { await enc.updateEncounter(encounterId, { snapshot: buildEncounterSnapshot() }); } catch { /* non-fatal */ }
+      return encounterId;
+    }
+    const patientData = patients.find(p => p._id === selectedPatient);
+    const created = await enc.createEncounter({
+      patientId: selectedPatient,
+      patientName: patientData ? `${patientData.firstName} ${patientData.surname}` : '',
+      hospitalNumber: patientData?.hospitalNumber || '',
+      clinicianId: currentUser?._id || '',
+      clinicianName: currentUser?.name || '',
+      hospitalId: currentUser?.hospitalId || '',
+      hospitalName: currentUser?.hospital?.name || currentUser?.hospitalName || '',
+      status: 'with_clinician',
+      snapshot: buildEncounterSnapshot(),
+      labOrderIds: [],
+      triageId: todaysTriage?._id,
+      startedAt: consultationStartedAt,
+      orgId: currentUser?.orgId,
+    });
+    setEncounterId(created._id);
+    return created._id;
+  };
+
+  // Move the encounter to a target status, tolerating an illegal direct hop
+  // (e.g. awaiting_pharmacy → awaiting_labs) by returning to `with_clinician`
+  // first — the awaiting_* states all allow that — then advancing.
+  const moveEncounter = async (
+    encId: string,
+    to: import('@/lib/clinical-flow/encounter-journey').EncounterStatus,
+    opts?: { snapshot?: Record<string, unknown>; labOrderIds?: string[]; medicalRecordId?: string; actorId?: string },
+  ): Promise<void> => {
+    const { transitionEncounter } = await import('@/lib/services/encounter-service');
+    try {
+      await transitionEncounter(encId, to, opts);
+    } catch {
+      await transitionEncounter(encId, 'with_clinician');
+      await transitionEncounter(encId, to, opts);
+    }
+  };
+
+  const handleSendToLab = async () => {
+    if (!selectedPatient || sendingLabs) return;
+    const selectedLabTests = Object.entries(labOrders).filter(([, checked]) => checked).map(([name]) => name);
+    if (selectedLabTests.length === 0) {
+      showToast('Select at least one investigation to send to the lab.', 'error');
+      return;
+    }
+    setSendingLabs(true);
+    const hospital = currentUser?.hospital;
+    const patientData = patients.find(p => p._id === selectedPatient);
+    const patientName = patientData ? `${patientData.firstName} ${patientData.surname}` : '';
+    const hospitalNumber = patientData?.hospitalNumber || '';
+    const hospitalId = currentUser?.hospitalId || '';
+    const hospitalName = hospital?.name || currentUser?.hospitalName || '';
+    try {
+      const activeEncounterId = await ensureEncounter();
+      const { createLabResult } = await import('@/lib/services/lab-service');
+      // Skip tests already written on a prior (failed-then-retried) send so a
+      // retry never re-orders or re-charges them.
+      const newTests = selectedLabTests.filter(tn => !committedLabTests.includes(tn));
+      const labOrderIds: string[] = [];
+      for (const testName of newTests) {
+        const order = await createLabResult({
+          patientId: selectedPatient,
+          patientName,
+          hospitalNumber,
+          testName,
+          specimen: specimenFor(testName),
+          status: 'pending',
+          result: '',
+          unit: '',
+          referenceRange: '',
+          abnormal: false,
+          critical: false,
+          orderedBy: currentUser?.name || '',
+          orderedAt: new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+          completedAt: '',
+          tier: labTier(testName),
+          hospitalId,
+          hospitalName,
+          orgId: currentUser?.orgId,
+        });
+        labOrderIds.push(order._id);
+        setCommittedLabTests(prev => prev.includes(testName) ? prev : [...prev, testName]);
+      }
+
+      // Pause the visit on its encounter, recording the orders just placed.
+      if (activeEncounterId) {
+        await moveEncounter(activeEncounterId, 'awaiting_labs', {
+          snapshot: buildEncounterSnapshot(),
+          labOrderIds,
+          actorId: currentUser?._id,
+        });
+      }
+
+      // Bill the ordered investigations now (best-effort — pricing optional).
+      try {
+        const { chargeForServices } = await import('@/lib/services/fee-schedule-service');
+        await chargeForServices(
+          {
+            patientId: selectedPatient,
+            patientName,
+            hospitalNumber,
+            facilityId: hospitalId,
+            facilityName: hospitalName,
+            facilityLevel: 'clinic',
+            state: patientData?.state || '',
+            county: patientData?.county,
+            orgId: currentUser?.orgId,
+            encounterId: activeEncounterId || undefined,
+            generatedBy: currentUser?._id || 'system',
+            generatedByName: currentUser?.name || 'System',
+            scope: { orgId: currentUser?.orgId, hospitalId, role: currentUser?.role || 'doctor' },
+          },
+          newTests.map(testName => ({
+            category: 'laboratory' as const,
+            serviceCode: testName,
+            description: testName,
+            referenceType: 'lab_result',
+          })),
+        );
+      } catch {
+        /* pricing not configured — labs still ordered */
+      }
+
+      showToast(`Sent ${selectedLabTests.length} test(s) to the lab. Resume this visit from your dashboard when results are back.`, 'success');
+      router.push('/dashboard');
+    } catch (err) {
+      console.error('Send to lab failed', err);
+      showToast('Could not send the investigations to the lab. Please try again.', 'error');
+    } finally {
+      setSendingLabs(false);
+    }
+  };
+
+  // Stable signature for a prescription row, used to avoid sending/charging the
+  // same medication to the pharmacy twice.
+  const rxSignature = (rx: PrescriptionEntry) => `${rx.medication}||${rx.dose}||${rx.frequency}||${rx.duration}`;
+
+  // Send the current prescriptions to the pharmacy queue now (so the pharmacist
+  // can start preparing) without ending the visit. Already-sent rows are
+  // skipped here and on final completion so nothing is queued twice.
+  const handleSendToPharmacy = async () => {
+    if (!selectedPatient || sendingRx) return;
+    const pending = prescriptions.filter(rx => rx.medication && !sentRxSignatures.includes(rxSignature(rx)));
+    if (pending.length === 0) {
+      showToast('No new prescriptions to send to the pharmacy.', 'error');
+      return;
+    }
+    setSendingRx(true);
+    const hospital = currentUser?.hospital;
+    const patientData = patients.find(p => p._id === selectedPatient);
+    const patientName = patientData ? `${patientData.firstName} ${patientData.surname}` : '';
+    const hospitalId = currentUser?.hospitalId || '';
+    const hospitalName = hospital?.name || currentUser?.hospitalName || '';
+    try {
+      const activeEncounterId = await ensureEncounter();
+      const { createPrescription } = await import('@/lib/services/prescription-service');
+      for (const rx of pending) {
+        await createPrescription({
+          patientId: selectedPatient,
+          patientName,
+          medication: rx.medication,
+          dose: rx.dose,
+          route: rx.route,
+          frequency: rx.frequency,
+          duration: rx.duration,
+          prescribedBy: currentUser?.name || '',
+          status: 'pending',
+          orderStatus: 'received_in_pharmacy_queue',
+          quantityToDispense: estimateDispenseQuantity(rx),
+          encounterId: activeEncounterId || undefined,
+          urgency: rx.urgency,
+          hospitalId,
+          hospitalName,
+          orgId: currentUser?.orgId,
+        });
+      }
+      setSentRxSignatures(prev => [...prev, ...pending.map(rxSignature)]);
+      // Reflect on the encounter that pharmacy work is now in flight (the visit
+      // continues; finalising later moves it on to clinic checkout).
+      if (activeEncounterId) {
+        await moveEncounter(activeEncounterId, 'awaiting_pharmacy', {
+          snapshot: buildEncounterSnapshot(),
+          actorId: currentUser?._id,
+        });
+      }
+      showToast(`Sent ${pending.length} prescription(s) to the pharmacy queue.`, 'success');
+    } catch (err) {
+      console.error('Send to pharmacy failed', err);
+      showToast('Could not send the prescriptions to the pharmacy. Please try again.', 'error');
+    } finally {
+      setSendingRx(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -390,7 +829,23 @@ export default function ConsultationPage() {
       }
     }
 
+    // Facility checkout gate: a resumed visit can't be closed while any of its
+    // ordered investigations are still open at the lab. The clinician should
+    // wait for the result (the visit stays on their "Awaiting results"
+    // worklist) or cancel the order before finalising.
+    if (encounterId) {
+      const stillOpen = resumedLabResults.filter(r => r.status !== 'completed');
+      if (stillOpen.length > 0) {
+        showToast(`${stillOpen.length} investigation${stillOpen.length === 1 ? ' is' : 's are'} still pending at the lab — you can't close this visit until ${stillOpen.length === 1 ? 'it is' : 'they are'} back.`, 'error');
+        return;
+      }
+    }
+
     setIsSaving(true);
+    // Non-critical post-steps (charges, referral, triage, encounter close) each
+    // run independently; failures are collected here and surfaced together so
+    // the clinician knows exactly what to follow up — the visit still saves.
+    const postWarnings: string[] = [];
     const hospital = currentUser?.hospital;
     const now = new Date().toISOString();
     const weight = parseFloat(vitals.weight) || 0;
@@ -401,23 +856,43 @@ export default function ConsultationPage() {
     const hospitalId = currentUser?.hospitalId || '';
     const hospitalName = hospital?.name || currentUser?.hospitalName || '';
 
+    // Names the critical stage in progress so a failure tells the clinician
+    // exactly what to retry. The save is a journaled, idempotent staged commit:
+    // the encounter is the journal, each create is dedup-guarded, so re-pressing
+    // Complete resumes without duplicating anything (the offline-first stand-in
+    // for a transaction — PouchDB has no cross-document rollback).
+    let failedStage = 'saving the visit';
     try {
-      // 1. Create lab orders in tamamhealth_lab_results DB
+      // 0. Ensure this visit has a canonical encounter (created lazily if the
+      //    clinician never sent to lab/pharmacy). Everything below links to it.
+      const activeEncounterId = await ensureEncounter();
+      const { getEncounter, updateEncounter } = await import('@/lib/services/encounter-service');
+      // If a prior attempt already wrote the medical record, reuse it instead of
+      // creating a duplicate on retry.
+      const existingRecordId = activeEncounterId
+        ? (await getEncounter(activeEncounterId))?.medicalRecordId
+        : undefined;
+
+      // 1. Create lab orders in tamamhealth_lab_results DB, capturing their ids
+      //    so the medical record can reference the actual orders.
       const selectedLabTests = Object.entries(labOrders).filter(([, checked]) => checked).map(([name]) => name);
-      const labTestSpecimens: Record<string, string> = {
-        'Malaria RDT': 'Blood', 'Full Blood Count': 'Blood', 'Blood Glucose': 'Blood',
-        'Urinalysis': 'Urine', 'HIV Rapid Test': 'Blood', 'CD4 Count': 'Blood',
-        'Liver Function': 'Blood', 'Renal Function': 'Blood',
-      };
-      if (selectedLabTests.length > 0) {
+      // Tests already ordered when this visit was paused — don't re-order or
+      // re-bill them on finalise (they were sent + charged at send-to-lab time).
+      const resumedLabTests = resumedLabResults.map(r => r.testName);
+      // Exclude tests already ordered on resume AND any created during a prior
+      // failed save attempt, so a retry can't duplicate orders.
+      const newLabTests = selectedLabTests.filter(tn => !resumedLabTests.includes(tn) && !committedLabTests.includes(tn));
+      const labOrderIds: string[] = resumedLabResults.map(r => r._id);
+      failedStage = 'recording the lab orders';
+      if (newLabTests.length > 0) {
         const { createLabResult } = await import('@/lib/services/lab-service');
-        for (const testName of selectedLabTests) {
-          await createLabResult({
+        for (const testName of newLabTests) {
+          const order = await createLabResult({
             patientId: selectedPatient,
             patientName,
             hospitalNumber,
             testName,
-            specimen: labTestSpecimens[testName] || 'Blood',
+            specimen: specimenFor(testName),
             status: 'pending',
             result: '',
             unit: '',
@@ -427,18 +902,27 @@ export default function ConsultationPage() {
             orderedBy: currentUser?.name || '',
             orderedAt: new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
             completedAt: '',
+            tier: labTier(testName),
             hospitalId,
             hospitalName,
             orgId: currentUser?.orgId,
           });
+          labOrderIds.push(order._id);
+          // Record immediately so a later failure + retry won't re-create it.
+          setCommittedLabTests(prev => prev.includes(testName) ? prev : [...prev, testName]);
         }
       }
 
-      // 2. Create prescriptions in tamamhealth_prescriptions DB
-      if (prescriptions.length > 0) {
+      // 2. Create prescriptions in tamamhealth_prescriptions DB — skipping any
+      //    already pushed to the pharmacy mid-visit so they aren't queued twice.
+      //    Capture ids + link each to this encounter for traceability.
+      const rxToCreate = prescriptions.filter(rx => !sentRxSignatures.includes(rxSignature(rx)));
+      const prescriptionIds: string[] = [];
+      failedStage = 'recording the prescriptions';
+      if (rxToCreate.length > 0) {
         const { createPrescription } = await import('@/lib/services/prescription-service');
-        for (const rx of prescriptions) {
-          await createPrescription({
+        for (const rx of rxToCreate) {
+          const res = await createPrescription({
             patientId: selectedPatient,
             patientName,
             medication: rx.medication,
@@ -448,26 +932,40 @@ export default function ConsultationPage() {
             duration: rx.duration,
             prescribedBy: currentUser?.name || '',
             status: 'pending',
+            orderStatus: 'received_in_pharmacy_queue',
+            quantityToDispense: estimateDispenseQuantity(rx),
+            encounterId: activeEncounterId || undefined,
+            urgency: rx.urgency,
             hospitalId,
             hospitalName,
             orgId: currentUser?.orgId,
           });
+          prescriptionIds.push(res.prescription._id);
+          // Mark as committed so a retry after a later failure won't re-queue it.
+          setSentRxSignatures(prev => prev.includes(rxSignature(rx)) ? prev : [...prev, rxSignature(rx)]);
         }
       }
 
-      // 3. Build lab results summary for the medical record
-      const labResultsSummary = selectedLabTests.map(testName => ({
-        testName,
-        result: '',
-        unit: '',
-        referenceRange: '',
-        abnormal: false,
-        critical: false,
-        date: now.split('T')[0],
-      }));
+      // 3. Build lab results summary for the medical record. For a resumed
+      //    visit the ordered tests have come back, so carry their real values
+      //    into the record; freshly ordered tests stay as pending placeholders.
+      const labResultsSummary = selectedLabTests.map(testName => {
+        const done = resumedLabResults.find(r => r.testName === testName);
+        return {
+          testName,
+          result: done?.result || '',
+          unit: done?.unit || '',
+          referenceRange: done?.referenceRange || '',
+          abnormal: done?.abnormal || false,
+          critical: done?.critical || false,
+          date: now.split('T')[0],
+        };
+      });
 
-      // 4. Save the medical record with all data linked
-      await createRecord({
+      // 4. Save the medical record with all data linked. Idempotent: if a prior
+      //    attempt already wrote it, reuse that id instead of duplicating.
+      failedStage = 'saving the medical record';
+      const savedRecord = existingRecordId ? { _id: existingRecordId } : await createRecord({
         patientId: selectedPatient,
         hospitalId,
         hospitalName,
@@ -479,7 +977,30 @@ export default function ConsultationPage() {
         providerRole: currentUser?.role || 'doctor',
         department: 'Outpatient',
         chiefComplaint,
-        historyOfPresentIllness: chiefComplaint,
+        chiefComplaints: complaints.length > 0 ? complaints : (chiefComplaint ? [chiefComplaint] : []),
+        historyOfPresentIllness: history.hpi || chiefComplaint,
+        reviewOfSystems: Object.fromEntries(Object.entries(ros).map(([k, v]) => [k, { status: v.status, findings: v.findings || undefined }])),
+        pastMedicalHistory: {
+          chronicConditions: history.pmhConditions,
+          pastAdmissions: history.pmhAdmissions || undefined,
+          pastSurgeries: history.pmhSurgeries || undefined,
+          bloodTransfusion: history.pmhTransfusion,
+        },
+        familyHistory: history.familyHistory || undefined,
+        socialHistory: {
+          smoking: history.shSmoking,
+          alcohol: history.shAlcohol,
+          substanceUse: history.shSubstance || undefined,
+          occupation: history.shOccupation || undefined,
+          hasHealthInsurance: history.shInsurance,
+          insuranceProvider: history.shInsuranceProvider || undefined,
+          socioeconomicStatus: history.shSES || undefined,
+        },
+        drugHistory: {
+          chronicMedications: history.dhChronicMeds || undefined,
+          allergies: history.dhAllergies ? history.dhAllergies.split(',').map(s => s.trim()).filter(Boolean) : [],
+          noKnownAllergies: history.dhNKDA,
+        },
         vitalSigns: {
           temperature: parseFloat(vitals.temperature) || 0,
           systolic: parseInt(vitals.systolic) || 0,
@@ -502,14 +1023,27 @@ export default function ConsultationPage() {
           frequency: rx.frequency,
           duration: rx.duration,
           instructions: rx.instructions,
+          urgency: rx.urgency,
         })),
         labResults: labResultsSummary,
         treatmentPlan,
         attachments: consultAttachments.length > 0 ? consultAttachments : undefined,
         followUp: followUpDate ? { date: followUpDate, reason: followUpReason } : undefined,
         syncStatus: 'pending',
-        aiEvaluation: aiEvaluation || undefined,
+        // Referential links to the actual documents created this visit.
+        encounterId: activeEncounterId || undefined,
+        triageId: todaysTriage?._id,
+        labOrderIds: labOrderIds.length > 0 ? labOrderIds : undefined,
+        prescriptionIds: prescriptionIds.length > 0 ? prescriptionIds : undefined,
       });
+
+      // Journal the record id onto the encounter immediately, so if anything
+      // after this point fails a retry reuses this record instead of writing a
+      // second one.
+      if (activeEncounterId && savedRecord?._id && !existingRecordId) {
+        try { await updateEncounter(activeEncounterId, { medicalRecordId: savedRecord._id }); } catch { /* non-fatal */ }
+      }
+      failedStage = 'finalising the visit';
 
       // 5. Update the patient's last-consultation timestamp so the dashboard
       //    and patient profile header reflect the most recent visit immediately.
@@ -523,6 +1057,38 @@ export default function ConsultationPage() {
         });
       } catch (e) {
         console.warn('Could not update patient lastConsultedAt', e);
+      }
+
+      // 6. Generate charges from the service price catalog: the consultation
+      //    fee plus a line for each ordered lab test and prescribed drug. Lines
+      //    with no catalogued price are skipped, and no bill is created when the
+      //    org hasn't priced anything — so this is safe before pricing is set up.
+      try {
+        const { chargeForServices } = await import('@/lib/services/fee-schedule-service');
+        const lines = [
+          { category: 'consultation' as const, serviceCode: 'CONS-GEN', description: 'Consultation' },
+          // Only bill labs not already charged when they were sent to the lab.
+          ...newLabTests.map(testName => ({ category: 'laboratory' as const, serviceCode: testName, description: testName, referenceType: 'lab_result' })),
+          ...prescriptions.map(rx => ({ category: 'pharmacy' as const, serviceCode: rx.medication, description: rx.medication, referenceType: 'prescription' })),
+        ];
+        await chargeForServices({
+          patientId: selectedPatient,
+          patientName,
+          hospitalNumber,
+          facilityId: hospitalId,
+          facilityName: hospitalName,
+          facilityLevel: 'clinic',
+          state: patientData?.state || '',
+          county: patientData?.county,
+          orgId: currentUser?.orgId,
+          encounterId: activeEncounterId || undefined,
+          generatedBy: currentUser?._id || 'system',
+          generatedByName: currentUser?.name || 'System',
+          scope: { orgId: currentUser?.orgId, hospitalId, role: currentUser?.role || 'doctor' },
+        }, lines);
+      } catch (e) {
+        console.warn('Could not generate charges from price catalog', e);
+        postWarnings.push('charges were not generated');
       }
 
       // 6.5. If the doctor enabled "Add referral", create the outbound
@@ -558,6 +1124,7 @@ export default function ConsultationPage() {
           // from the referrals page.
           console.warn('Failed to create referral from consultation', e);
           showToast(t('consultation.referralCreateFailed'), 'error');
+          postWarnings.push('referral was not sent');
         }
       }
 
@@ -580,6 +1147,30 @@ export default function ConsultationPage() {
         }
       } catch (e) {
         console.warn('Could not update triage handoff', e);
+        postWarnings.push('triage hand-off was not recorded');
+      }
+
+      // Close the encounter out: move it to clinic checkout and link the
+      //    medical record that finalises the visit, so it leaves any worklist.
+      //    Runs for every visit now (the encounter is always created above).
+      if (activeEncounterId) {
+        try {
+          await moveEncounter(activeEncounterId, 'ready_for_clinic_checkout', {
+            medicalRecordId: savedRecord?._id,
+            actorId: currentUser?._id,
+          });
+          // Close the result-review loop: finalising the visit means the
+          // clinician has reviewed each returned result (Stage 6 enforces this).
+          const { advanceLabOrder } = await import('@/lib/services/lab-service');
+          for (const r of resumedLabResults) {
+            if (r.status === 'completed' && (r.orderStatus ?? 'resulted') === 'resulted') {
+              try { await advanceLabOrder(r._id, 'reviewed_by_clinician'); } catch { /* non-fatal */ }
+            }
+          }
+        } catch (e) {
+          console.warn('Could not finalise the resumed encounter', e);
+          postWarnings.push('the visit could not be closed to checkout');
+        }
       }
 
       // Successful save → clear the encrypted draft so we don't re-prompt on next visit
@@ -590,11 +1181,18 @@ export default function ConsultationPage() {
         // ignore
       }
 
-      showToast(t('consultation.savedSuccess'), 'success');
+      if (postWarnings.length > 0) {
+        showToast(`Consultation saved, but ${postWarnings.join(', ')}. Please follow up.`, 'error');
+      } else {
+        showToast(t('consultation.savedSuccess'), 'success');
+      }
       router.push(`/patients/${selectedPatient}`);
     } catch (err) {
       console.error('Failed to save consultation:', err);
-      showToast(t('consultation.saveFailed'), 'error');
+      // The form keeps all its data and the orders already written are tracked,
+      // so the clinician can safely press Complete again to finish the save
+      // without duplicating any orders.
+      showToast(`Save stopped while ${failedStage}. Your entries are kept and nothing was duplicated — press Complete to retry.`, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -627,7 +1225,7 @@ export default function ConsultationPage() {
       // Skip the next autosave so the restore itself doesn't trigger an
       // immediate write of the same data (no-op but cleaner).
       skipNextAutosave.current = true;
-      if (parsed.chiefComplaint != null) setChiefComplaint(parsed.chiefComplaint);
+      if (parsed.chiefComplaint != null) { setChiefComplaint(parsed.chiefComplaint); setComplaints(parsed.chiefComplaint.split(';').map(s => s.trim()).filter(Boolean)); }
       if (parsed.vitals) setVitals(parsed.vitals);
       if (parsed.physExam) setPhysExam(parsed.physExam);
       if (Array.isArray(parsed.diagnoses)) setDiagnoses(parsed.diagnoses);
@@ -660,57 +1258,6 @@ export default function ConsultationPage() {
     setRestorePromptFor(null);
   };
 
-  const runAIEvaluation = () => {
-    if (!selectedPatientData) return;
-    setAiLoading(true);
-    // Simulate slight delay for UX feedback
-    setTimeout(() => {
-      const age = selectedPatientData.estimatedAge || (selectedPatientData.dateOfBirth ? (new Date().getFullYear() - new Date(selectedPatientData.dateOfBirth).getFullYear()) : 0);
-      const result = evaluatePatient({
-        chiefComplaint,
-        vitals: {
-          temperature: parseFloat(vitals.temperature) || 0,
-          systolic: parseInt(vitals.systolic) || 0,
-          diastolic: parseInt(vitals.diastolic) || 0,
-          pulse: parseInt(vitals.pulse) || 0,
-          respiratoryRate: parseInt(vitals.respRate) || 0,
-          oxygenSaturation: parseInt(vitals.o2Sat) || 0,
-          weight: parseFloat(vitals.weight) || 0,
-          height: parseFloat(vitals.height) || 0,
-          muac: parseFloat(vitals.muac) || undefined,
-        },
-        age,
-        gender: selectedPatientData.gender as 'Male' | 'Female',
-        physicalExam: physExam,
-        chronicConditions: selectedPatientData.chronicConditions || [],
-        allergies: selectedPatientData.allergies || [],
-      });
-      setAiEvaluation(result);
-      setAiLoading(false);
-      setAcceptedDiagnoses(new Set());
-      setAcceptedTests(new Set());
-      // Auto-open the AI section
-      setOpenSections(prev => prev.map((v, i) => i === 3 ? true : v));
-
-      // Audit trail: record that the rule-based AI evaluated this patient,
-      // who triggered it, and what the engine suggested. No clinical data
-      // leaves the device (the engine runs in-browser), but clinicians and
-      // auditors need a provable log of every AI-assisted decision.
-      import('@/lib/services/audit-service').then(({ logAudit }) => {
-        const topDx = (result.suggestedDiagnoses || [])
-          .slice(0, 3)
-          .map(d => `${d.icd10Code || ''} ${d.name}`.trim())
-          .join(', ');
-        logAudit(
-          'AI_EVALUATION',
-          currentUser?._id,
-          currentUser?.username,
-          `Patient ${selectedPatientData._id} (${selectedPatientData.hospitalNumber}): rule-based diagnosis engine run. Severity=${result.severityAssessment || 'unknown'}. Top dx: ${topDx || 'none'}`
-        ).catch(() => {});
-      }).catch(() => {});
-    }, 300);
-  };
-
   // Apply AI Clinical Scribe extraction to all form fields
   const applyScribeExtraction = (extraction: ScribeExtraction) => {
     // Audit trail: record that clinical scribe extracted structured data
@@ -736,6 +1283,7 @@ export default function ConsultationPage() {
     // Chief Complaint
     if (extraction.chiefComplaint) {
       setChiefComplaint(extraction.chiefComplaint);
+      setComplaints(extraction.chiefComplaint.split(';').map(s => s.trim()).filter(Boolean).slice(0, 3));
     }
 
     // Vitals
@@ -799,6 +1347,7 @@ export default function ConsultationPage() {
             frequency: med.frequency,
             duration: med.duration,
             instructions: '',
+            urgency: 'definitive',
           }]);
         }
       }
@@ -853,22 +1402,11 @@ export default function ConsultationPage() {
     showToast(t('consultation.scribeApplied'), 'success');
   };
 
-  const acceptAIDiagnosis = (icd10Code: string, name: string, severity?: 'mild' | 'moderate' | 'severe') => {
-    if (diagnoses.find(d => d.code === icd10Code)) return;
-    addDiagnosis(icd10Code, name, severity);
-    setAcceptedDiagnoses(prev => new Set(prev).add(icd10Code));
-  };
-
-  const acceptAITest = (testName: string) => {
-    setLabOrders(prev => ({ ...prev, [testName]: true }));
-    setAcceptedTests(prev => new Set(prev).add(testName));
-  };
-
   const sectionHeaders: { icon: React.ElementType; label: string }[] = [
     { icon: ClipboardList, label: t('consultation.sectionChiefComplaint') },      // 0
     { icon: Thermometer, label: t('consultation.sectionVitalSigns') },             // 1
     { icon: Stethoscope, label: t('consultation.sectionPhysicalExam') },    // 2
-    { icon: Brain, label: t('consultation.sectionAiEvaluation') },        // 3
+    { icon: Brain, label: 'History & review' },        // 3
     { icon: AlertTriangle, label: t('consultation.sectionDiagnosis') },             // 4
     { icon: Pill, label: t('consultation.sectionPrescriptions') },                  // 5
     { icon: FlaskConical, label: t('consultation.sectionLabOrders') },             // 6
@@ -887,7 +1425,7 @@ export default function ConsultationPage() {
         style={{ borderBottom: openSections[index] ? '1px solid var(--border-light)' : 'none' }}
       >
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(43,111,224,0.10)' }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(59, 130, 246,0.10)' }}>
             <Icon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
           </div>
           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</span>
@@ -901,10 +1439,59 @@ export default function ConsultationPage() {
     );
   };
 
+  // The 11 form sections grouped into the labelled stages of the clinical
+  // workflow, so the clinician can see where they are in the visit and where
+  // the hand-off to the lab happens (Investigations → Awaiting results).
+  const workflowStages: { label: string; sections: number[] }[] = [
+    { label: 'Intake & History', sections: [0, 1, 2, 3] },
+    { label: 'Assessment', sections: [4] },
+    { label: 'Investigations', sections: [6] },
+    { label: 'Treatment', sections: [5, 7] },
+    { label: 'Plan & checkout', sections: [8, 9, 10] },
+  ];
+  // Which section cards belong to the current wizard step (others are hidden).
+  const stepHas = (sectionIndex: number) => workflowStages[step]?.sections.includes(sectionIndex) ?? false;
+  const isLastStep = step === workflowStages.length - 1;
+
+  // Advance to the next step, enforcing the one hard requirement (a chief
+  // complaint) before leaving the first step — mirrors the registration wizard.
+  const goNext = () => {
+    if (step === 0 && (!chiefComplaint || chiefComplaint.trim().length < 3)) {
+      showToast(t('consultation.chiefComplaintRequired'), 'error');
+      return;
+    }
+    setStep(s => Math.min(s + 1, workflowStages.length - 1));
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const goBack = () => {
+    setStep(s => Math.max(s - 1, 0));
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Whether a section has any clinician-entered data. Single source of truth for
+  // both the stage rail and the progress checklist — progress is driven by what
+  // has been filled in, not by which section happens to be open.
+  const sectionFilled = (i: number): boolean => (
+    i === 0 ? chiefComplaint.length > 0
+    : i === 1 ? Object.values(vitals).some(v => v !== '')
+    : i === 2 ? Object.values(physExam).some(v => v !== '')
+    : i === 3 ? history.hpi.trim().length > 0 || history.pmhConditions.length > 0
+    : i === 4 ? diagnoses.length > 0
+    : i === 5 ? prescriptions.length > 0
+    : i === 6 ? Object.values(labOrders).some(v => v)
+    : i === 7 ? treatmentPlan.length > 0
+    : i === 8 ? consultAttachments.length > 0
+    : i === 9 ? followUpDate !== ''
+    : addReferral && referralHospital !== '' && referralReason.trim() !== ''
+  );
+  // A stage counts as done when at least one of its sections has data; the first
+  // not-yet-started stage is the "current" one. (Plan & checkout is optional.)
+  const stageDone = (sections: number[]) => sections.some(s => sectionFilled(s));
+
   return (
     <>
       <TopBar title={t('action.newConsultation')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
           <button onClick={() => router.push('/patients')} className="flex items-center gap-1.5 text-sm mb-4" style={{ color: 'var(--accent-primary)' }}>
             <ArrowLeft className="w-4 h-4" /> {t('consultation.backToPatients')}
           </button>
@@ -915,7 +1502,7 @@ export default function ConsultationPage() {
               className="card-elevated mb-4 px-4 py-3 flex items-center gap-3 flex-wrap"
               style={{
                 background: 'var(--accent-light)',
-                border: '1px solid var(--accent-border, rgba(43,111,224,0.25))',
+                border: '1px solid var(--accent-border, rgba(59, 130, 246,0.25))',
               }}
             >
               <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#fff' }}>
@@ -953,9 +1540,9 @@ export default function ConsultationPage() {
                 onClick={() => setScribeOpen(!scribeOpen)}
                 className="btn btn-sm flex items-center gap-2"
                 style={{
-                  background: scribeOpen ? 'rgba(229,46,66,0.12)' : 'rgba(43,111,224,0.10)',
+                  background: scribeOpen ? 'rgba(229,46,66,0.12)' : 'rgba(59, 130, 246,0.10)',
                   color: scribeOpen ? 'var(--color-danger)' : 'var(--accent-primary)',
-                  border: `1px solid ${scribeOpen ? 'rgba(229,46,66,0.2)' : 'rgba(43,111,224,0.2)'}`,
+                  border: `1px solid ${scribeOpen ? 'rgba(229,46,66,0.2)' : 'rgba(59, 130, 246,0.2)'}`,
                 }}
               >
                 <Mic className="w-4 h-4" />
@@ -985,20 +1572,16 @@ export default function ConsultationPage() {
                 </div>
                 <div className="space-y-1.5">
                   {pendingTriages.slice(0, 6).map(triage => {
-                    const pColor = triage.priority === 'RED' ? '#EF4444' : triage.priority === 'YELLOW' ? 'var(--color-warning)' : 'var(--color-success)';
                     return (
                       <button
                         key={triage._id}
                         onClick={() => { setSelectedPatient(triage.patientId); setPatientSearch(''); }}
                         className="w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-all hover:bg-[var(--accent-light)]"
-                        style={{ background: triage.priority === 'RED' ? 'rgba(239,68,68,0.04)' : 'var(--overlay-subtle)', border: `1px solid ${triage.priority === 'RED' ? 'rgba(239,68,68,0.15)' : 'var(--border-light)'}` }}
+                        style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
                       >
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: pColor, color: '#fff' }}>
-                          <span className="text-[10px] font-black">{triage.priority}</span>
-                        </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{triage.patientName}</p>
-                          <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                          <PatientName name={triage.patientName} size={36} />
+                          <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
                             {triage.chiefComplaint || t('consultation.etatAssessment')} · {triage.hospitalNumber} · {t('consultation.triagedAt', { time: new Date(triage.triagedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })}
                           </p>
                         </div>
@@ -1013,10 +1596,13 @@ export default function ConsultationPage() {
             );
           })()}
 
-          {/* Patient Selector */}
-          <div className="card-elevated p-5 mb-4">
+          {/* Patient Selector — elevated above the following cards so the patient
+              search dropdown (which overflows the card) is never hidden behind
+              them. Each .card-elevated makes its own stacking context via
+              backdrop-filter, so without this the later cards paint on top. */}
+          <div className="card-elevated p-5 mb-4 relative z-50">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(43,111,224,0.10)' }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(59, 130, 246,0.10)' }}>
                 <UserSearch className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('consultation.selectPatient')}</span>
@@ -1030,7 +1616,13 @@ export default function ConsultationPage() {
                     {(selectedPatientData.firstName || '?')[0]}{(selectedPatientData.surname || '?')[0]}
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{formatPatientName(selectedPatientData)}</p>
+                    <button
+                      onClick={() => router.push(`/patients/${selectedPatientData._id}`)}
+                      className="text-sm font-medium text-left hover:underline"
+                      title={t('payments.openPatientRecord')}
+                    >
+                      {formatPatientName(selectedPatientData)}
+                    </button>
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                       {selectedPatientData.hospitalNumber} &middot; {selectedPatientData.gender} &middot; {selectedPatientData.state}
                     </p>
@@ -1055,7 +1647,6 @@ export default function ConsultationPage() {
                 {showPatientDropdown && filteredPatients.length > 0 && (
                   <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
                     {filteredPatients.map(p => {
-                      const age = p.estimatedAge || (p.dateOfBirth ? (new Date().getFullYear() - new Date(p.dateOfBirth).getFullYear()) : 0);
                       return (
                         <button
                           key={p._id}
@@ -1069,7 +1660,7 @@ export default function ConsultationPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{formatPatientName(p)}</p>
-                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber} &middot; {age}y &middot; {p.gender} &middot; {p.tribe}</p>
+                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber} &middot; {patientAgeLabel(p)} &middot; {p.gender} &middot; {p.tribe}</p>
                           </div>
                         </button>
                       );
@@ -1080,7 +1671,7 @@ export default function ConsultationPage() {
             )}
           </div>
 
-          <div className="flex gap-6">
+          <div className="flex gap-6 flex-1 min-h-0">
           {/* AI Clinical Scribe Panel */}
           {scribeOpen && (
             <div className="w-[380px] flex-shrink-0 sticky top-6 self-start rounded-2xl overflow-hidden" style={{
@@ -1096,25 +1687,98 @@ export default function ConsultationPage() {
           )}
 
           {/* Left: Form sections */}
-          <div className="flex-1 min-w-0 space-y-3">
+          <div className="flex-1 min-w-0 flex flex-col min-h-0">
+            {/* Step indicator — the consultation is a wizard: each workflow
+                stage is a step with Back/Next below. A tick means the step has
+                data; click any step to jump to it. Fixed at the top of the form
+                column while the step's content scrolls beneath it. */}
+            <div className="card-elevated p-4 flex-shrink-0 mb-3">
+              <div className="flex items-center">
+                {workflowStages.map((stage, i) => {
+                  const done = stageDone(stage.sections);
+                  const isCurrent = i === step;
+                  return (
+                    <div key={stage.label} className={`flex items-center ${i < workflowStages.length - 1 ? 'flex-1' : ''}`}>
+                      <button
+                        type="button"
+                        onClick={() => setStep(i)}
+                        className="flex flex-col items-center flex-shrink-0"
+                        title={stage.label}
+                      >
+                        <span className={`step-dot ${isCurrent ? 'step-dot-active' : done ? 'step-dot-completed' : ''}`}>
+                          {done && !isCurrent
+                            ? <Check className="w-4 h-4" />
+                            : i + 1}
+                        </span>
+                        <span className="text-[10px] mt-1.5 font-medium whitespace-nowrap" style={{ color: isCurrent ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+                          {stage.label}
+                        </span>
+                      </button>
+                      {i < workflowStages.length - 1 && (
+                        <div className={`step-line mx-2 flex-1 ${i < step ? 'step-line-completed' : i === step ? 'step-line-active' : ''}`} style={{ width: 'auto' }} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Scrolling step content — only this region scrolls; the header,
+                patient selector and step indicator above stay fixed. */}
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
             {/* Section 0: Chief Complaint */}
-            <div className="card-elevated overflow-hidden">
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(0) ? undefined : 'none' }}>
               <SectionHeader index={0} />
               {openSections[0] && (
                 <div className="p-5">
+                  {selectedPatient && !todaysTriage && (
+                    <div className="flex items-start gap-2 p-3 mb-4 rounded-lg" style={{ background: 'rgba(217,119,6,0.10)', border: '1px solid var(--color-warning)' }}>
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-warning)' }} />
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        This patient hasn’t been triaged today. You can proceed, but triage captures acuity and vitals — consider sending them to triage first for non-emergencies.
+                      </p>
+                    </div>
+                  )}
+                  {selectedPatient && todaysTriage && (
+                    <div className="flex items-center gap-2 p-2.5 mb-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded" style={{
+                        background: todaysTriage.priority === 'RED' ? 'rgba(229,46,66,0.12)' : todaysTriage.priority === 'YELLOW' ? 'rgba(217,119,6,0.12)' : 'rgba(21,121,92,0.12)',
+                        color: todaysTriage.priority === 'RED' ? 'var(--color-danger)' : todaysTriage.priority === 'YELLOW' ? 'var(--color-warning)' : 'var(--color-success)',
+                      }}>{todaysTriage.priority} priority</span>
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Triaged today — vitals carried over below.</span>
+                    </div>
+                  )}
                   <label>{t('consultation.chiefComplaintLabel')}</label>
-                  <textarea
-                    value={chiefComplaint}
-                    onChange={e => setChiefComplaint(e.target.value)}
-                    rows={3}
-                    placeholder={t('consultation.chiefComplaintPlaceholder')}
-                  />
+                  {complaints.length > 0 && (
+                    <div className="flex flex-col gap-2 mb-3">
+                      {complaints.map((c, i) => (
+                        <div key={i} className="flex items-center gap-2 p-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                          <span className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: 'var(--accent-light)', color: 'var(--accent-text)' }}>{i + 1}</span>
+                          <span className="flex-1 text-sm" style={{ color: 'var(--text-primary)' }}>{c}</span>
+                          <button type="button" aria-label="Remove" onClick={() => removeComplaint(i)} className="p-1 rounded" style={{ color: 'var(--color-danger)' }}><X className="w-4 h-4" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {complaints.length < 3 ? (
+                    <div className="flex gap-2 items-start">
+                      <textarea
+                        value={complaintInput}
+                        onChange={e => setComplaintInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComplaint(); } }}
+                        rows={2}
+                        style={{ flex: 1, resize: 'vertical', minHeight: 44 }}
+                      />
+                      <button type="button" onClick={addComplaint} className="btn btn-secondary btn-sm">Add</button>
+                    </div>
+                  ) : (
+                    <p className="text-[11px]" style={{ color: 'var(--color-warning)' }}>Maximum of 3 complaints reached.</p>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Section 1: Vital Signs */}
-            <div className="card-elevated overflow-hidden">
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(1) ? undefined : 'none' }}>
               <SectionHeader index={1} />
               {openSections[1] && (
                 <div className="p-5">
@@ -1187,7 +1851,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 2: Physical Examination */}
-            <div className="card-elevated overflow-hidden">
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(2) ? undefined : 'none' }}>
               <SectionHeader index={2} />
               {openSections[2] && (
                 <div className="p-5 space-y-4">
@@ -1212,193 +1876,157 @@ export default function ConsultationPage() {
               )}
             </div>
 
-            {/* Section 3: AI Clinical Evaluation */}
-            <div className="card-elevated overflow-hidden">
+            {/* Section 3: Patient History & Review of Systems */}
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(3) ? undefined : 'none' }}>
               <SectionHeader index={3} />
               {openSections[3] && (
-                <div className="p-5">
-                  {/* Analyze Button */}
-                  <div className="flex items-center gap-3 mb-4">
-                    <button
-                      onClick={runAIEvaluation}
-                      disabled={aiLoading || !chiefComplaint}
-                      className="btn btn-primary btn-sm"
-                      style={{ background: !chiefComplaint ? 'var(--text-muted)' : 'var(--accent-primary)', border: 'none' }}
-                    >
-                      {aiLoading ? (
-                        <span className="flex items-center gap-2">
-                          <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4 31.4" strokeLinecap="round"/></svg>
-                          {t('consultation.analyzing')}
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <Sparkles className="w-4 h-4" />
-                          {t('consultation.analyzePatientData')}
-                        </span>
-                      )}
-                    </button>
-                    {!chiefComplaint && (
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('consultation.enterChiefComplaintFirst')}</span>
-                    )}
+                <div className="p-5 space-y-5">
+                  <div>
+                    <label>History of present illness</label>
+                    <textarea value={history.hpi} onChange={e => setHistory(h => ({ ...h, hpi: e.target.value }))} rows={3}
+                      placeholder="Onset, location, duration, character, aggravating/relieving, radiation, timing, severity (OLDCARTS)" />
                   </div>
 
-                  {aiEvaluation && (
-                    <div className="space-y-4">
-                      {/* Severity Assessment */}
-                      <div className="p-3 rounded-lg" style={{
-                        background: aiEvaluation.severityAssessment.includes('HIGH') ? 'rgba(229,46,66,0.12)' : aiEvaluation.severityAssessment.includes('MODERATE') ? 'rgba(252,211,77,0.12)' : 'rgba(43,111,224,0.12)',
-                        border: `1px solid ${aiEvaluation.severityAssessment.includes('HIGH') ? 'var(--tamamhealth-red)' : aiEvaluation.severityAssessment.includes('MODERATE') ? 'var(--color-warning)' : 'var(--accent-primary)'}`,
-                      }}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <ShieldAlert className="w-4 h-4" style={{ color: aiEvaluation.severityAssessment.includes('HIGH') ? 'var(--tamamhealth-red)' : aiEvaluation.severityAssessment.includes('MODERATE') ? 'var(--color-warning)' : 'var(--accent-primary)' }} />
-                          <span className="text-xs font-bold uppercase tracking-wider" style={{ color: aiEvaluation.severityAssessment.includes('HIGH') ? '#F87171' : aiEvaluation.severityAssessment.includes('MODERATE') ? 'var(--color-warning)' : 'var(--accent-primary)' }}>
-                            {t('consultation.severityAssessment')}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{aiEvaluation.severityAssessment}</p>
-                      </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Past medical history</label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {CHRONIC_CONDITIONS.map(c => {
+                        const on = history.pmhConditions.includes(c);
+                        return (
+                          <button key={c} type="button" onClick={() => setHistory(h => ({ ...h, pmhConditions: on ? h.pmhConditions.filter(x => x !== c) : [...h.pmhConditions, c] }))}
+                            className="text-[12px] font-medium px-2.5 py-1 rounded-full"
+                            style={{ border: `1px solid ${on ? 'var(--accent-primary)' : 'var(--border-medium)'}`, background: on ? 'var(--accent-light)' : 'transparent', color: on ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
+                            {c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                      <div><label>Past surgeries</label><input value={history.pmhSurgeries} onChange={e => setHistory(h => ({ ...h, pmhSurgeries: e.target.value }))} placeholder="e.g. appendectomy 2019" /></div>
+                      <div><label>Prior admissions</label><input value={history.pmhAdmissions} onChange={e => setHistory(h => ({ ...h, pmhAdmissions: e.target.value }))} placeholder="e.g. severe malaria 2024" /></div>
+                    </div>
+                    <label className="flex items-center gap-2 mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <input type="checkbox" checked={history.pmhTransfusion} onChange={e => setHistory(h => ({ ...h, pmhTransfusion: e.target.checked }))} style={{ width: 'auto' }} />
+                      Previous blood transfusion
+                    </label>
+                  </div>
 
-                      {/* Vital Sign Alerts */}
-                      {aiEvaluation.vitalSignAlerts.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Activity className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
-                            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('consultation.vitalSignAlerts')}</span>
-                          </div>
-                          <div className="space-y-1.5">
-                            {aiEvaluation.vitalSignAlerts.map((alert, i) => (
-                              <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg text-sm" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-warning)' }} />
-                                <span style={{ color: 'var(--text-primary)' }}>{alert}</span>
+                  <div>
+                    <label>Family history</label>
+                    <textarea value={history.familyHistory} onChange={e => setHistory(h => ({ ...h, familyHistory: e.target.value }))} rows={2} placeholder="Relevant conditions in close family" />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Social history</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                      <div><label>Smoking</label><select value={history.shSmoking} onChange={e => setHistory(h => ({ ...h, shSmoking: e.target.value as typeof h.shSmoking }))}>{SMOKING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+                      <div><label>Alcohol</label><select value={history.shAlcohol} onChange={e => setHistory(h => ({ ...h, shAlcohol: e.target.value as typeof h.shAlcohol }))}>{ALCOHOL_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+                      <div><label>Occupation</label><input value={history.shOccupation} onChange={e => setHistory(h => ({ ...h, shOccupation: e.target.value }))} /></div>
+                      <div><label>Substance use</label><input value={history.shSubstance} onChange={e => setHistory(h => ({ ...h, shSubstance: e.target.value }))} placeholder="None / details" /></div>
+                      <div>
+                        <label>Socioeconomic status</label>
+                        <select value={history.shSES} onChange={e => setHistory(h => ({ ...h, shSES: e.target.value as typeof h.shSES }))}>
+                          <option value="">Not assessed</option>
+                          {SES_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label>Health insurance</label>
+                        <div className="mt-1 space-y-2">
+                          <label
+                            className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors"
+                            style={{
+                              background: history.shInsurance ? 'var(--accent-light)' : 'var(--overlay-subtle)',
+                              border: `1px solid ${history.shInsurance ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+                            }}
+                          >
+                            <span className="text-sm font-medium" style={{ color: history.shInsurance ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
+                              {history.shInsurance ? 'Insured' : 'Not insured'}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={history.shInsurance}
+                              onChange={e => setHistory(h => ({ ...h, shInsurance: e.target.checked, shInsuranceProvider: e.target.checked ? h.shInsuranceProvider : '' }))}
+                              style={{ width: 'auto', accentColor: 'var(--accent-primary)' }}
+                            />
+                          </label>
+                          {history.shInsurance && (
+                            <input
+                              value={history.shInsuranceProvider}
+                              onChange={e => setHistory(h => ({ ...h, shInsuranceProvider: e.target.value }))}
+                              placeholder="Insurance provider / scheme"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Drug history &amp; allergies</label>
+                    <div className="mt-2"><label>Current chronic medications</label><input value={history.dhChronicMeds} onChange={e => setHistory(h => ({ ...h, dhChronicMeds: e.target.value }))} placeholder="e.g. metformin, amlodipine" /></div>
+                    <div className="mt-3"><label>Drug allergies (comma separated)</label><input value={history.dhAllergies} disabled={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhAllergies: e.target.value }))} placeholder="e.g. penicillin, sulfa" /></div>
+                    <label className="flex items-center gap-2 mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <input type="checkbox" checked={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhNKDA: e.target.checked, dhAllergies: e.target.checked ? '' : h.dhAllergies }))} style={{ width: 'auto' }} />
+                      No known drug allergies
+                    </label>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Review of systems</label>
+                      <button type="button" onClick={() => setRos(prev => { const next = { ...prev }; for (const s of ROS_SYSTEMS) { if (!next[s.key]) next[s.key] = { status: 'negative', findings: '' }; } return next; })}
+                        className="text-[11px] font-semibold" style={{ color: 'var(--accent-text)' }}>Mark all negative</button>
+                    </div>
+                    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-light)' }}>
+                      {ROS_SYSTEMS.map((s, idx) => {
+                        const entry = ros[s.key];
+                        const status = entry?.status;
+                        return (
+                          <div
+                            key={s.key}
+                            className="px-3 py-2.5"
+                            style={{
+                              borderTop: idx === 0 ? 'none' : '1px solid var(--border-light)',
+                              background: status === 'positive' ? 'rgba(217,119,6,0.06)' : status === 'negative' ? 'rgba(59,130,246,0.04)' : 'transparent',
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{s.label}</div>
+                                <div className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{s.hint}</div>
                               </div>
-                            ))}
+                              {/* Segmented toggle */}
+                              <div className="inline-flex rounded-lg p-0.5 flex-shrink-0" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                                {(['negative', 'positive'] as const).map(st => {
+                                  const active = status === st;
+                                  const accent = st === 'positive' ? 'var(--color-warning)' : 'var(--accent-primary)';
+                                  return (
+                                    <button key={st} type="button"
+                                      onClick={() => setRos(prev => ({ ...prev, [s.key]: { status: st, findings: prev[s.key]?.findings || '' } }))}
+                                      className="text-[11px] font-semibold px-3 py-1 rounded-md transition-colors"
+                                      style={{ background: active ? accent : 'transparent', color: active ? '#fff' : 'var(--text-muted)' }}>
+                                      {st === 'negative' ? 'No symptoms' : 'Positive'}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            {status === 'positive' && (
+                              <input className="mt-2" value={entry?.findings || ''} onChange={e => setRos(prev => ({ ...prev, [s.key]: { status: 'positive', findings: e.target.value } }))} placeholder={`Describe ${s.label.toLowerCase()} findings`} />
+                            )}
                           </div>
-                        </div>
-                      )}
-
-                      {/* Suggested Diagnoses */}
-                      {aiEvaluation.suggestedDiagnoses.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Brain className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('consultation.suggestedDiagnoses')}</span>
-                          </div>
-                          <div className="space-y-2">
-                            {aiEvaluation.suggestedDiagnoses.map((dx) => {
-                              const isAccepted = acceptedDiagnoses.has(dx.icd10Code) || diagnoses.some(d => d.code === dx.icd10Code);
-                              return (
-                                <div key={dx.icd10Code} className="p-3 rounded-lg" style={{
-                                  background: isAccepted ? 'rgba(43,111,224,0.08)' : 'var(--overlay-subtle)',
-                                  border: `1px solid ${isAccepted ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                                }}>
-                                  <div className="flex items-center justify-between mb-1.5">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(43,111,224,0.10)', color: 'var(--accent-primary)' }}>{dx.icd10Code}</span>
-                                      <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{dx.name}</span>
-                                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${dx.severity === 'severe' ? 'badge-emergency' : dx.severity === 'moderate' ? 'badge-warning' : 'badge-normal'}`}>
-                                        {dx.severity}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <div className="flex items-center gap-1">
-                                        <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
-                                          <div className="h-full rounded-full" style={{
-                                            width: `${dx.confidence}%`,
-                                            background: dx.confidence >= 70 ? 'var(--accent-primary)' : dx.confidence >= 40 ? 'var(--color-warning)' : 'var(--text-muted)',
-                                          }} />
-                                        </div>
-                                        <span className="text-xs font-bold" style={{ color: dx.confidence >= 70 ? 'var(--accent-primary)' : dx.confidence >= 40 ? 'var(--color-warning)' : 'var(--text-muted)' }}>
-                                          {dx.confidence}%
-                                        </span>
-                                      </div>
-                                      {isAccepted ? (
-                                        <span className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
-                                          <Check className="w-3 h-3" /> {t('consultation.added')}
-                                        </span>
-                                      ) : (
-                                        <button
-                                          onClick={() => acceptAIDiagnosis(dx.icd10Code, dx.name, dx.severity)}
-                                          className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-colors"
-                                          style={{ background: 'rgba(43,111,224,0.10)', color: 'var(--accent-primary)' }}
-                                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(43,111,224,0.20)'; }}
-                                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(43,111,224,0.10)'; }}
-                                        >
-                                          <Plus className="w-3 h-3" /> {t('consultation.add')}
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>{dx.reasoning}</p>
-                                  {dx.suggestedTreatment && (
-                                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                      <span className="font-semibold">{t('consultation.txLabel')}</span> {dx.suggestedTreatment}
-                                    </p>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Recommended Tests */}
-                      {aiEvaluation.recommendedTests.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <TestTubes className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('consultation.recommendedTests')}</span>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {aiEvaluation.recommendedTests.map(test => {
-                              const isAccepted = acceptedTests.has(test) || labOrders[test];
-                              return (
-                                <button
-                                  key={test}
-                                  onClick={() => acceptAITest(test)}
-                                  disabled={isAccepted}
-                                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
-                                  style={{
-                                    background: isAccepted ? 'rgba(43,111,224,0.12)' : 'rgba(43,111,224,0.08)',
-                                    border: `1px solid ${isAccepted ? 'var(--accent-primary)' : 'var(--accent-primary)'}`,
-                                    color: isAccepted ? 'var(--accent-primary)' : 'var(--accent-primary)',
-                                    cursor: isAccepted ? 'default' : 'pointer',
-                                  }}
-                                >
-                                  {isAccepted ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                                  {test}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Clinical Notes */}
-                      <div className="p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                        <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('consultation.aiReasoningSummary')}</p>
-                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{aiEvaluation.clinicalNotes}</p>
-                        <p className="text-[10px] mt-2 italic" style={{ color: 'var(--text-muted)' }}>
-                          {t('consultation.evaluatedAt', { time: new Date(aiEvaluation.evaluatedAt).toLocaleTimeString() })}
-                        </p>
-                      </div>
+                        );
+                      })}
                     </div>
-                  )}
-
-                  {!aiEvaluation && !aiLoading && (
-                    <div className="text-center py-4">
-                      <Brain className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {t('consultation.aiEmptyState')}
-                        <br />{t('consultation.aiRunsLocally')}
-                      </p>
-                    </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
 
+
             {/* Section 4: Diagnosis */}
-            <div className="card-elevated overflow-hidden">
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(4) ? undefined : 'none' }}>
               <SectionHeader index={4} />
               {openSections[4] && (
                 <div className="p-5">
@@ -1426,7 +2054,7 @@ export default function ConsultationPage() {
                             className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
                             style={{ borderBottom: '1px solid var(--border-light)' }}
                           >
-                            <span className="font-mono text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(43,111,224,0.10)', color: 'var(--accent-primary)' }}>{c.code}</span>
+                            <span className="font-mono text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(59, 130, 246,0.10)', color: 'var(--accent-primary)' }}>{c.code}</span>
                             <span className="text-sm">{c.name}</span>
                           </button>
                         ))}
@@ -1439,7 +2067,7 @@ export default function ConsultationPage() {
                     <div className="space-y-2">
                       {diagnoses.map((d, i) => (
                         <div key={i} className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                          <span className="font-mono text-xs px-2 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(43,111,224,0.10)', color: 'var(--accent-primary)' }}>{d.code}</span>
+                          <span className="font-mono text-xs px-2 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(59, 130, 246,0.10)', color: 'var(--accent-primary)' }}>{d.code}</span>
                           <span className="text-sm font-medium flex-1 min-w-0 truncate">{d.name}</span>
                           <select
                             value={d.type}
@@ -1483,7 +2111,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 5: Prescriptions */}
-            <div className="card-elevated overflow-hidden">
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(5) ? undefined : 'none' }}>
               <SectionHeader index={5} />
               {openSections[5] && (
                 <div className="p-5">
@@ -1528,6 +2156,11 @@ export default function ConsultationPage() {
                             <div className="flex items-center gap-2">
                               <Pill className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                               <span className="text-sm font-semibold">{rx.medication}</span>
+                              {sentRxSignatures.includes(rxSignature(rx)) && (
+                                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded inline-flex items-center gap-1" style={{ background: 'rgba(21,121,92,0.12)', color: 'var(--color-success)' }}>
+                                  <Check className="w-2.5 h-2.5" /> Sent to pharmacy
+                                </span>
+                              )}
                             </div>
                             <button onClick={() => removePrescription(i)} className="p-1 rounded transition-colors" style={{ background: 'transparent' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(229,46,66,0.15)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                               <X className="w-4 h-4" style={{ color: 'var(--tamamhealth-red)' }} />
@@ -1566,8 +2199,41 @@ export default function ConsultationPage() {
                               onChange={e => updatePrescription(i, 'instructions', e.target.value)}
                               placeholder={t('consultation.rxInstructionsPlaceholder')} />
                           </div>
+                          <div className="mt-3">
+                            <label>Timing</label>
+                            <div className="flex gap-2 mt-1">
+                              {([['immediate', 'Immediate / emergency'], ['definitive', 'After diagnosis']] as const).map(([val, lbl]) => (
+                                <button key={val} type="button"
+                                  onClick={() => setPrescriptions(prev => prev.map((p, idx) => idx === i ? { ...p, urgency: val } : p))}
+                                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg"
+                                  style={{
+                                    border: `1px solid ${rx.urgency === val ? (val === 'immediate' ? 'var(--color-warning)' : 'var(--accent-primary)') : 'var(--border-medium)'}`,
+                                    background: rx.urgency === val ? (val === 'immediate' ? 'rgba(217,119,6,0.10)' : 'var(--accent-light)') : 'transparent',
+                                    color: rx.urgency === val ? (val === 'immediate' ? 'var(--color-warning)' : 'var(--accent-text)') : 'var(--text-muted)',
+                                  }}>
+                                  {lbl}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       ))}
+                      {prescriptions.some(rx => rx.medication && !sentRxSignatures.includes(rxSignature(rx))) && (
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={handleSendToPharmacy}
+                            disabled={sendingRx || !selectedPatient}
+                            className="btn btn-primary w-full flex items-center justify-center gap-2"
+                          >
+                            <Pill className="w-4 h-4" />
+                            {sendingRx ? 'Sending…' : 'Send to pharmacy'}
+                          </button>
+                          <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+                            Queues these medications at the pharmacy now so they can be prepared. Anything not sent here is queued automatically when you complete the visit.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm py-3" style={{ color: 'var(--text-muted)' }}>{t('consultation.noPrescriptions')}</p>
@@ -1577,48 +2243,122 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 6: Lab Orders */}
-            <div className="card-elevated overflow-hidden">
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(6) ? undefined : 'none' }}>
               <SectionHeader index={6} />
               {openSections[6] && (
-                <div className="p-5">
-                  <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>{t('consultation.selectTestsHint')}</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {labTests.map(test => (
-                      <label
-                        key={test}
-                        className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
-                        style={{
-                          background: labOrders[test] ? 'rgba(43,111,224,0.10)' : 'var(--overlay-subtle)',
-                          border: `1px solid ${labOrders[test] ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={labOrders[test]}
-                          onChange={e => setLabOrders(prev => ({ ...prev, [test]: e.target.checked }))}
-                          className="w-4 h-4 rounded"
-                          style={{ accentColor: 'var(--accent-primary)' }}
-                        />
-                        <div className="flex items-center gap-2">
-                          <FlaskConical className="w-3.5 h-3.5" style={{ color: labOrders[test] ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
-                          <span className="text-sm font-medium" style={{ color: labOrders[test] ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{test}</span>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                  {Object.values(labOrders).some(v => v) && (
-                    <div className="mt-4 p-3 rounded-lg" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-primary)' }}>
-                      <p className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
-                        {t('consultation.testsSelectedForOrdering', { count: Object.values(labOrders).filter(v => v).length })}
-                      </p>
+                <div className="p-5 space-y-5">
+                  {/* Returned results for a resumed visit, shown inline so the
+                      clinician can act on them before finalising. */}
+                  {resumedLabResults.length > 0 && (
+                    <div className="rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-light)' }}>
+                      <div className="px-3 py-2 flex items-center gap-2" style={{ background: 'var(--overlay-subtle)', borderBottom: '1px solid var(--border-light)' }}>
+                        <FlaskConical className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+                        <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Results from the lab</span>
+                      </div>
+                      <div className="divide-y" style={{ borderColor: 'var(--border-light)' }}>
+                        {resumedLabResults.map(r => {
+                          const done = r.status === 'completed';
+                          return (
+                            <div key={r._id} className="flex items-center justify-between gap-3 px-3 py-2">
+                              <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{r.testName}</span>
+                              {done ? (
+                                <span className="text-sm" style={{ color: r.critical ? 'var(--color-danger)' : r.abnormal ? 'var(--color-warning)' : 'var(--text-secondary)' }}>
+                                  {r.result || '—'}{r.unit ? ` ${r.unit}` : ''}
+                                  {r.referenceRange ? <span className="text-[11px] ml-1.5" style={{ color: 'var(--text-muted)' }}>(ref {r.referenceRange})</span> : null}
+                                  {(r.abnormal || r.critical) && (
+                                    <span className="text-[9px] font-bold uppercase ml-2 px-1.5 py-0.5 rounded" style={{ background: r.critical ? 'rgba(229,46,66,0.1)' : 'rgba(184,116,28,0.12)', color: r.critical ? 'var(--color-danger)' : 'var(--color-warning)' }}>
+                                      {r.critical ? 'Critical' : 'Abnormal'}
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold uppercase tracking-wider inline-flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                                  <Clock className="w-3 h-3" /> Pending
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
+                  )}
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('consultation.selectTestsHint')}</p>
+
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Basic panel</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {BASIC_LABS.map(test => (
+                        <label key={test} className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
+                          style={{ background: labOrders[test] ? 'rgba(59, 130, 246,0.10)' : 'var(--overlay-subtle)', border: `1px solid ${labOrders[test] ? 'var(--accent-primary)' : 'var(--border-light)'}` }}>
+                          <input type="checkbox" checked={!!labOrders[test]} onChange={e => setLabOrders(prev => ({ ...prev, [test]: e.target.checked }))} className="w-4 h-4 rounded" style={{ accentColor: 'var(--accent-primary)' }} />
+                          <div className="flex items-center gap-2">
+                            <FlaskConical className="w-3.5 h-3.5" style={{ color: labOrders[test] ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
+                            <span className="text-sm font-medium" style={{ color: labOrders[test] ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{test}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Special investigations</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {SPECIAL_LABS.map(test => (
+                        <label key={test} className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
+                          style={{ background: labOrders[test] ? 'rgba(59, 130, 246,0.10)' : 'var(--overlay-subtle)', border: `1px solid ${labOrders[test] ? 'var(--accent-primary)' : 'var(--border-light)'}` }}>
+                          <input type="checkbox" checked={!!labOrders[test]} onChange={e => setLabOrders(prev => ({ ...prev, [test]: e.target.checked }))} className="w-4 h-4 rounded" style={{ accentColor: 'var(--accent-primary)' }} />
+                          <div className="flex items-center gap-2">
+                            <FlaskConical className="w-3.5 h-3.5" style={{ color: labOrders[test] ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
+                            <span className="text-sm font-medium" style={{ color: labOrders[test] ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{test}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <input value={customLab} onChange={e => setCustomLab(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomLab(); } }} placeholder="Add a specific investigation (e.g. ferritin, ESR, culture)…" style={{ flex: 1 }} />
+                      <button type="button" onClick={addCustomLab} className="btn btn-secondary btn-sm">Add</button>
+                    </div>
+                    {Object.keys(labOrders).filter(tn => labOrders[tn] && !labTests.includes(tn)).length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {Object.keys(labOrders).filter(tn => labOrders[tn] && !labTests.includes(tn)).map(tn => (
+                          <span key={tn} className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-text)' }}>
+                            {tn}
+                            <button type="button" aria-label="Remove" onClick={() => setLabOrders(prev => ({ ...prev, [tn]: false }))} style={{ color: 'var(--accent-text)' }}><X className="w-3 h-3" /></button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {Object.values(labOrders).some(v => v) && (
+                    <>
+                      <div className="p-3 rounded-lg" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-primary)' }}>
+                        <p className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
+                          {t('consultation.testsSelectedForOrdering', { count: Object.values(labOrders).filter(v => v).length })}
+                        </p>
+                      </div>
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={handleSendToLab}
+                          disabled={sendingLabs || !selectedPatient}
+                          className="btn btn-primary w-full flex items-center justify-center gap-2"
+                        >
+                          <FlaskConical className="w-4 h-4" />
+                          {sendingLabs ? 'Ordering…' : 'Order tests & send to lab'}
+                        </button>
+                        <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+                          Orders these investigations, pauses the visit as <strong>Awaiting labs</strong>, and lets you resume it from your dashboard when the results return. Your draft is saved — nothing is finalised yet.
+                        </p>
+                      </div>
+                    </>
                   )}
                 </div>
               )}
             </div>
 
             {/* Section 7: Treatment Plan */}
-            <div className="card-elevated overflow-hidden">
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(7) ? undefined : 'none' }}>
               <SectionHeader index={7} />
               {openSections[7] && (
                 <div className="p-5">
@@ -1634,7 +2374,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 8: Attachments / Scans */}
-            <div className="card-elevated overflow-hidden">
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(8) ? undefined : 'none' }}>
               <SectionHeader index={8} />
               {openSections[8] && (
                 <div className="p-5">
@@ -1653,7 +2393,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 9: Follow-up */}
-            <div className="card-elevated overflow-hidden">
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(9) ? undefined : 'none' }}>
               <SectionHeader index={9} />
               {openSections[9] && (
                 <div className="p-5">
@@ -1673,7 +2413,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 10: Referral */}
-            <div className="card-elevated overflow-hidden">
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(10) ? undefined : 'none' }}>
               <SectionHeader index={10} />
               {openSections[10] && (
                 <div className="p-5">
@@ -1731,20 +2471,30 @@ export default function ConsultationPage() {
               )}
             </div>
 
-            {/* Submit */}
-            <div className="flex items-center justify-between pt-4 pb-8">
-              <button onClick={() => router.push('/patients')} className="btn btn-secondary">
-                <ArrowLeft className="w-4 h-4" /> {t('action.cancel')}
+            {/* Step navigation — Back / Next, with Complete on the final step */}
+            <div className="flex items-center justify-between pt-4 pb-8 border-t" style={{ borderColor: 'var(--border-light)' }}>
+              <button onClick={() => step > 0 ? goBack() : router.push('/patients')} className="btn btn-secondary">
+                <ArrowLeft className="w-4 h-4" /> {step === 0 ? t('action.cancel') : t('patientNew.previous')}
               </button>
-              <button onClick={handleSubmit} disabled={isSaving || !selectedPatient} className="btn btn-primary btn-lg" style={{ opacity: isSaving ? 0.7 : 1 }}>
-                {isSaving ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('consultation.saving')}</> : <><Save className="w-4 h-4" /> {t('consultation.saveConsultation')}</>}
-              </button>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                Step {step + 1} of {workflowStages.length} · {workflowStages[step]?.label}
+              </span>
+              {!isLastStep ? (
+                <button onClick={goNext} className="btn btn-primary">
+                  {t('patientNew.next')} <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <button onClick={handleSubmit} disabled={isSaving || !selectedPatient} className="btn btn-primary btn-lg" style={{ opacity: isSaving ? 0.7 : 1 }}>
+                  {isSaving ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('consultation.saving')}</> : <><Check className="w-4 h-4" /> {t('consultation.saveConsultation')}</>}
+                </button>
+              )}
+            </div>
             </div>
           </div>
 
           {/* Right: Patient summary panel */}
-          <div className="hidden xl:block w-[320px] flex-shrink-0">
-            <div className="sticky top-6 space-y-4">
+          <div className="hidden xl:block w-[320px] flex-shrink-0 overflow-y-auto min-h-0">
+            <div className="space-y-4">
               {selectedPatientData ? (
                 <>
                   {/* Patient card */}
@@ -1766,7 +2516,7 @@ export default function ConsultationPage() {
                     <div className="space-y-2">
                       {[
                         { label: t('patient.gender'), value: selectedPatientData.gender },
-                        { label: t('patient.age'), value: selectedPatientData.estimatedAge ? `~${selectedPatientData.estimatedAge}y` : selectedPatientData.dateOfBirth ? `${new Date().getFullYear() - new Date(selectedPatientData.dateOfBirth).getFullYear()}y` : t('consultation.unknown') },
+                        { label: t('patient.age'), value: patientAgeLabel(selectedPatientData) },
                         { label: t('patient.bloodType'), value: selectedPatientData.bloodType || t('consultation.unknown') },
                         { label: t('consultation.state'), value: selectedPatientData.state },
                         { label: t('patient.tribe'), value: selectedPatientData.tribe },
@@ -1818,27 +2568,28 @@ export default function ConsultationPage() {
                     </div>
                   )}
 
+                  {/* Account balance (advisory) */}
+                  {patientBalance !== null && patientBalance > 0 && (
+                    <div className="card-elevated p-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Outstanding balance</span>
+                        <span className="text-sm font-bold" style={{ color: 'var(--color-warning)' }}>{patientBalance.toLocaleString()} SSP</span>
+                      </div>
+                      <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>Collect at checkout — ordering is not blocked.</p>
+                    </div>
+                  )}
+
                   {/* Consultation progress */}
                   <div className="card-elevated p-4">
                     <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('consultation.progress')}</p>
                     <div className="space-y-2">
                       {sectionHeaders.map((s, i) => {
                         const Icon = s.icon;
-                        const filled = i === 0 ? chiefComplaint.length > 0
-                          : i === 1 ? Object.values(vitals).some(v => v !== '')
-                          : i === 2 ? Object.values(physExam).some(v => v !== '')
-                          : i === 3 ? aiEvaluation !== null
-                          : i === 4 ? diagnoses.length > 0
-                          : i === 5 ? prescriptions.length > 0
-                          : i === 6 ? Object.values(labOrders).some(v => v)
-                          : i === 7 ? treatmentPlan.length > 0
-                          : i === 8 ? consultAttachments.length > 0
-                          : i === 9 ? followUpDate !== ''
-                          : addReferral && referralHospital !== '' && referralReason.trim() !== '';
+                        const filled = sectionFilled(i);
                         return (
                           <div key={s.label} className="flex items-center gap-3">
                             <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{
-                              background: filled ? 'rgba(43,111,224,0.15)' : 'var(--overlay-subtle)',
+                              background: filled ? 'rgba(59, 130, 246,0.15)' : 'var(--overlay-subtle)',
                               border: `1px solid ${filled ? 'var(--accent-primary)' : 'var(--border-light)'}`,
                             }}>
                               {filled ? (

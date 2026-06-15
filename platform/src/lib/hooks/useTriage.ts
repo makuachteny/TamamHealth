@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { makeCoalescer } from './live-reload';
 import type { TriageDoc } from '../db-types';
 import { triageDB } from '../db';
 import { useDataScope } from './useDataScope';
@@ -42,11 +43,13 @@ export function useTriage(patientId?: string) {
   // Live subscription — any triage write anywhere re-renders consumers.
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) load(); });
     const changes = triageDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) load(); })
+      .on('change', () => reload.trigger())
       .on('error', (err) => { console.warn('Triage subscription error:', err); });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [load]);

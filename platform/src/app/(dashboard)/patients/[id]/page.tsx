@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import Modal from '@/components/Modal';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import SendMessageModal from '@/components/SendMessageModal';
@@ -10,7 +11,7 @@ import {
   Pill, Activity, Brain, ChevronDown, ChevronUp,
   ShieldAlert, TestTubes, MessageSquare, ChevronRight,
   CalendarClock, TrendingUp as TrendingUpIcon, ClipboardList,
-  User as UserIcon, Building2, Search, X, Printer, Wallet,
+  User as UserIcon, Building2, Search, X, Printer, Wallet, Syringe,
 } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
@@ -21,23 +22,36 @@ import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { useANC } from '@/lib/hooks/useANC';
 import { Package, Clock, Building2 as Building2Icon } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import VitalsTrends from '@/components/VitalsTrends';
+import dynamic from 'next/dynamic';
+// Lazy-loaded: recharts is large and only used on the Trends view, so keep it
+// out of the patient-record initial bundle.
+const VitalsTrends = dynamic(() => import('@/components/VitalsTrends'), {
+  ssr: false,
+  loading: () => <div className="p-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading charts…</div>,
+});
 import PatientTimeline from '@/components/PatientTimeline';
 import VitalCard from '@/components/VitalCard';
 import { Icon as DuotoneInfoIcon } from '@/components/icons';
-import { formatDateTime } from '@/lib/format-utils';
+import { formatDateTime, formatDate } from '@/lib/format-utils';
+import { patientFullName, patientInitials, patientAgeLabel } from '@/lib/patient-utils';
 import { usePatientAppointments } from '@/lib/hooks/useAppointments';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import PatientQRCode from '@/components/PatientQRCode';
 import { usePatientPayments } from '@/lib/hooks/usePayments';
 import BillingTab from '@/components/patients/BillingTab';
-import BillingSidebarCard from '@/components/patients/BillingSidebarCard';
 import PatientIndex from '@/components/patients/PatientIndex';
 import PatientSBAR from '@/components/patients/PatientSBAR';
 import ProblemList from '@/components/patients/ProblemList';
+import PatientCommunication from '@/components/PatientCommunication';
 import { useProblems } from '@/lib/hooks/useProblems';
+import type { PatientNoteDoc } from '@/lib/db-types';
+
+// Administrative tabs are the only ones a non-clinical role (e.g. Medical
+// Receptionist) may see — the "minimum necessary" rule: contact details,
+// referral follow-up, and billing/scheduling, but NOT clinical notes, test
+// results, diagnoses, vitals, or medications.
+const ADMIN_TAB_IDS = ['overview', 'referrals', 'billing', 'communication'];
 
 export default function PatientDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
@@ -68,9 +82,45 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
   const { appointments: patientAppointments } = usePatientAppointments(patient?._id);
   const { prescriptions: allPrescriptions } = usePrescriptions();
   const { triages: patientTriages } = useTriage(patient?._id);
-  const { canConsult } = usePermissions();
+  const { canConsult, canViewClinical, canOrderLabs, canPrescribe } = usePermissions();
+
+  // Defence in depth: if a non-clinical viewer lands on (or deep-links to) a
+  // clinical tab, snap them back to the overview so clinical panels never render.
+  useEffect(() => {
+    if (!canViewClinical && !ADMIN_TAB_IDS.includes(activeTab)) {
+      setActiveTab('overview');
+    }
+  }, [canViewClinical, activeTab]);
   const { balance: patientBalance, reload: reloadPayments } = usePatientPayments(patient?._id);
   const { problems: patientProblems, active: activeProblems } = useProblems(patient?._id);
+
+  // Patient care notes (free-text staff notes) — surfaced on the overview only
+  // when present, so the page never shows an empty "Notes" placeholder.
+  const [patientNotes, setPatientNotes] = useState<PatientNoteDoc[]>([]);
+  const patientIdForNotes = patient?._id;
+  useEffect(() => {
+    if (!patientIdForNotes) { setPatientNotes([]); return; }
+    let cancelled = false;
+    import('@/lib/services/patient-note-service')
+      .then(m => m.getNotesByPatient(patientIdForNotes))
+      .then(n => { if (!cancelled) setPatientNotes(n); })
+      .catch(() => { /* best-effort */ });
+    return () => { cancelled = true; };
+  }, [patientIdForNotes]);
+
+  // Outstanding balance for the most recent encounter — surfaced as a chip on
+  // the "Most Recent Record" hero so clinicians see if the visit is settled.
+  const [encounterBalance, setEncounterBalance] = useState<number | null>(null);
+  const latestRecordId = records[0]?._id;
+  useEffect(() => {
+    if (!latestRecordId) { setEncounterBalance(null); return; }
+    let cancelled = false;
+    import('@/lib/services/ledger-service')
+      .then(m => m.getEncounterBalance(latestRecordId))
+      .then(b => { if (!cancelled) setEncounterBalance(b); })
+      .catch(() => { /* best-effort */ });
+    return () => { cancelled = true; };
+  }, [latestRecordId]);
 
   // Edit form state — initialised when modal opens
   const [editForm, setEditForm] = useState({
@@ -174,7 +224,6 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
     );
   }
 
-  const age = patient.estimatedAge || (patient.dateOfBirth ? (new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear()) : 0);
   const regHospital = hospitals.find(h => h._id === patient.registrationHospital);
 
   // Counts for the "Related Records" sidebar card
@@ -184,7 +233,17 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
   const immunizationsCount = (allImmunizations || []).filter(i => i.patientId === patient._id).length;
   const prescriptionsCount = records.reduce((sum, r) => sum + (r.prescriptions?.length || 0), 0);
 
-  const tabs = [
+  // Last & next appointment (surfaced on the overview only when they exist).
+  const apptTs = (a: { appointmentDate: string; appointmentTime?: string }) =>
+    new Date(`${a.appointmentDate}T${a.appointmentTime || '00:00'}:00`).getTime();
+  const upcomingAppts = [...(patientAppointments || [])]
+    .filter(a => a.status !== 'cancelled' && a.status !== 'no_show')
+    .sort((x, y) => apptTs(x) - apptTs(y));
+  const nextAppt = upcomingAppts.find(a => apptTs(a) >= Date.now());
+  const lastAppt = [...upcomingAppts].reverse().find(a => apptTs(a) < Date.now());
+  const latestNote = patientNotes[0];
+
+  const allTabs = [
     { id: 'overview', label: t('tab.overview'), icon: Heart },
     { id: 'index', label: 'Index', icon: ClipboardList },
     { id: 'sbar', label: 'SBAR Handoff', icon: FileText },
@@ -195,9 +254,12 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
     { id: 'vitals', label: t('tab.vitals'), icon: Activity },
     { id: 'labs', label: t('tab.labResults'), icon: FlaskConical },
     { id: 'prescriptions', label: t('tab.prescriptions'), icon: Pill },
+    { id: 'immunizations', label: 'Immunizations', icon: Syringe },
     { id: 'referrals', label: t('tab.referrals'), icon: ArrowRightLeft },
+    { id: 'communication', label: 'Communication', icon: MessageSquare },
     { id: 'billing', label: 'Billing', icon: Wallet },
   ];
+  const tabs = canViewClinical ? allTabs : allTabs.filter(tb => ADMIN_TAB_IDS.includes(tb.id));
 
   // records[] is sorted newest-first by the service layer.
   const latestRecord = records[0];
@@ -377,7 +439,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
           {/* Patient Header — TamamHealth-style: avatar | name+pills+info-strip | action row */}
           {(() => {
-            const initials = `${(patient.firstName || '?')[0]}${(patient.surname || '?')[0]}`.toUpperCase();
+            const initials = patientInitials(patient);
             const isFemale = patient.gender === 'Female';
             const hasAllergy = patient.allergies?.length > 0 && patient.allergies[0] !== 'None known';
             // Pregnancy is signaled via active ANC visits — pull the most recent
@@ -389,9 +451,8 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
             const infoBits: { icon: 'qr' | 'patient' | 'phone' | 'mapPin' | 'clock'; label: string; value: string; accent: string; mono?: boolean }[] = [
               { icon: 'qr', label: 'Geocode', value: patient.geocodeId || patient.hospitalNumber, accent: '#1E3A8A', mono: true },
-              { icon: 'patient', label: 'Age / Sex', value: `${age} y · ${patient.gender}`, accent: 'var(--accent-primary)' },
+              { icon: 'patient', label: 'Age / Sex', value: `${patientAgeLabel(patient)} · ${patient.gender || '—'}`, accent: 'var(--accent-primary)' },
               ...(patient.phone ? [{ icon: 'phone' as const, label: 'Phone', value: patient.phone, accent: '#3b82f6', mono: true }] : []),
-              ...(patient.state ? [{ icon: 'mapPin' as const, label: 'Location', value: patient.state, accent: '#C44536' }] : []),
               { icon: 'clock', label: 'Last Visit', value: lastConsultedDisplay, accent: '#E4A84B' },
             ];
 
@@ -448,7 +509,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                     {/* Name + status pills */}
                     <div className="flex items-center gap-2 flex-wrap mb-2">
                       <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.4 }}>
-                        {`${patient.firstName} ${patient.middleName || ''} ${patient.surname}`.replace(/\s+/g, ' ').trim()}
+                        {patientFullName(patient)}
                       </h1>
                       {isPregnant && (
                         <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-bold" style={{
@@ -506,12 +567,16 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                             <Stethoscope className="w-4 h-4" /> Start Consultation
                           </button>
                         )}
-                        <button onClick={() => setActiveTab('labs')} className="btn btn-secondary">
-                          <FlaskConical className="w-4 h-4" style={{ color: '#E4A84B' }} /> Order Lab
-                        </button>
-                        <button onClick={() => setActiveTab('prescriptions')} className="btn btn-secondary">
-                          <Pill className="w-4 h-4" /> Prescribe
-                        </button>
+                        {canOrderLabs && (
+                          <button onClick={() => setActiveTab('labs')} className="btn btn-secondary">
+                            <FlaskConical className="w-4 h-4" style={{ color: '#E4A84B' }} /> Order Lab
+                          </button>
+                        )}
+                        {canPrescribe && (
+                          <button onClick={() => setActiveTab('prescriptions')} className="btn btn-secondary">
+                            <Pill className="w-4 h-4" /> Prescribe
+                          </button>
+                        )}
                         <button onClick={() => router.push('/referrals')} className="btn btn-secondary">
                           <ArrowRightLeft className="w-4 h-4" /> Refer
                         </button>
@@ -615,10 +680,9 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             })}
           </div>
 
-          {/* Overview Tab */}
-          {activeTab === 'overview' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              <div className="lg:col-span-2 space-y-5">
+          {/* Overview Tab — full clinical overview (clinical roles only) */}
+          {activeTab === 'overview' && canViewClinical && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
                 {/* Active triage banner — shows at top whenever a nurse has
                     triaged this patient recently (within 24h). Visible to
                     every role (nurse, doctor, med supt, etc.) so there is a
@@ -627,11 +691,11 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   const latest = patientTriages[0];
                   const hoursOld = (Date.now() - new Date(latest.triagedAt).getTime()) / 3600000;
                   if (hoursOld > 24 && latest.status !== 'pending') return null;
-                  const bg = latest.priority === 'RED' ? 'rgba(229,46,66,0.14)' : latest.priority === 'YELLOW' ? 'rgba(252,211,77,0.14)' : 'rgba(16,185,129,0.12)';
+                  const bg = latest.priority === 'RED' ? 'rgba(229,46,66,0.14)' : latest.priority === 'YELLOW' ? 'rgba(252,211,77,0.14)' : 'rgba(31, 157, 111,0.12)';
                   const color = latest.priority === 'RED' ? 'var(--color-danger)' : latest.priority === 'YELLOW' ? 'var(--color-warning)' : 'var(--color-success)';
                   const label = latest.priority === 'RED' ? 'Emergency — immediate care' : latest.priority === 'YELLOW' ? 'Priority — see soon' : 'Non-urgent';
                   return (
-                    <div className="card-elevated p-4 flex items-center gap-4" style={{ background: bg, border: `1px solid ${color}40` }}>
+                    <div className="card-elevated p-4 flex items-center gap-4 lg:col-span-3 lg:order-1" style={{ background: bg, border: `1px solid ${color}40` }}>
                       <div className="flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: color, color: '#fff' }}>
                         <span className="text-base font-black">{latest.priority}</span>
                       </div>
@@ -671,9 +735,9 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
                 {/* Most Recent Record — hero card, first thing the doctor sees */}
                 <div
-                  className="card-elevated overflow-hidden relative"
+                  className="card-elevated overflow-hidden relative lg:col-span-2 lg:order-2"
                   style={{
-                    boxShadow: '0 8px 32px -12px rgba(43,111,224,0.18), 0 2px 8px rgba(0,0,0,0.04)',
+                    boxShadow: '0 8px 32px -12px rgba(59, 130, 246,0.18), 0 2px 8px rgba(0,0,0,0.04)',
                   }}
                 >
                   {/* Decorative gradient corner */}
@@ -682,7 +746,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                     style={{
                       position: 'absolute', top: 0, right: 0,
                       width: 200, height: 160, pointerEvents: 'none',
-                      background: 'radial-gradient(ellipse at top right, rgba(43,111,224,0.08), transparent 70%)',
+                      background: 'radial-gradient(ellipse at top right, rgba(59, 130, 246,0.08), transparent 70%)',
                     }}
                   />
 
@@ -807,6 +871,18 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                             {latestRecord.hospitalName}
                           </span>
                         )}
+                        {encounterBalance != null && (
+                          <span
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-semibold"
+                            style={{
+                              background: encounterBalance > 0 ? 'rgba(196,69,54,0.12)' : 'rgba(31,157,111,0.12)',
+                              color: encounterBalance > 0 ? 'var(--color-danger)' : 'var(--color-success)',
+                            }}
+                          >
+                            <Wallet className="w-3 h-3" />
+                            {encounterBalance > 0 ? `SSP ${Math.round(encounterBalance).toLocaleString()} due` : 'Visit settled'}
+                          </span>
+                        )}
                       </div>
 
                       {/* Clinical blocks: medications + treatment plan */}
@@ -822,7 +898,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                             className="text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5"
                             style={{ color: 'var(--text-muted)' }}
                           >
-                            <Pill className="w-3 h-3" style={{ color: '#14B8A6' }} />
+                            <Pill className="w-3 h-3" style={{ color: '#3B82F6' }} />
                             Current medications
                           </p>
                           {(latestRecord.prescriptions || []).length > 0 ? (
@@ -889,7 +965,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                 </div>
 
                 {/* Latest Vitals */}
-                <div className="card-elevated">
+                <div className="card-elevated lg:col-span-3 lg:order-4">
                   <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
                     <div className="flex items-center gap-2.5">
                       <div className="icon-box-sm" style={{ background: 'rgba(196, 69, 54, 0.12)' }}>
@@ -934,7 +1010,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                 </div>
 
                 {/* Recent Visits */}
-                <div className="card-elevated">
+                <div className="card-elevated lg:col-span-3 lg:order-5">
                   <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
                     <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
                       <FileText className="w-3.5 h-3.5" style={{ color: 'var(--tamamhealth-blue)' }} />
@@ -977,6 +1053,27 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                         <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
                           Provider: {rec.providerName} · {rec.providerRole}
                         </p>
+
+                        {/* Structured clinical history — surfaced for continuity */}
+                        {(rec.historyOfPresentIllness || (rec.pastMedicalHistory?.chronicConditions?.length ?? 0) > 0 || (rec.drugHistory?.allergies?.length ?? 0) > 0 || rec.drugHistory?.noKnownAllergies || rec.socialHistory?.hasHealthInsurance !== undefined) && (
+                          <div className="mt-2 p-3 rounded-lg space-y-1" style={{ background: 'var(--overlay-subtle)' }}>
+                            {rec.historyOfPresentIllness && rec.historyOfPresentIllness !== rec.chiefComplaint && (
+                              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}><span className="font-semibold">HPI:</span> {rec.historyOfPresentIllness}</p>
+                            )}
+                            {(rec.pastMedicalHistory?.chronicConditions?.length ?? 0) > 0 && (
+                              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}><span className="font-semibold">PMH:</span> {(rec.pastMedicalHistory?.chronicConditions || []).join(', ')}</p>
+                            )}
+                            {(rec.drugHistory?.noKnownAllergies || (rec.drugHistory?.allergies?.length ?? 0) > 0) && (
+                              <p className="text-xs" style={{ color: 'var(--tamamhealth-red)' }}><span className="font-semibold">Allergies:</span> {rec.drugHistory?.noKnownAllergies ? 'NKDA' : (rec.drugHistory?.allergies || []).join(', ')}</p>
+                            )}
+                            {rec.socialHistory && (rec.socialHistory.hasHealthInsurance !== undefined || rec.socialHistory.socioeconomicStatus) && (
+                              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                                {rec.socialHistory.hasHealthInsurance ? `Insured${rec.socialHistory.insuranceProvider ? ' · ' + rec.socialHistory.insuranceProvider : ''}` : 'Uninsured'}
+                                {rec.socialHistory.socioeconomicStatus ? ` · ${rec.socialHistory.socioeconomicStatus} income` : ''}
+                              </p>
+                            )}
+                          </div>
+                        )}
                         {ai && (
                           <>
                             <button
@@ -1020,120 +1117,16 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                     );})}
                   </div>
                 </div>
-              </div>
 
-              {/* Sidebar info */}
-              <div className="space-y-5">
-                {/* ── Related Records (deep links) ── */}
+              {/* Sidebar info — only data that is NOT already its own tab.
+                  Allergies (header flag) and chronic conditions (Problems tab)
+                  live elsewhere; records with dedicated tabs (history, referrals,
+                  labs, prescriptions, immunizations, billing) are on the tab bar.
+                  Cards stretch to fill the column beside the main content. */}
+              <div className="lg:col-span-1 lg:order-3 flex flex-col gap-5">
                 <div className="card-elevated">
                   <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                    <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
-                      <ClipboardList className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                    </div>
-                    <h3 className="font-semibold text-sm">Related Records</h3>
-                  </div>
-                  <div className="p-3 space-y-1">
-                    {[
-                      {
-                        icon: FileText,
-                        label: 'Past Consultations',
-                        count: consultationsCount,
-                        action: () => setActiveTab('history'),
-                        iconBg: 'var(--accent-light)',
-                        iconColor: 'var(--accent-primary)',
-                      },
-                      {
-                        icon: ArrowRightLeft,
-                        label: 'Active Referrals',
-                        count: activeReferralsCount,
-                        action: () => setActiveTab('referrals'),
-                        iconBg: 'var(--accent-light)',
-                        iconColor: 'var(--accent-primary)',
-                      },
-                      {
-                        icon: FlaskConical,
-                        label: 'Lab Orders',
-                        count: labOrdersCount,
-                        action: () => setActiveTab('labs'),
-                        iconBg: 'rgba(139,92,246,0.12)',
-                        iconColor: '#8B5CF6',
-                      },
-                      {
-                        icon: Pill,
-                        label: 'Prescriptions',
-                        count: prescriptionsCount,
-                        action: () => setActiveTab('prescriptions'),
-                        iconBg: 'rgba(20,184,166,0.12)',
-                        iconColor: '#14B8A6',
-                      },
-                      {
-                        icon: Heart,
-                        label: 'Immunizations',
-                        count: immunizationsCount,
-                        action: () => router.push(`/immunizations`),
-                        iconBg: 'rgba(236,72,153,0.12)',
-                        iconColor: '#EC4899',
-                      },
-                    ].map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <button
-                          key={item.label}
-                          onClick={item.action}
-                          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-[var(--accent-light)] text-left"
-                          title={`View ${item.label}`}
-                        >
-                          <div
-                            className="icon-box-sm flex-shrink-0"
-                            style={{ background: item.iconBg }}
-                          >
-                            <Icon className="w-3.5 h-3.5" style={{ color: item.iconColor }} />
-                          </div>
-                          <span className="text-xs flex-1" style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
-                          <span
-                            className="text-xs font-bold px-2 py-0.5 rounded-full min-w-[24px] text-center"
-                            style={{
-                              background: item.count > 0 ? 'var(--accent-primary)' : 'var(--overlay-subtle)',
-                              color: item.count > 0 ? '#fff' : 'var(--text-muted)',
-                            }}
-                          >
-                            {item.count}
-                          </span>
-                          <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* ── Billing & Financial Summary ── */}
-                <BillingSidebarCard
-                  patientId={patient._id}
-                  onPayClick={() => { setActiveTab('billing'); setShowPaymentPanel(true); }}
-                  onViewBilling={() => setActiveTab('billing')}
-                />
-
-                {/* ── Patient QR Code ── */}
-                <div className="card-elevated no-print">
-                  <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                    <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
-                      <Search className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                    </div>
-                    <h3 className="font-semibold text-sm">Patient QR Code</h3>
-                  </div>
-                  <div className="p-5 flex justify-center">
-                    <PatientQRCode
-                      patientId={patient._id}
-                      patientName={`${patient.firstName} ${patient.surname}`}
-                      hospitalNumber={patient.hospitalNumber}
-                      size={180}
-                    />
-                  </div>
-                </div>
-
-                <div className="card-elevated">
-                  <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                    <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
+                    <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
                       <UserIcon className="w-3.5 h-3.5" style={{ color: 'var(--tamamhealth-blue)' }} />
                     </div>
                     <h3 className="font-semibold text-sm">{t('patient.demographics')}</h3>
@@ -1142,7 +1135,6 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                     {/* Personal Info */}
                     <div className="data-row-divider-sm">
                       {[
-                        { l: t('patient.phone'), v: patient.phone },
                         { l: t('patient.bloodType'), v: patient.bloodType },
                         { l: t('patient.location'), v: `${patient.county}, ${patient.state}` },
                         { l: t('patient.tribe'), v: patient.tribe },
@@ -1183,55 +1175,94 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   </div>
                 </div>
 
-                <div className="card-elevated">
-                  <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                    <div className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.12)' }}>
-                      <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--tamamhealth-red)' }} />
-                    </div>
-                    <h3 className="font-semibold text-sm">{t('patient.allergies')}</h3>
-                  </div>
-                  <div className="p-5 data-row-divider-sm">
-                    {(patient.allergies || ['None known']).map(a => (
-                      <div key={a} className="px-3 py-2 rounded-lg text-sm font-medium"
-                        style={{ background: a === 'None known' ? 'var(--overlay-subtle)' : 'rgba(229,46,66,0.14)', color: a === 'None known' ? 'var(--text-secondary)' : '#F87171' }}>
-                        {a}
+                {/* Appointments — shown only when the patient has one on record */}
+                {(lastAppt || nextAppt) && (
+                  <div className="card-elevated">
+                    <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                      <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                        <CalendarClock className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
                       </div>
-                    ))}
+                      <h3 className="font-semibold text-sm">Appointments</h3>
+                    </div>
+                    <div className="p-5 space-y-4">
+                      {lastAppt && (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Last visit</p>
+                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatDate(`${lastAppt.appointmentDate}T${lastAppt.appointmentTime || '00:00'}:00`)} · {lastAppt.appointmentTime}</p>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{lastAppt.providerName} · {lastAppt.department || lastAppt.reason}</p>
+                        </div>
+                      )}
+                      {nextAppt && (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent-primary)' }}>Next visit</p>
+                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatDate(`${nextAppt.appointmentDate}T${nextAppt.appointmentTime || '00:00'}:00`)} · {nextAppt.appointmentTime}</p>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{nextAppt.providerName} · {nextAppt.department || nextAppt.reason}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="card-elevated">
-                  <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                    <div className="icon-box-sm" style={{ background: 'rgba(236,72,153,0.12)' }}>
-                      <Heart className="w-3.5 h-3.5" style={{ color: '#EC4899' }} />
-                    </div>
-                    <h3 className="font-semibold text-sm">{t('patient.chronicConditions')}</h3>
-                  </div>
-                  <div className="p-5 data-row-divider-sm">
-                    {(patient.chronicConditions || ['None']).map(c => (
-                      <div key={c} className="px-3 py-2 rounded-lg text-sm"
-                        style={{ background: c === 'None' ? 'var(--overlay-subtle)' : 'rgba(252,211,77,0.14)', color: c === 'None' ? 'var(--text-secondary)' : 'var(--color-warning)' }}>
-                        {c}
+                {/* Care Notes — shown only when a note exists */}
+                {latestNote && (
+                  <div className="card-elevated">
+                    <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                      <div className="icon-box-sm" style={{ background: 'rgba(228,168,75,0.14)' }}>
+                        <FileText className="w-3.5 h-3.5" style={{ color: '#E4A84B' }} />
                       </div>
-                    ))}
+                      <h3 className="font-semibold text-sm">Care Notes</h3>
+                    </div>
+                    <div className="p-5">
+                      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{latestNote.body}</p>
+                      <p className="text-[11px] mt-2 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                        <Clock className="w-3 h-3" /> {latestNote.authorName} · {formatDate(latestNote.createdAt)}
+                        {patientNotes.length > 1 && ` · +${patientNotes.length - 1} more`}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="card-elevated">
-                  <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                    <div className="icon-box-sm" style={{ background: 'rgba(20,184,166,0.12)' }}>
-                      <Pill className="w-3.5 h-3.5" style={{ color: '#14B8A6' }} />
+              </div>
+            </div>
+          )}
+
+          {/* Overview Tab — administrative-only summary (non-clinical roles, e.g. Medical Receptionist).
+              Minimum-necessary: contact + registration + next of kin, with shortcuts to the
+              admin tabs. No clinical notes, diagnoses, vitals, labs, or medications. */}
+          {activeTab === 'overview' && !canViewClinical && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="card-elevated">
+                <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                  <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+                    <UserIcon className="w-3.5 h-3.5" style={{ color: 'var(--tamamhealth-blue)' }} />
+                  </div>
+                  <h3 className="font-semibold text-sm">{t('patient.demographics')}</h3>
+                </div>
+                <div className="p-5 data-row-divider-sm">
+                  {[
+                    { l: t('patient.phone'), v: patient.phone },
+                    { l: t('patient.location'), v: `${patient.county}, ${patient.state}` },
+                    { l: t('patient.language'), v: patient.primaryLanguage },
+                    { l: t('patient.registered'), v: registeredAtDisplay },
+                    { l: t('patient.facility'), v: regHospital?.name || 'N/A' },
+                    { l: t('patient.nextOfKin'), v: `${patient.nokName} (${patient.nokRelationship})` },
+                    { l: t('patient.nokPhone'), v: patient.nokPhone },
+                  ].map(item => (
+                    <div key={item.l} className="flex justify-between">
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.l}</span>
+                      <span className="text-xs font-medium text-right max-w-[60%] truncate">{item.v}</span>
                     </div>
-                    <h3 className="font-semibold text-sm">{t('patient.medications')}</h3>
-                  </div>
-                  <div className="p-5 data-row-divider-sm">
-                    {records[0]?.prescriptions?.map((p, i) => (
-                      <div key={i} className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                        <p className="text-sm font-medium">{p.drugName}</p>
-                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{p.dose} · {p.route} · {p.frequency}</p>
-                      </div>
-                    ))}
-                  </div>
+                  ))}
+                </div>
+              </div>
+              <div className="card-elevated p-5">
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Clinical information (notes, test results, diagnoses, vitals, and medications) is restricted for your role. Use the tabs below for the administrative tasks you handle.
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <button onClick={() => setActiveTab('billing')} className="btn btn-secondary btn-sm"><Wallet className="w-4 h-4" /> {t('billing.sidebarTitle')}</button>
+                  <button onClick={() => setActiveTab('referrals')} className="btn btn-secondary btn-sm"><ArrowRightLeft className="w-4 h-4" /> {t('tab.referrals')}</button>
+                  <button onClick={() => router.push(`/appointments?patientId=${patient._id}`)} className="btn btn-secondary btn-sm"><ClipboardList className="w-4 h-4" /> {t('nav.appointments')}</button>
                 </div>
               </div>
             </div>
@@ -1252,6 +1283,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                 activeReferrals: activeReferralsCount,
               }}
               onJump={setActiveTab}
+              canConsult={canConsult}
             />
           )}
 
@@ -1630,7 +1662,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                             {(rec.prescriptions || []).length > 0 && (
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                                  <Pill className="w-3 h-3" style={{ color: '#14B8A6' }} />
+                                  <Pill className="w-3 h-3" style={{ color: '#3B82F6' }} />
                                   Prescriptions ({rec.prescriptions!.length})
                                 </p>
                                 <ul className="space-y-1">
@@ -1776,8 +1808,8 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             <div className="space-y-4">
               <div className="flex items-center justify-between px-1 mb-1">
                 <div className="flex items-center gap-2">
-                  <div className="icon-box-sm" style={{ background: 'rgba(20,184,166,0.12)' }}>
-                    <Pill className="w-3.5 h-3.5" style={{ color: '#14B8A6' }} />
+                  <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+                    <Pill className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Prescriptions</span>
                 </div>
@@ -1785,6 +1817,21 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   View in Pharmacy <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
+              {patient.preferredPharmacy && (
+                <div className="card-elevated px-5 py-3 flex items-center gap-3">
+                  <div className="icon-box-sm flex-shrink-0" style={{ background: 'rgba(59,130,246,0.12)' }}>
+                    <Building2 className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Preferred Pharmacy</p>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {patient.preferredPharmacy.name}
+                      {patient.preferredPharmacy.address && <span className="font-normal" style={{ color: 'var(--text-muted)' }}> · {patient.preferredPharmacy.address}</span>}
+                      {patient.preferredPharmacy.phone && <span className="font-normal" style={{ color: 'var(--text-muted)' }}> · {patient.preferredPharmacy.phone}</span>}
+                    </p>
+                  </div>
+                </div>
+              )}
               {records.map(rec => (
                 <div key={rec._id} className="card-elevated">
                   <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
@@ -1797,8 +1844,8 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   <div className="divide-y data-row-divider-sm" style={{ borderColor: 'var(--table-row-border)' }}>
                     {(rec.prescriptions || []).map((rx, i) => (
                       <div key={i} className="px-5 py-3 flex items-center gap-4">
-                        <div className="icon-box-sm flex-shrink-0" style={{ background: 'rgba(20,184,166,0.12)' }}>
-                          <Pill className="w-3.5 h-3.5" style={{ color: '#14B8A6' }} />
+                        <div className="icon-box-sm flex-shrink-0" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+                          <Pill className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
                         </div>
                         <div className="flex-1">
                           <p className="text-sm font-medium">{rx.drugName}</p>
@@ -1854,6 +1901,71 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             </div>
           )}
 
+          {/* Immunizations Tab */}
+          {activeTab === 'immunizations' && (() => {
+            const immRecords = (allImmunizations || [])
+              .filter(i => i.patientId === patient._id)
+              .sort((a, b) => new Date(b.dateGiven || b.nextDueDate).getTime() - new Date(a.dateGiven || a.nextDueDate).getTime());
+            const statusStyle: Record<string, { bg: string; color: string }> = {
+              completed: { bg: 'rgba(31,157,111,0.14)', color: 'var(--color-success)' },
+              scheduled: { bg: 'var(--accent-light)', color: 'var(--accent-primary)' },
+              overdue: { bg: 'rgba(229,46,66,0.14)', color: 'var(--color-danger)' },
+              missed: { bg: 'rgba(252,211,77,0.16)', color: 'var(--color-warning)' },
+            };
+            return (
+              <div className="card-elevated overflow-hidden">
+                <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
+                  <div className="flex items-center gap-2.5">
+                    <div className="icon-box-sm" style={{ background: 'rgba(31,157,111,0.12)' }}>
+                      <Syringe className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm">Immunizations</h3>
+                      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{immRecords.length} record{immRecords.length === 1 ? '' : 's'} on file</p>
+                    </div>
+                  </div>
+                  <button onClick={() => router.push('/immunizations')} className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors" style={{ color: 'var(--accent-primary)', border: '1px solid var(--accent-border)' }}>
+                    Immunization registry <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {immRecords.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <Syringe className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No immunizations recorded for this patient.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                        {['Vaccine', 'Dose', 'Date given', 'Next due', 'Site', 'Batch', 'Status'].map(h => (
+                          <th key={h} className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {immRecords.map(im => {
+                        const s = statusStyle[im.status] || statusStyle.scheduled;
+                        return (
+                          <tr key={im._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                            <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{im.vaccine}</td>
+                            <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>{im.doseNumber ? `Dose ${im.doseNumber}` : '—'}</td>
+                            <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>{im.dateGiven ? formatDate(im.dateGiven) : '—'}</td>
+                            <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>{im.nextDueDate ? formatDate(im.nextDueDate) : '—'}</td>
+                            <td className="px-4 py-3 text-xs capitalize" style={{ color: 'var(--text-muted)' }}>{im.site || '—'}</td>
+                            <td className="px-4 py-3 text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{im.batchNumber || '—'}</td>
+                            <td className="px-4 py-3">
+                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ background: s.bg, color: s.color }}>{im.status}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Referrals Tab */}
           {activeTab === 'referrals' && (
             <div className="space-y-3">
@@ -1906,9 +2018,15 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                         <span className="font-medium">{ref.toHospital}</span>
                         <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--overlay-subtle)' }}>{ref.department}</span>
                       </div>
-                      <p className="text-sm mb-1"><span className="font-medium">Reason:</span> {ref.reason}</p>
-                      {ref.notes && (
-                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Notes: {ref.notes}</p>
+                      {canViewClinical ? (
+                        <>
+                          <p className="text-sm mb-1"><span className="font-medium">Reason:</span> {ref.reason}</p>
+                          {ref.notes && (
+                            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Notes: {ref.notes}</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>Clinical reason restricted</p>
                       )}
                       <div className="flex items-center gap-3 mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
                         <span>Dr. {ref.referringDoctor}</span>
@@ -1924,6 +2042,14 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                 })
               )}
             </div>
+          )}
+
+          {activeTab === 'communication' && (
+            <PatientCommunication
+              patientId={patient._id}
+              patientName={patientFullName(patient)}
+              patientPhone={patient.phone}
+            />
           )}
 
           {activeTab === 'billing' && (
@@ -1953,7 +2079,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
       {/* Edit Demographics Modal */}
       {showEditModal && patient && (
-        <div className="modal-backdrop" onClick={() => !editSubmitting && setShowEditModal(false)}>
+        <Modal onClose={() => !editSubmitting && setShowEditModal(false)}>
           <div className="modal-content card-elevated p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold">Edit Patient Demographics</h3>
@@ -2011,7 +2137,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

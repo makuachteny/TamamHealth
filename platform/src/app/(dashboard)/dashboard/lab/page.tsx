@@ -12,6 +12,7 @@ import {
   MessageSquare, ChevronRight, Beaker, Thermometer, Loader2,
   X, Save, Table, List, BarChart3, Timer, Bell, BellOff,
 } from '@/components/icons/lucide';
+import PatientName from '@/components/PatientName';
 
 const ACCENT = 'var(--accent-primary)';
 
@@ -84,12 +85,12 @@ const LAB_EVENT_TYPES = [
   { label: 'Centrifuge Started', color: '#A855F7', icon: Loader2 },
   { label: 'Malaria RDT Completed', color: 'var(--color-success)', icon: Microscope },
   { label: 'Critical Hemoglobin Flagged', color: '#F87171', icon: AlertTriangle },
-  { label: 'CBC Analysis Running', color: '#5CB8A8', icon: Activity },
+  { label: 'CBC Analysis Running', color: '#2563EB', icon: Activity },
   { label: 'Urinalysis Complete', color: 'var(--color-warning)', icon: Beaker },
   { label: 'Blood Culture Incubated', color: '#EC4899', icon: Thermometer },
   { label: 'Result Validated', color: 'var(--accent-primary)', icon: CheckCircle2 },
   { label: 'Specimen Rejected - Hemolyzed', color: 'var(--color-danger)', icon: AlertTriangle },
-  { label: 'Glucose Result Ready', color: '#5CB8A8', icon: FlaskConical },
+  { label: 'Glucose Result Ready', color: '#2563EB', icon: FlaskConical },
 ];
 
 interface LiveEvent {
@@ -438,7 +439,7 @@ export default function LabDashboardPage() {
     { label: t('lab.criticalResults'), value: kpis.critical, icon: AlertTriangle, color: 'var(--color-danger)' },
     { label: t('lab.unackCritical'), value: kpis.unacknowledgedCritical, icon: Bell, color: 'var(--color-danger)' },
     { label: t('lab.abnormal'), value: kpis.abnormal, icon: AlertTriangle, color: '#FB923C' },
-    { label: t('lab.avgTurnaround'), value: `${kpis.avgTurnaround}h`, icon: Zap, color: '#5CB8A8' },
+    { label: t('lab.avgTurnaround'), value: `${kpis.avgTurnaround}h`, icon: Zap, color: '#2563EB' },
     { label: t('lab.totalTests'), value: kpis.total, icon: TestTubes, color: ACCENT },
   ];
 
@@ -446,7 +447,7 @@ export default function LabDashboardPage() {
     { label: t('lab.acceptOrder'), icon: FileText, color: 'var(--color-success)', onClick: () => {} },
     { label: t('lab.enterResult'), icon: Microscope, color: ACCENT, onClick: () => setShowResultModal(true) },
     { label: t('lab.batchEntry'), icon: Table, color: '#A855F7', onClick: () => { setEntryMode('batch'); setShowResultModal(true); } },
-    { label: t('lab.message'), icon: MessageSquare, color: '#5CB8A8', onClick: () => {} },
+    { label: t('lab.message'), icon: MessageSquare, color: '#2563EB', onClick: () => {} },
   ];
 
   return (
@@ -747,7 +748,7 @@ export default function LabDashboardPage() {
         <div className="dash-card rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <div className="flex items-center gap-2">
-              <Timer className="w-4 h-4" style={{ color: '#5CB8A8' }} />
+              <Timer className="w-4 h-4" style={{ color: '#2563EB' }} />
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.tatDashboard')}</span>
             </div>
             <div className="flex items-center gap-3">
@@ -955,7 +956,7 @@ export default function LabDashboardPage() {
 
                       {/* Reference Range Display */}
                       {currentRefRange && (
-                        <div className="p-3 rounded-xl" style={{ background: 'rgba(43,111,224,0.06)', border: '1px solid var(--accent-border)' }}>
+                        <div className="p-3 rounded-xl" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
                           <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: ACCENT }}>{t('lab.referenceRange')}</p>
                           <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
                             {currentRefRange.referenceStr}
@@ -1079,7 +1080,7 @@ export default function LabDashboardPage() {
                   {batchTestType && (() => {
                     const ref = getRefRange(batchTestType);
                     return ref ? (
-                      <div className="p-2.5 rounded-xl" style={{ background: 'rgba(43,111,224,0.06)', border: '1px solid var(--accent-border)' }}>
+                      <div className="p-2.5 rounded-xl" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
                         <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: ACCENT }}>
                           {t('lab.reference')}: {ref.referenceStr}
                           {ref.criticalLow !== undefined && ` | ${t('lab.criticalLabel')}: <${ref.criticalLow}`}
@@ -1107,7 +1108,7 @@ export default function LabDashboardPage() {
                             return (
                               <tr key={entry.orderId} style={{ borderTop: '1px solid var(--border-light)' }}>
                                 <td className="px-3 py-2">
-                                  <span className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{entry.patientName}</span>
+                                  <PatientName name={entry.patientName} size={24} nameClassName="text-[11px] font-medium" />
                                 </td>
                                 <td className="px-3 py-2">
                                   <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{entry.specimen}</span>

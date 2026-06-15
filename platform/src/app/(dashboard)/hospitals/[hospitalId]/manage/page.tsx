@@ -33,12 +33,13 @@ import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import {
   Building2, Users, BedDouble, Package, Pill, Calendar,
-  Activity, Settings, Search, ArrowLeft, Loader2, AlertTriangle,
+  Activity, Settings, ArrowLeft, Loader2, AlertTriangle,
   CheckCircle, Save, Clock, MapPin, Stethoscope, Plus,
   FlaskConical, Syringe,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { FilterBar, SearchInput, FilterSelect } from '@/components/filters';
 import type {
   HospitalDoc, UserDoc, UserRole, AppointmentDoc, PrescriptionDoc,
   ImmunizationDoc, LabResultDoc, StaffScheduleDoc, PharmacyInventoryDoc,
@@ -462,34 +463,31 @@ function StaffTab({ scope, hospitalId }: { scope: DataScope | undefined; hospita
 
   return (
     <div className="card-elevated" style={{ overflow: 'hidden' }}>
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative' }}>
-          <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: 'var(--text-muted)' }} />
-          <input
-            type="text"
-            placeholder={t('hospitals.searchNameUsername')}
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)' }}>
+        <FilterBar>
+          <SearchInput
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ paddingLeft: 30, width: 240 }}
+            onChange={setSearch}
+            placeholder={t('hospitals.searchNameUsername')}
+            aria-label={t('hospitals.searchNameUsername')}
           />
-        </div>
-        <select
-          value={roleFilter}
-          onChange={e => setRoleFilter(e.target.value)}
-          style={{
-            background: 'var(--bg-card)', color: 'var(--text-primary)',
-            border: '1px solid var(--border-light)', borderRadius: 'var(--input-radius)',
-            padding: '5px 12px', fontSize: 12, minHeight: 30,
-          }}
-        >
-          <option value="all">{t('hospitals.allRoles')}</option>
-          {Object.keys(roleCounts).map(r => (
-            <option key={r} value={r}>{r.replace(/_/g, ' ')} ({roleCounts[r]})</option>
-          ))}
-        </select>
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
-          {t('hospitals.countOf', { shown: filtered.length, total: users.length })}
-        </span>
+          <FilterSelect
+            value={roleFilter}
+            onChange={setRoleFilter}
+            options={[
+              { value: 'all', label: t('hospitals.allRoles') },
+              ...Object.keys(roleCounts).map(r => ({
+                value: r,
+                label: `${r.replace(/_/g, ' ')} (${roleCounts[r]})`,
+              })),
+            ]}
+            aria-label={t('hospitals.colRole')}
+          />
+          <FilterBar.Spacer />
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {t('hospitals.countOf', { shown: filtered.length, total: users.length })}
+          </span>
+        </FilterBar>
       </div>
       <div style={{ overflow: 'auto' }}>
         <table className="data-table">
@@ -1037,11 +1035,11 @@ function PerformanceTab({ scope, hospitalId }: { scope: DataScope | undefined; h
   const cards: { label: string; value: number | string; icon: typeof Calendar; tint: string }[] = [
     { label: t('hospitals.kpiVisitsToday'),       value: kpis.visitsToday,                  icon: Calendar,    tint: '#3b82f6' },
     { label: t('hospitals.kpiActiveAdmissions'),  value: kpis.activeAdmissions,             icon: BedDouble,   tint: '#A78BFA' },
-    { label: t('hospitals.kpiDischargesToday'),   value: kpis.dischargesToday,              icon: CheckCircle, tint: '#10B981' },
+    { label: t('hospitals.kpiDischargesToday'),   value: kpis.dischargesToday,              icon: CheckCircle, tint: '#1F9D6F' },
     { label: t('hospitals.kpiTransfersToday'),    value: kpis.transfersToday,               icon: ArrowLeft,   tint: '#3B82F6' },
     { label: t('hospitals.kpiAvgLabTat'),         value: kpis.labTatHours || '—',           icon: FlaskConical, tint: '#F59E0B' },
     { label: t('hospitals.kpiRxDispensedToday'),  value: kpis.prescriptionsDispensedToday,  icon: Pill,        tint: '#EC4899' },
-    { label: t('hospitals.kpiImmunizationsToday'), value: kpis.immunizationsToday,          icon: Syringe,     tint: '#14B8A6' },
+    { label: t('hospitals.kpiImmunizationsToday'), value: kpis.immunizationsToday,          icon: Syringe,     tint: '#3B82F6' },
   ];
 
   return (

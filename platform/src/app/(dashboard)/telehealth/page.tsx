@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
+import PortalModal from '@/components/Modal';
+import PatientName from '@/components/PatientName';
 import Link from 'next/link';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import {
   Video, Plus, Phone, PhoneOff, Clock, CheckCircle2, XCircle,
-  Search, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MessageSquare, FileText,
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MessageSquare, FileText,
   Star, Shield, X, WifiOff,
   Calendar, DollarSign, Lock,
   Filter, UserPlus, ExternalLink,
@@ -17,6 +19,7 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { FilterBar, SearchInput } from '@/components/filters';
 import type { TelehealthType, TelehealthStatus, TelehealthSessionDoc } from '@/lib/db-types';
 
 /* ─── Config ─── */
@@ -24,7 +27,7 @@ const statusConfig: Record<TelehealthStatus, { color: string; bg: string; label:
   scheduled: { color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.08)', label: 'Scheduled', icon: Calendar },
   waiting_room: { color: 'var(--color-warning)', bg: 'rgba(217,119,6,0.08)', label: 'Waiting', icon: Clock },
   in_session: { color: 'var(--color-success)', bg: 'rgba(5,150,105,0.08)', label: 'In Session', icon: Video },
-  completed: { color: 'var(--color-success)', bg: 'rgba(16,185,129,0.08)', label: 'Completed', icon: CheckCircle2 },
+  completed: { color: 'var(--color-success)', bg: 'rgba(31, 157, 111,0.08)', label: 'Completed', icon: CheckCircle2 },
   cancelled: { color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.08)', label: 'Cancelled', icon: XCircle },
   failed: { color: '#6B7280', bg: 'rgba(107,114,128,0.08)', label: 'Failed', icon: WifiOff },
   no_show: { color: '#9CA3AF', bg: 'rgba(156,163,175,0.08)', label: 'No Show', icon: XCircle },
@@ -241,25 +244,22 @@ export default function TelehealthPage() {
               </button>
             ))}
           </div>
+          {/* Search grows to fill; Filters toggle sits to its right in the same row */}
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <SearchInput value={search} onChange={setSearch} placeholder={t('telehealth.searchPlaceholder')} />
+          </div>
           <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary" style={{ gap: 6 }}>
             <Filter size={14} /> {t('patients.filters')}
           </button>
-          <div style={{ flex: 1 }} />
         </div>
 
-        {/* Filters */}
-        {showFilters && (
-          <div className="card-elevated" style={{ padding: 12, marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
-              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('telehealth.searchPlaceholder')} style={{ paddingLeft: 32 }} />
-            </div>
-            {selectedDate && (
-              <button onClick={() => setSelectedDate(null)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-                <X size={12} /> {t('telehealth.clearDate')}
-              </button>
-            )}
-          </div>
+        {/* Filters (expanded panel) */}
+        {showFilters && selectedDate && (
+          <FilterBar>
+            <button onClick={() => setSelectedDate(null)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
+              <X size={12} /> {t('telehealth.clearDate')}
+            </button>
+          </FilterBar>
         )}
 
         {/* Compliance banner */}
@@ -295,7 +295,7 @@ export default function TelehealthPage() {
                 return (
                   <button key={i} onClick={() => setSelectedDate(isSel ? null : day.date)} style={{
                     padding: '10px 4px', minHeight: 0, border: 'none', cursor: 'pointer',
-                    background: isSel ? 'var(--accent-light)' : day.isToday ? 'rgba(16,185,129,0.04)' : 'transparent',
+                    background: isSel ? 'var(--accent-light)' : day.isToday ? 'rgba(31, 157, 111,0.04)' : 'transparent',
                     borderRight: (i + 1) % 7 !== 0 ? '1px solid var(--border-medium)' : 'none',
                     borderBottom: '1px solid var(--border-medium)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
@@ -349,7 +349,7 @@ export default function TelehealthPage() {
               <div key={a._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: '1px solid var(--border-medium)' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', minWidth: 44 }}>{a.appointmentTime}</span>
                 <Calendar size={13} style={{ color: 'var(--accent-primary)' }} />
-                <span style={{ fontSize: 12, color: 'var(--text-primary)', flex: 1 }}>{a.patientName}</span>
+                <span style={{ flex: 1 }}><PatientName name={a.patientName} size={24} nameClassName="text-xs" /></span>
                 <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{a.department}</span>
               </div>
             ))}
@@ -394,11 +394,11 @@ export default function TelehealthPage() {
                               className="hover:underline"
                               title={t('dashboard.viewPatientRecord')}
                             >
-                              {session.patientName}
+                              <PatientName name={session.patientName} nameClassName="text-[13px] font-semibold" />
                               <ExternalLink size={11} style={{ opacity: 0.55 }} />
                             </Link>
                           ) : (
-                            session.patientName
+                            <PatientName name={session.patientName} nameClassName="text-[13px] font-semibold" />
                           )}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t(`telehealth.type_${session.sessionType}`)} &middot; {session.chiefComplaint.slice(0, 40)}{session.chiefComplaint.length > 40 ? '...' : ''}</div>
@@ -443,7 +443,7 @@ export default function TelehealthPage() {
                             <Btn c="#3b82f6" onClick={() => { setNotesId(session._id); setNotesText(session.clinicalNotes || ''); setNotesDx(session.diagnosis || ''); setNotesIcd(session.icd10Code || ''); }}><FileText size={13} /> {t('nurse.notes')}</Btn>
                           )}
                           {session.status === 'completed' && !session.patientRating && <Btn c="#F59E0B" onClick={() => setRatingId(session._id)}><Star size={13} /> {t('telehealth.btnRate')}</Btn>}
-                          {session.status === 'completed' && session.paymentStatus === 'pending' && <Btn c="#10B981" onClick={() => update(session._id, { paymentStatus: 'paid' })}><DollarSign size={13} /> {t('telehealth.payment_paid')}</Btn>}
+                          {session.status === 'completed' && session.paymentStatus === 'pending' && <Btn c="#1F9D6F" onClick={() => update(session._id, { paymentStatus: 'paid' })}><DollarSign size={13} /> {t('telehealth.payment_paid')}</Btn>}
                         </div>
                       </div>
                     )}
@@ -514,7 +514,7 @@ export default function TelehealthPage() {
 /* ─── Helpers ─── */
 function Modal({ children, title, onClose, sm }: { children: React.ReactNode; title: string; onClose: () => void; sm?: boolean }) {
   return (
-    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <PortalModal onClose={onClose} width={sm ? 420 : 560}>
       <div className={`modal-panel ${sm ? 'modal-panel--sm' : 'modal-panel--md'}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h3>
@@ -522,7 +522,7 @@ function Modal({ children, title, onClose, sm }: { children: React.ReactNode; ti
         </div>
         {children}
       </div>
-    </div>
+    </PortalModal>
   );
 }
 

@@ -20,6 +20,7 @@ import {
 } from '@/components/icons/lucide';
 import type { PatientDoc } from '@/lib/db-types';
 import { useWards } from '@/lib/hooks/useWards';
+import { patientAge } from '@/lib/patient-utils';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface IndexCellProps {
@@ -40,7 +41,7 @@ const EMPHASIS_TINTS: Record<NonNullable<IndexCellProps['emphasis']>, { iconBg: 
   default:    { iconBg: 'var(--accent-light)',     iconColor: 'var(--accent-primary)',  ring: 'var(--border-light)' },
   safety:     { iconBg: 'rgba(196,69,54,0.14)',    iconColor: 'var(--tamamhealth-red)', ring: 'rgba(196,69,54,0.20)' },
   maternal:   { iconBg: 'rgba(236,72,153,0.14)',   iconColor: '#EC4899',                ring: 'rgba(236,72,153,0.22)' },
-  paediatric: { iconBg: 'rgba(20,184,166,0.14)',   iconColor: '#0D9488',                ring: 'rgba(20,184,166,0.22)' },
+  paediatric: { iconBg: 'rgba(59, 130, 246,0.14)',   iconColor: '#1E3A8A',                ring: 'rgba(59, 130, 246,0.22)' },
   inpatient:  { iconBg: 'rgba(124,58,237,0.14)',   iconColor: '#7C3AED',                ring: 'rgba(124,58,237,0.22)' },
 };
 
@@ -141,16 +142,11 @@ export interface PatientIndexProps {
     activeReferrals: number;
   };
   onJump: (tabId: string) => void;
+  /** Whether the viewer may start a consultation (consultation capability). */
+  canConsult: boolean;
 }
 
-function calcAge(dob?: string): number | null {
-  if (!dob) return null;
-  const d = new Date(dob);
-  if (Number.isNaN(d.getTime())) return null;
-  return new Date().getFullYear() - d.getFullYear();
-}
-
-export default function PatientIndex({ patient, counts, onJump }: PatientIndexProps) {
+export default function PatientIndex({ patient, counts, onJump, canConsult }: PatientIndexProps) {
   const { t } = useTranslation();
   const { activeAdmissions } = useWards();
   const admission = useMemo(
@@ -158,7 +154,7 @@ export default function PatientIndex({ patient, counts, onJump }: PatientIndexPr
     [activeAdmissions, patient._id],
   );
 
-  const age = calcAge(patient.dateOfBirth);
+  const age = patientAge(patient);
   const isFemale = patient.gender === 'Female';
   const isAdult = age != null && age >= 15;
   const isUnder5 = age != null && age < 5;
@@ -204,12 +200,14 @@ export default function PatientIndex({ patient, counts, onJump }: PatientIndexPr
       </IndexGroup>
 
       <IndexGroup title={t('patientIndex.groupClinical')}>
-        <IndexCell
-          icon={Stethoscope}
-          label={t('action.newConsultation')}
-          hint={t('patientIndex.newConsultationHint')}
-          href={`/consultation/${patient._id}`}
-        />
+        {canConsult && (
+          <IndexCell
+            icon={Stethoscope}
+            label={t('action.newConsultation')}
+            hint={t('patientIndex.newConsultationHint')}
+            href={`/consultation?patientId=${patient._id}`}
+          />
+        )}
         <IndexCell
           icon={AlertTriangle}
           label={t('patientIndex.problemList')}

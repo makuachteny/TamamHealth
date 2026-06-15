@@ -9,9 +9,9 @@ import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { SearchInput, FilterSelect, FilterBar } from '@/components/filters';
 import {
-  Baby, Plus, Search, X, ChevronDown, ChevronUp,
-  HeartPulse, CheckCircle, AlertTriangle
+  Baby, Plus, X, ChevronDown, ChevronUp,
 } from '@/components/icons/lucide';
 
 export default function BirthsPage() {
@@ -22,6 +22,7 @@ export default function BirthsPage() {
   const { showToast } = useToast();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
+  const [deliveryFilter, setDeliveryFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [expandedBirth, setExpandedBirth] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -34,8 +35,9 @@ export default function BirthsPage() {
   });
 
   const filtered = (births || []).filter(b =>
-    !search || `${b.childFirstName} ${b.childSurname}`.toLowerCase().includes(search.toLowerCase()) ||
-    (b.motherName || '').toLowerCase().includes(search.toLowerCase()) || (b.certificateNumber || '').toLowerCase().includes(search.toLowerCase())
+    (deliveryFilter === 'all' || b.deliveryType === deliveryFilter) &&
+    (!search || `${b.childFirstName} ${b.childSurname}`.toLowerCase().includes(search.toLowerCase()) ||
+    (b.motherName || '').toLowerCase().includes(search.toLowerCase()) || (b.certificateNumber || '').toLowerCase().includes(search.toLowerCase()))
   );
 
   const handleSubmit = async () => {
@@ -73,36 +75,37 @@ export default function BirthsPage() {
           )}
         />
 
-        {/* Stats */}
-        {stats && (
-          <div className="kpi-grid mb-6">
-            {[
-              { label: 'Total Registered', value: stats.total, icon: Baby, color: '#EC4899', bg: 'rgba(236,72,153,0.12)' },
-              { label: 'This Month', value: stats.thisMonth, icon: HeartPulse, color: '#14B8A6', bg: 'rgba(20,184,166,0.12)' },
-              { label: 'Male / Female', value: <><span style={{ color: 'var(--accent-primary)' }}>{stats.byGender.male}</span><span style={{ color: 'var(--text-muted)' }}> / </span><span style={{ color: 'var(--color-danger)' }}>{stats.byGender.female}</span></>, icon: CheckCircle, color: '#059669', bg: 'rgba(5,150,105,0.12)' },
-              { label: 'Caesarean Rate', value: `${stats.total ? Math.round(stats.byDeliveryType.caesarean / stats.total * 100) : 0}%`, icon: AlertTriangle, color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
-            ].map(stat => (
-              <div key={stat.label} className="kpi">
-                <div className="icon-box-sm" style={{ background: stat.bg }}>
-                  <stat.icon style={{ color: stat.color }} />
+        {/* Search + filters, with the registry stats surfaced inline on the right */}
+        <FilterBar>
+          <SearchInput value={search} onChange={setSearch} placeholder="Search by child name, mother name, or certificate..." />
+          <FilterSelect
+            value={deliveryFilter}
+            onChange={setDeliveryFilter}
+            options={[
+              { value: 'all', label: 'All deliveries' },
+              { value: 'normal', label: 'Normal' },
+              { value: 'caesarean', label: 'Caesarean' },
+              { value: 'assisted', label: 'Assisted' },
+            ]}
+            aria-label="Filter by delivery type"
+          />
+          <FilterBar.Spacer />
+          {stats && (
+            <div className="flex items-center gap-4 sm:gap-5 pr-1">
+              {[
+                { label: 'Total Registered', value: stats.total, color: '#EC4899' },
+                { label: 'This Month', value: stats.thisMonth, color: '#3B82F6' },
+                { label: 'Male / Female', value: <><span style={{ color: 'var(--accent-primary)' }}>{stats.byGender.male}</span><span style={{ color: 'var(--text-muted)' }}> / </span><span style={{ color: 'var(--color-danger)' }}>{stats.byGender.female}</span></>, color: '#059669' },
+                { label: 'Caesarean Rate', value: `${stats.total ? Math.round(stats.byDeliveryType.caesarean / stats.total * 100) : 0}%`, color: '#DC2626' },
+              ].map(s => (
+                <div key={s.label} className="text-center leading-tight">
+                  <div className="text-base font-bold" style={{ color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
                 </div>
-                <div className="kpi__body">
-                  <div className="kpi__value">{stat.value}</div>
-                  <div className="kpi__label">{stat.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Search */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-            <Search className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input type="text" placeholder="Search by child name, mother name, or certificate..." value={search} onChange={e => setSearch(e.target.value)}
-              className="flex-1 bg-transparent text-sm outline-none" style={{ color: 'var(--text-primary)' }} />
-          </div>
-        </div>
+              ))}
+            </div>
+          )}
+        </FilterBar>
 
         {/* Table */}
         <div className="card-elevated overflow-hidden">
@@ -128,7 +131,7 @@ export default function BirthsPage() {
                   <tr key={b._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setExpandedBirth(expandedBirth === b._id ? null : b._id)}>
                     <td className="font-mono text-xs">{b.certificateNumber}</td>
                     <td className="font-medium text-sm">{b.childFirstName} {b.childSurname}</td>
-                    <td><span className="badge text-[10px]" style={{ background: b.childGender === 'Male' ? 'rgba(43,111,224,0.12)' : 'rgba(229,46,66,0.12)', color: b.childGender === 'Male' ? 'var(--accent-primary)' : 'var(--color-danger)' }}>{b.childGender}</span></td>
+                    <td><span className="badge text-[10px]" style={{ background: b.childGender === 'Male' ? 'rgba(59, 130, 246,0.12)' : 'rgba(229,46,66,0.12)', color: b.childGender === 'Male' ? 'var(--accent-primary)' : 'var(--color-danger)' }}>{b.childGender}</span></td>
                     <td className="text-xs font-mono">{b.dateOfBirth}</td>
                     <td className="text-sm">{b.birthWeight}g</td>
                     <td className="text-xs capitalize">{b.deliveryType}</td>

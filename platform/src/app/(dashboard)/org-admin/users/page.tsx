@@ -205,12 +205,9 @@ export default function OrgUsersPage() {
       pharmacist: t('orgUsers.rolePharmacist'),
       front_desk: t('orgUsers.roleFrontDesk'),
       government: t('orgUsers.roleGovernment'),
-      boma_health_worker: t('orgUsers.roleBomaHealthWorker'),
-      payam_supervisor: t('orgUsers.rolePayamSupervisor'),
       data_entry_clerk: t('orgUsers.roleDataEntryClerk'),
       medical_superintendent: t('orgUsers.roleMedicalSuperintendent'),
       hrio: t('orgUsers.roleHrio'),
-      community_health_volunteer: t('orgUsers.roleCommunityHealthVolunteer'),
       nutritionist: t('orgUsers.roleNutritionist'),
       radiologist: t('orgUsers.roleRadiologist'),
       hospital_manager: t('orgUsers.roleHospitalManager'),
@@ -228,14 +225,11 @@ export default function OrgUsersPage() {
       nurse: '#EC4899',
       lab_tech: '#06B6D4',
       pharmacist: 'var(--color-warning)',
-      front_desk: '#14B8A6',
+      front_desk: '#3B82F6',
       government: 'var(--accent-primary)',
-      boma_health_worker: 'var(--color-success)',
-      payam_supervisor: 'var(--color-warning)',
       data_entry_clerk: '#0891B2',
       medical_superintendent: '#1E40AF',
       hrio: '#0F766E',
-      community_health_volunteer: '#16A34A',
       nutritionist: '#EA580C',
       radiologist: '#7C3AED',
       hospital_manager: '#1E3A8A',
@@ -400,7 +394,7 @@ export default function OrgUsersPage() {
                       <span
                         className="text-xs font-medium px-2 py-0.5 rounded-full"
                         style={{
-                          background: user.isActive ? 'rgba(43,111,224,0.1)' : 'rgba(229,46,66,0.1)',
+                          background: user.isActive ? 'rgba(59, 130, 246,0.1)' : 'rgba(229,46,66,0.1)',
                           color: user.isActive ? 'var(--accent-primary)' : 'var(--color-danger)',
                         }}
                       >

@@ -177,7 +177,6 @@ export async function applyOrgScopedSecurity(roles: string[]): Promise<void> {
     'tamamhealth_facility_assessments',
     'tamamhealth_immunizations',
     'tamamhealth_anc',
-    'tamamhealth_boma_visits',
     'tamamhealth_follow_ups',
     'tamamhealth_organizations',
     'tamamhealth_platform_config',

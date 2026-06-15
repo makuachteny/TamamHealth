@@ -9,13 +9,12 @@ import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
 
 export async function getAllAssets(scope?: DataScope): Promise<AssetDoc[]> {
   const db = assetsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as AssetDoc)
-    .filter(d => d && d.type === 'asset')
+  const all = (await findByType<AssetDoc>(db, 'asset'))
     .sort((a, b) => a.name.localeCompare(b.name));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -104,6 +103,15 @@ export async function createAsset(input: CreateAssetInput): Promise<AssetDoc> {
       `Registered asset "${doc.name}" (tag ${doc.assetTag}) at ${doc.facilityName}`);
   }
 
+  emitSyncEvent({
+    resourceType: 'asset',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
@@ -121,6 +129,14 @@ export async function updateAsset(id: string, updates: Partial<AssetDoc>): Promi
     };
     const resp = await db.put(next);
     next._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'asset',
+      resourceId: next._id,
+      operation: 'update',
+      resourceVersion: next._rev,
+      orgId: next.orgId,
+      hospitalId: next.facilityId,
+    });
     return next;
   } catch {
     return null;
@@ -165,6 +181,14 @@ export async function logMaintenance(
     next._rev = resp.rev;
     await logAuditSafe('ASSET_MAINTENANCE', entry.performedBy, entry.performedByName,
       `${entry.type} on "${existing.name}": ${entry.notes}`);
+    emitSyncEvent({
+      resourceType: 'asset',
+      resourceId: next._id,
+      operation: 'update',
+      resourceVersion: next._rev,
+      orgId: next.orgId,
+      hospitalId: next.facilityId,
+    });
     return next;
   } catch {
     return null;
@@ -175,7 +199,15 @@ export async function deleteAsset(id: string): Promise<boolean> {
   const db = assetsDB();
   try {
     const existing = await db.get(id);
+    const typed = existing as unknown as AssetDoc;
     await db.remove(existing);
+    emitSyncEvent({
+      resourceType: 'asset',
+      resourceId: id,
+      operation: 'delete',
+      orgId: typed.orgId,
+      hospitalId: typed.facilityId,
+    });
     return true;
   } catch {
     return false;

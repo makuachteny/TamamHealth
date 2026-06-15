@@ -72,7 +72,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
       <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
-            background: isRecording ? 'rgba(229,46,66,0.15)' : 'rgba(43,111,224,0.12)',
+            background: isRecording ? 'rgba(229,46,66,0.15)' : 'rgba(59, 130, 246,0.12)',
           }}>
             {isRecording ? (
               <Mic className="w-4 h-4 animate-pulse" style={{ color: 'var(--color-danger)' }} />
@@ -271,7 +271,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             </FieldSection>
 
             <FieldSection
-              icon={Thermometer} label={t('scribe.sectionVitals')} color="#5CB8A8"
+              icon={Thermometer} label={t('scribe.sectionVitals')} color="#2563EB"
               expanded={expandedSections.has('vitals')}
               onToggle={() => toggleSection('vitals')}
               empty={!Object.values(scribe.extraction.vitals).some(v => v)}

@@ -30,7 +30,7 @@ const STATUS_TINT: Record<ProblemStatus, { bg: string; color: string; ring: stri
   active:   { bg: 'rgba(196,69,54,0.10)',  color: 'var(--tamamhealth-red)', ring: 'rgba(196,69,54,0.20)', label: 'Active' },
   chronic:  { bg: 'rgba(124,58,237,0.10)', color: '#6D28D9',                ring: 'rgba(124,58,237,0.22)', label: 'Chronic' },
   inactive: { bg: 'rgba(100,116,139,0.10)',color: '#475569',                ring: 'rgba(100,116,139,0.22)', label: 'Inactive' },
-  resolved: { bg: 'rgba(16,185,129,0.10)', color: '#047857',                ring: 'rgba(16,185,129,0.22)', label: 'Resolved' },
+  resolved: { bg: 'rgba(31, 157, 111,0.10)', color: '#047857',                ring: 'rgba(31, 157, 111,0.22)', label: 'Resolved' },
 };
 
 function ProblemRow({

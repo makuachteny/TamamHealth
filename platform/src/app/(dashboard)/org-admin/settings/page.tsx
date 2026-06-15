@@ -249,8 +249,8 @@ export default function OrgSettingsPage() {
                     key={flag.key}
                     className="flex items-start gap-3 p-3 rounded-lg"
                     style={{
-                      background: enabled ? 'rgba(43,111,224,0.05)' : 'var(--overlay-subtle)',
-                      border: `1px solid ${enabled ? 'rgba(43,111,224,0.15)' : 'var(--border-light)'}`,
+                      background: enabled ? 'rgba(59, 130, 246,0.05)' : 'var(--overlay-subtle)',
+                      border: `1px solid ${enabled ? 'rgba(59, 130, 246,0.15)' : 'var(--border-light)'}`,
                     }}
                   >
                     <div className="pt-0.5">

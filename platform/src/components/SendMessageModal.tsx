@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Send, MessageSquare, Smartphone, Radio } from '@/components/icons/lucide';
+import Modal from '@/components/Modal';
 import { useMessages } from '@/lib/hooks/useMessages';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -113,11 +114,10 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <Modal onClose={onClose} width={540}>
       <div
         className="modal-content card-elevated"
-        style={{ maxWidth: 540, width: '100%' }}
-        onClick={(e) => e.stopPropagation()}
+        style={{ width: '100%' }}
       >
         {/* Header */}
         <div
@@ -337,6 +337,6 @@ export default function SendMessageModal({ isOpen, onClose, recipient }: SendMes
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

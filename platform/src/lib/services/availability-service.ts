@@ -2,15 +2,14 @@ import { availabilityDB } from '../db';
 import type { AvailabilityDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 
 export async function getAllAvailability(scope?: DataScope): Promise<AvailabilityDoc[]> {
   const db = availabilityDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as AvailabilityDoc)
-    .filter(d => d && d.type === 'availability' && d.status !== 'cancelled')
+  const all = (await findByType<AvailabilityDoc>(db, 'availability'))
+    .filter(d => d && d.status !== 'cancelled')
     .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
   return scope ? filterByScope(all, scope) : all;
 }

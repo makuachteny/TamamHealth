@@ -1,15 +1,14 @@
 import { facilityAssessmentsDB } from '../db';
 import type { FacilityAssessmentDoc } from '../db-types';
 import { v4 as uuidv4 } from 'uuid';
+import { emitSyncEvent } from './sync-event-service';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 
 export async function getAllAssessments(scope?: DataScope): Promise<FacilityAssessmentDoc[]> {
   const db = facilityAssessmentsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as FacilityAssessmentDoc)
-    .filter(d => d && d.type === 'facility_assessment')
+  const all = (await findByType<FacilityAssessmentDoc>(db, 'facility_assessment'))
     .sort((a, b) => new Date(b.assessmentDate).getTime() - new Date(a.assessmentDate).getTime());
   return scope ? filterByScope(all, scope) : all;
 }
@@ -32,6 +31,14 @@ export async function createAssessment(data: Omit<FacilityAssessmentDoc, '_id' |
   };
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'facility_assessment',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
@@ -48,6 +55,14 @@ export async function updateAssessment(id: string, data: Partial<FacilityAssessm
     };
     const resp = await db.put(updated);
     updated._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'facility_assessment',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;
@@ -58,7 +73,15 @@ export async function deleteAssessment(id: string): Promise<boolean> {
   const db = facilityAssessmentsDB();
   try {
     const doc = await db.get(id);
+    const typed = doc as unknown as FacilityAssessmentDoc;
     await db.remove(doc);
+    emitSyncEvent({
+      resourceType: 'facility_assessment',
+      resourceId: id,
+      operation: 'delete',
+      orgId: typed.orgId,
+      hospitalId: typed.facilityId,
+    });
     return true;
   } catch {
     return false;

@@ -43,7 +43,10 @@ export function usePermissions() {
   const canOrderLabs = role === 'doctor' || role === 'clinical_officer' || isClinician || isMedSupt;
 
   // Patient registration — clinical + front desk + BHW + midwife + workflow clerks/nurses
-  const canRegisterPatients = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRegistrationClerk || isClinicClerk || role === 'front_desk' || role === 'boma_health_worker' || role === 'community_health_volunteer' || role === 'hrio' || isMedSupt;
+  // Nurses do not register patients — registration is a clerical/front-desk and
+  // prescriber task. Triage/rooming nurses are workflow-station roles, distinct
+  // from the bedside `nurse` role, and keep registration for their stations.
+  const canRegisterPatients = role === 'doctor' || role === 'clinical_officer' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRegistrationClerk || isClinicClerk || role === 'front_desk' || role === 'hrio' || isMedSupt;
 
   // Specialized roles
   const canDispense = role === 'pharmacist';
@@ -51,16 +54,16 @@ export function usePermissions() {
   const canDoTelehealth = role === 'doctor' || isClinician || isMedSupt;
 
   // Referrals — clinical staff + front desk + supervisors + midwife (obstetric)
-  const canManageReferrals = role === 'doctor' || role === 'clinical_officer' || isClinician || isMidwife || isRegistrationClerk || role === 'front_desk' || role === 'payam_supervisor' || isSuperAdmin;
+  const canManageReferrals = role === 'doctor' || role === 'clinical_officer' || isClinician || isMidwife || isRegistrationClerk || role === 'front_desk' || isSuperAdmin;
 
   // Appointments — clinical staff + front desk + workflow clerks can book/manage
   const canBookAppointments = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isRegistrationClerk || isClinicClerk || role === 'front_desk' || isMedSupt || isSuperAdmin;
 
   // Messages — any clinical/CHW role can send (view is broader via nav config)
-  const canSendMessages = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRegistrationClerk || isClinicClerk || isRecordsHmis || isFacilityAdmin || role === 'front_desk' || isCashier || role === 'pharmacist' || role === 'lab_tech' || role === 'boma_health_worker' || role === 'community_health_volunteer' || role === 'payam_supervisor' || isCountyDirector || role === 'hrio' || role === 'nutritionist' || role === 'radiologist' || isMedSupt || isOrgAdmin || isSuperAdmin;
+  const canSendMessages = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRegistrationClerk || isClinicClerk || isRecordsHmis || isFacilityAdmin || role === 'front_desk' || isCashier || role === 'pharmacist' || role === 'lab_tech' || isCountyDirector || role === 'hrio' || role === 'nutritionist' || role === 'radiologist' || isMedSupt || isOrgAdmin || isSuperAdmin;
 
   // Facility assessments — data entry + supervisors + government + hospital manager + county + records/admin
-  const canAssessFacility = isDataEntry || role === 'hrio' || isRecordsHmis || isFacilityAdmin || role === 'payam_supervisor' || isMedSupt || isGovernment || isCountyDirector || isHospitalManager || isSuperAdmin;
+  const canAssessFacility = isDataEntry || role === 'hrio' || isRecordsHmis || isFacilityAdmin || isMedSupt || isGovernment || isCountyDirector || isHospitalManager || isSuperAdmin;
 
   // Analytics & intelligence — management + government + county (moved off doctors)
   const canViewEpidemicIntel = isHospitalManager || isMedSupt || isFacilityAdmin || isGovernment || isCountyDirector || isSuperAdmin;
@@ -68,7 +71,7 @@ export function usePermissions() {
 
   // Reports & export — HRIO, records/HMIS officer, and the county director own DHIS2/HMIS reporting.
   const canExportDHIS2 = isGovernment || isHospitalManager || role === 'hrio' || isRecordsHmis || isCountyDirector || isSuperAdmin;
-  const canViewReports = role === 'clinical_officer' || role === 'payam_supervisor' || role === 'hrio' || isRecordsHmis || isFacilityAdmin || isHospitalManager || isMedSupt || isGovernment || isCountyDirector || isOrgAdmin || isSuperAdmin;
+  const canViewReports = role === 'clinical_officer' || role === 'hrio' || isRecordsHmis || isFacilityAdmin || isHospitalManager || isMedSupt || isGovernment || isCountyDirector || isOrgAdmin || isSuperAdmin;
 
   // Billing & collections — biller + dedicated cashier + management + admins.
   // Front desk no longer handles money (separation of duties).
@@ -76,7 +79,7 @@ export function usePermissions() {
   const canManageBilling = isMedicalBiller || isFacilityAdmin || isHospitalManager || isOrgAdmin || isSuperAdmin;
 
   // Vital events — clinical staff + midwife + BHW/CHV + records/data entry + workflow nurses/clinician
-  const canRecordVitalEvents = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRecordsHmis || role === 'boma_health_worker' || role === 'community_health_volunteer' || role === 'hrio' || isDataEntry || isMedSupt;
+  const canRecordVitalEvents = role === 'doctor' || role === 'clinical_officer' || role === 'nurse' || isMidwife || isClinician || isTriageNurse || isRoomingNurse || isRecordsHmis || role === 'hrio' || isDataEntry || isMedSupt;
 
   const canAccess = (path: string): boolean => {
     if (!role) return false;

@@ -1,23 +1,21 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
-import { useImmunizations } from '@/lib/hooks/useImmunizations';
-import { useANC } from '@/lib/hooks/useANC';
-import { useBirths } from '@/lib/hooks/useBirths';
-import { useLabResults } from '@/lib/hooks/useLabResults';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { useToast } from '@/components/Toast';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
+import PatientName from '@/components/PatientName';
+import { patientFullName, patientGenderAge } from '@/lib/patient-utils';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
-  Activity, HeartPulse, Syringe, Baby, Pill, Clock,
-  Radio, Wifi, ChevronRight, Clipboard, Thermometer,
-  Stethoscope, MessageSquare, FileText, BedDouble, AlertCircle,
-  Shield, Droplets, Bandage, X, Check, Printer,
+  Activity, Pill, Clock,
+  ChevronRight, Thermometer,
+  Stethoscope, FileText, BedDouble, AlertCircle,
+  Shield, X, Check, Printer, Search,
   AlertTriangle, ArrowUpDown, Wind, Eye, Brain, Heart
 } from '@/components/icons/lucide';
 
@@ -56,45 +54,9 @@ interface TriageResult {
   priority: 'RED' | 'YELLOW' | 'GREEN' | '';
 }
 
-// Live activity ticker is a demo-only flourish — the events are randomly
-// sampled below from NURSE_EVENTS / NAMES / WARDS to make the UI feel busy.
-// In production we suppress it so users do not see invented patient activity
-// presented as real charting.
-const NURSE_LIVE_FEED_ENABLED = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
-const IS_DEMO = NURSE_LIVE_FEED_ENABLED;
-
-// Simulated nursing care events
-const NURSE_EVENTS = [
-  { type: 'vitals', label: 'Vitals Recorded', color: 'var(--color-success)', icon: Activity },
-  { type: 'medication', label: 'Medication Given', color: '#5CB8A8', icon: Pill },
-  { type: 'birth_assist', label: 'Birth Assisted', color: '#EC4899', icon: Baby },
-  { type: 'immunization', label: 'Immunization Given', color: '#A855F7', icon: Syringe },
-  { type: 'wound_care', label: 'Wound Dressed', color: '#FB923C', icon: Bandage },
-  { type: 'anc_check', label: 'ANC Checkup', color: '#F472B6', icon: HeartPulse },
-  { type: 'blood_draw', label: 'Blood Sample Drawn', color: 'var(--color-danger)', icon: Droplets },
-  { type: 'patient_assess', label: 'Patient Assessment', color: '#5CB8A8', icon: Clipboard },
-  { type: 'temp_check', label: 'Temperature Check', color: 'var(--color-warning)', icon: Thermometer },
-];
-
-// Route map: event type → destination page
-const EVENT_ROUTES: Record<string, string> = {
-  vitals: '/patients',
-  medication: '/dashboard/pharmacy',
-  birth_assist: '/births',
-  immunization: '/immunizations',
-  wound_care: '/patients',
-  anc_check: '/anc',
-  blood_draw: '/dashboard/lab',
-  patient_assess: '/patients',
-  temp_check: '/patients',
-};
-
-const NAMES = [
-  'Deng Mabior', 'Achol Mayen', 'Nyamal Koang', 'Gatluak Ruot', 'Ayen Dut',
-  'Kuol Akot', 'Ladu Tombe', 'Rose Gbudue', 'Majok Chol', 'Nyandit Dut',
-  'Abuk Deng', 'Garang Makuei', 'Awut Makuei', 'Nyandeng Chol', 'Tut Chuol',
-];
-const WARDS = ['Maternity', 'General Ward', 'Pediatrics', 'OPD', 'Emergency', 'Post-Op'];
+// Demo mode gates the seeded ward roster so the board is never empty during a
+// walkthrough. (The old live "Care Feed" ticker has been removed app-wide.)
+const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 const MEDICATIONS = [
   { name: 'Amoxicillin', dose: '500mg', route: 'Oral' },
@@ -109,17 +71,48 @@ const MEDICATIONS = [
   { name: 'Iron/Folate', dose: '200mg/0.4mg', route: 'Oral' },
 ];
 
-interface LiveEvent {
-  id: number;
-  type: string;
-  label: string;
-  color: string;
-  icon: typeof Activity;
-  patient: string;
-  ward: string;
-  time: string;
-  isNew: boolean;
-}
+// A ward-board row. Real patient docs are structurally compatible with the
+// fields used here; demo rows (below) carry their triage inline via `_triage`.
+type WardRow = {
+  _id: string;
+  firstName: string;
+  surname: string;
+  hospitalNumber: string;
+  gender: string;
+  estimatedAge?: number;
+  dateOfBirth?: string;
+  assignedDoctor?: string;
+  assignedDoctorName?: string;
+  _demo?: boolean;
+  _triage?: { priority: 'RED' | 'YELLOW' | 'GREEN'; chiefComplaint: string; status: string };
+};
+
+// Demo ward roster — shown only in demo mode when the facility has fewer than
+// 10 seeded patients, so the ward board is never empty during a walkthrough.
+// These are display-only rows: charting/triage/assign actions are suppressed.
+const DEMO_WARD_PATIENTS: WardRow[] = [
+  { firstName: 'Deng', surname: 'Mabior', gender: 'Male', age: 34, hn: 'WRD-1042', priority: 'RED', complaint: 'Severe malaria, high fever', status: 'pending' },
+  { firstName: 'Achol', surname: 'Mayen', gender: 'Female', age: 27, hn: 'WRD-1043', priority: 'RED', complaint: 'Postpartum haemorrhage', status: 'pending' },
+  { firstName: 'Nyamal', surname: 'Koang', gender: 'Female', age: 19, hn: 'WRD-1044', priority: 'YELLOW', complaint: 'Obstructed labour — monitoring', status: 'seen' },
+  { firstName: 'Gatluak', surname: 'Ruot', gender: 'Male', age: 45, hn: 'WRD-1045', priority: 'YELLOW', complaint: 'Pneumonia, on IV antibiotics', status: 'seen' },
+  { firstName: 'Ayen', surname: 'Dut', gender: 'Female', age: 31, hn: 'WRD-1046', priority: 'YELLOW', complaint: 'Dehydration from diarrhoea', status: 'pending' },
+  { firstName: 'Kuol', surname: 'Akot', gender: 'Male', age: 8, hn: 'WRD-1047', priority: 'GREEN', complaint: 'Minor laceration, dressed', status: 'admitted' },
+  { firstName: 'Rose', surname: 'Gbudue', gender: 'Female', age: 52, hn: 'WRD-1048', priority: 'GREEN', complaint: 'Hypertension review', status: 'seen' },
+  { firstName: 'Majok', surname: 'Chol', gender: 'Male', age: 60, hn: 'WRD-1049', priority: 'YELLOW', complaint: 'Diabetic foot, wound care', status: 'admitted' },
+  { firstName: 'Nyandit', surname: 'Dut', gender: 'Female', age: 24, hn: 'WRD-1050', priority: 'GREEN', complaint: 'ANC routine check', status: 'seen' },
+  { firstName: 'Garang', surname: 'Makuei', gender: 'Male', age: 38, hn: 'WRD-1051', priority: 'GREEN', complaint: 'Typhoid, recovering', status: 'admitted' },
+  { firstName: 'Awut', surname: 'Deng', gender: 'Female', age: 5, hn: 'WRD-1052', priority: 'YELLOW', complaint: 'Acute respiratory infection', status: 'pending' },
+  { firstName: 'Tut', surname: 'Chuol', gender: 'Male', age: 29, hn: 'WRD-1053', priority: 'GREEN', complaint: 'Fracture follow-up', status: 'discharged' },
+].map((d, i) => ({
+  _id: `demo-ward-${i}`,
+  firstName: d.firstName,
+  surname: d.surname,
+  hospitalNumber: d.hn,
+  gender: d.gender,
+  estimatedAge: d.age,
+  _demo: true,
+  _triage: { priority: d.priority as 'RED' | 'YELLOW' | 'GREEN', chiefComplaint: d.complaint, status: d.status },
+}));
 
 const ACCENT = 'var(--accent-primary)';
 
@@ -176,12 +169,6 @@ export default function NurseDashboardPage() {
   const router = useRouter();
   const { currentUser, globalSearch } = useApp();
   const { patients, reload } = usePatients();
-  const { stats: immStats } = useImmunizations();
-  const { stats: ancStats } = useANC();
-  const { stats: birthStats } = useBirths();
-  const { results: labResults } = useLabResults();
-  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
-  const [eventCounter, setEventCounter] = useState(0);
 
   // Feature states
   const [vitalsModalOpen, setVitalsModalOpen] = useState(false);
@@ -193,6 +180,10 @@ export default function NurseDashboardPage() {
   const [vitalsSaved, setVitalsSaved] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'ward' | 'mar' | 'triage'>('ward');
+
+  // Local search for the ward patient table (mirrors the search pattern used
+  // elsewhere in the nurse views).
+  const [wardSearch, setWardSearch] = useState('');
 
   const [marEntries, setMarEntries] = useState<MAREntry[]>([]);
 
@@ -290,37 +281,6 @@ export default function NurseDashboardPage() {
   // Sort mode for task prioritization
   const [sortByUrgency, setSortByUrgency] = useState(true);
 
-  const generateEvent = useCallback((): LiveEvent => {
-    const evtType = NURSE_EVENTS[Math.floor(Math.random() * NURSE_EVENTS.length)];
-    return {
-      id: Date.now() + Math.random(), ...evtType,
-      patient: NAMES[Math.floor(Math.random() * NAMES.length)],
-      ward: WARDS[Math.floor(Math.random() * WARDS.length)],
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      isNew: true,
-    };
-  }, []);
-
-  // Start live event feed (demo only — see NURSE_LIVE_FEED_ENABLED)
-  useEffect(() => {
-    if (!NURSE_LIVE_FEED_ENABLED) return;
-    const initial: LiveEvent[] = [];
-    for (let i = 0; i < 6; i++) {
-      initial.push({ ...generateEvent(), isNew: false, id: i });
-    }
-    setLiveEvents(initial);
-
-    const interval = setInterval(() => {
-      setLiveEvents(prev => {
-        const newEvent = generateEvent();
-        return [newEvent, ...prev.slice(0, 9).map(e => ({ ...e, isNew: false }))];
-      });
-      setEventCounter(c => c + 1);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [generateEvent]);
-
   // Generate MAR entries from patient data
   useEffect(() => {
     if (patients.length === 0) return;
@@ -375,23 +335,28 @@ export default function NurseDashboardPage() {
     return map;
   }, [triageHistory]);
 
-  // Ward patients with priority sorting using REAL triage data
-  const wardPatients = useMemo(() => {
-    const filtered = patients.slice(0, 12).filter(p =>
-      !globalSearch || `${p.firstName} ${p.surname}`.toLowerCase().includes(globalSearch.toLowerCase()) || p.hospitalNumber.toLowerCase().includes(globalSearch.toLowerCase())
+  // Ward patients with priority sorting using REAL triage data. When the
+  // facility has fewer than 10 seeded patients (demo mode), fall back to the
+  // demo roster so the ward board always shows a realistic, full list.
+  const wardPatients = useMemo<WardRow[]>(() => {
+    const realRows: WardRow[] = patients.slice(0, 12);
+    const base: WardRow[] = (realRows.length >= 10 || !IS_DEMO) ? realRows : DEMO_WARD_PATIENTS;
+
+    const q = (wardSearch || globalSearch || '').toLowerCase();
+    const filtered = base.filter(p =>
+      !q || `${p.firstName} ${p.surname}`.toLowerCase().includes(q) || p.hospitalNumber.toLowerCase().includes(q)
     );
 
     if (!sortByUrgency) return filtered;
 
     const priorityOrder: Record<string, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
+    const priorityOf = (p: WardRow) => patientTriageMap.get(p._id)?.priority ?? p._triage?.priority;
     return [...filtered].sort((a, b) => {
-      const aTriage = patientTriageMap.get(a._id);
-      const bTriage = patientTriageMap.get(b._id);
-      const aPriority = aTriage ? (priorityOrder[aTriage.priority] ?? 3) : 3;
-      const bPriority = bTriage ? (priorityOrder[bTriage.priority] ?? 3) : 3;
-      return aPriority - bPriority;
+      const ap = priorityOf(a);
+      const bp = priorityOf(b);
+      return (ap ? (priorityOrder[ap] ?? 3) : 3) - (bp ? (priorityOrder[bp] ?? 3) : 3);
     });
-  }, [patients, globalSearch, sortByUrgency, patientTriageMap]);
+  }, [patients, globalSearch, wardSearch, sortByUrgency, patientTriageMap]);
 
   // Save vitals to PouchDB
   const handleSaveVitals = async () => {
@@ -486,22 +451,16 @@ export default function NurseDashboardPage() {
   const displayName = currentUser.name.split(' ')[1] || currentUser.name.split(' ')[0];
   const hr = new Date().getHours();
   const greeting = hr < 12 ? t('nurse.greetingMorning') : hr < 17 ? t('nurse.greetingAfternoon') : t('nurse.greetingEvening');
-  // KPI counts: in demo mode we synthesize plausible workloads from the seeded
-  // patient list (`Math.max(N, ratio*length)` ensures the cards never show
-  // zero against a non-empty hospital). Production has real workload data
-  // available, so we use the raw counts and skip the floor/ceiling tricks.
+  // Vitals-due count drives the shift-handoff task list. In demo mode we
+  // synthesize a plausible workload from the seeded patient list so it never
+  // reads zero against a non-empty ward.
   const vitalsDue = IS_DEMO ? Math.max(4, Math.floor(patients.length * 0.3)) : 0;
-  const medsDue = IS_DEMO ? Math.max(6, Math.floor(patients.length * 0.25)) : 0;
-  const pendingOrders = IS_DEMO
-    ? Math.max(3, labResults.length > 0 ? Math.floor(labResults.length * 0.15) : 5)
-    : labResults.filter(l => l.status === 'pending').length;
   const vitalFlags = getVitalFlags(vitalsForm);
 
-  // Handoff data
-  const criticalPatients = wardPatients.filter((_, idx) => {
-    const origIdx = patients.indexOf(wardPatients[idx]);
-    return origIdx % 3 === 0;
-  });
+  // Handoff data — critical = RED triage priority (real or demo).
+  const criticalPatients = wardPatients.filter(p =>
+    (patientTriageMap.get(p._id)?.priority ?? p._triage?.priority) === 'RED'
+  );
   const overdueMarCount = marEntries.filter(e => e.status === 'overdue').length;
   const dueMarCount = marEntries.filter(e => e.status === 'due').length;
 
@@ -522,6 +481,36 @@ export default function NurseDashboardPage() {
       case 'GREEN': return { bg: 'var(--color-success)', text: '#000', label: t('nurse.priorityGreenLabel') };
       default: return { bg: 'var(--text-muted)', text: '#FFF', label: t('nurse.priorityDefaultLabel') };
     }
+  };
+
+  // Quick actions double as the view switcher (the old tabs). Defined once and
+  // reused: as a right-hand card on the ward view, and as a top bar on the
+  // MAR/triage views so navigation is always reachable.
+  const quickActions = [
+    { key: 'ward', label: t('nurse.tabWard'), icon: BedDouble, color: 'var(--color-success)', bg: 'rgba(27,158,119,0.10)', onClick: () => setActiveTab('ward') },
+    { key: 'mar', label: t('nurse.tabMar'), icon: Pill, color: '#2563EB', bg: 'rgba(37,99,235,0.10)', onClick: () => setActiveTab('mar') },
+    { key: 'triage', label: t('nurse.tabTriage'), icon: AlertTriangle, color: '#FB923C', bg: 'rgba(251,146,60,0.10)', onClick: () => setActiveTab('triage') },
+    { key: 'handoff', label: t('nurse.shiftHandoff'), icon: FileText, color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.10)', onClick: () => setHandoffOpen(true) },
+  ];
+  const quickActionButton = (a: typeof quickActions[number]) => {
+    const isCurrent = a.key === activeTab;
+    return (
+      <button
+        key={a.key}
+        onClick={a.onClick}
+        className="flex flex-col items-center justify-center text-center gap-2 p-3 rounded-xl transition-all hover:shadow-sm hover:-translate-y-0.5"
+        style={{
+          background: a.bg,
+          border: `1px solid ${isCurrent ? a.color : 'var(--border-light)'}`,
+          boxShadow: isCurrent ? `0 0 0 1px ${a.color}` : undefined,
+        }}
+      >
+        <span className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg-card-solid)' }}>
+          <a.icon className="w-[18px] h-[18px]" style={{ color: a.color }} />
+        </span>
+        <span className="text-[12px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{a.label}</span>
+      </button>
+    );
   };
 
   return (
@@ -560,144 +549,41 @@ export default function NurseDashboardPage() {
               <FileText className="w-3.5 h-3.5" />
               {t('nurse.shiftHandoff')}
             </button>
-            <div className="text-[10px] text-right" style={{ color: 'var(--text-muted)' }}>
-              <div className="flex items-center gap-1">
-                <Wifi className="w-3 h-3" style={{ color: 'var(--color-success)' }} />
-                <span>{t('nurse.connected', { type: hospital?.internetType || 'N/A' })}</span>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* KPI CARDS — Doctor-style rich cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-          {/* Ward Patients */}
-          <div className="dash-card" style={{ padding: '16px 18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>{t('nurse.wardPatients')}</p>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-success)', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                <BedDouble className="w-3 h-3" /> {t('nurse.active')}
-              </span>
-            </div>
-            <div className="text-3xl font-bold mb-3" style={{ color: 'var(--text-primary)', lineHeight: 1 }}>{patients.length || 0}</div>
-            <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 12, display: 'flex', gap: 0 }}>
-              {[
-                { v: vitalsDue, l: t('nurse.vitalsDue'), c: '#F87171' },
-                { v: medsDue, l: t('nurse.medsDue'), c: '#5CB8A8' },
-                { v: pendingOrders, l: t('nurse.orders'), c: '#FB923C' },
-              ].map((s, i) => (
-                <div key={s.l} style={{ flex: 1, textAlign: 'center', borderRight: i < 2 ? '1px solid var(--border-light)' : 'none' }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: s.c }}>{s.v}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{s.l}</div>
-                </div>
-              ))}
-            </div>
+        {/* QUICK ACTIONS bar — shown on the MAR/Triage views so navigation back
+            to the ward is always reachable. On the ward view the quick actions
+            sit on the right of the status row instead (see below). */}
+        {activeTab !== 'ward' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+            {quickActions.map(quickActionButton)}
           </div>
-
-          {/* Maternal & Child */}
-          <div className="dash-card" style={{ padding: '16px 18px' }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12 }}>{t('nurse.maternalChild')}</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[
-                { Icon: HeartPulse, label: t('nurse.ancMothers'), count: ancStats?.totalMothers || 0, color: '#F472B6' },
-                { Icon: Baby, label: t('nurse.birthsWk'), count: birthStats?.total || 0, color: 'var(--accent-primary)' },
-                { Icon: Syringe, label: t('nurse.immunizations'), count: immStats?.totalVaccinations || 0, color: '#A855F7' },
-              ].map(r => (
-                <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 30, height: 30, borderRadius: 8, background: `${typeof r.color === 'string' && r.color.startsWith('#') ? r.color + '15' : 'var(--accent-light)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <r.Icon className="w-3.5 h-3.5" style={{ color: r.color }} />
-                  </div>
-                  <span style={{ fontSize: 13, color: 'var(--text-secondary)', flex: 1 }}>{r.label}</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{r.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Shift Overview */}
-          <div className="dash-card" style={{ padding: '16px 18px' }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 14 }}>{t('nurse.shiftOverview')}</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { Icon: Activity, label: t('nurse.vitalsTaken'), value: IS_DEMO ? Math.max(8, Math.floor(patients.length * 0.4)) : 0, color: 'var(--color-success)', bg: 'rgba(27,158,119,0.12)' },
-                { Icon: Pill, label: t('nurse.medsGiven'), value: IS_DEMO ? Math.max(5, Math.floor(patients.length * 0.2)) : 0, color: '#5CB8A8', bg: 'rgba(92,184,168,0.12)' },
-                { Icon: Clipboard, label: t('nurse.assessments'), value: IS_DEMO ? Math.max(3, Math.floor(patients.length * 0.15)) : 0, color: '#A855F7', bg: 'rgba(168,85,247,0.12)' },
-                { Icon: Baby, label: t('nurse.birthsAssisted'), value: birthStats?.total || 0, color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
-              ].map(item => (
-                <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 7, background: item.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <item.Icon className="w-3.5 h-3.5" style={{ color: item.color }} />
-                  </div>
-                  <span style={{ fontSize: 13, color: 'var(--text-secondary)', flex: 1 }}>{item.label}</span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: item.color }}>{item.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Actions Card */}
-          <div className="dash-card" style={{ padding: '16px 18px' }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12 }}>{t('nurse.quickActions')}</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {[
-                { label: t('nurse.recordVitals'), icon: Activity, href: '/patients', color: 'var(--color-success)' },
-                { label: t('nurse.ancVisit'), icon: HeartPulse, href: '/anc', color: '#F472B6' },
-                { label: t('nurse.immunization'), icon: Syringe, href: '/immunizations', color: '#A855F7' },
-                { label: t('nurse.birthReg'), icon: Baby, href: '/births', color: ACCENT },
-                { label: t('nurse.labOrders'), icon: Stethoscope, href: '/lab', color: '#FB923C' },
-                { label: t('nurse.messages'), icon: MessageSquare, href: '/messages', color: '#5CB8A8' },
-              ].map(action => (
-                <button
-                  key={action.label}
-                  onClick={() => router.push(action.href)}
-                  className="flex items-center gap-2 p-2 rounded-lg transition-all"
-                  style={{ background: `${typeof action.color === 'string' && action.color.startsWith('#') ? action.color + '08' : 'var(--accent-light)'}`, border: `1px solid ${typeof action.color === 'string' && action.color.startsWith('#') ? action.color + '15' : 'var(--accent-border)'}` }}
-                >
-                  <action.icon className="w-3.5 h-3.5" style={{ color: action.color }} />
-                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* TAB NAVIGATION */}
-        <div className="flex items-center gap-1 mb-4">
-          {[
-            { key: 'ward' as const, label: t('nurse.tabWard'), icon: BedDouble },
-            { key: 'mar' as const, label: t('nurse.tabMar'), icon: Pill },
-            { key: 'triage' as const, label: t('nurse.tabTriage'), icon: AlertTriangle },
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
-              style={{
-                background: activeTab === tab.key ? ACCENT : 'var(--bg-card)',
-                color: activeTab === tab.key ? '#FFF' : 'var(--text-secondary)',
-                border: `1px solid ${activeTab === tab.key ? ACCENT : 'var(--border-light)'}`,
-              }}
-            >
-              <tab.icon className="w-3.5 h-3.5" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        )}
 
         {/* ═══ TAB: WARD PATIENTS ═══ */}
         {activeTab === 'ward' && (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-            {/* Ward Patient Table */}
-            <div className="dash-card mb-4 overflow-hidden" style={{ flexShrink: 0, padding: '0' }}>
+            {/* Ward Patient Table — moved below the triage/medication panels (order: 1) */}
+            <div className="dash-card mb-4 overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0, padding: '0', order: 1 }}>
               <div className="flex items-center justify-between p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <div className="flex items-center gap-2">
                   <BedDouble className="w-4 h-4" style={{ color: ACCENT }} />
                   <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.wardPatients')}</h3>
-                  <span className="px-2 py-0.5 rounded text-[9px] font-bold tracking-wider" style={{
-                    background: 'var(--accent-light)', color: ACCENT, border: '1px solid var(--accent-border)',
-                  }}>{t('nurse.live')}</span>
                 </div>
                 <div className="flex items-center gap-3">
+                  {/* Ward patient search */}
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+                    <input
+                      type="search"
+                      value={wardSearch}
+                      onChange={(e) => setWardSearch(e.target.value)}
+                      placeholder={t('nurse.searchPatientPlaceholder')}
+                      className="pl-8 pr-3 py-1.5 rounded-lg text-[11px]"
+                      style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', width: '190px' }}
+                    />
+                  </div>
                   <button
                     onClick={() => setSortByUrgency(!sortByUrgency)}
                     className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all"
@@ -715,11 +601,11 @@ export default function NurseDashboardPage() {
                   </button>
                 </div>
               </div>
-              <div style={{ overflowX: 'auto' }}>
+              <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
                 <table className="w-full">
                   <thead>
                     <tr>
-                      {[t('nurse.colPriority'), t('nurse.colPatientName'), t('nurse.colId'), t('nurse.colGenderAge'), t('nurse.colChiefComplaint'), t('nurse.colStatus'), t('nurse.colActions')].map(h => (
+                      {[t('nurse.colPatientName'), t('nurse.colId'), t('nurse.colGenderAge'), t('nurse.colChiefComplaint'), t('nurse.colStatus'), t('nurse.colActions')].map(h => (
                         <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
                           {h}
                         </th>
@@ -727,36 +613,42 @@ export default function NurseDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
+                    {wardPatients.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                          {t('patients.patientsFound', { count: 0 })}
+                        </td>
+                      </tr>
+                    )}
                     {wardPatients.map((patient) => {
-                      const triage = patientTriageMap.get(patient._id);
+                      const realTriage = patientTriageMap.get(patient._id);
+                      const triage = realTriage || patient._triage;
                       const triagePriority = triage?.priority;
                       const triageStatus = triage?.status || 'none';
                       const isRed = triagePriority === 'RED';
-                      const pColor = isRed ? 'var(--color-danger)' : triagePriority === 'YELLOW' ? 'var(--color-warning)' : triagePriority === 'GREEN' ? 'var(--color-success)' : 'var(--text-muted)';
                       return (
                         <tr
                           key={patient._id}
-                          className="cursor-pointer transition-colors hover:bg-[var(--table-row-hover)]"
+                          onClick={() => { if (!patient._demo) router.push(`/patients/${patient._id}`); }}
+                          className="transition-colors hover:bg-[var(--table-row-hover)]"
                           style={{
                             borderBottom: '1px solid var(--border-light)',
                             background: isRed ? 'rgba(196,69,54,0.04)' : 'transparent',
+                            cursor: patient._demo ? 'default' : 'pointer',
                           }}
                         >
                           <td className="px-4 py-2.5">
-                            {triagePriority ? (
-                              <span className="text-[9px] font-black px-2 py-1 rounded-md text-white" style={{ background: pColor }}>{triagePriority}</span>
+                            {patient._demo ? (
+                              <PatientName patient={patient} size={28} nameClassName="text-[12px]" />
                             ) : (
-                              <span className="text-[9px] font-bold px-2 py-1 rounded-md" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>—</span>
+                              <button onClick={() => router.push(`/patients/${patient._id}`)} className="text-left hover:opacity-80">
+                                <PatientName patient={patient} size={28} nameClassName="text-[12px]" />
+                              </button>
                             )}
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <button onClick={() => router.push(`/patients/${patient._id}`)} className="text-left hover:underline">
-                              <span className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{patient.firstName} {patient.surname}</span>
-                            </button>
                           </td>
                           <td className="px-4 py-2.5 text-[12px] font-mono" style={{ color: 'var(--text-secondary)' }}>{patient.hospitalNumber}</td>
                           <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
-                            {patient.gender} · {patient.estimatedAge || (patient.dateOfBirth ? new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear() : 0)}y
+                            {patientGenderAge(patient)}
                           </td>
                           <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
                             {triage?.chiefComplaint || '—'}
@@ -766,7 +658,7 @@ export default function NurseDashboardPage() {
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(252,211,77,0.15)', color: 'var(--color-warning)' }}>{t('nurse.statusWaiting')}</span>
                             )}
                             {triageStatus === 'seen' && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(92,184,168,0.15)', color: '#5CB8A8' }}>{t('nurse.statusInConsult')}</span>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(92,184,168,0.15)', color: '#2563EB' }}>{t('nurse.statusInConsult')}</span>
                             )}
                             {(triageStatus === 'discharged' || triageStatus === 'admitted') && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--color-success)' }}>{triageStatus.toUpperCase()}</span>
@@ -791,7 +683,7 @@ export default function NurseDashboardPage() {
                               >
                                 <Thermometer className="w-3.5 h-3.5" />
                               </button>
-                              {(!triage || triageStatus === 'none') && (
+                              {!patient._demo && (!triage || triageStatus === 'none') && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -805,7 +697,7 @@ export default function NurseDashboardPage() {
                                   <AlertTriangle className="w-3.5 h-3.5" />
                                 </button>
                               )}
-                              {triageStatus === 'pending' && (
+                              {!patient._demo && triageStatus === 'pending' && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -813,7 +705,7 @@ export default function NurseDashboardPage() {
                                       patientId: patient._id,
                                       patientName: `${patient.firstName} ${patient.surname}`,
                                       hospitalNumber: patient.hospitalNumber,
-                                      triageId: triage?._id,
+                                      triageId: realTriage?._id,
                                       currentDoctorId: patient.assignedDoctor,
                                     });
                                   }}
@@ -834,145 +726,111 @@ export default function NurseDashboardPage() {
               </div>
             </div>
 
-            {/* Bottom row: 3-column grid — Care Feed | Triage Queue | Medication Status — fills remaining viewport */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ flex: 1, minHeight: 340 }}>
+            {/* Triage Queue + Medication Status + Quick Actions — three panels in
+                one line, with Quick Actions on the right (order: 0) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4" style={{ order: 0 }}>
 
-              {/* Care Feed */}
-              <div className="dash-card overflow-hidden flex flex-col" style={{ height: '100%', padding: '0' }}>
-                <div className="px-3 py-2 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
-                  <div className="flex items-center gap-2">
-                    <Radio className="w-4 h-4" style={{ color: ACCENT }} />
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.careFeed')}</span>
-                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider" style={{
-                      background: 'rgba(74,222,128,0.12)', color: 'var(--color-success)',
-                    }}>{t('nurse.live')}</span>
-                  </div>
-                  <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('nurse.events', { count: eventCounter })}</span>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1" style={{ minHeight: 0 }}>
-                  {liveEvents.map(evt => {
-                    const Icon = evt.icon;
-                    return (
-                      <div
-                        key={evt.id}
-                        className="p-2 rounded-lg transition-all cursor-pointer hover:bg-[var(--accent-light)]"
-                        onClick={() => router.push(EVENT_ROUTES[evt.type] || '/patients')}
-                        style={{
-                          background: evt.isNew ? `${evt.color}08` : 'transparent',
-                          border: evt.isNew ? `1px solid ${evt.color}20` : '1px solid transparent',
-                          animation: evt.isNew ? 'fadeIn 0.3s ease-out' : undefined,
-                        }}
-                      >
-                        <div className="flex items-start gap-2">
-                          <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: `${evt.color}15` }}>
-                            <Icon className="w-3 h-3" style={{ color: evt.color }} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-semibold truncate" style={{ color: evt.color }}>{evt.label}</span>
-                              {evt.isNew && (
-                                <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: `${evt.color}20`, color: evt.color }}>{t('nurse.new')}</span>
-                              )}
-                            </div>
-                            <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{evt.patient}</p>
-                            <div className="flex items-center justify-between mt-0.5">
-                              <span className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>{evt.ward}</span>
-                              <span className="text-[9px] font-mono flex-shrink-0 ml-1" style={{ color: 'var(--text-muted)' }}>{evt.time}</span>
-                            </div>
-                          </div>
+              {/* Ward Status — Triage Queue + Medication Status merged into one card */}
+              <div className="dash-card overflow-hidden flex flex-col lg:col-span-2" style={{ padding: '0' }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 flex-1" style={{ minHeight: 0 }}>
+
+                  {/* Triage Queue section */}
+                  <div className="flex flex-col border-b sm:border-b-0 sm:border-r" style={{ borderColor: 'var(--border-light)' }}>
+                    <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" style={{ color: '#FB923C' }} />
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.triageQueue')}</span>
+                      </div>
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        {t('nurse.waiting', { count: triageHistory.filter(t => t.status === 'pending').length })}
+                      </span>
+                    </div>
+                    <div className="p-3 space-y-2 flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
+                      {[
+                        { label: t('nurse.redEmergency'), count: triageHistory.filter(ti => ti.priority === 'RED' && ti.status === 'pending').length, color: 'var(--color-danger)', bg: 'rgba(196,69,54,0.12)' },
+                        { label: t('nurse.yellowPriority'), count: triageHistory.filter(ti => ti.priority === 'YELLOW' && ti.status === 'pending').length, color: 'var(--color-warning)', bg: 'rgba(228,168,75,0.12)' },
+                        { label: t('nurse.greenStandard'), count: triageHistory.filter(ti => ti.priority === 'GREEN' && ti.status === 'pending').length, color: 'var(--color-success)', bg: 'rgba(27,158,119,0.12)' },
+                      ].map(item => (
+                        <div key={item.label} className="flex items-center justify-between p-2.5 rounded-lg" style={{
+                          background: item.bg, border: '1px solid var(--border-light)',
+                        }}>
+                          <span className="text-[10px] font-semibold" style={{ color: item.color }}>{item.label}</span>
+                          <span className="text-sm font-bold" style={{ color: item.color }}>{item.count}</span>
+                        </div>
+                      ))}
+                      {/* Today's triage activity */}
+                      <div className="pt-2 mt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
+                        <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('nurse.todaysActivity')}</p>
+                        <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.totalTriagedToday')}</span>
+                          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                            {triageHistory.filter(ti => (ti.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.currentlyInConsult')}</span>
+                          <span className="text-sm font-bold" style={{ color: '#2563EB' }}>
+                            {triageHistory.filter(ti => ti.status === 'seen').length}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.dischargedToday')}</span>
+                          <span className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>
+                            {triageHistory.filter(ti => ti.status === 'discharged' && (ti.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length}
+                          </span>
                         </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  </div>
+
+                  {/* Medication Status section */}
+                  <div className="flex flex-col">
+                    <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
+                      <div className="flex items-center gap-2">
+                        <Pill className="w-4 h-4" style={{ color: '#2563EB' }} />
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.medicationStatus')}</span>
+                      </div>
+                    </div>
+                    <div className="p-3 space-y-2 flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
+                      {[
+                        { label: t('nurse.overdue'), value: overdueMarCount, color: 'var(--color-danger)' },
+                        { label: t('nurse.dueNow'), value: dueMarCount, color: 'var(--color-warning)' },
+                        { label: t('nurse.upcoming'), value: marEntries.filter(e => e.status === 'upcoming').length, color: 'var(--text-muted)' },
+                        { label: t('nurse.given'), value: marEntries.filter(e => e.status === 'given').length, color: 'var(--color-success)' },
+                      ].map(item => (
+                        <div key={item.label} className="flex items-center justify-between p-2.5 rounded-lg" style={{
+                          background: 'var(--overlay-subtle)',
+                          border: '1px solid var(--border-light)',
+                        }}>
+                          <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>{item.label}</span>
+                          <span className="text-sm font-bold" style={{ color: item.color }}>{item.value}</span>
+                        </div>
+                      ))}
+                      {/* MAR summary */}
+                      <div className="pt-2 mt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
+                        <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('nurse.shiftProgress')}</p>
+                        <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.totalScheduled')}</span>
+                          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{marEntries.length}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.completionRate')}</span>
+                          <span className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>
+                            {marEntries.length > 0 ? Math.round((marEntries.filter(e => e.status === 'given').length / marEntries.length) * 100) : 0}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
-              {/* Triage Queue Summary */}
-              <div className="dash-card overflow-hidden flex flex-col" style={{ height: '100%', padding: '0' }}>
-                <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" style={{ color: '#FB923C' }} />
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.triageQueue')}</span>
-                  </div>
-                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    {t('nurse.waiting', { count: triageHistory.filter(t => t.status === 'pending').length })}
-                  </span>
-                </div>
-                <div className="p-3 space-y-2 flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
-                  {[
-                    { label: t('nurse.redEmergency'), count: triageHistory.filter(ti => ti.priority === 'RED' && ti.status === 'pending').length, color: 'var(--color-danger)', bg: 'rgba(196,69,54,0.12)' },
-                    { label: t('nurse.yellowPriority'), count: triageHistory.filter(ti => ti.priority === 'YELLOW' && ti.status === 'pending').length, color: 'var(--color-warning)', bg: 'rgba(228,168,75,0.12)' },
-                    { label: t('nurse.greenStandard'), count: triageHistory.filter(ti => ti.priority === 'GREEN' && ti.status === 'pending').length, color: 'var(--color-success)', bg: 'rgba(27,158,119,0.12)' },
-                  ].map(item => (
-                    <div key={item.label} className="flex items-center justify-between p-2.5 rounded-lg" style={{
-                      background: item.bg, border: '1px solid var(--border-light)',
-                    }}>
-                      <span className="text-[10px] font-semibold" style={{ color: item.color }}>{item.label}</span>
-                      <span className="text-sm font-bold" style={{ color: item.color }}>{item.count}</span>
-                    </div>
-                  ))}
-                  {/* Today's triage activity */}
-                  <div className="pt-2 mt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
-                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('nurse.todaysActivity')}</p>
-                    <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.totalTriagedToday')}</span>
-                      <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                        {triageHistory.filter(ti => (ti.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.currentlyInConsult')}</span>
-                      <span className="text-sm font-bold" style={{ color: '#5CB8A8' }}>
-                        {triageHistory.filter(ti => ti.status === 'seen').length}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.dischargedToday')}</span>
-                      <span className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>
-                        {triageHistory.filter(ti => ti.status === 'discharged' && (ti.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Medication Status */}
-              <div className="dash-card overflow-hidden flex flex-col" style={{ height: '100%', padding: '0' }}>
-                <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
-                  <div className="flex items-center gap-2">
-                    <Pill className="w-4 h-4" style={{ color: '#5CB8A8' }} />
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.medicationStatus')}</span>
-                  </div>
-                </div>
-                <div className="p-3 space-y-2 flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
-                  {[
-                    { label: t('nurse.overdue'), value: overdueMarCount, color: 'var(--color-danger)' },
-                    { label: t('nurse.dueNow'), value: dueMarCount, color: 'var(--color-warning)' },
-                    { label: t('nurse.upcoming'), value: marEntries.filter(e => e.status === 'upcoming').length, color: 'var(--text-muted)' },
-                    { label: t('nurse.given'), value: marEntries.filter(e => e.status === 'given').length, color: 'var(--color-success)' },
-                  ].map(item => (
-                    <div key={item.label} className="flex items-center justify-between p-2.5 rounded-lg" style={{
-                      background: 'var(--overlay-subtle)',
-                      border: '1px solid var(--border-light)',
-                    }}>
-                      <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>{item.label}</span>
-                      <span className="text-sm font-bold" style={{ color: item.color }}>{item.value}</span>
-                    </div>
-                  ))}
-                  {/* MAR summary */}
-                  <div className="pt-2 mt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
-                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('nurse.shiftProgress')}</p>
-                    <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.totalScheduled')}</span>
-                      <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{marEntries.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.completionRate')}</span>
-                      <span className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>
-                        {marEntries.length > 0 ? Math.round((marEntries.filter(e => e.status === 'given').length / marEntries.length) * 100) : 0}%
-                      </span>
-                    </div>
-                  </div>
+              {/* Quick Actions — right column; doubles as the view switcher */}
+              <div className="dash-card p-4 flex flex-col lg:col-span-1">
+                <h3 className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('dashboard.quickActions')}</h3>
+                <div className="grid grid-cols-2 gap-2.5 flex-1">
+                  {quickActions.map(quickActionButton)}
                 </div>
               </div>
             </div>
@@ -984,11 +842,11 @@ export default function NurseDashboardPage() {
           <div className="dash-card overflow-hidden flex flex-col" style={{ padding: '0' }}>
             <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2">
-                <Pill className="w-4 h-4" style={{ color: '#5CB8A8' }} />
+                <Pill className="w-4 h-4" style={{ color: '#2563EB' }} />
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.marTitle')}</h3>
                 <span className="px-2 py-0.5 rounded text-[9px] font-bold tracking-wider" style={{
                   background: 'rgba(92,184,168,0.1)',
-                  color: '#5CB8A8',
+                  color: '#2563EB',
                   border: '1px solid rgba(92,184,168,0.2)',
                 }}>{t('nurse.pending', { count: marEntries.filter(e => e.status !== 'given').length })}</span>
               </div>
@@ -1091,10 +949,10 @@ export default function NurseDashboardPage() {
                     <div className="flex items-center justify-between px-3 py-2.5 rounded-xl" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(59, 130, 246,0.25))' }}>
                       <div>
                         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {selectedTriagePatient.firstName} {selectedTriagePatient.surname}
+                          {patientFullName(selectedTriagePatient)}
                         </p>
                         <p className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                          {selectedTriagePatient.hospitalNumber} · {selectedTriagePatient.gender} · {selectedTriagePatient.estimatedAge || (selectedTriagePatient.dateOfBirth ? new Date().getFullYear() - new Date(selectedTriagePatient.dateOfBirth).getFullYear() : '?')}y
+                          {selectedTriagePatient.hospitalNumber} · {patientGenderAge(selectedTriagePatient)}
                         </p>
                       </div>
                       <button onClick={() => { setTriagePatientId(''); setTriagePatientSearch(''); }} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
@@ -1124,7 +982,7 @@ export default function NurseDashboardPage() {
                               className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--overlay-subtle)]"
                               style={{ borderBottom: '1px solid var(--border-light)' }}
                             >
-                              <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>{p.firstName} {p.surname}</div>
+                              <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</div>
                               <div className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber} · {p.gender}</div>
                             </button>
                           ))}
@@ -1152,7 +1010,7 @@ export default function NurseDashboardPage() {
                   {/* Airway */}
                   <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                     <div className="flex items-center gap-2 mb-2">
-                      <Wind className="w-4 h-4" style={{ color: '#5CB8A8' }} />
+                      <Wind className="w-4 h-4" style={{ color: '#2563EB' }} />
                       <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.airway')}</span>
                     </div>
                     <div className="flex gap-2">
@@ -1242,7 +1100,7 @@ export default function NurseDashboardPage() {
                   {/* Consciousness (AVPU) */}
                   <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                     <div className="flex items-center gap-2 mb-2">
-                      <Brain className="w-4 h-4" style={{ color: '#5CB8A8' }} />
+                      <Brain className="w-4 h-4" style={{ color: '#2563EB' }} />
                       <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.consciousnessAvpu')}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
@@ -1417,7 +1275,7 @@ export default function NurseDashboardPage() {
                             </p>
                           </button>
                           <div className="flex-shrink-0">
-                            <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: ti.status === 'pending' ? 'rgba(252,211,77,0.12)' : ti.status === 'seen' ? 'rgba(92,184,168,0.12)' : 'rgba(16,185,129,0.12)', color: ti.status === 'pending' ? 'var(--color-warning)' : ti.status === 'seen' ? '#5CB8A8' : 'var(--color-success)' }}>
+                            <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: ti.status === 'pending' ? 'rgba(252,211,77,0.12)' : ti.status === 'seen' ? 'rgba(92,184,168,0.12)' : 'rgba(31, 157, 111,0.12)', color: ti.status === 'pending' ? 'var(--color-warning)' : ti.status === 'seen' ? '#2563EB' : 'var(--color-success)' }}>
                               {ti.status}
                             </span>
                           </div>
@@ -1736,7 +1594,7 @@ export default function NurseDashboardPage() {
                         <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: 'var(--color-danger)' }}>
                           {(p.firstName || '?')[0]}{(p.surname || '?')[0]}
                         </div>
-                        <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>{p.firstName} {p.surname}</span>
+                        <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>
                         <span className="text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: 'rgba(248,113,113,0.15)', color: '#F87171' }}>{t('nurse.vitalsOverdue')}</span>
                       </div>
                     ))}
@@ -1779,10 +1637,10 @@ export default function NurseDashboardPage() {
                 </div>
                 <div className="rounded-xl p-3" style={{ background: 'rgba(92,184,168,0.05)', border: '1px solid rgba(92,184,168,0.15)' }}>
                   <div className="flex items-center gap-2 mb-1">
-                    <Eye className="w-4 h-4" style={{ color: '#5CB8A8' }} />
-                    <span className="text-xs font-semibold" style={{ color: '#5CB8A8' }}>{t('nurse.dischargesToday')}</span>
+                    <Eye className="w-4 h-4" style={{ color: '#2563EB' }} />
+                    <span className="text-xs font-semibold" style={{ color: '#2563EB' }}>{t('nurse.dischargesToday')}</span>
                   </div>
-                  <p className="text-2xl font-bold" style={{ color: '#5CB8A8' }}>{IS_DEMO ? Math.max(1, Math.floor(patients.length * 0.03)) : 0}</p>
+                  <p className="text-2xl font-bold" style={{ color: '#2563EB' }}>{IS_DEMO ? Math.max(1, Math.floor(patients.length * 0.03)) : 0}</p>
                 </div>
               </div>
 

@@ -2,6 +2,7 @@ import { ancDB, birthsDB, deathsDB, immunizationsDB } from '../db';
 import type { ANCVisitDoc, BirthRegistrationDoc, DeathRegistrationDoc, ImmunizationDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { jubaYearMonth, jubaIsInMonth } from '../time-juba';
 import { SOUTH_SUDAN_STATES } from '../geographic-data';
 
@@ -644,17 +645,12 @@ function identifyHighRiskPregnancies(visits: ANCVisitDoc[]): HighRiskPregnancy[]
 
 export async function getMCHAnalytics(scope?: DataScope): Promise<MCHAnalyticsData> {
   // Fetch all data in parallel
-  const [ancResult, birthResult, deathResult, immResult] = await Promise.all([
-    ancDB().allDocs({ include_docs: true }),
-    birthsDB().allDocs({ include_docs: true }),
-    deathsDB().allDocs({ include_docs: true }),
-    immunizationsDB().allDocs({ include_docs: true }),
+  let [visits, births, deaths, immunizations] = await Promise.all([
+    findByType<ANCVisitDoc>(ancDB(), 'anc_visit'),
+    findByType<BirthRegistrationDoc>(birthsDB(), 'birth'),
+    findByType<DeathRegistrationDoc>(deathsDB(), 'death'),
+    findByType<ImmunizationDoc>(immunizationsDB(), 'immunization'),
   ]);
-
-  let visits = ancResult.rows.map(r => r.doc as ANCVisitDoc).filter(d => d?.type === 'anc_visit');
-  let births = birthResult.rows.map(r => r.doc as BirthRegistrationDoc).filter(d => d?.type === 'birth');
-  let deaths = deathResult.rows.map(r => r.doc as DeathRegistrationDoc).filter(d => d?.type === 'death');
-  let immunizations = immResult.rows.map(r => r.doc as ImmunizationDoc).filter(d => d?.type === 'immunization');
 
   // Apply tenant scoping (orgId/hospitalId per role) so non-government users
   // never see other facilities' MCH data through the analytics surface.

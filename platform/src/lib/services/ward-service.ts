@@ -8,8 +8,10 @@ import { getDB } from '../db';
 import type { WardDoc, BedDoc, AdmissionDoc, BedStatus } from '../db-types-ward';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 
 const wardDB = () => getDB('tamamhealth_wards');
 
@@ -17,10 +19,7 @@ const wardDB = () => getDB('tamamhealth_wards');
 
 export async function getAllWards(scope?: DataScope): Promise<WardDoc[]> {
   const db = wardDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as WardDoc)
-    .filter(d => d && d.type === 'ward')
+  const all = (await findByType<WardDoc>(db, 'ward'))
     .sort((a, b) => a.name.localeCompare(b.name));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -49,6 +48,14 @@ export async function createWard(data: Omit<WardDoc, '_id' | '_rev' | 'type' | '
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   await logAuditSafe('WARD_CREATED', undefined, undefined, `Ward ${doc.name} created at ${doc.facilityName}`);
+  emitSyncEvent({
+    resourceType: 'ward',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
@@ -56,10 +63,8 @@ export async function createWard(data: Omit<WardDoc, '_id' | '_rev' | 'type' | '
 
 export async function getBedsByWard(wardId: string): Promise<BedDoc[]> {
   const db = wardDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as BedDoc)
-    .filter(d => d && d.type === 'bed' && d.wardId === wardId)
+  const rows = await findByType<BedDoc>(db, 'bed', { wardId }, { indexFields: ['type', 'wardId'] });
+  return rows
     .sort((a, b) => a.bedNumber.localeCompare(b.bedNumber));
 }
 
@@ -85,6 +90,14 @@ export async function updateBedStatus(bedId: string, status: BedStatus, patientI
     bed.updatedAt = new Date().toISOString();
     const resp = await db.put(bed);
     bed._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'bed',
+      resourceId: bed._id,
+      operation: 'update',
+      resourceVersion: bed._rev,
+      orgId: bed.orgId,
+      hospitalId: bed.facilityId,
+    });
     return bed;
   } catch {
     return null;
@@ -95,10 +108,7 @@ export async function updateBedStatus(bedId: string, status: BedStatus, patientI
 
 export async function getAllAdmissions(scope?: DataScope): Promise<AdmissionDoc[]> {
   const db = wardDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as AdmissionDoc)
-    .filter(d => d && d.type === 'admission');
+  const all = await findByType<AdmissionDoc>(db, 'admission');
   /* istanbul ignore next -- defensive null-safety in sort */
   all.sort((a, b) => (b.admissionDate || '').localeCompare(a.admissionDate || ''));
   return scope ? filterByScope(all, scope) : all;
@@ -174,6 +184,15 @@ export async function admitPatient(data: AdmitPatientInput): Promise<AdmissionDo
     `Admitted ${data.patientName} to ${data.wardName} (${data.admittingDiagnosis})`
   );
 
+  emitSyncEvent({
+    resourceType: 'admission',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
@@ -230,6 +249,15 @@ export async function dischargePatient(
       `Discharged ${admission.patientName} from ${admission.wardName} (LOS: ${admission.lengthOfStay}d)`
     );
 
+    emitSyncEvent({
+      resourceType: 'admission',
+      resourceId: admission._id,
+      operation: 'update',
+      resourceVersion: admission._rev,
+      orgId: admission.orgId,
+      hospitalId: admission.facilityId,
+    });
+
     return admission;
   } catch {
     return null;
@@ -247,7 +275,16 @@ async function updateWardOccupancy(wardId: string): Promise<void> {
     ward.occupiedBeds = beds.filter(b => b.status === 'occupied').length;
     ward.availableBeds = ward.totalBeds - ward.occupiedBeds;
     ward.updatedAt = new Date().toISOString();
-    await db.put(ward);
+    const resp = await db.put(ward);
+    ward._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'ward',
+      resourceId: ward._id,
+      operation: 'update',
+      resourceVersion: ward._rev,
+      orgId: ward.orgId,
+      hospitalId: ward.facilityId,
+    });
   } catch {
     // Ward occupancy update is best-effort
   }

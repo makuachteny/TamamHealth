@@ -12,6 +12,7 @@
  */
 import { syncEventsDB } from '../db';
 import type { SyncEventDoc } from '../db-types';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface SyncEventInput {
@@ -135,8 +136,7 @@ export async function getSyncEventStats(): Promise<{
   newestEvent?: string;
 }> {
   const db = syncEventsDB();
-  const res = await db.allDocs({ include_docs: true });
-  const docs = res.rows.map((r) => r.doc as SyncEventDoc).filter((d) => d && d.type === 'sync_event');
+  const docs = await findByType<SyncEventDoc>(db, 'sync_event');
 
   const stats = {
     total: docs.length,

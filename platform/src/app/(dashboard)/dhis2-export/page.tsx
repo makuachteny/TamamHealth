@@ -164,7 +164,7 @@ export default function DHIS2ExportPage() {
               style={{
                 background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
                 color: syncing ? 'var(--text-muted)' : '#fff',
-                boxShadow: syncing ? 'none' : '0 4px 12px rgba(43,111,224,0.3)',
+                boxShadow: syncing ? 'none' : '0 4px 12px rgba(59, 130, 246,0.3)',
               }}
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
@@ -179,7 +179,7 @@ export default function DHIS2ExportPage() {
             { label: t('dhis2.statConnection'), value: t('dhis2.statConnectionActive'), icon: Wifi, color: '#10B944', sub: 'hmis.southsudan.health' },
             { label: t('dhis2.tabDataElements'), value: `${syncedCount}/${DHIS2_DATA_ELEMENTS.length}`, icon: Database, color: 'var(--accent-primary)', sub: t('sync.synced') },
             { label: t('dhis2.statReportsDue'), value: String(DHIS2_REPORTS.filter(r => r.status !== 'submitted').length), icon: FileText, color: 'var(--color-warning)', sub: t('dhis2.statPendingCompletion') },
-            { label: t('dhis2.statLastSync'), value: t('dhis2.statLastSyncValue'), icon: Clock, color: '#0D9488', sub: 'Feb 22, 2026' },
+            { label: t('dhis2.statLastSync'), value: t('dhis2.statLastSyncValue'), icon: Clock, color: '#1E3A8A', sub: 'Feb 22, 2026' },
           ].map((stat) => (
             <div key={stat.label} className="card-elevated p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -358,7 +358,7 @@ export default function DHIS2ExportPage() {
               className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all"
               style={{
                 background: 'linear-gradient(135deg, #3b82f6, #1E40AF)',
-                boxShadow: '0 4px 12px rgba(43,111,224,0.3)',
+                boxShadow: '0 4px 12px rgba(59, 130, 246,0.3)',
               }}
             >
               <Upload className="w-4 h-4" />
@@ -459,7 +459,7 @@ export default function DHIS2ExportPage() {
             </div>
 
             {exportResult && (
-              <div className="card-elevated p-4" style={{ background: 'rgba(43,111,224,0.06)', border: '1px solid var(--accent-border)' }}>
+              <div className="card-elevated p-4" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
                 <div className="flex items-center gap-2 mb-1">
                   <CheckCircle className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                   <span className="font-semibold text-sm" style={{ color: 'var(--accent-primary)' }}>{t('dhis2.exportSuccessful')}</span>

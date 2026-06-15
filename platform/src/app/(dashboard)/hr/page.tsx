@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Modal from '@/components/Modal';
 import { useSearchParams, useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
@@ -577,7 +578,7 @@ export default function HRPage() {
 
         {/* ── Modals ────────────────────────────────────── */}
         {leaveOpen && (
-          <div className="modal-backdrop" onClick={() => setLeaveOpen(false)}>
+          <Modal onClose={() => setLeaveOpen(false)}>
             <div className="modal-content card-elevated p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold">{t('hr.requestLeave')}</h3>
@@ -622,11 +623,11 @@ export default function HRPage() {
                 <button onClick={handleRequestLeave} className="btn btn-primary flex-1">{t('hr.submit')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
 
         {scheduleOpen && (
-          <div className="modal-backdrop" onClick={() => setScheduleOpen(false)}>
+          <Modal onClose={() => setScheduleOpen(false)}>
             <div className="modal-content card-elevated p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold">{t('hr.scheduleShift')}</h3>
@@ -683,11 +684,11 @@ export default function HRPage() {
                 <button onClick={handleAddShift} className="btn btn-primary flex-1">{t('hr.saveShift')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
 
         {payrollOpen && (
-          <div className="modal-backdrop" onClick={() => setPayrollOpen(false)}>
+          <Modal onClose={() => setPayrollOpen(false)}>
             <div className="modal-content card-elevated p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold">{t('hr.addPayrollEntryPeriod', { period: payrollPeriod })}</h3>
@@ -739,7 +740,7 @@ export default function HRPage() {
                 <button onClick={handleAddPayroll} className="btn btn-primary flex-1">{t('hr.addEntry')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </main>
     </>

@@ -135,13 +135,8 @@ export default function NewPatientPage() {
         lastVisitHospital: currentUser?.hospitalId || '',
         isActive: true,
       });
-      showToast(t('patientNew.toastRegistered', { firstName: form.firstName, surname: form.surname }), 'success');
-      // BHW flow: go straight to boma dashboard with patient pre-selected for symptoms
-      if (currentUser?.role === 'boma_health_worker' && result?._id) {
-        router.push(`/dashboard/boma?newPatientId=${result._id}`);
-      } else {
-        router.push('/patients');
-      }
+      showToast(`${t('patientNew.toastRegistered', { firstName: form.firstName, surname: form.surname })}${result?.hospitalNumber ? ` — Hospital No. ${result.hospitalNumber}` : ''}`, 'success');
+      router.push('/patients');
     } catch (err) {
       console.error('Failed to register patient:', err);
       if (err instanceof Error && 'fields' in err) {
@@ -170,10 +165,10 @@ export default function NewPatientPage() {
             subtitle={t('patientNew.pageSubtitle')}
           />
 
-          {/* Step Indicator */}
-          <div className="flex items-center gap-0 mb-8">
+          {/* Step Indicator — stretches across the full width of the form below */}
+          <div className="flex items-center gap-0 mb-8 w-full">
             {steps.map((s, i) => (
-              <div key={s} className="flex items-center">
+              <div key={s} className={`flex items-center ${i < steps.length - 1 ? 'flex-1' : ''}`}>
                 <div className="flex flex-col items-center">
                   <div className={`step-dot ${i === step ? 'step-dot-active' : i < step ? 'step-dot-completed' : ''}`}>
                     {i < step ? <Check className="w-4 h-4" /> : i + 1}
@@ -181,7 +176,7 @@ export default function NewPatientPage() {
                   <span className="text-[10px] mt-1.5 font-medium whitespace-nowrap" style={{ color: i === step ? 'var(--tamamhealth-blue)' : 'var(--text-muted)' }}>{s}</span>
                 </div>
                 {i < steps.length - 1 && (
-                  <div className={`step-line mx-2 ${i < step ? 'step-line-completed' : i === step ? 'step-line-active' : ''}`} />
+                  <div className={`step-line mx-2 flex-1 ${i < step ? 'step-line-completed' : i === step ? 'step-line-active' : ''}`} style={{ width: 'auto' }} />
                 )}
               </div>
             ))}

@@ -12,8 +12,8 @@ import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
-  HeartPulse, Search, Plus, X, Users, AlertTriangle,
-  Calendar, ChevronRight, ExternalLink, CheckCircle,
+  HeartPulse, Search, Plus, X, Users,
+  Calendar, ChevronRight, ExternalLink,
 } from '@/components/icons/lucide';
 
 const RISK_FACTOR_OPTIONS = [
@@ -23,7 +23,7 @@ const RISK_FACTOR_OPTIONS = [
 ];
 
 const riskColors = {
-  low: { color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)', label: 'Low Risk' },
+  low: { color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)', label: 'Low Risk' },
   moderate: { color: 'var(--color-warning)', bg: 'rgba(245,158,11,0.12)', label: 'Moderate' },
   high: { color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.12)', label: 'High Risk' },
 };
@@ -34,6 +34,10 @@ export default function ANCPage() {
   const { visits, stats, loading, register } = useANC();
   const { patients } = usePatients();
   const { canRecordVitalEvents } = usePermissions();
+  // Programme analytics (summary cards + ANC continuum funnel) are a population
+  // view for facility management and the Ministry of Health. Clinical roles keep
+  // the data recordings, workflow, and the mother/visit data.
+  const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
   const [search, setSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
@@ -184,6 +188,12 @@ export default function ANCPage() {
           icon={HeartPulse}
           title={t('anc.title')}
           subtitle={t('anc.subtitle')}
+          stats={canViewCoverage && stats ? [
+            { label: t('anc.mothersEnrolled'), value: stats.totalMothers, color: 'var(--accent-primary)' },
+            { label: t('anc.anc4PlusRate'), value: `${stats.anc4PlusRate}%`, color: '#22C55E' },
+            { label: t('anc.highRisk'), value: stats.highRiskCount, color: '#EF4444' },
+            { label: t('anc.thisMonth'), value: stats.thisMonthVisits, color: '#6366F1' },
+          ] : undefined}
           actions={canRecordVitalEvents && (
             <button onClick={() => setShowModal(true)} className="btn btn-primary">
               <Plus className="w-4 h-4" /> {t('anc.registerVisit')}
@@ -191,30 +201,8 @@ export default function ANCPage() {
           )}
         />
 
-        {/* Stats Row */}
-        {stats && (
-          <div className="kpi-grid mb-6">
-            {[
-              { label: t('anc.mothersEnrolled'), value: stats.totalMothers.toString(), color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)', icon: Users },
-              { label: t('anc.anc4PlusRate'), value: `${stats.anc4PlusRate}%`, color: '#22C55E', bg: 'rgba(34,197,94,0.12)', icon: CheckCircle },
-              { label: t('anc.highRisk'), value: stats.highRiskCount.toString(), color: '#EF4444', bg: 'rgba(229,46,66,0.12)', icon: AlertTriangle },
-              { label: t('anc.thisMonth'), value: stats.thisMonthVisits.toString(), color: '#6366F1', bg: 'rgba(99,102,241,0.12)', icon: Calendar },
-            ].map(stat => (
-              <div key={stat.label} className="kpi">
-                <div className="icon-box-sm" style={{ background: stat.bg }}>
-                  <stat.icon style={{ color: stat.color }} />
-                </div>
-                <div className="kpi__body">
-                  <div className="kpi__value">{stat.value}</div>
-                  <div className="kpi__label">{stat.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Continuum funnel */}
-        {stats && stats.continuum && stats.totalMothers > 0 && (
+        {canViewCoverage && stats && stats.continuum && stats.totalMothers > 0 && (
           <div className="card-elevated p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -235,7 +223,7 @@ export default function ANCPage() {
               ] as const).map((step, i) => {
                 const pct = stats.totalMothers > 0 ? Math.round((step.count / stats.totalMothers) * 100) : 0;
                 const dropoff = i > 0 ? Math.max(0, ([stats.continuum.anc1, stats.continuum.anc2, stats.continuum.anc3, stats.continuum.anc4, stats.continuum.anc5plus][i - 1]) - step.count) : 0;
-                const barColor = step.key === 'anc4' ? 'var(--accent-primary)' : pct >= 50 ? '#0D9488' : pct >= 25 ? 'var(--color-warning)' : 'var(--color-danger)';
+                const barColor = step.key === 'anc4' ? 'var(--accent-primary)' : pct >= 50 ? '#1E3A8A' : pct >= 25 ? 'var(--color-warning)' : 'var(--color-danger)';
                 return (
                   <div key={step.key} className="flex items-center gap-3">
                     <span className="text-xs font-medium w-44 text-right" style={{ color: 'var(--text-secondary)' }}>{step.label}</span>
@@ -263,12 +251,15 @@ export default function ANCPage() {
         )}
 
         {/* Search & Filter */}
-        <div className="flex gap-3 mb-4">
+        <div
+          className="flex items-center mb-4 rounded-lg overflow-hidden"
+          style={{ border: '1px solid var(--border-light)', background: 'var(--surface, #fff)' }}
+        >
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             <input
               type="search"
-              className="search-icon-input"
+              className="w-full bg-transparent border-0 outline-none pl-10 pr-3 py-2.5 text-sm"
               placeholder={t('anc.searchMotherPlaceholder')}
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -277,7 +268,8 @@ export default function ANCPage() {
           <select
             value={riskFilter}
             onChange={e => setRiskFilter(e.target.value)}
-            style={{ width: '180px' }}
+            className="bg-transparent border-0 outline-none py-2.5 px-3 text-sm cursor-pointer"
+            style={{ width: '180px', borderLeft: '1px solid var(--border-light)' }}
           >
             <option value="all">{t('anc.allRiskLevels')}</option>
             <option value="high">{t('anc.riskHigh')}</option>
@@ -459,7 +451,7 @@ export default function ANCPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Link to existing patient (recommended) */}
-                <div className="rounded-lg p-3" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(43,111,224,0.25))' }}>
+                <div className="rounded-lg p-3" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(59, 130, 246,0.25))' }}>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--accent-primary)', textTransform: 'uppercase' }}>
                     <Users className="w-3 h-3" />
                     Link to existing mother (recommended)

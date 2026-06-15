@@ -17,6 +17,7 @@ import type { PharmacyInventoryDoc } from '../db-types';
 import { classifyStockStatus } from './pharmacy-inventory-service';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 
 // WHO Essential Medicines commonly needed in South Sudan facilities
 const ESSENTIAL_MEDICINES = [
@@ -117,10 +118,7 @@ function alertSeverity(item: PharmacyInventoryDoc, status: string): 'emergency' 
  */
 export async function getStockAlerts(facilityId?: string, scope?: DataScope): Promise<StockAlert[]> {
   const db = pharmacyInventoryDB();
-  const result = await db.allDocs({ include_docs: true });
-  let items = result.rows
-    .map(r => r.doc as PharmacyInventoryDoc)
-    .filter(d => d && d.type === 'pharmacy_inventory');
+  let items = await findByType<PharmacyInventoryDoc>(db, 'pharmacy_inventory');
   /* istanbul ignore next -- defensive: facility filter depends on param */
   items = items.filter(d => !facilityId || d.hospitalId === facilityId);
   if (scope) items = filterByScope(items, scope);
@@ -234,10 +232,7 @@ export async function getStockAlerts(facilityId?: string, scope?: DataScope): Pr
  */
 export async function getSupplyChainSummary(facilityId?: string, scope?: DataScope): Promise<SupplyChainSummary> {
   const db = pharmacyInventoryDB();
-  const result = await db.allDocs({ include_docs: true });
-  let items = result.rows
-    .map(r => r.doc as PharmacyInventoryDoc)
-    .filter(d => d && d.type === 'pharmacy_inventory');
+  let items = await findByType<PharmacyInventoryDoc>(db, 'pharmacy_inventory');
   /* istanbul ignore next -- defensive: facility filter depends on param */
   items = items.filter(d => !facilityId || d.hospitalId === facilityId);
   if (scope) items = filterByScope(items, scope);
@@ -332,10 +327,12 @@ export async function getConsumptionTrend(
   scope?: DataScope,
 ): Promise<{ dailyAverage: number; projectedStockoutDays: number | null; currentStock: number }> {
   const db = pharmacyInventoryDB();
-  const result = await db.allDocs({ include_docs: true });
-  let items = result.rows
-    .map(r => r.doc as PharmacyInventoryDoc)
-    .filter(d => d && d.type === 'pharmacy_inventory' && d.medicationName === medicationName);
+  let items = await findByType<PharmacyInventoryDoc>(
+    db,
+    'pharmacy_inventory',
+    { medicationName },
+    { indexFields: ['type', 'medicationName'] },
+  );
   /* istanbul ignore next -- defensive: facility filter depends on param */
   items = items.filter(d => !facilityId || d.hospitalId === facilityId);
   if (scope) items = filterByScope(items, scope);

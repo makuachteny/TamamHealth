@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
-import { Package, Plus, X, Search, AlertTriangle, CheckCircle2, Clock, Settings as Wrench } from '@/components/icons/lucide';
+import { Package, Plus, X, AlertTriangle, CheckCircle2, Clock, Settings as Wrench } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { FilterBar, SearchInput, FilterSelect } from '@/components/filters';
 import type { AssetDoc, AssetCategory, AssetStatus } from '@/lib/db-types-asset';
 
 const CATEGORIES: { id: AssetCategory; labelKey: string }[] = [
@@ -163,24 +165,29 @@ export default function AssetsPage() {
         )}
 
         {/* Search + filters */}
-        <div className="dash-card p-3 mb-3">
-          <div className="flex gap-3 items-center flex-wrap">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-              <input className="pl-9 search-icon-input" placeholder={t('equipment.searchPlaceholder')} value={q} onChange={e => setQ(e.target.value)} style={{ background: 'var(--overlay-subtle)' }} />
-            </div>
-            <select value={filter} onChange={e => setFilter(e.target.value as AssetCategory | '')} className="text-sm">
-              <option value="">{t('equipment.allCategories')}</option>
-              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{t(c.labelKey)}</option>)}
-            </select>
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as AssetStatus | '')} className="text-sm">
-              <option value="">{t('equipment.allStatuses')}</option>
-              {(Object.entries(STATUS_TOKENS) as [AssetStatus, typeof STATUS_TOKENS[AssetStatus]][]).map(([id, tok]) => (
-                <option key={id} value={id}>{t(tok.labelKey)}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <FilterBar>
+          <SearchInput value={q} onChange={setQ} placeholder={t('equipment.searchPlaceholder')} />
+          <FilterSelect
+            aria-label={t('equipment.allCategories')}
+            value={filter}
+            neutralValue=""
+            onChange={v => setFilter(v as AssetCategory | '')}
+            options={[
+              { value: '', label: t('equipment.allCategories') },
+              ...CATEGORIES.map(c => ({ value: c.id, label: t(c.labelKey) })),
+            ]}
+          />
+          <FilterSelect
+            aria-label={t('equipment.allStatuses')}
+            value={statusFilter}
+            neutralValue=""
+            onChange={v => setStatusFilter(v as AssetStatus | '')}
+            options={[
+              { value: '', label: t('equipment.allStatuses') },
+              ...(Object.entries(STATUS_TOKENS) as [AssetStatus, typeof STATUS_TOKENS[AssetStatus]][]).map(([id, tok]) => ({ value: id, label: t(tok.labelKey) })),
+            ]}
+          />
+        </FilterBar>
 
         {/* Asset table */}
         <div className="dash-card overflow-hidden">
@@ -247,7 +254,7 @@ export default function AssetsPage() {
 
         {/* Register modal */}
         {createOpen && (
-          <div className="modal-backdrop" onClick={() => setCreateOpen(false)}>
+          <Modal onClose={() => setCreateOpen(false)}>
             <div className="modal-content card-elevated p-6 max-w-2xl w-full" style={{ maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold">{t('equipment.registerModalTitle')}</h3>
@@ -323,12 +330,12 @@ export default function AssetsPage() {
                 <button onClick={handleCreate} className="btn btn-primary flex-1">{t('equipment.register')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
 
         {/* Maintenance modal */}
         {serviceFor && (
-          <div className="modal-backdrop" onClick={() => setServiceFor(null)}>
+          <Modal onClose={() => setServiceFor(null)}>
             <div className="modal-content card-elevated p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -364,7 +371,7 @@ export default function AssetsPage() {
                 <button onClick={handleLogService} className="btn btn-primary flex-1">{t('equipment.saveLog')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </main>
     </>

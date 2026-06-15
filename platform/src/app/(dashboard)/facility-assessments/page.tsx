@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import { useFacilityAssessments } from '@/lib/hooks/useFacilityAssessments';
@@ -56,7 +57,7 @@ export default function FacilityAssessmentsPage() {
   if (loading) return <><TopBar title={t('facilityAssessments.topBarTitle')} /><main className="page-container flex items-center justify-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</p></main></>;
 
   const scoreColor = (score: number) => score >= 70 ? 'var(--accent-primary)' : score >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
-  const scoreBg = (score: number) => score >= 70 ? 'rgba(43,111,224,0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
+  const scoreBg = (score: number) => score >= 70 ? 'rgba(59, 130, 246,0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
 
   const handleSubmit = async () => {
     if (!form.facilityId) {
@@ -126,6 +127,12 @@ export default function FacilityAssessmentsPage() {
           icon={ClipboardCheck}
           title={t('facilityAssessments.pageTitle')}
           subtitle={t('facilityAssessments.pageSubtitle')}
+          stats={summary ? [
+            { label: t('facilityAssessments.kpiFacilitiesAssessed'), value: summary.facilitiesAssessed, color: 'var(--accent-primary)' },
+            { label: t('facilityAssessments.kpiAvgOverallScore'), value: `${summary.avgOverallScore}%`, color: scoreColor(summary.avgOverallScore) },
+            { label: t('facilityAssessments.kpiDHIS2Adoption'), value: `${summary.withDHIS2}/${summary.facilitiesAssessed}`, color: scoreColor(summary.facilitiesAssessed ? (summary.withDHIS2 / summary.facilitiesAssessed * 100) : 0) },
+            { label: t('facilityAssessments.kpiAvgReportingCompleteness'), value: `${summary.avgReportingCompleteness}%`, color: scoreColor(summary.avgReportingCompleteness) },
+          ] : undefined}
           actions={canAssessFacility && (
             <button onClick={() => setShowForm(true)} className="btn btn-primary">
               <Plus className="w-4 h-4" /> {t('facilityAssessments.newAssessment')}
@@ -135,26 +142,6 @@ export default function FacilityAssessmentsPage() {
 
         {summary && (
           <>
-            {/* Summary cards */}
-            <div className="kpi-grid mb-6">
-              {[
-                { label: t('facilityAssessments.kpiFacilitiesAssessed'), value: summary.facilitiesAssessed, icon: Building2, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
-                { label: t('facilityAssessments.kpiAvgOverallScore'), value: `${summary.avgOverallScore}%`, icon: ClipboardCheck, color: scoreColor(summary.avgOverallScore), bg: scoreBg(summary.avgOverallScore) },
-                { label: t('facilityAssessments.kpiDHIS2Adoption'), value: `${summary.withDHIS2}/${summary.facilitiesAssessed}`, icon: Wifi, color: scoreColor(summary.facilitiesAssessed ? (summary.withDHIS2 / summary.facilitiesAssessed * 100) : 0), bg: scoreBg(summary.facilitiesAssessed ? (summary.withDHIS2 / summary.facilitiesAssessed * 100) : 0) },
-                { label: t('facilityAssessments.kpiAvgReportingCompleteness'), value: `${summary.avgReportingCompleteness}%`, icon: Activity, color: scoreColor(summary.avgReportingCompleteness), bg: scoreBg(summary.avgReportingCompleteness) },
-              ].map(stat => (
-                <div key={stat.label} className="kpi">
-                  <div className="kpi__icon" style={{ background: stat.bg }}>
-                    <stat.icon style={{ color: stat.color }} />
-                  </div>
-                  <div className="kpi__body">
-                    <div className="kpi__value">{stat.value}</div>
-                    <div className="kpi__label">{stat.label}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
             {/* National averages */}
             <div className="card-elevated p-4 mb-6">
               <h3 className="font-semibold text-sm mb-4">{t('facilityAssessments.nationalAvgTitle')}</h3>
@@ -256,7 +243,7 @@ export default function FacilityAssessmentsPage() {
                           ))}
                         </div>
                         {a.recommendations && (
-                          <div className="p-3 rounded-lg" style={{ background: 'rgba(43,111,224,0.06)', border: '1px solid var(--accent-border)' }}>
+                          <div className="p-3 rounded-lg" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
                             <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{t('facilityAssessments.recommendations')}</p>
                             <p className="text-xs">{a.recommendations}</p>
                           </div>
@@ -272,7 +259,7 @@ export default function FacilityAssessmentsPage() {
 
         {/* Create Assessment Modal */}
         {showForm && (
-          <div className="modal-backdrop" onClick={() => !submitting && setShowForm(false)}>
+          <Modal onClose={() => !submitting && setShowForm(false)}>
             <div className="modal-content card-elevated p-6 max-w-2xl w-full" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
@@ -369,7 +356,7 @@ export default function FacilityAssessmentsPage() {
                 </button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </main>
     </>

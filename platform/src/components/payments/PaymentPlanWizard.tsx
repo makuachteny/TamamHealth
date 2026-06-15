@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Modal from '@/components/Modal';
 import { X, CheckCircle2, ArrowRight, Loader2 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -67,7 +68,7 @@ export default function PaymentPlanWizard({
 
   if (success) {
     return (
-      <div className="modal-backdrop">
+      <Modal onClose={onCancel} width={360}>
         <div className="modal-content" style={{ padding: 48, textAlign: 'center', maxWidth: 360 }}>
           <CheckCircle2 size={64} style={{ color: 'var(--success)', marginBottom: 16 }} />
           <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700 }}>{t('payments.planCreated')}</h3>
@@ -75,12 +76,12 @@ export default function PaymentPlanWizard({
             {t('payments.planCreatedSummary', { amount: monthlyAmount.toLocaleString(), currency, months: termMonths })}
           </p>
         </div>
-      </div>
+      </Modal>
     );
   }
 
   return (
-    <div className="modal-backdrop" onClick={onCancel}>
+    <Modal onClose={onCancel} width={440}>
       <div className="modal-content" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border-medium)' }}>
@@ -169,6 +170,6 @@ export default function PaymentPlanWizard({
           )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

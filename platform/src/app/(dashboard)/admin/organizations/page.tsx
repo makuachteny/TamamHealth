@@ -7,8 +7,11 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
+import FilterBar from '@/components/filters/FilterBar';
+import SearchInput from '@/components/filters/SearchInput';
+import FilterSelect from '@/components/filters/FilterSelect';
 import {
-  Plus, Search, X, Edit3, Ban,
+  Plus, X, Edit3, Ban,
   ToggleLeft, ToggleRight
 } from '@/components/icons/lucide';
 
@@ -50,6 +53,7 @@ export default function AdminOrganizationsPage() {
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<OrgFormData>(emptyForm);
@@ -89,9 +93,10 @@ export default function AdminOrganizationsPage() {
       const q = search.toLowerCase();
       const matchSearch = !q || o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q) || o.contactEmail.toLowerCase().includes(q);
       const matchStatus = filterStatus === 'all' || o.subscriptionStatus === filterStatus;
-      return matchSearch && matchStatus;
+      const matchType = filterType === 'all' || o.orgType === filterType;
+      return matchSearch && matchStatus && matchType;
     });
-  }, [organizations, search, filterStatus]);
+  }, [organizations, search, filterStatus, filterType]);
 
   if (!currentUser || currentUser.role !== 'super_admin') return null;
 
@@ -198,27 +203,40 @@ export default function AdminOrganizationsPage() {
       <main className="page-container page-enter">
 
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          <div className="relative flex-1" style={{ minWidth: '200px', maxWidth: '360px' }}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input
-              type="text" placeholder={t('orgAdmin.searchPlaceholder')}
-              value={search} onChange={e => setSearch(e.target.value)}
-              style={{ ...inputStyle, paddingLeft: '36px' }}
-            />
-          </div>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ ...selectStyle, width: 'auto', minWidth: '160px' }}>
-            <option value="all">{t('orgAdmin.statusAll')}</option>
-            <option value="active">{t('orgAdmin.statusActive')}</option>
-            <option value="trial">{t('orgAdmin.statusTrial')}</option>
-            <option value="suspended">{t('orgAdmin.statusSuspended')}</option>
-            <option value="cancelled">{t('orgAdmin.statusCancelled')}</option>
-          </select>
-          <div className="flex-1" />
+        <FilterBar>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={t('orgAdmin.searchPlaceholder')}
+            aria-label={t('orgAdmin.searchPlaceholder')}
+          />
+          <FilterSelect
+            value={filterType}
+            onChange={setFilterType}
+            options={[
+              { value: 'all', label: t('orgAdmin.typeAll') },
+              { value: 'public', label: t('orgAdmin.typePublic') },
+              { value: 'private', label: t('orgAdmin.typePrivate') },
+            ]}
+            aria-label={t('orgAdmin.filterByType')}
+          />
+          <FilterSelect
+            value={filterStatus}
+            onChange={setFilterStatus}
+            options={[
+              { value: 'all', label: t('orgAdmin.statusAll') },
+              { value: 'active', label: t('orgAdmin.statusActive') },
+              { value: 'trial', label: t('orgAdmin.statusTrial') },
+              { value: 'suspended', label: t('orgAdmin.statusSuspended') },
+              { value: 'cancelled', label: t('orgAdmin.statusCancelled') },
+            ]}
+            aria-label={t('orgAdmin.filterByStatus')}
+          />
+          <FilterBar.Spacer />
           <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: 'var(--color-danger)' }}>
             <Plus className="w-4 h-4" /> {t('orgAdmin.newOrganization')}
           </button>
-        </div>
+        </FilterBar>
 
         {/* Table */}
         <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>

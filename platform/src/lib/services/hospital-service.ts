@@ -2,13 +2,12 @@ import { hospitalsDB } from '../db';
 import type { HospitalDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
 
 export async function getAllHospitals(scope?: DataScope): Promise<HospitalDoc[]> {
   const db = hospitalsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as HospitalDoc)
-    .filter(d => d && d.type === 'hospital');
+  const all = await findByType<HospitalDoc>(db, 'hospital');
   return scope ? filterByScope(all, scope) : all;
 }
 
@@ -48,6 +47,16 @@ export async function createHospital(
   doc._rev = resp.rev;
   const { logAudit } = await import('./audit-service');
   await logAudit('hospital_created', actorId, actorUsername, `Created hospital "${data.name}"`, true);
+  emitSyncEvent({
+    resourceType: 'hospital',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    userId: actorId,
+    username: actorUsername,
+    orgId: doc.orgId,
+    hospitalId: doc._id,
+  });
   return doc;
 }
 
@@ -61,6 +70,14 @@ export async function updateHospitalStatus(
     const updated = { ...existing, ...data, _id: existing._id, _rev: existing._rev, updatedAt: new Date().toISOString() };
     const resp2 = await db.put(updated);
     updated._rev = resp2.rev;
+    emitSyncEvent({
+      resourceType: 'hospital',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated._id,
+    });
     return updated;
   } catch {
     return null;

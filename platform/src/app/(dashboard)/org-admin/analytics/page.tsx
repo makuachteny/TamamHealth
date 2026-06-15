@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
+import PatientName from '@/components/PatientName';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
@@ -20,7 +21,7 @@ const RechartsBarChart = dynamic(
     const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } = mod;
 
     function ChartComponent({ data, brandColor }: { data: { name: string; patients: number }[]; brandColor: string }) {
-      const barColors = [brandColor, 'var(--accent-primary)', 'var(--color-success)', 'var(--color-warning)', '#EC4899', '#06B6D4', '#8B5CF6', '#14B8A6'];
+      const barColors = [brandColor, 'var(--accent-primary)', 'var(--color-success)', 'var(--color-warning)', '#EC4899', '#06B6D4', '#8B5CF6', '#3B82F6'];
 
       return (
         <ResponsiveContainer width="100%" height={300}>
@@ -350,8 +351,10 @@ export default function OrgAnalyticsPage() {
                     };
                     return (
                       <tr key={ref._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                        <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                          {ref.patientName || '-'}
+                        <td className="px-4 py-3">
+                          {ref.patientName
+                            ? <PatientName name={ref.patientName} nameClassName="text-sm font-medium" />
+                            : <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>-</span>}
                         </td>
                         <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
                           {ref.fromHospital || '-'}

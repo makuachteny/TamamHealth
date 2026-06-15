@@ -16,6 +16,7 @@ import {
 import { useApp } from '@/lib/context';
 import { getRoleConfig } from '@/lib/permissions';
 import type { NavItem } from '@/lib/permissions';
+import AvailabilityModal from '@/components/AvailabilityModal';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { SUPPORTED_LOCALES } from '@/lib/i18n';
 
@@ -40,6 +41,7 @@ export default function Sidebar() {
   const { logout, currentUser, sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useApp();
   const { t, locale, setLocale } = useTranslation();
   const [showLangPicker, setShowLangPicker] = useState(false);
+  const [showAvailability, setShowAvailability] = useState(false);
   const currentLocaleConfig = SUPPORTED_LOCALES.find(l => l.code === locale);
 
   // Map nav hrefs to i18n keys — falls back to the original label if no key exists
@@ -68,6 +70,16 @@ export default function Sidebar() {
   const groups = groupBySection(navItems);
   const hasSections = navItems.some(i => i.section);
 
+  // Highlight only the *most specific* matching nav item. Prefix matching keeps
+  // a sub-route (e.g. /patients/123) highlighting its parent nav item
+  // (/patients), but when a deeper route is itself a nav item — e.g.
+  // /payments/plans sitting under /payments — only the deepest match should be
+  // active. Without this, both /payments and /payments/plans light up at once.
+  const activeHref = navItems
+    .map(i => i.href)
+    .filter((h): h is string => !!h && (pathname === h || !!pathname?.startsWith(h + '/')))
+    .sort((a, b) => b.length - a.length)[0];
+
   const branding = currentUser?.branding;
   // The top of the sidebar is the product brand. The org/facility identity is
   // shown exactly once in the user card below, so it must not be repeated here.
@@ -80,6 +92,39 @@ export default function Sidebar() {
   };
 
   const collapsed = sidebarCollapsed;
+
+  // Render a single nav entry. Items with an `action` are in-place triggers
+  // (e.g. the Schedule tab opens the Add availability modal) rather than route
+  // links, so they render as buttons instead of <Link>.
+  const renderNavItem = (item: NavItem) => {
+    if (item.action === 'availability') {
+      return (
+        <button
+          key={item.href}
+          type="button"
+          onClick={() => { handleNavClick(); setShowAvailability(true); }}
+          title={collapsed ? navLabel(item) : undefined}
+          className={`nav-item w-full text-left ${collapsed ? 'justify-center !px-0' : ''}`}
+        >
+          <item.icon className="w-[22px] h-[22px] flex-shrink-0" style={{ opacity: 0.7 }} />
+          {!collapsed && <span className="font-medium text-[13px]">{navLabel(item)}</span>}
+        </button>
+      );
+    }
+    const isActive = !!activeHref && item.href === activeHref;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={handleNavClick}
+        title={collapsed ? navLabel(item) : undefined}
+        className={`nav-item ${isActive ? 'nav-item-active' : ''} ${collapsed ? 'justify-center !px-0' : ''}`}
+      >
+        <item.icon className="w-[22px] h-[22px] flex-shrink-0" style={{ opacity: isActive ? 1 : 0.7 }} />
+        {!collapsed && <span className="font-medium text-[13px]">{navLabel(item)}</span>}
+      </Link>
+    );
+  };
 
   // Drag-to-collapse/expand
   const dragRef = useRef<{ startX: number; startWidth: number; dragging: boolean }>({ startX: 0, startWidth: 256, dragging: false });
@@ -151,22 +196,30 @@ export default function Sidebar() {
 
   const sidebarContent = (
     <>
-      {/* Logo */}
-      <div className={`pt-5 pb-4 ${collapsed ? 'px-2' : 'px-5'}`}>
+      {/* Logo — pt tuned so the brand row lines up with the body's first row
+          (breadcrumb / page header), which sits ~20px from the viewport top. */}
+      <div className={`pt-3 pb-4 ${collapsed ? 'px-2' : 'px-5'}`}>
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-2.5'}`}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={brandLogo || '/assets/tamamhealth-logo.svg'}
-            alt={brandName}
-            className="flex-shrink-0 object-contain"
-            style={{ width: collapsed ? 32 : 36, height: collapsed ? 32 : 36 }}
-          />
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <h1 className="font-extrabold text-[15px] leading-[1.12]" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-                {brandName}
-              </h1>
-            </div>
+          {collapsed ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={brandLogo || '/assets/tamamhealth-logo.svg'}
+                alt={brandName}
+                className="flex-shrink-0 object-contain"
+                style={{ width: 34, height: 34 }}
+              />
+            </>
+          ) : (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={brandLogo || '/assets/tamamhealth-logo-full.svg'}
+                alt={brandName}
+                className="flex-1 min-w-0 object-contain object-left"
+                style={{ height: 36, width: 'auto', maxWidth: 190 }}
+              />
+            </>
           )}
           {/* Close button - only on mobile/tablet */}
           {!collapsed && (
@@ -182,9 +235,10 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* User role & facility */}
+      {/* User role & facility — nudged down so the card's centre lines up with
+          the page header title ("Patient Registry") in the content column. */}
       {currentUser && !collapsed && (
-        <div className="mx-4 mb-3 p-3 rounded-xl" style={{
+        <div className="mx-4 mt-2.5 mb-3 p-3 rounded-xl" style={{
           background: 'var(--overlay-subtle)',
           border: '1px solid var(--border-medium)',
         }}>
@@ -218,7 +272,9 @@ export default function Sidebar() {
       )}
 
       {/* Navigation */}
-      <nav aria-label="Main navigation" className={`flex-1 mt-1 overflow-y-auto overflow-x-hidden no-scrollbar ${collapsed ? 'px-2' : 'px-3'}`}>
+      {/* Extra top gap (expanded only) drops the first section label ("RECEPTION")
+          to the same line as the page search bar in the content column. */}
+      <nav aria-label="Main navigation" className={`flex-1 overflow-y-auto overflow-x-hidden no-scrollbar ${collapsed ? 'mt-1 px-2' : 'mt-6 px-3'}`}>
         {hasSections ? (
           groups.map((group, gi) => (
             <div key={gi} className={gi > 0 ? 'mt-4' : ''}>
@@ -231,41 +287,13 @@ export default function Sidebar() {
                 <div className="w-6 h-px mx-auto my-2" style={{ background: 'var(--border-medium)' }} />
               )}
               <div className="space-y-1">
-                {group.items.map(item => {
-                  const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={handleNavClick}
-                      title={collapsed ? navLabel(item) : undefined}
-                      className={`nav-item ${isActive ? 'nav-item-active' : ''} ${collapsed ? 'justify-center !px-0' : ''}`}
-                    >
-                      <item.icon className="w-[22px] h-[22px] flex-shrink-0" style={{ opacity: isActive ? 1 : 0.7 }} />
-                      {!collapsed && <span className="font-medium text-[13px]">{navLabel(item)}</span>}
-                    </Link>
-                  );
-                })}
+                {group.items.map(item => renderNavItem(item))}
               </div>
             </div>
           ))
         ) : (
           <div className="space-y-1">
-            {navItems.map(item => {
-              const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={handleNavClick}
-                  title={collapsed ? item.label : undefined}
-                  className={`nav-item ${isActive ? 'nav-item-active' : ''} ${collapsed ? 'justify-center !px-0' : ''}`}
-                >
-                  <item.icon className="w-[22px] h-[22px] flex-shrink-0" style={{ opacity: isActive ? 1 : 0.7 }} />
-                  {!collapsed && <span className="font-medium text-[13px]">{item.label}</span>}
-                </Link>
-              );
-            })}
+            {navItems.map(item => renderNavItem(item))}
           </div>
         )}
       </nav>
@@ -420,10 +448,12 @@ export default function Sidebar() {
           margin: '12px',
           marginRight: '0',
           height: 'calc(100vh - 24px)',
-          background: 'var(--sidebar-bg)',
-          borderRadius: '10px',
-          border: '1px solid var(--border-medium)',
-          boxShadow: 'var(--panel-shadow)',
+          background: 'var(--glass-bg-strong)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
+          borderRadius: 'var(--card-radius)',
+          border: '1px solid var(--glass-border)',
+          boxShadow: 'var(--panel-shadow), var(--glass-highlight)',
         }}
       >
         {sidebarContent}
@@ -432,7 +462,7 @@ export default function Sidebar() {
           onMouseDown={onMouseDown}
           onTouchStart={onTouchStart}
           className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-50 group"
-          style={{ borderRadius: '0 10px 10px 0' }}
+          style={{ borderRadius: '0 var(--card-radius) var(--card-radius) 0' }}
         >
           <div
             className="absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"
@@ -459,14 +489,19 @@ export default function Sidebar() {
           width: '280px',
           margin: '8px',
           height: 'calc(100vh - 16px)',
-          background: 'var(--sidebar-bg)',
+          background: 'var(--glass-bg-strong)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
           borderRadius: '10px',
-          border: '1px solid var(--border-medium)',
+          border: '1px solid var(--glass-border)',
           boxShadow: sidebarOpen ? 'var(--card-shadow-xl)' : 'none',
         }}
       >
         {sidebarContent}
       </aside>
+
+      {/* Add availability — opened from the Schedule nav item */}
+      {showAvailability && <AvailabilityModal onClose={() => setShowAvailability(false)} />}
     </>
   );
 }

@@ -1,16 +1,42 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
+import Modal from '@/components/Modal';
+import PatientName from '@/components/PatientName';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
-import { FlaskConical, Clock, CheckCircle2, AlertTriangle, Search, X, Plus, TrendingUp } from '@/components/icons/lucide';
+import { FlaskConical, AlertTriangle, X, Plus } from '@/components/icons/lucide';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { FilterBar, SearchInput, FilterTabs } from '@/components/filters';
+import type { LabOrderStatus } from '@/lib/clinical-flow/order-lifecycles';
+import { RESULT_REVIEW_SLA } from '@/lib/clinical-flow/order-lifecycles';
+
+// Human labels for the granular diagnostics lifecycle (Stage 6).
+const ORDER_STAGE_LABEL: Record<LabOrderStatus, string> = {
+  ordered: 'Ordered',
+  specimen_collected: 'Specimen collected',
+  received_at_lab: 'Received at lab',
+  rejected_needs_recollection: 'Needs re-collection',
+  in_process: 'In process',
+  resulted: 'Resulted',
+  reviewed_by_clinician: 'Reviewed',
+  acted_upon: 'Acted upon',
+  communicated_to_patient: 'Communicated',
+};
+
+// Derive the granular stage for an order, defaulting older orders from status.
+function effOrderStatus(o: { orderStatus?: LabOrderStatus; status: 'pending' | 'in_progress' | 'completed' }): LabOrderStatus {
+  if (o.orderStatus) return o.orderStatus;
+  if (o.status === 'completed') return 'resulted';
+  if (o.status === 'in_progress') return 'in_process';
+  return 'ordered';
+}
 
 interface ResultDraft {
   orderId: string;
@@ -43,7 +69,7 @@ export default function LabPage() {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const { globalSearch, currentUser } = useApp();
-  const { results: labResults, update: updateLabResult, loading: labLoading, reload: reloadLabs } = useLabResults();
+  const { results: labResults, update: updateLabResult, advance: advanceLabOrder, loading: labLoading, reload: reloadLabs } = useLabResults();
   const { patients } = usePatients();
   const { canEnterLabResults, canOrderLabs } = usePermissions();
   const { showToast } = useToast();
@@ -127,51 +153,16 @@ export default function LabPage() {
   const pending = labResults.filter(o => o.status === 'pending').length;
   const inProgress = labResults.filter(o => o.status === 'in_progress').length;
   const completed = labResults.filter(o => o.status === 'completed').length;
-  const abnormal = labResults.filter(o => o.abnormal).length;
 
-  // Lab turnaround time analysis: parse orderedAt → completedAt, bucket
-  // each completed result into a TAT band, and compute the median per
-  // test type. Helps facility managers spot bottlenecks (e.g. cultures
-  // that take 5+ days while RDTs return in <1h).
-  const tatStats = useMemo(() => {
-    const buckets = { '<1h': 0, '1-4h': 0, '4-24h': 0, '1-3d': 0, '>3d': 0 };
-    const byTest: Record<string, number[]> = {};
-    let totalCompleted = 0;
-    let totalHours = 0;
-    for (const r of labResults) {
-      if (r.status !== 'completed' || !r.orderedAt || !r.completedAt) continue;
-      const o = Date.parse(r.orderedAt);
-      const c = Date.parse(r.completedAt);
-      if (Number.isNaN(o) || Number.isNaN(c) || c < o) continue;
-      const hours = (c - o) / 3600000;
-      totalCompleted++;
-      totalHours += hours;
-      if (hours < 1) buckets['<1h']++;
-      else if (hours < 4) buckets['1-4h']++;
-      else if (hours < 24) buckets['4-24h']++;
-      else if (hours < 72) buckets['1-3d']++;
-      else buckets['>3d']++;
-      if (!byTest[r.testName]) byTest[r.testName] = [];
-      byTest[r.testName].push(hours);
-    }
-    const medianByTest = Object.entries(byTest).map(([name, hrs]) => {
-      const sorted = [...hrs].sort((a, b) => a - b);
-      let median = 0;
-      if (sorted.length > 0) {
-        const mid = Math.floor(sorted.length / 2);
-        median = sorted.length % 2 === 0
-          ? (sorted[mid - 1] + sorted[mid]) / 2
-          : sorted[mid];
-      }
-      return { name, median, count: hrs.length };
-    }).sort((a, b) => b.median - a.median).slice(0, 6);
-    return {
-      buckets,
-      totalCompleted,
-      avgHours: totalCompleted > 0 ? totalHours / totalCompleted : 0,
-      medianByTest,
-    };
-  }, [labResults]);
+  // Results back but not yet reviewed by a clinician past their SLA
+  // (24h critical / 7 days routine) — surfaced so they can't sit unseen.
+  const overdueReviews = labResults.filter(o => {
+    if (effOrderStatus(o) !== 'resulted') return false;
+    const resultedAt = new Date(o.updatedAt || o.createdAt || '').getTime();
+    if (!Number.isFinite(resultedAt)) return false;
+    const slaHours = o.critical ? RESULT_REVIEW_SLA.criticalHours : RESULT_REVIEW_SLA.routineHours;
+    return (Date.now() - resultedAt) / 3_600_000 > slaHours;
+  });
 
   // When the user marks a result `critical`, we gate the submission through a
   // confirmation modal — typoing a Hb of 4 g/dL into a critical result is the
@@ -185,6 +176,7 @@ export default function LabPage() {
     try {
       await updateLabResult(resultDraft.orderId, {
         status: 'completed',
+        orderStatus: 'resulted',
         result: resultDraft.result.trim(),
         unit: resultDraft.unit.trim(),
         referenceRange: resultDraft.referenceRange.trim(),
@@ -252,6 +244,21 @@ export default function LabPage() {
             )}
           />
 
+          {overdueReviews.length > 0 && (
+            <div className="card-elevated p-3 mb-4 flex items-start gap-2" style={{ background: 'rgba(229,46,66,0.08)', border: '1px solid var(--color-danger)' }}>
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-danger)' }} />
+              <div>
+                <p className="text-xs font-semibold" style={{ color: 'var(--color-danger)' }}>
+                  {overdueReviews.length} result{overdueReviews.length === 1 ? '' : 's'} awaiting clinician review past SLA
+                  {overdueReviews.some(o => o.critical) ? ` (${overdueReviews.filter(o => o.critical).length} critical)` : ''}
+                </p>
+                <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                  {overdueReviews.slice(0, 4).map(o => `${o.patientName} — ${o.testName}`).join('; ')}{overdueReviews.length > 4 ? '…' : ''}
+                </p>
+              </div>
+            </div>
+          )}
+
           {labLoading && (
             <div className="card-elevated p-4 mb-4 flex items-center gap-3" style={{ background: 'var(--overlay-subtle)' }}>
               <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
@@ -259,121 +266,21 @@ export default function LabPage() {
             </div>
           )}
 
-          {/* Stats */}
-          <div className="kpi-grid mb-4">
-            {[
-              { label: 'Pending Orders', value: pending, icon: Clock, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.10)' },
-              { label: 'In Progress', value: inProgress, icon: FlaskConical, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.10)' },
-              { label: 'Completed Today', value: completed, icon: CheckCircle2, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
-              { label: 'Abnormal Results', value: abnormal, icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.10)' },
-            ].map(s => (
-              <div key={s.label} className="kpi cursor-pointer" onClick={() => {
-              const filterMap: Record<string, string> = { 'Pending Orders': 'pending', 'In Progress': 'in_progress', 'Completed Today': 'completed', 'Abnormal Results': 'completed' };
-              setFilter(filterMap[s.label] || 'all');
-            }}>
-                <div className="kpi__icon" style={{ background: s.bg }}>
-                  <s.icon style={{ color: s.color }} />
-                </div>
-                <div className="kpi__body">
-                  <div className="kpi__value">{s.value}</div>
-                  <div className="kpi__label">{
-                    s.label === 'Pending Orders' ? t('lab.pendingOrders')
-                    : s.label === 'In Progress' ? t('lab.inProgress')
-                    : s.label === 'Completed Today' ? t('lab.completedToday')
-                    : s.label === 'Abnormal Results' ? t('lab.abnormalResults')
-                    : s.label
-                  }</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Turnaround Time Analysis */}
-          {tatStats.totalCompleted > 0 && (
-            <div className="card-elevated p-5 mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  <h3 className="font-semibold text-sm">{t('lab.turnaroundTime')}</h3>
-                </div>
-                <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>
-                  {t('lab.tatAvgSummary', { avg: tatStats.avgHours.toFixed(1), count: tatStats.totalCompleted })}
-                </span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('lab.distribution')}</p>
-                  <div className="space-y-1.5">
-                    {Object.entries(tatStats.buckets).map(([label, count]) => {
-                      const pct = tatStats.totalCompleted > 0 ? Math.round((count / tatStats.totalCompleted) * 100) : 0;
-                      const bg = label === '<1h' ? '#0D9488' : label === '1-4h' ? '#059669' : label === '4-24h' ? 'var(--accent-primary)' : label === '1-3d' ? 'var(--color-warning)' : 'var(--color-danger)';
-                      return (
-                        <div key={label} className="flex items-center gap-2">
-                          <span className="text-[10px] w-12 text-right font-mono" style={{ color: 'var(--text-muted)' }}>{label}</span>
-                          <div className="flex-1 h-5 rounded overflow-hidden" style={{ background: 'var(--overlay-light)' }}>
-                            <div className="h-full rounded flex items-center justify-end pr-1.5 transition-all duration-700"
-                              style={{ width: `${Math.max(pct, 4)}%`, background: bg }}>
-                              <span className="text-[9px] font-bold text-white">{count}</span>
-                            </div>
-                          </div>
-                          <span className="text-[10px] w-9 text-right" style={{ color: 'var(--text-muted)' }}>{pct}%</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('lab.slowestTests')}</p>
-                  <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column' }}>
-                    {tatStats.medianByTest.length === 0 ? (
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('lab.noCompletedTests')}</p>
-                    ) : tatStats.medianByTest.map(t => {
-                      const hoursLabel = t.median < 1 ? `${Math.round(t.median * 60)}m` : t.median < 24 ? `${t.median.toFixed(1)}h` : `${(t.median / 24).toFixed(1)}d`;
-                      const color = t.median < 4 ? '#0D9488' : t.median < 24 ? 'var(--color-warning)' : 'var(--color-danger)';
-                      return (
-                        <div key={t.name} className="flex items-center justify-between gap-2 text-xs py-1 px-2 rounded" style={{ background: 'var(--overlay-subtle)' }}>
-                          <div className="icon-box-sm flex-shrink-0" style={{ background: `${color}15` }}>
-                            <FlaskConical className="w-3 h-3" style={{ color }} />
-                          </div>
-                          <span className="truncate flex-1" style={{ color: 'var(--text-secondary)' }}>{t.name}</span>
-                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>n={t.count}</span>
-                          <span className="text-xs font-bold" style={{ color }}>{hoursLabel}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Filters */}
-          <div className="card-elevated p-4 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                <input type="search" placeholder={t('lab.searchByPatientOrTest')} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 search-icon-input" style={{ background: 'var(--overlay-subtle)' }} />
-              </div>
-              <div className="flex gap-1">
-                {[
-                  { id: 'all', label: t('lab.filterAll') },
-                  { id: 'pending', label: t('lab.filterPending') },
-                  { id: 'in_progress', label: t('lab.inProgress') },
-                  { id: 'completed', label: t('referral.completed') },
-                ].map(f => (
-                  <button key={f.id} onClick={() => setFilter(f.id)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                    style={{
-                      background: filter === f.id ? 'var(--accent-primary)' : 'transparent',
-                      color: filter === f.id ? 'white' : 'var(--text-secondary)',
-                      border: filter === f.id ? 'none' : '1px solid var(--border-light)',
-                    }}>
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          <FilterBar>
+            <SearchInput value={search} onChange={setSearch} placeholder={t('lab.searchByPatientOrTest')} />
+            <FilterTabs
+              ariaLabel={t('lab.title')}
+              active={filter}
+              onChange={setFilter}
+              tabs={[
+                { key: 'all', label: t('lab.filterAll'), count: labResults.length },
+                { key: 'pending', label: t('lab.filterPending'), count: pending },
+                { key: 'in_progress', label: t('lab.inProgress'), count: inProgress },
+                { key: 'completed', label: t('referral.completed'), count: completed },
+              ]}
+            />
+          </FilterBar>
 
           {/* Result Entry Modal */}
           {resultDraft && (
@@ -567,10 +474,15 @@ export default function LabPage() {
                 {filtered.map(order => (
                   <tr key={order._id} className="cursor-pointer hover:bg-white/[0.03]" onClick={() => { if (order.patientId) router.push(`/patients/${order.patientId}`); }}>
                     <td>
-                      <p className="font-medium text-sm">{order.patientName}</p>
+                      <PatientName name={order.patientName} nameClassName="font-medium text-sm" />
                       <p className="text-xs font-mono" style={{ color: 'var(--accent-primary)' }}>{order.hospitalNumber}</p>
                     </td>
-                    <td className="font-medium text-sm">{order.testName}</td>
+                    <td className="font-medium text-sm">
+                      {order.testName}
+                      {order.tier && (
+                        <span className="ml-2 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded align-middle" style={{ background: order.tier === 'special' ? 'rgba(124,58,237,0.12)' : 'var(--overlay-medium)', color: order.tier === 'special' ? '#7C3AED' : 'var(--text-muted)' }}>{order.tier}</span>
+                      )}
+                    </td>
                     <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{order.specimen}</td>
                     <td>
                       <span className={`badge text-[10px] ${
@@ -578,7 +490,7 @@ export default function LabPage() {
                         order.status === 'in_progress' ? 'badge-syncing' :
                         'badge-normal'
                       }`}>
-                        {order.status === 'in_progress' ? t('lab.statusProcessing') : order.status === 'pending' ? t('lab.filterPending') : t('referral.completed')}
+                        {ORDER_STAGE_LABEL[effOrderStatus(order)]}
                       </span>
                     </td>
                     <td>
@@ -600,26 +512,58 @@ export default function LabPage() {
                     </td>
                     {canEnterLabResults && (
                       <td onClick={(e) => e.stopPropagation()}>
-                        {order.status === 'pending' && (
-                          <button className="btn btn-primary btn-sm" style={{ padding: '4px 12px', fontSize: '0.75rem' }}
-                            onClick={() => updateLabResult(order._id, { status: 'in_progress' })}>{t('lab.accept')}</button>
-                        )}
-                        {order.status === 'in_progress' && (
-                          <button className="btn btn-primary btn-sm" style={{ padding: '4px 12px', fontSize: '0.75rem', background: 'var(--accent-primary)' }}
-                            onClick={() => setResultDraft({
-                              orderId: order._id,
-                              patientName: order.patientName || '',
-                              testName: order.testName || '',
-                              result: '',
-                              unit: order.unit || '',
-                              referenceRange: order.referenceRange || '',
-                              abnormal: false,
-                              critical: false,
-                            })}
-                          >
-                            {t('lab.enterResult')}
-                          </button>
-                        )}
+                        {(() => {
+                          const stage = effOrderStatus(order);
+                          const btn = { padding: '4px 12px', fontSize: '0.75rem' } as const;
+                          if (stage === 'ordered') {
+                            return (
+                              <button className="btn btn-primary btn-sm" style={btn}
+                                onClick={() => advanceLabOrder(order._id, 'specimen_collected')}>Collect specimen</button>
+                            );
+                          }
+                          if (stage === 'specimen_collected' || stage === 'rejected_needs_recollection') {
+                            return (
+                              <div className="flex flex-wrap gap-1.5">
+                                <button className="btn btn-primary btn-sm" style={btn}
+                                  onClick={() => advanceLabOrder(order._id, 'received_at_lab')}>Receive at lab</button>
+                                {stage === 'specimen_collected' && (
+                                  <button className="btn btn-secondary btn-sm" style={btn}
+                                    onClick={() => advanceLabOrder(order._id, 'rejected_needs_recollection')}>Reject</button>
+                                )}
+                                {stage === 'rejected_needs_recollection' && (
+                                  <button className="btn btn-secondary btn-sm" style={btn}
+                                    onClick={() => advanceLabOrder(order._id, 'specimen_collected')}>Re-collect</button>
+                                )}
+                              </div>
+                            );
+                          }
+                          if (stage === 'received_at_lab') {
+                            return (
+                              <button className="btn btn-primary btn-sm" style={btn}
+                                onClick={() => advanceLabOrder(order._id, 'in_process')}>Start processing</button>
+                            );
+                          }
+                          if (stage === 'in_process') {
+                            return (
+                              <button className="btn btn-primary btn-sm" style={{ ...btn, background: 'var(--accent-primary)' }}
+                                onClick={() => setResultDraft({
+                                  orderId: order._id,
+                                  patientName: order.patientName || '',
+                                  testName: order.testName || '',
+                                  result: '',
+                                  unit: order.unit || '',
+                                  referenceRange: order.referenceRange || '',
+                                  abnormal: false,
+                                  critical: false,
+                                })}
+                              >
+                                {t('lab.enterResult')}
+                              </button>
+                            );
+                          }
+                          // resulted and beyond — awaiting the clinician's review.
+                          return <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Awaiting clinician review</span>;
+                        })()}
                       </td>
                     )}
                   </tr>
@@ -630,7 +574,7 @@ export default function LabPage() {
 
           {/* New Lab Order Modal */}
           {showOrderModal && (
-            <div className="modal-backdrop" onClick={() => !orderSubmitting && setShowOrderModal(false)}>
+            <Modal onClose={() => !orderSubmitting && setShowOrderModal(false)}>
               <div className="modal-content card-elevated p-6 max-w-xl w-full" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -752,7 +696,7 @@ export default function LabPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )}
       </main>
     </>

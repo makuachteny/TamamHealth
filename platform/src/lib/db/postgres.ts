@@ -70,7 +70,6 @@ const ALLOWED_TABLES = new Set<string>([
   'deaths',
   'immunizations',
   'anc_visits',
-  'boma_visits',
   'facility_assessments',
   'audit_log',
   'organizations',
@@ -268,7 +267,6 @@ export const TABLE_CONFLICT_POLICY: Record<string, ConflictPolicy> = {
   // Each row is its own visit — natural last-write-wins.
   immunizations: ConflictPolicy.LAST_WRITE_WINS,
   anc_visits: ConflictPolicy.LAST_WRITE_WINS,
-  boma_visits: ConflictPolicy.LAST_WRITE_WINS,
 
   // Clinical-grade rows: refuse to roll back a finalized record and refuse
   // to apply a stale snapshot.
@@ -334,6 +332,10 @@ export const TABLE_CONFLICT_POLICY: Record<string, ConflictPolicy> = {
   // insurance_policies / eligibility_checks / payment_plans:
   // mutable lookup / state snapshots — last write wins.
   wards: ConflictPolicy.LAST_WRITE_WINS,
+  // beds & admissions share the wards CouchDB database but project to their own
+  // national tables (inpatient occupancy & admission/discharge analytics).
+  beds: ConflictPolicy.LAST_WRITE_WINS,
+  admissions: ConflictPolicy.LAST_WRITE_WINS,
   blood_bank: ConflictPolicy.LAST_WRITE_WINS,
   assets: ConflictPolicy.LAST_WRITE_WINS,
   staff_schedules: ConflictPolicy.LAST_WRITE_WINS,

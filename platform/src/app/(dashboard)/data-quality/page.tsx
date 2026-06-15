@@ -4,7 +4,7 @@ import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import { useDataQuality } from '@/lib/hooks/useDataQuality';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { Database, Wifi, Users, TrendingUp, BarChart3, Clock, CheckCircle2, Activity } from '@/components/icons/lucide';
+import { Database, Wifi, Users, TrendingUp, BarChart3 } from '@/components/icons/lucide';
 
 export default function DataQualityPage() {
   const { t } = useTranslation();
@@ -13,7 +13,7 @@ export default function DataQualityPage() {
   if (loading || !data) return <><TopBar title={t('dataQuality.topBarTitle')} /><main className="page-container flex items-center justify-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('dataQuality.loading')}</p></main></>;
 
   const scoreColor = (score: number) => score >= 70 ? 'var(--accent-primary)' : score >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
-  const scoreBg = (score: number) => score >= 70 ? 'rgba(43,111,224,0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
+  const scoreBg = (score: number) => score >= 70 ? 'rgba(59, 130, 246,0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
 
   return (
     <>
@@ -23,27 +23,13 @@ export default function DataQualityPage() {
           icon={Database}
           title={t('dataQuality.headerTitle')}
           subtitle={t('dataQuality.headerSubtitle')}
+          stats={[
+            { label: t('dataQuality.kpiAvgCompleteness'), value: `${data.avgCompleteness}%`, color: scoreColor(data.avgCompleteness) },
+            { label: t('dataQuality.kpiAvgTimeliness'), value: `${data.avgTimeliness}%`, color: scoreColor(data.avgTimeliness) },
+            { label: t('dataQuality.kpiAvgDataQuality'), value: `${data.avgQuality}%`, color: scoreColor(data.avgQuality) },
+            { label: t('dataQuality.kpiDhis2Adoption'), value: `${data.dhis2Adoption}%`, color: scoreColor(data.dhis2Adoption) },
+          ]}
         />
-
-        {/* National summary cards */}
-        <div className="kpi-grid mb-6">
-          {[
-            { label: t('dataQuality.kpiAvgCompleteness'), value: `${data.avgCompleteness}%`, icon: CheckCircle2, color: scoreColor(data.avgCompleteness), bg: scoreBg(data.avgCompleteness) },
-            { label: t('dataQuality.kpiAvgTimeliness'), value: `${data.avgTimeliness}%`, icon: Clock, color: scoreColor(data.avgTimeliness), bg: scoreBg(data.avgTimeliness) },
-            { label: t('dataQuality.kpiAvgDataQuality'), value: `${data.avgQuality}%`, icon: Activity, color: scoreColor(data.avgQuality), bg: scoreBg(data.avgQuality) },
-            { label: t('dataQuality.kpiDhis2Adoption'), value: `${data.dhis2Adoption}%`, icon: Wifi, color: scoreColor(data.dhis2Adoption), bg: scoreBg(data.dhis2Adoption) },
-          ].map(stat => (
-            <div key={stat.label} className="kpi">
-              <div className="kpi__icon" style={{ background: stat.bg }}>
-                <stat.icon style={{ color: stat.color }} />
-              </div>
-              <div className="kpi__body">
-                <div className="kpi__value">{stat.value}</div>
-                <div className="kpi__label">{stat.label}</div>
-              </div>
-            </div>
-          ))}
-        </div>
 
         {/* National indicators */}
         <div className="grid grid-cols-2 gap-3 mb-6">
@@ -94,7 +80,7 @@ export default function DataQualityPage() {
                 </p>
                 <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('dataQuality.facilitiesWithTrainedStaff', { trained: data.facilitiesWithTrainedStaff, total: data.totalFacilities })}</p>
               </div>
-              <div className="p-3 rounded-lg" style={{ background: data.dhis2Adoption >= 50 ? 'rgba(43,111,224,0.08)' : 'rgba(229,46,66,0.08)' }}>
+              <div className="p-3 rounded-lg" style={{ background: data.dhis2Adoption >= 50 ? 'rgba(59, 130, 246,0.08)' : 'rgba(229,46,66,0.08)' }}>
                 <div className="flex items-center gap-2 mb-1">
                   <Wifi className="w-3.5 h-3.5" style={{ color: scoreColor(data.dhis2Adoption) }} />
                   <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('dataQuality.electronicReporting')}</p>

@@ -7,7 +7,9 @@ import { getDB } from '../db';
 import type { LedgerEntryDoc, LedgerEntryType, PaymentMethodType } from '../db-types-payments';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
+import { emitSyncEvent } from './sync-event-service';
 
 const ledgerDB = () => getDB('tamamhealth_ledger');
 
@@ -65,6 +67,14 @@ export async function createLedgerEntry(input: CreateLedgerEntryInput): Promise<
 
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'ledger_entry',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
@@ -84,20 +94,14 @@ export async function getEncounterBalance(encounterId: string): Promise<number> 
 
 export async function getPatientLedger(patientId: string, limit?: number): Promise<LedgerEntryDoc[]> {
   const db = ledgerDB();
-  const result = await db.allDocs({ include_docs: true });
-  const entries = result.rows
-    .map(r => r.doc as LedgerEntryDoc)
-    .filter(d => d && d.type === 'ledger_entry' && d.patientId === patientId);
+  const entries = await findByType<LedgerEntryDoc>(db, 'ledger_entry', { patientId }, { indexFields: ['type', 'patientId'] });
   entries.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   return limit ? entries.slice(0, limit) : entries;
 }
 
 export async function getEncounterLedger(encounterId: string): Promise<LedgerEntryDoc[]> {
   const db = ledgerDB();
-  const result = await db.allDocs({ include_docs: true });
-  const entries = result.rows
-    .map(r => r.doc as LedgerEntryDoc)
-    .filter(d => d && d.type === 'ledger_entry' && d.encounterId === encounterId);
+  const entries = await findByType<LedgerEntryDoc>(db, 'ledger_entry', { encounterId }, { indexFields: ['type', 'encounterId'] });
   entries.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
   return entries;
 }
@@ -106,10 +110,7 @@ export async function getEncounterLedger(encounterId: string): Promise<LedgerEnt
 
 export async function getAllLedgerEntries(scope?: DataScope): Promise<LedgerEntryDoc[]> {
   const db = ledgerDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as LedgerEntryDoc)
-    .filter(d => d && d.type === 'ledger_entry');
+  const all = await findByType<LedgerEntryDoc>(db, 'ledger_entry');
   all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   return scope ? filterByScope(all, scope) : all;
 }

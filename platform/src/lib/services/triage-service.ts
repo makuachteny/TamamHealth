@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
 import { jubaDate } from '../time-juba';
 
 /**
@@ -45,10 +47,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 
 export async function getAllTriage(scope?: DataScope): Promise<TriageDoc[]> {
   const db = triageDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as TriageDoc)
-    .filter(d => d && d.type === 'triage');
+  const all = await findByType<TriageDoc>(db, 'triage');
   /* istanbul ignore next -- defensive null-safety in sort */
   all.sort((a, b) => (b.triagedAt || '').localeCompare(a.triagedAt || ''));
   return scope ? filterByScope(all, scope) : all;
@@ -83,6 +82,14 @@ export async function createTriage(
   await logAuditSafe('TRIAGE_RECORDED', data.triagedBy, data.triagedByName,
     `${data.priority} triage for ${data.patientName} (${data.patientId})`
   );
+  emitSyncEvent({
+    resourceType: 'triage',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
@@ -111,6 +118,14 @@ export async function updateTriage(
         `Triage ${id}: ${existing.status} → ${updates.status} for ${existing.patientName}`
       );
     }
+    emitSyncEvent({
+      resourceType: 'triage',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;

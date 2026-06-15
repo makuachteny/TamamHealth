@@ -12,6 +12,7 @@ import {
   FileText, BarChart3, TrendingUp, Eye,
   Image, Activity,
 } from '@/components/icons/lucide';
+import PatientName from '@/components/PatientName';
 
 const ACCENT = '#7C3AED';
 
@@ -116,7 +117,7 @@ export default function RadiologyDashboard() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
           {/* Study worklist */}
           <div className="lg:col-span-2 dash-card" style={{ padding: '16px', maxHeight: 'none', overflow: 'auto' }}>
@@ -166,7 +167,7 @@ export default function RadiologyDashboard() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{study.patientName}</span>
+                        <PatientName name={study.patientName} nameClassName="text-sm font-semibold" />
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
                           background: study.priority === 'emergency' ? '#DC262615' : study.priority === 'urgent' ? '#D9770615' : 'var(--overlay-subtle)',
                           color: study.priority === 'emergency' ? 'var(--color-danger)' : study.priority === 'urgent' ? 'var(--color-warning)' : 'var(--text-muted)',

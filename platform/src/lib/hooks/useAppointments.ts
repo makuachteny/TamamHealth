@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { AppointmentDoc, AppointmentStatus } from '../db-types';
 import { appointmentsDB } from '../db';
+import { makeCoalescer } from './live-reload';
 import { useDataScope } from './useDataScope';
 
 export function useAppointments() {
@@ -30,11 +31,13 @@ export function useAppointments() {
   // Live PouchDB subscription: re-load on any appointment change.
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) load(); });
     const changes = appointmentsDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) load(); })
+      .on('change', () => reload.trigger())
       .on('error', () => { /* swallow */ });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [load]);
@@ -116,11 +119,13 @@ export function useAppointmentStats() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) load(); });
     const changes = appointmentsDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) load(); })
+      .on('change', () => reload.trigger())
       .on('error', () => { /* swallow */ });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [load]);

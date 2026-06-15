@@ -7,10 +7,13 @@ import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
+import FilterBar from '@/components/filters/FilterBar';
+import SearchInput from '@/components/filters/SearchInput';
+import FilterSelect from '@/components/filters/FilterSelect';
 import {
   Building2, Users, HeartPulse, CreditCard, ChevronRight, ChevronLeft,
   TrendingUp, Shield, Activity, Settings, BarChart3,
-  Search, Clock, Database, RefreshCw,
+  Clock, Database, RefreshCw,
 } from '@/components/icons/lucide';
 import type { AuditLogDoc } from '@/lib/db-types';
 
@@ -27,6 +30,7 @@ export default function AdminDashboardPage() {
   const [auditLogs, setAuditLogs] = useState<AuditLogDoc[]>([]);
   const [auditLoading, setAuditLoading] = useState(true);
   const [auditSearch, setAuditSearch] = useState('');
+  const [auditAction, setAuditAction] = useState('all');
   const [auditPage, setAuditPage] = useState(0);
   const AUDIT_PAGE_SIZE = 20;
 
@@ -131,16 +135,27 @@ export default function AdminDashboardPage() {
     }
   }, [organizations, orgsLoading]);
 
+  // Distinct action types present in the loaded logs (for the filter dropdown)
+  const auditActionOptions = useMemo(() => {
+    const actions = Array.from(new Set(auditLogs.map(l => l.action).filter(Boolean))).sort();
+    return [
+      { value: 'all', label: t('admin.allActions') },
+      ...actions.map(a => ({ value: a, label: a })),
+    ];
+  }, [auditLogs, t]);
+
   // Filtered & paginated audit logs
   const filteredAuditLogs = useMemo(() => {
-    if (!auditSearch.trim()) return auditLogs;
-    const q = auditSearch.toLowerCase();
-    return auditLogs.filter(log =>
-      (log.username?.toLowerCase().includes(q)) ||
-      (log.action?.toLowerCase().includes(q)) ||
-      (log.details?.toLowerCase().includes(q))
-    );
-  }, [auditLogs, auditSearch]);
+    const q = auditSearch.trim().toLowerCase();
+    return auditLogs.filter(log => {
+      const matchSearch = !q ||
+        (log.username?.toLowerCase().includes(q)) ||
+        (log.action?.toLowerCase().includes(q)) ||
+        (log.details?.toLowerCase().includes(q));
+      const matchAction = auditAction === 'all' || log.action === auditAction;
+      return matchSearch && matchAction;
+    });
+  }, [auditLogs, auditSearch, auditAction]);
 
   const totalAuditPages = Math.ceil(filteredAuditLogs.length / AUDIT_PAGE_SIZE);
   const paginatedLogs = filteredAuditLogs.slice(auditPage * AUDIT_PAGE_SIZE, (auditPage + 1) * AUDIT_PAGE_SIZE);
@@ -493,19 +508,22 @@ export default function AdminDashboardPage() {
                 {t('admin.auditEntries', { count: filteredAuditLogs.length })}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-                <input
-                  type="text"
-                  value={auditSearch}
-                  onChange={e => { setAuditSearch(e.target.value); setAuditPage(0); }}
-                  placeholder={t('admin.searchPlaceholder')}
-                  className="text-xs pl-8 pr-3 py-2 rounded-lg outline-none"
-                  style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', width: '200px' }}
-                />
-              </div>
-            </div>
+          </div>
+          <div className="px-5 pt-4">
+            <FilterBar>
+              <SearchInput
+                value={auditSearch}
+                onChange={v => { setAuditSearch(v); setAuditPage(0); }}
+                placeholder={t('admin.searchPlaceholder')}
+                aria-label={t('admin.searchPlaceholder')}
+              />
+              <FilterSelect
+                value={auditAction}
+                onChange={v => { setAuditAction(v); setAuditPage(0); }}
+                options={auditActionOptions}
+                aria-label={t('admin.filterByAction')}
+              />
+            </FilterBar>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="w-full">
@@ -550,7 +568,7 @@ export default function AdminDashboardPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{
-                        background: log.success ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                        background: log.success ? 'rgba(31, 157, 111,0.12)' : 'rgba(239,68,68,0.12)',
                         color: log.success ? 'var(--color-success)' : 'var(--color-danger)',
                       }}>
                         {log.success ? t('admin.statusSuccess') : t('admin.statusFailed')}

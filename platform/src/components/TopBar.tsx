@@ -10,12 +10,12 @@ import {
   DuotoneUser as UserIcon,
   DuotoneArrowRight as ArrowRight,
 } from '@/components/icons';
-import SyncStatusBadge from '@/components/SyncStatusBadge';
 import QuickActions from '@/components/QuickActions';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { getRoleConfig } from '@/lib/permissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { patientFullName, patientInitials, patientGenderAge } from '@/lib/patient-utils';
 
 export default function TopBar({ hideSearch }: { title?: string; hideSearch?: boolean }) {
   const { t } = useTranslation();
@@ -75,10 +75,12 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
     <header
       className="h-[60px] flex items-center justify-between px-4 sm:px-5 z-30 mx-3 flex-shrink-0"
       style={{
-        background: 'var(--bg-card-solid)',
-        border: '1px solid var(--border-medium)',
+        background: 'var(--glass-bg-strong)',
+        backdropFilter: 'var(--glass-blur)',
+        WebkitBackdropFilter: 'var(--glass-blur)',
+        border: '1px solid var(--glass-border)',
         borderRadius: 'var(--card-radius)',
-        boxShadow: 'var(--card-shadow)',
+        boxShadow: 'var(--card-shadow), var(--glass-highlight)',
       }}
     >
       <div className="flex items-center gap-3">
@@ -154,15 +156,14 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
                           className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
                           style={{ background: 'var(--accent-primary)' }}
                         >
-                          {(p.firstName || '?')[0]}{(p.surname || '?')[0]}
+                          {patientInitials(p)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                            {p.firstName} {p.surname}
+                            {patientFullName(p)}
                           </p>
                           <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
-                            {p.hospitalNumber} · {p.gender}
-                            {p.estimatedAge ? ` · ${p.estimatedAge}y` : ''}
+                            {p.hospitalNumber} · {patientGenderAge(p)}
                             {p.phone ? ` · ${p.phone}` : ''}
                           </p>
                         </div>
@@ -199,7 +200,7 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
       </div>
 
       <div className="flex items-center gap-1.5">
-        {/* Quick actions: create appointment / availability, announcements, messages */}
+        {/* Quick actions: announcements / notification centre */}
         <QuickActions />
 
         {/* Theme Toggle */}
@@ -215,9 +216,6 @@ export default function TopBar({ hideSearch }: { title?: string; hideSearch?: bo
             <Sun className="w-[22px] h-[22px]" />
           )}
         </button>
-
-        {/* Sync status — animated pill with popover for pause/resume + sync now */}
-        <SyncStatusBadge />
 
         {/* Role badge */}
         {roleConfig && (

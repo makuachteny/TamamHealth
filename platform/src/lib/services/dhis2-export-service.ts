@@ -4,6 +4,7 @@ import { getAllAssessments } from './facility-assessment-service';
 import { getNationalDataQuality } from './data-quality-service';
 import { hospitalsDB, patientsDB, referralsDB, diseaseAlertsDB, labResultsDB, prescriptionsDB, immunizationsDB, ancDB } from '../db';
 import type { HospitalDoc, PatientDoc, ReferralDoc, DiseaseAlertDoc, LabResultDoc, PrescriptionDoc, ImmunizationDoc, ANCVisitDoc } from '../db-types';
+import { findByType } from './db-query';
 
 // DHIS2 only accepts compact period codes (YYYYMM / YYYYWww / YYYY) — accept
 // the HTML-friendly YYYY-MM the UI emits but reject anything else.
@@ -62,20 +63,16 @@ export async function generateDHIS2Export(
 
   // Gather all data
   const hDB = hospitalsDB();
-  const hResult = await hDB.allDocs({ include_docs: true });
-  const hospitals = hResult.rows.map(r => r.doc as HospitalDoc).filter(d => d?.type === 'hospital');
+  const hospitals = await findByType<HospitalDoc>(hDB, 'hospital');
 
   const pDB = patientsDB();
-  const pResult = await pDB.allDocs({ include_docs: true });
-  const patients = pResult.rows.map(r => r.doc as PatientDoc).filter(d => d?.type === 'patient');
+  const patients = await findByType<PatientDoc>(pDB, 'patient');
 
   const rDB = referralsDB();
-  const rResult = await rDB.allDocs({ include_docs: true });
-  const referrals = rResult.rows.map(r => r.doc as ReferralDoc).filter(d => d?.type === 'referral');
+  const referrals = await findByType<ReferralDoc>(rDB, 'referral');
 
   const daDB = diseaseAlertsDB();
-  const daResult = await daDB.allDocs({ include_docs: true });
-  const alerts = daResult.rows.map(r => r.doc as DiseaseAlertDoc).filter(d => d?.type === 'disease_alert');
+  const alerts = await findByType<DiseaseAlertDoc>(daDB, 'disease_alert');
 
   const birthStats = await getBirthStats();
   const deathStats = await getDeathStats();
@@ -86,23 +83,19 @@ export async function generateDHIS2Export(
 
   // Lab data
   const labDB = labResultsDB();
-  const labResult = await labDB.allDocs({ include_docs: true });
-  const labResults = labResult.rows.map(r => r.doc as LabResultDoc).filter(d => d?.type === 'lab_result');
+  const labResults = await findByType<LabResultDoc>(labDB, 'lab_result');
 
   // Prescription data
   const rxDB = prescriptionsDB();
-  const rxResult = await rxDB.allDocs({ include_docs: true });
-  const prescriptions = rxResult.rows.map(r => r.doc as PrescriptionDoc).filter(d => d?.type === 'prescription');
+  const prescriptions = await findByType<PrescriptionDoc>(rxDB, 'prescription');
 
   // Immunization data
   const immDB = immunizationsDB();
-  const immResult = await immDB.allDocs({ include_docs: true });
-  const immunizations = immResult.rows.map(r => r.doc as ImmunizationDoc).filter(d => d?.type === 'immunization');
+  const immunizations = await findByType<ImmunizationDoc>(immDB, 'immunization');
 
   // ANC data
   const ancDatabase = ancDB();
-  const ancResult = await ancDatabase.allDocs({ include_docs: true });
-  const ancVisits = ancResult.rows.map(r => r.doc as ANCVisitDoc).filter(d => d?.type === 'anc_visit');
+  const ancVisits = await findByType<ANCVisitDoc>(ancDatabase, 'anc_visit');
 
   const dataValues: DHIS2DataValue[] = [];
 

@@ -1,15 +1,14 @@
 import { immunizationsDB } from '../db';
 import type { ImmunizationDoc } from '../db-types';
 import { v4 as uuidv4 } from 'uuid';
+import { emitSyncEvent } from './sync-event-service';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 
 export async function getAllImmunizations(scope?: DataScope): Promise<ImmunizationDoc[]> {
   const db = immunizationsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as ImmunizationDoc)
-    .filter(d => d && d.type === 'immunization');
+  const all = await findByType<ImmunizationDoc>(db, 'immunization');
   /* istanbul ignore next -- defensive null-safety in sort */
   all.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
   return scope ? filterByScope(all, scope) : all;
@@ -38,6 +37,14 @@ export async function createImmunization(data: Omit<ImmunizationDoc, '_id' | '_r
   };
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'immunization',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
@@ -54,6 +61,14 @@ export async function updateImmunization(id: string, data: Partial<ImmunizationD
     };
     const resp = await db.put(updated);
     updated._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'immunization',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;
@@ -64,7 +79,15 @@ export async function deleteImmunization(id: string): Promise<boolean> {
   const db = immunizationsDB();
   try {
     const doc = await db.get(id);
+    const typed = doc as unknown as ImmunizationDoc;
     await db.remove(doc);
+    emitSyncEvent({
+      resourceType: 'immunization',
+      resourceId: id,
+      operation: 'delete',
+      orgId: typed.orgId,
+      hospitalId: typed.facilityId,
+    });
     return true;
   } catch {
     return false;

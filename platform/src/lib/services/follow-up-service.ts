@@ -2,18 +2,17 @@ import { followUpsDB } from '../db';
 import type { FollowUpDoc } from '../db-types';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 
 // `scope` is optional and defaults to ungated for back-compat with callers
 // (CHV/Boma worker dashboards) that already pre-filter by `workerId`. New
 // hook callers should pass a scope so org/hospital isolation is enforced.
 export async function getAllFollowUps(scope?: DataScope): Promise<FollowUpDoc[]> {
   const db = followUpsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const docs = result.rows
-    .map(r => r.doc as FollowUpDoc)
-    .filter(d => d && d.type === 'follow_up');
+  const docs = await findByType<FollowUpDoc>(db, 'follow_up');
   /* istanbul ignore next -- defensive null-safety in sort */
   docs.sort((a, b) => new Date(a.scheduledDate || '').getTime() - new Date(b.scheduledDate || '').getTime());
   return scope ? filterByScope(docs, scope) : docs;
@@ -50,6 +49,13 @@ export async function createFollowUp(
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   await logAuditSafe('CREATE_FOLLOW_UP', doc.assignedWorker, undefined, `Follow-up ${doc._id}: patient ${doc.patientId}, condition: ${doc.condition}`);
+  emitSyncEvent({
+    resourceType: 'follow_up',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+  });
   return doc;
 }
 
@@ -70,6 +76,13 @@ export async function updateFollowUp(
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_FOLLOW_UP', updated.assignedWorker, undefined, `Follow-up ${id}: status=${updated.status}${updated.outcome ? `, outcome=${updated.outcome}` : ''}`);
+    emitSyncEvent({
+      resourceType: 'follow_up',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+    });
     return updated;
   } catch {
     return null;

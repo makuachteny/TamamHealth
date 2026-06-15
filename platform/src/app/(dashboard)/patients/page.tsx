@@ -4,12 +4,18 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
-import { Search, Filter, ChevronRight, UserPlus, Users, ScanLine, Hash, X, ArrowRight, Stethoscope } from '@/components/icons/lucide';
+import { comparePatients, PATIENT_SORT_OPTIONS, type PatientSort, patientFullName, patientAgeLabel, patientInitials } from '@/lib/patient-utils';
+import { Search, Filter, ChevronRight, UserPlus, Users, ScanLine, Hash, X, ArrowRight, Stethoscope, Clock } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { states } from '@/data/mock';
-import QRScanner from '@/components/QRScanner';
+import dynamic from 'next/dynamic';
+// Lazy-loaded: html5-qrcode is heavy and only needed when the scanner opens,
+// so it stays out of the patients-route bundle until used.
+const QRScanner = dynamic(() => import('@/components/QRScanner'), { ssr: false });
+import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
+import { formatRelativeShort, formatDate } from '@/lib/format-utils';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
 // Pagination cap — capped to keep DOM-node count manageable on low-end devices.
@@ -22,13 +28,19 @@ export default function PatientsPage() {
   const { t } = useTranslation();
   const { globalSearch, currentUser } = useApp();
   const { patients } = usePatients();
-  const { canRegisterPatients } = usePermissions();
+  const { canRegisterPatients, canViewClinical } = usePermissions();
   const [search, setSearch] = useState('');
   const [filterState, setFilterState] = useState('');
   const [filterGender, setFilterGender] = useState('');
   const [assignedToMe, setAssignedToMe] = useState(false);
+  const [clinicalFilter, setClinicalFilter] = useState<'all' | 'visited30d' | 'chronic' | 'allergies'>('all');
+  const [sort, setSort] = useState<PatientSort>('recent');
   // Only clinicians who can be the responsible provider get the "assigned to me" toggle.
   const canBeAssigned = ['doctor', 'clinical_officer', 'medical_superintendent'].includes(currentUser?.role ?? '');
+  // Reception roles can assign a patient to a care provider straight from the
+  // registry. The AssignDoctorModal picks doctor vs. nurse from the facility tier.
+  const canAssignPatients = ['front_desk', 'central_registration_clerk', 'clinic_clerk'].includes(currentUser?.role ?? '');
+  const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   const assignedToMeCount = canBeAssigned
     ? patients.filter(p => p.assignedDoctor === currentUser?._id).length
     : 0;
@@ -60,6 +72,16 @@ export default function PatientsPage() {
     }
   };
 
+  // Clinical predicates — also drive the quick-filter tab counts that replaced
+  // the old summary KPI cards.
+  const MS30 = 30 * 24 * 60 * 60 * 1000;
+  const isRecentlyVisited = (p: typeof patients[number]) =>
+    !!p.lastConsultedAt && (Date.now() - new Date(p.lastConsultedAt).getTime()) < MS30;
+  const hasChronic = (p: typeof patients[number]) =>
+    !!(p.chronicConditions?.length && p.chronicConditions[0] !== 'None');
+  const hasAllergies = (p: typeof patients[number]) =>
+    !!(p.allergies?.length && p.allergies[0] !== 'None known');
+
   const filtered = patients.filter(p => {
     const q = search || globalSearch;
     const matchSearch = !q ||
@@ -69,15 +91,31 @@ export default function PatientsPage() {
     const matchState = !filterState || p.state === filterState;
     const matchGender = !filterGender || p.gender === filterGender;
     const matchAssigned = !assignedToMe || p.assignedDoctor === currentUser?._id;
-    return matchSearch && matchState && matchGender && matchAssigned;
-  });
+    const matchClinical = clinicalFilter === 'all'
+      || (clinicalFilter === 'visited30d' && isRecentlyVisited(p))
+      || (clinicalFilter === 'chronic' && hasChronic(p))
+      || (clinicalFilter === 'allergies' && hasAllergies(p));
+    return matchSearch && matchState && matchGender && matchAssigned && matchClinical;
+  }).sort(comparePatients(sort));
+
+  // Chronic-condition and allergy filters expose clinical attributes, so they are
+  // only offered to clinical roles. A non-clinical role (e.g. Medical Receptionist)
+  // sees just the administrative cuts: everyone and recently-visited.
+  const clinicalTabs = [
+    { key: 'all', label: t('patients.kpiTotalPatients'), count: patients.length },
+    { key: 'visited30d', label: t('patients.kpiVisitedLast30d'), count: patients.filter(isRecentlyVisited).length },
+    ...(canViewClinical ? [
+      { key: 'chronic', label: t('patient.chronicConditions'), count: patients.filter(hasChronic).length, tint: '#B8741C' },
+      { key: 'allergies', label: t('patients.kpiAllergiesFlagged'), count: patients.filter(hasAllergies).length, tint: '#C44536' },
+    ] : []),
+  ];
 
   // Reset the visible window whenever the filter or search changes — otherwise
   // narrowing the result set would leave the user looking at a stale "Load more"
   // count that doesn't correspond to the new filtered.length.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [search, filterState, filterGender, globalSearch, assignedToMe]);
+  }, [search, filterState, filterGender, globalSearch, assignedToMe, clinicalFilter, sort]);
 
   const visible = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
@@ -85,7 +123,7 @@ export default function PatientsPage() {
   return (
     <>
       <TopBar title={t('nav.patients')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column' }}>
           <PageHeader
             icon={Users}
             title={t('patients.registryTitle')}
@@ -106,41 +144,8 @@ export default function PatientsPage() {
             }
           />
 
-          {/* Summary KPI strip */}
-          {(() => {
-            const now = Date.now();
-            const MS30 = 30 * 24 * 60 * 60 * 1000;
-            const visitedRecently = patients.filter(p => p.lastConsultedAt && (now - new Date(p.lastConsultedAt).getTime()) < MS30).length;
-            const withConditions = patients.filter(p => p.chronicConditions?.length && p.chronicConditions[0] !== 'None').length;
-            const withAllergies = patients.filter(p => p.allergies?.length && p.allergies[0] !== 'None known').length;
-            const kpis = [
-              { label: t('patients.kpiTotalPatients'), value: patients.length, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
-              { label: t('patients.kpiVisitedLast30d'), value: visitedRecently, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
-              { label: t('patient.chronicConditions'), value: withConditions, accent: '#B8741C', bg: 'rgba(228, 168, 75, 0.10)', border: 'rgba(228, 168, 75, 0.28)' },
-              { label: t('patients.kpiAllergiesFlagged'), value: withAllergies, accent: '#C44536', bg: 'rgba(196, 69, 54, 0.08)', border: 'rgba(196, 69, 54, 0.28)' },
-            ];
-            return (
-              <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', alignItems: 'stretch' }}>
-                {kpis.map(k => (
-                  <div key={k.label} style={{
-                    padding: '14px 16px', borderRadius: 10,
-                    background: k.bg, border: `1px solid ${k.border}`,
-                    height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                  }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: k.accent }}>
-                      {k.label}
-                    </div>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, marginTop: 2 }}>
-                      {k.value.toLocaleString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-
           {/* Search & Filter */}
-          <div className="dash-card p-4 mb-4">
+          <div className="dash-card p-4 mb-4 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -181,6 +186,22 @@ export default function PatientsPage() {
             {showFilters && (
               <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
                 <div className="w-full sm:w-48">
+                  <label>{t('patients.show')}</label>
+                  <select value={clinicalFilter} onChange={e => setClinicalFilter(e.target.value as typeof clinicalFilter)} aria-label={t('patients.show')}>
+                    {clinicalTabs.map(tab => (
+                      <option key={tab.key} value={tab.key}>{tab.label} ({tab.count})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="w-full sm:w-44">
+                  <label>{t('patients.sortBy')}</label>
+                  <select value={sort} onChange={e => setSort(e.target.value as PatientSort)} aria-label={t('patients.sortBy')}>
+                    {PATIENT_SORT_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="w-full sm:w-48">
                   <label>{t('patients.state')}</label>
                   <select value={filterState} onChange={(e) => setFilterState(e.target.value)}>
                     <option value="">{t('patients.allStates')}</option>
@@ -196,7 +217,7 @@ export default function PatientsPage() {
                   </select>
                 </div>
                 <div className="flex items-end">
-                  <button onClick={() => { setFilterState(''); setFilterGender(''); }} className="btn btn-secondary btn-sm">
+                  <button onClick={() => { setFilterState(''); setFilterGender(''); setClinicalFilter('all'); }} className="btn btn-secondary btn-sm">
                     {t('patients.clear')}
                   </button>
                 </div>
@@ -205,125 +226,90 @@ export default function PatientsPage() {
           </div>
 
           {/* Patient Table */}
-          <div className="dash-card overflow-hidden">
-            <div className="patient-table-wrap">
-              <table className="data-table patient-table">
+          <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+            <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+              <table className="w-full">
                 <thead>
                   <tr>
-                    <th className="col-patient">{t('frontDesk.colPatient')}</th>
-                    <th className="col-hospital">{t('patients.colHospitalNo')}</th>
-                    <th className="col-age">{t('patients.colAgeGender')}</th>
-                    <th className="col-state">{t('patients.state')}</th>
-                    <th className="col-phone hide-mobile">{t('patient.phone')}</th>
-                    <th className="col-visit hide-mobile">{t('frontDesk.lastVisit')}</th>
-                    <th className="col-cond hide-mobile">{t('patients.colConditions')}</th>
-                    <th className="col-arrow"></th>
+                    {[t('frontDesk.colPatient'), t('patients.colHospitalNo'), t('patient.phone'), t('patient.location'), t('frontDesk.lastVisit'), t('patient.registered'), t('patients.colConditions'), canAssignPatients ? t('frontDesk.colAction') : ''].map((h, i) => (
+                      <th
+                        key={i}
+                        className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap"
+                        style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
+                  {visible.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                        {t('patients.patientsFound', { count: 0 })}
+                      </td>
+                    </tr>
+                  )}
                   {visible.map(patient => {
-                    const age = patient.estimatedAge || (patient.dateOfBirth ? (new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear()) : 0);
-                    const isFemale = patient.gender === 'Female';
-                    const initials = `${(patient.firstName || '?')[0]}${(patient.surname || '?')[0]}`.toUpperCase();
                     const hasAllergy = patient.allergies?.length && patient.allergies[0] !== 'None known';
                     const chronic = (patient.chronicConditions || []).filter(c => c && c !== 'None');
                     const hasChronic = chronic.length > 0;
-                    const lastVisit = patient.lastConsultedAt
-                      ? new Date(patient.lastConsultedAt)
-                      : null;
+                    const lastVisit = patient.lastConsultedAt ? new Date(patient.lastConsultedAt) : null;
                     const daysAgo = lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / 86400000) : null;
-                    // Data-freshness indicator: how long ago was this record's data last
-                    // touched (locally or via sync replication)? Offline edits bump
-                    // updatedAt instantly; replicated changes arrive with the origin
-                    // updatedAt intact, so this is a real "data vintage" signal.
-                    const updatedAt = patient.updatedAt ? new Date(patient.updatedAt) : null;
-                    const updatedMinsAgo = updatedAt ? Math.floor((Date.now() - updatedAt.getTime()) / 60000) : null;
-                    const freshnessLabel = updatedMinsAgo == null
-                      ? '—'
-                      : updatedMinsAgo < 2 ? t('sync.justNow')
-                      : updatedMinsAgo < 60 ? t('sync.minutesAgo', { count: updatedMinsAgo })
-                      : updatedMinsAgo < 1440 ? t('sync.hoursAgo', { count: Math.floor(updatedMinsAgo / 60) })
-                      : t('sync.daysAgo', { count: Math.floor(updatedMinsAgo / 1440) });
-                    const isStale = updatedMinsAgo != null && updatedMinsAgo > 60 * 24 * 30; // >30d
-                    const isVeryStale = updatedMinsAgo != null && updatedMinsAgo > 60 * 24 * 90; // >90d
+                    const location = [patient.county, patient.state].filter(Boolean).join(', ');
                     return (
-                      <tr key={patient._id} className="cursor-pointer" onClick={() => router.push(`/patients/${patient._id}`)}>
-                        <td className="col-patient">
+                      <tr
+                        key={patient._id}
+                        role="button"
+                        tabIndex={0}
+                        className="cursor-pointer transition-colors hover:bg-[var(--table-row-hover)]"
+                        onClick={() => router.push(`/patients/${patient._id}`)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${patient._id}`); } }}
+                        style={{ borderBottom: '1px solid var(--border-light)' }}
+                      >
+                        {/* Patient name + inline age/gender */}
+                        <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div
-                              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white"
-                              style={{
-                                background: isFemale
-                                  ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)'
-                                  : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)',
-                                letterSpacing: 0.3,
-                              }}
+                            <span
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                              style={{ background: patient.gender === 'Female' ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)', letterSpacing: 0.3 }}
                               aria-hidden
                             >
-                              {initials}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>
-                                {patient.firstName} {patient.surname}
-                              </p>
-                              <p className="text-[11px] truncate flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                                <span>{patient.tribe || '—'}</span>
-                                <span
-                                  aria-hidden
-                                  className="w-1 h-1 rounded-full flex-shrink-0"
-                                  style={{ background: 'var(--border-medium)' }}
-                                />
-                                <span
-                                  title={t('patients.lastUpdated', { value: patient.updatedAt || t('patients.unknown') })}
-                                  style={{
-                                    fontSize: 10, fontWeight: 600, letterSpacing: 0.2,
-                                    color: isVeryStale ? '#C44536' : isStale ? '#B8741C' : 'var(--text-muted)',
-                                  }}
-                                >
-                                  {freshnessLabel}
-                                </span>
-                              </p>
-                            </div>
+                              {patientInitials(patient)}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{patientFullName(patient)}</span>
+                              <span className="text-[10px] ml-1.5" style={{ color: 'var(--text-muted)' }}>{patientAgeLabel(patient)}, {patient.gender?.[0] ?? '?'}</span>
+                            </span>
                           </div>
                         </td>
-                        <td className="col-hospital">
-                          <span
-                            className="font-mono text-[11px] whitespace-nowrap px-2 py-0.5 rounded-md"
-                            style={{ background: 'rgba(59, 130, 246, 0.10)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.20)', fontWeight: 600 }}
-                          >
-                            {patient.hospitalNumber}
-                          </span>
-                        </td>
-                        <td className="col-age whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-primary)' }}>
-                            <span
-                              aria-hidden
-                              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                              style={{ background: isFemale ? '#D96E59' : '#3b82f6' }}
-                            />
-                            <span className="font-semibold">{age}y</span>
-                            <span style={{ color: 'var(--text-muted)' }}>· {patient.gender?.[0] ?? '?'}</span>
-                          </span>
-                        </td>
-                        <td className="col-state text-xs" style={{ color: 'var(--text-secondary)' }}>{patient.state || '—'}</td>
-                        <td className="col-phone hide-mobile font-mono text-[11px]" style={{ color: 'var(--text-secondary)' }}>{patient.phone || '—'}</td>
-                        <td className="col-visit hide-mobile text-xs">
+                        {/* Patient ID */}
+                        <td className="px-4 py-2.5 text-[12px] font-mono whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{patient.hospitalNumber || '—'}</td>
+                        {/* Phone */}
+                        <td className="px-4 py-2.5 text-[12px] font-mono whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{patient.phone || '—'}</td>
+                        {/* Location */}
+                        <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{location || '—'}</td>
+                        {/* Last visit */}
+                        <td className="px-4 py-2.5 text-[11px] whitespace-nowrap">
                           {lastVisit ? (
-                            <div>
-                              <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                                {lastVisit.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                              </div>
-                              {daysAgo != null && (
-                                <div className="text-[10px]" style={{ color: daysAgo > 90 ? '#C44536' : daysAgo > 30 ? '#B8741C' : 'var(--text-muted)' }}>
-                                  {daysAgo === 0 ? t('time.today') : daysAgo === 1 ? t('time.yesterday') : t('sync.daysAgo', { count: daysAgo })}
-                                </div>
-                              )}
-                            </div>
+                            <span
+                              className="inline-flex items-center gap-1 font-medium"
+                              title={lastVisit.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              style={{ color: daysAgo != null && daysAgo > 90 ? '#C44536' : daysAgo != null && daysAgo > 30 ? '#B8741C' : 'var(--text-secondary)' }}
+                            >
+                              <Clock className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />
+                              {formatRelativeShort(patient.lastConsultedAt)}
+                            </span>
                           ) : (
-                            <span style={{ color: 'var(--text-muted)' }}>{patient.lastVisitDate || '—'}</span>
+                            <span style={{ color: 'var(--text-muted)' }}>—</span>
                           )}
                         </td>
-                        <td className="col-cond hide-mobile">
+                        {/* Registered */}
+                        <td className="px-4 py-2.5 text-[11px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+                          {patient.registeredAt || patient.registrationDate ? formatDate(patient.registeredAt || patient.registrationDate) : '—'}
+                        </td>
+                        {/* Conditions */}
+                        <td className="px-4 py-2.5">
                           <div className="flex flex-wrap items-center gap-1">
                             {hasAllergy && (
                               <span
@@ -347,7 +333,30 @@ export default function PatientsPage() {
                             ) : null}
                           </div>
                         </td>
-                        <td className="col-arrow"><ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} /></td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center justify-end gap-2">
+                            {canAssignPatients && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAssignTarget({
+                                    patientId: patient._id,
+                                    patientName: patientFullName(patient),
+                                    hospitalNumber: patient.hospitalNumber,
+                                    currentDoctorId: patient.assignedDoctor,
+                                  });
+                                }}
+                                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg inline-flex items-center gap-1 whitespace-nowrap transition-colors hover:opacity-90"
+                                style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--border-light)' }}
+                                title={patient.assignedDoctor ? `${t('frontDesk.assignedTo', { name: patient.assignedDoctorName ?? 'provider' })}` : t('frontDesk.assignToProvider')}
+                              >
+                                <Stethoscope className="w-3.5 h-3.5" />
+                                {patient.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign')}
+                              </button>
+                            )}
+                            <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -446,6 +455,13 @@ export default function PatientsPage() {
             router.push(`/patients/${data.id}`);
           }}
           onClose={() => setShowQRScanner(false)}
+        />
+      )}
+
+      {assignTarget && (
+        <AssignDoctorModal
+          target={assignTarget}
+          onClose={() => setAssignTarget(null)}
         />
       )}
     </>

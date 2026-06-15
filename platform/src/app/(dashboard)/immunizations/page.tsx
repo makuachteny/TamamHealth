@@ -6,12 +6,14 @@ import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import EmptyState from '@/components/EmptyState';
+import PatientName from '@/components/PatientName';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useBodyScrollLock } from '@/lib/hooks/useBodyScrollLock';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { SearchInput, FilterSelect, FilterBar } from '@/components/filters';
 import type { ImmunizationDefaulter } from '@/lib/services/immunization-service';
 import {
   Syringe, Search, Plus, X, CheckCircle2, Clock, AlertTriangle,
@@ -35,7 +37,12 @@ export default function ImmunizationsPage() {
   const { immunizations, stats, coverage, loading, register } = useImmunizations();
   const { patients } = usePatients();
   const { canRecordVitalEvents } = usePermissions();
+  // Coverage analytics (summary cards, coverage-by-antigen, coverage-by-age) are
+  // a population-health view for facility management and the Ministry of Health.
+  // Clinical roles (doctors, nurses, etc.) just work the records and defaulters.
+  const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
   const [search, setSearch] = useState('');
+  const [vaccineFilter, setVaccineFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   useBodyScrollLock(showModal);
   const [expandedChild, setExpandedChild] = useState<string | null>(null);
@@ -126,12 +133,12 @@ export default function ImmunizationsPage() {
 
   const filteredChildren = useMemo(() => {
     const entries = Array.from(childGroups.entries());
-    if (!search) return entries;
     const q = search.toLowerCase();
     return entries.filter(([, records]) =>
-      records[0]?.patientName?.toLowerCase().includes(q)
+      (!search || records[0]?.patientName?.toLowerCase().includes(q)) &&
+      (vaccineFilter === 'all' || records.some(r => r.vaccine === vaccineFilter))
     );
-  }, [childGroups, search]);
+  }, [childGroups, search, vaccineFilter]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,34 +189,18 @@ export default function ImmunizationsPage() {
           icon={Syringe}
           title={t('immun.trackerTitle')}
           subtitle={t('immun.trackerSubtitle')}
+          stats={canViewCoverage && stats ? [
+            { label: t('immun.totalVaccinations'), value: stats.totalVaccinations, color: '#059669' },
+            { label: t('immun.childrenTracked'), value: stats.totalChildren, color: 'var(--accent-primary)' },
+            { label: t('immun.overdueDoses'), value: stats.overdue, color: 'var(--color-danger)' },
+            { label: t('immun.coverageRate'), value: `${stats.coverageRate}%`, color: '#059669' },
+          ] : undefined}
           actions={canRecordVitalEvents && (
             <button onClick={() => setShowModal(true)} className="btn btn-primary">
               <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}
             </button>
           )}
         />
-
-        {/* Stats Row */}
-        {stats && (
-          <div className="kpi-grid mb-6">
-            {[
-              { label: t('immun.totalVaccinations'), value: stats.totalVaccinations.toString(), color: '#059669', bg: 'rgba(5,150,105,0.12)', icon: Syringe },
-              { label: t('immun.childrenTracked'), value: stats.totalChildren.toString(), color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)', icon: Users },
-              { label: t('immun.overdueDoses'), value: stats.overdue.toString(), color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.12)', icon: AlertTriangle },
-              { label: t('immun.coverageRate'), value: `${stats.coverageRate}%`, color: '#059669', bg: 'rgba(5,150,105,0.12)', icon: CheckCircle2 },
-            ].map(stat => (
-              <div key={stat.label} className="kpi">
-                <div className="icon-box-sm" style={{ background: stat.bg }}>
-                  <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
-                </div>
-                <div className="kpi__body">
-                  <div className="kpi__value">{stat.value}</div>
-                  <div className="kpi__label">{stat.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Tab switcher */}
         <div className="flex gap-0 border-b mb-5" style={{ borderColor: 'var(--border-light)' }}>
@@ -231,7 +222,7 @@ export default function ImmunizationsPage() {
         </div>
 
         {/* Coverage by Antigen */}
-        {activeTab === 'records' && coverage && (
+        {activeTab === 'records' && canViewCoverage && coverage && (
           <div className="card-elevated p-5 mb-6">
             <h3 className="font-semibold text-sm mb-0 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <span className="icon-box-sm" style={{ background: 'rgba(5,150,105,0.12)' }}>
@@ -265,7 +256,7 @@ export default function ImmunizationsPage() {
         )}
 
         {/* Coverage by Age Cohort heatmap */}
-        {activeTab === 'records' && cohortRows.length > 0 && (
+        {activeTab === 'records' && canViewCoverage && cohortRows.length > 0 && (
           <div className="card-elevated p-5 mb-6">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -315,16 +306,18 @@ export default function ImmunizationsPage() {
 
         {/* Search */}
         {activeTab === 'records' && (
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-          <input
-            type="search"
-            className="search-icon-input"
-            placeholder={t('immun.searchByChildName')}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+        <FilterBar>
+          <SearchInput value={search} onChange={setSearch} placeholder={t('immun.searchByChildName')} />
+          <FilterSelect
+            value={vaccineFilter}
+            onChange={setVaccineFilter}
+            options={[
+              { value: 'all', label: 'All vaccines' },
+              ...VACCINES.map(v => ({ value: v, label: v })),
+            ]}
+            aria-label="Filter by vaccine"
           />
-        </div>
+        </FilterBar>
         )}
 
         {/* Defaulters Panel */}
@@ -335,8 +328,8 @@ export default function ImmunizationsPage() {
                 {[
                   { label: t('immun.critical30Days'), value: defaulterStats.critical, bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)', filter: 'critical' as const },
                   { label: t('immun.high14Days'), value: defaulterStats.high, bg: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)', filter: 'high' as const },
-                  { label: t('immun.medium0Days'), value: defaulterStats.medium, bg: 'rgba(43,111,224,0.12)', color: 'var(--accent-primary)', filter: 'medium' as const },
-                  { label: t('immun.uniqueChildren'), value: defaulterStats.uniqueChildren, bg: 'rgba(43,111,224,0.08)', color: 'var(--accent-primary)', filter: 'all' as const },
+                  { label: t('immun.medium0Days'), value: defaulterStats.medium, bg: 'rgba(59, 130, 246,0.12)', color: 'var(--accent-primary)', filter: 'medium' as const },
+                  { label: t('immun.uniqueChildren'), value: defaulterStats.uniqueChildren, bg: 'rgba(59, 130, 246,0.08)', color: 'var(--accent-primary)', filter: 'all' as const },
                 ].map(k => (
                   <div key={k.label} className="kpi cursor-pointer" onClick={() => setDefaulterFilter(k.filter)}>
                     <div className="icon-box-sm" style={{ background: k.bg }}>
@@ -386,10 +379,10 @@ export default function ImmunizationsPage() {
                     </td></tr>
                   ) : defaulters.filter(d => defaulterFilter === 'all' || d.urgency === defaulterFilter).map((d, i) => {
                     const urgencyColor = d.urgency === 'critical' ? 'var(--color-danger)' : d.urgency === 'high' ? 'var(--color-warning)' : 'var(--accent-primary)';
-                    const urgencyBg = d.urgency === 'critical' ? 'rgba(229,46,66,0.10)' : d.urgency === 'high' ? 'rgba(252,211,77,0.10)' : 'rgba(43,111,224,0.10)';
+                    const urgencyBg = d.urgency === 'critical' ? 'rgba(229,46,66,0.10)' : d.urgency === 'high' ? 'rgba(252,211,77,0.10)' : 'rgba(59, 130, 246,0.10)';
                     return (
                       <tr key={`${d.patientId}-${d.vaccine}-${i}`} className="cursor-pointer" onClick={() => router.push(`/patients/${d.patientId}`)}>
-                        <td className="font-medium text-sm" style={{ color: 'var(--accent-primary)' }}>{d.patientName}</td>
+                        <td><PatientName name={d.patientName} gender={d.gender} nameClassName="font-medium text-sm" /></td>
                         <td className="text-xs">{Math.floor(d.ageMonths / 12)}y {d.ageMonths % 12}m</td>
                         <td className="text-xs">{d.gender}</td>
                         <td className="text-sm font-medium">{d.vaccine}</td>
@@ -530,7 +523,7 @@ export default function ImmunizationsPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Link to existing patient (recommended) */}
-                <div className="rounded-lg p-3" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(43,111,224,0.25))' }}>
+                <div className="rounded-lg p-3" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(59, 130, 246,0.25))' }}>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--accent-primary)', textTransform: 'uppercase' }}>
                     <Users className="w-3 h-3" />
                     {t('immun.linkToExistingChild')}

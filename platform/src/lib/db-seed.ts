@@ -2,14 +2,14 @@ import { hashPassword } from './auth';
 import {
   usersDB, patientsDB, hospitalsDB, referralsDB,
   diseaseAlertsDB, labResultsDB, prescriptionsDB, medicalRecordsDB,
-  messagesDB, birthsDB, deathsDB, facilityAssessmentsDB,
-  immunizationsDB, ancDB, bomaVisitsDB, followUpsDB,
+  messagesDB, conversationsDB, birthsDB, deathsDB, facilityAssessmentsDB,
+  immunizationsDB, ancDB, followUpsDB,
   organizationsDB,
   paymentsDB, insurancePoliciesDB, chargesDB, claimsDB,
-  paymentPlansDB, ledgerDB,
+  paymentPlansDB, ledgerDB, billingDB, feeScheduleDB,
   appointmentsDB, wardDB, pharmacyInventoryDB, triageDB,
-  patientFeedbackDB, assetsDB, leaveRequestsDB, payrollEntriesDB,
-  problemsDB, telehealthDB,
+  assetsDB, leaveRequestsDB, payrollEntriesDB,
+  problemsDB, telehealthDB, patientNotesDB,
   isSeeded, markSeeded, resetAllDatabases
 } from './db';
 // `@/data/mock` carries 88 KB of fake patient PHI (50+ patient records, fake
@@ -20,18 +20,19 @@ import type {
   UserDoc, PatientDoc, HospitalDoc, ReferralDoc,
   DiseaseAlertDoc, LabResultDoc, PrescriptionDoc, MedicalRecordDoc, MessageDoc,
   BirthRegistrationDoc, DeathRegistrationDoc, FacilityAssessmentDoc,
-  ImmunizationDoc, ANCVisitDoc, BomaVisitDoc, FollowUpDoc, OrganizationDoc
+  ImmunizationDoc, ANCVisitDoc, FollowUpDoc, OrganizationDoc,
+  PatientNoteDoc
 } from './db-types';
 import type {
   PaymentDoc, InsurancePolicyDoc, ChargeDoc, ClaimDoc,
   PaymentPlanDoc, LedgerEntryDoc
 } from './db-types-payments';
+import type { BillingDoc, ChargeCategory } from './db-types-billing';
 import type {
   AppointmentDoc, TriageDoc, PharmacyInventoryDoc, ProblemDoc,
   TelehealthSessionDoc
 } from './db-types';
 import type { WardDoc, BedDoc, AdmissionDoc } from './db-types-ward';
-import type { PatientFeedbackDoc } from './db-types-feedback';
 import type { AssetDoc } from './db-types-asset';
 import type { PayrollEntryDoc, LeaveRequestDoc } from './db-types-hr';
 
@@ -104,9 +105,9 @@ const defaultOrganizations: Omit<OrganizationDoc, '_rev'>[] = [
 type SeedUserRole =
   | 'super_admin' | 'government' | 'county_health_director' | 'doctor'
   | 'clinical_officer' | 'nurse' | 'midwife'
-  | 'lab_tech' | 'pharmacist' | 'front_desk' | 'cashier' | 'boma_health_worker'
-  | 'payam_supervisor' | 'data_entry_clerk' | 'medical_superintendent'
-  | 'hrio' | 'community_health_volunteer' | 'nutritionist' | 'radiologist'
+  | 'lab_tech' | 'pharmacist' | 'front_desk' | 'cashier'
+  | 'data_entry_clerk' | 'medical_superintendent'
+  | 'hrio' | 'nutritionist' | 'radiologist'
   | 'org_admin' | 'hospital_manager' | 'medical_biller'
   | 'central_registration_clerk' | 'clinic_clerk' | 'triage_nurse' | 'rooming_nurse'
   | 'clinician' | 'records_hmis_officer' | 'facility_administrator';
@@ -128,18 +129,19 @@ const defaultUsers: SeedUserProfile[] = [
   { username: 'dr.wani', name: 'Dr. James Wani Igga', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'dr.achol', name: 'Dr. Achol Mayen Deng', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'co.deng', name: 'CO Deng Mabior Kuol', role: 'clinical_officer', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'dr.wau', name: 'Dr. Mary Akuol Deng', role: 'doctor', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'nurse.wau', name: 'Nurse Grace Achai Lual', role: 'nurse', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'pharma.wau', name: 'Pharmacist John Bol Garang', role: 'pharmacist', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
+  { username: 'desk.wau', name: 'Tabitha Nyandeng Kuol', role: 'front_desk', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'nurse.stella', name: 'Nurse Stella Keji Lemi', role: 'nurse', hospitalId: 'hosp-003', hospitalName: 'Malakal Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'lab.gatluak', name: 'Lab Tech Gatluak Puok', role: 'lab_tech', hospitalId: 'hosp-004', hospitalName: 'Bentiu State Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'pharma.rose', name: 'Pharmacist Rose Gbudue', role: 'pharmacist', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'desk.amira', name: 'Amira Juma Hassan', role: 'front_desk', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'bhw.akol', name: 'Akol Deng Mading', role: 'boma_health_worker', hospitalId: 'phcu-001', hospitalName: 'Kajo-keji Boma PHCU', orgId: PUBLIC_ORG_ID },
-  { username: 'sup.mary', name: 'Mary Lado Kenyi', role: 'payam_supervisor', hospitalId: 'phcc-001', hospitalName: 'Kajo-keji PHCC', orgId: PUBLIC_ORG_ID },
   { username: 'data.ayen', name: 'Ayen Dut Malual', role: 'data_entry_clerk', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'supt.lado', name: 'Dr. Lado Tombe Kenyi', role: 'medical_superintendent', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'manager.aluel', name: 'Aluel Bol Maker', role: 'hospital_manager', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'biller.nyandeng', name: 'Nyandeng Chol Atem', role: 'medical_biller', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'hrio.dut', name: 'Dut Machar Kuol', role: 'hrio', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'chv.ajak', name: 'Ajak Deng Mawien', role: 'community_health_volunteer', hospitalId: 'phcu-001', hospitalName: 'Kajo-keji Boma PHCU', orgId: PUBLIC_ORG_ID },
   { username: 'nutr.nyabol', name: 'Nyabol Koang Jal', role: 'nutritionist', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'rad.tamamhealth', name: 'TamamHealth Ladu Soro', role: 'radiologist', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
   { username: 'midwife.nyakong', name: 'Midwife Nyakong Gatkuoth', role: 'midwife', hospitalId: 'hosp-003', hospitalName: 'Malakal Teaching Hospital', orgId: PUBLIC_ORG_ID },
@@ -341,20 +343,7 @@ const seedANCVisits: Omit<ANCVisitDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'anc-015', type: 'anc_visit', motherId: 'pat-00058', motherName: 'Nyakuoth Koang Jal', motherAge: 30, gravida: 4, parity: 3, visitNumber: 3, visitDate: '2026-02-01', gestationalAge: 23, facilityId: 'hosp-004', facilityName: 'Bentiu State Hospital', state: 'Unity', bloodPressure: '148/95', weight: 75, fundalHeight: 23, fetalHeartRate: 148, hemoglobin: 9.2, urineProtein: '++', bloodGroup: 'A', rhFactor: '+', hivStatus: 'Negative', malariaTest: 'Negative', syphilisTest: 'Non-reactive', ironFolateGiven: true, tetanusVaccine: false, iptpDose: 2, riskFactors: ['hypertension', 'previous_csection', 'anemia', 'proteinuria'], riskLevel: 'high', birthPlan: { facility: 'Juba Teaching Hospital', transport: 'Ambulance referral', bloodDonor: 'Brother' }, nextVisitDate: '2026-02-15', notes: 'Pre-eclampsia developing. Urgent referral to JTH for closer monitoring.', attendedBy: 'CO Deng Mabior Kuol', attendedByRole: 'Clinical Officer', createdAt: '2026-02-01T08:00:00Z', updatedAt: '2026-02-01T08:00:00Z' },
 ];
 
-// Boma Health Worker visit seed data
-const seedBomaVisits: Omit<BomaVisitDoc, '_rev' | 'createdBy'>[] = [
-  { _id: 'boma-visit-001', type: 'boma_visit', workerId: 'user-bhw.akol', workerName: 'Akol Deng Mading', assignedBoma: 'KJ', geocodeId: 'BOMA-KJ-HH1001', patientName: 'Ayen Dut Malual', patientAge: 34, patientGender: 'Female', visitDate: new Date().toISOString(), chiefComplaint: 'Malaria', suspectedCondition: 'Malaria', icd11Code: '1A42', action: 'treated', treatmentGiven: 'Coartem + Paracetamol', outcome: 'unknown', followUpRequired: true, nextFollowUp: new Date(Date.now() + 3 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', payam: 'Kajo-keji', boma: 'Kajo-keji', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { _id: 'boma-visit-002', type: 'boma_visit', workerId: 'user-bhw.akol', workerName: 'Akol Deng Mading', assignedBoma: 'KJ', geocodeId: 'BOMA-KJ-HH1012', patientName: 'Ladu Tombe Keji', patientAge: 28, patientGender: 'Male', visitDate: new Date().toISOString(), chiefComplaint: 'Injury', suspectedCondition: 'Injury', action: 'referred', referredTo: 'Nearest PHCU', outcome: 'unknown', followUpRequired: true, nextFollowUp: new Date(Date.now() + 2 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', payam: 'Kajo-keji', boma: 'Kajo-keji', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { _id: 'boma-visit-003', type: 'boma_visit', workerId: 'user-bhw.akol', workerName: 'Akol Deng Mading', assignedBoma: 'KJ', geocodeId: 'BOMA-KJ-HH1007', patientName: 'Rose Gbudue', patientAge: 25, patientGender: 'Female', visitDate: new Date().toISOString(), chiefComplaint: 'Pregnancy Issue', suspectedCondition: 'Pregnancy complication', action: 'referred', referredTo: 'Juba Teaching Hospital', outcome: 'unknown', followUpRequired: true, nextFollowUp: new Date(Date.now() + 1 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', payam: 'Kajo-keji', boma: 'Kajo-keji', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { _id: 'boma-visit-004', type: 'boma_visit', workerId: 'user-bhw.akol', workerName: 'Akol Deng Mading', assignedBoma: 'KJ', geocodeId: 'BOMA-KJ-HH1019', patientName: 'Majok Chol Wol', patientAge: 5, patientGender: 'Male', visitDate: new Date().toISOString(), chiefComplaint: 'Diarrhea', suspectedCondition: 'Diarrhea', icd11Code: 'DA90', action: 'treated', treatmentGiven: 'ORS + Zinc', outcome: 'unknown', followUpRequired: true, nextFollowUp: new Date(Date.now() + 2 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', payam: 'Kajo-keji', boma: 'Kajo-keji', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { _id: 'boma-visit-005', type: 'boma_visit', workerId: 'user-bhw.akol', workerName: 'Akol Deng Mading', assignedBoma: 'KJ', geocodeId: 'BOMA-KJ-HH1031', patientName: 'Gatluak Puok', patientAge: 42, patientGender: 'Male', visitDate: new Date().toISOString(), chiefComplaint: 'Malaria', suspectedCondition: 'Malaria', icd11Code: '1A42', action: 'treated', treatmentGiven: 'Coartem', outcome: 'unknown', followUpRequired: true, nextFollowUp: new Date(Date.now() + 3 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', payam: 'Kajo-keji', boma: 'Kajo-keji', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  // Older visits (previous days)
-  { _id: 'boma-visit-006', type: 'boma_visit', workerId: 'user-bhw.akol', workerName: 'Akol Deng Mading', assignedBoma: 'KJ', geocodeId: 'BOMA-KJ-HH1003', patientName: 'Achol Deng', patientAge: 18, patientGender: 'Female', visitDate: new Date(Date.now() - 3 * 86400000).toISOString(), chiefComplaint: 'Malaria', suspectedCondition: 'Malaria', action: 'treated', treatmentGiven: 'Coartem', outcome: 'unknown', followUpRequired: true, state: 'Central Equatoria', county: 'Kajo-keji', payam: 'Kajo-keji', boma: 'Kajo-keji', createdAt: new Date(Date.now() - 3 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 3 * 86400000).toISOString() },
-  { _id: 'boma-visit-007', type: 'boma_visit', workerId: 'user-bhw.akol', workerName: 'Akol Deng Mading', assignedBoma: 'KJ', geocodeId: 'BOMA-KJ-HH1015', patientName: 'Kuol Mabior', patientAge: 3, patientGender: 'Male', visitDate: new Date(Date.now() - 5 * 86400000).toISOString(), chiefComplaint: 'Diarrhea', suspectedCondition: 'Diarrhea', action: 'treated', treatmentGiven: 'ORS', outcome: 'unknown', followUpRequired: true, state: 'Central Equatoria', county: 'Kajo-keji', payam: 'Kajo-keji', boma: 'Kajo-keji', createdAt: new Date(Date.now() - 5 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 5 * 86400000).toISOString() },
-  { _id: 'boma-visit-008', type: 'boma_visit', workerId: 'user-bhw.akol', workerName: 'Akol Deng Mading', assignedBoma: 'KJ', geocodeId: 'BOMA-KJ-HH1022', patientName: 'Nyamal Gatdet', patientAge: 2, patientGender: 'Female', visitDate: new Date(Date.now() - 7 * 86400000).toISOString(), chiefComplaint: 'Malnutrition', suspectedCondition: 'Malnutrition', icd11Code: '5B71', action: 'referred', referredTo: 'Nearest PHCU', outcome: 'unknown', followUpRequired: true, state: 'Central Equatoria', county: 'Kajo-keji', payam: 'Kajo-keji', boma: 'Kajo-keji', createdAt: new Date(Date.now() - 7 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 7 * 86400000).toISOString() },
-];
-
-// Follow-up seed data (pending follow-ups for BHW)
+// Follow-up seed data (pending follow-ups)
 const seedFollowUps: Omit<FollowUpDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'followup-001', type: 'follow_up', patientId: 'BOMA-KJ-HH1003', patientName: 'Achol Deng', geocodeId: 'BOMA-KJ-HH1003', assignedWorker: 'user-bhw.akol', assignedWorkerName: 'Akol Deng Mading', status: 'active', condition: 'Malaria', facilityLevel: 'boma', scheduledDate: new Date(Date.now() - 1 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', sourceVisitId: 'boma-visit-006', createdAt: new Date(Date.now() - 3 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 3 * 86400000).toISOString() },
   { _id: 'followup-002', type: 'follow_up', patientId: 'BOMA-KJ-HH1015', patientName: 'Kuol Mabior', geocodeId: 'BOMA-KJ-HH1015', assignedWorker: 'user-bhw.akol', assignedWorkerName: 'Akol Deng Mading', status: 'active', condition: 'Diarrhea', facilityLevel: 'boma', scheduledDate: new Date(Date.now() - 2 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', sourceVisitId: 'boma-visit-007', createdAt: new Date(Date.now() - 5 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 5 * 86400000).toISOString() },
@@ -380,6 +369,39 @@ const motherPatients: (Partial<PatientDoc> & Record<string, unknown>)[] = [
   { _id: 'pat-00060', type: 'patient', firstName: 'Nyandit', middleName: 'Dut', surname: 'Malual', gender: 'Female', dateOfBirth: '2000-08-05', age: 26, phone: '+211-912-555-060', registrationHospital: 'hosp-003', registrationHospitalName: 'Malakal Teaching Hospital', hospitalNumber: 'MTH-000002', state: 'Upper Nile', county: 'Malakal', payam: '', boma: '', geocodeId: '', createdAt: '2026-01-05T08:00:00Z', updatedAt: '2026-01-05T08:00:00Z' },
   { _id: 'pat-00061', type: 'patient', firstName: 'Awut', middleName: 'Makuei', surname: 'Lual', gender: 'Female', dateOfBirth: '2004-04-12', age: 22, phone: '+211-912-555-061', registrationHospital: 'hosp-005', registrationHospitalName: 'Bor State Hospital', hospitalNumber: 'BSH-000004', state: 'Jonglei', county: 'Bor South', payam: '', boma: '', geocodeId: '', createdAt: '2025-12-10T10:00:00Z', updatedAt: '2025-12-10T10:00:00Z' },
   { _id: 'pat-00062', type: 'patient', firstName: 'Nyandeng', middleName: 'Chol', surname: 'Wol', gender: 'Female', dateOfBirth: '1998-11-25', age: 28, phone: '+211-912-555-062', registrationHospital: 'hosp-001', registrationHospitalName: 'Juba Teaching Hospital', hospitalNumber: 'JTH-000062', state: 'Central Equatoria', county: 'Juba', payam: '', boma: '', geocodeId: '', createdAt: '2025-08-01T10:00:00Z', updatedAt: '2025-08-01T10:00:00Z' },
+];
+
+// Wau State Hospital (hosp-002) roster — gives the Clinical Officer (co.deng,
+// "CO Deng Mabior Kuol") a deterministic panel of patients to work with. Several
+// are assigned to the CO so the "assigned to me" worklist, recently-visited
+// filter, and consultation workflow all have demo data at this facility.
+const CO_ID = 'user-co.deng';
+const CO_NAME = 'CO Deng Mabior Kuol';
+const wauPatients: (Partial<PatientDoc> & Record<string, unknown>)[] = [
+  { _id: 'pat-00063', type: 'patient', firstName: 'Santino', middleName: 'Akot', surname: 'Madut', gender: 'Male', dateOfBirth: '1979-02-12', age: 47, phone: '+211-915-200-063', bloodType: 'O+', allergies: ['None known'], chronicConditions: ['Hypertension'], nokName: 'Adut Madut', nokRelationship: 'Spouse', nokPhone: '+211-915-200-163', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000010', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-08', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-08T09:20:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-03-04T08:00:00Z', updatedAt: '2026-06-08T09:20:00Z' },
+  { _id: 'pat-00064', type: 'patient', firstName: 'Aluel', middleName: 'Bol', surname: 'Garang', gender: 'Female', dateOfBirth: '1991-07-30', age: 34, phone: '+211-915-200-064', bloodType: 'A+', allergies: ['Penicillin'], chronicConditions: ['None'], nokName: 'Garang Bol', nokRelationship: 'Father', nokPhone: '+211-915-200-164', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000011', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-09', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-09T11:05:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-05-21T08:00:00Z', updatedAt: '2026-06-09T11:05:00Z' },
+  { _id: 'pat-00065', type: 'patient', firstName: 'Deng', middleName: 'Akec', surname: 'Wol', gender: 'Male', dateOfBirth: '1965-11-03', age: 60, phone: '+211-915-200-065', bloodType: 'B+', allergies: ['None known'], chronicConditions: ['Diabetes Mellitus', 'Hypertension'], nokName: 'Nyibol Akec', nokRelationship: 'Daughter', nokPhone: '+211-915-200-165', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000012', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-05', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-05T08:40:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2024-12-10T08:00:00Z', updatedAt: '2026-06-05T08:40:00Z' },
+  { _id: 'pat-00066', type: 'patient', firstName: 'Nyibol', middleName: 'Ring', surname: 'Atem', gender: 'Female', dateOfBirth: '2003-04-18', age: 23, phone: '+211-915-200-066', bloodType: 'O-', allergies: ['Sulfa drugs'], chronicConditions: ['Asthma'], nokName: 'Ring Atem', nokRelationship: 'Father', nokPhone: '+211-915-200-166', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000013', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-09', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-09T14:30:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-09-02T08:00:00Z', updatedAt: '2026-06-09T14:30:00Z' },
+  { _id: 'pat-00067', type: 'patient', firstName: 'Mabior', middleName: 'Kuol', surname: 'Deng', gender: 'Male', dateOfBirth: '1988-09-09', age: 37, phone: '+211-915-200-067', bloodType: 'AB+', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Achol Kuol', nokRelationship: 'Spouse', nokPhone: '+211-915-200-167', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000014', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-07', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-07T10:15:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-06-18T08:00:00Z', updatedAt: '2026-06-07T10:15:00Z' },
+  { _id: 'pat-00068', type: 'patient', firstName: 'Adut', middleName: 'Mawien', surname: 'Lual', gender: 'Female', dateOfBirth: '1996-12-22', age: 29, phone: '+211-915-200-068', bloodType: 'A-', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Mawien Lual', nokRelationship: 'Father', nokPhone: '+211-915-200-168', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000015', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-05-28', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-05-28T09:00:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-04-11T08:00:00Z', updatedAt: '2026-05-28T09:00:00Z' },
+  { _id: 'pat-00069', type: 'patient', firstName: 'Chol', middleName: 'Ajak', surname: 'Mayen', gender: 'Male', dateOfBirth: '1972-06-14', age: 53, phone: '+211-915-200-069', bloodType: 'O+', allergies: ['None known'], chronicConditions: ['Epilepsy'], nokName: 'Ajak Mayen', nokRelationship: 'Brother', nokPhone: '+211-915-200-169', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000016', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-03', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-03T13:20:00.000Z', isActive: true, createdAt: '2024-10-30T08:00:00Z', updatedAt: '2026-06-03T13:20:00Z' },
+  { _id: 'pat-00070', type: 'patient', firstName: 'Nyankiir', middleName: 'Deng', surname: 'Achuil', gender: 'Female', dateOfBirth: '1959-01-08', age: 67, phone: '+211-915-200-070', bloodType: 'B-', allergies: ['Aspirin'], chronicConditions: ['Hypertension', 'Osteoarthritis'], nokName: 'Deng Achuil', nokRelationship: 'Son', nokPhone: '+211-915-200-170', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000017', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-06', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-06T08:10:00.000Z', isActive: true, createdAt: '2024-08-15T08:00:00Z', updatedAt: '2026-06-06T08:10:00Z' },
+  { _id: 'pat-00071', type: 'patient', firstName: 'Garang', middleName: 'Maker', surname: 'Bol', gender: 'Male', dateOfBirth: '2015-03-27', age: 11, phone: '', bloodType: 'O+', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Maker Bol', nokRelationship: 'Father', nokPhone: '+211-915-200-171', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000018', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-09', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-09T15:45:00.000Z', isActive: true, createdAt: '2026-01-20T08:00:00Z', updatedAt: '2026-06-09T15:45:00Z' },
+  { _id: 'pat-00072', type: 'patient', firstName: 'Awien', middleName: 'Chol', surname: 'Madit', gender: 'Female', dateOfBirth: '1985-10-11', age: 40, phone: '+211-915-200-072', bloodType: 'A+', allergies: ['None known'], chronicConditions: ['HIV'], nokName: 'Chol Madit', nokRelationship: 'Spouse', nokPhone: '+211-915-200-172', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000019', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-05-30', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-05-30T10:50:00.000Z', isActive: true, createdAt: '2024-11-22T08:00:00Z', updatedAt: '2026-05-30T10:50:00Z' },
+  { _id: 'pat-00073', type: 'patient', firstName: 'Kuol', middleName: 'Riak', surname: 'Anyieth', gender: 'Male', dateOfBirth: '2000-08-19', age: 25, phone: '+211-915-200-073', bloodType: 'O+', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Riak Anyieth', nokRelationship: 'Father', nokPhone: '+211-915-200-173', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000020', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-04-15', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-04-15T09:30:00.000Z', isActive: true, createdAt: '2025-07-09T08:00:00Z', updatedAt: '2026-04-15T09:30:00Z' },
+  { _id: 'pat-00074', type: 'patient', firstName: 'Abuk', middleName: 'Ater', surname: 'Nyok', gender: 'Female', dateOfBirth: '1993-05-02', age: 33, phone: '+211-915-200-074', bloodType: 'B+', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Ater Nyok', nokRelationship: 'Spouse', nokPhone: '+211-915-200-174', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000021', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-04', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-04T12:00:00.000Z', isActive: true, createdAt: '2025-02-28T08:00:00Z', updatedAt: '2026-06-04T12:00:00Z' },
+  { _id: 'pat-00075', type: 'patient', firstName: 'Majok', middleName: 'Deng', surname: 'Akol', gender: 'Male', dateOfBirth: '1982-04-17', age: 44, phone: '+211-915-200-075', bloodType: 'O+', allergies: ['None known'], chronicConditions: ['Hypertension'], nokName: 'Deng Akol', nokRelationship: 'Brother', nokPhone: '+211-915-200-175', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000022', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-09', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-09T08:25:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-03-14T08:00:00Z', updatedAt: '2026-06-09T08:25:00Z' },
+  { _id: 'pat-00076', type: 'patient', firstName: 'Ayen', middleName: 'Bol', surname: 'Achuil', gender: 'Female', dateOfBirth: '1998-09-03', age: 27, phone: '+211-915-200-076', bloodType: 'A+', allergies: ['Penicillin'], chronicConditions: ['None'], nokName: 'Bol Achuil', nokRelationship: 'Father', nokPhone: '+211-915-200-176', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000023', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-08', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-08T10:40:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-05-02T08:00:00Z', updatedAt: '2026-06-08T10:40:00Z' },
+  { _id: 'pat-00077', type: 'patient', firstName: 'Riak', middleName: 'Gai', surname: 'Tut', gender: 'Male', dateOfBirth: '1969-12-29', age: 56, phone: '+211-915-200-077', bloodType: 'B+', allergies: ['None known'], chronicConditions: ['Diabetes Mellitus'], nokName: 'Nyabol Gai', nokRelationship: 'Spouse', nokPhone: '+211-915-200-177', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000024', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-07', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-07T09:15:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2024-11-19T08:00:00Z', updatedAt: '2026-06-07T09:15:00Z' },
+  { _id: 'pat-00078', type: 'patient', firstName: 'Nyandeng', middleName: 'Akec', surname: 'Mawut', gender: 'Female', dateOfBirth: '2007-02-11', age: 19, phone: '+211-915-200-078', bloodType: 'O-', allergies: ['None known'], chronicConditions: ['Asthma'], nokName: 'Akec Mawut', nokRelationship: 'Father', nokPhone: '+211-915-200-178', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000025', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-09', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-09T13:05:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-08-22T08:00:00Z', updatedAt: '2026-06-09T13:05:00Z' },
+  { _id: 'pat-00079', type: 'patient', firstName: 'Lual', middleName: 'Maker', surname: 'Ring', gender: 'Male', dateOfBirth: '1990-07-08', age: 35, phone: '+211-915-200-079', bloodType: 'AB+', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Maker Ring', nokRelationship: 'Brother', nokPhone: '+211-915-200-179', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000026', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-06', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-06T11:30:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-06-30T08:00:00Z', updatedAt: '2026-06-06T11:30:00Z' },
+  { _id: 'pat-00080', type: 'patient', firstName: 'Achol', middleName: 'Garang', surname: 'Deng', gender: 'Female', dateOfBirth: '1985-03-23', age: 41, phone: '+211-915-200-080', bloodType: 'A-', allergies: ['Sulfa drugs'], chronicConditions: ['Hypertension'], nokName: 'Garang Deng', nokRelationship: 'Spouse', nokPhone: '+211-915-200-180', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000027', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-05', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-05T09:50:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-01-27T08:00:00Z', updatedAt: '2026-06-05T09:50:00Z' },
+  { _id: 'pat-00081', type: 'patient', firstName: 'Gatwech', middleName: 'Both', surname: 'Chuol', gender: 'Male', dateOfBirth: '2001-10-14', age: 24, phone: '+211-915-200-081', bloodType: 'O+', allergies: ['None known'], chronicConditions: ['Epilepsy'], nokName: 'Both Chuol', nokRelationship: 'Father', nokPhone: '+211-915-200-181', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000028', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-05-29', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-05-29T14:10:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-07-15T08:00:00Z', updatedAt: '2026-05-29T14:10:00Z' },
+  { _id: 'pat-00082', type: 'patient', firstName: 'Nyakong', middleName: 'Jal', surname: 'Puok', gender: 'Female', dateOfBirth: '1994-06-19', age: 31, phone: '+211-915-200-082', bloodType: 'B-', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Jal Puok', nokRelationship: 'Spouse', nokPhone: '+211-915-200-182', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000029', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-08', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-08T08:55:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-04-08T08:00:00Z', updatedAt: '2026-06-08T08:55:00Z' },
+  { _id: 'pat-00083', type: 'patient', firstName: 'Deng', middleName: 'Wol', surname: 'Madit', gender: 'Male', dateOfBirth: '1956-08-30', age: 69, phone: '+211-915-200-083', bloodType: 'O+', allergies: ['Aspirin'], chronicConditions: ['Hypertension', 'Osteoarthritis'], nokName: 'Wol Madit', nokRelationship: 'Son', nokPhone: '+211-915-200-183', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000030', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-04', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-04T10:20:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2024-09-12T08:00:00Z', updatedAt: '2026-06-04T10:20:00Z' },
+  { _id: 'pat-00084', type: 'patient', firstName: 'Awut', middleName: 'Dut', surname: 'Anyieth', gender: 'Female', dateOfBirth: '2016-11-05', age: 9, phone: '', bloodType: 'A+', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Dut Anyieth', nokRelationship: 'Mother', nokPhone: '+211-915-200-184', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000031', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-09', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-09T15:00:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2026-02-03T08:00:00Z', updatedAt: '2026-06-09T15:00:00Z' },
+  { _id: 'pat-00085', type: 'patient', firstName: 'Chol', middleName: 'Ater', surname: 'Bol', gender: 'Male', dateOfBirth: '1988-01-26', age: 38, phone: '+211-915-200-085', bloodType: 'O+', allergies: ['None known'], chronicConditions: ['HIV'], nokName: 'Ater Bol', nokRelationship: 'Spouse', nokPhone: '+211-915-200-185', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000032', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-05-31', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-05-31T11:45:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2024-12-05T08:00:00Z', updatedAt: '2026-05-31T11:45:00Z' },
+  { _id: 'pat-00086', type: 'patient', firstName: 'Adau', middleName: 'Mayen', surname: 'Kuol', gender: 'Female', dateOfBirth: '1996-05-12', age: 30, phone: '+211-915-200-086', bloodType: 'B+', allergies: ['None known'], chronicConditions: ['None'], nokName: 'Mayen Kuol', nokRelationship: 'Spouse', nokPhone: '+211-915-200-186', registrationHospital: 'hosp-002', registrationHospitalName: 'Wau State Hospital', hospitalNumber: 'WSH-000033', state: 'Western Bahr el Ghazal', county: 'Wau', payam: '', boma: '', geocodeId: '', lastVisitDate: '2026-06-07', lastVisitHospital: 'hosp-002', lastConsultedAt: '2026-06-07T12:35:00.000Z', assignedDoctor: CO_ID, assignedDoctorName: CO_NAME, isActive: true, createdAt: '2025-03-21T08:00:00Z', updatedAt: '2026-06-07T12:35:00Z' },
 ];
 
 // Helper: put a doc, silently skip if it already exists (409 conflict)
@@ -453,6 +475,18 @@ const seedInsurancePolicies: Omit<InsurancePolicyDoc, '_rev' | 'createdBy'>[] = 
     isActive: true,
     facilityId: 'hosp-001', orgId: 'org-moh-ss',
     createdAt: '2026-01-10T14:00:00Z', updatedAt: '2026-03-01T10:00:00Z',
+  },
+];
+
+// Free-text care notes surfaced on the patient Overview "Notes" card. These are
+// the kind of soft, human reminders that don't belong in structured fields.
+const seedPatientNotes: Omit<PatientNoteDoc, '_rev'>[] = [
+  {
+    _id: 'pnote-001', type: 'patient_note', patientId: 'pat-00012',
+    body: 'Prefers to be seen by a male clinician. Travels >3 hrs from Bor — try to consolidate labs and review into a single visit where possible.',
+    authorId: 'user-doctor-1', authorName: 'Dr. Lauren Deng', authorRole: 'doctor',
+    hospitalId: 'hosp-001',
+    createdAt: '2026-03-18T09:15:00Z', updatedAt: '2026-03-18T09:15:00Z',
   },
 ];
 
@@ -653,6 +687,10 @@ const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-10', type: 'appointment', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', patientPhone: '+211-912-555-012', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(6), appointmentTime: '11:30', endTime: '12:00', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Missed previous slot', status: 'cancelled', cancelledReason: 'Patient travelling', cancelledBy: 'user-desk.amira', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(13), updatedAt: daysAgo(7) },
   { _id: 'appointment-11', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211-912-555-018', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(14), appointmentTime: '08:00', endTime: '08:30', duration: 30, appointmentType: 'specialist', priority: 'routine', department: 'Endocrinology', reason: 'Diabetes specialist review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
   { _id: 'appointment-12', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '0912345678', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(5), appointmentTime: '13:00', endTime: '13:30', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Cardiology', reason: 'Hypertension review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(2) },
+  // ── Today's scheduled arrivals so the reception queue shows appointments. ──
+  { _id: 'appointment-13', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '0912345678', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '08:00', endTime: '08:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Hypertension follow-up', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(0) },
+  { _id: 'appointment-14', type: 'appointment', patientId: 'pat-00057', patientName: 'Achol Mayen Garang', patientPhone: '+211-912-555-057', providerId: 'user-midwife.nyakong', providerName: 'Midwife Nyakong Gatkuoth', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '09:15', endTime: '09:45', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Maternity', reason: 'ANC visit', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
+  { _id: 'appointment-15', type: 'appointment', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', patientPhone: '+211-912-555-035', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '10:45', endTime: '11:15', duration: 30, appointmentType: 'general', priority: 'urgent', department: 'Outpatient', reason: 'Persistent fever', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
 ];
 
 // ═══ Ward + bed + admission seed data ═════════════════════════════
@@ -709,20 +747,11 @@ const seedTriage: Omit<TriageDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'triage-4', type: 'triage', patientId: 'pat-00040', patientName: 'Majok Chol Wol', hospitalNumber: 'JTH-000040', airway: 'obstructed', breathing: 'absent', circulation: 'absent', consciousness: 'unresponsive', priority: 'RED', temperature: '36.0', pulse: '40', respiratoryRate: '6', systolic: '70', diastolic: '40', oxygenSaturation: '78', chiefComplaint: 'Collapsed, unresponsive', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'pending', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'triage-5', type: 'triage', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', hospitalNumber: 'JTH-000018', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'GREEN', temperature: '37.0', pulse: '82', respiratoryRate: '17', systolic: '128', diastolic: '84', oxygenSaturation: '99', chiefComplaint: 'High blood sugar review', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(2), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'discharged', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(2) },
   { _id: 'triage-6', type: 'triage', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', hospitalNumber: 'JTH-000035', airway: 'clear', breathing: 'distressed', circulation: 'normal', consciousness: 'alert', priority: 'YELLOW', temperature: '38.0', pulse: '96', respiratoryRate: '26', systolic: '118', diastolic: '76', oxygenSaturation: '93', chiefComplaint: 'Cough and difficulty breathing', triagedBy: 'user-co.deng', triagedByName: 'CO Deng Mabior Kuol', triagedAt: daysAgo(3), facilityId: 'hosp-002', facilityName: 'Wau State Hospital', status: 'referred', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(3) },
-];
-
-// ═══ Patient feedback seed data ═══════════════════════════════════
-const seedFeedback: Omit<PatientFeedbackDoc, '_rev' | 'createdBy'>[] = [
-  { _id: 'fb-1', type: 'patient_feedback', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', department: 'Outpatient', visitDate: dateAgo(1), rating: 5, npsScore: 9, sentiment: 'positive', category: 'staff_courtesy', comment: 'Doctors were very attentive and kind.', channel: 'in_person', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
-  { _id: 'fb-2', type: 'patient_feedback', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', department: 'Maternity', visitDate: dateAgo(2), rating: 4, npsScore: 8, sentiment: 'positive', category: 'clinical_quality', comment: 'Good antenatal care, slightly long wait.', channel: 'sms', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(2) },
-  { _id: 'fb-3', type: 'patient_feedback', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', department: 'Pharmacy', visitDate: dateAgo(3), rating: 2, npsScore: 3, sentiment: 'negative', category: 'medication_availability', comment: 'Medicine was out of stock, had to buy outside.', channel: 'kiosk', followUpRequired: true, followUpStatus: 'open', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(3) },
-  { _id: 'fb-4', type: 'patient_feedback', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', department: 'Outpatient', visitDate: dateAgo(5), rating: 3, npsScore: 6, sentiment: 'neutral', category: 'wait_time', comment: 'Waited over two hours to be seen.', channel: 'phone', followUpRequired: false, state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(5), updatedAt: daysAgo(5) },
-  { _id: 'fb-5', type: 'patient_feedback', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', department: 'Internal Medicine', visitDate: dateAgo(7), rating: 5, npsScore: 10, sentiment: 'positive', category: 'communication', comment: 'Explained my condition clearly. Very satisfied.', channel: 'in_person', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(7), updatedAt: daysAgo(7) },
-  { _id: 'fb-6', type: 'patient_feedback', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', department: 'General Ward', visitDate: dateAgo(10), rating: 1, npsScore: 1, sentiment: 'negative', category: 'cleanliness', comment: 'Ward toilets were not clean.', channel: 'web', followUpRequired: true, followUpStatus: 'in_progress', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(10), updatedAt: daysAgo(9) },
-  { _id: 'fb-7', type: 'patient_feedback', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', department: 'Laboratory', visitDate: dateAgo(12), rating: 4, npsScore: 8, sentiment: 'positive', category: 'clinical_quality', comment: 'Results came back fast.', channel: 'sms', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(12), updatedAt: daysAgo(12) },
-  { _id: 'fb-8', type: 'patient_feedback', patientId: 'pat-00040', patientName: 'Majok Chol Wol', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', department: 'Outpatient', visitDate: dateAgo(18), rating: 3, npsScore: 5, sentiment: 'neutral', category: 'cost', comment: 'Services were a bit expensive.', channel: 'in_person', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(18), updatedAt: daysAgo(18) },
-  { _id: 'fb-9', type: 'patient_feedback', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', department: 'Outpatient', visitDate: dateAgo(25), rating: 5, npsScore: 9, sentiment: 'positive', category: 'staff_courtesy', comment: 'Friendly and helpful staff.', channel: 'kiosk', followUpRequired: false, state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(25), updatedAt: daysAgo(25) },
-  { _id: 'fb-10', type: 'patient_feedback', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', department: 'Emergency', visitDate: dateAgo(30), rating: 4, npsScore: 7, sentiment: 'positive', category: 'clinical_quality', comment: 'Quick emergency response.', channel: 'web', followUpRequired: false, state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(30), updatedAt: daysAgo(30) },
+  // ── Today's reception walk-ins (still WAITING / in consult) so the front-desk
+  //    queue is populated on the seed day. ──
+  { _id: 'triage-7', type: 'triage', patientId: 'pat-00004', patientName: 'Mary Nyandeng Lado', hospitalNumber: 'JTH-000004', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'YELLOW', temperature: '37.4', pulse: '92', respiratoryRate: '19', systolic: '142', diastolic: '90', oxygenSaturation: '97', chiefComplaint: 'High blood sugar and dizziness', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'pending', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
+  { _id: 'triage-8', type: 'triage', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', hospitalNumber: 'JTH-000005', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'GREEN', temperature: '36.8', pulse: '80', respiratoryRate: '17', systolic: '116', diastolic: '74', oxygenSaturation: '99', chiefComplaint: 'Antenatal check-in', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'pending', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
+  { _id: 'triage-9', type: 'triage', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', hospitalNumber: 'JTH-000012', airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert', priority: 'YELLOW', temperature: '37.1', pulse: '86', respiratoryRate: '18', systolic: '124', diastolic: '80', oxygenSaturation: '98', chiefComplaint: 'HIV review, fatigue', triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0), facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'seen', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
 ];
 
 // ═══ Asset / equipment seed data ══════════════════════════════════
@@ -883,6 +912,70 @@ async function migratePatientPhotos(): Promise<void> {
   }
 }
 
+// Service price catalog — drives the org-admin Service Pricing page and the
+// "pick a service" amount selector in Collect Payment. Seeded for both orgs.
+const feeScheduleBase: { category: ChargeCategory; serviceCode: string; serviceName: string; unitPrice: number }[] = [
+  { category: 'consultation', serviceCode: 'CONS-GEN', serviceName: 'General consultation', unitPrice: 5000 },
+  { category: 'consultation', serviceCode: 'CONS-SPEC', serviceName: 'Specialist consultation', unitPrice: 12000 },
+  { category: 'laboratory', serviceCode: 'LAB-MAL', serviceName: 'Malaria RDT', unitPrice: 2000 },
+  { category: 'laboratory', serviceCode: 'LAB-FBC', serviceName: 'Full Blood Count', unitPrice: 3500 },
+  { category: 'laboratory', serviceCode: 'LAB-UA', serviceName: 'Urinalysis', unitPrice: 1500 },
+  { category: 'radiology', serviceCode: 'RAD-XR', serviceName: 'X-ray', unitPrice: 15000 },
+  { category: 'pharmacy', serviceCode: 'PH-DISP', serviceName: 'Medication dispensing', unitPrice: 1000 },
+  { category: 'procedure', serviceCode: 'PROC-DRESS', serviceName: 'Wound dressing', unitPrice: 4000 },
+  { category: 'bed_charge', serviceCode: 'BED-GEN', serviceName: 'General ward bed (per night)', unitPrice: 8000 },
+];
+
+// Billing invoices so the checkout/billing screens show real charged amounts
+// (instead of "Charged: SSP 0") and a mix of paid / partial / unpaid accounts.
+const seedBills: Omit<BillingDoc, '_rev'>[] = [
+  {
+    _id: 'bill-001', type: 'billing',
+    patientId: 'pat-00001', patientName: 'Deng Mabior Garang', hospitalNumber: 'JTH-000001',
+    facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national',
+    encounterDate: dateAgo(3), encounterId: 'enc-pay-001',
+    items: [
+      { id: 'li-001a', category: 'consultation', description: 'General consultation', quantity: 1, unitPrice: 5000, totalPrice: 5000 },
+      { id: 'li-001b', category: 'laboratory', description: 'Malaria RDT', quantity: 1, unitPrice: 2000, totalPrice: 2000 },
+    ],
+    subtotal: 7000, discount: 0, taxRate: 0, taxAmount: 0, totalAmount: 7000,
+    amountPaid: 7000, balanceDue: 0, currency: 'SSP', payments: [],
+    status: 'paid', generatedBy: 'user-cashier.deng', generatedByName: 'Deng Akec Ring',
+    invoiceNumber: 'INV-20260607-0001', state: 'Central Equatoria', county: 'Juba',
+    orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(3),
+  },
+  {
+    _id: 'bill-002', type: 'billing',
+    patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', hospitalNumber: 'JTH-000005',
+    facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national',
+    encounterDate: dateAgo(1), encounterId: 'enc-pay-002',
+    items: [
+      { id: 'li-002a', category: 'consultation', description: 'Specialist consultation', quantity: 1, unitPrice: 12000, totalPrice: 12000 },
+      { id: 'li-002b', category: 'radiology', description: 'X-ray', quantity: 1, unitPrice: 15000, totalPrice: 15000 },
+    ],
+    subtotal: 27000, discount: 0, taxRate: 0, taxAmount: 0, totalAmount: 27000,
+    amountPaid: 10000, balanceDue: 17000, currency: 'SSP', payments: [],
+    status: 'partial', generatedBy: 'user-cashier.deng', generatedByName: 'Deng Akec Ring',
+    invoiceNumber: 'INV-20260609-0002', state: 'Central Equatoria', county: 'Juba',
+    orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1),
+  },
+  {
+    _id: 'bill-003', type: 'billing',
+    patientId: 'pat-00040', patientName: 'Akon Deng', hospitalNumber: 'JTH-000040',
+    facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national',
+    encounterDate: dateAgo(0), encounterId: 'enc-pay-003',
+    items: [
+      { id: 'li-003a', category: 'consultation', description: 'General consultation', quantity: 1, unitPrice: 5000, totalPrice: 5000 },
+      { id: 'li-003b', category: 'procedure', description: 'Wound dressing', quantity: 2, unitPrice: 4000, totalPrice: 8000 },
+    ],
+    subtotal: 13000, discount: 0, taxRate: 0, taxAmount: 0, totalAmount: 13000,
+    amountPaid: 0, balanceDue: 13000, currency: 'SSP', payments: [],
+    status: 'pending', generatedBy: 'user-cashier.deng', generatedByName: 'Deng Akec Ring',
+    invoiceNumber: 'INV-20260610-0003', state: 'Central Equatoria', county: 'Juba',
+    orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0),
+  },
+];
+
 export async function seedDatabase(): Promise<void> {
   if (await isSeeded()) {
     // Run photo migration on already-seeded databases so existing installs
@@ -1016,6 +1109,20 @@ export async function seedDatabase(): Promise<void> {
     await safePut(pDB, { ...mother, orgId: PUBLIC_ORG_ID } as unknown as Record<string, unknown>);
   }
 
+  // Seed Wau State Hospital roster (Clinical Officer's panel). Patients assigned
+  // to the CO also get an assignment timestamp + assigning nurse so the
+  // dashboard worklist's "Admitted" and "Assigned Nurse" columns populate.
+  for (const wp of wauPatients) {
+    const assignment = wp.assignedDoctor
+      ? {
+          assignedAt: (wp.lastConsultedAt as string) || (wp.createdAt as string),
+          assignedBy: 'user-nurse.wau',
+          assignedByName: 'Nurse Grace Achai Lual',
+        }
+      : {};
+    await safePut(pDB, { ...wp, ...assignment, orgId: PUBLIC_ORG_ID } as unknown as Record<string, unknown>);
+  }
+
   // Seed referrals (all public org)
   const rDB = referralsDB();
   for (const r of referrals) {
@@ -1119,6 +1226,99 @@ export async function seedDatabase(): Promise<void> {
     }
   }
 
+  // ── Clinical Officer panel: full clinical history for the Wau (hosp-002)
+  // patients so their medical records, medication history, lab results, and
+  // vitals trends are visualizable when signed in as CO Deng (clinical_officer).
+  // Records are pinned to Wau State Hospital with the CO as provider so they
+  // survive the hospital-scope filter, and each visit's prescriptions/labs are
+  // also written as standalone docs so the dedicated medication and lab views
+  // populate (not just the embedded record arrays).
+  const coRxDB = prescriptionsDB();
+  const coLabDB = labResultsDB();
+  for (const wp of wauPatients) {
+    const pid = wp._id as string;
+    const pname = `${String(wp.firstName)} ${String(wp.surname)}`;
+    const pnum = (wp.hospitalNumber as string) || '';
+    const records = generateMedicalRecords(pid, 6);
+    for (let ri = 0; ri < records.length; ri++) {
+      const r = records[ri];
+      const isLatest = ri === records.length - 1;
+      const visitAt = r.consultedAt || now;
+      const record = {
+        ...r,
+        hospitalId: 'hosp-002',
+        hospitalName: 'Wau State Hospital',
+        providerName: 'CO Deng Mabior Kuol',
+        providerRole: 'Clinical Officer',
+      };
+      const mrDoc: MedicalRecordDoc = {
+        _id: record.id,
+        type: 'medical_record',
+        ...Object.fromEntries(Object.entries(record).filter(([k]) => k !== 'id')),
+        orgId: PUBLIC_ORG_ID,
+        createdAt: visitAt,
+        updatedAt: visitAt,
+      } as MedicalRecordDoc;
+      await safePut(mrDB, mrDoc as unknown as Record<string, unknown>);
+
+      // Medication history — standalone prescription docs. The most recent
+      // visit's drugs stay 'pending' (active script); older ones are dispensed.
+      for (let k = 0; k < record.prescriptions.length; k++) {
+        const rx = record.prescriptions[k];
+        const dispensed = !isLatest;
+        await safePut(coRxDB, {
+          _id: `rx-${pid}-${ri}-${k}`,
+          type: 'prescription',
+          patientId: pid,
+          patientName: pname,
+          medication: rx.genericName ? `${rx.drugName} (${rx.genericName})` : rx.drugName,
+          dose: rx.dose,
+          route: rx.route,
+          frequency: rx.frequency,
+          duration: rx.duration,
+          prescribedBy: 'CO Deng Mabior Kuol',
+          status: dispensed ? 'dispensed' : 'pending',
+          urgency: 'definitive',
+          ...(dispensed ? { dispensedAt: visitAt } : {}),
+          hospitalId: 'hosp-002',
+          hospitalName: 'Wau State Hospital',
+          orgId: PUBLIC_ORG_ID,
+          createdAt: visitAt,
+          updatedAt: visitAt,
+        } as unknown as Record<string, unknown>);
+      }
+
+      // Lab history — standalone completed lab_result docs.
+      for (let k = 0; k < record.labResults.length; k++) {
+        const lab = record.labResults[k];
+        await safePut(coLabDB, {
+          _id: `lab-${pid}-${ri}-${k}`,
+          type: 'lab_result',
+          patientId: pid,
+          patientName: pname,
+          hospitalNumber: pnum,
+          testName: lab.testName,
+          specimen: 'Blood',
+          status: 'completed',
+          result: String(lab.result),
+          unit: lab.unit || '',
+          referenceRange: lab.referenceRange || '',
+          abnormal: !!lab.abnormal,
+          critical: !!lab.critical,
+          orderedBy: 'CO Deng Mabior Kuol',
+          orderedAt: visitAt,
+          completedAt: visitAt,
+          tier: 'basic',
+          hospitalId: 'hosp-002',
+          hospitalName: 'Wau State Hospital',
+          orgId: PUBLIC_ORG_ID,
+          createdAt: visitAt,
+          updatedAt: visitAt,
+        } as unknown as Record<string, unknown>);
+      }
+    }
+  }
+
   // Seed messages (all public org). Spread across the last week so the
   // messaging "recent" list stays fresh.
   const msgDB = messagesDB();
@@ -1132,6 +1332,172 @@ export async function seedDatabase(): Promise<void> {
       updatedAt: sent,
       orgId: PUBLIC_ORG_ID,
     } as unknown as Record<string, unknown>);
+  }
+
+  // ── Internal clinical staff chat: demo conversations among Juba Teaching
+  // Hospital (hosp-001) staff so the messaging screen is populated when signed
+  // in as a hosp-001 clinician (e.g. Dr. James Wani Igga). Each conversation is
+  // a ConversationDoc plus a stream of staff_to_staff MessageDocs.
+  const convDB = conversationsDB();
+  const H1 = { id: 'hosp-001', name: 'Juba Teaching Hospital' };
+  const WAU = { id: 'hosp-002', name: 'Wau State Hospital' };
+  const P = {
+    wani: { id: 'user-dr.wani', name: 'Dr. James Wani Igga' },
+    achol: { id: 'user-dr.achol', name: 'Dr. Achol Mayen Deng' },
+    rose: { id: 'user-pharma.rose', name: 'Pharmacist Rose Gbudue' },
+    lado: { id: 'user-supt.lado', name: 'Dr. Lado Tombe Kenyi' },
+    aluel: { id: 'user-manager.aluel', name: 'Aluel Bol Maker' },
+    mary: { id: 'user-triage.mary', name: 'Mary Nyaruai Gai' },
+    sara: { id: 'user-rooming.sara', name: 'Sara Aluel Bol' },
+    peter: { id: 'user-clinician.peter', name: 'Dr. Peter Garang Deng' },
+    nyandeng: { id: 'user-biller.nyandeng', name: 'Nyandeng Chol Atem' },
+    amira: { id: 'user-desk.amira', name: 'Amira Juma Hassan' },
+    // Wau State Hospital (hosp-002) staff so the Clinical Officer demo (co.deng) has a populated chat.
+    deng: { id: 'user-co.deng', name: 'CO Deng Mabior Kuol' },
+    maryAkuol: { id: 'user-dr.wau', name: 'Dr. Mary Akuol Deng' },
+    grace: { id: 'user-nurse.wau', name: 'Nurse Grace Achai Lual' },
+    johnBol: { id: 'user-pharma.wau', name: 'Pharmacist John Bol Garang' },
+    tabitha: { id: 'user-desk.wau', name: 'Tabitha Nyandeng Kuol' },
+  };
+  const tsAgo = (minsAgo: number) => new Date(Date.now() - minsAgo * 60000).toISOString();
+  interface SeedConv {
+    id: string; kind: 'dm' | 'group'; name?: string;
+    hosp?: { id: string; name: string };
+    members: { id: string; name: string }[];
+    msgs: { from: { id: string; name: string }; body: string; minsAgo: number }[];
+  }
+  const staffConversations: SeedConv[] = [
+    {
+      id: 'conv-seed-huddle', kind: 'group', name: 'Morning Clinical Huddle',
+      members: [P.wani, P.achol, P.peter, P.mary],
+      msgs: [
+        { from: P.achol, body: 'Morning team — quick huddle at 7:30 before rounds?', minsAgo: 180 },
+        { from: P.peter, body: 'Works for me.', minsAgo: 175 },
+        { from: P.wani, body: "I'll be there.", minsAgo: 170 },
+        { from: P.mary, body: 'Bed 12 needs review before discharge — vitals stable overnight.', minsAgo: 45 },
+      ],
+    },
+    {
+      id: 'conv-seed-ward4b', kind: 'group', name: 'Ward 4B Care Team',
+      members: [P.wani, P.rose, P.sara],
+      msgs: [
+        { from: P.sara, body: 'Mr. Garang in 4B is due for his next dose at noon.', minsAgo: 120 },
+        { from: P.rose, body: 'Coartem is ready at pharmacy for pickup.', minsAgo: 90 },
+        { from: P.wani, body: "Thanks, I'll round on him after clinic.", minsAgo: 60 },
+      ],
+    },
+    {
+      id: 'conv-seed-discharge', kind: 'group', name: 'Room 515 Discharge Team',
+      members: [P.wani, P.aluel, P.nyandeng, P.amira],
+      msgs: [
+        { from: P.aluel, body: 'Two discharges planned today — we need the beds for incoming.', minsAgo: 240 },
+        { from: P.nyandeng, body: 'Billing cleared for both patients.', minsAgo: 200 },
+        { from: P.amira, body: 'Patient in 515 is ready for discharge — transport arranged.', minsAgo: 5 },
+      ],
+    },
+    {
+      id: 'conv-seed-dm-achol', kind: 'dm',
+      members: [P.wani, P.achol],
+      msgs: [
+        { from: P.wani, body: 'Can you cover my 2pm clinic? Stuck in theatre.', minsAgo: 100 },
+        { from: P.achol, body: 'Sure, no problem — I’ll take it.', minsAgo: 95 },
+      ],
+    },
+    {
+      id: 'conv-seed-dm-rose', kind: 'dm',
+      members: [P.wani, P.rose],
+      msgs: [
+        { from: P.rose, body: 'We’re low on amoxicillin suspension — flagged for reorder.', minsAgo: 300 },
+        { from: P.wani, body: 'Noted, thanks for the heads up.', minsAgo: 290 },
+      ],
+    },
+    {
+      id: 'conv-seed-dm-lado', kind: 'dm',
+      members: [P.wani, P.lado],
+      msgs: [
+        { from: P.lado, body: 'Good work on the M&M presentation yesterday.', minsAgo: 1440 },
+        { from: P.wani, body: 'Appreciate it.', minsAgo: 1430 },
+      ],
+    },
+    // ── Wau State Hospital (hosp-002) — the Clinical Officer's conversations ──
+    {
+      id: 'conv-wau-opd', kind: 'group', name: 'OPD Care Team', hosp: WAU,
+      members: [P.deng, P.maryAkuol, P.grace, P.johnBol],
+      msgs: [
+        { from: P.grace, body: 'Triage queue is building up in OPD — three febrile children waiting.', minsAgo: 95 },
+        { from: P.deng, body: 'On my way, start the malaria RDTs please.', minsAgo: 88 },
+        { from: P.johnBol, body: 'Coartem and ORS are in stock if needed.', minsAgo: 80 },
+        { from: P.maryAkuol, body: 'I can take the two adults in bay 2.', minsAgo: 22 },
+      ],
+    },
+    {
+      id: 'conv-wau-discharge', kind: 'group', name: 'Discharge Planning', hosp: WAU,
+      members: [P.deng, P.maryAkuol, P.tabitha],
+      msgs: [
+        { from: P.tabitha, body: 'Bed WSH-12 ready for checkout once notes are signed.', minsAgo: 150 },
+        { from: P.deng, body: 'Discharge summary done — please arrange transport.', minsAgo: 30 },
+      ],
+    },
+    {
+      id: 'conv-wau-dm-mary', kind: 'dm', hosp: WAU,
+      members: [P.deng, P.maryAkuol],
+      msgs: [
+        { from: P.deng, body: 'Can you review the chest X-ray for bed 7 when free?', minsAgo: 70 },
+        { from: P.maryAkuol, body: 'Sure — looks like a lobar pneumonia. Start antibiotics.', minsAgo: 64 },
+      ],
+    },
+    {
+      id: 'conv-wau-dm-grace', kind: 'dm', hosp: WAU,
+      members: [P.deng, P.grace],
+      msgs: [
+        { from: P.grace, body: 'Patient in WSH-000012 is asking about his diabetes meds.', minsAgo: 40 },
+        { from: P.grace, body: 'He hasn’t collected this month’s Metformin yet.', minsAgo: 38 },
+      ],
+    },
+    {
+      id: 'conv-wau-dm-john', kind: 'dm', hosp: WAU,
+      members: [P.deng, P.johnBol],
+      msgs: [
+        { from: P.deng, body: 'Do we still have amoxicillin suspension for paeds?', minsAgo: 200 },
+        { from: P.johnBol, body: 'Yes, plenty in stock.', minsAgo: 195 },
+      ],
+    },
+  ];
+  for (const c of staffConversations) {
+    const H = c.hosp || H1;
+    const last = c.msgs[c.msgs.length - 1];
+    await safePut(convDB, {
+      _id: c.id, type: 'conversation', kind: c.kind,
+      ...(c.name ? { name: c.name } : {}),
+      participantIds: c.members.map(m => m.id),
+      participantNames: c.members.map(m => m.name),
+      createdByName: c.members[0].name,
+      lastMessageAt: tsAgo(last.minsAgo),
+      lastMessagePreview: last.body.slice(0, 120),
+      lastMessageFromName: last.from.name,
+      pinnedBy: [],
+      hospitalId: H.id, hospitalName: H.name, orgId: PUBLIC_ORG_ID,
+      createdAt: tsAgo(600), updatedAt: tsAgo(last.minsAgo),
+    } as unknown as Record<string, unknown>);
+    for (let k = 0; k < c.msgs.length; k++) {
+      const m = c.msgs[k];
+      const sentAt = tsAgo(m.minsAgo);
+      const isLast = k === c.msgs.length - 1;
+      // Older messages are read by everyone; the final message is read only by
+      // its sender so the recipient sees a realistic unread badge.
+      const readBy = isLast ? [m.from.id] : c.members.map(mm => mm.id);
+      await safePut(msgDB, {
+        _id: `${c.id}-m${k + 1}`, type: 'message',
+        recipientType: 'staff', direction: 'staff_to_staff',
+        conversationId: c.id,
+        patientId: c.id, patientName: c.name || 'Direct message', patientPhone: '',
+        fromDoctorId: m.from.id, fromDoctorName: m.from.name,
+        fromHospitalName: H.name, fromHospitalId: H.id,
+        recipientHospitalId: H.id, recipientHospitalName: H.name,
+        subject: '', body: m.body, channel: 'app', status: 'delivered',
+        sentAt, readBy, orgId: PUBLIC_ORG_ID, createdAt: sentAt, updatedAt: sentAt,
+      } as unknown as Record<string, unknown>);
+    }
   }
 
   // Seed births (all public org). Spread across the last ~5 weeks so the
@@ -1184,12 +1550,6 @@ export async function seedDatabase(): Promise<void> {
     await safePut(ancDatabase, { ...anc, orgId: PUBLIC_ORG_ID } as unknown as Record<string, unknown>);
   }
 
-  // Seed boma visits (all public org)
-  const bvDB = bomaVisitsDB();
-  for (const bv of seedBomaVisits) {
-    await safePut(bvDB, { ...bv, orgId: PUBLIC_ORG_ID } as unknown as Record<string, unknown>);
-  }
-
   // Seed follow-ups (all public org)
   const fuDB = followUpsDB();
   for (const fu of seedFollowUps) {
@@ -1227,6 +1587,33 @@ export async function seedDatabase(): Promise<void> {
     await safePut(ledDB, led as unknown as Record<string, unknown>);
   }
 
+  // Seed a patient care note so the Overview "Notes" card has real content.
+  const noteDB = patientNotesDB();
+  for (const note of seedPatientNotes) {
+    await safePut(noteDB, { ...note, orgId: PUBLIC_ORG_ID } as unknown as Record<string, unknown>);
+  }
+
+  // Seed the service price catalog for both demo orgs so the org-admin Service
+  // Pricing page and the Collect Payment service picker both show prices.
+  const feeDB = feeScheduleDB();
+  for (const orgId of [PUBLIC_ORG_ID, PRIVATE_ORG_ID]) {
+    for (const f of feeScheduleBase) {
+      await safePut(feeDB, {
+        _id: `fee-${orgId}-${f.serviceCode}`, type: 'fee_schedule',
+        facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital',
+        category: f.category, serviceCode: f.serviceCode, serviceName: f.serviceName,
+        unitPrice: f.unitPrice, currency: 'SSP', isActive: true, effectiveFrom: now,
+        orgId, createdAt: now, updatedAt: now,
+      } as unknown as Record<string, unknown>);
+    }
+  }
+
+  // Seed billing invoices so checkout/billing show charged amounts, not zero.
+  const blDB = billingDB();
+  for (const b of seedBills) {
+    await safePut(blDB, b as unknown as Record<string, unknown>);
+  }
+
   // Seed appointments
   const apptDB = appointmentsDB();
   for (const a of seedAppointments) {
@@ -1255,12 +1642,6 @@ export async function seedDatabase(): Promise<void> {
   const trDB = triageDB();
   for (const t of seedTriage) {
     await safePut(trDB, t as unknown as Record<string, unknown>);
-  }
-
-  // Seed patient feedback
-  const fbDB = patientFeedbackDB();
-  for (const fb of seedFeedback) {
-    await safePut(fbDB, fb as unknown as Record<string, unknown>);
   }
 
   // Seed assets

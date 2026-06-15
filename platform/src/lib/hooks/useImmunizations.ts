@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { makeCoalescer } from './live-reload';
 import type { ImmunizationDoc } from '../db-types';
 import { immunizationsDB } from '../db';
 import { useDataScope } from './useDataScope';
@@ -34,11 +35,13 @@ export function useImmunizations() {
   // Live PouchDB subscription: re-load on any immunization create/update.
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) load(); });
     const changes = immunizationsDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) load(); })
+      .on('change', () => reload.trigger())
       .on('error', () => { /* swallow */ });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [load]);

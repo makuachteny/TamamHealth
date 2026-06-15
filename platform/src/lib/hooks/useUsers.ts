@@ -44,6 +44,7 @@ export function useUsers() {
 
   const update = useCallback(async (id: string, data: {
     name?: string;
+    phone?: string;
     role?: UserRole;
     hospitalId?: string;
     hospitalName?: string;

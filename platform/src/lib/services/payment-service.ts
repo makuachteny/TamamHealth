@@ -4,6 +4,21 @@
  * All financial mutations create corresponding ledger entries.
  */
 import { getDB } from '../db';
+import { findByType } from './db-query';
+
+/**
+ * Referential-integrity guard: throw if an id is provided but the referenced
+ * document doesn't exist, so charges/payments can't be created pointing at a
+ * missing encounter/invoice (which would silently break reports + audit trails).
+ */
+async function assertRefExists(dbName: string, id: string | undefined, label: string): Promise<void> {
+  if (!id) return;
+  try {
+    await getDB(dbName).get(id);
+  } catch {
+    throw new Error(`${label} ${id} does not exist — refusing to create an orphaned record.`);
+  }
+}
 import type {
   PaymentDoc, PaymentMethodType, PaymentStatus, PaymentAllocation,
   InsurancePolicyDoc, PayerType,
@@ -21,6 +36,7 @@ import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 import { createLedgerEntry, getPatientBalance } from './ledger-service';
 import { jubaDate } from '../time-juba';
 
@@ -69,6 +85,9 @@ export interface CollectPaymentInput {
 export async function collectPayment(input: CollectPaymentInput): Promise<PaymentDoc> {
   const db = paymentsDB();
   const now = new Date().toISOString();
+  // Don't post a payment against an encounter/invoice that doesn't exist.
+  await assertRefExists('tamamhealth_encounters', input.encounterId, 'Encounter');
+  await assertRefExists('tamamhealth_invoices', input.invoiceId, 'Invoice');
 
   const doc: PaymentDoc = {
     _id: `pmt-${uuidv4().slice(0, 10)}`,
@@ -121,24 +140,27 @@ export async function collectPayment(input: CollectPaymentInput): Promise<Paymen
     `${input.amount} ${doc.currency} via ${input.method} from ${input.patientName} (ref: ${doc.reference})`
   );
 
+  emitSyncEvent({
+    resourceType: 'payment',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
 export async function getPaymentsByPatient(patientId: string): Promise<PaymentDoc[]> {
-  const db = paymentsDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as PaymentDoc)
-    .filter(d => d && d.type === 'payment' && d.patientId === patientId)
+  const rows = await findByType<PaymentDoc>(paymentsDB(), 'payment', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
     .sort((a, b) => (b.processedAt || '').localeCompare(a.processedAt || ''));
 }
 
 export async function getAllPayments(scope?: DataScope): Promise<PaymentDoc[]> {
   const db = paymentsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as PaymentDoc)
-    .filter(d => d && d.type === 'payment');
+  const all = await findByType<PaymentDoc>(db, 'payment');
   all.sort((a, b) => (b.processedAt || '').localeCompare(a.processedAt || ''));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -173,6 +195,15 @@ export async function reversePayment(
 
     await logAuditSafe('PAYMENT_REVERSED', reversedBy, reversedByName,
       `Reversed ${pmt.amount} ${pmt.currency} — ${reason}`);
+
+    emitSyncEvent({
+      resourceType: 'payment',
+      resourceId: pmt._id,
+      operation: 'update',
+      resourceVersion: pmt._rev,
+      orgId: pmt.orgId,
+      hospitalId: pmt.facilityId,
+    });
 
     return pmt;
   } catch { return null; }
@@ -236,15 +267,22 @@ export async function createInsurancePolicy(input: CreateInsurancePolicyInput): 
 
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'insurance_policy',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
 export async function getPatientInsurancePolicies(patientId: string): Promise<InsurancePolicyDoc[]> {
   const db = insurancePoliciesDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as InsurancePolicyDoc)
-    .filter(d => d && d.type === 'insurance_policy' && d.patientId === patientId && d.isActive)
+  const rows = await findByType<InsurancePolicyDoc>(db, 'insurance_policy', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
+    .filter(d => d && d.isActive)
     .sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
 }
 
@@ -260,6 +298,14 @@ export async function updateInsurancePolicy(id: string, updates: Partial<Insuran
     Object.assign(doc, updates, { updatedAt: new Date().toISOString() });
     const resp = await db.put(doc);
     doc._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'insurance_policy',
+      resourceId: doc._id,
+      operation: 'update',
+      resourceVersion: doc._rev,
+      orgId: doc.orgId,
+      hospitalId: doc.facilityId,
+    });
     return doc;
   } catch { return null; }
 }
@@ -270,7 +316,16 @@ export async function deactivateInsurancePolicy(id: string): Promise<boolean> {
     const doc = await db.get(id) as InsurancePolicyDoc;
     doc.isActive = false;
     doc.updatedAt = new Date().toISOString();
-    await db.put(doc);
+    const resp = await db.put(doc);
+    doc._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'insurance_policy',
+      resourceId: doc._id,
+      operation: 'update',
+      resourceVersion: doc._rev,
+      orgId: doc.orgId,
+      hospitalId: doc.facilityId,
+    });
     return true;
   } catch { return false; }
 }
@@ -318,15 +373,20 @@ export async function checkEligibility(input: CheckEligibilityInput): Promise<El
 
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'eligibility_check',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
 export async function getLatestEligibility(patientId: string): Promise<EligibilityCheckDoc | null> {
   const db = eligibilityChecksDB();
-  const result = await db.allDocs({ include_docs: true });
-  const checks = result.rows
-    .map(r => r.doc as EligibilityCheckDoc)
-    .filter(d => d && d.type === 'eligibility_check' && d.patientId === patientId)
+  const checks = (await findByType<EligibilityCheckDoc>(db, 'eligibility_check', { patientId }, { indexFields: ['type', 'patientId'] }))
     .sort((a, b) => (b.checkDate || '').localeCompare(a.checkDate || ''));
   return checks[0] || null;
 }
@@ -369,6 +429,8 @@ export interface CreateChargeInput {
 export async function createCharge(input: CreateChargeInput): Promise<ChargeDoc> {
   const db = chargesDB();
   const now = new Date().toISOString();
+  // Don't create a charge linked to a non-existent encounter.
+  await assertRefExists('tamamhealth_encounters', input.encounterId, 'Encounter');
 
   const doc: ChargeDoc = {
     _id: `chg-${uuidv4().slice(0, 10)}`,
@@ -398,23 +460,26 @@ export async function createCharge(input: CreateChargeInput): Promise<ChargeDoc>
     createdBy: input.createdBy,
   });
 
+  emitSyncEvent({
+    resourceType: 'charge',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
 export async function getChargesByEncounter(encounterId: string): Promise<ChargeDoc[]> {
   const db = chargesDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as ChargeDoc)
-    .filter(d => d && d.type === 'charge' && d.encounterId === encounterId);
+  return findByType<ChargeDoc>(db, 'charge', { encounterId }, { indexFields: ['type', 'encounterId'] });
 }
 
 export async function getChargesByPatient(patientId: string): Promise<ChargeDoc[]> {
-  const db = chargesDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as ChargeDoc)
-    .filter(d => d && d.type === 'charge' && d.patientId === patientId)
+  const rows = await findByType<ChargeDoc>(chargesDB(), 'charge', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
     .sort((a, b) => (b.serviceDate || '').localeCompare(a.serviceDate || ''));
 }
 
@@ -459,6 +524,15 @@ export async function submitClaim(input: SubmitClaimInput): Promise<ClaimDoc> {
   await logAuditSafe('CLAIM_SUBMITTED', input.submittedBy, input.submittedBy,
     `Claim ${doc.claimNumber}: ${input.totalBilled} to ${input.payerName}`);
 
+  emitSyncEvent({
+    resourceType: 'claim',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
@@ -486,6 +560,15 @@ export async function adjudicateClaim(
 
     const resp = await db.put(claim);
     claim._rev = resp.rev;
+
+    emitSyncEvent({
+      resourceType: 'claim',
+      resourceId: claim._id,
+      operation: 'update',
+      resourceVersion: claim._rev,
+      orgId: claim.orgId,
+      hospitalId: claim.facilityId,
+    });
 
     // Create ledger entries for insurance payment and write-off
     if (approved > 0) {
@@ -520,20 +603,14 @@ export async function adjudicateClaim(
 }
 
 export async function getClaimsByPatient(patientId: string): Promise<ClaimDoc[]> {
-  const db = claimsDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as ClaimDoc)
-    .filter(d => d && d.type === 'claim' && d.patientId === patientId)
+  const rows = await findByType<ClaimDoc>(claimsDB(), 'claim', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
     .sort((a, b) => (b.submittedDate || '').localeCompare(a.submittedDate || ''));
 }
 
 export async function getAllClaims(scope?: DataScope): Promise<ClaimDoc[]> {
   const db = claimsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as ClaimDoc)
-    .filter(d => d && d.type === 'claim');
+  const all = await findByType<ClaimDoc>(db, 'claim');
   all.sort((a, b) => (b.submittedDate || '').localeCompare(a.submittedDate || ''));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -588,6 +665,15 @@ export async function createAdjustment(input: {
 
   await logAuditSafe('ADJUSTMENT_CREATED', input.approvedBy, input.approvedByName,
     `${input.adjustmentType} of ${input.amount}: ${input.reason}`);
+
+  emitSyncEvent({
+    resourceType: 'adjustment',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
 
   return doc;
 }
@@ -646,15 +732,21 @@ export async function issueRefund(input: {
   await logAuditSafe('REFUND_ISSUED', input.processedBy, input.processedByName,
     `Refund ${input.amount} ${doc.currency} to ${input.patientName}: ${input.reason}`);
 
+  emitSyncEvent({
+    resourceType: 'refund',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
 export async function getRefundsByPatient(patientId: string): Promise<RefundDoc[]> {
-  const db = refundsDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as RefundDoc)
-    .filter(d => d && d.type === 'refund' && d.patientId === patientId);
+  const rows = await findByType<RefundDoc>(refundsDB(), 'refund', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -736,24 +828,27 @@ export async function createPaymentPlan(input: {
   await logAuditSafe('PAYMENT_PLAN_CREATED', input.createdByStaff, input.createdByStaffName,
     `Plan for ${input.patientName}: ${input.totalBalance} over ${input.termMonths} months`);
 
+  emitSyncEvent({
+    resourceType: 'payment_plan',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
 export async function getPaymentPlansByPatient(patientId: string): Promise<PaymentPlanDoc[]> {
-  const db = paymentPlansDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as PaymentPlanDoc)
-    .filter(d => d && d.type === 'payment_plan' && d.patientId === patientId)
+  const rows = await findByType<PaymentPlanDoc>(paymentPlansDB(), 'payment_plan', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 }
 
 export async function getAllPaymentPlans(scope?: DataScope): Promise<PaymentPlanDoc[]> {
   const db = paymentPlansDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as PaymentPlanDoc)
-    .filter(d => d && d.type === 'payment_plan');
+  const all = await findByType<PaymentPlanDoc>(db, 'payment_plan');
   all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -786,6 +881,14 @@ export async function recordPlanPayment(planId: string, installmentNumber: numbe
     plan.updatedAt = new Date().toISOString();
     const resp = await db.put(plan);
     plan._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'payment_plan',
+      resourceId: plan._id,
+      operation: 'update',
+      resourceVersion: plan._rev,
+      orgId: plan.orgId,
+      hospitalId: plan.facilityId,
+    });
     return plan;
   } catch { return null; }
 }
@@ -852,15 +955,20 @@ export async function generateInvoice(input: {
 
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'invoice',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
 export async function getInvoicesByPatient(patientId: string): Promise<InvoiceDoc[]> {
-  const db = invoicesDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as InvoiceDoc)
-    .filter(d => d && d.type === 'invoice' && d.patientId === patientId)
+  const rows = await findByType<InvoiceDoc>(invoicesDB(), 'invoice', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
     .sort((a, b) => (b.issuedDate || '').localeCompare(a.issuedDate || ''));
 }
 
@@ -875,6 +983,14 @@ export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Pr
     doc.updatedAt = new Date().toISOString();
     const resp = await db.put(doc);
     doc._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'invoice',
+      resourceId: doc._id,
+      operation: 'update',
+      resourceVersion: doc._rev,
+      orgId: doc.orgId,
+      hospitalId: doc.facilityId,
+    });
     return doc;
   } catch { return null; }
 }
@@ -926,11 +1042,21 @@ export async function savePaymentMethod(input: {
 }
 
 export async function getPatientPaymentMethods(patientId: string): Promise<SavedPaymentMethodDoc[]> {
+  const rows = await findByType<SavedPaymentMethodDoc>(savedPaymentMethodsDB(), 'saved_payment_method', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows;
+}
+
+/** Remove a saved payment method (patient-managed convenience record). */
+export async function deletePaymentMethod(id: string): Promise<boolean> {
   const db = savedPaymentMethodsDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as SavedPaymentMethodDoc)
-    .filter(d => d && d.type === 'saved_payment_method' && d.patientId === patientId);
+  try {
+    const doc = await db.get(id);
+    await db.remove(doc);
+    await logAuditSafe('DELETE_PAYMENT_METHOD', undefined, undefined, `Saved payment method ${id} removed`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════

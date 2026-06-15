@@ -10,13 +10,12 @@ import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
 
 export async function getAllPayrollEntries(scope?: DataScope): Promise<PayrollEntryDoc[]> {
   const db = payrollEntriesDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as PayrollEntryDoc)
-    .filter(d => d && d.type === 'payroll_entry')
+  const all = (await findByType<PayrollEntryDoc>(db, 'payroll_entry'))
     .sort((a, b) => (b.period || '').localeCompare(a.period || ''));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -70,6 +69,14 @@ export async function createPayrollEntry(input: CreatePayrollInput): Promise<Pay
   doc._rev = resp.rev;
   await logAuditSafe('PAYROLL_ENTRY_CREATED', undefined, undefined,
     `Payroll for ${input.userName} (${input.period}): ${doc.netPay} ${doc.currency}`);
+  emitSyncEvent({
+    resourceType: 'payroll_entry',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
@@ -93,6 +100,14 @@ export async function setPayrollStatus(
     existing._rev = resp.rev;
     await logAuditSafe('PAYROLL_STATUS', actor.id, actor.name,
       `${existing.userName} ${existing.period} → ${status}`);
+    emitSyncEvent({
+      resourceType: 'payroll_entry',
+      resourceId: existing._id,
+      operation: 'update',
+      resourceVersion: existing._rev,
+      orgId: existing.orgId,
+      hospitalId: existing.facilityId,
+    });
     return existing;
   } catch {
     return null;
@@ -107,6 +122,14 @@ export async function updatePayrollEntry(id: string, updates: Partial<PayrollEnt
     merged.netPay = merged.baseSalary + merged.allowances - merged.deductions;
     const resp = await db.put(merged);
     merged._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'payroll_entry',
+      resourceId: merged._id,
+      operation: 'update',
+      resourceVersion: merged._rev,
+      orgId: merged.orgId,
+      hospitalId: merged.facilityId,
+    });
     return merged;
   } catch {
     return null;
@@ -117,7 +140,15 @@ export async function deletePayrollEntry(id: string): Promise<boolean> {
   const db = payrollEntriesDB();
   try {
     const existing = await db.get(id);
+    const typed = existing as unknown as PayrollEntryDoc;
     await db.remove(existing);
+    emitSyncEvent({
+      resourceType: 'payroll_entry',
+      resourceId: id,
+      operation: 'delete',
+      orgId: typed.orgId,
+      hospitalId: typed.facilityId,
+    });
     return true;
   } catch {
     return false;

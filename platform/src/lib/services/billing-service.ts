@@ -13,6 +13,8 @@ import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
 
 const billingDB = () => getDB('tamamhealth_billing');
 
@@ -45,10 +47,7 @@ function calculateTotals(items: BillLineItem[], discount: number, taxRate: numbe
 
 export async function getAllBills(scope?: DataScope): Promise<BillingDoc[]> {
   const db = billingDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as BillingDoc)
-    .filter(d => d && d.type === 'billing');
+  const all = await findByType<BillingDoc>(db, 'billing');
   /* istanbul ignore next -- defensive null-safety in sort */
   all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   return scope ? filterByScope(all, scope) : all;
@@ -64,8 +63,7 @@ export async function getBillById(id: string): Promise<BillingDoc | null> {
 }
 
 export async function getBillsByPatient(patientId: string): Promise<BillingDoc[]> {
-  const all = await getAllBills();
-  return all.filter(b => b.patientId === patientId);
+  return findByType<BillingDoc>(billingDB(), 'billing', { patientId }, { indexFields: ['type', 'patientId'] });
 }
 
 export async function getUnpaidBills(scope?: DataScope): Promise<BillingDoc[]> {
@@ -171,6 +169,15 @@ export async function createBill(data: CreateBillInput): Promise<BillingDoc> {
     `Invoice ${invoiceNumber}: ${data.patientName} total=${totalAmount} ${doc.currency}`
   );
 
+  emitSyncEvent({
+    resourceType: 'billing',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
@@ -221,6 +228,15 @@ export async function recordPayment(
       `Payment ${payment.id}: ${amount} ${bill.currency} via ${method} for ${bill.invoiceNumber}`
     );
 
+    emitSyncEvent({
+      resourceType: 'billing',
+      resourceId: bill._id,
+      operation: 'update',
+      resourceVersion: bill._rev,
+      orgId: bill.orgId,
+      hospitalId: bill.facilityId,
+    });
+
     return bill;
   } catch {
     return null;
@@ -247,6 +263,15 @@ export async function waiveBill(
       'BILL_WAIVED', waivedBy, waivedByName,
       `Waived ${bill.invoiceNumber}: ${bill.totalAmount} ${bill.currency} — ${reason}`
     );
+
+    emitSyncEvent({
+      resourceType: 'billing',
+      resourceId: bill._id,
+      operation: 'update',
+      resourceVersion: bill._rev,
+      orgId: bill.orgId,
+      hospitalId: bill.facilityId,
+    });
 
     return bill;
   } catch {

@@ -7,8 +7,11 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
+import FilterBar from '@/components/filters/FilterBar';
+import SearchInput from '@/components/filters/SearchInput';
+import FilterSelect from '@/components/filters/FilterSelect';
 import {
-  CreditCard, Search, Edit3, Check, X,
+  CreditCard, Edit3, Check, X,
   Building2, Users, TrendingUp
 } from '@/components/icons/lucide';
 
@@ -19,6 +22,7 @@ export default function AdminBillingPage() {
   const { organizations, loading, update } = useOrganizations();
 
   const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPlan, setEditPlan] = useState<'basic' | 'professional' | 'enterprise'>('basic');
   const [editStatus, setEditStatus] = useState<'trial' | 'active' | 'suspended' | 'cancelled'>('trial');
@@ -34,10 +38,13 @@ export default function AdminBillingPage() {
   }, [currentUser, router]);
 
   const filteredOrgs = useMemo(() => {
-    if (!search) return organizations;
     const q = search.toLowerCase();
-    return organizations.filter(o => o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q));
-  }, [organizations, search]);
+    return organizations.filter(o => {
+      const matchSearch = !q || o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q);
+      const matchStatus = filterStatus === 'all' || o.subscriptionStatus === filterStatus;
+      return matchSearch && matchStatus;
+    });
+  }, [organizations, search, filterStatus]);
 
   if (!currentUser || currentUser.role !== 'super_admin') return null;
 
@@ -135,16 +142,26 @@ export default function AdminBillingPage() {
         </div>
 
         {/* Search */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex-1" style={{ maxWidth: '360px' }}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input
-              type="text" placeholder={t('adminBilling.searchPlaceholder')}
-              value={search} onChange={e => setSearch(e.target.value)}
-              style={{ ...inputStyle, paddingLeft: '36px', width: '100%', padding: '10px 14px 10px 36px', borderRadius: '10px', fontSize: '14px' }}
-            />
-          </div>
-        </div>
+        <FilterBar>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={t('adminBilling.searchPlaceholder')}
+            aria-label={t('adminBilling.searchPlaceholder')}
+          />
+          <FilterSelect
+            value={filterStatus}
+            onChange={setFilterStatus}
+            options={[
+              { value: 'all', label: t('adminBilling.statusAll') },
+              { value: 'trial', label: t('adminBilling.statusTrial') },
+              { value: 'active', label: t('adminBilling.statusActive') },
+              { value: 'suspended', label: t('adminBilling.statusSuspended') },
+              { value: 'cancelled', label: t('adminBilling.statusCancelled') },
+            ]}
+            aria-label={t('adminBilling.filterByStatus')}
+          />
+        </FilterBar>
 
         {/* Table */}
         <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>

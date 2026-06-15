@@ -19,6 +19,7 @@ import type {
   PatientDoc, MedicalRecordDoc, LabResultDoc, PrescriptionDoc, TriageDoc, ProblemDoc,
 } from '@/lib/db-types';
 import { formatDateTime } from '@/lib/format-utils';
+import { patientAge, patientFullName } from '@/lib/patient-utils';
 
 interface PatientSBARProps {
   patient: PatientDoc;
@@ -29,21 +30,11 @@ interface PatientSBARProps {
   problems: ProblemDoc[];
 }
 
-function calcAge(dob?: string): number | null {
-  if (!dob) return null;
-  const d = new Date(dob);
-  if (Number.isNaN(d.getTime())) return null;
-  const today = new Date();
-  let age = today.getFullYear() - d.getFullYear();
-  const m = today.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
-  return age;
-}
 
 const LETTER_COLORS = {
   S: { bg: 'rgba(196,69,54,0.12)',  fg: 'var(--tamamhealth-red)' },
   B: { bg: 'rgba(228,168,75,0.18)', fg: 'var(--color-warning)' },
-  A: { bg: 'rgba(20,184,166,0.14)', fg: '#0D9488' },
+  A: { bg: 'rgba(59, 130, 246,0.14)', fg: '#1E3A8A' },
   R: { bg: 'var(--accent-light)',   fg: 'var(--accent-primary)' },
 } as const;
 
@@ -110,8 +101,8 @@ export default function PatientSBAR({
   patient, records, labs, prescriptions, triages, problems,
 }: PatientSBARProps) {
   const { t } = useTranslation();
-  const age = calcAge(patient.dateOfBirth);
-  const fullName = `${patient.firstName} ${patient.middleName ? patient.middleName + ' ' : ''}${patient.surname}`.trim();
+  const age = patientAge(patient);
+  const fullName = patientFullName(patient);
   const allergies = (patient.allergies || []).filter(a => a && a.toLowerCase() !== 'none known' && a.toLowerCase() !== 'none');
   const chronic = (patient.chronicConditions || []).filter(c => c && c.toLowerCase() !== 'none');
 

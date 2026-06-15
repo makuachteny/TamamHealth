@@ -28,9 +28,9 @@ export default function VitalStatisticsPage() {
         <h2 className="font-semibold text-sm flex items-center gap-2 mb-3"><Baby className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} /> {t('vitalStats.birthStatistics')}</h2>
         <div className="kpi-grid mb-6">
           {[
-            { label: t('vitalStats.totalBirths'), value: birthStats.total, icon: Baby, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
-            { label: t('births.statThisMonth'), value: birthStats.thisMonth, icon: Activity, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
-            { label: t('vitalStats.maleBirths'), value: birthStats.byGender.male, icon: Baby, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
+            { label: t('vitalStats.totalBirths'), value: birthStats.total, icon: Baby, color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)' },
+            { label: t('births.statThisMonth'), value: birthStats.thisMonth, icon: Activity, color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)' },
+            { label: t('vitalStats.maleBirths'), value: birthStats.byGender.male, icon: Baby, color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)' },
             { label: t('vitalStats.femaleBirths'), value: birthStats.byGender.female, icon: Baby, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.12)' },
             { label: t('births.statCaesareanRate'), value: `${birthStats.total ? Math.round(birthStats.byDeliveryType.caesarean / birthStats.total * 100) : 0}%`, icon: Activity, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.12)' },
           ].map(stat => (
@@ -73,7 +73,7 @@ export default function VitalStatisticsPage() {
             { label: t('deaths.statMaternalDeaths'), value: deathStats.maternalDeaths, icon: Skull, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.12)' },
             { label: t('deaths.statUnder5Deaths'), value: deathStats.under5Deaths, icon: AlertTriangle, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.12)' },
             { label: t('vitalStats.neonatalDeaths'), value: deathStats.neonatalDeaths, icon: AlertTriangle, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.12)' },
-            { label: t('vitalStats.icd11Coded'), value: `${deathStats.total ? Math.round(deathStats.withICD11Code / deathStats.total * 100) : 0}%`, icon: Activity, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
+            { label: t('vitalStats.icd11Coded'), value: `${deathStats.total ? Math.round(deathStats.withICD11Code / deathStats.total * 100) : 0}%`, icon: Activity, color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)' },
           ].map(stat => (
             <div key={stat.label} className="kpi">
               <div className="icon-box-sm" style={{ background: stat.bg }}>

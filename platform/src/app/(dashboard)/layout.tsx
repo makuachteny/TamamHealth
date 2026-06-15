@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import Sidebar from '@/components/Sidebar';
-import AssistantChat from '@/components/AssistantChat';
 import RoleGuard from '@/components/RoleGuard';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
-import Breadcrumbs from '@/components/Breadcrumbs';
 import LockScreen from '@/components/LockScreen';
 import ConnectivityNotice from '@/components/ConnectivityNotice';
 import GetStartedCard from '@/components/onboarding/GetStartedCard';
@@ -17,6 +15,11 @@ import { Loader2 } from '@/components/icons/lucide';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
+  // Messaging is an immersive, full-screen workspace: it hides the global nav
+  // rail and chrome so the chat occupies the entire screen (a Back control in
+  // the page returns to the rest of the app).
+  const focusMode = !!pathname && pathname.startsWith('/messages');
   const { isAuthenticated, currentUser, dbReady, sidebarCollapsed, logout } = useApp();
   const orgTimeout = currentUser?.organization?.lockTimeoutMinutes;
   const { isLocked, hasPin, unlock, verifyPin, setPin } = useAutoLock(isAuthenticated, orgTimeout);
@@ -72,26 +75,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       )}
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      <Sidebar />
+      {!focusMode && <Sidebar />}
       <div
         className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10 transition-all duration-300 ease-in-out"
       >
-        <style>{`
-          @media (min-width: 1024px) {
-            .dashboard-content-area { margin-left: ${sidebarMargin}; }
-          }
-        `}</style>
-        <div className="dashboard-content-area flex-1 flex flex-col min-w-0 overflow-hidden pt-3">
-          <Breadcrumbs />
+        {!focusMode && (
+          <style>{`
+            @media (min-width: 1024px) {
+              .dashboard-content-area { margin-left: ${sidebarMargin}; }
+            }
+          `}</style>
+        )}
+        <div className={`${focusMode ? '' : 'dashboard-content-area pt-3'} flex-1 flex flex-col min-w-0 overflow-hidden`}>
           <main id="main-content" className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
             <RoleGuard>{children}</RoleGuard>
             {/* First-run onboarding. Self-gates: only renders for a new user
                 on their home dashboard, overlaying the content area. */}
-            <GetStartedCard />
+            {!focusMode && <GetStartedCard />}
           </main>
         </div>
       </div>
-      <AssistantChat />
       <KeyboardShortcuts />
       <ConnectivityNotice />
     </div>

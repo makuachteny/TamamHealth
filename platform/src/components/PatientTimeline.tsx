@@ -50,9 +50,9 @@ interface TimelineEvent {
 
 const CATEGORY_CONFIG: Record<TimelineEvent['category'], { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string; bg: string; labelKey: string }> = {
   triage:        { icon: Activity,       color: '#FB923C',               bg: 'rgba(251,146,60,0.14)', labelKey: 'timeline.categoryTriage' },
-  consultation:  { icon: Stethoscope,    color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)', labelKey: 'timeline.categoryConsultation' },
+  consultation:  { icon: Stethoscope,    color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)', labelKey: 'timeline.categoryConsultation' },
   lab:           { icon: FlaskConical,   color: '#7C3AED',               bg: 'rgba(124,58,237,0.12)', labelKey: 'timeline.categoryLab' },
-  prescription:  { icon: Pill,           color: '#0D9488',               bg: 'rgba(13,148,136,0.12)', labelKey: 'timeline.categoryRx' },
+  prescription:  { icon: Pill,           color: '#1E3A8A',               bg: 'rgba(13,148,136,0.12)', labelKey: 'timeline.categoryRx' },
   immunization:  { icon: Syringe,        color: '#059669',               bg: 'rgba(5,150,105,0.12)',  labelKey: 'timeline.categoryVaccine' },
   referral:      { icon: ArrowRightLeft, color: '#F59E0B',               bg: 'rgba(245,158,11,0.12)', labelKey: 'timeline.categoryReferral' },
   anc:           { icon: HeartPulse,     color: '#EC4899',               bg: 'rgba(236,72,153,0.12)', labelKey: 'timeline.categoryAnc' },
@@ -80,7 +80,7 @@ function buildEvents(props: PatientTimelineProps, t: TFunc): TimelineEvent[] {
         ? { label: t('timeline.badgeRed'), bg: 'rgba(229,46,66,0.14)', color: 'var(--color-danger)' }
         : tr.priority === 'YELLOW'
         ? { label: t('timeline.badgeYellow'), bg: 'rgba(252,211,77,0.14)', color: 'var(--color-warning)' }
-        : { label: t('timeline.badgeGreen'), bg: 'rgba(16,185,129,0.12)', color: 'var(--color-success)' },
+        : { label: t('timeline.badgeGreen'), bg: 'rgba(31, 157, 111,0.12)', color: 'var(--color-success)' },
     });
   }
 
@@ -93,7 +93,7 @@ function buildEvents(props: PatientTimelineProps, t: TFunc): TimelineEvent[] {
       title: r.chiefComplaint || t('timeline.titleConsultation'),
       subtitle: dx || r.providerName || undefined,
       meta: r.providerName ? `${r.providerName}${r.department ? ` · ${r.department}` : ''}` : r.department,
-      badge: r.visitType ? { label: r.visitType, bg: 'rgba(43,111,224,0.10)', color: 'var(--accent-primary)' } : undefined,
+      badge: r.visitType ? { label: r.visitType, bg: 'rgba(59, 130, 246,0.10)', color: 'var(--accent-primary)' } : undefined,
     });
   }
 
@@ -123,7 +123,7 @@ function buildEvents(props: PatientTimelineProps, t: TFunc): TimelineEvent[] {
       subtitle: `${rx.dose || ''} ${rx.frequency || ''}${rx.duration ? ` · ${rx.duration}` : ''}`.trim(),
       meta: rx.prescribedBy,
       badge: rx.status === 'dispensed'
-        ? { label: t('timeline.badgeDispensed'), bg: 'rgba(16,185,129,0.14)', color: 'var(--color-success)' }
+        ? { label: t('timeline.badgeDispensed'), bg: 'rgba(31, 157, 111,0.14)', color: 'var(--color-success)' }
         : { label: t('timeline.badgePending'), bg: 'rgba(252,211,77,0.14)', color: 'var(--color-warning)' },
     });
   }

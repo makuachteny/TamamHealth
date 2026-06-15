@@ -159,12 +159,13 @@ export const diseaseAlertsDB = () => getDB('tamamhealth_disease_alerts');
 export const prescriptionsDB = () => getDB('tamamhealth_prescriptions');
 export const auditLogDB = () => getDB('tamamhealth_audit_log');
 export const messagesDB = () => getDB('tamamhealth_messages');
+export const conversationsDB = () => getDB('tamamhealth_conversations');
+export const patientNotesDB = () => getDB('tamamhealth_patient_notes');
 export const birthsDB = () => getDB('tamamhealth_births');
 export const deathsDB = () => getDB('tamamhealth_deaths');
 export const facilityAssessmentsDB = () => getDB('tamamhealth_facility_assessments');
 export const immunizationsDB = () => getDB('tamamhealth_immunizations');
 export const ancDB = () => getDB('tamamhealth_anc');
-export const bomaVisitsDB = () => getDB('tamamhealth_boma_visits');
 export const followUpsDB = () => getDB('tamamhealth_follow_ups');
 export const organizationsDB = () => getDB('tamamhealth_organizations');
 export const platformConfigDB = () => getDB('tamamhealth_platform_config');
@@ -182,10 +183,11 @@ export const bloodBankDB = () => getDB('tamamhealth_blood_bank');
 export const emergencyPlansDB = () => getDB('tamamhealth_emergency_plans');
 export const assetsDB = () => getDB('tamamhealth_assets');
 export const leaveRequestsDB = () => getDB('tamamhealth_leave_requests');
-export const patientFeedbackDB = () => getDB('tamamhealth_patient_feedback');
 export const payrollEntriesDB = () => getDB('tamamhealth_payroll_entries');
 export const controlledSubstanceLogDB = () => getDB('tamamhealth_controlled_substance_log');
 export const problemsDB = () => getDB('tamamhealth_problems');
+// In-progress / paused clinical encounters (consultation workflow state machine).
+export const encountersDB = () => getDB('tamamhealth_encounters');
 
 // Sync + conflict databases (Phase 1 closeout)
 export const syncEventsDB = () => getDB('tamamhealth_sync_events');
@@ -204,8 +206,13 @@ export const paymentPlansDB = () => getDB('tamamhealth_payment_plans');
 export const invoicesDB = () => getDB('tamamhealth_invoices');
 export const ledgerDB = () => getDB('tamamhealth_ledger');
 
-// Bump this version to force a re-seed (destroys all data and re-creates)
-export const SEED_VERSION = 27;
+// Bump this version to force a re-seed (destroys all data and re-creates).
+// Bumped to 34: v2 demo deployment flipped to demo mode — force browsers that
+// previously seeded in production mode (admin-only) to re-seed the full demo
+// dataset (sample patients + the complete user roster).
+// Bumped to 37: added today-dated reception walk-ins + appointments so the
+// front-desk queue is populated on seed day.
+export const SEED_VERSION = 37;
 
 export async function isSeeded(): Promise<boolean> {
   try {
@@ -244,9 +251,9 @@ export async function resetAllDatabases(): Promise<void> {
   const dbNames = [
     'tamamhealth_users', 'tamamhealth_patients', 'tamamhealth_hospitals',
     'tamamhealth_medical_records', 'tamamhealth_referrals', 'tamamhealth_lab_results',
-    'tamamhealth_disease_alerts', 'tamamhealth_prescriptions', 'tamamhealth_audit_log', 'tamamhealth_messages',
+    'tamamhealth_disease_alerts', 'tamamhealth_prescriptions', 'tamamhealth_audit_log', 'tamamhealth_messages', 'tamamhealth_conversations', 'tamamhealth_patient_notes',
     'tamamhealth_births', 'tamamhealth_deaths', 'tamamhealth_facility_assessments',
-    'tamamhealth_immunizations', 'tamamhealth_anc', 'tamamhealth_boma_visits', 'tamamhealth_follow_ups',
+    'tamamhealth_immunizations', 'tamamhealth_anc', 'tamamhealth_follow_ups',
     'tamamhealth_organizations', 'tamamhealth_platform_config',
     'tamamhealth_appointments', 'tamamhealth_telehealth', 'tamamhealth_pharmacy_inventory',
     'tamamhealth_triage',
@@ -256,7 +263,15 @@ export async function resetAllDatabases(): Promise<void> {
     'tamamhealth_claims', 'tamamhealth_adjustments', 'tamamhealth_payments', 'tamamhealth_refunds',
     'tamamhealth_saved_payment_methods', 'tamamhealth_payment_plans', 'tamamhealth_invoices', 'tamamhealth_ledger',
     'tamamhealth_sync_events', 'tamamhealth_conflict_queue',
-    'tamamhealth_problems',
+    'tamamhealth_problems', 'tamamhealth_encounters',
+    // Operational DBs that were created + synced but previously missed here,
+    // leaving stale data behind on reset/re-seed.
+    'tamamhealth_availability', 'tamamhealth_announcements',
+    'tamamhealth_emergency_plans', 'tamamhealth_assets',
+    'tamamhealth_leave_requests', 'tamamhealth_payroll_entries',
+    // NOTE: 'tamamhealth_controlled_substance_log' is deliberately NOT reset
+    // here — it is an append-only regulatory audit trail and resetAllDatabases()
+    // runs on production seed-version bumps (see seedProduction).
     'tamamhealth_meta'
   ];
   for (const name of dbNames) {

@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
+import PatientName from '@/components/PatientName';
 import RoleGuard from '@/components/RoleGuard';
 import PaymentPanel from '@/components/payments/PaymentPanel';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
-  Wallet, Receipt, ClipboardCheck, CreditCard, ArrowRight,
+  Wallet, Receipt, ClipboardCheck, ArrowRight,
   TrendingUp, AlertTriangle, ShieldCheck,
 } from '@/components/icons/lucide';
 import type { BillingDoc } from '@/lib/db-types-billing';
@@ -60,6 +62,7 @@ interface CollectTarget {
 
 function BillingDashboard() {
   const { t } = useTranslation();
+  const router = useRouter();
   const [bills, setBills] = useState<BillingDoc[]>([]);
   const [payments, setPayments] = useState<PaymentDoc[]>([]);
   const [claims, setClaims] = useState<ClaimDoc[]>([]);
@@ -213,9 +216,8 @@ function BillingDashboard() {
         </div>
 
         {/* Quick links */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginTop: 12 }}>
           <QuickLink href="/payments/claims" icon={ShieldCheck} title={t('billing.insuranceClaims')} desc={t('billing.insuranceClaimsDesc')} />
-          <QuickLink href="/payments/plans" icon={CreditCard} title={t('billing.paymentPlans')} desc={t('billing.paymentPlansDesc')} />
           <QuickLink href="/payments" icon={Receipt} title={t('billing.allBills')} desc={t('billing.allBillsDesc')} />
         </div>
 
@@ -243,16 +245,20 @@ function BillingDashboard() {
                   <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{t('billing.nothingOutstanding')}</td></tr>
                 )}
                 {byPatient.map(p => (
-                  <tr key={p.patientId}>
+                  <tr
+                    key={p.patientId}
+                    onClick={() => router.push(`/patients/${p.patientId}`)}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <td>
-                      <Link href={`/patients/${p.patientId}`} className="link-accent" style={{ fontWeight: 600 }}>{p.patientName}</Link>
+                      <Link href={`/patients/${p.patientId}`} onClick={(e) => e.stopPropagation()} className="link-accent" style={{ fontWeight: 600 }}><PatientName name={p.patientName} nameClassName="text-sm font-medium" /></Link>
                     </td>
                     <td>{p.bills}</td>
                     <td style={{ fontWeight: 700 }}>{money(p.balance)}</td>
                     <td style={{ textAlign: 'right' }}>
                       <button
                         className="btn btn-primary btn-sm"
-                        onClick={() => setCollectFor({ patientId: p.patientId, patientName: p.patientName, encounterId: p.encounterId, amountDue: p.balance, currency })}
+                        onClick={(e) => { e.stopPropagation(); setCollectFor({ patientId: p.patientId, patientName: p.patientName, encounterId: p.encounterId, amountDue: p.balance, currency }); }}
                       >
                         {t('billing.collect')}
                       </button>

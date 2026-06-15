@@ -1,12 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import RoleGuard from '@/components/RoleGuard';
 import {
-  ChevronRight, Baby, Skull, HeartPulse, Syringe, Building2,
+  Baby, Skull, HeartPulse, Syringe, Building2,
 } from '@/components/icons/lucide';
 import { useMCHAnalytics } from '@/lib/hooks/useMCHAnalytics';
 import { useBirths } from '@/lib/hooks/useBirths';
@@ -25,7 +24,6 @@ function countByState(
 }
 
 export default function StateDashboardPage() {
-  const router = useRouter();
   const { t } = useTranslation();
   const { currentUser } = useApp();
   const stateName = (currentUser as unknown as { state?: string } | null)?.state || '';
@@ -102,10 +100,9 @@ export default function StateDashboardPage() {
           ) : (
             <div className="space-y-2">
               {counties.map(c => (
-                <button
+                <div
                   key={c.county}
-                  onClick={() => router.push(`/dashboard/payam?county=${encodeURIComponent(c.county)}`)}
-                  className="w-full flex items-center justify-between p-3 rounded-xl text-left transition-colors"
+                  className="w-full flex items-center justify-between p-3 rounded-xl text-left"
                   style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
                 >
                   <div>
@@ -114,8 +111,7 @@ export default function StateDashboardPage() {
                       {t('state.countyStats', { births: c.birthCount, deaths: c.deathCount, anc: c.ancTotal })}
                     </p>
                   </div>
-                  <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                </button>
+                </div>
               ))}
             </div>
           )}

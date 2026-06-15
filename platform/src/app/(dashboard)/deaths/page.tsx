@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
+import PatientName from '@/components/PatientName';
 import { useDeaths } from '@/lib/hooks/useDeaths';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -10,8 +11,9 @@ import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { SearchInput, FilterSelect, FilterBar } from '@/components/filters';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
-import { Plus, Search, X, AlertTriangle, FileText, ChevronDown, ChevronUp, UserCheck, Skull, Baby, Hash, ClipboardCheck } from '@/components/icons/lucide';
+import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck } from '@/components/icons/lucide';
 
 export default function DeathsPage() {
   const { t } = useTranslation();
@@ -22,6 +24,7 @@ export default function DeathsPage() {
   const { canRecordVitalEvents } = usePermissions();
   const { showToast } = useToast();
   const [search, setSearch] = useState('');
+  const [genderFilter, setGenderFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [expandedDeath, setExpandedDeath] = useState<string | null>(null);
   const [patientLookup, setPatientLookup] = useState('');
@@ -64,8 +67,9 @@ export default function DeathsPage() {
   }, [patientLookup, patients]);
 
   const filtered = (deaths || []).filter(d =>
-    !search || `${d.deceasedFirstName} ${d.deceasedSurname}`.toLowerCase().includes(search.toLowerCase()) ||
-    (d.certificateNumber || '').toLowerCase().includes(search.toLowerCase()) || (d.underlyingICD11 || '').toLowerCase().includes(search.toLowerCase())
+    (genderFilter === 'all' || d.deceasedGender === genderFilter) &&
+    (!search || `${d.deceasedFirstName} ${d.deceasedSurname}`.toLowerCase().includes(search.toLowerCase()) ||
+    (d.certificateNumber || '').toLowerCase().includes(search.toLowerCase()) || (d.underlyingICD11 || '').toLowerCase().includes(search.toLowerCase()))
   );
 
   const handleSubmit = async () => {
@@ -135,75 +139,37 @@ export default function DeathsPage() {
           )}
         />
 
-        {/* Stats */}
-        {stats && (
-          <div className="grid grid-cols-5 gap-3 mb-6">
-            <div className="card-elevated p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}><Skull className="w-3.5 h-3.5" /></div>
-                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('deaths.statTotalDeaths')}</p>
-              </div>
-              <p className="text-2xl font-bold" style={{ color: 'var(--color-danger)' }}>{stats.total}</p>
-            </div>
-            <div className="card-elevated p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}><AlertTriangle className="w-3.5 h-3.5" /></div>
-                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('deaths.statMaternalDeaths')}</p>
-              </div>
-              <p className="text-2xl font-bold" style={{ color: 'var(--color-danger)' }}>{stats.maternalDeaths}</p>
-            </div>
-            <div className="card-elevated p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="icon-box-sm" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--color-warning)' }}><Baby className="w-3.5 h-3.5" /></div>
-                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('deaths.statUnder5Deaths')}</p>
-              </div>
-              <p className="text-2xl font-bold" style={{ color: 'var(--color-warning)' }}>{stats.under5Deaths}</p>
-            </div>
-            <div className="card-elevated p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)', color: 'var(--accent-primary)' }}><Hash className="w-3.5 h-3.5" /></div>
-                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('deaths.statWithIcd11')}</p>
-              </div>
-              <p className="text-2xl font-bold" style={{ color: 'var(--accent-primary)' }}>{stats.withICD11Code}/{stats.total}</p>
-            </div>
-            <div className="card-elevated p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)', color: 'var(--accent-primary)' }}><ClipboardCheck className="w-3.5 h-3.5" /></div>
-                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('deaths.statRegistered')}</p>
-              </div>
-              <p className="text-2xl font-bold" style={{ color: 'var(--accent-primary)' }}>{stats.registered}/{stats.total}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Top causes */}
-        {stats && stats.topCauses.length > 0 && (
-          <div className="card-elevated p-4 mb-6">
-            <h3 className="font-semibold text-sm flex items-center gap-2">
-              <div className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}><AlertTriangle className="w-3.5 h-3.5" /></div>
-              {t('deaths.topCauses')}
-            </h3>
-            <hr className="section-divider" />
-            <div className="grid grid-cols-5 gap-2">
-              {stats.topCauses.slice(0, 5).map(c => (
-                <div key={c.code} className="p-2 rounded-lg" style={{ background: 'rgba(229,46,66,0.08)' }}>
-                  <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(229,46,66,0.15)', color: 'var(--color-danger)' }}>{c.code}</span>
-                  <p className="text-xs font-medium mt-1">{c.cause}</p>
-                  <p className="text-lg font-bold" style={{ color: 'var(--color-danger)' }}>{c.count}</p>
+        {/* Search + filters, with the registry stats surfaced inline on the right */}
+        <FilterBar>
+          <SearchInput value={search} onChange={setSearch} placeholder={t('deaths.searchPlaceholder')} />
+          <FilterSelect
+            value={genderFilter}
+            onChange={setGenderFilter}
+            options={[
+              { value: 'all', label: 'All sexes' },
+              { value: 'Male', label: 'Male' },
+              { value: 'Female', label: 'Female' },
+            ]}
+            aria-label="Filter by sex"
+          />
+          <FilterBar.Spacer />
+          {stats && (
+            <div className="flex items-center gap-4 sm:gap-5 pr-1">
+              {[
+                { label: t('deaths.statTotalDeaths'), value: stats.total, color: 'var(--color-danger)' },
+                { label: t('deaths.statMaternalDeaths'), value: stats.maternalDeaths, color: 'var(--color-danger)' },
+                { label: t('deaths.statUnder5Deaths'), value: stats.under5Deaths, color: 'var(--color-warning)' },
+                { label: t('deaths.statWithIcd11'), value: `${stats.withICD11Code}/${stats.total}`, color: 'var(--accent-primary)' },
+                { label: t('deaths.statRegistered'), value: `${stats.registered}/${stats.total}`, color: 'var(--accent-primary)' },
+              ].map(s => (
+                <div key={s.label} className="text-center leading-tight">
+                  <div className="text-base font-bold" style={{ color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Search */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-            <Search className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input type="text" placeholder={t('deaths.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)}
-              className="flex-1 bg-transparent text-sm outline-none" style={{ color: 'var(--text-primary)' }} />
-          </div>
-        </div>
+          )}
+        </FilterBar>
 
         {/* Table */}
         <div className="card-elevated overflow-hidden">
@@ -224,7 +190,7 @@ export default function DeathsPage() {
               {filtered.map(d => (
                 <tr key={d._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setExpandedDeath(expandedDeath === d._id ? null : d._id)}>
                   <td className="font-mono text-xs">{d.certificateNumber}</td>
-                  <td className="font-medium text-sm">{d.deceasedFirstName} {d.deceasedSurname}</td>
+                  <td><PatientName name={`${d.deceasedFirstName} ${d.deceasedSurname}`} gender={d.deceasedGender} nameClassName="text-sm font-medium" /></td>
                   <td className="text-sm">{d.ageAtDeath < 1 ? t('deaths.neonate') : `${d.ageAtDeath}y`}</td>
                   <td className="text-xs font-mono">{d.dateOfDeath}</td>
                   <td>
@@ -295,7 +261,7 @@ export default function DeathsPage() {
               </div>
               <div className="p-4 space-y-4">
                 {/* Link to existing patient (optional) */}
-                <div className="rounded-lg p-3" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(43,111,224,0.2))' }}>
+                <div className="rounded-lg p-3" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(59, 130, 246,0.2))' }}>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--accent-primary)' }}>
                     <UserCheck className="w-3 h-3" />
                     {t('deaths.linkPatient')}

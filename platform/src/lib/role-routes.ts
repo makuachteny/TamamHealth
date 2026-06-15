@@ -31,8 +31,8 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dhis2-export', '/public-stats',
       '/appointments', '/telehealth',
       '/payments', '/payments/claims', '/payments/plans',
-      '/wards', '/equipment', '/hr', '/feedback', '/dashboard/hr',
-      '/sync-conflicts', 
+      '/wards', '/equipment', '/hr', '/dashboard/hr',
+      '/blood-bank', '/controlled-substances', '/emergency-preparedness',
     ],
     defaultDashboard: '/admin',
   },
@@ -40,12 +40,12 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   org_admin: {
     allowed: [
       '/org-admin', '/org-admin/users', '/org-admin/hospitals',
-      '/org-admin/branding', '/org-admin/settings', '/org-admin/analytics',
-      '/hospitals', '/reports', '/settings', '/my-facility',
+      '/org-admin/branding', '/org-admin/settings', '/org-admin/analytics', '/org-admin/pricing',
+      '/hospitals', '/reports', '/settings',
       '/appointments',
       '/payments', '/payments/claims', '/payments/plans',
-      '/wards', '/equipment', '/hr', '/feedback', '/dashboard/hr',
-      '/sync-conflicts',
+      '/wards', '/equipment', '/hr', '/dashboard/hr',
+      '/blood-bank', '/controlled-substances', '/emergency-preparedness',
     ],
     defaultDashboard: '/org-admin',
   },
@@ -56,7 +56,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/settings',
       '/appointments', '/telehealth',
-      '/wards', '/alerts', 
+      '/wards', '/alerts', '/blood-bank',
     ],
     defaultDashboard: '/dashboard',
   },
@@ -67,9 +67,9 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
-      '/surveillance', '/settings', '/my-facility',
+      '/surveillance', '/settings',
       '/appointments',
-      '/wards', '/feedback', 
+      '/wards', '/blood-bank',
     ],
     defaultDashboard: '/dashboard',
   },
@@ -80,8 +80,8 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/dashboard/nurse', '/patients', '/messages',
       '/lab', '/immunizations', '/anc', '/births', '/deaths',
-      '/settings', '/my-facility', '/appointments',
-      '/wards', '/feedback', 
+      '/settings', '/appointments',
+      '/wards', 
     ],
     defaultDashboard: '/dashboard/nurse',
   },
@@ -96,34 +96,34 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard/nurse', '/patients', '/messages',
       '/anc', '/births', '/deaths', '/immunizations',
       '/wards', '/referrals', '/appointments',
-      '/settings', '/my-facility',
+      '/settings',
     ],
     defaultDashboard: '/dashboard/nurse',
   },
 
   lab_tech: {
     allowed: [
-      '/dashboard/lab', '/lab', '/messages', '/settings',
+      '/dashboard/lab', '/lab', '/blood-bank', '/messages', '/settings',
     ],
     defaultDashboard: '/dashboard/lab',
   },
 
   pharmacist: {
     allowed: [
-      '/dashboard/pharmacy', '/pharmacy', '/messages', '/settings',
+      '/dashboard/pharmacy', '/pharmacy', '/controlled-substances', '/messages', '/settings',
     ],
     defaultDashboard: '/dashboard/pharmacy',
   },
 
   front_desk: {
-    // Reception: registration, appointment booking, referral intake, feedback.
+    // Reception: registration, appointment booking, referral intake.
     // Money handling moves to the dedicated cashier role; bed/ward management is
     // a nursing function. Insurance claims belong to the medical biller.
     allowed: [
       '/dashboard/front-desk', '/patients', '/referrals', '/messages',
-      '/settings', '/my-facility',
+      '/settings',
       '/appointments',
-      '/feedback', 
+      
     ],
     defaultDashboard: '/dashboard/front-desk',
   },
@@ -139,30 +139,9 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     defaultDashboard: '/payments',
   },
 
-  boma_health_worker: {
-    // Household visits, child & maternal health, plus community disease
-    // surveillance/event reporting (part of the BHI standard package).
-    allowed: [
-      '/dashboard/boma', '/patients', '/messages',
-      '/immunizations', '/anc', '/births', '/deaths', '/surveillance',
-    ],
-    defaultDashboard: '/dashboard/boma',
-  },
-
-  payam_supervisor: {
-    allowed: [
-      '/dashboard/payam', '/dashboard/boma', '/dashboard/state',
-      '/patients', '/referrals', '/messages',
-      '/immunizations', '/anc', '/births', '/deaths',
-      '/surveillance', '/reports', '/facility-assessments', '/data-quality',
-      '/settings',
-    ],
-    defaultDashboard: '/dashboard/payam',
-  },
-
   government: {
     allowed: [
-      '/government', '/dashboard/state', '/dashboard/payam',
+      '/government', '/dashboard/state',
       '/hospitals', '/vital-statistics', '/immunizations',
       '/anc', '/births', '/deaths', '/facility-assessments', '/data-quality',
       '/surveillance', '/reports', '/dhis2-export', '/public-stats', '/settings',
@@ -177,7 +156,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // statistics, and owns DHIS2/HMIS reporting for the county. Aggregate views
     // only — no individual patient records, prescribing, dispensing, or billing.
     allowed: [
-      '/dashboard/state', '/dashboard/payam',
+      '/dashboard/state',
       '/hospitals', '/surveillance', '/epidemic-intelligence', '/mch-analytics',
       '/vital-statistics', '/immunizations', '/anc', '/births', '/deaths',
       '/facility-assessments', '/data-quality', '/reports', '/dhis2-export',
@@ -191,7 +170,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard/data-entry', '/facility-assessments',
       '/data-quality', '/immunizations', '/anc',
       '/births', '/deaths', '/vital-statistics',
-      '/messages', '/settings', '/my-facility',
+      '/messages', '/settings',
     ],
     defaultDashboard: '/dashboard/data-entry',
   },
@@ -201,11 +180,11 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/reports', '/hospitals', '/settings',
-      '/epidemic-intelligence', '/mch-analytics', '/my-facility',
+      '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
       '/appointments', '/telehealth', '/facility-assessments', '/data-quality',
       '/payments', '/payments/claims', '/payments/plans',
-      '/wards', '/equipment', '/hr', '/feedback', '/dashboard/hr',
-      '/sync-conflicts', 
+      '/wards', '/equipment', '/hr', '/dashboard/hr',
+      '/blood-bank', '/controlled-substances', '/emergency-preparedness',
     ],
     defaultDashboard: '/dashboard',
   },
@@ -218,19 +197,10 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard/data-entry', '/patients', '/facility-assessments',
       '/data-quality', '/reports', '/vital-statistics',
       '/immunizations', '/anc', '/births', '/deaths',
-      '/hospitals', '/messages', '/settings', '/my-facility',
+      '/hospitals', '/messages', '/settings',
       '/dhis2-export',
-      '/sync-conflicts',
     ],
     defaultDashboard: '/dashboard/data-entry',
-  },
-
-  community_health_volunteer: {
-    allowed: [
-      '/dashboard/boma', '/patients', '/messages',
-      '/immunizations', '/anc', '/births', '/deaths',
-    ],
-    defaultDashboard: '/dashboard/boma',
   },
 
   nutritionist: {
@@ -240,14 +210,14 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // maternal-nutrition data is reviewed via MCH analytics and the patient record.
     allowed: [
       '/dashboard/nutrition', '/patients', '/messages',
-      '/mch-analytics', '/settings', '/my-facility',
+      '/mch-analytics', '/settings',
     ],
     defaultDashboard: '/dashboard/nutrition',
   },
 
   radiologist: {
     allowed: [
-      '/dashboard/radiology', '/patients', '/lab', '/messages', '/settings', '/my-facility',
+      '/dashboard/radiology', '/patients', '/lab', '/messages', '/settings',
     ],
     defaultDashboard: '/dashboard/radiology',
   },
@@ -258,18 +228,18 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       // Intelligence & population health
       '/epidemic-intelligence', '/mch-analytics', '/surveillance',
       // Network & facility
-      '/hospitals', '/my-facility', '/facility-assessments',
+      '/hospitals', '/my-facility', '/facility-overview', '/facility-assessments',
       // Reporting
       '/reports', '/data-quality', '/vital-statistics', '/dhis2-export', '/public-stats',
       // Facility operations
-      '/equipment', '/hr', '/dashboard/hr', '/feedback',
+      '/equipment', '/hr', '/dashboard/hr', 
       // Finance oversight
       '/payments', '/payments/claims', '/payments/plans',
       // Clinical context (read). Lab/pharmacy are operational service queues run
       // by lab techs/pharmacists; the manager sees utilisation via reports, not
       // the live work queues.
       '/patients', '/wards', '/referrals', '/appointments', '/messages',
-      '/settings', '/sync-conflicts',
+      '/settings',
     ],
     defaultDashboard: '/dashboard/hospital-manager',
   },
@@ -287,7 +257,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   central_registration_clerk: {
     allowed: [
       '/patients', '/appointments', '/referrals', '/messages',
-      '/settings', '/my-facility', '/dashboard/front-desk', '/payments',
+      '/settings', '/dashboard/front-desk', '/payments',
     ],
     defaultDashboard: '/dashboard/front-desk',
   },
@@ -295,7 +265,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   clinic_clerk: {
     allowed: [
       '/patients', '/appointments', '/messages',
-      '/settings', '/my-facility', '/dashboard/front-desk',
+      '/settings', '/dashboard/front-desk',
     ],
     defaultDashboard: '/dashboard/front-desk',
   },
@@ -305,7 +275,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // routes the patient. No lab operations page — orders are placed by the
     // clinician downstream.
     allowed: [
-      '/patients', '/messages', '/settings', '/my-facility',
+      '/patients', '/messages', '/settings',
       '/dashboard/nurse', '/wards',
     ],
     defaultDashboard: '/dashboard/nurse',
@@ -313,7 +283,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   rooming_nurse: {
     allowed: [
-      '/patients', '/messages', '/settings', '/my-facility',
+      '/patients', '/messages', '/settings',
       '/dashboard/nurse', '/immunizations', '/anc', '/lab',
     ],
     defaultDashboard: '/dashboard/nurse',
@@ -323,7 +293,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
-      '/appointments', '/telehealth', '/wards', '/alerts', '/settings', '/my-facility',
+      '/appointments', '/telehealth', '/wards', '/alerts', '/settings',
     ],
     defaultDashboard: '/dashboard',
   },
@@ -332,8 +302,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/dashboard/data-entry', '/patients', '/facility-assessments', '/data-quality',
       '/reports', '/vital-statistics', '/immunizations', '/anc', '/births', '/deaths',
-      '/hospitals', '/messages', '/settings', '/my-facility', '/dhis2-export',
-      '/sync-conflicts', 
+      '/hospitals', '/messages', '/settings', '/dhis2-export',
     ],
     defaultDashboard: '/dashboard/data-entry',
   },
@@ -346,12 +315,13 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/dashboard', '/patients', '/referrals', '/messages',
       '/immunizations', '/anc', '/births', '/deaths',
-      '/surveillance', '/reports', '/hospitals', '/settings',
-      '/epidemic-intelligence', '/mch-analytics', '/my-facility',
+      '/surveillance', '/reports', '/settings',
+      '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
       '/appointments', '/facility-assessments', '/data-quality',
       '/payments', '/payments/claims', '/payments/plans',
-      '/wards', '/equipment', '/hr', '/feedback', '/dashboard/hr',
-      '/sync-conflicts', '/org-admin/users',
+      '/wards', '/equipment', '/hr', '/dashboard/hr',
+      '/blood-bank', '/controlled-substances', '/emergency-preparedness',
+      '/org-admin/users',
     ],
     defaultDashboard: '/dashboard',
   },

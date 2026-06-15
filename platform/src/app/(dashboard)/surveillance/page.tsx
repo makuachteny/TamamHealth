@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import {
@@ -30,7 +31,7 @@ const COLORS = {
   malaria: 'var(--accent-primary)',
   cholera: 'var(--color-danger)',
   measles: 'var(--color-warning)',
-  pneumonia: '#5CB8A8',
+  pneumonia: '#2563EB',
   diarrhea: 'var(--color-success)',
   tb: '#D4A843',
   hiv: '#7C3AED',
@@ -349,10 +350,10 @@ export default function SurveillancePage() {
   };
 
   const summaryCards = [
-    { label: t('surveillance.totalAlerts'), value: totalAlerts.toString(), icon: Bell, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
+    { label: t('surveillance.totalAlerts'), value: totalAlerts.toString(), icon: Bell, color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)' },
     { label: t('surveillance.emergencies'), value: emergencies.toString(), icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.10)' },
     { label: t('surveillance.warnings'), value: warnings.toString(), icon: Shield, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.10)' },
-    { label: t('surveillance.watchItems'), value: watchItems.toString(), icon: Eye, color: '#5CB8A8', bg: 'rgba(43,111,224,0.10)' },
+    { label: t('surveillance.watchItems'), value: watchItems.toString(), icon: Eye, color: '#2563EB', bg: 'rgba(59, 130, 246,0.10)' },
   ];
 
   return (
@@ -363,6 +364,7 @@ export default function SurveillancePage() {
             icon={Activity}
             title={t('surveillance.dashboardTitle')}
             subtitle={t('surveillance.dashboardSubtitle', { week: reportingWeek })}
+            stats={summaryCards.map(c => ({ label: c.label, value: c.value, color: c.color }))}
             actions={
               <>
                 {canReportAlert && (
@@ -379,27 +381,12 @@ export default function SurveillancePage() {
             }
           />
 
-          {/* Summary Cards */}
-          <div className="kpi-grid mb-6">
-            {summaryCards.map(stat => (
-              <div key={stat.label} className="kpi cursor-pointer" onClick={() => setSelectedDisease('all')}>
-                <div className="kpi__icon" style={{ background: stat.bg }}>
-                  <stat.icon style={{ color: stat.color }} />
-                </div>
-                <div className="kpi__body">
-                  <div className="kpi__value">{stat.value}</div>
-                  <div className="kpi__label">{stat.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
           {/* Aggregate summary strip */}
           <div className="card-elevated p-4 mb-6 flex items-center justify-between">
             <div className="flex items-center gap-8">
               <div className="flex items-center gap-2">
-                <div className="icon-box-sm" style={{ background: 'rgba(20,184,166,0.12)' }}>
-                  <Activity className="w-3.5 h-3.5" style={{ color: '#5CB8A8' }} />
+                <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+                  <Activity className="w-3.5 h-3.5" style={{ color: '#2563EB' }} />
                 </div>
                 <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('surveillance.totalCasesThisWeek')}</span>
                 <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{totalCases.toLocaleString()}</span>
@@ -460,7 +447,7 @@ export default function SurveillancePage() {
                   <svg viewBox="0 0 600 400" className="w-full" style={{ maxHeight: '340px' }}>
                     {/* Background - South Sudan shape approximation */}
                     <rect x="30" y="20" width="540" height="360" rx="24" ry="24"
-                      fill="rgba(43,111,224,0.08)" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+                      fill="rgba(59, 130, 246,0.08)" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
 
                     {/* Country label */}
                     <text x="300" y="55" textAnchor="middle" fontSize="16" fontWeight="600"
@@ -476,8 +463,8 @@ export default function SurveillancePage() {
 
                     {/* White Nile approximation */}
                     <path d="M 410 60 Q 380 120 360 180 Q 340 240 300 280 Q 270 310 240 340"
-                      fill="none" stroke="rgba(43,111,224,0.15)" strokeWidth="2" opacity="1" strokeLinecap="round" />
-                    <text x="370" y="150" fontSize="9" fill="rgba(43,111,224,0.15)" opacity="1" fontStyle="italic">
+                      fill="none" stroke="rgba(59, 130, 246,0.15)" strokeWidth="2" opacity="1" strokeLinecap="round" />
+                    <text x="370" y="150" fontSize="9" fill="rgba(59, 130, 246,0.15)" opacity="1" fontStyle="italic">
                       White Nile
                     </text>
 
@@ -587,7 +574,7 @@ export default function SurveillancePage() {
               <div className="card-elevated">
                 <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                   <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                    <Activity className="w-4 h-4" style={{ color: '#5CB8A8' }} />
+                    <Activity className="w-4 h-4" style={{ color: '#2563EB' }} />
                     {t('surveillance.casesByStateTitle')}
                   </h3>
                   <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('surveillance.top5Diseases')}</span>
@@ -827,7 +814,7 @@ export default function SurveillancePage() {
                 </div>
                 <div className="px-4 py-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
                   <button onClick={handleExport} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--tamamhealth-blue)' }}>
-                    <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
+                    <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
                       <FileText className="w-3.5 h-3.5" />
                     </div>
                     {t('surveillance.downloadFullReport')}
@@ -840,7 +827,7 @@ export default function SurveillancePage() {
 
           {/* Report Disease Alert Modal */}
           {showNewAlert && (
-            <div className="modal-backdrop" onClick={() => !alertSubmitting && setShowNewAlert(false)}>
+            <Modal onClose={() => !alertSubmitting && setShowNewAlert(false)}>
               <div className="modal-content card-elevated p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -912,7 +899,7 @@ export default function SurveillancePage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )}
       </main>
     </>

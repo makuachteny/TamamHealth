@@ -1,12 +1,18 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import {
-  Search, X, Wallet, Activity, AlertCircle, ChevronRight, ExternalLink, ArrowRight, Receipt, Shield, Clock,
+  X, Wallet, Activity, AlertCircle, ChevronRight, ExternalLink, Receipt, Shield, Clock, Banknote,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { SearchInput, FilterBar, FilterSelect } from '@/components/filters';
+import PlanKpiCards from '@/components/payments/PlanKpiCards';
+import PageHeader from '@/components/PageHeader';
+import Modal from '@/components/Modal';
+import PaymentPanel from '@/components/payments/PaymentPanel';
 import { getMethodConfig } from '@/lib/payment-method-config';
 import type { PaymentDoc, ClaimDoc, PaymentPlanDoc } from '@/lib/db-types-payments';
 import type { BillingDoc } from '@/lib/db-types-billing';
@@ -40,7 +46,14 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState<PatientLine | null>(null);
+  const [balanceFilter, setBalanceFilter] = useState('all');
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [payingLine, setPayingLine] = useState<PatientLine | null>(null);
+  // Installment recording for a payment plan (folded in from the old Plans page).
+  const [recordPlanFor, setRecordPlanFor] = useState<PaymentPlanDoc | null>(null);
+  const [planAmount, setPlanAmount] = useState('');
+  const [planNotes, setPlanNotes] = useState('');
+  const [savingPlan, setSavingPlan] = useState(false);
 
   const scope = useMemo(() => (
     currentUser ? { orgId: currentUser.orgId, hospitalId: currentUser.hospitalId, role: currentUser.role } : undefined
@@ -140,12 +153,46 @@ export default function PaymentsPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return patientLines;
-    return patientLines.filter(l =>
-      l.patientName.toLowerCase().includes(q) ||
-      (l.hospitalNumber || '').toLowerCase().includes(q)
-    );
-  }, [patientLines, search]);
+    return patientLines.filter(l => {
+      if (balanceFilter === 'outstanding' && !(l.outstanding > 0)) return false;
+      if (balanceFilter === 'paid' && l.outstanding > 0) return false;
+      if (!q) return true;
+      return l.patientName.toLowerCase().includes(q) ||
+        (l.hospitalNumber || '').toLowerCase().includes(q);
+    });
+  }, [patientLines, search, balanceFilter]);
+
+  // Derive the open patient's line from the live aggregates so the drawer's
+  // balance/totals refresh automatically after a payment is recorded.
+  const selectedLine = useMemo(
+    () => (selectedPatientId ? patientLines.find(l => l.patientId === selectedPatientId) || null : null),
+    [selectedPatientId, patientLines],
+  );
+
+  // Record an installment against a payment plan (folded in from the old
+  // standalone Plans page so the cashier manages plans from the same screen).
+  const handleRecordPlanPayment = async () => {
+    if (!recordPlanFor) return;
+    const amount = parseFloat(planAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    setSavingPlan(true);
+    try {
+      const { recordPlanPayment } = await import('@/lib/services/payment-service');
+      const installmentNumber = recordPlanFor.monthlyAmount > 0
+        ? Math.floor(recordPlanFor.paidToDate / recordPlanFor.monthlyAmount) + 1
+        : 1;
+      const paymentId = `PAY-${Date.now()}`;
+      await recordPlanPayment(recordPlanFor._id, installmentNumber, paymentId, amount);
+      setRecordPlanFor(null);
+      setPlanAmount('');
+      setPlanNotes('');
+      loadData();
+    } catch (err) {
+      console.error('Failed to record plan payment:', err);
+    } finally {
+      setSavingPlan(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -177,27 +224,38 @@ export default function PaymentsPage() {
         )}
 
         {/* Page header */}
-        <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>{t('payments.title')}</h1>
-            <p className="text-[12px]" style={{ color: 'var(--text-muted)', marginTop: 2 }}>
-              {filtered.length} {filtered.length === 1 ? t('payments.patient') : t('payments.patients')}
-              {filtered.filter(l => l.outstanding > 0).length > 0 && (
-                <> · <span style={{ color: '#C44536', fontWeight: 600 }}>{t('payments.withOutstandingBalance', { count: filtered.filter(l => l.outstanding > 0).length })}</span></>
-              )}
-            </p>
-          </div>
-          <div className="relative" style={{ minWidth: 280 }}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input
-              className="pl-9 search-icon-input w-full"
-              placeholder={t('payments.searchPlaceholder')}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ background: 'var(--overlay-subtle)' }}
-            />
-          </div>
-        </div>
+        <PageHeader
+          icon={Wallet}
+          title={t('payments.title')}
+          subtitle={
+            `${filtered.length} ${filtered.length === 1 ? t('payments.patient') : t('payments.patients')}` +
+            (filtered.filter(l => l.outstanding > 0).length > 0
+              ? ` · ${t('payments.withOutstandingBalance', { count: filtered.filter(l => l.outstanding > 0).length })}`
+              : '')
+          }
+        />
+
+        {/* Payment-plan KPI summary */}
+        <PlanKpiCards plans={data.plans} />
+
+        {/* Search + filter */}
+        <FilterBar>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={t('payments.searchPlaceholder')}
+          />
+          <FilterSelect
+            value={balanceFilter}
+            onChange={setBalanceFilter}
+            options={[
+              { value: 'all', label: 'All Accounts' },
+              { value: 'outstanding', label: 'Has Balance' },
+              { value: 'paid', label: 'Paid Up' },
+            ]}
+            aria-label="Filter by balance status"
+          />
+        </FilterBar>
 
         {/* People list */}
         <div className="dash-card overflow-hidden">
@@ -214,7 +272,7 @@ export default function PaymentsPage() {
                 return (
                   <button
                     key={line.patientId}
-                    onClick={() => setSelectedPatient(line)}
+                    onClick={() => setSelectedPatientId(line.patientId)}
                     className="w-full text-left data-row hover:opacity-95 transition-opacity"
                     style={owing ? { background: 'rgba(196, 69, 54, 0.04)' } : undefined}
                   >
@@ -266,16 +324,85 @@ export default function PaymentsPage() {
         </div>
       </main>
 
-      {/* Detail drawer */}
-      {selectedPatient && (
+      {/* Account detail — centered modal */}
+      {selectedLine && (
         <PatientBillingDetail
-          line={selectedPatient}
-          payments={data.payments.filter(p => p.patientId === selectedPatient.patientId)}
-          claims={data.claims.filter(c => c.patientId === selectedPatient.patientId)}
-          plans={data.plans.filter(p => p.patientId === selectedPatient.patientId)}
-          bills={data.bills.filter(b => b.patientId === selectedPatient.patientId)}
-          onClose={() => setSelectedPatient(null)}
+          line={selectedLine}
+          payments={data.payments.filter(p => p.patientId === selectedLine.patientId)}
+          claims={data.claims.filter(c => c.patientId === selectedLine.patientId)}
+          plans={data.plans.filter(p => p.patientId === selectedLine.patientId)}
+          bills={data.bills.filter(b => b.patientId === selectedLine.patientId)}
+          onClose={() => setSelectedPatientId(null)}
+          onRecordPayment={() => setPayingLine(selectedLine)}
+          onRecordPlanPayment={(plan) => { setRecordPlanFor(plan); setPlanAmount(''); setPlanNotes(''); }}
         />
+      )}
+
+      {/* Record-payment form (cash / mobile money / card / insurance) */}
+      {payingLine && (
+        <PaymentPanel
+          patientId={payingLine.patientId}
+          patientName={payingLine.patientName}
+          amountDue={payingLine.outstanding}
+          onCancel={() => setPayingLine(null)}
+          onSuccess={() => { setPayingLine(null); loadData(); }}
+        />
+      )}
+
+      {/* Record an installment against a payment plan */}
+      {recordPlanFor && (
+        <Modal onClose={() => setRecordPlanFor(null)} width={440}>
+          <div className="card-elevated" style={{ background: 'var(--bg-card-solid)', borderRadius: 16, padding: 0, overflow: 'hidden' }}>
+            <div className="px-5 py-4 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="flex items-center gap-2">
+                <Receipt className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+                <div>
+                  <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('plans.recordPayment')}</h2>
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{recordPlanFor.patientName}</p>
+                </div>
+              </div>
+              <button onClick={() => setRecordPlanFor(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('plans.paymentAmountLabel')}</label>
+                <input
+                  type="number"
+                  value={planAmount}
+                  onChange={(e) => setPlanAmount(e.target.value)}
+                  placeholder={t('plans.paymentAmountPlaceholder')}
+                  autoFocus
+                  className="w-full rounded-lg border px-3 py-2.5 text-sm"
+                  style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-input, var(--bg-card-solid))', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('plans.notesLabel')}</label>
+                <textarea
+                  value={planNotes}
+                  onChange={(e) => setPlanNotes(e.target.value)}
+                  placeholder={t('plans.notesPlaceholder')}
+                  rows={3}
+                  className="w-full resize-none rounded-lg border px-3 py-2.5 text-sm"
+                  style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-input, var(--bg-card-solid))', color: 'var(--text-primary)' }}
+                />
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t flex items-center justify-end gap-2" style={{ borderColor: 'var(--border-light)' }}>
+              <button onClick={() => setRecordPlanFor(null)} className="btn btn-secondary">{t('action.cancel')}</button>
+              <button
+                onClick={handleRecordPlanPayment}
+                disabled={!planAmount || savingPlan}
+                className="btn btn-primary inline-flex items-center gap-1.5"
+              >
+                <Receipt className="w-4 h-4" />
+                {t('plans.recordPayment')}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </>
   );
@@ -283,21 +410,18 @@ export default function PaymentsPage() {
 
 // ═══ Detail drawer ═══════════════════════════════════════════════════
 
-function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }: {
+function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, onRecordPayment, onRecordPlanPayment }: {
   line: PatientLine;
   payments: PaymentDoc[];
   claims: ClaimDoc[];
   plans: PaymentPlanDoc[];
   bills: BillingDoc[];
   onClose: () => void;
+  onRecordPayment: () => void;
+  onRecordPlanPayment: (plan: PaymentPlanDoc) => void;
 }) {
   const { t } = useTranslation();
-  // Lock body scroll while drawer is open
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, []);
+  const router = useRouter();
 
   // Saved payment methods (loaded on demand)
   const [methods, setMethods] = useState<{ id: string; label: string; type: string; brand?: string; isDefault: boolean }[]>([]);
@@ -331,18 +455,17 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
   const owing = line.outstanding > 0;
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{ alignItems: 'stretch', justifyContent: 'flex-end' }}>
+    <Modal onClose={onClose} width={600} labelledBy="billing-detail-name">
       <div
         className="card-elevated"
-        onClick={e => e.stopPropagation()}
         style={{
-          width: 'min(640px, 100vw)',
-          height: '100vh',
           background: 'var(--bg-card-solid)',
-          overflow: 'auto',
-          borderRadius: 0,
+          overflow: 'hidden',
+          borderRadius: 16,
           padding: 0,
-          animation: 'modalSlideUp 0.25s ease-out',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: 'calc(100vh - 32px)',
         }}
       >
         {/* Header */}
@@ -359,7 +482,13 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
               {initials || '?'}
             </div>
             <div>
-              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{line.patientName}</h2>
+              <button
+                onClick={() => router.push(`/patients/${line.patientId}`)}
+                className="text-left hover:underline"
+                title={t('payments.openPatientRecord')}
+              >
+                <h2 id="billing-detail-name" className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{line.patientName}</h2>
+              </button>
               {line.hospitalNumber && (
                 <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.10)', color: '#3b82f6', fontWeight: 600 }}>
                   {line.hospitalNumber}
@@ -394,6 +523,9 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
             </div>
           </div>
         </div>
+
+        {/* Scrollable account sections */}
+        <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
 
         {/* Saved payment methods */}
         <Section title={t('payments.paymentMethods')} icon={<Shield className="w-4 h-4" />} count={methods.length}>
@@ -529,38 +661,65 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
             <Empty>{t('payments.noPaymentPlans')}</Empty>
           ) : (
             <div className="space-y-1.5">
-              {plans.map(p => (
-                <div key={p._id} className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {t('payments.planMonthly', { amount: fmt(p.monthlyAmount), months: p.termMonths })}
+              {plans.map(p => {
+                const planOutstanding = Math.max(0, p.totalBalance - p.paidToDate);
+                return (
+                  <div key={p._id} className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {t('payments.planMonthly', { amount: fmt(p.monthlyAmount), months: p.termMonths })}
+                        </div>
+                        <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                          {p.startDate.slice(0, 10)} → {p.endDate.slice(0, 10)} · {p.apr === 0 ? t('payments.interestFree') : t('payments.aprValue', { apr: p.apr })}
+                        </div>
                       </div>
-                      <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
-                        {p.startDate.slice(0, 10)} → {p.endDate.slice(0, 10)} · {p.apr === 0 ? t('payments.interestFree') : t('payments.aprValue', { apr: p.apr })}
-                      </div>
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
+                        background: p.status === 'active' ? 'rgba(59, 130, 246, 0.14)' : p.status === 'completed' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(228, 168, 75, 0.14)',
+                        color: p.status === 'active' ? '#15795C' : p.status === 'completed' ? '#3b82f6' : '#B8741C',
+                      }}>
+                        {p.status}
+                      </span>
                     </div>
-                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
-                      background: p.status === 'active' ? 'rgba(59, 130, 246, 0.14)' : p.status === 'completed' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(228, 168, 75, 0.14)',
-                      color: p.status === 'active' ? '#15795C' : p.status === 'completed' ? '#3b82f6' : '#B8741C',
-                    }}>
-                      {p.status}
-                    </span>
+                    <div className="flex items-center justify-between gap-3 mt-2 pt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
+                      <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                        {t('payments.paid')}: <span className="font-mono" style={{ color: '#15795C' }}>{fmt(p.paidToDate)}</span>
+                        {' · '}{t('billing.kpiOutstanding')}: <span className="font-mono" style={{ color: planOutstanding > 0 ? '#C44536' : 'var(--text-secondary)' }}>{fmt(planOutstanding)}</span>
+                      </div>
+                      {p.status === 'active' && (
+                        <button
+                          onClick={() => onRecordPlanPayment(p)}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg inline-flex items-center gap-1 whitespace-nowrap transition-opacity hover:opacity-90 text-white"
+                          style={{ background: 'var(--accent-primary)' }}
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                          {t('plans.recordPayment')}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Section>
 
+        </div>{/* /scrollable account sections */}
+
         {/* Footer actions */}
-        <div className="px-5 py-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
-          <a href={`/patients/${line.patientId}`} className="btn btn-secondary w-full inline-flex items-center justify-center gap-2">
-            {t('payments.openPatientRecord')} <ExternalLink className="w-3.5 h-3.5" /> <ArrowRight className="w-3.5 h-3.5" />
-          </a>
+        <div className="px-5 py-3 border-t flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+          <button onClick={() => router.push(`/patients/${line.patientId}`)} className="btn btn-secondary flex-1 inline-flex items-center justify-center gap-2">
+            {t('payments.openPatientRecord')} <ExternalLink className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onRecordPayment}
+            className="btn btn-primary flex-1 inline-flex items-center justify-center gap-2"
+          >
+            <Banknote className="w-4 h-4" /> {t('billing.collectPayment')}
+          </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

@@ -18,6 +18,7 @@ import {
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { FilterSelect } from '@/components/filters';
 import type { HospitalDoc, UserRole } from '@/lib/db-types';
 
 // Roles that can open the per-hospital management dashboard. The route itself
@@ -27,7 +28,7 @@ const MANAGE_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'medical_superintendent', 'hrio',
 ];
 import {
-  getPerformanceColor, getMetricColorInterpolated,
+  getPerformanceColor,
   METRIC_LABELS, type PerformanceMetricKey,
 } from '@/lib/performance-colors';
 import { states, statesAndCounties } from '@/data/mock';
@@ -184,6 +185,7 @@ function HospitalsPageInner() {
     };
   }, [filteredHospitals]);
 
+
   // ── CSV export ──
   const handleExport = useCallback(() => {
     const headers = ['Name', 'Type', 'State', 'County', 'Town', 'Ownership', 'Status', 'Beds',
@@ -229,11 +231,6 @@ function HospitalsPageInner() {
           subtitle={t('hospitals.facilitiesCount', { count: filteredHospitals.length })}
           actions={
             <>
-              <div style={{ position: 'relative' }}>
-                <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: 'var(--text-muted)' }} />
-                <input type="text" placeholder={t('hospitals.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)}
-                  style={{ paddingLeft: 32, width: 200 }} />
-              </div>
               <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
                 <Filter style={{ width: 13, height: 13 }} /> {t('hospitals.filters')}
                 <ChevronDown style={{ width: 12, height: 12, transform: showFilters ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
@@ -245,30 +242,37 @@ function HospitalsPageInner() {
           }
         />
 
-        {/* ── Filters ── */}
-        {showFilters && (
-          <div className="card-elevated" style={{ padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <FilterDropdown label={t('hospitals.filterState')} value={filterState} onChange={setFilterState} options={[{ value: 'all', label: t('hospitals.allStates') }, ...states.map(s => ({ value: s, label: s }))]} />
-            {availableCounties.length > 0 && (
-              <FilterDropdown label={t('hospitals.filterCounty')} value={filterCounty} onChange={setFilterCounty} options={[{ value: 'all', label: t('hospitals.allCounties') }, ...availableCounties.map(c => ({ value: c, label: c }))]} />
-            )}
-            <FilterDropdown label={t('hospitals.filterType')} value={filterType} onChange={setFilterType} options={[{ value: 'all', label: t('hospitals.allTypes') }, ...Object.entries(TYPE_LABEL_KEYS).map(([v, l]) => ({ value: v, label: t(l) }))]} />
-            <FilterDropdown label={t('hospitals.filterOwnership')} value={filterOwnership} onChange={setFilterOwnership} options={[{ value: 'all', label: t('hospitals.allOwnership') }, ...Object.entries(OWNERSHIP_LABEL_KEYS).map(([v, l]) => ({ value: v, label: t(l) }))]} />
-            <FilterDropdown label={t('hospitals.filterService')} value={filterService} onChange={setFilterService} options={[{ value: 'all', label: t('hospitals.allServices') }, ...Object.entries(SERVICE_FLAG_ICONS).map(([k, v]) => ({ value: k, label: t(v.labelKey) }))]} />
-            <FilterDropdown label={t('hospitals.filterStatus')} value={filterStatus} onChange={setFilterStatus} options={[{ value: 'all', label: t('hospitals.allStatus') }, ...Object.entries(STATUS_LABEL_KEYS).map(([v, l]) => ({ value: v, label: t(l) }))]} />
-            <div style={{ width: 1, height: 20, background: 'var(--border-light)' }} />
-            <FilterDropdown label={t('hospitals.colorBy')} value={colorMetric} onChange={v => setColorMetric(v as PerformanceMetricKey)} options={METRIC_KEYS.map(k => ({ value: k, label: METRIC_LABELS[k] }))} />
-          </div>
-        )}
-
         {/* ── KPIs ── */}
-        <div className="kpi-grid" style={{ marginBottom: 16 }}>
-          <KpiCard label={t('hospitals.kpiFacilities')} value={kpis.total} icon={Building2} color="#14B8A6" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5" style={{ marginBottom: 12 }}>
+          <KpiCard label={t('hospitals.kpiFacilities')} value={kpis.total} icon={Building2} color="#3B82F6" />
           <KpiCard label={t('hospitals.kpiFunctional')} value={`${kpis.pctFunctional}%`} icon={ShieldCheck} color={getPerformanceColor(kpis.pctFunctional)} />
           <KpiCard label={t('hospitals.kpiReporting')} value={`${kpis.avgReporting}%`} icon={Activity} color={getPerformanceColor(kpis.avgReporting)} />
           <KpiCard label={t('hospitals.kpiReadiness')} value={`${kpis.avgReadiness}%`} icon={Stethoscope} color={getPerformanceColor(kpis.avgReadiness)} />
           <KpiCard label={t('hospitals.kpiGaps')} value={kpis.coverageGaps} icon={Syringe} color={kpis.coverageGaps > 5 ? 'var(--color-danger)' : 'var(--color-warning)'} />
-          <KpiCard label={t('hospitals.kpiStaffPerBed')} value={kpis.staffPerBed} icon={Users} color="#3B82F6" />
+          <KpiCard label={t('hospitals.kpiStaffPerBed')} value={kpis.staffPerBed} icon={Users} color="#7C3AED" />
+        </div>
+
+        {/* ── Search + Filters (search left, filters to its right, same row) ── */}
+        <div className="card-elevated" style={{ padding: '14px', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ position: 'relative', width: '100%' }}>
+            <Search style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'var(--text-muted)' }} />
+            <input type="text" placeholder={t('hospitals.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)}
+              style={{ paddingLeft: 36, width: '100%' }} />
+          </div>
+          {showFilters && (
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, flexWrap: 'wrap' }}>
+              <FilterDropdown label={t('hospitals.filterState')} value={filterState} onChange={setFilterState} options={[{ value: 'all', label: t('hospitals.allStates') }, ...states.map(s => ({ value: s, label: s }))]} />
+              {availableCounties.length > 0 && (
+                <FilterDropdown label={t('hospitals.filterCounty')} value={filterCounty} onChange={setFilterCounty} options={[{ value: 'all', label: t('hospitals.allCounties') }, ...availableCounties.map(c => ({ value: c, label: c }))]} />
+              )}
+              <FilterDropdown label={t('hospitals.filterType')} value={filterType} onChange={setFilterType} options={[{ value: 'all', label: t('hospitals.allTypes') }, ...Object.entries(TYPE_LABEL_KEYS).map(([v, l]) => ({ value: v, label: t(l) }))]} />
+              <FilterDropdown label={t('hospitals.filterOwnership')} value={filterOwnership} onChange={setFilterOwnership} options={[{ value: 'all', label: t('hospitals.allOwnership') }, ...Object.entries(OWNERSHIP_LABEL_KEYS).map(([v, l]) => ({ value: v, label: t(l) }))]} />
+              <FilterDropdown label={t('hospitals.filterService')} value={filterService} onChange={setFilterService} options={[{ value: 'all', label: t('hospitals.allServices') }, ...Object.entries(SERVICE_FLAG_ICONS).map(([k, v]) => ({ value: k, label: t(v.labelKey) }))]} />
+              <FilterDropdown label={t('hospitals.filterStatus')} value={filterStatus} onChange={setFilterStatus} options={[{ value: 'all', label: t('hospitals.allStatus') }, ...Object.entries(STATUS_LABEL_KEYS).map(([v, l]) => ({ value: v, label: t(l) }))]} />
+              <div style={{ width: 1, height: 20, background: 'var(--border-light)' }} />
+              <FilterDropdown label={t('hospitals.colorBy')} value={colorMetric} onChange={v => setColorMetric(v as PerformanceMetricKey)} options={METRIC_KEYS.map(k => ({ value: k, label: METRIC_LABELS[k] }))} />
+            </div>
+          )}
         </div>
 
         {/* ── Facility Table / Profile ── */}
@@ -293,29 +297,8 @@ function FilterDropdown({ label, value, onChange, options }: {
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
 }) {
-  const isActive = value !== 'all' && value !== options[0]?.value;
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[9px] font-semibold uppercase tracking-[0.06em]" style={{ color: 'var(--text-muted)' }}>{label}</span>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="text-[11px] font-semibold cursor-pointer transition-colors"
-        style={{
-          background: isActive ? 'rgba(43,111,224,0.08)' : 'var(--bg-card)',
-          color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)',
-          border: isActive ? '1px solid rgba(43,111,224,0.2)' : '1px solid var(--border-light)',
-          borderRadius: 'var(--input-radius)',
-          padding: '5px 28px 5px 10px',
-          maxWidth: '160px',
-          minHeight: '30px',
-        }}
-      >
-        {options.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-    </div>
+    <FilterSelect label={label} value={value} onChange={onChange} options={options} size="sm" />
   );
 }
 
@@ -329,14 +312,17 @@ function KpiCard({ label, value, icon: Icon, color }: {
   color: string;
 }) {
   return (
-    <div className="kpi">
-      <div className="icon-box-sm" style={{ background: `${color}18` }}>
-        <Icon style={{ color }} />
-      </div>
-      <div className="kpi__body">
-        <div className="kpi__value">{value}</div>
-        <div className="kpi__label">{label}</div>
-      </div>
+    <div
+      className="flex items-center gap-2.5 p-3 rounded-xl"
+      style={{ background: `color-mix(in srgb, ${color} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 22%, transparent)` }}
+    >
+      <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `color-mix(in srgb, ${color} 16%, transparent)` }}>
+        <Icon className="w-[18px] h-[18px]" style={{ color }} />
+      </span>
+      <span className="flex flex-col justify-center min-w-0 leading-tight">
+        <span className="text-lg font-extrabold" style={{ color, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+        <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      </span>
     </div>
   );
 }
@@ -365,7 +351,8 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
       <table className="data-table" style={{ minWidth: 700 }}>
         <thead>
           <tr>
-            <th style={{ width: '28%' }}>{t('hospitals.colFacility')}</th>
+            <th style={{ width: '4%', textAlign: 'center' }}>#</th>
+            <th style={{ width: '26%' }}>{t('hospitals.colFacility')}</th>
             <th style={{ width: '10%' }}>{t('hospitals.colType')}</th>
             <th style={{ width: '14%' }}>{t('hospitals.colLocation')}</th>
             <th style={{ width: '8%' }}>{t('hospitals.colStatus')}</th>
@@ -377,31 +364,27 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
           </tr>
         </thead>
         <tbody>
-          {hospitals.map(h => {
+          {hospitals.map((h, i) => {
             const metricVal = h.performance ? (h.performance[colorMetric as keyof typeof h.performance] as number) : 0;
             const normVal = normalizeMetricForColor(colorMetric, metricVal);
             const staff = (h.doctors || 0) + (h.nurses || 0) + (h.clinicalOfficers || 0);
             return (
               <tr key={h._id} onClick={() => onSelect(h)} style={{ cursor: 'pointer' }}>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: getMetricColorInterpolated(normVal), flexShrink: 0 }} />
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>{h.name}</span>
-                  </div>
+                <td style={{ textAlign: 'center' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 7, background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
                 </td>
                 <td>
-                  <span style={{
-                    fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-                    background: 'var(--accent-light)', color: 'var(--accent-primary)',
-                  }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{h.name}</span>
+                </td>
+                <td>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
                     {TYPE_SHORT[h.facilityType] || h.facilityType}
                   </span>
                 </td>
                 <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{h.town}, {h.state}</td>
                 <td>
                   {h.operationalStatus && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: STATUS_COLORS[h.operationalStatus] }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: STATUS_COLORS[h.operationalStatus] }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: STATUS_COLORS[h.operationalStatus] }}>
                       {t(STATUS_LABEL_KEYS[h.operationalStatus])}
                     </span>
                   )}
@@ -411,11 +394,11 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{
-                      flex: 1, height: 4, borderRadius: 2, background: 'var(--overlay-subtle)', maxWidth: 60,
+                      flex: 1, height: 6, borderRadius: 3, background: `color-mix(in srgb, ${getPerformanceColor(normVal)} 16%, transparent)`, maxWidth: 72,
                     }}>
                       <div style={{
                         width: `${Math.min(100, PERCENTAGE_METRICS.includes(colorMetric) ? metricVal : normVal)}%`,
-                        height: '100%', borderRadius: 2,
+                        height: '100%', borderRadius: 3,
                         background: getPerformanceColor(normVal),
                       }} />
                     </div>
@@ -426,13 +409,10 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
                 </td>
                 <td>
                   <span style={{
-                    display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 500,
+                    display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 600, padding: '3px 9px', borderRadius: 999, textTransform: 'capitalize',
                     color: h.syncStatus === 'online' ? 'var(--color-success)' : h.syncStatus === 'syncing' ? 'var(--color-warning)' : 'var(--text-muted)',
+                    background: h.syncStatus === 'online' ? 'color-mix(in srgb, var(--color-success) 12%, transparent)' : h.syncStatus === 'syncing' ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--overlay-subtle)',
                   }}>
-                    <span style={{
-                      width: 5, height: 5, borderRadius: '50%',
-                      background: h.syncStatus === 'online' ? 'var(--color-success)' : h.syncStatus === 'syncing' ? 'var(--color-warning)' : 'var(--text-muted)',
-                    }} />
                     {h.syncStatus}
                   </span>
                 </td>
@@ -571,7 +551,7 @@ function FacilityProfile({ hospital, onClose, canManage }: {
             <ResponsiveContainer width="100%" height={50}>
               <LineChart data={hospital.monthlyTrends} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
                 <Line type="monotone" dataKey="opdVisits" stroke="#3b82f6" strokeWidth={1.5} dot={false} />
-                <Line type="monotone" dataKey="reportingTimeliness" stroke="#10B981" strokeWidth={1.5} dot={false} />
+                <Line type="monotone" dataKey="reportingTimeliness" stroke="#1F9D6F" strokeWidth={1.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
             )}
@@ -589,7 +569,7 @@ function FacilityProfile({ hospital, onClose, canManage }: {
             {[
               { label: t('hospitals.bedsIcu'), value: hospital.icuBeds, color: 'var(--color-danger)' },
               { label: t('hospitals.bedsMaternity'), value: hospital.maternityBeds, color: '#EC4899' },
-              { label: t('hospitals.bedsPediatric'), value: hospital.pediatricBeds, color: '#5CB8A8' },
+              { label: t('hospitals.bedsPediatric'), value: hospital.pediatricBeds, color: '#2563EB' },
               { label: t('hospitals.bedsGeneral'), value: Math.max(0, hospital.totalBeds - hospital.icuBeds - hospital.maternityBeds - hospital.pediatricBeds), color: 'var(--text-muted)' },
             ].map(b => (
               <div key={b.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
@@ -634,9 +614,9 @@ function FacilityProfile({ hospital, onClose, canManage }: {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {hospital.hasElectricity ? <InfraBadge icon={Zap} label={t('hospitals.infraPower')} color="#FCD34D" bg="rgba(252,211,77,0.10)" />
               : <InfraBadge icon={ZapOff} label={t('hospitals.infraNoPower')} color="#8A9E9A" bg="rgba(100,116,139,0.10)" />}
-            {hospital.hasGenerator && <InfraBadge icon={Activity} label={t('hospitals.infraGenerator')} color="#10B981" bg="rgba(16,185,129,0.10)" />}
+            {hospital.hasGenerator && <InfraBadge icon={Activity} label={t('hospitals.infraGenerator')} color="#1F9D6F" bg="rgba(31, 157, 111,0.10)" />}
             {hospital.hasSolar && <InfraBadge icon={Sun} label={t('hospitals.infraSolar')} color="#FCD34D" bg="rgba(252,211,77,0.08)" />}
-            {hospital.hasInternet ? <InfraBadge icon={Signal} label={hospital.internetType} color="#5CB8A8" bg="rgba(96,165,250,0.10)" />
+            {hospital.hasInternet ? <InfraBadge icon={Signal} label={hospital.internetType} color="#2563EB" bg="rgba(96,165,250,0.10)" />
               : <InfraBadge icon={WifiOff} label={t('hospitals.infraNoInternet')} color="#8A9E9A" bg="rgba(100,116,139,0.10)" />}
             {hospital.hasAmbulance && <InfraBadge icon={Truck} label={t('hospitals.infraAmbulance')} color="#EF4444" bg="rgba(239,68,68,0.08)" />}
             {hospital.emergency24hr && <InfraBadge icon={HeartPulse} label={t('hospitals.infra24hrEr')} color="#EF4444" bg="rgba(239,68,68,0.08)" />}

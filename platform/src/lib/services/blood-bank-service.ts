@@ -2,15 +2,25 @@ import { bloodBankDB } from '../db';
 import type { BloodBankDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
+
+function emitBloodBank(doc: BloodBankDoc, operation: 'create' | 'update'): void {
+  emitSyncEvent({
+    resourceType: 'blood_bank',
+    resourceId: doc._id,
+    operation,
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+}
 
 export async function getAllUnits(scope?: DataScope): Promise<BloodBankDoc[]> {
   const db = bloodBankDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as BloodBankDoc)
-    .filter(d => d && d.type === 'blood_bank')
+  const all = (await findByType<BloodBankDoc>(db, 'blood_bank'))
     .sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -43,6 +53,7 @@ export async function addUnit(
   await logAuditSafe('ADD_BLOOD_UNIT', undefined, undefined,
     `Blood unit ${doc._id}: ${data.bloodGroup} ${data.component} (${data.volume}ml) added at ${data.facilityName}`
   );
+  emitBloodBank(doc, 'create');
   return doc;
 }
 
@@ -57,6 +68,7 @@ export async function updateUnit(
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_BLOOD_UNIT', undefined, undefined, `Blood unit ${id} updated`);
+    emitBloodBank(updated, 'update');
     return updated;
   } catch {
     return null;
@@ -81,6 +93,7 @@ export async function reserveUnit(id: string, patientId: string): Promise<BloodB
     await logAuditSafe('RESERVE_BLOOD_UNIT', undefined, undefined,
       `Blood unit ${id} reserved for patient ${patientId}`
     );
+    emitBloodBank(updated, 'update');
     return updated;
   } catch {
     return null;
@@ -105,6 +118,7 @@ export async function crossmatchUnit(
     await logAuditSafe('CROSSMATCH_BLOOD_UNIT', undefined, undefined,
       `Blood unit ${id} crossmatch result: ${result}`
     );
+    emitBloodBank(updated, 'update');
     return updated;
   } catch {
     return null;
@@ -133,6 +147,7 @@ export async function recordTransfusion(
     await logAuditSafe('TRANSFUSE_BLOOD_UNIT', transfusedBy, undefined,
       `Blood unit ${id} transfused to patient ${patientId}`
     );
+    emitBloodBank(updated, 'update');
     return updated;
   } catch {
     return null;
@@ -154,6 +169,7 @@ export async function discardUnit(id: string, reason: string): Promise<BloodBank
     await logAuditSafe('DISCARD_BLOOD_UNIT', undefined, undefined,
       `Blood unit ${id} discarded: ${reason}`
     );
+    emitBloodBank(updated, 'update');
     return updated;
   } catch {
     return null;

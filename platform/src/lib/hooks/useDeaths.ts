@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { makeCoalescer } from './live-reload';
 import type { DeathRegistrationDoc } from '../db-types';
 import { deathsDB } from '../db';
 import { useDataScope } from './useDataScope';
@@ -32,11 +33,13 @@ export function useDeaths() {
   // Live PouchDB subscription: re-load when deaths change.
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) load(); });
     const changes = deathsDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) load(); })
+      .on('change', () => reload.trigger())
       .on('error', () => { /* swallow */ });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [load]);

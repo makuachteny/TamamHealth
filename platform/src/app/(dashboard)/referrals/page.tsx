@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
 import EmptyState from '@/components/EmptyState';
 import {
-  ArrowRightLeft, Plus, Send, Eye, CheckCircle2, Clock,
+  ArrowRightLeft, Plus, Send, Eye, CheckCircle2,
   AlertTriangle, ChevronDown, ChevronUp, X, Building2,
-  Stethoscope, Search, Package, FileText, Image as ImageIcon,
+  Stethoscope, Package, FileText, Image as ImageIcon,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   User, Activity, FlaskConical, Paperclip, XCircle, MessageSquarePlus,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -14,7 +15,9 @@ import {
 } from '@/components/icons/lucide';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { FilterBar, SearchInput, FilterSelect } from '@/components/filters';
 import PageHeader from '@/components/PageHeader';
+import PatientName from '@/components/PatientName';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -22,7 +25,7 @@ import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import FileUpload from '@/components/FileUpload';
-import type { Attachment, TransferPackage } from '@/data/mock';
+import type { Attachment, TransferPackage, ReferralDisposition } from '@/data/mock';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -36,10 +39,14 @@ const departments = [
   'Dermatology', 'ENT', 'Outpatient'
 ];
 
+const DISPOSITION_OPTIONS: ReferralDisposition[] = [
+  'treated_discharged', 'admitted', 'referred_onward', 'did_not_arrive', 'deceased',
+];
+
 export default function ReferralsPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { referrals, createWithTransfer, accept, updateStatus, updateNotes } = useReferrals();
+  const { referrals, createWithTransfer, accept, updateStatus, updateNotes, completeWithOutcome } = useReferrals();
   const { showToast } = useToast();
   const { hospitals } = useHospitals();
   const { patients } = usePatients();
@@ -51,6 +58,7 @@ export default function ReferralsPage() {
   const [showNewReferral, setShowNewReferral] = useState(false);
   const [expandedReferral, setExpandedReferral] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // New referral form state
   const [formPatient, setFormPatient] = useState('');
@@ -68,6 +76,8 @@ export default function ReferralsPage() {
   const [declineReason, setDeclineReason] = useState('');
   const [completeModalId, setCompleteModalId] = useState<string | null>(null);
   const [completeOutcome, setCompleteOutcome] = useState('');
+  const [completeDisposition, setCompleteDisposition] = useState<ReferralDisposition>('treated_discharged');
+  const [completeFollowUp, setCompleteFollowUp] = useState('');
   const [noteModalId, setNoteModalId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
   const [actionSubmitting, setActionSubmitting] = useState(false);
@@ -87,31 +97,6 @@ export default function ReferralsPage() {
   // Referral network analytics: top destinations + acceptance rate.
   // For each receiving facility, count how many referrals we sent there
   // and what fraction were accepted (status sent → received → seen → completed).
-  const networkStats = useMemo(() => {
-    const out = outgoingReferrals;
-    const byDestination: Record<string, { name: string; sent: number; accepted: number; completed: number; declined: number }> = {};
-    for (const r of out) {
-      const key = r.toHospitalId || r.toHospital || 'unknown';
-      if (!byDestination[key]) byDestination[key] = { name: r.toHospital || 'Unknown', sent: 0, accepted: 0, completed: 0, declined: 0 };
-      byDestination[key].sent++;
-      if (r.status === 'received' || r.status === 'seen' || r.status === 'completed') byDestination[key].accepted++;
-      if (r.status === 'completed') byDestination[key].completed++;
-      if (r.status === 'cancelled') byDestination[key].declined++;
-    }
-    const top = Object.values(byDestination).sort((a, b) => b.sent - a.sent).slice(0, 5);
-    const totalOut = out.length;
-    const totalAccepted = out.filter(r => r.status === 'received' || r.status === 'seen' || r.status === 'completed').length;
-    const totalCompleted = out.filter(r => r.status === 'completed').length;
-    const totalCancelled = out.filter(r => r.status === 'cancelled').length;
-    return {
-      top,
-      totalOut,
-      acceptanceRate: totalOut > 0 ? Math.round((totalAccepted / totalOut) * 100) : 0,
-      completionRate: totalOut > 0 ? Math.round((totalCompleted / totalOut) * 100) : 0,
-      cancellationRate: totalOut > 0 ? Math.round((totalCancelled / totalOut) * 100) : 0,
-    };
-  }, [outgoingReferrals]);
-
   // New incoming referrals (status 'sent') for notification badge
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const newIncomingCount = incomingReferrals.filter(r => r.status === 'sent' && !viewedReferralIds.has(r._id)).length;
@@ -128,38 +113,14 @@ export default function ReferralsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedReferral]);
 
-  // Search filtering
+  // Search filtering (+ status filter)
   const combinedSearch = `${search} ${globalSearch}`.toLowerCase().trim();
-  const filteredReferrals = combinedSearch
-    ? activeReferrals.filter(r => {
-        const haystack = `${r.patientName} ${r.fromHospital} ${r.toHospital} ${r.department} ${r.referringDoctor} ${r.notes} ${r.reason}`.toLowerCase();
-        return combinedSearch.split(/\s+/).every(term => haystack.includes(term));
-      })
-    : activeReferrals;
-
-  // Summary stats
-  const totalReferrals = referrals.filter(
-    r => r.toHospitalId === OUR_HOSPITAL_ID || r.fromHospitalId === OUR_HOSPITAL_ID
-  ).length;
-  const pendingCount = referrals.filter(
-    r => (r.toHospitalId === OUR_HOSPITAL_ID || r.fromHospitalId === OUR_HOSPITAL_ID) &&
-    (r.status === 'sent' || r.status === 'received')
-  ).length;
-  const inProgressCount = referrals.filter(
-    r => (r.toHospitalId === OUR_HOSPITAL_ID || r.fromHospitalId === OUR_HOSPITAL_ID) &&
-    r.status === 'seen'
-  ).length;
-  const completedCount = referrals.filter(
-    r => (r.toHospitalId === OUR_HOSPITAL_ID || r.fromHospitalId === OUR_HOSPITAL_ID) &&
-    r.status === 'completed'
-  ).length;
-
-  const stats = [
-    { label: 'Total Referrals', displayLabel: t('referrals.statTotal'), value: totalReferrals, icon: ArrowRightLeft, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-    { label: 'Pending', displayLabel: t('referrals.statPending'), value: pendingCount, icon: Clock, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.10)' },
-    { label: 'In Progress', displayLabel: t('referrals.statInProgress'), value: inProgressCount, icon: Stethoscope, color: '#5CB8A8', bg: 'rgba(92,184,168,0.10)' },
-    { label: 'Completed', displayLabel: t('referrals.statCompleted'), value: completedCount, icon: CheckCircle2, color: '#16A34A', bg: 'rgba(22,163,74,0.12)' },
-  ];
+  const filteredReferrals = activeReferrals.filter(r => {
+    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    if (!combinedSearch) return true;
+    const haystack = `${r.patientName} ${r.fromHospital} ${r.toHospital} ${r.department} ${r.referringDoctor} ${r.notes} ${r.reason}`.toLowerCase();
+    return combinedSearch.split(/\s+/).every(term => haystack.includes(term));
+  });
 
   const getStatusLabel = (status: string) => {
     const map: Record<string, string> = {
@@ -254,15 +215,18 @@ export default function ReferralsPage() {
     if (!completeModalId || !completeOutcome.trim()) return;
     try {
       setActionSubmitting(true);
-      const ref = referrals.find(r => r._id === completeModalId);
-      const existingNotes = ref?.notes || '';
-      const outcomeNote = `[${new Date().toISOString().split('T')[0]} ${currentUser?.name || 'Unknown'}] OUTCOME: ${completeOutcome.trim()}`;
-      const updatedNotes = existingNotes ? `${existingNotes}\n\n${outcomeNote}` : outcomeNote;
-      await updateStatus(completeModalId, 'completed');
-      await updateNotes(completeModalId, updatedNotes);
+      await completeWithOutcome(completeModalId, {
+        disposition: completeDisposition,
+        summary: completeOutcome.trim(),
+        followUp: completeFollowUp.trim() || undefined,
+        recordedBy: currentUser?.name || 'Unknown',
+        recordedAt: new Date().toISOString(),
+      });
       showToast(t('referrals.toastCompleted'), 'success');
       setCompleteModalId(null);
       setCompleteOutcome('');
+      setCompleteDisposition('treated_discharged');
+      setCompleteFollowUp('');
     } catch {
       showToast(t('referrals.toastCompleteFailed'), 'error');
     } finally {
@@ -330,7 +294,7 @@ export default function ReferralsPage() {
         {refAttachments && refAttachments.length > 0 && (
           <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2 mb-3">
-              <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
+              <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
                 <Paperclip className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.referralAttachments', { count: refAttachments.length })}</span>
@@ -359,7 +323,7 @@ export default function ReferralsPage() {
         {/* Patient Demographics */}
         <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
           <div className="flex items-center gap-2 mb-3">
-            <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
+            <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
               <User className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
             </div>
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.patientDemographics')}</span>
@@ -409,7 +373,7 @@ export default function ReferralsPage() {
           <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2 mb-3">
               <div className="icon-box-sm" style={{ background: 'rgba(92,184,168,0.12)' }}>
-                <Stethoscope className="w-4 h-4" style={{ color: '#5CB8A8' }} />
+                <Stethoscope className="w-4 h-4" style={{ color: '#2563EB' }} />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.medicalRecords', { count: pkg.medicalRecords.length })}</span>
             </div>
@@ -487,7 +451,7 @@ export default function ReferralsPage() {
         {pkg.labResults.length > 0 && (
           <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2 mb-3">
-              <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
+              <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
                 <FlaskConical className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.labResults', { count: pkg.labResults.length })}</span>
@@ -535,7 +499,7 @@ export default function ReferralsPage() {
         {pkg.attachments.length > 0 && (
           <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2 mb-3">
-              <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
+              <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
                 <ImageIcon className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.patientAttachments', { count: pkg.attachments.length })}</span>
@@ -560,8 +524,8 @@ export default function ReferralsPage() {
         <hr className="section-divider" />
 
         {/* Package Metadata */}
-        <div className="flex items-center gap-3 p-3 rounded-lg text-xs" style={{ background: 'rgba(43,111,224,0.06)', border: '1px solid var(--accent-border)' }}>
-          <div className="icon-box-sm flex-shrink-0" style={{ background: 'rgba(43,111,224,0.12)' }}>
+        <div className="flex items-center gap-3 p-3 rounded-lg text-xs" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
+          <div className="icon-box-sm flex-shrink-0" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
             <Package className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
           </div>
           <span style={{ color: 'var(--text-muted)' }}>
@@ -599,65 +563,6 @@ export default function ReferralsPage() {
               </button>
             )}
           />
-
-          {/* Summary Stats */}
-          <div className="kpi-grid mb-6">
-            {stats.map(stat => (
-              <div key={stat.label} className="kpi cursor-pointer" onClick={() => {
-                const tabMap: Record<string, 'incoming' | 'outgoing'> = { 'Pending': 'incoming', 'In Progress': 'incoming', 'Completed': 'outgoing' };
-                if (tabMap[stat.label]) setActiveTab(tabMap[stat.label]);
-              }}>
-                <div className="kpi__icon" style={{ background: stat.bg }}>
-                  <stat.icon style={{ color: stat.color }} />
-                </div>
-                <div className="kpi__body">
-                  <div className="kpi__value">{stat.value}</div>
-                  <div className="kpi__label">{stat.displayLabel}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Referral Network Analytics */}
-          {networkStats.totalOut > 0 && (
-            <div className="card-elevated p-5 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="icon-box-sm" style={{ background: 'rgba(245,158,11,0.12)' }}>
-                    <ArrowRightLeft className="w-4 h-4" style={{ color: '#F59E0B' }} />
-                  </div>
-                  <h3 className="font-semibold text-sm">{t('referrals.network')}</h3>
-                </div>
-                <div className="flex items-center gap-3 text-[11px]">
-                  <span><span className="font-bold" style={{ color: 'var(--color-success)' }}>{networkStats.acceptanceRate}%</span> {t('referrals.accepted')}</span>
-                  <span><span className="font-bold" style={{ color: 'var(--accent-primary)' }}>{networkStats.completionRate}%</span> {t('referrals.completedLower')}</span>
-                  <span><span className="font-bold" style={{ color: 'var(--color-danger)' }}>{networkStats.cancellationRate}%</span> {t('referrals.cancelledLower')}</span>
-                </div>
-              </div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('referrals.topDestinations')}</p>
-              <div className="data-row-divider-sm">
-                {networkStats.top.map(d => {
-                  const acceptRate = d.sent > 0 ? Math.round((d.accepted / d.sent) * 100) : 0;
-                  const completeRate = d.sent > 0 ? Math.round((d.completed / d.sent) * 100) : 0;
-                  const barColor = acceptRate >= 80 ? '#0D9488' : acceptRate >= 50 ? 'var(--accent-primary)' : acceptRate >= 25 ? 'var(--color-warning)' : 'var(--color-danger)';
-                  return (
-                    <div key={d.name} className="flex items-center gap-3">
-                      <span className="text-xs font-medium w-44 truncate text-right" style={{ color: 'var(--text-secondary)' }} title={d.name}>{d.name}</span>
-                      <div className="flex-1 h-6 rounded-md overflow-hidden" style={{ background: 'var(--overlay-light)' }}>
-                        <div className="h-full rounded-md flex items-center justify-end pr-2 transition-all duration-700"
-                          style={{ width: `${Math.max(acceptRate, 6)}%`, background: barColor }}>
-                          <span className="text-[9px] font-bold text-white">{d.accepted}/{d.sent}</span>
-                        </div>
-                      </div>
-                      <span className="text-[10px] w-24 text-right" style={{ color: 'var(--text-muted)' }}>
-                        {t('referrals.acceptDone', { accept: acceptRate, done: completeRate })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* New Referral Form */}
           {showNewReferral && (
@@ -860,7 +765,7 @@ export default function ReferralsPage() {
                 <span
                   className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                   style={{
-                    background: activeTab === 'incoming' ? 'rgba(43,111,224,0.12)' : 'rgba(100,116,139,0.12)',
+                    background: activeTab === 'incoming' ? 'rgba(59, 130, 246,0.12)' : 'rgba(100,116,139,0.12)',
                     color: activeTab === 'incoming' ? 'var(--tamamhealth-blue)' : 'var(--text-muted)',
                   }}
                 >
@@ -891,7 +796,7 @@ export default function ReferralsPage() {
                 <span
                   className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                   style={{
-                    background: activeTab === 'outgoing' ? 'rgba(43,111,224,0.12)' : 'rgba(100,116,139,0.12)',
+                    background: activeTab === 'outgoing' ? 'rgba(59, 130, 246,0.12)' : 'rgba(100,116,139,0.12)',
                     color: activeTab === 'outgoing' ? 'var(--tamamhealth-blue)' : 'var(--text-muted)',
                   }}
                 >
@@ -902,12 +807,22 @@ export default function ReferralsPage() {
           </div>
 
           {/* Search */}
-          <div className="card-elevated p-4 mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-              <input type="search" placeholder={t('referrals.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 search-icon-input" style={{ background: 'var(--overlay-subtle)' }} />
-            </div>
-          </div>
+          <FilterBar>
+            <SearchInput value={search} onChange={setSearch} placeholder={t('referrals.searchPlaceholder')} />
+            <FilterSelect
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: 'all', label: 'All statuses' },
+                { value: 'sent', label: getStatusLabel('sent') },
+                { value: 'received', label: getStatusLabel('received') },
+                { value: 'seen', label: getStatusLabel('seen') },
+                { value: 'completed', label: getStatusLabel('completed') },
+                { value: 'cancelled', label: getStatusLabel('cancelled') },
+              ]}
+              aria-label="Filter by status"
+            />
+          </FilterBar>
 
           {/* Referrals List */}
           <div className="space-y-3">
@@ -931,17 +846,16 @@ export default function ReferralsPage() {
                   <div key={ref._id} className="card-elevated overflow-hidden">
                     {/* Referral row */}
                     <div className="flex items-center gap-3 p-4">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: 'var(--tamamhealth-blue)' }}>
-                        {ref.patientName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-sm font-semibold cursor-pointer hover:underline" style={{ color: 'var(--accent-primary)' }} onClick={(e) => { e.stopPropagation(); if (ref.patientId) router.push(`/patients/${ref.patientId}`); }}>{ref.patientName}</span>
+                          <span className="cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); if (ref.patientId) router.push(`/patients/${ref.patientId}`); }}>
+                            <PatientName name={ref.patientName} size={36} />
+                          </span>
                           <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>{ref.patientId}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                           <div className="icon-box-sm" style={{ background: 'rgba(13,148,136,0.12)' }}>
-                            <Building2 className="w-3.5 h-3.5" style={{ color: '#0D9488' }} />
+                            <Building2 className="w-3.5 h-3.5" style={{ color: '#1E3A8A' }} />
                           </div>
                           {ref.fromHospital} → {ref.toHospital}
                           <span>&middot;</span>
@@ -1028,6 +942,24 @@ export default function ReferralsPage() {
                     {/* Expanded View: Transfer Package */}
                     {isExpanded && (
                       <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--border-light)' }}>
+                        {ref.outcome && (
+                          <div className="mt-4 p-3 rounded-lg" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <ClipboardCheck className="w-4 h-4" style={{ color: '#16A34A' }} />
+                              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#16A34A' }}>{t('referrals.outcomeReceived')}</p>
+                              <span className="badge ref-completed text-[10px]">{t(`referrals.disposition_${ref.outcome.disposition}`)}</span>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{ref.outcome.summary}</p>
+                            {ref.outcome.followUp && (
+                              <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
+                                <span className="font-semibold">{t('referrals.outcomeFollowUp')}: </span>{ref.outcome.followUp}
+                              </p>
+                            )}
+                            <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>
+                              {t('referrals.outcomeRecordedBy', { name: ref.outcome.recordedBy, date: ref.outcome.recordedAt.slice(0, 10) })}
+                            </p>
+                          </div>
+                        )}
                         {tp ? (
                           <TransferPackageViewer pkg={tp} refAttachments={refAtts} reason={ref.reason} notes={ref.notes} />
                         ) : (
@@ -1058,7 +990,7 @@ export default function ReferralsPage() {
 
           {/* Add Note Modal */}
           {noteModalId && (
-            <div className="modal-backdrop" onClick={() => setNoteModalId(null)}>
+            <Modal onClose={() => setNoteModalId(null)}>
               <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('action.addNote')}</h3>
@@ -1084,12 +1016,12 @@ export default function ReferralsPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )}
 
           {/* Decline Modal */}
           {declineModalId && (
-            <div className="modal-backdrop" onClick={() => setDeclineModalId(null)}>
+            <Modal onClose={() => setDeclineModalId(null)}>
               <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referrals.declineReferral')}</h3>
@@ -1115,12 +1047,12 @@ export default function ReferralsPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )}
 
           {/* Complete Modal */}
           {completeModalId && (
-            <div className="modal-backdrop" onClick={() => setCompleteModalId(null)}>
+            <Modal onClose={() => setCompleteModalId(null)}>
               <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referrals.completeReferral')}</h3>
@@ -1131,11 +1063,32 @@ export default function ReferralsPage() {
                 <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
                   {t('referrals.completeHint')}
                 </p>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('referrals.outcomeDisposition')}</label>
+                <select
+                  value={completeDisposition}
+                  onChange={e => setCompleteDisposition(e.target.value as ReferralDisposition)}
+                  className="w-full mb-3"
+                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
+                >
+                  {DISPOSITION_OPTIONS.map(d => (
+                    <option key={d} value={d}>{t(`referrals.disposition_${d}`)}</option>
+                  ))}
+                </select>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('referrals.outcomeSummary')}</label>
                 <textarea
                   value={completeOutcome}
                   onChange={e => setCompleteOutcome(e.target.value)}
-                  rows={4}
+                  rows={3}
                   placeholder={t('referrals.completePlaceholder')}
+                  className="w-full mb-3"
+                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
+                />
+                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('referrals.outcomeFollowUp')}</label>
+                <textarea
+                  value={completeFollowUp}
+                  onChange={e => setCompleteFollowUp(e.target.value)}
+                  rows={2}
+                  placeholder={t('referrals.outcomeFollowUpPlaceholder')}
                   className="w-full mb-4"
                   style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
                 />
@@ -1146,7 +1099,7 @@ export default function ReferralsPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )}
 
           {/* Preview Modal for attachments */}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { LabResultDoc } from '../db-types';
 import { labResultsDB } from '../db';
+import { makeCoalescer } from './live-reload';
 import { useApp } from '../context';
 
 export function useLabResults() {
@@ -39,11 +40,13 @@ export function useLabResults() {
   // reflected immediately without manual refresh.
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) loadResults(); });
     const changes = labResultsDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) loadResults(); })
+      .on('change', () => reload.trigger())
       .on('error', (err) => { console.warn('Lab results subscription error:', err); });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [loadResults]);
@@ -62,5 +65,13 @@ export function useLabResults() {
     return result;
   }, [loadResults]);
 
-  return { results, loading, error, create, update, reload: loadResults };
+  // Advance an order through its diagnostics lifecycle (validated server-side).
+  const advance = useCallback(async (id: string, to: import('../clinical-flow/order-lifecycles').LabOrderStatus, extra?: Partial<LabResultDoc>) => {
+    const { advanceLabOrder } = await import('../services/lab-service');
+    const result = await advanceLabOrder(id, to, extra);
+    await loadResults();
+    return result;
+  }, [loadResults]);
+
+  return { results, loading, error, create, update, advance, reload: loadResults };
 }

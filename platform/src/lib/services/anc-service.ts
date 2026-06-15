@@ -4,14 +4,14 @@ import { v4 as uuidv4 } from 'uuid';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 import { jubaYearMonth, jubaIsInMonth } from '../time-juba';
+import { findByType } from './db-query';
 
 export async function getAllANCVisits(scope?: DataScope): Promise<ANCVisitDoc[]> {
   const db = ancDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as ANCVisitDoc)
-    .filter(d => d && d.type === 'anc_visit' && d.isDeleted !== true);
+  const all = (await findByType<ANCVisitDoc>(db, 'anc_visit'))
+    .filter(d => d.isDeleted !== true);
   /* istanbul ignore next -- defensive null-safety in sort */
   all.sort((a, b) => new Date(b.visitDate || '').getTime() - new Date(a.visitDate || '').getTime());
   return scope ? filterByScope(all, scope) : all;
@@ -40,6 +40,14 @@ export async function createANCVisit(data: Omit<ANCVisitDoc, '_id' | '_rev' | 't
   };
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'anc_visit',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
 
   // Auto-trigger a clinical alert message if the mother is high-risk so the
   // facility's clinical team is notified immediately. The message lands in
@@ -157,6 +165,14 @@ export async function updateANCVisit(id: string, data: Partial<ANCVisitDoc>): Pr
     };
     const resp = await db.put(updated);
     updated._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'anc_visit',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;
@@ -167,7 +183,15 @@ export async function deleteANCVisit(id: string): Promise<boolean> {
   const db = ancDB();
   try {
     const doc = await db.get(id);
+    const typed = doc as unknown as ANCVisitDoc;
     await db.remove(doc);
+    emitSyncEvent({
+      resourceType: 'anc_visit',
+      resourceId: id,
+      operation: 'delete',
+      orgId: typed.orgId,
+      hospitalId: typed.facilityId,
+    });
     return true;
   } catch {
     return false;

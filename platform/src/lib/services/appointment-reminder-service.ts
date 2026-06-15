@@ -4,6 +4,7 @@ import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { logAuditSafe } from './audit-service';
 import { createMessage, updateMessage } from './message-service';
+import { findByType } from './db-query';
 import { sendSms } from '../sms';
 import { jubaDate } from '../time-juba';
 
@@ -11,10 +12,7 @@ export async function getUpcomingReminders(daysAhead?: number, facilityId?: stri
   /* istanbul ignore next -- defensive default */
   const effectiveDays = daysAhead ?? 1;
   const db = appointmentsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as AppointmentDoc)
-    .filter(d => d && d.type === 'appointment');
+  const all = await findByType<AppointmentDoc>(db, 'appointment');
 
   const today = jubaDate();
   const future = new Date();
@@ -117,10 +115,7 @@ export async function generateReminderMessages(appointments: AppointmentDoc[]): 
 
 export async function getOverdueAppointments(facilityId?: string): Promise<AppointmentDoc[]> {
   const db = appointmentsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as AppointmentDoc)
-    .filter(d => d && d.type === 'appointment');
+  const all = await findByType<AppointmentDoc>(db, 'appointment');
 
   const today = jubaDate();
 
@@ -145,10 +140,7 @@ export async function getNoShowStats(
   byDepartment: Record<string, { total: number; noShow: number; rate: number }>;
 }> {
   const db = appointmentsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as AppointmentDoc)
-    .filter(d => d && d.type === 'appointment');
+  const all = await findByType<AppointmentDoc>(db, 'appointment');
 
   const filtered = all.filter(a =>
     a.appointmentDate >= dateRange.start &&
@@ -185,10 +177,7 @@ export async function getNoShowStats(
 
 export async function getMissedFollowUps(facilityId?: string): Promise<AppointmentDoc[]> {
   const db = appointmentsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as AppointmentDoc)
-    .filter(d => d && d.type === 'appointment');
+  const all = await findByType<AppointmentDoc>(db, 'appointment');
 
   const today = jubaDate();
 

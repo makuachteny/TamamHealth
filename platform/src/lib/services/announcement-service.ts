@@ -2,6 +2,7 @@ import { announcementsDB } from '../db';
 import type { AnnouncementDoc, UserRole } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 
@@ -26,12 +27,9 @@ interface Viewer {
  */
 export async function getVisibleAnnouncements(scope: DataScope, viewer: Viewer): Promise<AnnouncementDoc[]> {
   const db = announcementsDB();
-  const result = await db.allDocs({ include_docs: true });
+  const docs = await findByType<AnnouncementDoc>(db, 'announcement');
   const now = new Date().toISOString();
-  const all = filterByScope(
-    result.rows.map(r => r.doc as AnnouncementDoc).filter(d => d && d.type === 'announcement'),
-    scope,
-  );
+  const all = filterByScope(docs, scope);
   return all
     .filter(a => !a.expiresAt || a.expiresAt > now)
     .filter(a => !viewer.userId || !(a.dismissedBy || []).includes(viewer.userId))

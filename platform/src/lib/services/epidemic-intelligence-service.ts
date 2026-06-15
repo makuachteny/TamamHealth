@@ -2,6 +2,7 @@ import { diseaseAlertsDB } from '../db';
 import type { DiseaseAlertDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { jubaWeekStart } from '../time-juba';
 import { SOUTH_SUDAN_STATES } from '../geographic-data';
 
@@ -399,10 +400,7 @@ function generateEWARSAlerts(alerts: DiseaseAlertDoc[]): EWARSAlert[] {
 
 export async function getEpidemicIntelligence(scope?: DataScope): Promise<EpidemicIntelligenceData> {
   const daDB = diseaseAlertsDB();
-  const daResult = await daDB.allDocs({ include_docs: true });
-  let alerts = daResult.rows
-    .map(r => r.doc as DiseaseAlertDoc)
-    .filter(d => d && d.type === 'disease_alert');
+  let alerts = await findByType<DiseaseAlertDoc>(daDB, 'disease_alert');
 
   // Tenant scoping — government / super_admin still see everything; per-org
   // and per-facility users see only their own scope.

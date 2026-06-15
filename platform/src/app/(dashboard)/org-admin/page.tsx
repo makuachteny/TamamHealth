@@ -408,12 +408,12 @@ function OrgAdminDashboard() {
                   return (
                     <tr key={h._id} style={{
                       borderBottom: '1px solid var(--border-light)',
-                      background: isTop ? 'rgba(16,185,129,0.04)' : isBottom ? 'rgba(239,68,68,0.04)' : 'transparent',
+                      background: isTop ? 'rgba(31, 157, 111,0.04)' : isBottom ? 'rgba(239,68,68,0.04)' : 'transparent',
                     }}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{h.name}</span>
-                          {isTop && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.12)', color: 'var(--color-success)' }}>{t('orgAdmin.badgeTop')}</span>}
+                          {isTop && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(31, 157, 111,0.12)', color: 'var(--color-success)' }}>{t('orgAdmin.badgeTop')}</span>}
                           {isBottom && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>{t('orgAdmin.badgeLow')}</span>}
                         </div>
                       </td>
@@ -421,7 +421,7 @@ function OrgAdminDashboard() {
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-primary)' }}>{staffCount}</td>
                       <td className="px-4 py-3">
                         <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
-                          background: occupancy > 90 ? 'rgba(239,68,68,0.12)' : occupancy > 70 ? 'rgba(245,158,11,0.12)' : 'rgba(16,185,129,0.12)',
+                          background: occupancy > 90 ? 'rgba(239,68,68,0.12)' : occupancy > 70 ? 'rgba(245,158,11,0.12)' : 'rgba(31, 157, 111,0.12)',
                           color: occupancy > 90 ? 'var(--color-danger)' : occupancy > 70 ? 'var(--color-warning)' : 'var(--color-success)',
                         }}>{occupancy}%</span>
                       </td>
@@ -456,7 +456,7 @@ function OrgAdminDashboard() {
                 <span
                   className="text-xs font-medium px-2 py-0.5 rounded-full"
                   style={{
-                    background: org?.subscriptionStatus === 'active' ? 'rgba(43,111,224,0.12)' : 'rgba(245,158,11,0.12)',
+                    background: org?.subscriptionStatus === 'active' ? 'rgba(59, 130, 246,0.12)' : 'rgba(245,158,11,0.12)',
                     color: org?.subscriptionStatus === 'active' ? 'var(--accent-primary)' : 'var(--color-warning)',
                   }}
                 >
@@ -594,7 +594,7 @@ function OrgAdminDashboard() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{
-                          background: log.success ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                          background: log.success ? 'rgba(31, 157, 111,0.12)' : 'rgba(239,68,68,0.12)',
                           color: log.success ? 'var(--color-success)' : 'var(--color-danger)',
                         }}>
                           {log.success ? t('orgAdmin.statusSuccess') : t('orgAdmin.statusFailed')}

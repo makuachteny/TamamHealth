@@ -6,10 +6,10 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  Search,
   AlertTriangle,
 } from '@/components/icons/lucide';
 import TopBar from '@/components/TopBar';
+import { SearchInput, FilterBar, FilterSelect } from '@/components/filters';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { ClaimDoc, ClaimStatus } from '@/lib/db-types-payments';
@@ -417,96 +417,26 @@ export default function ClaimsPage() {
       <hr className="section-divider" />
 
       {/* Search and Filter Controls */}
-      <div style={{
-        display: 'flex',
-        gap: '1.25rem',
-        marginBottom: '2rem',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-      }}>
-        {/* Search Input */}
-        <div style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
-          <Search
-            size={44}
-            style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-secondary)',
-              pointerEvents: 'none',
-            }}
-          />
-          <input
-            type="text"
-            placeholder={t('claims.searchPlaceholder')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px 12px 10px 38px',
-              border: '1px solid var(--border-light)',
-              borderRadius: '8px',
-              fontSize: '0.9375rem',
-              color: 'var(--text-primary)',
-              background: 'var(--bg-card)',
-              boxSizing: 'border-box',
-              transition: 'border-color 0.2s',
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--accent-primary)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-light)';
-            }}
-          />
-        </div>
-
-        {/* Status Filter Pills */}
-        <div style={{
-          display: 'flex',
-          gap: '0.625rem',
-          flexWrap: 'wrap',
-        }}>
-          {['all', 'draft', 'submitted', 'accepted', 'denied', 'paid'].map(
-            (status) => (
-              <button
-                key={status}
-                onClick={() => setStatusFilter(status)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '99px',
-                  fontSize: '0.8125rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  border: 'none',
-                  transition: 'all 0.2s ease-in-out',
-                  backgroundColor: statusFilter === status
-                    ? 'var(--accent-primary)'
-                    : 'var(--overlay-subtle)',
-                  color: statusFilter === status
-                    ? 'white'
-                    : 'var(--text-secondary)',
-                }}
-                onMouseEnter={(e) => {
-                  if (statusFilter !== status) {
-                    e.currentTarget.style.backgroundColor = 'var(--overlay-subtle)';
-                    e.currentTarget.style.color = 'var(--text-primary)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (statusFilter !== status) {
-                    e.currentTarget.style.backgroundColor = 'var(--overlay-subtle)';
-                    e.currentTarget.style.color = 'var(--text-secondary)';
-                  }
-                }}
-              >
-                {status === 'all' ? t('claims.filterAll') : t(`claims.status_${status}`)}
-              </button>
-            )
-          )}
-        </div>
-      </div>
+      <FilterBar>
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder={t('claims.searchPlaceholder')}
+        />
+        <FilterSelect
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: 'all', label: t('claims.filterAll') },
+            { value: 'draft', label: t('claims.status_draft') },
+            { value: 'submitted', label: t('claims.status_submitted') },
+            { value: 'accepted', label: t('claims.status_accepted') },
+            { value: 'denied', label: t('claims.status_denied') },
+            { value: 'paid', label: t('claims.status_paid') },
+          ]}
+          aria-label="Filter by status"
+        />
+      </FilterBar>
 
       <hr className="section-divider" />
 

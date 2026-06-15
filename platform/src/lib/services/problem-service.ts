@@ -9,6 +9,7 @@ import { problemsDB, hospitalsDB } from '../db';
 import type { ProblemDoc, HospitalDoc, ProblemStatus } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
@@ -25,10 +26,7 @@ async function inferOrgIdFromHospital(hospitalId?: string): Promise<string | und
 
 export async function getAllProblems(scope?: DataScope): Promise<ProblemDoc[]> {
   const db = problemsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as ProblemDoc)
-    .filter(d => d && d.type === 'problem')
+  const all = (await findByType<ProblemDoc>(db, 'problem'))
     .sort((a, b) => (b.onsetDate || b.createdAt || '').localeCompare(a.onsetDate || a.createdAt || ''));
   return scope ? filterByScope(all, scope) : all;
 }

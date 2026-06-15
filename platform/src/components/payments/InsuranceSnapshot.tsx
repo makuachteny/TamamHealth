@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Shield, Plus, Edit3, Building2 } from '@/components/icons/lucide';
+import { useState, useEffect, useCallback } from 'react';
+import { Shield, Plus, Edit3, Building2, RefreshCw } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useApp } from '@/lib/context';
+import { useToast } from '@/components/Toast';
 import EligibilityBadge from './EligibilityBadge';
 
 interface InsuranceSnapshotProps {
@@ -28,24 +30,49 @@ interface Policy {
 
 export default function InsuranceSnapshot({ patientId, editable, onAddInsurance, onEditInsurance }: InsuranceSnapshotProps) {
   const { t } = useTranslation();
+  const { currentUser } = useApp();
+  const { showToast } = useToast();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [eligStatus, setEligStatus] = useState<'verified' | 'unverified' | 'expired' | 'denied' | 'cached' | 'none'>('none');
   const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { getPatientInsurancePolicies, getLatestEligibility } = await import('@/lib/services/payment-service');
-        const [pols, elig] = await Promise.all([
-          getPatientInsurancePolicies(patientId),
-          getLatestEligibility(patientId),
-        ]);
-        setPolicies(pols);
-        setEligStatus(elig?.status || 'none');
-      } catch { /* offline */ }
-      setLoading(false);
-    })();
+  const load = useCallback(async () => {
+    try {
+      const { getPatientInsurancePolicies, getLatestEligibility } = await import('@/lib/services/payment-service');
+      const [pols, elig] = await Promise.all([
+        getPatientInsurancePolicies(patientId),
+        getLatestEligibility(patientId),
+      ]);
+      setPolicies(pols);
+      setEligStatus(elig?.status || 'none');
+    } catch { /* offline */ }
+    setLoading(false);
   }, [patientId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleVerify = async (policyId: string) => {
+    const facilityId = currentUser?.hospitalId || currentUser?.hospital?._id;
+    if (!facilityId) { showToast(t('insuranceSnapshot.noFacility'), 'error'); return; }
+    setVerifying(true);
+    try {
+      const { checkEligibility } = await import('@/lib/services/payment-service');
+      await checkEligibility({
+        policyId,
+        patientId,
+        checkedBy: currentUser?._id || currentUser?.name || 'unknown',
+        facilityId,
+        orgId: currentUser?.orgId,
+      });
+      await load();
+      showToast(t('insuranceSnapshot.eligibilityVerified'), 'success');
+    } catch {
+      showToast(t('insuranceSnapshot.eligibilityFailed'), 'error');
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   if (loading) {
     return <div style={{ padding: 12, fontSize: 13, color: 'var(--text-muted)' }}>{t('insuranceSnapshot.loading')}</div>;
@@ -59,7 +86,7 @@ export default function InsuranceSnapshot({ patientId, editable, onAddInsurance,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 13 }}>
-          <span className="icon-box-sm" style={{ color: 'var(--teal, #14b8a6)' }}>
+          <span className="icon-box-sm" style={{ color: 'var(--teal, #3B82F6)' }}>
             <Shield size={16} />
           </span>
           {t('insuranceSnapshot.noInsuranceSelfPay')}
@@ -86,7 +113,7 @@ export default function InsuranceSnapshot({ patientId, editable, onAddInsurance,
           border: `1px solid ${policy.isPrimary ? 'var(--accent)' : 'var(--border-medium)'}`,
           display: 'flex', alignItems: 'center', gap: 12,
         }}>
-          <span className="icon-box-sm" style={{ color: 'var(--teal, #14b8a6)', flexShrink: 0 }}>
+          <span className="icon-box-sm" style={{ color: 'var(--teal, #3B82F6)', flexShrink: 0 }}>
             <Building2 size={44} />
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -96,6 +123,23 @@ export default function InsuranceSnapshot({ patientId, editable, onAddInsurance,
                 <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('insuranceSnapshot.primary')}</span>
               )}
               <EligibilityBadge status={eligStatus} compact />
+              {editable && (
+                <button
+                  onClick={() => handleVerify(policy._id)}
+                  disabled={verifying}
+                  title={t('insuranceSnapshot.verifyEligibility')}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '2px 8px', borderRadius: 12, border: '1px solid var(--accent-border)',
+                    background: 'var(--accent-light)', color: 'var(--accent-primary)',
+                    fontSize: 10, fontWeight: 700, cursor: verifying ? 'not-allowed' : 'pointer',
+                    opacity: verifying ? 0.6 : 1,
+                  }}
+                >
+                  <RefreshCw size={10} className={verifying ? 'animate-spin' : undefined} />
+                  {t('insuranceSnapshot.verify')}
+                </button>
+              )}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               {policy.memberId && <span>{t('insuranceSnapshot.memberId', { id: policy.memberId })}</span>}

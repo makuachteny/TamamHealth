@@ -45,18 +45,19 @@ export const DEMO_USER_PROFILES: SeedUserProfile[] = [
   { username: 'dr.wani',         name: 'Dr. James Wani Igga',        role: 'doctor',                 hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'dr.achol',        name: 'Dr. Achol Mayen Deng',       role: 'doctor',                 hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'co.deng',         name: 'CO Deng Mabior Kuol',        role: 'clinical_officer',       hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital',         orgId: PUBLIC_ORG_ID },
+  { username: 'dr.wau',          name: 'Dr. Mary Akuol Deng',        role: 'doctor',                 hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital',         orgId: PUBLIC_ORG_ID },
+  { username: 'nurse.wau',       name: 'Nurse Grace Achai Lual',     role: 'nurse',                  hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital',         orgId: PUBLIC_ORG_ID },
+  { username: 'pharma.wau',      name: 'Pharmacist John Bol Garang', role: 'pharmacist',             hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital',         orgId: PUBLIC_ORG_ID },
+  { username: 'desk.wau',        name: 'Tabitha Nyandeng Kuol',      role: 'front_desk',             hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital',         orgId: PUBLIC_ORG_ID },
   { username: 'nurse.stella',    name: 'Nurse Stella Keji Lemi',     role: 'nurse',                  hospitalId: 'hosp-003', hospitalName: 'Malakal Teaching Hospital',  orgId: PUBLIC_ORG_ID },
   { username: 'lab.gatluak',     name: 'Lab Tech Gatluak Puok',      role: 'lab_tech',               hospitalId: 'hosp-004', hospitalName: 'Bentiu State Hospital',      orgId: PUBLIC_ORG_ID },
   { username: 'pharma.rose',     name: 'Pharmacist Rose Gbudue',     role: 'pharmacist',             hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'desk.amira',      name: 'Amira Juma Hassan',          role: 'front_desk',             hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
-  { username: 'bhw.akol',        name: 'Akol Deng Mading',           role: 'boma_health_worker',     hospitalId: 'phcu-001', hospitalName: 'Kajo-keji Boma PHCU',        orgId: PUBLIC_ORG_ID },
-  { username: 'sup.mary',        name: 'Mary Lado Kenyi',            role: 'payam_supervisor',       hospitalId: 'phcc-001', hospitalName: 'Kajo-keji PHCC',             orgId: PUBLIC_ORG_ID },
   { username: 'data.ayen',       name: 'Ayen Dut Malual',            role: 'data_entry_clerk',       hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'supt.lado',       name: 'Dr. Lado Tombe Kenyi',       role: 'medical_superintendent', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'manager.aluel',   name: 'Aluel Bol Maker',            role: 'hospital_manager',       hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'biller.nyandeng', name: 'Nyandeng Chol Atem',         role: 'medical_biller',         hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'hrio.dut',        name: 'Dut Machar Kuol',            role: 'hrio',                   hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
-  { username: 'chv.ajak',        name: 'Ajak Deng Mawien',           role: 'community_health_volunteer', hospitalId: 'phcu-001', hospitalName: 'Kajo-keji Boma PHCU',    orgId: PUBLIC_ORG_ID },
   { username: 'nutr.nyabol',     name: 'Nyabol Koang Jal',           role: 'nutritionist',           hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'rad.tamamhealth', name: 'TamamHealth Ladu Soro',      role: 'radiologist',            hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',     orgId: PUBLIC_ORG_ID },
   { username: 'midwife.nyakong', name: 'Midwife Nyakong Gatkuoth',    role: 'midwife',                hospitalId: 'hosp-003', hospitalName: 'Malakal Teaching Hospital',  orgId: PUBLIC_ORG_ID },
@@ -99,6 +100,26 @@ function generatePassword(length = 24): string {
   let out = '';
   for (let i = 0; i < length; i++) {
     out += alphabet[bytes[i] % alphabet.length];
+  }
+  return out;
+}
+
+/**
+ * Deterministically derive a password for `username` from a server-only
+ * secret. Because the secret is identical on every instance (it's an env
+ * var), every instance computes the SAME password — no shared file required.
+ *
+ * This is what makes seeded logins consistent on horizontally-scaled / read-
+ * only-FS hosts (e.g. Vercel serverless), where the old random-per-instance
+ * file approach left the browser seed and the login verifier disagreeing.
+ * Uses a readable alphabet (no look-alike chars) so creds are console-safe.
+ */
+function deterministicPassword(username: string, secret: string, length = 16): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const mac = crypto.createHmac('sha256', secret).update(`seed-password:${username}`).digest();
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += alphabet[mac[i] % alphabet.length];
   }
   return out;
 }
@@ -151,6 +172,26 @@ export async function getOrCreateSeedCredentials(): Promise<CredentialsFile> {
   inflight = (async () => {
     const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
     const expectedUsers = demoMode ? DEMO_USERNAMES : ['admin'];
+
+    // Deterministic mode (serverless-safe). When SEED_CREDENTIALS_SECRET is
+    // set, derive every password from it instead of generating random ones and
+    // persisting a file. All instances then agree on the same credentials, so
+    // the browser seed, the demo-accounts dropdown, and the login verifier
+    // stay consistent across the platform — no shared/writable filesystem
+    // required. `admin` still honours an explicit ADMIN_INITIAL_PASSWORD.
+    const secret = process.env.SEED_CREDENTIALS_SECRET;
+    if (secret) {
+      const adminOverride = process.env.ADMIN_INITIAL_PASSWORD;
+      const passwords: Record<string, string> = {};
+      for (const username of expectedUsers) {
+        passwords[username] = username === 'admin' && adminOverride
+          ? adminOverride
+          : deterministicPassword(username, secret);
+      }
+      cache = { generatedAt: '1970-01-01T00:00:00.000Z', passwords };
+      inflight = null;
+      return cache;
+    }
 
     const existing = await readFile();
     let next: CredentialsFile;

@@ -38,18 +38,18 @@ export default function PublicStatsPage() {
         />
 
         {/* National Overview */}
-        <div className="card-elevated p-5 mb-6" style={{ background: 'rgba(43,111,224,0.04)' }}>
+        <div className="card-elevated p-5 mb-6" style={{ background: 'rgba(59, 130, 246,0.04)' }}>
           <div className="flex items-center gap-2 mb-4">
             <Shield className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
             <h2 className="font-semibold text-sm">{t('publicStats.nationalOverview')}</h2>
           </div>
           <div className="kpi-grid">
             {[
-              { label: t('publicStats.healthFacilities'), value: hospitals.length, icon: Building2, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
-              { label: t('patients.kpiTotalPatients'), value: totalPop.toLocaleString(), icon: Users, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
+              { label: t('publicStats.healthFacilities'), value: hospitals.length, icon: Building2, color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)' },
+              { label: t('patients.kpiTotalPatients'), value: totalPop.toLocaleString(), icon: Users, color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)' },
               { label: t('publicStats.hospitalBeds'), value: totalBeds.toLocaleString(), icon: BedDouble, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.12)' },
-              { label: t('publicStats.healthWorkers'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: '#5CB8A8', bg: 'rgba(56,189,248,0.12)' },
-              { label: t('publicStats.dhis2Coverage'), value: `${dqData?.dhis2Adoption ?? 0}%`, icon: Wifi, color: scoreColor(dqData?.dhis2Adoption ?? 0), bg: 'rgba(43,111,224,0.12)' },
+              { label: t('publicStats.healthWorkers'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: '#2563EB', bg: 'rgba(56,189,248,0.12)' },
+              { label: t('publicStats.dhis2Coverage'), value: `${dqData?.dhis2Adoption ?? 0}%`, icon: Wifi, color: scoreColor(dqData?.dhis2Adoption ?? 0), bg: 'rgba(59, 130, 246,0.12)' },
             ].map(stat => (
               <div key={stat.label} className="kpi">
                 <div className="kpi__icon" style={{ background: stat.bg }}>

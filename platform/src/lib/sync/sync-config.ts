@@ -33,7 +33,6 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_facility_assessments',  direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_immunizations',         direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_anc',                   direction: 'both', orgScoped: true },
-  { localName: 'tamamhealth_boma_visits',           direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_follow_ups',            direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_hospitals',             direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_problems',              direction: 'both', orgScoped: true },
@@ -41,6 +40,9 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_appointments',          direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_availability',          direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_announcements',         direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_conversations',         direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_patient_notes',         direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_encounters',            direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_telehealth',            direction: 'both', orgScoped: true },
 
   // ----- Operational / facility -----
@@ -52,7 +54,6 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_staff_schedules',       direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_leave_requests',        direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_payroll_entries',       direction: 'both', orgScoped: true },
-  { localName: 'tamamhealth_patient_feedback',      direction: 'both', orgScoped: true },
 
   // ----- Billing / payments / insurance -----
   { localName: 'tamamhealth_billing',               direction: 'both', orgScoped: true },

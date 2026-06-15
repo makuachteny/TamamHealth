@@ -315,7 +315,7 @@ export default function DataEntryDashboard() {
 
         {/* Latest report visualization */}
         {latest ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
             {/* Patient summary */}
             <div className="glass-section">
               <div className="glass-section-header">
