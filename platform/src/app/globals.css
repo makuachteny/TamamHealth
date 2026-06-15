@@ -27,9 +27,9 @@
   --section-spacing: 80px;
   --section-spacing-medium: 56px;
   --section-spacing-small: 40px;
-  --btn-radius: 10px;
-  --card-radius: 16px;
-  --input-radius: 10px;
+  --btn-radius: 12px;
+  --card-radius: 22px;
+  --input-radius: 12px;
   --sidebar-width: 256px;
   --sidebar-collapsed: 72px;
 }
@@ -38,10 +38,13 @@
 :root {
   /* Solid backgrounds — clean neutral white */
   --bg-gradient: #FFFFFF;
-  --bg-mesh-1: none;
-  --bg-mesh-2: none;
-  --bg-mesh-3: none;
-  --bg-mesh-4: none;
+
+  /* App canvas — soft lavender→blue gradient sitting behind white cards.
+     Keeps the page airy and clean while cards/sidebar/topbar stay solid white. */
+  --bg-app:
+    radial-gradient(1200px 700px at 80% -12%, rgba(129, 140, 248, 0.13), transparent 58%),
+    radial-gradient(1100px 680px at 102% 106%, rgba(59, 130, 246, 0.13), transparent 56%),
+    linear-gradient(150deg, #ECEFFB 0%, #F2F5FD 36%, #FAFBFE 62%, #E9F0FC 100%);
 
   /* Core palette — clear whitish page, white cards lifted by borders/shadow */
   --bg-primary: #FFFFFF;
@@ -54,11 +57,14 @@
   --bg-tinted: #eff6ff;
 
   /* Tamam Healthcare System brand colors (blue primary; amber/red kept semantic) */
-  --tamamhealth-teal-deep: #1e3a8a;     /* deep brand blue (blue-900) */
-  --tamamhealth-teal: #3b82f6;          /* primary brand blue (blue-600) */
+  --tamamhealth-primary-deep: #1e3a8a;  /* deep brand blue (blue-900) */
+  --tamamhealth-primary: #3b82f6;       /* primary brand blue (blue-600) */
+  /* Brand blue alias used across the app (icons, links, accents). Tracks the
+     active accent so it stays on-theme in both light and dark modes. */
+  --tamamhealth-blue: var(--accent-primary);
   --tamamhealth-amber: #E4A84B;
-  --tamamhealth-green: #3b82f6;
-  --tamamhealth-green-text: #1e3a8a;
+  --tamamhealth-accent: #3b82f6;
+  --tamamhealth-accent-text: #1e3a8a;
   --tamamhealth-red: #C44536;
   --tamamhealth-red-text: #C24435;
 
@@ -103,6 +109,15 @@
   --card-shadow-lg: 0 8px 24px rgba(30, 58, 138, 0.10);
   --card-shadow-xl: 0 16px 48px rgba(30, 58, 138, 0.12);
   --card-hover-border: #bfdbfe;
+
+  /* ── Glassmorphism (frosted surfaces over the gradient app background) ── */
+  --glass-bg: rgba(255, 255, 255, 0.70);
+  --glass-bg-strong: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  /* Blur radius kept modest — blur is the expensive part of backdrop-filter and
+     this app targets low-end hardware, so 10px reads as glass without the cost. */
+  --glass-blur: blur(10px) saturate(130%);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.65);
   --panel-shadow: 0 1px 3px rgba(30, 58, 138, 0.06), 0 4px 12px rgba(30, 58, 138, 0.05);
 
   /* Toggle */
@@ -121,7 +136,7 @@
   --nav-text: #475569;
   --nav-text-hover: #0F172A;
   --nav-hover-bg: #eff6ff;
-  --nav-active-bg: #1e3a8a;
+  --nav-active-bg: #3b82f6;
   --nav-active-text: #FFFFFF;
 
   /* Button secondary */
@@ -171,12 +186,11 @@
 
 /* ============ DARK THEME ============ */
 [data-theme="dark"] {
-  /* Deep brand-green dark background */
+  /* Deep navy dark background */
   --bg-gradient: #0a1a33;
-  --bg-mesh-1: none;
-  --bg-mesh-2: none;
-  --bg-mesh-3: none;
-  --bg-mesh-4: none;
+
+  /* App canvas stays solid navy in dark mode (gradient is a light-theme accent). */
+  --bg-app: #0a1a33;
 
   --bg-primary: #0a1a33;
   --bg-secondary: #06122a;
@@ -220,6 +234,13 @@
   --card-shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.5);
   --card-shadow-xl: 0 4px 16px rgba(0, 0, 0, 0.6);
   --card-hover-border: #2c4a82;
+
+  /* ── Glassmorphism (dark) ── */
+  --glass-bg: rgba(17, 36, 77, 0.62);
+  --glass-bg-strong: rgba(17, 36, 77, 0.84);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: blur(10px) saturate(130%);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 
   --toggle-track: #2c4a82;
@@ -305,7 +326,24 @@ a, button, input, select, textarea, .card, .card-elevated, .btn, .nav-item, .bad
 
 /* ============ Page background ============ */
 .gradient-mesh-bg {
-  background: var(--bg-primary);
+  background: var(--bg-app, var(--bg-primary));
+}
+
+/* Glass fallbacks: use solid (cheap, fully-opaque) cards when backdrop-filter
+   isn't supported or the user prefers reduced transparency — protects both
+   readability and low-end-device performance. */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  :root, [data-theme="dark"] {
+    --glass-bg: var(--bg-card-solid);
+    --glass-bg-strong: var(--bg-card-solid);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root, [data-theme="dark"] {
+    --glass-bg: var(--bg-card-solid);
+    --glass-bg-strong: var(--bg-card-solid);
+    --glass-blur: none;
+  }
 }
 
 ::-webkit-scrollbar { width: 7px; height: 7px; }
@@ -409,32 +447,40 @@ a.link-accent:hover {
   text-decoration-color: var(--link-color);
 }
 
-/* ============ Cards — solid, flat ============ */
+/* ============ Cards — frosted glass over the gradient app background ============ */
 .card {
-  background: var(--bg-card-solid);
-  border: 1px solid var(--border-light);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
+  box-shadow: var(--glass-highlight);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .card-elevated {
-  background: var(--bg-card-solid);
-  border: 1px solid var(--border-light);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
-  box-shadow: var(--card-shadow);
+  box-shadow: var(--card-shadow), var(--glass-highlight);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .card-elevated:hover {
   border-color: var(--card-hover-border);
-  box-shadow: var(--card-shadow-lg);
+  box-shadow: var(--card-shadow-lg), var(--glass-highlight);
   transform: translateY(-2px);
 }
 
 .card-glass {
-  background: var(--bg-card-solid);
-  border: 1px solid var(--border-light);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
+  box-shadow: var(--glass-highlight);
 }
 
 /* ============ Tabs ============ */
@@ -505,6 +551,14 @@ textarea {
 
 input[type="search"].search-icon-input {
   padding-left: 2.75rem;
+}
+
+/* Hide the browser's native search clear (✕) — pages render their own. */
+input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+
+/* Selects feel interactive on hover, matching button affordances. */
+select:hover:not(:focus):not(:disabled) {
+  border-color: var(--border-medium);
 }
 
 input:focus, select:focus, textarea:focus {
@@ -710,7 +764,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   color: var(--nav-active-text) !important;
   background: var(--nav-active-bg) !important;
   font-weight: 700;
-  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.28);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.30);
   border-left: none;
   padding-left: 14px;
 }
@@ -750,15 +804,17 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   font-weight: 700;
 }
 
-/* Compact KPI stat card — inline: icon | value + label */
+/* KPI stat "pill" — compact chip that hugs its content (icon + value + label)
+   instead of a stretched, mostly-empty full-width card. The label rides inline
+   beside the number so the figure actually reads as e.g. "40 Households". */
 .kpi {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 9px;
+  padding: 7px 15px 7px 8px;
   background: var(--bg-card-solid);
-  border: 1px solid var(--border-medium);
-  border-radius: var(--card-radius);
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
   box-shadow: var(--card-shadow);
   cursor: pointer;
   transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
@@ -770,47 +826,51 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   transform: translateY(-1px);
 }
 .kpi__icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 5px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.kpi__icon svg { width: 13px; height: 13px; }
-.kpi__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0; }
+.kpi__icon svg { width: 14px; height: 14px; }
+.kpi__body {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
 .kpi__value {
   font-family: 'Untitled Sans', Arial, sans-serif;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.1;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
-/* Labels hidden — KPI cards show icon + value only across all dashboards.
-   Text is kept in the DOM (clipped, not display:none) so it stays available
-   to screen readers and as the accessible name. */
+/* Labels are visible again — they ride inline next to the value so the number
+   has meaning. Kept as the accessible name too. */
 .kpi__label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
   white-space: nowrap;
-  border: 0;
 }
 
-/* KPI grid — stretches evenly to fill width */
+/* KPI strip — a wrapping row of compact pills, sized to their content. */
 .kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
-@media (max-width: 639px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 
 /* ============ KPI Card Header (shared across dashboard cards) ============
    Lightweight title row separated from the body by a single neutral divider.
@@ -1081,9 +1141,11 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   position: relative;
   width: 100%;
   border-radius: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-medium);
-  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.18);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.18), var(--glass-highlight);
   animation: modalSlideUp 0.25s ease-out;
   overflow: hidden;
   max-height: 90vh;
@@ -1289,18 +1351,22 @@ svg circle {
 .page-container {
   flex: 1;
   padding: 16px;
+  /* Extra top padding drops the page body so its first row lines up with the
+     sidebar's first nav item (the rail reserves logo + role-card space above
+     its nav). Applied here so every dashboard page aligns the same way. */
+  padding-top: 40px;
   overflow-y: auto;
   overflow-x: hidden;
 }
 @media (min-width: 640px) {
-  .page-container { padding: 20px; }
+  .page-container { padding: 20px; padding-top: 44px; }
 }
 
 /* Standard page header — icon + title + subtitle */
 /* ============ Unified page header ============ */
 .page-header-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
@@ -1309,12 +1375,15 @@ svg circle {
 .page-header {
   min-width: 0;
   flex: 1 1 auto;
-}
-.page-header__top {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 4px;
+  gap: 14px;
+}
+.page-header__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 .page-header__icon {
   width: 48px;
@@ -1341,8 +1410,8 @@ svg circle {
 .page-header__subtitle {
   font-size: 0.85rem;
   color: var(--text-secondary);
-  margin: 2px 0 0 60px;
-  line-height: 1.45;
+  margin: 0;
+  line-height: 1.4;
 }
 .page-header__actions {
   display: flex;
@@ -1352,7 +1421,7 @@ svg circle {
 }
 @media (max-width: 640px) {
   .page-header__title { font-size: 1.25rem; }
-  .page-header__subtitle { margin-left: 52px; font-size: 0.78rem; }
+  .page-header__subtitle { font-size: 0.78rem; }
 }
 
 /* Standard stat card grid */
@@ -1361,7 +1430,13 @@ svg circle {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   margin-bottom: 20px;
+  /* Keep stat cards a uniform height within each row. */
+  align-items: stretch;
 }
+
+/* Stat cards stretch to fill their grid cell so a row of them lines up.
+   (.kpi pills are content-sized and intentionally excluded.) */
+.stat-grid > .dash-stat { height: 100%; }
 
 /* ============ Unified Dashboard Card System ============ */
 /* Use these classes for consistent card styling across all dashboards */
@@ -1369,17 +1444,19 @@ svg circle {
 /* Standard dashboard card — white bg, subtle border, soft shadow.
    Hover lifts the shadow to a stronger tier for tactile feedback. */
 .dash-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-light);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
-  box-shadow: var(--card-shadow);
+  box-shadow: var(--card-shadow), var(--glass-highlight);
   padding: 16px;
   transition: border-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
               box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .dash-card:hover {
   border-color: var(--card-hover-border);
-  box-shadow: var(--card-shadow-lg);
+  box-shadow: var(--card-shadow-lg), var(--glass-highlight);
 }
 
 /* Dashboard stat/KPI card — compact padding, flex layout */
@@ -1617,9 +1694,9 @@ svg circle {
 }
 
 /* Dark mode overrides */
-[data-theme="dark"] .dash-card { background: var(--bg-card-solid); }
+[data-theme="dark"] .dash-card { background: var(--glass-bg); }
 [data-theme="dark"] .dash-stat { background: var(--bg-card-solid); }
-[data-theme="light"] .dash-card { border: 1px solid var(--border-light); }
+[data-theme="light"] .dash-card { border: 1px solid var(--glass-border); }
 [data-theme="light"] .dash-stat { border: 1px solid var(--border-light); }
 
 /* Standard modal overlay */
@@ -1634,14 +1711,16 @@ svg circle {
   padding: 16px;
 }
 .modal-panel {
-  background: var(--bg-card-solid);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border-radius: 12px;
-  border: 1px solid var(--border-medium);
+  border: 1px solid var(--glass-border);
   width: 100%;
   max-height: 90vh;
   overflow: auto;
   padding: 24px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.1), var(--glass-highlight);
   animation: modalSlideUp 0.2s ease-out;
 }
 @keyframes modalSlideUp {
@@ -1831,3 +1910,40 @@ svg circle {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============ react-big-calendar — Google-Calendar-style theming ============ */
+.rbc-tamam .rbc-toolbar { margin-bottom: 14px; gap: 6px; flex-wrap: wrap; }
+.rbc-tamam .rbc-toolbar button {
+  color: var(--text-secondary);
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-weight: 600;
+}
+.rbc-tamam .rbc-toolbar button:hover { background: var(--accent-light); color: var(--accent-text); }
+.rbc-tamam .rbc-toolbar button.rbc-active,
+.rbc-tamam .rbc-toolbar button.rbc-active:hover,
+.rbc-tamam .rbc-toolbar button.rbc-active:focus {
+  background: var(--accent-primary);
+  color: #fff;
+  border-color: var(--accent-primary);
+}
+.rbc-tamam .rbc-toolbar-label { font-weight: 700; font-size: 16px; color: var(--text-primary); }
+.rbc-tamam .rbc-header {
+  padding: 8px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-light);
+}
+.rbc-tamam .rbc-month-view,
+.rbc-tamam .rbc-time-view { border: 1px solid var(--border-light); border-radius: 12px; overflow: hidden; }
+.rbc-tamam .rbc-today { background: var(--accent-light); }
+.rbc-tamam .rbc-off-range-bg { background: var(--overlay-subtle); }
+.rbc-tamam .rbc-event,
+.rbc-tamam .rbc-day-slot .rbc-event { box-shadow: none; }
+.rbc-tamam .rbc-event:focus { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
+.rbc-tamam .rbc-current-time-indicator { background: var(--color-danger, #C44536); height: 2px; }
+.rbc-tamam .rbc-show-more { color: var(--accent-text); font-weight: 600; }

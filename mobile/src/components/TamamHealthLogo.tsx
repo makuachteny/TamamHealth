@@ -11,9 +11,9 @@ type Props = {
 /**
  * Tamam Healthcare System brand mark — the ascending dot cluster.
  * Geometry taken from the official style guide (June 2026), rendered in
- * brand green (#0d8844). Square, scales to `size`.
+ * brand blue (#3b82f6). Square, scales to `size`.
  */
-export default function TamamHealthLogo({ size = 120, color = '#0d8844' }: Props) {
+export default function TamamHealthLogo({ size = 120, color = '#3b82f6' }: Props) {
   return (
     <View style={{ width: size, height: size }}>
       <Svg viewBox="90 -11 316 316" width={size} height={size}>
