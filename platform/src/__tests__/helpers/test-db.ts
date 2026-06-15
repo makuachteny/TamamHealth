@@ -62,7 +62,6 @@ export function createDBMock() {
     facilityAssessmentsDB: () => getTestDB('test_tamamhealth_facility_assessments'),
     immunizationsDB: () => getTestDB('test_tamamhealth_immunizations'),
     ancDB: () => getTestDB('test_tamamhealth_anc'),
-    bomaVisitsDB: () => getTestDB('test_tamamhealth_boma_visits'),
     followUpsDB: () => getTestDB('test_tamamhealth_follow_ups'),
     organizationsDB: () => getTestDB('test_tamamhealth_organizations'),
     platformConfigDB: () => getTestDB('test_tamamhealth_platform_config'),

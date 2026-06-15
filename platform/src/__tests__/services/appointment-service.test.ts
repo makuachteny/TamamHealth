@@ -51,7 +51,7 @@ function validAppointment(overrides: Partial<AppointmentInput> = {}): Appointmen
     reminderSent: false,
     isRecurring: false,
     bookedBy: 'staff-001',
-    bookedByName: 'Front Desk',
+    bookedByName: 'Medical Receptionist',
     state: 'Central Equatoria',
     ...overrides,
   };

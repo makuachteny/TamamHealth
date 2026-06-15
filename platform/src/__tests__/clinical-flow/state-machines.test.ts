@@ -13,7 +13,6 @@ import {
   canTransition, unmetCriticalGateItems, type EncounterStatus,
 } from '@/lib/clinical-flow/encounter-journey';
 import { LAB_ORDER_TRANSITIONS, PROCEDURE_TRANSITIONS, PRESCRIPTION_TRANSITIONS } from '@/lib/clinical-flow/order-lifecycles';
-import { BHW_TASK_TRANSITIONS, BHW_VISIT_TRANSITIONS, SURVEILLANCE_TRANSITIONS } from '@/lib/clinical-flow/bhw-workflow';
 import { CLINICAL_FLOW_ROLES, capabilitiesForRoles, clinicalFlowRolesForUserRole } from '@/lib/clinical-flow/roles';
 
 function assertClosedMachine(table: Record<string, readonly string[]>) {
@@ -31,9 +30,6 @@ describe('clinical-flow state machines are closed', () => {
   test('lab order lifecycle', () => assertClosedMachine(LAB_ORDER_TRANSITIONS));
   test('procedure lifecycle', () => assertClosedMachine(PROCEDURE_TRANSITIONS));
   test('prescription lifecycle', () => assertClosedMachine(PRESCRIPTION_TRANSITIONS));
-  test('bhw task lifecycle', () => assertClosedMachine(BHW_TASK_TRANSITIONS));
-  test('bhw visit lifecycle', () => assertClosedMachine(BHW_VISIT_TRANSITIONS));
-  test('surveillance lifecycle', () => assertClosedMachine(SURVEILLANCE_TRANSITIONS));
 });
 
 describe('encounter journey invariants', () => {
@@ -76,8 +72,8 @@ describe('encounter journey invariants', () => {
 });
 
 describe('roles & capabilities', () => {
-  test('there are exactly 11 documented roles', () => {
-    expect(Object.keys(CLINICAL_FLOW_ROLES)).toHaveLength(11);
+  test('there are exactly 10 documented roles', () => {
+    expect(Object.keys(CLINICAL_FLOW_ROLES)).toHaveLength(10);
   });
 
   test('every role has at least one capability and a primary function', () => {
@@ -97,6 +93,5 @@ describe('roles & capabilities', () => {
   test('existing UserRoles map onto clinical-flow roles', () => {
     expect(clinicalFlowRolesForUserRole('doctor')).toContain('clinician');
     expect(clinicalFlowRolesForUserRole('cashier')).toContain('cashier');
-    expect(clinicalFlowRolesForUserRole('boma_health_worker')).toContain('boma_health_worker');
   });
 });

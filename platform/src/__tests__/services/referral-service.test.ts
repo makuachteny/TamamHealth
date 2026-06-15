@@ -286,6 +286,90 @@ describe('Referral Service', () => {
     expect(accepted!.status).toBe('seen');
   });
 
+  test('completeReferralWithOutcome stores structured outcome, sets completed, and appends a note line', async () => {
+    const { completeReferralWithOutcome } = require('@/lib/services/referral-service');
+    const ref = await createReferral(validReferral({ notes: 'Original handover note' }));
+    const updated = await completeReferralWithOutcome(ref._id, {
+      disposition: 'admitted',
+      summary: 'Admitted to surgical ward, ORIF performed',
+      followUp: 'Suture removal in 14 days at referring facility',
+      recordedBy: 'Dr. Receiver',
+      recordedAt: '2026-05-01T10:00:00.000Z',
+    });
+
+    expect(updated).not.toBeNull();
+    expect(updated.status).toBe('completed');
+    expect(updated.outcome.disposition).toBe('admitted');
+    expect(updated.outcome.summary).toContain('ORIF');
+    // Human-readable note line is appended after the original notes.
+    expect(updated.notes).toContain('Original handover note');
+    expect(updated.notes).toContain('OUTCOME (admitted)');
+    expect(updated.notes).toContain('Follow-up:');
+  });
+
+  test('completeReferralWithOutcome returns null for a nonexistent referral', async () => {
+    const { completeReferralWithOutcome } = require('@/lib/services/referral-service');
+    const result = await completeReferralWithOutcome('nope', {
+      disposition: 'treated_discharged', summary: 'x', recordedBy: 'y', recordedAt: '2026-05-01T10:00:00.000Z',
+    });
+    expect(result).toBeNull();
+  });
+
+  test('acceptReferral re-homes the patient to the receiving hospital AND its org', async () => {
+    // Cross-org referral: the destination hospital belongs to a different org.
+    // The patient transfer must carry the destination orgId, otherwise
+    // data-scope (which filters on orgId first) hides the accepted patient
+    // from the receiving org entirely.
+    const { updatePatient } = require('@/lib/services/patient-service');
+    updatePatient.mockClear();
+    const hdb = require('@/lib/db').hospitalsDB();
+    await hdb.put({ _id: 'hosp-dest-org', type: 'hospital', name: 'Dest Hospital', orgId: 'org-receiving' });
+
+    const ref = await createReferral(validReferral({ toHospitalId: 'hosp-dest-org', orgId: 'org-sending' }));
+    await acceptReferral(ref._id);
+
+    expect(updatePatient).toHaveBeenCalledWith('patient-001', {
+      registrationHospital: 'hosp-dest-org',
+      lastVisitHospital: 'hosp-dest-org',
+      orgId: 'org-receiving',
+    });
+  });
+
+  test('acceptReferral records an idempotent referral-intake encounter in the receiver EHR', async () => {
+    const mrDb = require('@/lib/db').medicalRecordsDB();
+    const ref = await createReferral(validReferral());
+    const intakeId = `rec-refin-${ref._id}`;
+
+    await acceptReferral(ref._id);
+    const intake = await mrDb.get(intakeId);
+    expect(intake.type).toBe('medical_record');
+    expect(intake.patientId).toBe('patient-001');
+    expect(intake.hospitalId).toBe('hosp-002');
+    expect(intake.visitType).toBe('referral');
+    expect(intake.chiefComplaint).toContain('Referral intake');
+
+    // Re-accepting must not spawn a duplicate intake row.
+    const revBefore = intake._rev;
+    await acceptReferral(ref._id);
+    const after = await mrDb.get(intakeId);
+    expect(after._rev).toBe(revBefore);
+  });
+
+  test('acceptReferral omits orgId when destination hospital is unreachable', async () => {
+    // Offline / missing destination hospital doc: fall back to transferring
+    // only the hospital fields, leaving orgId untouched (same-org path).
+    const { updatePatient } = require('@/lib/services/patient-service');
+    updatePatient.mockClear();
+
+    const ref = await createReferral(validReferral({ toHospitalId: 'hosp-not-in-db' }));
+    await acceptReferral(ref._id);
+
+    expect(updatePatient).toHaveBeenCalledWith('patient-001', {
+      registrationHospital: 'hosp-not-in-db',
+      lastVisitHospital: 'hosp-not-in-db',
+    });
+  });
+
   test('acceptReferral runs patient transfer BEFORE marking referral seen (atomicity)', async () => {
     // The previous order (status-first, then transfer) left referrals stuck
     // in 'seen' status when the transfer threw. Reversing the order means
