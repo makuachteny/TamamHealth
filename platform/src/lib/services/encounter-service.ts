@@ -1,0 +1,117 @@
+/**
+ * Clinical encounter service — persists and transitions an in-progress
+ * consultation through the documented patient-journey state machine
+ * (lib/clinical-flow/encounter-journey.ts). This is what lets a clinician
+ * order labs, pause the visit (`awaiting_labs`), and resume it when results
+ * return, instead of finalising everything in one shot.
+ *
+ * Transitions are validated against `canTransition()` so the system can only
+ * move an encounter the way the architecture document allows.
+ */
+import { v4 as uuidv4 } from 'uuid';
+import { encountersDB } from '../db';
+import type { EncounterDoc } from '../db-types';
+import {
+  canTransition, stageOf, type EncounterStatus,
+} from '../clinical-flow/encounter-journey';
+import { findByType } from './db-query';
+import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
+
+/** Statuses where the clinician has handed off and is waiting on a parallel order. */
+export const RESUMABLE_STATUSES: EncounterStatus[] = [
+  'awaiting_labs',
+  'awaiting_imaging',
+  'consultation_paused_draft',
+];
+
+export async function getEncounter(id: string): Promise<EncounterDoc | null> {
+  try {
+    return await encountersDB().get(id) as EncounterDoc;
+  } catch {
+    return null;
+  }
+}
+
+/** Open (non-closed) encounters a clinician can resume, newest first. */
+export async function getResumableEncounters(clinicianId?: string): Promise<EncounterDoc[]> {
+  const rows = await findByType<EncounterDoc>(encountersDB(), 'clinical_encounter', {}, { indexFields: ['type'] });
+  return rows
+    .filter(e => !e.closedAt && RESUMABLE_STATUSES.includes(e.status))
+    .filter(e => !clinicianId || e.clinicianId === clinicianId)
+    .sort((a, b) => new Date(b.updatedAt || '').getTime() - new Date(a.updatedAt || '').getTime());
+}
+
+/** Create a new in-progress encounter (defaults to `with_clinician`). */
+export async function createEncounter(
+  data: Omit<EncounterDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'stageKey'> & { status?: EncounterStatus },
+): Promise<EncounterDoc> {
+  const db = encountersDB();
+  const now = new Date().toISOString();
+  const status: EncounterStatus = data.status ?? 'with_clinician';
+  const doc: EncounterDoc = {
+    _id: `enc-${uuidv4().slice(0, 8)}`,
+    type: 'clinical_encounter',
+    ...data,
+    status,
+    stageKey: stageOf(status),
+    createdAt: now,
+    updatedAt: now,
+  };
+  const resp = await db.put(doc as unknown as Record<string, unknown>);
+  doc._rev = resp.rev;
+  await logAuditSafe('CREATE_ENCOUNTER', data.clinicianId, undefined, `Encounter ${doc._id} for ${data.patientName} (${status})`);
+  emitSyncEvent({ resourceType: 'clinical_encounter', resourceId: doc._id, operation: 'create', resourceVersion: doc._rev, orgId: doc.orgId, hospitalId: doc.hospitalId });
+  return doc;
+}
+
+/** Patch an encounter's snapshot / lab order ids without changing status. */
+export async function updateEncounter(id: string, patch: Partial<EncounterDoc>): Promise<EncounterDoc | null> {
+  const db = encountersDB();
+  try {
+    const existing = await db.get(id) as EncounterDoc;
+    const updated: EncounterDoc = { ...existing, ...patch, _id: existing._id, _rev: existing._rev, type: 'clinical_encounter', updatedAt: new Date().toISOString() };
+    const resp = await db.put(updated as unknown as Record<string, unknown>);
+    updated._rev = resp.rev;
+    emitSyncEvent({ resourceType: 'clinical_encounter', resourceId: id, operation: 'update', resourceVersion: updated._rev, orgId: updated.orgId, hospitalId: updated.hospitalId });
+    return updated;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Move an encounter to a new status, enforcing the journey state machine.
+ * Throws if the transition is not allowed by the architecture document.
+ */
+export async function transitionEncounter(
+  id: string,
+  to: EncounterStatus,
+  opts?: { snapshot?: Record<string, unknown>; labOrderIds?: string[]; medicalRecordId?: string; actorId?: string },
+): Promise<EncounterDoc> {
+  const db = encountersDB();
+  const existing = await db.get(id) as EncounterDoc;
+  if (existing.status !== to && !canTransition(existing.status, to)) {
+    throw new Error(`Illegal encounter transition: ${existing.status} → ${to}`);
+  }
+  const now = new Date().toISOString();
+  const closed = ['ready_for_clinic_checkout', 'referred_out', 'admitted', 'deceased'].includes(to);
+  const updated: EncounterDoc = {
+    ...existing,
+    status: to,
+    stageKey: stageOf(to),
+    snapshot: opts?.snapshot ?? existing.snapshot,
+    labOrderIds: opts?.labOrderIds ?? existing.labOrderIds,
+    medicalRecordId: opts?.medicalRecordId ?? existing.medicalRecordId,
+    closedAt: closed ? now : existing.closedAt,
+    updatedAt: now,
+    _id: existing._id,
+    _rev: existing._rev,
+    type: 'clinical_encounter',
+  };
+  const resp = await db.put(updated as unknown as Record<string, unknown>);
+  updated._rev = resp.rev;
+  await logAuditSafe('TRANSITION_ENCOUNTER', opts?.actorId ?? existing.clinicianId, undefined, `Encounter ${id}: ${existing.status} → ${to}`);
+  emitSyncEvent({ resourceType: 'clinical_encounter', resourceId: id, operation: 'update', resourceVersion: updated._rev, orgId: updated.orgId, hospitalId: updated.hospitalId });
+  return updated;
+}
