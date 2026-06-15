@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import {
-  ProductHero, ProductModuleGrid, ProductBenefits, ProductCTA, ProductIllustration,
+  ProductHero, ProductModuleGrid, ProductBenefits, ProductIllustration,
 } from "@/components/marketing/ProductPage";
 
 export const metadata: Metadata = {
@@ -19,7 +19,6 @@ export default function RadiologyManagementPage() {
           subtitle="A modality-first imaging workflow that keeps your radiographers and reporting radiologists in sync — even when the radiologist is reading remotely from Juba."
           accentColor="#1B7FA8"
           primaryCta={{ label: "Request a demo", href: "/about/contact" }}
-          secondaryCta={{ label: "See pricing", href: "/pricing" }}
           illustration={<ProductIllustration accent="#1B7FA8" variant="imaging" />}
         />
 
@@ -50,12 +49,6 @@ export default function RadiologyManagementPage() {
             { title: "Patient-take-home reports", description: "Auto-generated PDF + SMS link, in English plus the patient's home language." },
             { title: "Optional PACS, no lock-in", description: "Use the open-source Orthanc bundle, your existing PACS, or no PACS at all. Studies still flow." },
           ]}
-        />
-
-        <ProductCTA
-          heading="See your modality on a worklist"
-          subtitle="We bring a sandbox to your imaging room and walk through scheduling, acquisition, reporting, and result delivery in a single session."
-          primaryCta={{ label: "Schedule a demo", href: "/about/contact" }}
         />
       </main>
       

@@ -5,10 +5,8 @@ import Image from "next/image";
 import {
   Reveal,
   FAQItem,
-  DemoForm,
   CheckItem,
   TestimonialSwoosh,
-  PricingBannerIcon,
 } from "@/components/marketing/MarketingShared";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -41,7 +39,7 @@ export default function PharmacyLabPage() {
                 </div>
               </div>
               <div style={{ marginTop: 32 }}>
-                <Link href="#demo" className="mk-btn mk-btn-green mk-btn-lg">
+                <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
                   See drug interaction demo
                 </Link>
               </div>
@@ -58,13 +56,6 @@ export default function PharmacyLabPage() {
                   style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
                   priority
                 />
-              </Reveal>
-            </div>
-
-            {/* Right: Demo Form */}
-            <div className="mk-hero-form">
-              <Reveal delay={0.2}>
-                <DemoForm />
               </Reveal>
             </div>
           </div>
@@ -190,9 +181,6 @@ export default function PharmacyLabPage() {
                   <CheckItem>Controlled substance workflow and audit trail</CheckItem>
                   <CheckItem>Dose validation and frequency checking</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -225,9 +213,6 @@ export default function PharmacyLabPage() {
                   <CheckItem>Real-time formulary updates and pricing</CheckItem>
                   <CheckItem>Generic and brand name support</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -259,9 +244,6 @@ export default function PharmacyLabPage() {
                   <CheckItem>Automatic routing to lab systems</CheckItem>
                   <CheckItem>Specimen barcode generation and tracking</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -293,9 +275,6 @@ export default function PharmacyLabPage() {
                   <CheckItem>Critical value alerts and notifications</CheckItem>
                   <CheckItem>Patient portal access after provider review</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -327,9 +306,6 @@ export default function PharmacyLabPage() {
                   <CheckItem>Supply ordering integration with vendors</CheckItem>
                   <CheckItem>Expiration date tracking and waste alerts</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -361,9 +337,6 @@ export default function PharmacyLabPage() {
                   <CheckItem>Drug-disease interaction warnings</CheckItem>
                   <CheckItem>Compliance tracking for specialty protocols</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -502,30 +475,6 @@ export default function PharmacyLabPage() {
                   Learn more
                 </Link>
               </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── PRICING CTA BANNER ──────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-pricing-banner">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 48, height: 48 }}>
-                <PricingBannerIcon />
-              </div>
-              <div>
-                <h3 className="mk-h3" style={{ margin: "0 0 4px" }}>
-                  Flexible module pricing for any clinic
-                </h3>
-                <p style={{ margin: 0, color: "var(--tb-text-sec)" }}>
-                  Add Pharmacy & Lab to your EHR or use as a standalone module.
-                </p>
-              </div>
-              <Link href="/pricing" className="mk-btn mk-btn-outline-green mk-btn-lg">
-                View pricing
-              </Link>
             </div>
           </Reveal>
         </div>

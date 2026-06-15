@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import {
-  ProductHero, ProductModuleGrid, ProductBenefits, ProductCTA, ProductIllustration,
+  ProductHero, ProductModuleGrid, ProductBenefits, ProductIllustration,
 } from "@/components/marketing/ProductPage";
 
 export const metadata: Metadata = {
@@ -48,12 +48,6 @@ export default function PatientFeedbackPage() {
             { title: "Free with HMIS / CMS", description: "Bundled at no extra cost when you run any other TamamHealth product. Standalone for facilities not yet on the platform." },
             { title: "Anonymous responses count", description: "Don't lose insight from patients who won't speak up by name." },
           ]}
-        />
-
-        <ProductCTA
-          heading="Start hearing your patients today"
-          subtitle="We can have a kiosk live in your waiting area, with custom questions in your local languages, in under a week."
-          primaryCta={{ label: "Get started", href: "/about/contact" }}
         />
       </main>
       

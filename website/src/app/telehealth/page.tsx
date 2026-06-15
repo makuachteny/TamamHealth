@@ -5,10 +5,8 @@ import Image from "next/image";
 import {
   Reveal,
   FAQItem,
-  DemoForm,
   CheckItem,
   TestimonialSwoosh,
-  PricingBannerIcon,
 } from "@/components/marketing/MarketingShared";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -41,7 +39,7 @@ export default function TelehealthPage() {
                 </div>
               </div>
               <div style={{ marginTop: 32 }}>
-                <Link href="#demo" className="mk-btn mk-btn-green mk-btn-lg">
+                <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
                   See offline capability demo
                 </Link>
               </div>
@@ -58,13 +56,6 @@ export default function TelehealthPage() {
                   style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
                   priority
                 />
-              </Reveal>
-            </div>
-
-            {/* Right: Demo Form */}
-            <div className="mk-hero-form">
-              <Reveal delay={0.2}>
-                <DemoForm />
               </Reveal>
             </div>
           </div>
@@ -190,9 +181,6 @@ export default function TelehealthPage() {
                   <CheckItem>Works reliably on 2G/3G starting at 240p</CheckItem>
                   <CheckItem>1:1 consultations and multi-party video support</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -225,9 +213,6 @@ export default function TelehealthPage() {
                   <CheckItem>Estimated wait time with real-time adjustments</CheckItem>
                   <CheckItem>Asynchronous intake forms and history collection</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -259,9 +244,6 @@ export default function TelehealthPage() {
                   <CheckItem>Intelligent frame rate and resolution scaling</CheckItem>
                   <CheckItem>Voice-only fallback mode for critical connectivity issues</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -293,9 +275,6 @@ export default function TelehealthPage() {
                   <CheckItem>X-ray, ECG, and imaging viewer integration</CheckItem>
                   <CheckItem>Optional encrypted recording for quality assurance</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -327,9 +306,6 @@ export default function TelehealthPage() {
                   <CheckItem>Encrypted recording storage with automatic purging</CheckItem>
                   <CheckItem>Quality assurance and compliance audit trails</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -361,9 +337,6 @@ export default function TelehealthPage() {
                   <CheckItem>Tablet-friendly responsive design for clinical teams</CheckItem>
                   <CheckItem>Push notifications and call alerts even offline</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -502,30 +475,6 @@ export default function TelehealthPage() {
                   Learn more
                 </Link>
               </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── PRICING CTA BANNER ──────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-pricing-banner">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 48, height: 48 }}>
-                <PricingBannerIcon />
-              </div>
-              <div>
-                <h3 className="mk-h3" style={{ margin: "0 0 4px" }}>
-                  Flexible telehealth pricing for practices of any size
-                </h3>
-                <p style={{ margin: 0, color: "var(--tb-text-sec)" }}>
-                  From solo practitioners to health systems, we scale with your needs.
-                </p>
-              </div>
-              <Link href="/pricing" className="mk-btn mk-btn-outline-green mk-btn-lg">
-                View pricing
-              </Link>
             </div>
           </Reveal>
         </div>

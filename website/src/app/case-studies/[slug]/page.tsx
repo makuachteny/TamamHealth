@@ -231,16 +231,6 @@ export default async function CaseStudyDetail({ params }: Params) {
           </section>
         )}
 
-        <section className="mk-cta-banner">
-          <div className="mk-container mk-cta-narrow">
-            <h2 className="mk-h2" style={{ marginBottom: 16 }}>Want results like these at your facility?</h2>
-            <p style={{ fontSize: 17, lineHeight: 1.55, color: "var(--tb-text-sec)", marginBottom: 28 }}>
-              Tell us about your facility and current pain points. We&rsquo;ll come back with a clear plan and timeline.
-            </p>
-            <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">Talk to our team</Link>
-          </div>
-        </section>
-
       </main>
       
     </>

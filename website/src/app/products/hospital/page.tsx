@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import {
-  ProductHero, ProductModuleGrid, ProductBenefits, ProductCTA, ProductIllustration,
+  ProductHero, ProductModuleGrid, ProductBenefits, ProductIllustration,
 } from "@/components/marketing/ProductPage";
 
 export const metadata: Metadata = {
@@ -19,7 +19,6 @@ export default function HospitalManagementPage() {
           subtitle="From the OPD queue at 6am to the night-shift handover, TamamHealth HMIS runs every department on one shared patient record. Built for the realities of intermittent power and bandwidth in South Sudan."
           accentColor="var(--tb-blue-700)"
           primaryCta={{ label: "Request a demo", href: "/about/contact" }}
-          secondaryCta={{ label: "See pricing", href: "/pricing" }}
           illustration={<ProductIllustration accent="var(--tb-blue-700)" variant="vitals" />}
         />
 
@@ -54,12 +53,6 @@ export default function HospitalManagementPage() {
             { title: "Multi-language ready", description: "English, Juba Arabic, Dinka, and Nuer locale packs. Switch per user, per facility, or per organization." },
             { title: "Local hosting + cloud option", description: "Run on a $300 mini-PC at the facility, or on cloud. Encryption in transit and at rest, with SS data sovereignty controls." },
           ]}
-        />
-
-        <ProductCTA
-          heading="See HMIS in your facility"
-          subtitle="A 30-minute walkthrough with one of our solutions team — we'll show you the modules that matter most for your facility size and patient volume."
-          primaryCta={{ label: "Request a demo", href: "/about/contact" }}
         />
       </main>
       

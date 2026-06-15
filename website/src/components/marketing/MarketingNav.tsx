@@ -35,37 +35,26 @@ export default function MarketingNav() {
       }}>
         <div className="mk-container mk-navbar-inner">
           {/* Logo */}
-          <Link href="/" className="mk-nav-logo">
-            <TamamHealthLogoNav />
-            <span className="mk-nav-logo-wordmark">
-              <span className="mk-nav-logo-text">
-                Tamam<span style={{ color: "#0d8844" }}>Health</span>
-              </span>
-              <span className="mk-nav-logo-tagline">Digital Records System</span>
-            </span>
+          <Link href="/" className="mk-nav-logo" aria-label="Tamam Healthcare System — home" style={{ display: "flex", alignItems: "center" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/tamamhealth-logo-name.svg"
+              alt="Tamam Healthcare System"
+              height={40}
+              style={{ height: 40, width: "auto", display: "block" }}
+            />
           </Link>
 
           {/* Desktop center nav links */}
           <div className="mk-nav-center desktop-only">
-            <Link href="/products" className="mk-nav-item">Services</Link>
-            <Link href="/ehr" className="mk-nav-item">Platform</Link>
-            <Link href="/case-studies" className="mk-nav-item">Case Studies</Link>
+            <Link href="/products" className="mk-nav-item">Product</Link>
+            <Link href="/pricing" className="mk-nav-item">Pricing</Link>
             <Link href="/about" className="mk-nav-item">About</Link>
             <Link href="/about/contact" className="mk-nav-item">Contact</Link>
           </div>
 
           {/* Desktop right CTA actions */}
           <div className="mk-nav-actions desktop-only" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                fontSize: 13, fontWeight: 600, color: "var(--tb-text-sec)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <DuoIcon name="phone" size={14} />
-              +1 (973) 566-4336
-            </span>
             {SHOW_FUNDRAISING && (
               <>
                 <div style={{ width: 1, height: 20, background: "var(--tb-cream-300)" }} />
@@ -92,8 +81,8 @@ export default function MarketingNav() {
                 </Link>
               </>
             )}
-            <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-sm">
-              Request a Demo
+            <Link href="/download" className="mk-btn mk-btn-green mk-btn-sm">
+              Open app
             </Link>
           </div>
 
@@ -120,19 +109,13 @@ export default function MarketingNav() {
             overflowY: "auto",
           }}>
             <Link href="/products" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-              Products
+              Product
             </Link>
-            <Link href="/ehr" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-              Platform
-            </Link>
-            <Link href="/case-studies" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-              Case Studies
+            <Link href="/pricing" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+              Pricing
             </Link>
             <Link href="/about" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
               About
-            </Link>
-            <Link href="/about/team" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-              Team
             </Link>
             <Link href="/about/contact" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
               Contact
@@ -156,8 +139,8 @@ export default function MarketingNav() {
               </Link>
             )}
 
-            <Link href="/about/contact" className="mk-btn mk-btn-green" onClick={() => setMobileOpen(false)}>
-              Request a Demo
+            <Link href="/download" className="mk-btn mk-btn-green" onClick={() => setMobileOpen(false)}>
+              Open app
             </Link>
           </div>
         )}
@@ -213,36 +196,5 @@ export default function MarketingNav() {
         }
       `}</style>
     </>
-  );
-}
-
-/* ── Inline SVG Icons ──────────────────────────────────────────── */
-function TamamHealthLogoNav() {
-  // Tamam Healthcare System dot-cluster mark (brand green).
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="90 -11 316 316" width="36" height="36" role="img" aria-label="Tamam Healthcare System">
-      <g fill="#0d8844">
-        <circle cx="127.67" cy="28.84" r="28.84"/>
-        <circle cx="218.69" cy="46.28" r="28.84"/>
-        <circle cx="296.1" cy="97.22" r="28.84"/>
-        <circle cx="348.12" cy="173.91" r="28.84"/>
-        <circle cx="366.84" cy="264.67" r="28.84"/>
-        <circle cx="130.25" cy="103.54" r="24.99"/>
-        <circle cx="192.48" cy="116.29" r="24.99"/>
-        <circle cx="245.1" cy="151.87" r="24.99"/>
-        <circle cx="280.09" cy="204.88" r="24.99"/>
-        <circle cx="292.14" cy="267.26" r="24.99"/>
-        <circle cx="129.41" cy="171.67" r="14.53"/>
-        <circle cx="165.64" cy="178.9" r="14.53"/>
-        <circle cx="196.34" cy="199.45" r="14.53"/>
-        <circle cx="216.83" cy="230.18" r="14.53"/>
-        <circle cx="224.01" cy="266.42" r="14.53"/>
-        <circle cx="129.38" cy="213.9" r="8.05"/>
-        <circle cx="149.44" cy="217.9" r="8.05"/>
-        <circle cx="166.45" cy="229.28" r="8.05"/>
-        <circle cx="177.81" cy="246.31" r="8.05"/>
-        <circle cx="181.78" cy="266.38" r="8.05"/>
-      </g>
-    </svg>
   );
 }

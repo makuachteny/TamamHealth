@@ -249,17 +249,6 @@ export default function ProductsPage() {
           </div>
         </section>
 
-        {/* CTA */}
-        <section className="mk-cta-banner">
-          <div className="mk-container mk-cta-narrow">
-            <h2 className="mk-h2" style={{ marginBottom: 16 }}>Not sure which service fits?</h2>
-            <p style={{ fontSize: 17, lineHeight: 1.55, color: "var(--tb-text-sec)", marginBottom: 28 }}>
-              Tell us about your facility — we&rsquo;ll recommend the right combination and walk you through pricing.
-            </p>
-            <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">Talk to our team</Link>
-          </div>
-        </section>
-
       </main>
       
     </>

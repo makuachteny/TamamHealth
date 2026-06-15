@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import {
-  ProductHero, ProductModuleGrid, ProductBenefits, ProductCTA, ProductIllustration,
+  ProductHero, ProductModuleGrid, ProductBenefits, ProductIllustration,
 } from "@/components/marketing/ProductPage";
 
 export const metadata: Metadata = {
@@ -19,7 +19,6 @@ export default function LabManagementPage() {
           subtitle="Receive orders from any clinician on the platform, run the bench workflow, capture results, and release them back to the requester. With turnaround-time tracking, instrument integration, and critical-value alerts."
           accentColor="var(--tb-gold-dark)"
           primaryCta={{ label: "Request a demo", href: "/about/contact" }}
-          secondaryCta={{ label: "See pricing", href: "/pricing" }}
           illustration={<ProductIllustration accent="var(--tb-gold-dark)" variant="lab" />}
         />
 
@@ -50,12 +49,6 @@ export default function LabManagementPage() {
             { title: "External order routing", description: "Receive samples from clinics that don't run TamamHealth — they get a lab-result PDF + SMS at no extra cost." },
             { title: "Drug-resistance + outbreak signal", description: "Built-in tracking for malaria RDT, TB, HIV viral load — feeds straight into the surveillance module." },
           ]}
-        />
-
-        <ProductCTA
-          heading="Bring your bench online"
-          subtitle="We'll connect your existing analyzers, configure your test menu, and train your technologists. Most labs are running in under two weeks."
-          primaryCta={{ label: "Schedule a site visit", href: "/about/contact" }}
         />
       </main>
       

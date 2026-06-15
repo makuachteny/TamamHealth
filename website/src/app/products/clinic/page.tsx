@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import {
-  ProductHero, ProductModuleGrid, ProductBenefits, ProductCTA, ProductIllustration,
+  ProductHero, ProductModuleGrid, ProductBenefits, ProductIllustration,
 } from "@/components/marketing/ProductPage";
 
 export const metadata: Metadata = {
@@ -19,7 +19,6 @@ export default function ClinicManagementPage() {
           subtitle="Run your full patient day on one screen — registration, consultation, prescription, dispensing, billing — without paying for inpatient features your facility doesn't have."
           accentColor="var(--tb-green-dark)"
           primaryCta={{ label: "Request a demo", href: "/about/contact" }}
-          secondaryCta={{ label: "See pricing", href: "/pricing" }}
           illustration={<ProductIllustration accent="var(--tb-green-dark)" variant="clinic" />}
         />
 
@@ -50,12 +49,6 @@ export default function ClinicManagementPage() {
             { title: "DHIS2 reports auto-built", description: "Your monthly HMIS 105 is generated from the visits you've already entered — no double data entry." },
             { title: "Local language", description: "Switch the UI to Juba Arabic, Dinka, or Nuer for staff who're more comfortable in their working language." },
           ]}
-        />
-
-        <ProductCTA
-          heading="See CMS in 20 minutes"
-          subtitle="A focused walkthrough of the clinic-day workflow — from arrival to discharge. We can have you in a sandbox by tomorrow."
-          primaryCta={{ label: "Book a walkthrough", href: "/about/contact" }}
         />
       </main>
       
