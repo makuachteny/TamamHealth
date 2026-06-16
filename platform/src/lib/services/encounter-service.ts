@@ -12,7 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { encountersDB } from '../db';
 import type { EncounterDoc } from '../db-types';
 import {
-  canTransition, stageOf, type EncounterStatus,
+  canTransition, stageOf, isTerminal, type EncounterStatus,
 } from '../clinical-flow/encounter-journey';
 import { findByType } from './db-query';
 import { logAuditSafe } from './audit-service';
@@ -114,4 +114,54 @@ export async function transitionEncounter(
   await logAuditSafe('TRANSITION_ENCOUNTER', opts?.actorId ?? existing.clinicianId, undefined, `Encounter ${id}: ${existing.status} → ${to}`);
   emitSyncEvent({ resourceType: 'clinical_encounter', resourceId: id, operation: 'update', resourceVersion: updated._rev, orgId: updated.orgId, hospitalId: updated.hospitalId });
   return updated;
+}
+
+/** The most recent still-open (non-terminal) encounter for a patient, or null. */
+export async function getOpenEncounterForPatient(patientId: string): Promise<EncounterDoc | null> {
+  const rows = await findByType<EncounterDoc>(
+    encountersDB(), 'clinical_encounter', { patientId }, { indexFields: ['type', 'patientId'] },
+  );
+  const open = rows.filter(e => !isTerminal(e.status));
+  open.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  return open[0] ?? null;
+}
+
+/**
+ * Facility checkout (Stage 10): advance an encounter that has finished its
+ * clinical work through the legal clinic-checkout → facility-checkout chain to
+ * a terminal `discharged` status (or `discharged_with_pending_items` when the
+ * checkout gate had unmet items that were overridden). Encounters that are
+ * already terminal, or that haven't reached the clinic-checkout stage yet (e.g.
+ * still `with_clinician`, or admitted/deceased/referred), are left untouched —
+ * we never force a discharge on a visit the clinician hasn't closed.
+ */
+const FACILITY_DISCHARGE_CHAIN: EncounterStatus[] = [
+  'ready_for_clinic_checkout',
+  'in_clinic_checkout',
+  'clinic_complete_awaiting_next_station',
+  'awaiting_facility_checkout',
+  'in_facility_checkout',
+];
+
+export async function dischargeEncounter(
+  id: string,
+  opts: { actorId?: string; pendingItems?: boolean } = {},
+): Promise<EncounterDoc | null> {
+  const enc = await getEncounter(id);
+  if (!enc) return null;
+  if (isTerminal(enc.status)) return enc; // already closed — nothing to do
+  const startIdx = FACILITY_DISCHARGE_CHAIN.indexOf(enc.status);
+  if (startIdx === -1) return enc; // not in a checkout-eligible state — leave as-is
+
+  const finalStatus: EncounterStatus = opts.pendingItems
+    ? 'discharged_with_pending_items'
+    : 'discharged';
+
+  let current = enc;
+  // Step through the remaining chain hops, then the terminal discharge.
+  for (let i = startIdx + 1; i < FACILITY_DISCHARGE_CHAIN.length; i++) {
+    current = await transitionEncounter(id, FACILITY_DISCHARGE_CHAIN[i], { actorId: opts.actorId });
+  }
+  current = await transitionEncounter(id, finalStatus, { actorId: opts.actorId });
+  return current;
 }

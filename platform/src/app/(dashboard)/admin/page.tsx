@@ -12,7 +12,7 @@ import SearchInput from '@/components/filters/SearchInput';
 import FilterSelect from '@/components/filters/FilterSelect';
 import {
   Building2, Users, HeartPulse, CreditCard, ChevronRight, ChevronLeft,
-  TrendingUp, Shield, Activity, Settings, BarChart3,
+  Shield, Activity, Settings, BarChart3,
   Clock, Database, RefreshCw,
 } from '@/components/icons/lucide';
 import type { AuditLogDoc } from '@/lib/db-types';
@@ -228,7 +228,7 @@ export default function AdminDashboardPage() {
         />
 
         {/* KPI Stat Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {[
             {
               id: 'totalOrgs',
@@ -263,29 +263,29 @@ export default function AdminDashboardPage() {
               accent: 'var(--accent-primary)',
             },
           ].map((stat) => (
-            <div key={stat.id} className="p-5 rounded-xl cursor-pointer" onClick={() => {
+            <button key={stat.id} type="button" className="dash-card text-left" style={{ padding: '14px 16px', cursor: 'pointer' }} onClick={() => {
               const routes: Record<string, string> = { totalOrgs: '/admin/organizations', totalUsers: '/admin/users', totalPatients: '/patients', activeSubs: '/admin/billing' };
               if (routes[stat.id]) router.push(routes[stat.id]);
-            }} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="icon-box-sm" style={{ background: `${stat.accent}15` }}>
-                  <stat.icon className="w-5 h-5" style={{ color: stat.accent }} />
+            }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <stat.icon className="w-3.5 h-3.5" style={{ color: stat.accent }} />
                 </div>
-                <TrendingUp className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                <span className="kpi-card-title">{stat.label}</span>
               </div>
-              <p className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{stat.value}</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{stat.label}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{stat.sub}</p>
-            </div>
+              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{stat.value}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{stat.sub}</div>
+            </button>
           ))}
         </div>
 
         {/* SYSTEM HEALTH DASHBOARD */}
-        <div className="rounded-2xl p-5 mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <Activity className="w-5 h-5" style={{ color: 'var(--color-success)' }} />
-            <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('admin.systemHealthDashboard')}</h2>
+        <div className="dash-card overflow-hidden mb-4">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('admin.systemHealthDashboard')}</h3>
           </div>
+          <div className="p-4">
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {/* Database Health */}
@@ -368,12 +368,13 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
           {/* Recent Organizations Table */}
-          <div className="lg:col-span-2 rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+          <div className="lg:col-span-2 dash-card overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
@@ -453,7 +454,7 @@ export default function AdminDashboardPage() {
           <div className="space-y-4">
 
             {/* Quick Links */}
-            <div className="rounded-xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="dash-card p-4">
               <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('admin.quickActions')}</p>
               <div className="data-row-divider-sm">
                 {quickLinks.map(link => (
@@ -472,7 +473,7 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Plan Distribution */}
-            <div className="rounded-xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="dash-card p-4">
               <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('admin.planDistribution')}</p>
               <div className="data-row-divider-sm">
                 {[
@@ -499,8 +500,8 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* AUDIT LOG VIEWER */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+        <div className="dash-card overflow-hidden">
+          <div className="flex items-center justify-between p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('admin.auditLog')}</span>

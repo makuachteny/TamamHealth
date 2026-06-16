@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import type { HospitalDoc, OrganizationDoc, UserRole, UserDoc } from './db-types';
 import type { OrgBranding } from './branding';
 import type { AggregateStatus } from './sync/sync-manager';
@@ -329,14 +329,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setTheme(prev => {
       const next = prev === 'light' ? 'dark' : 'light';
       localStorage.setItem('tamamhealth-theme', next);
       document.documentElement.setAttribute('data-theme', next);
       return next;
     });
-  };
+  }, []);
 
   const login = useCallback(async (username: string, password: string, hospitalId?: string): Promise<UserRole | false> => {
     try {
@@ -626,16 +626,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const syncPaused = !wantsOnline;
 
+  // Memoize the context value so consumers (TopBar, Sidebar, every page that
+  // calls useApp) don't re-render on each provider render — only when one of
+  // these values actually changes. setState setters and the useCallback'd
+  // actions are stable, so they don't need to be in the dependency list.
+  const value = useMemo<AppState>(() => ({
+    isAuthenticated, currentUser, isOnline, isNetworkUp, syncPaused,
+    lastSync, theme, dbReady,
+    globalSearch, setGlobalSearch,
+    sidebarOpen, setSidebarOpen,
+    sidebarCollapsed, setSidebarCollapsed,
+    login, logout, toggleOnline, toggleTheme,
+    syncStatus, syncNow,
+  }), [
+    isAuthenticated, currentUser, isOnline, isNetworkUp, syncPaused,
+    lastSync, theme, dbReady, globalSearch, sidebarOpen, sidebarCollapsed,
+    syncStatus, login, logout, toggleOnline, toggleTheme, syncNow,
+  ]);
+
   return (
-    <AppContext.Provider value={{
-      isAuthenticated, currentUser, isOnline, isNetworkUp, syncPaused,
-      lastSync, theme, dbReady,
-      globalSearch, setGlobalSearch,
-      sidebarOpen, setSidebarOpen,
-      sidebarCollapsed, setSidebarCollapsed,
-      login, logout, toggleOnline, toggleTheme,
-      syncStatus, syncNow,
-    }}>
+    <AppContext.Provider value={value}>
       {children}
     </AppContext.Provider>
   );

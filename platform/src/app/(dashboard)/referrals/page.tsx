@@ -6,7 +6,7 @@ import TopBar from '@/components/TopBar';
 import EmptyState from '@/components/EmptyState';
 import {
   ArrowRightLeft, Plus, Send, Eye, CheckCircle2,
-  AlertTriangle, ChevronDown, ChevronUp, X, Building2,
+  AlertTriangle, ChevronDown, ChevronUp, X,
   Stethoscope, Package, FileText, Image as ImageIcon,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   User, Activity, FlaskConical, Paperclip, XCircle, MessageSquarePlus,
@@ -545,7 +545,7 @@ export default function ReferralsPage() {
   return (
     <>
       <TopBar title={t('nav.referrals')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <PageHeader
             icon={ArrowRightLeft}
             title={t('referrals.pageTitle')}
@@ -754,7 +754,7 @@ export default function ReferralsPage() {
           )}
 
           {/* Tabs */}
-          <div className="flex items-center gap-0 mb-4 border-b" style={{ borderColor: 'var(--border-light)' }}>
+          <div className="flex items-center gap-0 mb-4 border-b" style={{ borderColor: 'var(--border-light)', marginTop: 16 }}>
             <button
               onClick={() => setActiveTab('incoming')}
               className={`px-5 py-3 text-sm font-medium transition-colors relative ${activeTab === 'incoming' ? 'tab-active' : ''}`}
@@ -825,7 +825,7 @@ export default function ReferralsPage() {
           </FilterBar>
 
           {/* Referrals List */}
-          <div className="space-y-3">
+          <div className="space-y-3" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
             {filteredReferrals.length === 0 ? (
               <div className="card-elevated">
                 <EmptyState
@@ -854,9 +854,6 @@ export default function ReferralsPage() {
                           <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>{ref.patientId}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          <div className="icon-box-sm" style={{ background: 'rgba(13,148,136,0.12)' }}>
-                            <Building2 className="w-3.5 h-3.5" style={{ color: '#1E3A8A' }} />
-                          </div>
                           {ref.fromHospital} → {ref.toHospital}
                           <span>&middot;</span>
                           <span>{ref.department}</span>

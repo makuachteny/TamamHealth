@@ -96,7 +96,7 @@ export default function HRDashboardPage() {
     <>
       <TopBar title={t('hr.dashboardTitle')} />
       <main className="page-container page-enter">
-        <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
+        <div className="flex items-end justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
           <div>
             <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>{t('hr.dashboardTitle')}</h1>
             <p className="text-[12px]" style={{ color: 'var(--text-muted)', marginTop: 2 }}>

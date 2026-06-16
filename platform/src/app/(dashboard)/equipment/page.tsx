@@ -134,7 +134,7 @@ export default function AssetsPage() {
   return (
     <>
       <TopBar title={t('equipment.topBarTitle')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <PageHeader
           icon={Package}
           title={t('equipment.pageTitle')}
@@ -190,7 +190,8 @@ export default function AssetsPage() {
         </FilterBar>
 
         {/* Asset table */}
-        <div className="dash-card overflow-hidden">
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
           <table className="data-table">
             <thead>
               <tr>
@@ -250,6 +251,7 @@ export default function AssetsPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Register modal */}

@@ -84,7 +84,13 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   // ----- Append-only audit trails (push only) -----
   { localName: 'tamamhealth_audit_log',             direction: 'push', orgScoped: true },
   { localName: 'tamamhealth_controlled_substance_log', direction: 'push', orgScoped: true },
-  { localName: 'tamamhealth_ledger',                direction: 'push', orgScoped: true },
+
+  // ----- Financial ledger (append-only, but READ for live balances) -----
+  // Must replicate BOTH ways: a charge raised at one station (e.g. the clinic)
+  // and a payment taken at another (the cashier) have to converge so every
+  // device computes the same patient balance. Unlike the audit/controlled logs
+  // (write-only trails), the ledger is read at the point of care.
+  { localName: 'tamamhealth_ledger',                direction: 'both', orgScoped: true },
 ];
 
 /** Build the full CouchDB remote URL for a given database name */

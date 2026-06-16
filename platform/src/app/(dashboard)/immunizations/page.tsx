@@ -189,12 +189,6 @@ export default function ImmunizationsPage() {
           icon={Syringe}
           title={t('immun.trackerTitle')}
           subtitle={t('immun.trackerSubtitle')}
-          stats={canViewCoverage && stats ? [
-            { label: t('immun.totalVaccinations'), value: stats.totalVaccinations, color: '#059669' },
-            { label: t('immun.childrenTracked'), value: stats.totalChildren, color: 'var(--accent-primary)' },
-            { label: t('immun.overdueDoses'), value: stats.overdue, color: 'var(--color-danger)' },
-            { label: t('immun.coverageRate'), value: `${stats.coverageRate}%`, color: '#059669' },
-          ] : undefined}
           actions={canRecordVitalEvents && (
             <button onClick={() => setShowModal(true)} className="btn btn-primary">
               <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}

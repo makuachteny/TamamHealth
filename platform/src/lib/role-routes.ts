@@ -41,6 +41,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/org-admin', '/org-admin/users', '/org-admin/hospitals',
       '/org-admin/branding', '/org-admin/settings', '/org-admin/analytics', '/org-admin/pricing',
+      '/facility-settings',
       '/hospitals', '/reports', '/settings',
       '/appointments',
       '/payments', '/payments/claims', '/payments/plans',
@@ -180,6 +181,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/reports', '/hospitals', '/settings',
+      '/facility-settings',
       '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
       '/appointments', '/telehealth', '/facility-assessments', '/data-quality',
       '/payments', '/payments/claims', '/payments/plans',
@@ -229,6 +231,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/epidemic-intelligence', '/mch-analytics', '/surveillance',
       // Network & facility
       '/hospitals', '/my-facility', '/facility-overview', '/facility-assessments',
+      '/facility-settings',
       // Reporting
       '/reports', '/data-quality', '/vital-statistics', '/dhis2-export', '/public-stats',
       // Facility operations
@@ -245,12 +248,13 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   },
 
   medical_biller: {
+    // The old /billing "Collections" cockpit was retired: A/R aging moved to
+    // /payments and the payer mix moved to /payments/claims.
     allowed: [
-      '/billing',
       '/payments', '/payments/claims', '/payments/plans', '/payments/portal',
       '/patients', '/appointments', '/messages', '/settings',
     ],
-    defaultDashboard: '/billing',
+    defaultDashboard: '/payments',
   },
 
   // ───────── Clinical-flow workflow stations (EHR Clinical Flow doc §4) ─────────
@@ -294,6 +298,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/appointments', '/telehealth', '/wards', '/alerts', '/settings',
+      '/blood-bank',
     ],
     defaultDashboard: '/dashboard',
   },
@@ -318,12 +323,16 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/surveillance', '/reports', '/settings',
       '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
       '/appointments', '/facility-assessments', '/data-quality',
+      '/facility-settings',
       '/payments', '/payments/claims', '/payments/plans',
       '/wards', '/equipment', '/hr', '/dashboard/hr',
       '/blood-bank', '/controlled-substances', '/emergency-preparedness',
       '/org-admin/users',
     ],
-    defaultDashboard: '/dashboard',
+    // The Facility Overview page is the facility administrator's home dashboard
+    // (the legacy quick-actions dashboard was removed; every shortcut it held now
+    // lives as its own sidebar tab).
+    defaultDashboard: '/facility-overview',
   },
 };
 

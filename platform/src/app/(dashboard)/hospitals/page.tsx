@@ -224,7 +224,7 @@ function HospitalsPageInner() {
   return (
     <>
       <TopBar title={t('hospitals.topBarTitle')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <PageHeader
           icon={Building2}
           title={t('hospitalManager.hospitalNetwork')}
@@ -276,7 +276,7 @@ function HospitalsPageInner() {
         </div>
 
         {/* ── Facility Table / Profile ── */}
-        <div className="card-elevated" style={{ overflow: 'hidden' }}>
+        <div className="card-elevated flex flex-col" style={{ overflow: 'hidden', flex: 1, minHeight: 0 }}>
           {selectedHospital ? (
             <FacilityProfile hospital={selectedHospital} onClose={() => setSelectedHospital(null)} canManage={canManage} />
           ) : (
@@ -347,7 +347,7 @@ function FacilityList({ hospitals, colorMetric, onSelect, canManage }: {
   }
 
   return (
-    <div style={{ overflow: 'auto' }}>
+    <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
       <table className="data-table" style={{ minWidth: 700 }}>
         <thead>
           <tr>
@@ -461,7 +461,7 @@ function FacilityProfile({ hospital, onClose, canManage }: {
   const totalStaff = (hospital.doctors || 0) + (hospital.clinicalOfficers || 0) + (hospital.nurses || 0) + (hospital.labTechnicians || 0) + (hospital.pharmacists || 0);
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 20, overflowY: 'auto', flex: 1, minHeight: 0 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>

@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Wallet, CreditCard, CalendarClock, DollarSign,
+  Wallet, CreditCard, CalendarClock,
   Shield, FileText, Clock,
   Receipt, AlertTriangle, CheckCircle, Printer, BarChart3,
   Plus, Trash2, RotateCcw, RefreshCw, X,
 } from '@/components/icons/lucide';
 import { BalanceBanner, InsuranceSnapshot, PaymentHistoryTimeline, PaymentPanel, PaymentPlanWizard } from '@/components/payments';
+import DataTile from '@/components/DataTile';
 import Modal from '@/components/Modal';
 import { getMethodConfig } from '@/lib/payment-method-config';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -315,60 +316,15 @@ export default function BillingTab({
       />
 
       {/* ─── Financial Summary KPIs ─── */}
-      <div className="grid grid-cols-2 gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', alignItems: 'stretch' }}>
-        {/* Total Charged */}
-        <div className="card-elevated p-4" style={{ borderLeft: '3px solid var(--accent-primary)' }}>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg" style={{ background: 'var(--accent-light)' }}>
-              <FileText size={44} style={{ color: 'var(--accent-primary)' }} />
-            </div>
-            <div>
-              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('billing.totalBilled')}</div>
-              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{fmt(d.totalCharged)}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Total Collected */}
-        <div className="card-elevated p-4" style={{ borderLeft: '3px solid var(--color-success)' }}>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg" style={{ background: 'var(--color-success-bg)' }}>
-              <CheckCircle size={44} style={{ color: 'var(--color-success)' }} />
-            </div>
-            <div>
-              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('billing.totalPaid')}</div>
-              <div className="text-lg font-bold" style={{ color: 'var(--color-success)' }}>{fmt(d.totalPaid)}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Insurance Paid */}
-        <div className="card-elevated p-4" style={{ borderLeft: '3px solid var(--color-info)' }}>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg" style={{ background: 'var(--color-info-bg)' }}>
-              <Shield size={44} style={{ color: 'var(--color-info)' }} />
-            </div>
-            <div>
-              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('billing.insurancePaid')}</div>
-              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{fmt(d.insurancePaid)}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Outstanding */}
-        <div className="card-elevated p-4" style={{ borderLeft: `3px solid ${d.outstanding > 0 ? 'var(--color-danger)' : 'var(--color-success)'}` }}>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg" style={{ background: d.outstanding > 0 ? 'var(--color-danger-bg)' : 'var(--color-success-bg)' }}>
-              <DollarSign size={44} style={{ color: d.outstanding > 0 ? 'var(--color-danger)' : 'var(--color-success)' }} />
-            </div>
-            <div>
-              <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('billing.kpiOutstanding')}</div>
-              <div className="text-lg font-bold" style={{ color: d.outstanding > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
-                {d.outstanding > 0 ? fmt(d.outstanding) : t('billing.paidInFull')}
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', alignItems: 'stretch' }}>
+        <DataTile label={t('billing.totalBilled')} value={fmt(d.totalCharged)} />
+        <DataTile label={t('billing.totalPaid')} value={fmt(d.totalPaid)} tone={d.totalPaid > 0 ? 'ok' : 'default'} />
+        <DataTile label={t('billing.insurancePaid')} value={fmt(d.insurancePaid)} />
+        <DataTile
+          label={t('billing.kpiOutstanding')}
+          value={d.outstanding > 0 ? fmt(d.outstanding) : t('billing.paidInFull')}
+          tone={d.outstanding > 0 ? 'danger' : 'ok'}
+        />
       </div>
 
       {/* ─── Quick Actions ─── */}

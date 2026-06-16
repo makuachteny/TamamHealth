@@ -498,17 +498,17 @@ export default function NurseDashboardPage() {
       <button
         key={a.key}
         onClick={a.onClick}
-        className="flex flex-col items-center justify-center text-center gap-2 p-3 rounded-xl transition-all hover:shadow-sm hover:-translate-y-0.5"
+        className="flex flex-col items-center justify-center text-center gap-1.5 p-2.5 rounded-lg transition-all hover:shadow-sm hover:-translate-y-0.5"
         style={{
           background: a.bg,
           border: `1px solid ${isCurrent ? a.color : 'var(--border-light)'}`,
           boxShadow: isCurrent ? `0 0 0 1px ${a.color}` : undefined,
         }}
       >
-        <span className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg-card-solid)' }}>
-          <a.icon className="w-[18px] h-[18px]" style={{ color: a.color }} />
+        <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg-card-solid)' }}>
+          <a.icon className="w-4 h-4" style={{ color: a.color }} />
         </span>
-        <span className="text-[12px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{a.label}</span>
+        <span className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{a.label}</span>
       </button>
     );
   };
@@ -519,7 +519,7 @@ export default function NurseDashboardPage() {
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column' }}>
 
         {/* COMMAND CENTER HEADER */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
               background: 'var(--accent-primary)',
@@ -758,28 +758,6 @@ export default function NurseDashboardPage() {
                           <span className="text-sm font-bold" style={{ color: item.color }}>{item.count}</span>
                         </div>
                       ))}
-                      {/* Today's triage activity */}
-                      <div className="pt-2 mt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
-                        <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('nurse.todaysActivity')}</p>
-                        <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.totalTriagedToday')}</span>
-                          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                            {triageHistory.filter(ti => (ti.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.currentlyInConsult')}</span>
-                          <span className="text-sm font-bold" style={{ color: '#2563EB' }}>
-                            {triageHistory.filter(ti => ti.status === 'seen').length}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.dischargedToday')}</span>
-                          <span className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>
-                            {triageHistory.filter(ti => ti.status === 'discharged' && (ti.triagedAt || '').startsWith(new Date().toISOString().slice(0, 10))).length}
-                          </span>
-                        </div>
-                      </div>
                     </div>
                   </div>
 
@@ -794,7 +772,6 @@ export default function NurseDashboardPage() {
                     <div className="p-3 space-y-2 flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
                       {[
                         { label: t('nurse.overdue'), value: overdueMarCount, color: 'var(--color-danger)' },
-                        { label: t('nurse.dueNow'), value: dueMarCount, color: 'var(--color-warning)' },
                         { label: t('nurse.upcoming'), value: marEntries.filter(e => e.status === 'upcoming').length, color: 'var(--text-muted)' },
                         { label: t('nurse.given'), value: marEntries.filter(e => e.status === 'given').length, color: 'var(--color-success)' },
                       ].map(item => (
@@ -806,20 +783,6 @@ export default function NurseDashboardPage() {
                           <span className="text-sm font-bold" style={{ color: item.color }}>{item.value}</span>
                         </div>
                       ))}
-                      {/* MAR summary */}
-                      <div className="pt-2 mt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
-                        <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('nurse.shiftProgress')}</p>
-                        <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.totalScheduled')}</span>
-                          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{marEntries.length}</span>
-                        </div>
-                        <div className="flex items-center justify-between p-2 rounded-lg mt-1.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nurse.completionRate')}</span>
-                          <span className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>
-                            {marEntries.length > 0 ? Math.round((marEntries.filter(e => e.status === 'given').length / marEntries.length) * 100) : 0}%
-                          </span>
-                        </div>
-                      </div>
                     </div>
                   </div>
 
@@ -829,7 +792,7 @@ export default function NurseDashboardPage() {
               {/* Quick Actions — right column; doubles as the view switcher */}
               <div className="dash-card p-4 flex flex-col lg:col-span-1">
                 <h3 className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('dashboard.quickActions')}</h3>
-                <div className="grid grid-cols-2 gap-2.5 flex-1">
+                <div className="grid grid-cols-2 gap-2.5 flex-1 content-center">
                   {quickActions.map(quickActionButton)}
                 </div>
               </div>
@@ -1248,7 +1211,14 @@ export default function NurseDashboardPage() {
                 ) : (
                   <div className="space-y-2">
                     {triageHistory.slice(0, 12).map(ti => {
-                      const c = triagePriorityColor(ti.priority);
+                      // Tinted priority chip — same light-bg + colored-text treatment
+                      // used by the ward status pills and the KPI tiles, so YELLOW
+                      // reads as a clean amber rather than a muddy solid fill.
+                      const pri = ti.priority === 'RED'
+                        ? { bg: 'rgba(196,69,54,0.12)', color: 'var(--color-danger)', border: 'rgba(196,69,54,0.30)' }
+                        : ti.priority === 'YELLOW'
+                        ? { bg: 'rgba(228,168,75,0.15)', color: 'var(--color-warning)', border: 'rgba(228,168,75,0.38)' }
+                        : { bg: 'rgba(27,158,119,0.12)', color: 'var(--color-success)', border: 'rgba(27,158,119,0.30)' };
                       const timeAgo = (() => {
                         try {
                           const mins = Math.floor((Date.now() - new Date(ti.triagedAt).getTime()) / 60000);
@@ -1265,8 +1235,8 @@ export default function NurseDashboardPage() {
                           className="flex items-center gap-2 p-2 rounded-xl"
                           style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
                         >
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: c.bg, color: c.text }}>
-                            <span className="text-[9px] font-black">{ti.priority}</span>
+                          <div className="px-1.5 h-8 min-w-[2.75rem] rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: pri.bg, color: pri.color, border: `1px solid ${pri.border}` }}>
+                            <span className="text-[9px] font-bold tracking-wide">{ti.priority}</span>
                           </div>
                           <button className="flex-1 min-w-0 text-left" onClick={() => router.push(`/patients/${ti.patientId}`)} title={t('nurse.viewPatientRecord')}>
                             <p className="text-[11px] font-semibold truncate hover:underline" style={{ color: 'var(--text-primary)' }}>{ti.patientName}</p>

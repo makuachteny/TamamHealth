@@ -270,7 +270,7 @@ export default function OrgUsersPage() {
     <div className="flex-1 flex flex-col">
       <TopBar title={t('orgUsers.pageTitle')} />
 
-      <div className="page-container page-enter">
+      <div className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Success/Error banners */}
         {success && (
           <div className="mb-4 p-3 rounded-lg text-sm font-medium" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-border)' }}>
@@ -342,7 +342,12 @@ export default function OrgUsersPage() {
         </div>
 
         {/* Users Table */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgUsers.heading')}</h3>
+          </div>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
           <table className="w-full">
             <thead>
               <tr>
@@ -449,6 +454,7 @@ export default function OrgUsersPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 

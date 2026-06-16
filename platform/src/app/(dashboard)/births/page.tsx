@@ -63,7 +63,7 @@ export default function BirthsPage() {
   return (
     <>
       <TopBar title={t('nav.births')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <PageHeader
           icon={Baby}
           title={t('nav.births')}
@@ -108,7 +108,8 @@ export default function BirthsPage() {
         </FilterBar>
 
         {/* Table */}
-        <div className="card-elevated overflow-hidden">
+        <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
           {loading ? (
             <div className="p-8 text-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</p></div>
           ) : (
@@ -181,6 +182,7 @@ export default function BirthsPage() {
               </tbody>
             </table>
           )}
+          </div>
         </div>
 
         {/* Registration Form Modal */}

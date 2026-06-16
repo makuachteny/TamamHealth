@@ -1,13 +1,17 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import Sidebar from '@/components/Sidebar';
 import RoleGuard from '@/components/RoleGuard';
+import { SettingsProvider } from '@/lib/settings/SettingsProvider';
+import PreferenceEffects from '@/components/PreferenceEffects';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import LockScreen from '@/components/LockScreen';
 import ConnectivityNotice from '@/components/ConnectivityNotice';
+import MessagingDock from '@/components/MessagingDock';
+import { MessagingDockProvider } from '@/lib/messaging-dock-context';
 import GetStartedCard from '@/components/onboarding/GetStartedCard';
 import ForcePasswordChange from '@/components/ForcePasswordChange';
 import { useAutoLock } from '@/lib/hooks/useAutoLock';
@@ -15,11 +19,6 @@ import { Loader2 } from '@/components/icons/lucide';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
-  // Messaging is an immersive, full-screen workspace: it hides the global nav
-  // rail and chrome so the chat occupies the entire screen (a Back control in
-  // the page returns to the rest of the app).
-  const focusMode = !!pathname && pathname.startsWith('/messages');
   const { isAuthenticated, currentUser, dbReady, sidebarCollapsed, logout } = useApp();
   const orgTimeout = currentUser?.organization?.lockTimeoutMinutes;
   const { isLocked, hasPin, unlock, verifyPin, setPin } = useAutoLock(isAuthenticated, orgTimeout);
@@ -63,6 +62,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const sidebarMargin = sidebarCollapsed ? '92px' : '268px';
 
   return (
+    <SettingsProvider>
+    <MessagingDockProvider>
     <div className="flex h-screen overflow-hidden gradient-mesh-bg">
       {isLocked && currentUser && (
         <LockScreen
@@ -75,28 +76,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       )}
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      {!focusMode && <Sidebar />}
+      <Sidebar />
       <div
         className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10 transition-all duration-300 ease-in-out"
       >
-        {!focusMode && (
-          <style>{`
-            @media (min-width: 1024px) {
-              .dashboard-content-area { margin-left: ${sidebarMargin}; }
-            }
-          `}</style>
-        )}
-        <div className={`${focusMode ? '' : 'dashboard-content-area pt-3'} flex-1 flex flex-col min-w-0 overflow-hidden`}>
+        <style>{`
+          @media (min-width: 1024px) {
+            .dashboard-content-area { margin-left: ${sidebarMargin}; }
+          }
+        `}</style>
+        <div className="dashboard-content-area pt-3 flex-1 flex flex-col min-w-0 overflow-hidden">
           <main id="main-content" className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
             <RoleGuard>{children}</RoleGuard>
             {/* First-run onboarding. Self-gates: only renders for a new user
                 on their home dashboard, overlaying the content area. */}
-            {!focusMode && <GetStartedCard />}
+            <GetStartedCard />
           </main>
         </div>
       </div>
+      <PreferenceEffects />
       <KeyboardShortcuts />
       <ConnectivityNotice />
+      <MessagingDock />
     </div>
+    </MessagingDockProvider>
+    </SettingsProvider>
   );
 }

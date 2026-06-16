@@ -237,6 +237,21 @@ export default function DataEntryDashboard() {
       <TopBar title={t('dataEntry.title')} />
       <main className="page-container page-enter">
 
+        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
+        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-primary)' }}>
+              <ClipboardCheck className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.title')}</h1>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {myHospital?.name || currentUser.hospitalName || ''}{myHospital?.state ? ` · ${myHospital.state}` : ''}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Facility banner */}
         {myHospital && (
           <div className="dash-card mb-4">
@@ -267,21 +282,21 @@ export default function DataEntryDashboard() {
         )}
 
         {/* KPI strip from latest report */}
-        <div className="kpi-grid mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {[
             { label: t('dataEntry.kpiFacilityScore'), value: facilityStats ? `${facilityStats.pct}%` : '--', icon: BarChart3, color: facilityStats && facilityStats.pct >= 80 ? 'var(--color-success)' : 'var(--color-warning)' },
             { label: t('dashboard.bedOccupancy'), value: latest ? `${bedOccupancy}%` : '--', icon: BedDouble, color: bedOccupancy > 90 ? 'var(--color-danger)' : bedOccupancy > 70 ? 'var(--color-warning)' : 'var(--color-success)' },
             { label: t('dataEntry.kpiMedicineAvail'), value: latest ? `${medAvailability}%` : '--', icon: Pill, color: medAvailability >= 80 ? 'var(--color-success)' : medAvailability >= 50 ? 'var(--color-warning)' : 'var(--color-danger)' },
             { label: t('dataEntry.kpiReportsFiled'), value: savedReports.length, icon: FileText, color: ACCENT },
           ].map(k => (
-            <div key={k.label} className="kpi">
-              <div className="kpi__icon" style={{ background: `${k.color}15` }}>
-                <k.icon style={{ color: k.color }} />
+            <div key={k.label} className="dash-card" style={{ padding: '14px 16px' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <k.icon className="w-3.5 h-3.5" style={{ color: k.color }} />
+                </div>
+                <span className="kpi-card-title">{k.label}</span>
               </div>
-              <div className="kpi__body">
-                <div className="kpi__value">{k.value}</div>
-                <div className="kpi__label">{k.label}</div>
-              </div>
+              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{k.value}</div>
             </div>
           ))}
         </div>

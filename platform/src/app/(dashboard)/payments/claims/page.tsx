@@ -3,16 +3,37 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   FileText,
-  Clock,
-  CheckCircle,
-  XCircle,
   AlertTriangle,
 } from '@/components/icons/lucide';
 import TopBar from '@/components/TopBar';
+import PageHeader from '@/components/PageHeader';
+import DataTile from '@/components/DataTile';
 import { SearchInput, FilterBar, FilterSelect } from '@/components/filters';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import type { ClaimDoc, ClaimStatus } from '@/lib/db-types-payments';
+import type { ClaimDoc, ClaimStatus, PayerType } from '@/lib/db-types-payments';
+
+// Payer mix labels/colours — relocated from the old Billing cockpit so the
+// payer breakdown lives next to the claims it summarises.
+const PAYER_LABEL_KEYS: Record<PayerType, string> = {
+  self_pay: 'billing.payerSelfPay',
+  nhis: 'billing.payerNhis',
+  cbhi: 'billing.payerCbhi',
+  donor: 'billing.payerDonor',
+  government: 'billing.payerGovernment',
+  private: 'billing.payerPrivate',
+  employer: 'billing.payerEmployer',
+};
+
+const PAYER_COLORS: Record<PayerType, string> = {
+  self_pay: 'var(--accent-primary)',
+  nhis: 'var(--color-success)',
+  cbhi: '#0891B2',
+  donor: 'var(--color-warning)',
+  government: '#7C3AED',
+  private: '#EA580C',
+  employer: '#0F766E',
+};
 
 interface ClaimKPIs {
   totalClaims: number;
@@ -234,187 +255,55 @@ export default function ClaimsPage() {
     return colorMap[status] || 'var(--text-secondary)';
   };
 
+  // Revenue share by payer type across all claims.
+  const payerMix = useMemo(() => {
+    const mix: Partial<Record<PayerType, number>> = {};
+    for (const c of claims) mix[c.payerType] = (mix[c.payerType] || 0) + (c.totalBilled || 0);
+    const total = Object.values(mix).reduce((s, v) => s + (v || 0), 0) || 1;
+    return (Object.keys(mix) as PayerType[])
+      .map(k => ({ payer: k, amount: mix[k] || 0, pct: Math.round(((mix[k] || 0) / total) * 100) }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [claims]);
+
   return (
-    <main className="page-container page-enter">
+    <>
       <TopBar title={t('claims.title')} />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
-      {/* KPI Cards - Premium Style with Top Border Accents */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', alignItems: 'stretch', gap: '1.5rem', marginBottom: '2.5rem' }}>
-        {/* Total Claims KPI */}
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-light)',
-          borderRadius: 'var(--card-radius)',
-          boxShadow: 'var(--card-shadow)',
-          borderTop: '3px solid var(--color-info)',
-          padding: '1.5rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-            <div className="icon-box-sm" style={{
-              background: 'var(--color-info-bg)',
-            }}>
-              <FileText size={16} color="var(--color-info)" strokeWidth={1.5} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{
-                fontSize: 'clamp(1.25rem, 2vw, 1.75rem)',
-                fontWeight: '700',
-                color: 'var(--text-primary)',
-                lineHeight: '1.2',
-              }}>
-                {kpis.totalClaims}
-              </div>
-              <div style={{
-                fontSize: '0.6875rem',
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: 'var(--text-secondary)',
-                marginTop: '0.5rem',
-              }}>
-                {t('claims.kpiTotalClaims')}
-              </div>
-            </div>
-          </div>
-        </div>
+      <PageHeader
+        icon={FileText}
+        title={t('claims.title')}
+      />
 
-        {/* Pending Review KPI */}
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-light)',
-          borderRadius: 'var(--card-radius)',
-          boxShadow: 'var(--card-shadow)',
-          borderTop: '3px solid var(--color-warning)',
-          padding: '1.5rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-            <div className="icon-box-sm" style={{
-              background: 'var(--color-warning-bg)',
-            }}>
-              <Clock size={16} color="var(--color-warning)" strokeWidth={1.5} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{
-                fontSize: 'clamp(1.25rem, 2vw, 1.75rem)',
-                fontWeight: '700',
-                color: 'var(--text-primary)',
-                lineHeight: '1.2',
-              }}>
-                {kpis.pendingReview}
-              </div>
-              <div style={{
-                fontSize: '0.6875rem',
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: 'var(--text-secondary)',
-                marginTop: '0.5rem',
-              }}>
-                {t('claims.kpiPendingReview')}
-              </div>
-              <div style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)',
-                marginTop: '0.5rem',
-              }}>
-                SSP {kpis.pendingAmount.toLocaleString()}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Approved Claims KPI */}
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-light)',
-          borderRadius: 'var(--card-radius)',
-          boxShadow: 'var(--card-shadow)',
-          borderTop: '3px solid var(--color-success)',
-          padding: '1.5rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-            <div className="icon-box-sm" style={{
-              background: 'var(--color-success-bg)',
-            }}>
-              <CheckCircle size={16} color="var(--color-success)" strokeWidth={1.5} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{
-                fontSize: 'clamp(1.25rem, 2vw, 1.75rem)',
-                fontWeight: '700',
-                color: 'var(--text-primary)',
-                lineHeight: '1.2',
-              }}>
-                {kpis.approved}
-              </div>
-              <div style={{
-                fontSize: '0.6875rem',
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: 'var(--text-secondary)',
-                marginTop: '0.5rem',
-              }}>
-                {t('claims.kpiApprovedClaims')}
-              </div>
-              <div style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)',
-                marginTop: '0.5rem',
-              }}>
-                SSP {kpis.approvedAmount.toLocaleString()}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Denied Claims KPI */}
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-light)',
-          borderRadius: 'var(--card-radius)',
-          boxShadow: 'var(--card-shadow)',
-          borderTop: '3px solid var(--color-danger)',
-          padding: '1.5rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-            <div className="icon-box-sm" style={{
-              background: 'var(--color-danger-bg)',
-            }}>
-              <XCircle size={16} color="var(--color-danger)" strokeWidth={1.5} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{
-                fontSize: 'clamp(1.25rem, 2vw, 1.75rem)',
-                fontWeight: '700',
-                color: 'var(--text-primary)',
-                lineHeight: '1.2',
-              }}>
-                {kpis.denied}
-              </div>
-              <div style={{
-                fontSize: '0.6875rem',
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: 'var(--text-secondary)',
-                marginTop: '0.5rem',
-              }}>
-                {t('claims.kpiDeniedClaims')}
-              </div>
-              <div style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)',
-                marginTop: '0.5rem',
-              }}>
-                SSP {kpis.deniedAmount.toLocaleString()}
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+        <DataTile label={t('claims.kpiTotalClaims')} value={kpis.totalClaims} />
+        <DataTile label={t('claims.kpiPendingReview')} value={kpis.pendingReview} hint={`SSP ${kpis.pendingAmount.toLocaleString()}`} tone={kpis.pendingReview > 0 ? 'warning' : 'default'} />
+        <DataTile label={t('claims.kpiApprovedClaims')} value={kpis.approved} hint={`SSP ${kpis.approvedAmount.toLocaleString()}`} tone={kpis.approved > 0 ? 'ok' : 'default'} />
+        <DataTile label={t('claims.kpiDeniedClaims')} value={kpis.denied} hint={`SSP ${kpis.deniedAmount.toLocaleString()}`} tone={kpis.denied > 0 ? 'danger' : 'default'} />
       </div>
 
-      <hr className="section-divider" />
+      {/* Payer mix — revenue share by payer across all claims. */}
+      {payerMix.length > 0 && (
+        <section className="glass-section" style={{ marginBottom: 16 }}>
+          <div className="glass-section-header">
+            <span className="kpi-card-title">{t('billing.payerMix')}</span>
+          </div>
+          <div className="glass-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {payerMix.map(({ payer, amount, pct }) => (
+              <div key={payer}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 3 }}>
+                  <span style={{ fontWeight: 600 }}>{t(PAYER_LABEL_KEYS[payer])}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>SSP {amount.toLocaleString()} · {pct}%</span>
+                </div>
+                <div style={{ height: 6, borderRadius: 3, background: 'var(--overlay-medium)', overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: PAYER_COLORS[payer] }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Search and Filter Controls */}
       <FilterBar>
@@ -438,41 +327,24 @@ export default function ClaimsPage() {
         />
       </FilterBar>
 
-      <hr className="section-divider" />
-
-      {/* Claims Table - Premium Style */}
-      <div style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-light)',
-        borderRadius: 'var(--card-radius)',
-        boxShadow: 'var(--card-shadow)',
-        overflowX: 'auto',
-      }}>
+      {/* Claims Table */}
+      <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+        <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+          <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('claims.title')}</h3>
+        </div>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
         {loading ? (
-          <div style={{
-            padding: '3rem 2rem',
-            textAlign: 'center',
-            color: 'var(--text-secondary)',
-            fontSize: '0.9375rem',
-          }}>
+          <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
             {t('claims.loading')}
           </div>
         ) : filteredClaims.length === 0 ? (
-          <div style={{
-            padding: '3rem 2rem',
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '1rem',
-          }}>
-            <AlertTriangle size={56} color="var(--text-muted)" />
-            <div>
-              <p style={{ margin: 0, fontWeight: '600', color: 'var(--text-primary)' }}>{t('claims.emptyTitle')}</p>
-              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                {t('claims.emptyDescription')}
-              </p>
-            </div>
+          <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
+            <AlertTriangle className="w-8 h-8 mx-auto mb-2" style={{ opacity: 0.6 }} />
+            <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t('claims.emptyTitle')}</p>
+            <p style={{ marginTop: 4, fontSize: '0.8125rem' }}>
+              {t('claims.emptyDescription')}
+            </p>
           </div>
         ) : (
           <table style={{
@@ -685,6 +557,7 @@ export default function ClaimsPage() {
             </tbody>
           </table>
         )}
+        </div>
       </div>
 
       {/* Adjudication Modal - Premium Style */}
@@ -954,6 +827,7 @@ export default function ClaimsPage() {
           </div>
         </div>
       )}
-    </main>
+      </main>
+    </>
   );
 }

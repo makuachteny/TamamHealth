@@ -80,7 +80,6 @@ const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: number }> 
   '/hr': { verb: 'Manage HR & leave', desc: 'Review staff records and approve leave requests.', est: 2 },
   '/payments': { verb: 'Take a payment', desc: 'Record a payment, issue a receipt, and view outstanding bills.', est: 2 },
   '/payments/claims': { verb: 'Submit an insurance claim', desc: 'Create and track claims through to adjudication.', est: 2 },
-  '/billing': { verb: 'Work the collections queue', desc: 'Review balances and drive bills and claims to closure.', est: 2 },
   // Admin / org-admin
   '/admin/organizations': { verb: 'Set up organizations', desc: 'Create and configure the organizations on the platform.', est: 2 },
   '/admin/users': { verb: 'Manage all users', desc: 'Create accounts and assign roles across the platform.', est: 2 },

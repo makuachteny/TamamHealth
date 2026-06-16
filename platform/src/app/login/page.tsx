@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, ChevronRight, X } from '@/components/icons/lucide';
 import { Icon } from '@/components/icons';
 import { useApp } from '@/lib/context';
-import { getDefaultDashboard } from '@/lib/permissions';
+import { resolveLandingPage } from '@/lib/user-prefs';
 import type { UserRole } from '@/lib/db-types';
 
 // Tamam brand accent — Tailwind blue scale.
@@ -191,7 +191,7 @@ export default function LoginPage() {
   }, [demoEnabled]);
 
   useEffect(() => {
-    if (isAuthenticated && currentUser) router.push(getDefaultDashboard(currentUser.role));
+    if (isAuthenticated && currentUser) router.push(resolveLandingPage(currentUser.role));
   }, [isAuthenticated, currentUser, router]);
 
   // Open a demo user's sign-in screen with their credentials pre-filled.
@@ -221,7 +221,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await login(username, password, hospitalId || undefined);
-      if (result) router.push(getDefaultDashboard(result));
+      if (result) router.push(resolveLandingPage(result));
       else { setError('Invalid credentials. Please try again.'); setLoading(false); }
     } catch { setError('Login failed. Please try again.'); setLoading(false); }
   };

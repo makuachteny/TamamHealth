@@ -203,7 +203,7 @@ function FacilityOverview() {
         </div>
 
         {/* ═══ KPI STRIP ═══ */}
-        <div className="stat-grid">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
           <StatCard icon={Users} label="Patients" value={String(hospital?.patientCount ?? 0)} tint="var(--accent-primary)" />
           <StatCard icon={BedDouble} label="Beds" value={String(hospital?.totalBeds ?? 0)} tint="var(--color-warning)" />
           <StatCard icon={Users} label="Clinical Staff" value={String(staff)} tint="var(--accent-primary)" />
@@ -264,7 +264,7 @@ function FacilityOverview() {
         {/* ═══ VITAL EVENTS ═══ */}
         <div className="card-elevated p-5 mt-4 mb-2">
           <SectionTitle icon={<HeartPulse className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />} title="Vital Events & Care Programs" />
-          <div className="stat-grid mt-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3">
             <StatCard icon={Baby} label="Births Registered" value={String(births.length)} tint="var(--accent-primary)" />
             <StatCard icon={Skull} label="Deaths Registered" value={String(deaths.length)} tint="var(--text-muted)" />
             <StatCard icon={HeartPulse} label="ANC Visits" value={String(ancVisits.length)} tint="#ec4899" />
@@ -278,14 +278,14 @@ function FacilityOverview() {
 
 function StatCard({ icon: Icon, label, value, tint }: { icon: typeof Users; label: string; value: string; tint: string }) {
   return (
-    <div className="dash-stat">
-      <div className="dash-stat__icon" style={{ background: 'var(--accent-light)', color: tint }}>
-        <Icon className="w-4 h-4" />
+    <div className="dash-card" style={{ padding: '14px 16px' }}>
+      <div className="flex items-center gap-2 mb-2">
+        <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+          <Icon className="w-3.5 h-3.5" style={{ color: tint }} />
+        </div>
+        <span className="kpi-card-title">{label}</span>
       </div>
-      <div>
-        <div className="dash-stat__value">{value}</div>
-        <div className="dash-stat__label">{label}</div>
-      </div>
+      <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800, letterSpacing: '-0.03em' }}>{value}</div>
     </div>
   );
 }

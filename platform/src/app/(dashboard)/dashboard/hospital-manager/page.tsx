@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import RoleGuard from '@/components/RoleGuard';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Building2, Users, Wallet, BarChart3, ArrowRight,
   AlertTriangle, Download, HeartPulse, Bug, ShieldCheck, Receipt, Globe,
+  LayoutDashboard,
 } from '@/components/icons/lucide';
 
 /**
@@ -117,29 +117,51 @@ function HospitalManagerDashboard() {
     <>
       <TopBar />
       <main className="page-container">
-        <PageHeader
-          icon={Building2}
-          title={t('hospitalManager.title')}
-          subtitle={t('hospitalManager.subtitle', { facility: facilityName })}
-        />
 
-        {/* KPI strip */}
-        <div className="stat-grid">
-          <StatCard icon={Users} label={t('hospitalManager.kpiPatients')} value={loading ? '—' : String(stats?.patients ?? 0)} tint="var(--accent-primary)" />
-          <StatCard icon={Building2} label={t('hospitalManager.kpiFacilitiesInNetwork')} value={loading ? '—' : String(stats?.facilities ?? 0)} tint="var(--accent-primary)" />
-          <StatCard icon={Wallet} label={t('hospitalManager.kpiRevenueCollected')} value={loading ? '—' : money(stats?.revenue ?? 0)} tint="var(--color-success)" />
-          <StatCard icon={Receipt} label={t('hospitalManager.kpiOutstanding')} value={loading ? '—' : money(stats?.outstanding ?? 0)} tint="var(--color-warning)" />
-          <StatCard icon={ShieldCheck} label={t('hospitalManager.kpiFacilityReadiness')} value={loading ? '—' : `${stats?.readiness ?? 0}%`} tint="var(--accent-primary)" />
-          <StatCard
-            icon={AlertTriangle}
-            label={t('hospitalManager.kpiEpidemicRisk')}
-            value={loading ? '—' : (stats?.riskLevel ?? 'low').toUpperCase()}
-            tint={RISK_COLORS[stats?.riskLevel ?? 'low']}
-          />
+        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
+        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-primary)' }}>
+              <Building2 className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('hospitalManager.title')}</h1>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {t('hospitalManager.subtitle', { facility: facilityName })}
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Intelligence + management entry points */}
-        <div className="grid grid-cols-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 8 }}>
+        {/* ═══ KPI TILES ═══ */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-4">
+          {[
+            { icon: Users, label: t('hospitalManager.kpiPatients'), value: loading ? '—' : String(stats?.patients ?? 0), tint: 'var(--accent-primary)' },
+            { icon: Building2, label: t('hospitalManager.kpiFacilitiesInNetwork'), value: loading ? '—' : String(stats?.facilities ?? 0), tint: 'var(--accent-primary)' },
+            { icon: Wallet, label: t('hospitalManager.kpiRevenueCollected'), value: loading ? '—' : money(stats?.revenue ?? 0), tint: 'var(--color-success)' },
+            { icon: Receipt, label: t('hospitalManager.kpiOutstanding'), value: loading ? '—' : money(stats?.outstanding ?? 0), tint: 'var(--color-warning)' },
+            { icon: ShieldCheck, label: t('hospitalManager.kpiFacilityReadiness'), value: loading ? '—' : `${stats?.readiness ?? 0}%`, tint: 'var(--accent-primary)' },
+            { icon: AlertTriangle, label: t('hospitalManager.kpiEpidemicRisk'), value: loading ? '—' : (stats?.riskLevel ?? 'low').toUpperCase(), tint: RISK_COLORS[stats?.riskLevel ?? 'low'] },
+          ].map(k => (
+            <div key={k.label} className="dash-card" style={{ padding: '14px 16px' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <k.icon className="w-3.5 h-3.5" style={{ color: k.tint }} />
+                </div>
+                <span className="kpi-card-title">{k.label}</span>
+              </div>
+              <div className="stat-value" style={{ color: 'var(--text-primary)', lineHeight: 1.05, fontWeight: 800, fontSize: 20 }}>{k.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ═══ INTELLIGENCE & MANAGEMENT ═══ */}
+        <div className="dash-card overflow-hidden">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <LayoutDashboard className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('hospitalManager.title')}</h3>
+          </div>
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <ManagementCard
             href="/epidemic-intelligence"
             icon={Bug}
@@ -203,25 +225,10 @@ function HospitalManagerDashboard() {
             desc={t('hospitalManager.publicStatisticsDesc')}
             stat={t('hospitalManager.viewStatistics')}
           />
+          </div>
         </div>
       </main>
     </>
-  );
-}
-
-function StatCard({
-  icon: Icon, label, value, tint,
-}: { icon: typeof Users; label: string; value: string; tint: string }) {
-  return (
-    <div className="dash-stat">
-      <div className="dash-stat__icon" style={{ background: 'var(--accent-light)', color: tint }}>
-        <Icon className="w-4 h-4" />
-      </div>
-      <div>
-        <div className="dash-stat__value">{value}</div>
-        <div className="dash-stat__label">{label}</div>
-      </div>
-    </div>
   );
 }
 
@@ -229,10 +236,10 @@ function ManagementCard({
   href, icon: Icon, title, desc, stat,
 }: { href: string; icon: typeof Users; title: string; desc: string; stat: string }) {
   return (
-    <Link href={href} className="dash-card" style={{ display: 'flex', flexDirection: 'column', gap: 10, textDecoration: 'none' }}>
+    <Link href={href} className="rounded-xl transition-all hover:bg-[var(--accent-light)]" style={{ display: 'flex', flexDirection: 'column', gap: 10, textDecoration: 'none', padding: 14, background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div className="icon-box" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
-          <Icon className="w-4 h-4" />
+        <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+          <Icon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
         </div>
         <ArrowRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
       </div>

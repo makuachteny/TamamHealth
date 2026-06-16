@@ -401,3 +401,25 @@ describe('billing-service', () => {
     expect(updated!.status).toBe('partial');
   });
 });
+
+describe('billing-service ↔ ledger reconciliation', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getPatientBalance } = require('@/lib/services/ledger-service');
+
+  test('createBill debits the ledger so the patient balance reflects it', async () => {
+    await createBill(makeBillData()); // total 7000, no insurance
+    expect(await getPatientBalance('pat-001')).toBe(7000);
+  });
+
+  test('recording a payment credits the ledger back to zero', async () => {
+    const bill = await createBill(makeBillData()); // 7000
+    await recordPayment(bill._id, 7000, 'cash', 'user-001', 'Cashier');
+    expect(await getPatientBalance('pat-001')).toBe(0);
+  });
+
+  test('insurance coverage only bills the patient their responsibility on the ledger', async () => {
+    // 50% coverage on a 7000 bill → patient owes 3500 on the ledger.
+    await createBill(makeBillData({ insuranceProvider: 'CIC', insuranceCoveragePercent: 50 }));
+    expect(await getPatientBalance('pat-001')).toBe(3500);
+  });
+});

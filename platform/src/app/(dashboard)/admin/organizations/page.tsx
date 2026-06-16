@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
+import PageHeader from '@/components/PageHeader';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
@@ -12,7 +13,7 @@ import SearchInput from '@/components/filters/SearchInput';
 import FilterSelect from '@/components/filters/FilterSelect';
 import {
   Plus, X, Edit3, Ban,
-  ToggleLeft, ToggleRight
+  ToggleLeft, ToggleRight, Building2
 } from '@/components/icons/lucide';
 
 type OrgFormData = {
@@ -200,7 +201,17 @@ export default function AdminOrganizationsPage() {
   return (
     <>
       <TopBar title={t('orgAdmin.title')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+
+        <PageHeader
+          icon={Building2}
+          title={t('orgAdmin.title')}
+          actions={
+            <button onClick={openCreate} className="btn btn-primary">
+              <Plus className="w-4 h-4" /> {t('orgAdmin.newOrganization')}
+            </button>
+          }
+        />
 
         {/* Toolbar */}
         <FilterBar>
@@ -232,15 +243,11 @@ export default function AdminOrganizationsPage() {
             ]}
             aria-label={t('orgAdmin.filterByStatus')}
           />
-          <FilterBar.Spacer />
-          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: 'var(--color-danger)' }}>
-            <Plus className="w-4 h-4" /> {t('orgAdmin.newOrganization')}
-          </button>
         </FilterBar>
 
         {/* Table */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div style={{ overflowX: 'auto' }}>
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <table className="w-full">
               <thead>
                 <tr>

@@ -22,7 +22,6 @@ import { useTriage } from '@/lib/hooks/useTriage';
 import { formatCompactDateTime } from '@/lib/format-utils';
 import { getDefaultDashboard } from '@/lib/permissions';
 import SuperintendentDashboard from '@/components/dashboards/SuperintendentDashboard';
-import FacilityAdminDashboard from '@/components/dashboards/FacilityAdminDashboard';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
 const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', 'Lab', 'Pharmacy', 'ICU'];
@@ -326,7 +325,7 @@ export default function DashboardPage() {
       currentUser.role !== 'doctor' &&
       currentUser.role !== 'clinical_officer' &&
       currentUser.role !== 'medical_superintendent' &&
-      currentUser.role !== 'facility_administrator'
+      currentUser.role !== 'clinician'
     ) {
       router.push(getDefaultDashboard(currentUser.role));
     }
@@ -415,9 +414,10 @@ export default function DashboardPage() {
   if (!currentUser) return null;
   // Medical superintendent → admin-oriented hospital dashboard.
   if (currentUser.role === 'medical_superintendent') return <SuperintendentDashboard />;
-  if (currentUser.role === 'facility_administrator') return <FacilityAdminDashboard />;
-  // Anyone else who isn't a doctor/clinical officer is mid-redirect (above).
-  if (currentUser.role !== 'doctor' && currentUser.role !== 'clinical_officer') return null;
+  // Facility administrators are redirected to /facility-overview (their home
+  // dashboard) by the effect above. Anyone else who isn't a doctor/clinical
+  // officer is likewise mid-redirect.
+  if (currentUser.role !== 'doctor' && currentUser.role !== 'clinical_officer' && currentUser.role !== 'clinician') return null;
 
 
 
@@ -471,7 +471,7 @@ export default function DashboardPage() {
   return (
     <>
       <TopBar title={t('nav.dashboard')} />
-      <main className="page-container page-enter" style={{ paddingTop: 12 }}>
+      <main className="page-container page-enter">
 
         {/* Clinical alerts moved to a dedicated /alerts page. */}
 

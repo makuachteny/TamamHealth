@@ -3,7 +3,14 @@
  * specimen type, and basic/special tiering. Imported by the consultation form,
  * the lab page and anywhere else that lists or creates lab orders — so the
  * catalogue lives in one place rather than being hard-coded per screen.
+ *
+ * The static exports below remain the hard-coded defaults (kept for back-compat
+ * and tests). The store-backed accessors (getLabCatalog, getBasicLabs, …) read
+ * the live facility settings so admin changes to the catalogue propagate.
  */
+
+import { getSettings } from '../settings/settings-store';
+import type { LabTestDef } from '../settings/facility-settings';
 
 export const BASIC_LABS = ['Full Blood Count', 'Urinalysis', 'Blood Glucose', 'Malaria RDT'] as const;
 
@@ -38,7 +45,30 @@ export const LAB_SPECIMENS: Record<string, string> = {
   'Lipid Profile': 'Blood',
 };
 
-export const labTier = (name: string): 'basic' | 'special' =>
-  (BASIC_LABS as readonly string[]).includes(name) ? 'basic' : 'special';
+// ── Store-backed accessors (read live facility settings) ────────────────────
 
-export const specimenFor = (name: string): string => LAB_SPECIMENS[name] || DEFAULT_SPECIMEN;
+/** The live lab catalogue from facility settings (defaults until hydrated). */
+export const getLabCatalog = (): LabTestDef[] => getSettings().labCatalog;
+
+/** Names of basic-tier investigations, from live settings. */
+export const getBasicLabs = (): string[] =>
+  getLabCatalog().filter(l => l.tier === 'basic').map(l => l.name);
+
+/** Names of special-tier investigations, from live settings. */
+export const getSpecialLabs = (): string[] =>
+  getLabCatalog().filter(l => l.tier === 'special').map(l => l.name);
+
+/** All investigation names (basic + special) from live settings. */
+export const getLabTestNames = (): string[] => getLabCatalog().map(l => l.name);
+
+export const labTier = (name: string): 'basic' | 'special' => {
+  const def = getSettings().labCatalog.find(l => l.name === name);
+  if (def) return def.tier;
+  return (BASIC_LABS as readonly string[]).includes(name) ? 'basic' : 'special';
+};
+
+export const specimenFor = (name: string): string => {
+  const def = getSettings().labCatalog.find(l => l.name === name);
+  if (def) return def.specimen;
+  return LAB_SPECIMENS[name] || DEFAULT_SPECIMEN;
+};

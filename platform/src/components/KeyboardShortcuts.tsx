@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Keyboard } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useMessagingDock } from '@/lib/messaging-dock-context';
 
 const SHORTCUTS = [
   { keys: ['Alt', 'N'], altKeys: ['Ctrl', 'N'], descriptionKey: 'keyboardShortcuts.newPatient', action: '/patients/new' },
@@ -18,6 +19,7 @@ const SHORTCUTS = [
 export default function KeyboardShortcuts() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { openDock } = useMessagingDock();
   const [showHelp, setShowHelp] = useState(false);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -79,11 +81,11 @@ export default function KeyboardShortcuts() {
       }
       if (e.altKey && key === 'm') {
         e.preventDefault();
-        router.push('/messages');
+        openDock();
         return;
       }
     }
-  }, [router]);
+  }, [router, openDock]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);

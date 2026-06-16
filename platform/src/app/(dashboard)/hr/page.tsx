@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import {
-  Users, Plus, X, Calendar, CheckCircle2, AlertCircle, Clock, Trash2,
+  Users, Plus, X, Calendar, CheckCircle2, AlertCircle, Clock, Trash2, Search,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useUsers } from '@/lib/hooks/useUsers';
@@ -58,6 +58,10 @@ export default function HRPage() {
 
   const initialTab = (searchParams?.get('tab') as TabId) || 'roster';
   const [tab, setTab] = useState<TabId>(initialTab);
+
+  // Roster search + role filter
+  const [rosterSearch, setRosterSearch] = useState('');
+  const [rosterRole, setRosterRole] = useState('all');
 
   // Sync tab → URL so deep links from dashboard work both ways
   useEffect(() => { setTab((searchParams?.get('tab') as TabId) || 'roster'); }, [searchParams]);
@@ -145,6 +149,20 @@ export default function HRPage() {
     for (const u of facilityUsers) counts[u.role] = (counts[u.role] || 0) + 1;
     return counts;
   }, [facilityUsers]);
+
+  const filteredRosterUsers = useMemo(() => {
+    const q = rosterSearch.trim().toLowerCase();
+    return facilityUsers.filter(u => {
+      if (rosterRole !== 'all' && u.role !== rosterRole) return false;
+      if (!q) return true;
+      return (
+        u.name.toLowerCase().includes(q) ||
+        u.username.toLowerCase().includes(q) ||
+        u.role.replace(/_/g, ' ').toLowerCase().includes(q) ||
+        (u.hospitalName || '').toLowerCase().includes(q)
+      );
+    });
+  }, [facilityUsers, rosterSearch, rosterRole]);
 
   // ── Handlers ────────────────────────────────────────────────────────
   const handleRequestLeave = async () => {
@@ -324,29 +342,59 @@ export default function HRPage() {
             { id: 'leave', label: t('hr.leaveRequests') },
             { id: 'schedule', label: t('hr.shiftSchedule') },
             { id: 'payroll', label: t('hr.payrollTab') },
-          ] as { id: TabId; label: string }[]).map(tabItem => (
-            <button
-              key={tabItem.id}
-              onClick={() => setTabAndUrl(tabItem.id)}
-              className={`btn btn-sm ${tab === tabItem.id ? 'btn-primary' : 'btn-secondary'}`}
-            >
-              {tabItem.label}
-            </button>
-          ))}
+          ] as { id: TabId; label: string }[]).map(tabItem => {
+            const isActive = tab === tabItem.id;
+            return (
+              <button
+                key={tabItem.id}
+                onClick={() => setTabAndUrl(tabItem.id)}
+                className="text-[12px] font-semibold px-3.5 py-1.5 rounded-full transition-colors"
+                style={{
+                  background: isActive ? 'var(--accent-primary)' : 'var(--overlay-subtle)',
+                  color: isActive ? '#fff' : 'var(--text-secondary)',
+                  border: `1px solid ${isActive ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+                }}
+              >
+                {tabItem.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* ── ROSTER ──────────────────────────────────────── */}
         {tab === 'roster' && (
           <div className="dash-card overflow-hidden">
-            <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+            <div className="p-4 pb-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <h3 className="font-semibold text-sm">{t('hr.activeRoster')}</h3>
-                <div className="flex gap-1.5 flex-wrap">
-                  {Object.entries(roleCounts).map(([role, count]) => (
-                    <span key={role} className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}>
-                      {role.replace(/_/g, ' ')} · {count}
-                    </span>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('hr.activeRoster')}</h3>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                    <input
+                      type="text"
+                      value={rosterSearch}
+                      onChange={e => setRosterSearch(e.target.value)}
+                      placeholder={t('hr.searchStaffPlaceholder')}
+                      className="text-[12px] rounded-full pl-7 pr-3 py-1.5 outline-none"
+                      style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', minWidth: 200 }}
+                    />
+                  </div>
+                  <select
+                    value={rosterRole}
+                    onChange={e => setRosterRole(e.target.value)}
+                    className="text-[12px] font-medium capitalize rounded-full px-3 py-1.5 outline-none"
+                    style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                  >
+                    <option value="all">{t('hr.allRoles')} ({facilityUsers.length})</option>
+                    {Object.entries(roleCounts).sort((a, b) => a[0].localeCompare(b[0])).map(([role, count]) => (
+                      <option key={role} value={role} className="capitalize">
+                        {role.replace(/_/g, ' ')} ({count})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
@@ -361,10 +409,12 @@ export default function HRPage() {
                 </tr>
               </thead>
               <tbody>
-                {facilityUsers.length === 0 && (
-                  <tr><td colSpan={5} className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>{t('hr.noStaffForFacility')}</td></tr>
+                {filteredRosterUsers.length === 0 && (
+                  <tr><td colSpan={5} className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
+                    {facilityUsers.length === 0 ? t('hr.noStaffForFacility') : t('hr.noStaffMatchFilters')}
+                  </td></tr>
                 )}
-                {facilityUsers.map(u => {
+                {filteredRosterUsers.map(u => {
                   const initials = u.name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
                   return (
                     <tr key={u._id}>

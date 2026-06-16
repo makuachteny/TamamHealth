@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { X, Banknote, Smartphone, CreditCard, Building2, Shield, CheckCircle2, Loader2, Printer, Mail } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useSettings } from '@/lib/settings/SettingsProvider';
+import { PAYOR_LABELS, type PaymentMethodKey } from '@/lib/settings/facility-settings';
 import Modal from '@/components/Modal';
 import type { PaymentDoc } from '@/lib/db-types-payments';
 import type { FeeScheduleDoc } from '@/lib/db-types-billing';
@@ -25,6 +27,7 @@ export default function PaymentPanel({
 }: PaymentPanelProps) {
   const { currentUser } = useApp();
   const { t } = useTranslation();
+  const settings = useSettings();
   const [tab, setTab] = useState<TabType>('cash');
   const [amount, setAmount] = useState(amountDue > 0 ? amountDue.toString() : '');
 
@@ -90,6 +93,29 @@ export default function PaymentPanel({
   const [claimReference, setClaimReference] = useState('');
   const [waiverReason, setWaiverReason] = useState('');
   const [approvedBy, setApprovedBy] = useState('');
+
+  // Concrete payment methods are gated by the facility's enabled methods
+  // (set in Facility Settings). The insurance/waiver path is always available
+  // since it's a payor/exemption flow, not a tender type.
+  const tabMethod: Record<TabType, PaymentMethodKey | null> = {
+    cash: 'cash', mobile: 'mobile_money', card: 'card', bank: 'bank_transfer', insurance: null,
+  };
+  const allTabs: { key: TabType; label: string; icon: typeof Banknote }[] = [
+    { key: 'cash', label: t('payments.methodCash'), icon: Banknote },
+    { key: 'mobile', label: t('payments.methodMobileMoney'), icon: Smartphone },
+    { key: 'card', label: t('payments.methodCard'), icon: CreditCard },
+    { key: 'bank', label: t('payments.methodBankTransfer'), icon: Building2 },
+    { key: 'insurance', label: t('payments.methodInsuranceWaiver'), icon: Shield },
+  ];
+  const tabs = allTabs.filter(tb => {
+    const m = tabMethod[tb.key];
+    return m === null || settings.paymentMethods.includes(m);
+  });
+  // If the active tab was disabled in settings, fall back to the first enabled.
+  useEffect(() => {
+    if (tabs.length && !tabs.some(tb => tb.key === tab)) setTab(tabs[0].key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.paymentMethods]);
 
   const handleSubmit = async () => {
     const numAmount = parseFloat(amount);
@@ -318,14 +344,6 @@ export default function PaymentPanel({
     );
   }
 
-  const tabs: { key: TabType; label: string; icon: typeof Banknote }[] = [
-    { key: 'cash', label: t('payments.methodCash'), icon: Banknote },
-    { key: 'mobile', label: t('payments.methodMobileMoney'), icon: Smartphone },
-    { key: 'card', label: t('payments.methodCard'), icon: CreditCard },
-    { key: 'bank', label: t('payments.methodBankTransfer'), icon: Building2 },
-    { key: 'insurance', label: t('payments.methodInsuranceWaiver'), icon: Shield },
-  ];
-
   return (
     <Modal onClose={onCancel} width={480}>
       <div className="modal-content pp-pay" style={{ width: '100%' }}>
@@ -528,6 +546,21 @@ export default function PaymentPanel({
 
               {insuranceWaiverMode === 'insurance' ? (
                 <>
+                  {settings.payors.filter(p => p !== 'out_of_pocket').length > 0 && (
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.payor', { defaultValue: 'Payor' })}</label>
+                      <select
+                        value={payerName}
+                        onChange={e => setPayerName(e.target.value)}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                      >
+                        <option value="">Select payor…</option>
+                        {settings.payors.filter(p => p !== 'out_of_pocket').map(p => (
+                          <option key={p} value={PAYOR_LABELS[p]}>{PAYOR_LABELS[p]}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('payments.payerName')}</label>
                     <input type="text" value={payerName} onChange={e => setPayerName(e.target.value)} placeholder={t('payments.payerNamePlaceholder')}

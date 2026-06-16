@@ -127,7 +127,7 @@ export default function DeathsPage() {
   return (
     <>
       <TopBar title={t('deaths.title')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <PageHeader
           icon={FileText}
           title={t('deaths.title')}
@@ -172,7 +172,8 @@ export default function DeathsPage() {
         </FilterBar>
 
         {/* Table */}
-        <div className="card-elevated overflow-hidden">
+        <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
           <table className="data-table">
             <thead>
               <tr>
@@ -249,6 +250,7 @@ export default function DeathsPage() {
               })()}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Death Registration Form Modal */}

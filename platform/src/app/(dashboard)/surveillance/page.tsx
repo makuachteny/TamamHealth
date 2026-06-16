@@ -5,7 +5,7 @@ import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
 import {
-  AlertTriangle, Shield, Eye, Bell, TrendingUp, TrendingDown,
+  AlertTriangle, Shield, TrendingUp, TrendingDown,
   Minus, MapPin, Activity, FileText, Calendar, ChevronRight,
   Download, Plus, X, BarChart3,
 } from '@/components/icons/lucide';
@@ -349,13 +349,6 @@ export default function SurveillancePage() {
     URL.revokeObjectURL(url);
   };
 
-  const summaryCards = [
-    { label: t('surveillance.totalAlerts'), value: totalAlerts.toString(), icon: Bell, color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)' },
-    { label: t('surveillance.emergencies'), value: emergencies.toString(), icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.10)' },
-    { label: t('surveillance.warnings'), value: warnings.toString(), icon: Shield, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.10)' },
-    { label: t('surveillance.watchItems'), value: watchItems.toString(), icon: Eye, color: '#2563EB', bg: 'rgba(59, 130, 246,0.10)' },
-  ];
-
   return (
     <>
       <TopBar title={t('nav.surveillance')} />
@@ -364,7 +357,6 @@ export default function SurveillancePage() {
             icon={Activity}
             title={t('surveillance.dashboardTitle')}
             subtitle={t('surveillance.dashboardSubtitle', { week: reportingWeek })}
-            stats={summaryCards.map(c => ({ label: c.label, value: c.value, color: c.color }))}
             actions={
               <>
                 {canReportAlert && (

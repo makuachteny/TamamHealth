@@ -6,7 +6,7 @@ import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
-import { labOrder, RESULT_REVIEW_SLA, type LabOrderStatus } from '../clinical-flow/order-lifecycles';
+import { labOrder, getResultReviewSLA, type LabOrderStatus } from '../clinical-flow/order-lifecycles';
 
 /**
  * The granular diagnostics-lifecycle stage of an order, defaulting older
@@ -134,7 +134,8 @@ export async function getOverdueUnreviewedResults(scope?: DataScope): Promise<La
     if (effectiveOrderStatus(r) !== 'resulted') return false;
     const resultedAt = new Date(r.updatedAt || r.createdAt || '').getTime();
     if (!Number.isFinite(resultedAt)) return false;
-    const slaHours = r.critical ? RESULT_REVIEW_SLA.criticalHours : RESULT_REVIEW_SLA.routineHours;
+    const sla = getResultReviewSLA();
+    const slaHours = r.critical ? sla.criticalHours : sla.routineHours;
     return (now - resultedAt) / 3_600_000 > slaHours;
   });
 }

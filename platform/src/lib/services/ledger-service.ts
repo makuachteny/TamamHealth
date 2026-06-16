@@ -10,6 +10,7 @@ import { filterByScope } from './data-scope';
 import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { emitSyncEvent } from './sync-event-service';
+import { getSettings } from '../settings/settings-store';
 
 const ledgerDB = () => getDB('tamamhealth_ledger');
 
@@ -19,6 +20,15 @@ const ledgerDB = () => getDB('tamamhealth_ledger');
  * override via `NEXT_PUBLIC_DEFAULT_CURRENCY` for other countries.
  */
 const DEFAULT_CURRENCY = process.env.NEXT_PUBLIC_DEFAULT_CURRENCY || 'SSP';
+
+/**
+ * Effective default currency: prefer the live facility setting, then the
+ * env-configured default, then 'SSP'. Used when a ledger entry doesn't carry
+ * its own currency.
+ */
+function currencyDefault(): string {
+  return getSettings().currency || DEFAULT_CURRENCY;
+}
 
 // ═══ Create Ledger Entry ═══════════════════════════════════════════
 
@@ -57,7 +67,7 @@ export async function createLedgerEntry(input: CreateLedgerEntryInput): Promise<
     referenceId: input.referenceId,
     referenceType: input.referenceType,
     method: input.method,
-    currency: input.currency || DEFAULT_CURRENCY,
+    currency: input.currency || currencyDefault(),
     facilityId: input.facilityId,
     orgId: input.orgId,
     createdAt: now,
@@ -83,8 +93,12 @@ export async function createLedgerEntry(input: CreateLedgerEntryInput): Promise<
 export async function getPatientBalance(patientId: string): Promise<number> {
   const entries = await getPatientLedger(patientId);
   if (entries.length === 0) return 0;
-  // Use the running balance from the most recent entry
-  return entries[0].runningBalance;
+  // Sum all entry amounts (debits positive, credits negative). This is robust
+  // to entries that share a createdAt timestamp — e.g. a bill that posts a
+  // charge and an insurance credit in the same millisecond — whereas reading
+  // the most-recent entry's stored runningBalance depends on a stable sort of
+  // tied timestamps and could return the wrong figure.
+  return Math.round(entries.reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
 }
 
 export async function getEncounterBalance(encounterId: string): Promise<number> {
@@ -125,7 +139,7 @@ export async function getLedgerSummary(scope?: DataScope): Promise<{
   currency: string;
 }> {
   const entries = await getAllLedgerEntries(scope);
-  const currency = entries[0]?.currency || DEFAULT_CURRENCY;
+  const currency = entries[0]?.currency || currencyDefault();
 
   const totalCharged = entries
     .filter(e => e.entryType === 'charge')

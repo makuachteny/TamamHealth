@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useMessagingDock } from '@/lib/messaging-dock-context';
 import {
   Pill, AlertTriangle, Package, Clock, ShieldCheck,
   MessageSquare, Activity, Radio, Zap, Wifi, ChevronRight,
@@ -322,6 +323,7 @@ function ReceiveStockModal({ items, onConfirm, onClose }: {
 export default function PharmacyDashboardPage() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { openDock } = useMessagingDock();
   const { currentUser } = useApp();
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [eventCounter, setEventCounter] = useState(0);
@@ -445,7 +447,7 @@ export default function PharmacyDashboardPage() {
       <main className="page-container page-enter">
 
         {/* Command Center Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
               background: 'var(--accent-primary)',
@@ -711,7 +713,7 @@ export default function PharmacyDashboardPage() {
               { label: t('pharmacy.message'), icon: Send, href: '/messages', color: '#EC4899' },
               { label: t('pharmacy.inventory'), icon: Package, href: '/pharmacy', color: 'var(--color-success)' },
             ].map(action => (
-              <button key={action.label} onClick={() => action.href ? router.push(action.href) : undefined}
+              <button key={action.label} onClick={() => action.href === '/messages' ? openDock() : action.href ? router.push(action.href) : undefined}
                 className="flex items-center gap-2 p-2.5 rounded-lg transition-all"
                 style={{ background: `${action.color}08`, border: `1px solid ${action.color}15` }}>
                 <action.icon className="w-3.5 h-3.5" style={{ color: action.color }} />

@@ -127,12 +127,6 @@ export default function FacilityAssessmentsPage() {
           icon={ClipboardCheck}
           title={t('facilityAssessments.pageTitle')}
           subtitle={t('facilityAssessments.pageSubtitle')}
-          stats={summary ? [
-            { label: t('facilityAssessments.kpiFacilitiesAssessed'), value: summary.facilitiesAssessed, color: 'var(--accent-primary)' },
-            { label: t('facilityAssessments.kpiAvgOverallScore'), value: `${summary.avgOverallScore}%`, color: scoreColor(summary.avgOverallScore) },
-            { label: t('facilityAssessments.kpiDHIS2Adoption'), value: `${summary.withDHIS2}/${summary.facilitiesAssessed}`, color: scoreColor(summary.facilitiesAssessed ? (summary.withDHIS2 / summary.facilitiesAssessed * 100) : 0) },
-            { label: t('facilityAssessments.kpiAvgReportingCompleteness'), value: `${summary.avgReportingCompleteness}%`, color: scoreColor(summary.avgReportingCompleteness) },
-          ] : undefined}
           actions={canAssessFacility && (
             <button onClick={() => setShowForm(true)} className="btn btn-primary">
               <Plus className="w-4 h-4" /> {t('facilityAssessments.newAssessment')}

@@ -7,6 +7,7 @@ import { validatePatientData, ValidationError } from '../validation';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { findByType } from './db-query';
+import { getSettings } from '../settings/settings-store';
 
 /**
  * Generate a geocode ID from boma code and household number.
@@ -58,6 +59,15 @@ const DEFAULT_HOSPITAL_PREFIX =
   process.env.NEXT_PUBLIC_HOSPITAL_NUMBER_DEFAULT_PREFIX || 'TAB';
 
 /**
+ * Effective default hospital-number prefix: prefer the live facility setting,
+ * then the env-configured default, then 'TAB'. The settings default mirrors
+ * 'TAB', so behaviour is identical until an admin changes it.
+ */
+function defaultHospitalPrefix(): string {
+  return getSettings().hospitalNumberPrefix || DEFAULT_HOSPITAL_PREFIX;
+}
+
+/**
  * Derive a 3-letter prefix from a hospital's display name when no explicit
  * `code` field exists on the doc. Picks initials of the first three words
  * (e.g. "Juba Teaching Hospital" -> "JTH"). Falls back to the first three
@@ -74,7 +84,7 @@ function deriveHospitalPrefix(name: string): string {
 
 /* istanbul ignore next -- private utility: hospital prefix lookup */
 async function getHospitalPrefix(hospitalId?: string): Promise<string> {
-  if (!hospitalId) return DEFAULT_HOSPITAL_PREFIX;
+  if (!hospitalId) return defaultHospitalPrefix();
 
   // Prefer the hospital's own `code` (or derived from name) when the doc is
   // present in hospitalsDB. This works for any deployment, not just the demo
@@ -93,7 +103,7 @@ async function getHospitalPrefix(hospitalId?: string): Promise<string> {
   if (hospitalId.startsWith('phcc-')) return 'PHC';
   if (hospitalId.startsWith('phcu-')) return 'BMU';
   if (hospitalId.startsWith('county-')) return 'CTY';
-  return DEFAULT_HOSPITAL_PREFIX;
+  return defaultHospitalPrefix();
 }
 
 /* istanbul ignore next -- private utility: org ID inference */

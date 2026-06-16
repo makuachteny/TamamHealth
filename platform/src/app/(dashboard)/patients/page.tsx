@@ -30,7 +30,9 @@ export default function PatientsPage() {
   const { t } = useTranslation();
   const { globalSearch, currentUser } = useApp();
   const { patients } = usePatients();
-  const { canRegisterPatients, canViewClinical } = usePermissions();
+  const { canRegisterPatients, canViewClinical, isMedicalBiller, isCashier } = usePermissions();
+  // Billing-desk roles see money (outstanding balance) instead of clinical detail.
+  const isBilling = isMedicalBiller || isCashier;
   const [search, setSearch] = useState('');
   const [filterState, setFilterState] = useState('');
   const [filterGender, setFilterGender] = useState('');
@@ -46,6 +48,32 @@ export default function PatientsPage() {
   const assignedToMeCount = canBeAssigned
     ? patients.filter(p => p.assignedDoctor === currentUser?._id).length
     : 0;
+
+  // Outstanding balance per patient — loaded only for billing-desk roles, so the
+  // registry shows a "Balance" column instead of clinical conditions. Aggregated
+  // from open bills (same rule the billing dashboard uses) in one pass.
+  const [balanceByPatient, setBalanceByPatient] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (!isBilling) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getAllBills } = await import('@/lib/services/billing-service');
+        const bills = await getAllBills();
+        const m = new Map<string, number>();
+        for (const b of bills) {
+          if ((b.balanceDue ?? 0) > 0 && b.status !== 'waived' && b.status !== 'cancelled') {
+            m.set(b.patientId, (m.get(b.patientId) || 0) + b.balanceDue);
+          }
+        }
+        if (!cancelled) setBalanceByPatient(m);
+      } catch (err) {
+        console.error('Failed to load patient balances:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isBilling]);
+  const fmtMoney = (n: number) => `SSP ${Math.round(n).toLocaleString()}`;
   const [showFilters, setShowFilters] = useState(false);
   const [showFindPatient, setShowFindPatient] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
@@ -123,10 +151,118 @@ export default function PatientsPage() {
   const visible = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
 
+  // ── Role-aware columns ──────────────────────────────────────────────────
+  // Every role sees the common identity columns (who + how to reach + where +
+  // recency). Beyond that the registry adapts to what the role needs to act on:
+  //   • clinical roles  → Conditions (allergies / chronic) for safe care
+  //   • billing desk    → Balance (outstanding) for collections
+  //   • reception       → an Assign action to route the patient to a provider
+  // Non-billing roles keep the Registered date; billers swap it for Balance.
+  type PatientCol = { key: string; label: string; width: number; align?: 'right'; render: (p: typeof patients[number]) => React.ReactNode };
+  const columns: PatientCol[] = [
+    {
+      key: 'patient', label: t('frontDesk.colPatient'), width: 20,
+      render: (p) => (
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+            style={{ background: p.gender === 'Female' ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)', letterSpacing: 0.3 }}
+            aria-hidden
+          >
+            {patientInitials(p)}
+          </span>
+          <span className="min-w-0 truncate block">
+            <span className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>
+            <span className="text-[10px] ml-1.5" style={{ color: 'var(--text-muted)' }}>{patientAgeLabel(p)}, {p.gender?.[0] ?? '?'}</span>
+          </span>
+        </div>
+      ),
+    },
+    { key: 'hospitalNo', label: t('patients.colHospitalNo'), width: 11, render: (p) => <span className="text-[12px] font-mono whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.hospitalNumber || '—'}</span> },
+    { key: 'phone', label: t('patient.phone'), width: 12, render: (p) => <span className="text-[12px] font-mono whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.phone || '—'}</span> },
+    { key: 'location', label: t('patient.location'), width: 15, render: (p) => <span className="text-[12px] block truncate" style={{ color: 'var(--text-secondary)' }}>{[p.county, p.state].filter(Boolean).join(', ') || '—'}</span> },
+    {
+      key: 'lastVisit', label: t('frontDesk.lastVisit'), width: 11,
+      render: (p) => {
+        const lastVisit = p.lastConsultedAt ? new Date(p.lastConsultedAt) : null;
+        const daysAgo = lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / 86400000) : null;
+        return lastVisit ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium" title={lastVisit.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} style={{ color: daysAgo != null && daysAgo > 90 ? '#C44536' : daysAgo != null && daysAgo > 30 ? '#B8741C' : 'var(--text-secondary)' }}>
+            <Clock className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />
+            {formatRelativeShort(p.lastConsultedAt)}
+          </span>
+        ) : <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>—</span>;
+      },
+    },
+  ];
+
+  if (canViewClinical) {
+    columns.push({
+      key: 'conditions', label: t('patients.colConditions'), width: 14,
+      render: (p) => {
+        const hasAllergy = !!(p.allergies?.length && p.allergies[0] !== 'None known');
+        const chronic = (p.chronicConditions || []).filter(c => c && c !== 'None');
+        const hasChronic = chronic.length > 0;
+        if (!hasAllergy && !hasChronic) return <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>;
+        const moreCount = hasAllergy ? chronic.length : chronic.length - 1;
+        const tooltip = [hasAllergy ? t('patients.allergyTitle', { list: p.allergies.join(', ') }) : null, ...chronic].filter(Boolean).join(' · ');
+        return (
+          <div className="flex items-center gap-1 whitespace-nowrap" title={tooltip}>
+            {hasAllergy ? (
+              <span className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded-md whitespace-nowrap" style={{ background: 'rgba(196, 69, 54, 0.14)', color: '#8B2E24', border: '1px solid rgba(196, 69, 54, 0.30)' }}>⚠ {t('patients.allergyBadge')}</span>
+            ) : (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap" style={{ background: 'rgba(228, 168, 75, 0.14)', color: '#B8741C', border: '1px solid rgba(228, 168, 75, 0.30)' }}>{chronic[0]}</span>
+            )}
+            {moreCount > 0 && <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>+{moreCount}</span>}
+          </div>
+        );
+      },
+    });
+  }
+
+  if (isBilling) {
+    columns.push({
+      key: 'balance', label: t('patients.colBalance'), width: 13,
+      render: (p) => {
+        const bal = balanceByPatient.get(p._id) || 0;
+        return bal > 0
+          ? <span className="text-[12px] font-bold whitespace-nowrap" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(bal)}</span>
+          : <span className="text-[11px]" style={{ color: 'var(--color-success)' }}>{t('billing.paidInFull')}</span>;
+      },
+    });
+  } else {
+    columns.push({
+      key: 'registered', label: t('patient.registered'), width: 11,
+      render: (p) => <span className="text-[11px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.registeredAt || p.registrationDate ? formatDate(p.registeredAt || p.registrationDate) : '—'}</span>,
+    });
+  }
+
+  columns.push({
+    key: 'action', label: canAssignPatients ? t('frontDesk.colAction') : '', width: canAssignPatients ? 12 : 6, align: 'right',
+    render: (p) => (
+      <div className="flex items-center justify-end gap-2">
+        {canAssignPatients && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setAssignTarget({ patientId: p._id, patientName: patientFullName(p), hospitalNumber: p.hospitalNumber, currentDoctorId: p.assignedDoctor }); }}
+            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg inline-flex items-center gap-1 whitespace-nowrap transition-colors hover:opacity-90"
+            style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--border-light)' }}
+            title={p.assignedDoctor ? t('frontDesk.assignedTo', { name: p.assignedDoctorName ?? 'provider' }) : t('frontDesk.assignToProvider')}
+          >
+            <Stethoscope className="w-3.5 h-3.5" />
+            {p.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign')}
+          </button>
+        )}
+        <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+      </div>
+    ),
+  });
+
+  const totalColWidth = columns.reduce((s, c) => s + c.width, 0);
+
   return (
     <>
       <TopBar title={t('nav.patients')} />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column' }}>
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <PageHeader
             icon={Users}
             title={t('patients.registryTitle')}
@@ -231,16 +367,21 @@ export default function PatientsPage() {
           {/* Patient Table */}
           <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
             <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-              <table className="w-full">
+              <table className="w-full" style={{ tableLayout: 'fixed' }}>
+                <colgroup>
+                  {columns.map(c => (
+                    <col key={c.key} style={{ width: `${(c.width / totalColWidth * 100).toFixed(2)}%` }} />
+                  ))}
+                </colgroup>
                 <thead>
                   <tr>
-                    {[t('frontDesk.colPatient'), t('patients.colHospitalNo'), t('patient.phone'), t('patient.location'), t('frontDesk.lastVisit'), t('patient.registered'), t('patients.colConditions'), canAssignPatients ? t('frontDesk.colAction') : ''].map((h, i) => (
+                    {columns.map(c => (
                       <th
-                        key={i}
-                        className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap"
+                        key={c.key}
+                        className={`${c.align === 'right' ? 'text-right' : 'text-left'} px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`}
                         style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}
                       >
-                        {h}
+                        {c.label}
                       </th>
                     ))}
                   </tr>
@@ -248,121 +389,26 @@ export default function PatientsPage() {
                 <tbody>
                   {visible.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                      <td colSpan={columns.length} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
                         {t('patients.patientsFound', { count: 0 })}
                       </td>
                     </tr>
                   )}
-                  {visible.map(patient => {
-                    const hasAllergy = patient.allergies?.length && patient.allergies[0] !== 'None known';
-                    const chronic = (patient.chronicConditions || []).filter(c => c && c !== 'None');
-                    const hasChronic = chronic.length > 0;
-                    const lastVisit = patient.lastConsultedAt ? new Date(patient.lastConsultedAt) : null;
-                    const daysAgo = lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / 86400000) : null;
-                    const location = [patient.county, patient.state].filter(Boolean).join(', ');
-                    return (
-                      <tr
-                        key={patient._id}
-                        role="button"
-                        tabIndex={0}
-                        className="cursor-pointer transition-colors hover:bg-[var(--table-row-hover)]"
-                        onClick={() => router.push(`/patients/${patient._id}`)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${patient._id}`); } }}
-                        style={{ borderBottom: '1px solid var(--border-light)' }}
-                      >
-                        {/* Patient name + inline age/gender */}
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                              style={{ background: patient.gender === 'Female' ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)', letterSpacing: 0.3 }}
-                              aria-hidden
-                            >
-                              {patientInitials(patient)}
-                            </span>
-                            <span className="min-w-0">
-                              <span className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{patientFullName(patient)}</span>
-                              <span className="text-[10px] ml-1.5" style={{ color: 'var(--text-muted)' }}>{patientAgeLabel(patient)}, {patient.gender?.[0] ?? '?'}</span>
-                            </span>
-                          </div>
-                        </td>
-                        {/* Patient ID */}
-                        <td className="px-4 py-2.5 text-[12px] font-mono whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{patient.hospitalNumber || '—'}</td>
-                        {/* Phone */}
-                        <td className="px-4 py-2.5 text-[12px] font-mono whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{patient.phone || '—'}</td>
-                        {/* Location */}
-                        <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{location || '—'}</td>
-                        {/* Last visit */}
-                        <td className="px-4 py-2.5 text-[11px] whitespace-nowrap">
-                          {lastVisit ? (
-                            <span
-                              className="inline-flex items-center gap-1 font-medium"
-                              title={lastVisit.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                              style={{ color: daysAgo != null && daysAgo > 90 ? '#C44536' : daysAgo != null && daysAgo > 30 ? '#B8741C' : 'var(--text-secondary)' }}
-                            >
-                              <Clock className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />
-                              {formatRelativeShort(patient.lastConsultedAt)}
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)' }}>—</span>
-                          )}
-                        </td>
-                        {/* Registered */}
-                        <td className="px-4 py-2.5 text-[11px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                          {patient.registeredAt || patient.registrationDate ? formatDate(patient.registeredAt || patient.registrationDate) : '—'}
-                        </td>
-                        {/* Conditions */}
-                        <td className="px-4 py-2.5">
-                          <div className="flex flex-wrap items-center gap-1">
-                            {hasAllergy && (
-                              <span
-                                className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded-md whitespace-nowrap"
-                                style={{ background: 'rgba(196, 69, 54, 0.14)', color: '#8B2E24', border: '1px solid rgba(196, 69, 54, 0.30)' }}
-                                title={t('patients.allergyTitle', { list: patient.allergies.join(', ') })}
-                              >
-                                ⚠ {t('patients.allergyBadge')}
-                              </span>
-                            )}
-                            {hasChronic ? (
-                              <span
-                                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap"
-                                style={{ background: 'rgba(228, 168, 75, 0.14)', color: '#B8741C', border: '1px solid rgba(228, 168, 75, 0.30)' }}
-                                title={chronic.join(', ')}
-                              >
-                                {chronic[0]}{chronic.length > 1 ? ` +${chronic.length - 1}` : ''}
-                              </span>
-                            ) : !hasAllergy ? (
-                              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center justify-end gap-2">
-                            {canAssignPatients && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setAssignTarget({
-                                    patientId: patient._id,
-                                    patientName: patientFullName(patient),
-                                    hospitalNumber: patient.hospitalNumber,
-                                    currentDoctorId: patient.assignedDoctor,
-                                  });
-                                }}
-                                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg inline-flex items-center gap-1 whitespace-nowrap transition-colors hover:opacity-90"
-                                style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--border-light)' }}
-                                title={patient.assignedDoctor ? `${t('frontDesk.assignedTo', { name: patient.assignedDoctorName ?? 'provider' })}` : t('frontDesk.assignToProvider')}
-                              >
-                                <Stethoscope className="w-3.5 h-3.5" />
-                                {patient.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign')}
-                              </button>
-                            )}
-                            <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {visible.map(patient => (
+                    <tr
+                      key={patient._id}
+                      role="button"
+                      tabIndex={0}
+                      className="cursor-pointer transition-colors hover:bg-[var(--table-row-hover)]"
+                      onClick={() => router.push(`/patients/${patient._id}`)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${patient._id}`); } }}
+                      style={{ borderBottom: '1px solid var(--border-light)' }}
+                    >
+                      {columns.map(col => (
+                        <td key={col.key} className="px-4 py-2.5">{col.render(patient)}</td>
+                      ))}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

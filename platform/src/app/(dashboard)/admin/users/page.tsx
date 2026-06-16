@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
+import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
@@ -149,22 +150,27 @@ export default function AdminUsersPage() {
       <TopBar title={t('adminUsers.title')} />
       <main className="page-container page-enter">
 
+        <PageHeader
+          icon={Users}
+          title={t('adminUsers.title')}
+        />
+
         {/* Header stats */}
-        <div className="kpi-grid mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {[
-            { label: t('adminUsers.statTotalUsers'), value: users.length, icon: Users, color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
-            { label: t('adminUsers.statActiveUsers'), value: users.filter(u => u.isActive).length, icon: UserCheck, color: 'var(--color-success)', bg: '#05966915' },
-            { label: t('adminUsers.statInactiveUsers'), value: users.filter(u => !u.isActive).length, icon: UserX, color: 'var(--color-danger)', bg: '#EF444415' },
-            { label: t('adminUsers.statAdminUsers'), value: users.filter(u => u.role === 'super_admin' || u.role === 'org_admin').length, icon: Shield, color: '#7C3AED', bg: '#7C3AED15' },
+            { label: t('adminUsers.statTotalUsers'), value: users.length, icon: Users, color: 'var(--accent-primary)' },
+            { label: t('adminUsers.statActiveUsers'), value: users.filter(u => u.isActive).length, icon: UserCheck, color: 'var(--color-success)' },
+            { label: t('adminUsers.statInactiveUsers'), value: users.filter(u => !u.isActive).length, icon: UserX, color: 'var(--color-danger)' },
+            { label: t('adminUsers.statAdminUsers'), value: users.filter(u => u.role === 'super_admin' || u.role === 'org_admin').length, icon: Shield, color: '#7C3AED' },
           ].map(stat => (
-            <div key={stat.label} className="kpi">
-              <div className="kpi__icon" style={{ background: stat.bg }}>
-                <stat.icon style={{ color: stat.color }} />
+            <div key={stat.label} className="dash-card" style={{ padding: '14px 16px' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <stat.icon className="w-3.5 h-3.5" style={{ color: stat.color }} />
+                </div>
+                <span className="kpi-card-title">{stat.label}</span>
               </div>
-              <div className="kpi__body">
-                <div className="kpi__value">{stat.value}</div>
-                <div className="kpi__label">{stat.label}</div>
-              </div>
+              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{stat.value}</div>
             </div>
           ))}
         </div>
@@ -196,7 +202,7 @@ export default function AdminUsersPage() {
         </div>
 
         {/* Table */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+        <div className="dash-card overflow-hidden">
           <div style={{ overflowX: 'auto' }}>
             <table className="w-full">
               <thead>
@@ -292,19 +298,19 @@ export default function AdminUsersPage() {
         </div>
 
         {/* Role Distribution */}
-        <div className="mt-6 rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>{t('adminUsers.roleDistribution')}</p>
-          <div className="flex flex-wrap gap-3">
+        <div className="dash-card overflow-hidden mt-4">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <Shield className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('adminUsers.roleDistribution')}</h3>
+          </div>
+          <div className="p-4 flex flex-wrap gap-2">
             {Object.keys(ROLE_LABELS).map((role) => {
               const count = roleCounts[role] || 0;
               if (count === 0) return null;
-              const color = ROLE_COLORS[role] || '#6B7280';
               return (
-                <div key={role} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: `${color}10`, border: `1px solid ${color}20` }}>
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
-                  <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{roleLabel(role)}</span>
-                  <span className="text-xs font-bold" style={{ color }}>{count}</span>
-                </div>
+                <span key={role} className="text-[11px] font-medium px-2.5 py-1 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>
+                  {roleLabel(role)} · {count}
+                </span>
               );
             })}
           </div>

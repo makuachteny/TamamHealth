@@ -120,7 +120,7 @@ export default function ServicePricingPage() {
   return (
     <>
       <TopBar title="Service Pricing" />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <PageHeader
           icon={Receipt}
           title="Service Pricing"
@@ -132,7 +132,7 @@ export default function ServicePricingPage() {
           }
         />
 
-        <div className="dash-card overflow-hidden" style={{ marginTop: 16 }}>
+        <div className="dash-card overflow-hidden flex flex-col" style={{ marginTop: 16, flex: 1, minHeight: 0 }}>
           <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <Search className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             <input
@@ -151,6 +151,7 @@ export default function ServicePricingPage() {
               {fees.length === 0 ? 'No services priced yet. Add your first service to start charging.' : 'No services match your search.'}
             </div>
           ) : (
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <table className="w-full">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
@@ -180,6 +181,7 @@ export default function ServicePricingPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

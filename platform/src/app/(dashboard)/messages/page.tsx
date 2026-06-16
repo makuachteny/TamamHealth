@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import TopBar from '@/components/TopBar';
 import Modal from '@/components/Modal';
 import { useStaffChat } from '@/lib/hooks/useStaffChat';
 import { useUsers } from '@/lib/hooks/useUsers';
@@ -83,7 +83,6 @@ const NON_MESSAGEABLE_ROLES: UserRole[] = ['super_admin', 'government'];
 /* ─────────────────────────── page ─────────────────────────── */
 
 export default function MessagesPage() {
-  const router = useRouter();
   const chat = useStaffChat();
   const {
     currentUser, conversations, messages, activeId, setActiveId,
@@ -215,16 +214,15 @@ export default function MessagesPage() {
   })) || [];
 
   return (
-    <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden', padding: 16 }}>
+    <>
+      <TopBar title="Messages" />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden', borderRadius: 'var(--card-radius)', border: '1px solid var(--border-light)', boxShadow: 'var(--card-shadow)', background: 'var(--bg-card-solid)' }}>
 
         {/* ── Conversation list ── */}
         <section className="flex flex-col flex-shrink-0" style={{ width: 320, borderRight: '1px solid var(--border-light)', background: 'var(--bg-card-solid)' }}>
           <div className="px-3 pt-3 pb-2 flex items-center justify-between">
             <div className="flex items-center gap-1.5 min-w-0">
-              <button onClick={() => router.push('/dashboard')} title="Back to app" className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 hover:bg-[var(--overlay-subtle)]" style={{ color: 'var(--text-muted)' }}>
-                <ArrowLeft className="w-[18px] h-[18px]" />
-              </button>
               <h2 className="text-base font-bold truncate" style={{ color: 'var(--text-primary)' }}>Messages</h2>
             </div>
             <button onClick={() => setNewChatOpen(true)} title="New chat" className="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0" style={{ background: 'var(--accent-primary)' }}>
@@ -509,6 +507,7 @@ export default function MessagesPage() {
           )}
         </section>
       </div>
+      </main>
 
       {newChatOpen && currentUser && (
         <StaffPickerModal
@@ -530,7 +529,7 @@ export default function MessagesPage() {
           onAdd={async (members) => { setAddMembersOpen(false); await addMembers(activeConversation._id, members.map(u => ({ id: u._id, name: u.name }))); }}
         />
       )}
-    </div>
+    </>
   );
 }
 

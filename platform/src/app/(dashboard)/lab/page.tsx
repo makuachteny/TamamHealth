@@ -15,7 +15,7 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { FilterBar, SearchInput, FilterTabs } from '@/components/filters';
 import type { LabOrderStatus } from '@/lib/clinical-flow/order-lifecycles';
-import { RESULT_REVIEW_SLA } from '@/lib/clinical-flow/order-lifecycles';
+import { useSettings } from '@/lib/settings/SettingsProvider';
 
 // Human labels for the granular diagnostics lifecycle (Stage 6).
 const ORDER_STAGE_LABEL: Record<LabOrderStatus, string> = {
@@ -75,6 +75,7 @@ export default function LabPage() {
   const { showToast } = useToast();
   const { t } = useTranslation();
   const router = useRouter();
+  const { resultReviewSLA } = useSettings();
   const [resultDraft, setResultDraft] = useState<ResultDraft | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -160,7 +161,7 @@ export default function LabPage() {
     if (effOrderStatus(o) !== 'resulted') return false;
     const resultedAt = new Date(o.updatedAt || o.createdAt || '').getTime();
     if (!Number.isFinite(resultedAt)) return false;
-    const slaHours = o.critical ? RESULT_REVIEW_SLA.criticalHours : RESULT_REVIEW_SLA.routineHours;
+    const slaHours = o.critical ? resultReviewSLA.criticalHours : resultReviewSLA.routineHours;
     return (Date.now() - resultedAt) / 3_600_000 > slaHours;
   });
 
@@ -232,7 +233,7 @@ export default function LabPage() {
   return (
     <>
       <TopBar title={t('lab.laboratory')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <PageHeader
             icon={FlaskConical}
             title={t('lab.infoSystem')}
@@ -456,7 +457,8 @@ export default function LabPage() {
           )}
 
           {/* Lab Orders Table */}
-          <div className="card-elevated overflow-hidden">
+          <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <table className="data-table">
               <thead>
                 <tr>
@@ -570,6 +572,7 @@ export default function LabPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* New Lab Order Modal */}

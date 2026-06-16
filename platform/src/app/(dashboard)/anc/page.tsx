@@ -188,12 +188,6 @@ export default function ANCPage() {
           icon={HeartPulse}
           title={t('anc.title')}
           subtitle={t('anc.subtitle')}
-          stats={canViewCoverage && stats ? [
-            { label: t('anc.mothersEnrolled'), value: stats.totalMothers, color: 'var(--accent-primary)' },
-            { label: t('anc.anc4PlusRate'), value: `${stats.anc4PlusRate}%`, color: '#22C55E' },
-            { label: t('anc.highRisk'), value: stats.highRiskCount, color: '#EF4444' },
-            { label: t('anc.thisMonth'), value: stats.thisMonthVisits, color: '#6366F1' },
-          ] : undefined}
           actions={canRecordVitalEvents && (
             <button onClick={() => setShowModal(true)} className="btn btn-primary">
               <Plus className="w-4 h-4" /> {t('anc.registerVisit')}

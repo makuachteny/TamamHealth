@@ -39,6 +39,7 @@ import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { createLedgerEntry, getPatientBalance } from './ledger-service';
 import { jubaDate } from '../time-juba';
+import { getSettings } from '../settings/settings-store';
 
 const COLLECTION_STAGE_DAYS = {
   followUp: Number(process.env.COLLECTION_STAGE_FOLLOWUP_DAYS) || 30,
@@ -1084,11 +1085,12 @@ export async function getPatientFinancialSummary(patientId: string): Promise<Pat
   if (overdueBalance > 0) {
     const oldestOverdue = overdueInvoices.sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
     if (oldestOverdue) {
+      const stageDays = getSettings().collectionStageDays || COLLECTION_STAGE_DAYS;
       const daysPastDue = Math.floor((Date.now() - new Date(oldestOverdue.dueDate).getTime()) / (1000 * 60 * 60 * 24));
       if (daysPastDue > 120) collectionStage = '120_plus';
-      else if (daysPastDue > COLLECTION_STAGE_DAYS.preWriteOff) collectionStage = '90_day';
-      else if (daysPastDue > COLLECTION_STAGE_DAYS.warning) collectionStage = '60_day';
-      else if (daysPastDue > COLLECTION_STAGE_DAYS.followUp) collectionStage = '30_day';
+      else if (daysPastDue > stageDays.preWriteOff) collectionStage = '90_day';
+      else if (daysPastDue > stageDays.warning) collectionStage = '60_day';
+      else if (daysPastDue > stageDays.followUp) collectionStage = '30_day';
     }
   }
 

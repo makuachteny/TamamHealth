@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
+import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
@@ -10,9 +11,9 @@ import type { OrganizationDoc } from '@/lib/db-types';
 import FilterBar from '@/components/filters/FilterBar';
 import SearchInput from '@/components/filters/SearchInput';
 import FilterSelect from '@/components/filters/FilterSelect';
+import DataTile from '@/components/DataTile';
 import {
   CreditCard, Edit3, Check, X,
-  Building2, Users, TrendingUp
 } from '@/components/icons/lucide';
 
 export default function AdminBillingPage() {
@@ -103,32 +104,29 @@ export default function AdminBillingPage() {
   return (
     <>
       <TopBar title={t('adminBilling.title')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+
+        <PageHeader
+          icon={CreditCard}
+          title={t('adminBilling.title')}
+          subtitle={t('adminBilling.activeSubscriptionsByPlan')}
+        />
 
         {/* KPI Cards */}
-        <div className="kpi-grid mb-6">
-          {[
-            { key: 'activeSubscriptions', label: t('adminBilling.kpiActiveSubscriptions'), value: totalActive, icon: CreditCard, color: 'var(--color-success)', bg: '#05966915' },
-            { key: 'trialOrganizations', label: t('adminBilling.kpiTrialOrganizations'), value: totalTrial, icon: TrendingUp, color: 'var(--color-warning)', bg: '#D9770615' },
-            { key: 'suspended', label: t('adminBilling.kpiSuspended'), value: totalSuspended, icon: Building2, color: 'var(--color-danger)', bg: '#EF444415' },
-            { key: 'totalLicensedUsers', label: t('adminBilling.kpiTotalLicensedUsers'), value: totalMaxUsers, icon: Users, color: '#3b82f6', bg: '#3b82f615' },
-          ].map(stat => (
-            <div key={stat.key} className="kpi">
-              <div className="kpi__icon" style={{ background: stat.bg }}>
-                <stat.icon style={{ color: stat.color }} />
-              </div>
-              <div className="kpi__body">
-                <div className="kpi__value">{stat.value}</div>
-                <div className="kpi__label">{stat.label}</div>
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+          <DataTile label={t('adminBilling.kpiActiveSubscriptions')} value={totalActive} tone={totalActive > 0 ? 'ok' : 'default'} />
+          <DataTile label={t('adminBilling.kpiTrialOrganizations')} value={totalTrial} tone={totalTrial > 0 ? 'warning' : 'default'} />
+          <DataTile label={t('adminBilling.kpiSuspended')} value={totalSuspended} tone={totalSuspended > 0 ? 'danger' : 'default'} />
+          <DataTile label={t('adminBilling.kpiTotalLicensedUsers')} value={totalMaxUsers} />
         </div>
 
         {/* Plan Breakdown */}
-        <div className="rounded-xl p-5 mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>{t('adminBilling.activeSubscriptionsByPlan')}</p>
-          <div className="flex gap-6">
+        <div className="dash-card overflow-hidden mb-4">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <CreditCard className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('adminBilling.activeSubscriptionsByPlan')}</h3>
+          </div>
+          <div className="p-4 flex flex-col sm:flex-row gap-3">
             {Object.entries(planRevenue).map(([plan, info]) => (
               <div key={plan} className="flex items-center gap-3 px-4 py-3 rounded-xl flex-1" style={{ background: `${info.color}08`, border: `1px solid ${info.color}20` }}>
                 <div className="w-3 h-3 rounded-full" style={{ background: info.color }} />
@@ -164,8 +162,8 @@ export default function AdminBillingPage() {
         </FilterBar>
 
         {/* Table */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div style={{ overflowX: 'auto' }}>
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <table className="w-full">
               <thead>
                 <tr>

@@ -8,6 +8,8 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
+import { useMessagingDock } from '@/lib/messaging-dock-context';
+import type { AppointmentDoc } from '@/lib/db-types';
 import { formatCompactDateTime } from '@/lib/format-utils';
 import { patientRegisteredAt, patientFullName, patientGenderAge } from '@/lib/patient-utils';
 import PatientName from '@/components/PatientName';
@@ -15,15 +17,18 @@ import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignD
 import Modal from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useSettings } from '@/lib/settings/SettingsProvider';
 import {
   Calendar, ClipboardCheck, ArrowRightLeft, MessageSquare,
   UserPlus, ChevronRight, Shield,
   ClipboardList,
   AlertCircle,
   MapPin, LogOut, Wallet, CheckCircle, X,
+  QrCode, Search,
 } from '@/components/icons/lucide';
 
 // Exam rooms / bays a walk-in patient can be placed in to meet the provider.
+// Fallback used only when facility settings provide no rooms.
 const ROOM_OPTIONS = ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5', 'Room 6', 'Bay A', 'Bay B', 'Bay C', 'Bay D'];
 
 const ACCENT = 'var(--accent-primary)';
@@ -66,11 +71,18 @@ export default function FrontDeskDashboardPage() {
   const { triages, update: updateTriage } = useTriage();
   const { showToast } = useToast();
   const { t } = useTranslation();
+  const { openDock } = useMessagingDock();
+  const { rooms } = useSettings();
+  // Reactive room list from facility settings; fall back to the static list.
+  const roomOptions = rooms.length ? rooms : ROOM_OPTIONS;
 
   const [queueFilter, setQueueFilter] = useState<'all' | 'walk-in' | 'appointment' | 'referral'>('all');
+  const [queueSearch, setQueueSearch] = useState('');
+  const [queueSort, setQueueSort] = useState<'priority' | 'name' | 'time' | 'status'>('priority');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
+  const [checkInTarget, setCheckInTarget] = useState<AppointmentDoc | null>(null);
   const [roomDraft, setRoomDraft] = useState('');
   const [savingRoom, setSavingRoom] = useState(false);
 
@@ -134,10 +146,15 @@ export default function FrontDeskDashboardPage() {
       });
     }
 
-    // Add appointments not already triaged
+    // Appointments only join the queue once the patient has CHECKED IN (arrived).
+    // Scheduled/confirmed appointments stay in the Today's Appointments card until
+    // the receptionist checks them in via the check-in popup.
+    const ARRIVED = new Set<AppointmentDoc['status']>(['checked_in', 'in_progress', 'completed']);
+    const apptPatientIds = new Set(todaysAppointments.map(a => a.patientId));
     const triagedPatientIds = new Set(todaysTriages.map(t => t.patientId));
     for (const a of todaysAppointments) {
       if (triagedPatientIds.has(a.patientId)) continue;
+      if (!ARRIVED.has(a.status)) continue; // not checked in yet → not in the queue
       const status = a.status === 'completed' ? 'DONE' :
                      a.status === 'in_progress' ? 'IN CONSULT' : 'WAITING';
       items.push({
@@ -161,6 +178,9 @@ export default function FrontDeskDashboardPage() {
       patientRegisteredAt(b).localeCompare(patientRegisteredAt(a)));
     for (const p of recent) {
       if (queuedPatientIds.has(p._id)) continue;
+      // A patient with a today's appointment is handled by the check-in flow
+      // above — don't also list them as a generic "registered" walk-in.
+      if (apptPatientIds.has(p._id)) continue;
       const registeredAt = patientRegisteredAt(p);
       items.push({
         id: `patient-${p._id}`,
@@ -193,9 +213,28 @@ export default function FrontDeskDashboardPage() {
   }, [todaysTriages, todaysAppointments, patients]);
 
   const filteredQueue = useMemo(() => {
-    if (queueFilter === 'all') return queue;
-    return queue.filter(q => q.type === queueFilter);
-  }, [queue, queueFilter]);
+    let items = queueFilter === 'all' ? queue : queue.filter(q => q.type === queueFilter);
+
+    const q = queueSearch.trim().toLowerCase();
+    if (q) {
+      items = items.filter(it =>
+        it.patientName.toLowerCase().includes(q) ||
+        it.complaint.toLowerCase().includes(q) ||
+        it.department.toLowerCase().includes(q)
+      );
+    }
+
+    if (queueSort !== 'priority') {
+      const statusOrder: Record<string, number> = { 'WAITING': 0, 'IN CONSULT': 1, 'DONE': 2 };
+      items = [...items].sort((a, b) => {
+        if (queueSort === 'name') return a.patientName.localeCompare(b.patientName);
+        if (queueSort === 'time') return a.time.localeCompare(b.time);
+        return (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
+      });
+    }
+
+    return items;
+  }, [queue, queueFilter, queueSearch, queueSort]);
 
   // ── Selected patient previous visit info (from real records) ──
   const selectedPatient = useMemo(() =>
@@ -219,18 +258,66 @@ export default function FrontDeskDashboardPage() {
   // ── Final checkout: close out a completed visit ──
   const handleCompleteCheckout = useCallback(async (target: CheckoutTarget) => {
     try {
+      // Stage 10 — Facility checkout gate. Evaluate the documented checkout gate
+      // (prescriptions dispensed, critical labs reviewed, …) and advance the
+      // clinical encounter to a terminal `discharged` status. Unmet critical
+      // items don't block the desk from closing the visit, but they flag it as
+      // `discharged_with_pending_items` and warn the receptionist.
+      let gateNote = '';
+      try {
+        const {
+          getOpenEncounterForPatient, dischargeEncounter,
+        } = await import('@/lib/services/encounter-service');
+        const enc = await getOpenEncounterForPatient(target.patientId);
+        if (enc) {
+          const { getPrescriptionsByPatient } = await import('@/lib/services/prescription-service');
+          const { getLabResultsByPatient } = await import('@/lib/services/lab-service');
+          const { unmetCriticalGateItems } = await import('@/lib/clinical-flow/encounter-journey');
+
+          const rxs = (await getPrescriptionsByPatient(target.patientId)).filter(r => !r.encounterId || r.encounterId === enc._id);
+          // Lab results aren't encounter-linked, so critical labs are checked at
+          // patient level (any unreviewed critical result blocks a clean discharge).
+          const labs = await getLabResultsByPatient(target.patientId);
+          const reviewed = new Set(['reviewed_by_clinician', 'acted_upon', 'communicated_to_patient']);
+
+          const satisfied: string[] = [
+            // The clinician closing the visit implies these were handled.
+            'all_clinic_visits_closed', 'in_clinic_procedures_complete',
+            'required_documentation_generated', 'payment_status_determined',
+            'pending_items_flagged',
+          ];
+          if (rxs.every(r => r.status !== 'pending')) satisfied.push('prescriptions_dispensed');
+          if (!labs.some(l => l.critical && l.status === 'completed' && !reviewed.has(l.orderStatus ?? ''))) {
+            satisfied.push('critical_labs_reviewed');
+          }
+
+          const unmet = unmetCriticalGateItems(satisfied);
+          await dischargeEncounter(enc._id, { actorId: currentUser?._id, pendingItems: unmet.length > 0 });
+          if (unmet.length > 0) gateNote = ` — flagged: ${unmet.map(u => u.label).join('; ')}`;
+        }
+      } catch (e) {
+        console.warn('Encounter discharge during checkout failed', e);
+      }
+
       if (target.appointmentId) {
         await updateAppointmentStatus(target.appointmentId, 'completed');
       } else if (target.triageId) {
         // 'discharged' is the terminal status in the TriageDoc status union.
         await updateTriage(target.triageId, { status: 'discharged' });
       }
-      showToast(`${target.patientName} checked out`, 'success');
+      showToast(`${target.patientName} checked out${gateNote}`, 'success');
       setCheckoutTarget(null);
     } catch {
       showToast('Failed to complete checkout', 'error');
     }
-  }, [updateAppointmentStatus, updateTriage, showToast]);
+  }, [updateAppointmentStatus, updateTriage, showToast, currentUser]);
+
+  // ── Appointment check-in: mark the patient as arrived → joins the queue ──
+  const handleCheckIn = useCallback(async (appt: AppointmentDoc) => {
+    await updateAppointmentStatus(appt._id, 'checked_in');
+    showToast(`${appt.patientName} checked in — added to queue`, 'success');
+    setCheckInTarget(null);
+  }, [updateAppointmentStatus, showToast]);
 
   if (!currentUser) return null;
 
@@ -247,32 +334,77 @@ export default function FrontDeskDashboardPage() {
       <TopBar title={t('frontDesk.receptionCenter')} />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
-        {/* HEADER */}
-        <div className="flex items-center justify-between mb-4">
+        {/* HEADER — stays at top, aligned with the sidebar role card. The extra
+            bottom gap drops Quick Actions + Today's Schedule down so they line up
+            with the sidebar's "RECEPTION" section label and nav items. */}
+        <div className="flex items-center justify-between flex-shrink-0" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: ACCENT }}>
-              <Shield className="w-5 h-5 text-white" />
+            <div className="page-header__icon">
+              <Shield size={22} strokeWidth={1.8} />
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('frontDesk.reception')}</h1>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{todayDate} · {hospital?.name || currentUser.hospitalName || ''}</p>
             </div>
           </div>
+
+          {/* Primary front-desk actions — to the right of the title */}
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            <button
+              onClick={() => router.push('/patients')}
+              className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold transition-all hover:shadow-sm"
+              style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+            >
+              <QrCode className="w-[18px] h-[18px]" style={{ color: 'var(--accent-primary)' }} />
+              <span className="hidden sm:inline">{t('frontDesk.findPatient')}</span>
+            </button>
+            <button
+              onClick={() => router.push('/patients/new')}
+              className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold text-white transition-all hover:shadow-md"
+              style={{ background: 'var(--accent-primary)' }}
+            >
+              <UserPlus className="w-[18px] h-[18px]" />
+              <span className="hidden sm:inline">{t('frontDesk.registerNewPatient')}</span>
+            </button>
+          </div>
         </div>
 
         {/* PATIENT QUEUE TABLE — below the cards (order: 2) */}
         <div className="dash-card rounded-2xl overflow-hidden mb-4 flex flex-col" style={{ padding: '0', flex: 1, minHeight: 0, order: 2 }}>
-          <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b flex-shrink-0 flex-wrap" style={{ borderColor: 'var(--border-light)' }}>
+            <div className="flex items-center gap-2 flex-shrink-0">
               <ClipboardList className="w-4 h-4" style={{ color: ACCENT }} />
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('frontDesk.patientQueue')}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+              <input
+                type="search"
+                value={queueSearch}
+                onChange={(e) => setQueueSearch(e.target.value)}
+                placeholder={t('frontDesk.searchQueue')}
+                className="search-icon-input text-xs"
+                style={{ background: 'var(--overlay-subtle)', paddingTop: '7px', paddingBottom: '7px' }}
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <select
+                value={queueSort}
+                onChange={(e) => setQueueSort(e.target.value as typeof queueSort)}
+                aria-label={t('patients.sortBy')}
+                className="text-[11px] font-medium px-2 py-1.5 rounded-lg cursor-pointer"
+                style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
+              >
+                <option value="priority">{t('frontDesk.sortPriority')}</option>
+                <option value="name">{t('frontDesk.sortName')}</option>
+                <option value="time">{t('frontDesk.sortTime')}</option>
+                <option value="status">{t('frontDesk.sortStatus')}</option>
+              </select>
               <div className="flex items-center gap-1 p-0.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                 {(['all', 'walk-in', 'appointment', 'referral'] as const).map(tab => {
                   const tabCount = tab === 'all' ? queue.length : queue.filter(q => q.type === tab).length;
                   return (
-                  <button key={tab} onClick={() => setQueueFilter(tab)} className="px-3 py-1 rounded-md text-[10px] font-semibold transition-all flex items-center gap-1.5" style={{ background: queueFilter === tab ? ACCENT : 'transparent', color: queueFilter === tab ? '#FFF' : 'var(--text-muted)' }}>
+                  <button key={tab} onClick={() => setQueueFilter(tab)} className="px-3 py-1 rounded-md text-[10px] font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap" style={{ background: queueFilter === tab ? ACCENT : 'transparent', color: queueFilter === tab ? '#FFF' : 'var(--text-muted)' }}>
                     {tab === 'all' ? t('frontDesk.tabAll') : tab === 'walk-in' ? t('frontDesk.tabWalkIns') : tab === 'appointment' ? t('frontDesk.tabAppts') : t('frontDesk.tabReferrals')}
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none tabular-nums" style={{ background: queueFilter === tab ? 'rgba(255,255,255,0.22)' : 'var(--border-light)', color: queueFilter === tab ? '#FFF' : 'var(--text-secondary)' }}>{tabCount}</span>
                   </button>
@@ -308,7 +440,7 @@ export default function FrontDeskDashboardPage() {
                     <tr className="cursor-pointer transition-all hover:bg-[var(--overlay-subtle)]" style={{ borderBottom: isOpen ? 'none' : '1px solid var(--border-light)', background: isOpen ? 'var(--overlay-subtle)' : undefined }} onClick={() => setSelectedPatientId(isOpen ? null : entry.patientId)}>
                       <td className="px-3 py-3">
                         <div className="flex flex-col gap-0.5">
-                          <PatientName name={entry.patientName} size={30} nameClassName="text-[12px]" />
+                          <PatientName name={entry.patientName} size={30} nameClassName="text-[12px] !font-normal" />
                           <div className="flex items-center gap-1 flex-wrap">
                             {entry.assignedRoom && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded w-fit flex items-center gap-0.5" style={{ background: 'var(--accent-light)', color: ACCENT }}>
@@ -318,12 +450,12 @@ export default function FrontDeskDashboardPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3"><span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ background: `${pColor}15`, color: pColor }}>{entry.priority}</span></td>
-                      <td className="px-3 py-3"><span className="text-[10px] font-semibold px-2 py-0.5 rounded" style={{ background: entry.type === 'walk-in' ? 'rgba(251,146,60,0.1)' : entry.type === 'referral' ? 'rgba(234,179,8,0.1)' : entry.type === 'registered' ? 'rgba(100,116,139,0.12)' : 'rgba(168,85,247,0.1)', color: entry.type === 'walk-in' ? '#FB923C' : entry.type === 'referral' ? 'var(--color-warning)' : entry.type === 'registered' ? '#64748B' : '#A855F7' }}>{entry.type.toUpperCase()}</span></td>
-                      <td className="px-3 py-3 text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{entry.complaint}</td>
-                      <td className="px-3 py-3 text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{entry.department}</td>
-                      <td className="px-3 py-3 text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{entry.time}</td>
-                      <td className="px-3 py-3"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${sColor}15`, color: sColor }}>{entry.status}</span></td>
+                      <td className="px-3 py-3"><span className="text-[12px] lowercase" style={{ color: pColor }}>{entry.priority}</span></td>
+                      <td className="px-3 py-3"><span className="text-[12px] lowercase" style={{ color: entry.type === 'walk-in' ? '#FB923C' : entry.type === 'referral' ? 'var(--color-warning)' : entry.type === 'registered' ? '#64748B' : '#A855F7' }}>{entry.type}</span></td>
+                      <td className="px-3 py-3 text-[12px] truncate" style={{ color: 'var(--text-secondary)' }}>{entry.complaint}</td>
+                      <td className="px-3 py-3 text-[12px]" style={{ color: 'var(--text-primary)' }}>{entry.department}</td>
+                      <td className="px-3 py-3 text-[12px] font-mono" style={{ color: 'var(--text-muted)' }}>{entry.time}</td>
+                      <td className="px-3 py-3"><span className="text-[12px] lowercase" style={{ color: sColor }}>{entry.status}</span></td>
                       <td className="px-3 py-3">
                         {entry.status !== 'DONE' ? (
                           <button
@@ -408,7 +540,7 @@ export default function FrontDeskDashboardPage() {
                                   style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-input, var(--bg-card-solid))', color: 'var(--text-primary)' }}
                                 >
                                   <option value="">— Unassigned —</option>
-                                  {ROOM_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                                  {roomOptions.map(r => <option key={r} value={r}>{r}</option>)}
                                 </select>
                                 <button
                                   disabled={savingRoom}
@@ -436,37 +568,36 @@ export default function FrontDeskDashboardPage() {
         </div>
 
         {/* CARDS GRID: Quick Actions + Today's Appointments — above the queue (order: 1) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-4 flex-shrink-0" style={{ order: 1 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3 flex-shrink-0 lg:items-start" style={{ order: 1 }}>
 
           {/* Quick Actions — compact tile grid (clinician-dashboard style) */}
-          <div className="dash-card p-3 flex flex-col lg:col-span-2" style={{ order: 1 }}>
+          <div className="dash-card p-3 flex flex-col lg:self-start" style={{ order: 1 }}>
             <h3 className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('frontDesk.quickActions')}</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
                 { label: t('frontDesk.registerNewPatient'), icon: UserPlus, href: '/patients/new', color: 'var(--accent-primary)', bg: 'rgba(59,130,246,0.10)' },
-                { label: t('frontDesk.findPatient'), icon: ClipboardCheck, href: '/patients', color: '#059669', bg: 'rgba(5,150,105,0.10)' },
                 { label: t('frontDesk.viewReferrals'), icon: ArrowRightLeft, href: '/referrals', color: '#F59E0B', bg: 'rgba(245,158,11,0.10)' },
                 { label: t('nav.appointments'), icon: Calendar, href: '/appointments', color: '#2563EB', bg: 'rgba(37,99,235,0.10)' },
                 { label: t('action.sendMessage'), icon: MessageSquare, href: '/messages', color: '#A855F7', bg: 'rgba(168,85,247,0.10)' },
               ].map(action => (
                 <button
                   key={action.label}
-                  onClick={() => router.push(action.href)}
-                  className="flex flex-col items-center justify-center text-center gap-1.5 p-2.5 rounded-xl transition-all hover:shadow-sm hover:-translate-y-0.5"
+                  onClick={() => (action.href === '/messages' ? openDock() : router.push(action.href))}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all hover:shadow-sm hover:-translate-y-0.5"
                   style={{ background: action.bg, border: '1px solid var(--border-light)' }}
                 >
-                  <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg-card-solid)' }}>
+                  <span className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'var(--bg-card-solid)' }}>
                     <action.icon className="w-4 h-4" style={{ color: action.color }} />
                   </span>
-                  <span className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
+                  <span className="text-[11px] font-semibold leading-tight text-left" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Today's Appointments — list card, shows ~one appointment then scrolls */}
-          <div className="dash-card overflow-hidden flex flex-col lg:col-span-1" style={{ order: 2 }}>
-            <div className="px-4 py-3 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
+          <div className="dash-card overflow-hidden flex flex-col lg:self-start" style={{ order: 2 }}>
+            <div className="px-3 py-2.5 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
               <h3 className="font-semibold text-sm inline-flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <Calendar className="w-4 h-4" style={{ color: '#2563EB' }} /> {t('frontDesk.todaysAppointments')}
               </h3>
@@ -475,15 +606,27 @@ export default function FrontDeskDashboardPage() {
                 <button onClick={() => router.push('/appointments')} className="text-xs font-medium flex items-center gap-1" style={{ color: ACCENT }}>{t('frontDesk.viewAll')} <ChevronRight className="w-3.5 h-3.5" /></button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2" style={{ minHeight: 0 }}>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1.5" style={{ minHeight: 0, maxHeight: 76 }}>
               {todaysAppointments.length === 0 ? (
                 <p className="text-center text-[12px] py-8" style={{ color: 'var(--text-muted)' }}>{t('frontDesk.noAppointmentsToday')}</p>
-              ) : todaysAppointments.map(appt => (
-                <div key={appt._id} onClick={() => router.push(`/patients/${appt.patientId}`)} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all hover:bg-[var(--table-row-hover)]" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+              ) : todaysAppointments.map(appt => {
+                const arrived = appt.status === 'checked_in' || appt.status === 'in_progress' || appt.status === 'completed';
+                return (
+                <div key={appt._id} onClick={() => setCheckInTarget(appt)} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all hover:bg-[var(--table-row-hover)]" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }} title={t('frontDesk.checkInTitle')}>
                   <span className="text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{appt.patientName}</span>
-                  <span className="text-[11px] font-mono flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{appt.appointmentTime}</span>
+                  <span className="flex items-center gap-2 flex-shrink-0">
+                    {arrived ? (
+                      <span className="text-[10px] font-semibold inline-flex items-center gap-1" style={{ color: 'var(--color-success)' }}>
+                        <CheckCircle className="w-3 h-3" />{t('frontDesk.checkedIn')}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold" style={{ color: ACCENT }}>{t('frontDesk.checkIn')}</span>
+                    )}
+                    <span className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{appt.appointmentTime}</span>
+                  </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -501,6 +644,15 @@ export default function FrontDeskDashboardPage() {
             onClose={() => setCheckoutTarget(null)}
             onComplete={handleCompleteCheckout}
             onCollectPayment={(pid) => router.push(`/payments?patientId=${pid}`)}
+          />
+        )}
+
+        {checkInTarget && (
+          <CheckInModal
+            appt={checkInTarget}
+            onClose={() => setCheckInTarget(null)}
+            onCheckIn={handleCheckIn}
+            onViewPatient={(pid) => router.push(`/patients/${pid}`)}
           />
         )}
       </main>
@@ -605,5 +757,91 @@ function CheckoutModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+// ── Appointment check-in modal: confirm the patient has arrived; on check-in
+//    they're added to the live patient queue. ──
+function CheckInModal({
+  appt,
+  onClose,
+  onCheckIn,
+  onViewPatient,
+}: {
+  appt: AppointmentDoc;
+  onClose: () => void;
+  onCheckIn: (appt: AppointmentDoc) => Promise<void>;
+  onViewPatient: (patientId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [checking, setChecking] = useState(false);
+  const alreadyIn = appt.status === 'checked_in' || appt.status === 'in_progress' || appt.status === 'completed';
+
+  return (
+    <Modal onClose={onClose} width={440}>
+      <div className="modal-content card-elevated" style={{ width: '100%' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+          <div className="flex items-center gap-2">
+            <ClipboardCheck className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+            <div>
+              <h2 className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>{t('frontDesk.checkInTitle')}</h2>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{appt.patientName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg transition-colors hover:bg-black/5" aria-label="Close">
+            <X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
+          </button>
+        </div>
+
+        {/* Body — appointment detail */}
+        <div className="p-4 space-y-2.5">
+          <div className="rounded-xl p-3 space-y-2" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+            <DetailRow icon={<Calendar className="w-4 h-4" style={{ color: ACCENT }} />} label={t('frontDesk.colTime')} value={appt.appointmentTime} />
+            <DetailRow icon={<ClipboardList className="w-4 h-4" style={{ color: ACCENT }} />} label={t('frontDesk.colComplaint')} value={appt.reason || '—'} />
+            <DetailRow icon={<MapPin className="w-4 h-4" style={{ color: ACCENT }} />} label={t('frontDesk.department')} value={appt.department || '—'} />
+          </div>
+          {alreadyIn && (
+            <div className="rounded-xl p-3 flex items-center gap-2" style={{ background: 'var(--accent-light)', border: '1px solid var(--border-light)' }}>
+              <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
+              <p className="text-[12px]" style={{ color: 'var(--text-primary)' }}>{t('frontDesk.alreadyInQueue')}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-2 p-4" style={{ borderTop: '1px solid var(--border-light)' }}>
+          <button onClick={() => onViewPatient(appt.patientId)} className="rounded-lg px-3 py-2 text-sm font-semibold transition-colors hover:bg-black/5" style={{ color: ACCENT }}>
+            {t('frontDesk.viewProfile')}
+          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-semibold transition-colors hover:bg-black/5" style={{ color: 'var(--text-muted)' }}>
+              {t('action.cancel')}
+            </button>
+            {!alreadyIn && (
+              <button
+                onClick={async () => { setChecking(true); try { await onCheckIn(appt); } finally { setChecking(false); } }}
+                disabled={checking}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+                style={{ background: 'var(--color-success)' }}
+              >
+                <CheckCircle className="w-4 h-4" />
+                {checking ? t('frontDesk.checkingIn') : t('frontDesk.checkIn')}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="flex-shrink-0">{icon}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wide flex-shrink-0" style={{ color: 'var(--text-muted)', minWidth: 78 }}>{label}</span>
+      <span className="text-[12px] truncate" style={{ color: 'var(--text-primary)' }}>{value}</span>
+    </div>
   );
 }

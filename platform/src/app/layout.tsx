@@ -3,6 +3,7 @@ import "./globals.css";
 import { AppProvider } from "@/lib/context";
 import { ToastProvider } from "@/components/Toast";
 import TextareaAutoResize from "@/components/TextareaAutoResize";
+import BootIntegrityGuard from "@/components/BootIntegrityGuard";
 
 export const metadata: Metadata = {
   title: "TamamHealth — Digital Health Records for South Sudan",
@@ -39,6 +40,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="antialiased">
+        <BootIntegrityGuard />
         <AppProvider>
           <ToastProvider>
             <TextareaAutoResize />

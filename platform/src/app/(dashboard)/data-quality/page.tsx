@@ -23,12 +23,6 @@ export default function DataQualityPage() {
           icon={Database}
           title={t('dataQuality.headerTitle')}
           subtitle={t('dataQuality.headerSubtitle')}
-          stats={[
-            { label: t('dataQuality.kpiAvgCompleteness'), value: `${data.avgCompleteness}%`, color: scoreColor(data.avgCompleteness) },
-            { label: t('dataQuality.kpiAvgTimeliness'), value: `${data.avgTimeliness}%`, color: scoreColor(data.avgTimeliness) },
-            { label: t('dataQuality.kpiAvgDataQuality'), value: `${data.avgQuality}%`, color: scoreColor(data.avgQuality) },
-            { label: t('dataQuality.kpiDhis2Adoption'), value: `${data.dhis2Adoption}%`, color: scoreColor(data.dhis2Adoption) },
-          ]}
         />
 
         {/* National indicators */}

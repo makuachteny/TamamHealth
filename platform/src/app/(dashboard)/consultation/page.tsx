@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { LabResultDoc } from '@/lib/db-types';
-import { BASIC_LABS, SPECIAL_LABS, LAB_TESTS as labTests, labTier, specimenFor } from '@/lib/clinical-flow/lab-catalog';
+import { labTier, specimenFor } from '@/lib/clinical-flow/lab-catalog';
+import { useSettings } from '@/lib/settings/SettingsProvider';
 import { estimateDispenseQuantity } from '@/lib/clinical-flow/dispense-quantity';
 import TopBar from '@/components/TopBar';
 import PageHeader from '@/components/PageHeader';
@@ -72,6 +73,23 @@ export default function ConsultationPage() {
   const searchParams = useSearchParams();
   const { showToast } = useToast();
   const { t } = useTranslation();
+
+  // Lab investigation lists, derived reactively from facility settings so an
+  // admin's catalogue changes propagate here. Defaults mirror the old static
+  // BASIC_LABS / SPECIAL_LABS / LAB_TESTS, so behaviour is identical at defaults.
+  const settings = useSettings();
+  const basicLabs = useMemo(
+    () => settings.labCatalog.filter(l => l.tier === 'basic').map(l => l.name),
+    [settings.labCatalog]
+  );
+  const specialLabs = useMemo(
+    () => settings.labCatalog.filter(l => l.tier === 'special').map(l => l.name),
+    [settings.labCatalog]
+  );
+  const labTests = useMemo(
+    () => settings.labCatalog.map(l => l.name),
+    [settings.labCatalog]
+  );
 
   // PouchDB hooks
   const { patients } = usePatients();
@@ -654,7 +672,7 @@ export default function ConsultationPage() {
     if (!selectedPatient || sendingLabs) return;
     const selectedLabTests = Object.entries(labOrders).filter(([, checked]) => checked).map(([name]) => name);
     if (selectedLabTests.length === 0) {
-      showToast('Select at least one investigation to send to the lab.', 'error');
+      showToast(t('consultation.toastSelectInvestigation'), 'error');
       return;
     }
     setSendingLabs(true);
@@ -735,11 +753,11 @@ export default function ConsultationPage() {
         /* pricing not configured — labs still ordered */
       }
 
-      showToast(`Sent ${selectedLabTests.length} test(s) to the lab. Resume this visit from your dashboard when results are back.`, 'success');
+      showToast(t('consultation.toastSentToLab', { count: selectedLabTests.length }), 'success');
       router.push('/dashboard');
     } catch (err) {
       console.error('Send to lab failed', err);
-      showToast('Could not send the investigations to the lab. Please try again.', 'error');
+      showToast(t('consultation.toastSendLabFailed'), 'error');
     } finally {
       setSendingLabs(false);
     }
@@ -756,7 +774,7 @@ export default function ConsultationPage() {
     if (!selectedPatient || sendingRx) return;
     const pending = prescriptions.filter(rx => rx.medication && !sentRxSignatures.includes(rxSignature(rx)));
     if (pending.length === 0) {
-      showToast('No new prescriptions to send to the pharmacy.', 'error');
+      showToast(t('consultation.toastNoNewRx'), 'error');
       return;
     }
     setSendingRx(true);
@@ -797,7 +815,7 @@ export default function ConsultationPage() {
           actorId: currentUser?._id,
         });
       }
-      showToast(`Sent ${pending.length} prescription(s) to the pharmacy queue.`, 'success');
+      showToast(t('consultation.toastSentToPharmacy', { count: pending.length }), 'success');
     } catch (err) {
       console.error('Send to pharmacy failed', err);
       showToast('Could not send the prescriptions to the pharmacy. Please try again.', 'error');
@@ -1065,27 +1083,39 @@ export default function ConsultationPage() {
       //    org hasn't priced anything — so this is safe before pricing is set up.
       try {
         const { chargeForServices } = await import('@/lib/services/fee-schedule-service');
+        // Idempotency guard: if a prior attempt already billed this encounter
+        // for the consultation (then a later stage failed and the user retried,
+        // or they re-opened a completed visit), don't charge again. Lab-only
+        // mid-visit bills carry no 'consultation' line, so the consultation fee
+        // is still billed exactly once per visit.
+        const { getBillsByPatient } = await import('@/lib/services/billing-service');
+        const priorBills = activeEncounterId ? await getBillsByPatient(selectedPatient) : [];
+        const alreadyChargedConsult = priorBills.some(
+          b => b.encounterId === activeEncounterId && b.items.some(i => i.category === 'consultation'),
+        );
         const lines = [
           { category: 'consultation' as const, serviceCode: 'CONS-GEN', description: 'Consultation' },
           // Only bill labs not already charged when they were sent to the lab.
           ...newLabTests.map(testName => ({ category: 'laboratory' as const, serviceCode: testName, description: testName, referenceType: 'lab_result' })),
           ...prescriptions.map(rx => ({ category: 'pharmacy' as const, serviceCode: rx.medication, description: rx.medication, referenceType: 'prescription' })),
         ];
-        await chargeForServices({
-          patientId: selectedPatient,
-          patientName,
-          hospitalNumber,
-          facilityId: hospitalId,
-          facilityName: hospitalName,
-          facilityLevel: 'clinic',
-          state: patientData?.state || '',
-          county: patientData?.county,
-          orgId: currentUser?.orgId,
-          encounterId: activeEncounterId || undefined,
-          generatedBy: currentUser?._id || 'system',
-          generatedByName: currentUser?.name || 'System',
-          scope: { orgId: currentUser?.orgId, hospitalId, role: currentUser?.role || 'doctor' },
-        }, lines);
+        if (!alreadyChargedConsult) {
+          await chargeForServices({
+            patientId: selectedPatient,
+            patientName,
+            hospitalNumber,
+            facilityId: hospitalId,
+            facilityName: hospitalName,
+            facilityLevel: 'clinic',
+            state: patientData?.state || '',
+            county: patientData?.county,
+            orgId: currentUser?.orgId,
+            encounterId: activeEncounterId || undefined,
+            generatedBy: currentUser?._id || 'system',
+            generatedByName: currentUser?.name || 'System',
+            scope: { orgId: currentUser?.orgId, hospitalId, role: currentUser?.role || 'doctor' },
+          }, lines);
+        }
       } catch (e) {
         console.warn('Could not generate charges from price catalog', e);
         postWarnings.push('charges were not generated');
@@ -2287,7 +2317,7 @@ export default function ConsultationPage() {
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Basic panel</div>
                     <div className="grid grid-cols-2 gap-3">
-                      {BASIC_LABS.map(test => (
+                      {basicLabs.map(test => (
                         <label key={test} className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
                           style={{ background: labOrders[test] ? 'rgba(59, 130, 246,0.10)' : 'var(--overlay-subtle)', border: `1px solid ${labOrders[test] ? 'var(--accent-primary)' : 'var(--border-light)'}` }}>
                           <input type="checkbox" checked={!!labOrders[test]} onChange={e => setLabOrders(prev => ({ ...prev, [test]: e.target.checked }))} className="w-4 h-4 rounded" style={{ accentColor: 'var(--accent-primary)' }} />
@@ -2303,7 +2333,7 @@ export default function ConsultationPage() {
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Special investigations</div>
                     <div className="grid grid-cols-2 gap-3">
-                      {SPECIAL_LABS.map(test => (
+                      {specialLabs.map(test => (
                         <label key={test} className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
                           style={{ background: labOrders[test] ? 'rgba(59, 130, 246,0.10)' : 'var(--overlay-subtle)', border: `1px solid ${labOrders[test] ? 'var(--accent-primary)' : 'var(--border-light)'}` }}>
                           <input type="checkbox" checked={!!labOrders[test]} onChange={e => setLabOrders(prev => ({ ...prev, [test]: e.target.checked }))} className="w-4 h-4 rounded" style={{ accentColor: 'var(--accent-primary)' }} />

@@ -111,16 +111,18 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
   // Outstanding balance for the most recent encounter — surfaced as a chip on
   // the "Most Recent Record" hero so clinicians see if the visit is settled.
   const [encounterBalance, setEncounterBalance] = useState<number | null>(null);
-  const latestRecordId = records[0]?._id;
+  // The ledger is keyed by encounterId (enc-…), not the medical-record id (mr-…),
+  // so the balance must be looked up by the record's encounterId.
+  const latestEncounterId = (records[0] as { encounterId?: string } | undefined)?.encounterId;
   useEffect(() => {
-    if (!latestRecordId) { setEncounterBalance(null); return; }
+    if (!latestEncounterId) { setEncounterBalance(null); return; }
     let cancelled = false;
     import('@/lib/services/ledger-service')
-      .then(m => m.getEncounterBalance(latestRecordId))
+      .then(m => m.getEncounterBalance(latestEncounterId))
       .then(b => { if (!cancelled) setEncounterBalance(b); })
       .catch(() => { /* best-effort */ });
     return () => { cancelled = true; };
-  }, [latestRecordId]);
+  }, [latestEncounterId]);
 
   // Edit form state — initialised when modal opens
   const [editForm, setEditForm] = useState({

@@ -9,8 +9,9 @@ import {
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { SearchInput, FilterBar, FilterSelect } from '@/components/filters';
-import PlanKpiCards from '@/components/payments/PlanKpiCards';
+import { computePlanKpis } from '@/components/payments/PlanKpiCards';
 import PageHeader from '@/components/PageHeader';
+import DataTile from '@/components/DataTile';
 import Modal from '@/components/Modal';
 import PaymentPanel from '@/components/payments/PaymentPanel';
 import { getMethodConfig } from '@/lib/payment-method-config';
@@ -18,6 +19,10 @@ import type { PaymentDoc, ClaimDoc, PaymentPlanDoc } from '@/lib/db-types-paymen
 import type { BillingDoc } from '@/lib/db-types-billing';
 
 const fmt = (n: number) => 'SSP ' + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+// Shared grid template for the patient-account list so the column header row and
+// every data row line up: Patient | Payments | Claims | Plans | Last activity | Balance | ›
+const PAYMENTS_COLS = 'minmax(0, 1fr) 90px 80px 80px 130px 150px 24px';
 
 interface PatientLine {
   patientId: string;
@@ -49,6 +54,10 @@ export default function PaymentsPage() {
   const [balanceFilter, setBalanceFilter] = useState('all');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [payingLine, setPayingLine] = useState<PatientLine | null>(null);
+  // Inline "Collect payment" launcher: a header button opens a patient picker,
+  // and choosing a patient drops straight into the record-payment panel.
+  const [collectPickerOpen, setCollectPickerOpen] = useState(false);
+  const [collectSearch, setCollectSearch] = useState('');
   // Installment recording for a payment plan (folded in from the old Plans page).
   const [recordPlanFor, setRecordPlanFor] = useState<PaymentPlanDoc | null>(null);
   const [planAmount, setPlanAmount] = useState('');
@@ -162,6 +171,25 @@ export default function PaymentsPage() {
     });
   }, [patientLines, search, balanceFilter]);
 
+  // A/R aging buckets — days since the encounter, over every bill still carrying
+  // a balance. Relocated from the old Billing cockpit so the biller sees how old
+  // the receivables are right on the bills screen.
+  const aging = useMemo(() => {
+    const buckets = { current: 0, d31: 0, d61: 0, d91: 0, d120: 0 };
+    const now = Date.now();
+    for (const b of data.bills) {
+      if ((b.balanceDue ?? 0) <= 0 || b.status === 'waived' || b.status === 'cancelled') continue;
+      const dateStr = b.encounterDate || b.createdAt;
+      const days = Math.floor((now - new Date(dateStr).getTime()) / 86_400_000);
+      if (days <= 30) buckets.current += b.balanceDue;
+      else if (days <= 60) buckets.d31 += b.balanceDue;
+      else if (days <= 90) buckets.d61 += b.balanceDue;
+      else if (days <= 120) buckets.d91 += b.balanceDue;
+      else buckets.d120 += b.balanceDue;
+    }
+    return buckets;
+  }, [data.bills]);
+
   // Derive the open patient's line from the live aggregates so the drawer's
   // balance/totals refresh automatically after a payment is recorded.
   const selectedLine = useMemo(
@@ -211,7 +239,7 @@ export default function PaymentsPage() {
   return (
     <>
       <TopBar title={t('payments.title')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {error && (
           <div style={{
             background: 'rgba(196, 69, 54, 0.08)', borderLeft: '4px solid #C44536',
@@ -233,10 +261,46 @@ export default function PaymentsPage() {
               ? ` · ${t('payments.withOutstandingBalance', { count: filtered.filter(l => l.outstanding > 0).length })}`
               : '')
           }
+          actions={
+            <button onClick={() => { setCollectSearch(''); setCollectPickerOpen(true); }} className="btn btn-primary">
+              <Banknote className="w-4 h-4" /> {t('billing.collectPayment')}
+            </button>
+          }
         />
 
-        {/* Payment-plan KPI summary */}
-        <PlanKpiCards plans={data.plans} />
+        {/* Payment Plans + A/R Aging — side by side, styled like the front-desk
+            Quick Actions / Appointments cards (dash-card + uppercase header). */}
+        {(() => {
+          const k = computePlanKpis(data.plans);
+          // Uniform tile height so the plan KPIs (label + value) and the A/R tiles
+          // (label + value + hint) are the same size and both cards line up.
+          const tile = { minHeight: 84 };
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 lg:items-start">
+              {/* Payment plans */}
+              <div className="dash-card p-3 flex flex-col lg:self-start">
+                <h3 className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('plans.title')}</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <DataTile style={tile} label={t('plans.kpiActivePlans')} value={k.activePlans} />
+                  <DataTile style={tile} label={t('plans.kpiTotalOutstanding')} value={fmt(k.totalOutstanding)} tone={k.totalOutstanding > 0 ? 'warning' : 'default'} />
+                  <DataTile style={tile} label={t('plans.kpiDelinquentPlans')} value={k.delinquentPlans} tone={k.delinquentPlans > 0 ? 'danger' : 'default'} pulse={k.delinquentPlans > 0} />
+                  <DataTile style={tile} label={t('plans.kpiCompletedThisMonth')} value={k.completedThisMonth} tone={k.completedThisMonth > 0 ? 'ok' : 'default'} />
+                </div>
+              </div>
+
+              {/* A/R aging — how old the outstanding receivables are. */}
+              <div className="dash-card p-3 flex flex-col lg:self-start">
+                <h3 className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('billing.arAging')}</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <DataTile style={tile} label={t('billing.agingCurrent')} hint="0–30d" value={fmt(aging.current)} tone="ok" />
+                  <DataTile style={tile} label="61–90d" hint={t('billing.agingFollowUp')} value={fmt(aging.d61)} />
+                  <DataTile style={tile} label="91–120d" hint={t('billing.agingAtRisk')} value={fmt(aging.d91)} tone="warning" />
+                  <DataTile style={tile} label="120d+" hint={t('billing.agingCollections')} value={fmt(aging.d120)} tone="danger" pulse={aging.d120 > 0} />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Search + filter */}
         <FilterBar>
@@ -257,68 +321,120 @@ export default function PaymentsPage() {
           />
         </FilterBar>
 
-        {/* People list */}
-        <div className="dash-card overflow-hidden">
+        {/* People list — fills the remaining viewport height; rows scroll inside. */}
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           {filtered.length === 0 ? (
             <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
               <Wallet className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
               {search ? t('payments.noPatientsMatch') : t('payments.noBillingActivity')}
             </div>
           ) : (
-            <div>
-              {filtered.map(line => {
-                const initials = line.patientName.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
-                const owing = line.outstanding > 0;
-                return (
-                  <button
-                    key={line.patientId}
-                    onClick={() => setSelectedPatientId(line.patientId)}
-                    className="w-full text-left data-row hover:opacity-95 transition-opacity"
-                    style={owing ? { background: 'rgba(196, 69, 54, 0.04)' } : undefined}
-                  >
-                    <div
-                      className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[12px] font-bold text-white"
+            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+              <div style={{ minWidth: 760 }}>
+                {/* Column headers */}
+                <div
+                  className="grid items-center gap-3 px-4 py-2.5"
+                  style={{
+                    gridTemplateColumns: PAYMENTS_COLS,
+                    position: 'sticky', top: 0, zIndex: 1,
+                    background: 'var(--bg-card-solid)',
+                    borderBottom: '1px solid var(--border-light)',
+                  }}
+                >
+                  {[
+                    { label: t('payments.colPatient'), align: 'left' as const },
+                    { label: t('payments.colPayments'), align: 'right' as const },
+                    { label: t('payments.colClaims'), align: 'right' as const },
+                    { label: t('payments.colPlans'), align: 'right' as const },
+                    { label: t('payments.colLastActivity'), align: 'left' as const },
+                    { label: t('payments.colBalance'), align: 'right' as const },
+                    { label: '', align: 'left' as const },
+                  ].map((h, i) => (
+                    <span
+                      key={i}
+                      className="text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap"
+                      style={{ color: 'var(--text-muted)', textAlign: h.align }}
+                    >
+                      {h.label}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Rows */}
+                {filtered.map(line => {
+                  const initials = line.patientName.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+                  const owing = line.outstanding > 0;
+                  return (
+                    <button
+                      key={line.patientId}
+                      onClick={() => setSelectedPatientId(line.patientId)}
+                      className="w-full text-left grid items-center gap-3 px-4 py-3 border-b hover:opacity-95 transition-opacity"
                       style={{
-                        background: owing
-                          ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)'
-                          : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)',
+                        gridTemplateColumns: PAYMENTS_COLS,
+                        borderColor: 'var(--border-light)',
+                        ...(owing ? { background: 'rgba(196, 69, 54, 0.04)' } : {}),
                       }}
                     >
-                      {initials || '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <div className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{line.patientName}</div>
-                        {line.hospitalNumber && (
-                          <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.10)', color: '#3b82f6', fontWeight: 600 }}>
-                            {line.hospitalNumber}
-                          </span>
+                      {/* Patient */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[12px] font-bold text-white"
+                          style={{
+                            background: owing
+                              ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)'
+                              : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)',
+                          }}
+                        >
+                          {initials || '?'}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>{line.patientName}</div>
+                          {line.hospitalNumber && (
+                            <span className="font-mono text-[10.5px]" style={{ color: '#3b82f6', fontWeight: 600 }}>{line.hospitalNumber}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Payments */}
+                      <div className="text-right text-[13px]" style={{ color: line.paymentCount > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                        {line.paymentCount > 0 ? line.paymentCount : '—'}
+                      </div>
+
+                      {/* Open claims */}
+                      <div className="text-right text-[13px]" style={{ color: line.openClaims > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                        {line.openClaims > 0 ? line.openClaims : '—'}
+                      </div>
+
+                      {/* Active plans */}
+                      <div className="text-right text-[13px]" style={{ color: line.activePlans > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                        {line.activePlans > 0 ? line.activePlans : '—'}
+                      </div>
+
+                      {/* Last activity */}
+                      <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                        {line.lastActivity ? new Date(line.lastActivity).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      </div>
+
+                      {/* Balance + status */}
+                      <div className="text-right">
+                        {owing ? (
+                          <>
+                            <div className="font-bold text-sm" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{fmt(line.outstanding)}</div>
+                            <div className="text-[10px] font-bold uppercase" style={{ color: '#C44536' }}>{t('billing.kpiOutstanding')}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="font-bold text-sm" style={{ color: '#15795C', fontVariantNumeric: 'tabular-nums' }}>{fmt(line.totalCollected)}</div>
+                            <div className="text-[10px] font-bold uppercase" style={{ color: '#15795C' }}>{t('payments.paid')}</div>
+                          </>
                         )}
                       </div>
-                      <div className="text-[11px] mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {line.paymentCount > 0 && <span>{line.paymentCount} {line.paymentCount === 1 ? t('payments.payment') : t('payments.payments')}</span>}
-                        {line.openClaims > 0 && <span>· {line.openClaims === 1 ? t('payments.openClaim', { count: line.openClaims }) : t('payments.openClaims', { count: line.openClaims })}</span>}
-                        {line.activePlans > 0 && <span>· {line.activePlans === 1 ? t('payments.activePlan', { count: line.activePlans }) : t('payments.activePlans', { count: line.activePlans })}</span>}
-                        {line.lastActivity && <span>· {t('payments.lastActivity', { date: new Date(line.lastActivity).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) })}</span>}
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      {owing ? (
-                        <>
-                          <div className="font-bold text-sm" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{fmt(line.outstanding)}</div>
-                          <div className="text-[10px] font-bold uppercase" style={{ color: '#C44536' }}>{t('billing.kpiOutstanding')}</div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="font-bold text-sm" style={{ color: '#15795C', fontVariantNumeric: 'tabular-nums' }}>{fmt(line.totalCollected)}</div>
-                          <div className="text-[10px] font-bold uppercase" style={{ color: '#15795C' }}>{t('payments.paid')}</div>
-                        </>
-                      )}
-                    </div>
-                    <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
-                  </button>
-                );
-              })}
+
+                      <ChevronRight className="w-4 h-4 flex-shrink-0 justify-self-end" style={{ color: 'var(--text-muted)' }} />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -336,6 +452,52 @@ export default function PaymentsPage() {
           onRecordPayment={() => setPayingLine(selectedLine)}
           onRecordPlanPayment={(plan) => { setRecordPlanFor(plan); setPlanAmount(''); setPlanNotes(''); }}
         />
+      )}
+
+      {/* Collect-payment patient picker (opened from the header button) */}
+      {collectPickerOpen && (
+        <Modal onClose={() => setCollectPickerOpen(false)} width={460}>
+          <div className="card-elevated" style={{ background: 'var(--bg-card-solid)', borderRadius: 16, padding: 0, overflow: 'hidden' }}>
+            <div className="px-5 py-4 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="flex items-center gap-2">
+                <Banknote className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+                <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('billing.collectPayment')}</h2>
+              </div>
+              <button onClick={() => setCollectPickerOpen(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-3">
+              <SearchInput value={collectSearch} onChange={setCollectSearch} placeholder={t('payments.searchPlaceholder')} />
+              <div className="mt-2 space-y-1" style={{ maxHeight: 360, overflowY: 'auto' }}>
+                {(() => {
+                  const q = collectSearch.trim().toLowerCase();
+                  const list = patientLines
+                    .filter(l => l.outstanding > 0)
+                    .filter(l => !q || l.patientName.toLowerCase().includes(q) || (l.hospitalNumber || '').toLowerCase().includes(q))
+                    .sort((a, b) => b.outstanding - a.outstanding);
+                  if (list.length === 0) {
+                    return <p className="text-center text-[12px] py-8" style={{ color: 'var(--text-muted)' }}>{t('payments.noOutstanding')}</p>;
+                  }
+                  return list.map(line => (
+                    <button
+                      key={line.patientId}
+                      onClick={() => { setPayingLine(line); setCollectPickerOpen(false); }}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-[var(--overlay-subtle)]"
+                      style={{ border: '1px solid var(--border-light)' }}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{line.patientName}</div>
+                        {line.hospitalNumber && <div className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{line.hospitalNumber}</div>}
+                      </div>
+                      <div className="text-[13px] font-bold flex-shrink-0" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{fmt(line.outstanding)}</div>
+                    </button>
+                  ));
+                })()}
+              </div>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Record-payment form (cash / mobile money / card / insurance) */}

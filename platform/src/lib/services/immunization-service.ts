@@ -157,7 +157,7 @@ export interface ImmunizationDefaulter {
 }
 
 export async function getDefaulters(scope?: DataScope): Promise<ImmunizationDefaulter[]> {
-  // Scope-aware: payam_supervisors / hospital users only see their slice.
+  // Scope-aware: hospital users only see their slice.
   const all = await getAllImmunizations(scope);
   const now = new Date();
   const defaulters: ImmunizationDefaulter[] = [];

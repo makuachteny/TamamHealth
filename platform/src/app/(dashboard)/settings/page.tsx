@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useUsers } from '@/lib/hooks/useUsers';
@@ -9,6 +8,9 @@ import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { SUPPORTED_LOCALES } from '@/lib/i18n';
+import { hasLockPin, setLockPin, clearLockPin } from '@/lib/hooks/useAutoLock';
+import { getUserPrefs, setUserPrefs, DEFAULT_USER_PREFS, type UserPrefs } from '@/lib/user-prefs';
+import { getRoleConfig } from '@/lib/permissions';
 import { useToast } from '@/components/Toast';
 import { statesAndCounties } from '@/data/mock';
 import type { UserRole } from '@/lib/db-types';
@@ -17,7 +19,7 @@ import SearchInput from '@/components/filters/SearchInput';
 import FilterSelect from '@/components/filters/FilterSelect';
 import {
   Users, Building2, Plus, Search, Edit3, KeyRound, UserX, UserCheck,
-  X, Eye, EyeOff, RefreshCw, Check,
+  X, Eye, EyeOff, RefreshCw, Check, Bell, LayoutDashboard,
   Settings as SettingsIcon, Globe, Moon, Sun, Lock, Save, User as UserIcon,
 } from '@/components/icons/lucide';
 
@@ -56,8 +58,7 @@ function generatePassword(): string {
 }
 
 export default function SettingsPage() {
-  const router = useRouter();
-  const { currentUser, theme, toggleTheme } = useApp();
+  const { currentUser, theme, toggleTheme, isOnline, syncPaused, toggleOnline, syncNow, lastSync } = useApp();
   const { users, loading: usersLoading, create: createUser, update: updateUser, resetPassword, deactivate } = useUsers();
   const { hospitals, loading: hospitalsLoading, create: createHospital, reload: reloadHospitals } = useHospitals();
   const { canManageUsers } = usePermissions();
@@ -72,6 +73,74 @@ export default function SettingsPage() {
   const [pwForm, setPwForm] = useState({ next: '', confirm: '' });
   const [pwSaving, setPwSaving] = useState(false);
   const [showSelfPw, setShowSelfPw] = useState(false);
+
+  // ── Screen-lock PIN (per device — for shared workstations) ──
+  const [pinForm, setPinForm] = useState({ next: '', confirm: '' });
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinIsSet, setPinIsSet] = useState(false);
+  useEffect(() => { setPinIsSet(hasLockPin()); }, []);
+
+  const handleSetPin = async () => {
+    if (!/^\d{4,6}$/.test(pinForm.next)) { showToast('PIN must be 4–6 digits', 'error'); return; }
+    if (pinForm.next !== pinForm.confirm) { showToast('PINs do not match', 'error'); return; }
+    setPinSaving(true);
+    try {
+      await setLockPin(pinForm.next);
+      setPinIsSet(true);
+      setPinForm({ next: '', confirm: '' });
+      showToast('Screen-lock PIN set', 'success');
+    } finally {
+      setPinSaving(false);
+    }
+  };
+
+  const handleClearPin = () => {
+    clearLockPin();
+    setPinIsSet(false);
+    setPinForm({ next: '', confirm: '' });
+    showToast('Screen-lock PIN removed', 'success');
+  };
+
+  // ── Sync & connectivity ──
+  const [syncing, setSyncing] = useState(false);
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    try { await syncNow(); showToast('Sync started', 'success'); }
+    catch { showToast('Could not start sync', 'error'); }
+    finally { setSyncing(false); }
+  };
+
+  // ── Workspace + notification preferences (per device) ──
+  const [prefs, setPrefsState] = useState<UserPrefs>(DEFAULT_USER_PREFS);
+  useEffect(() => { setPrefsState(getUserPrefs()); }, []);
+  const updatePref = (patch: Partial<UserPrefs>) => setPrefsState(setUserPrefs(patch));
+
+  // Start-page options come from the role's own nav items (so every option is a
+  // page the user can actually open), plus a "default" sentinel.
+  const startPageOptions = useMemo(() => {
+    const cfg = currentUser ? getRoleConfig(currentUser.role) : null;
+    const opts: { href: string; label: string }[] = [{ href: '', label: 'Default (role dashboard)' }];
+    const seen = new Set<string>();
+    for (const it of cfg?.navItems ?? []) {
+      if (!seen.has(it.href)) { seen.add(it.href); opts.push({ href: it.href, label: it.label }); }
+    }
+    return opts;
+  }, [currentUser?.role]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleToggleNotifications = async () => {
+    if (!prefs.messageNotifications) {
+      if (typeof Notification === 'undefined') { showToast('This browser does not support notifications', 'error'); return; }
+      if (Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { showToast('Allow notifications in your browser to enable this', 'error'); return; }
+      }
+      updatePref({ messageNotifications: true });
+      showToast('Desktop notifications on', 'success');
+    } else {
+      updatePref({ messageNotifications: false });
+      showToast('Desktop notifications off', 'success');
+    }
+  };
 
   useEffect(() => {
     if (currentUser) {
@@ -142,12 +211,10 @@ export default function SettingsPage() {
   });
   const [hospitalFormLoading, setHospitalFormLoading] = useState(false);
 
-  // Access control
-  useEffect(() => {
-    if (currentUser && currentUser.role !== 'government') {
-      router.push('/dashboard');
-    }
-  }, [currentUser, router]);
+  // Access: every authenticated user can open Settings for their own
+  // Preferences (theme, language, profile, password, screen-lock, sync,
+  // workspace, notifications). The User/Hospital management tabs are gated
+  // separately by `canManageUsers`, so no page-level role redirect is needed.
 
   // Filtered users
   const filteredUsers = useMemo(() => {
@@ -160,7 +227,7 @@ export default function SettingsPage() {
     });
   }, [users, search, filterRole, filterHospital]);
 
-  if (!currentUser || currentUser.role !== 'government') return null;
+  if (!currentUser) return null;
 
   const roleLabel = (role: string) => ROLES.find(r => r.value === role)?.label || role;
 
@@ -480,6 +547,143 @@ export default function SettingsPage() {
                 <button onClick={handleChangeOwnPassword} disabled={pwSaving || !pwForm.next} className="btn btn-secondary btn-sm">
                   <KeyRound className="w-4 h-4" /> {pwSaving ? 'Updating…' : 'Change password'}
                 </button>
+              </div>
+            </div>
+
+            {/* Screen lock — per-device unlock PIN for shared workstations */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Lock className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Screen lock</h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  The screen locks automatically when idle. Set a PIN so it can&apos;t be unlocked without it — recommended on shared front-desk devices.
+                  {pinIsSet && <span className="ml-1 font-semibold" style={{ color: 'var(--color-success)' }}>PIN is active.</span>}
+                </p>
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>{pinIsSet ? 'New PIN' : 'PIN'} (4–6 digits)</label>
+                  <input inputMode="numeric" maxLength={6} type="password" value={pinForm.next}
+                    onChange={e => setPinForm(p => ({ ...p, next: e.target.value.replace(/\D/g, '') }))}
+                    className="w-full" style={{ background: 'var(--overlay-subtle)' }} autoComplete="off" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Confirm PIN</label>
+                  <input inputMode="numeric" maxLength={6} type="password" value={pinForm.confirm}
+                    onChange={e => setPinForm(p => ({ ...p, confirm: e.target.value.replace(/\D/g, '') }))}
+                    className="w-full" style={{ background: 'var(--overlay-subtle)' }} autoComplete="off" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleSetPin} disabled={pinSaving || !pinForm.next} className="btn btn-primary btn-sm">
+                    <Lock className="w-4 h-4" /> {pinSaving ? 'Saving…' : pinIsSet ? 'Update PIN' : 'Set PIN'}
+                  </button>
+                  {pinIsSet && (
+                    <button onClick={handleClearPin} className="btn btn-secondary btn-sm">Remove PIN</button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Sync & connectivity */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Sync &amp; data</h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: isOnline ? 'var(--color-success)' : syncPaused ? 'var(--color-warning)' : 'var(--text-muted)' }} />
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                    {isOnline ? 'Online — syncing' : syncPaused ? 'Sync paused' : 'Offline'}
+                  </span>
+                </div>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Last synced: {lastSync ? new Date(lastSync).toLocaleString() : '—'}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleSyncNow} disabled={syncing || !isOnline} className="btn btn-primary btn-sm">
+                    <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} /> {syncing ? 'Syncing…' : 'Sync now'}
+                  </button>
+                  <button onClick={toggleOnline} className="btn btn-secondary btn-sm">
+                    {syncPaused ? 'Resume sync' : 'Pause sync'}
+                  </button>
+                </div>
+                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  Your work is always saved on this device first and syncs when you&apos;re online.
+                </p>
+              </div>
+            </div>
+
+            {/* Workspace — start page + density */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><LayoutDashboard className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Workspace</h3>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Start page after login</label>
+                  <select
+                    value={prefs.startPage}
+                    onChange={e => updatePref({ startPage: e.target.value })}
+                    className="w-full" style={{ background: 'var(--overlay-subtle)' }}
+                    aria-label="Start page after login"
+                  >
+                    {startPageOptions.map(o => (
+                      <option key={o.href || 'default'} value={o.href}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Spacing</p>
+                  <div className="flex gap-2">
+                    {([
+                      { v: 'comfortable' as const, label: 'Comfortable' },
+                      { v: 'compact' as const, label: 'Compact' },
+                    ]).map(opt => {
+                      const active = prefs.density === opt.v;
+                      return (
+                        <button
+                          key={opt.v}
+                          onClick={() => updatePref({ density: opt.v })}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                          style={active
+                            ? { background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }
+                            : { background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                        >
+                          {opt.label}{active && <Check className="w-3.5 h-3.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Notifications */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Bell className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Notifications</h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                    Desktop alerts for new messages
+                    <span className="block text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      Pops a notification when a message arrives and this tab isn&apos;t in focus.
+                    </span>
+                  </span>
+                  <button
+                    role="switch"
+                    aria-checked={prefs.messageNotifications}
+                    onClick={handleToggleNotifications}
+                    className="relative flex-shrink-0"
+                    style={{ width: 42, height: 24, borderRadius: 999, background: prefs.messageNotifications ? 'var(--accent-primary)' : 'var(--border-medium)', transition: 'background .15s', border: 'none', cursor: 'pointer' }}
+                  >
+                    <span style={{ position: 'absolute', top: 2, left: prefs.messageNotifications ? 20 : 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+                  </button>
+                </label>
               </div>
             </div>
           </div>

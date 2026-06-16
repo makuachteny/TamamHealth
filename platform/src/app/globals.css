@@ -1351,16 +1351,25 @@ svg circle {
 .page-container {
   flex: 1;
   padding: 16px;
-  /* Extra top padding drops the page body so its first row lines up with the
-     sidebar's first nav item (the rail reserves logo + role-card space above
-     its nav). Applied here so every dashboard page aligns the same way. */
-  padding-top: 40px;
+  /* Top padding tuned so the page header's icon + title line up with the
+     sidebar role card (the "Medical Receptionist" card). The rail reserves
+     logo height above the role card; this matches it in the content column so
+     every dashboard page aligns the same way. Tuned to baseline-align the page
+     title with the role card's text (not just the box tops). */
+  padding-top: 20px;
   overflow-y: auto;
   overflow-x: hidden;
 }
 @media (min-width: 640px) {
-  .page-container { padding: 20px; padding-top: 44px; }
+  .page-container { padding: 20px; padding-top: 20px; }
 }
+
+/* Compact density (Settings → Workspace → Spacing): tighten the central page
+   spacing so more content fits per screen. Scoped to the shared layout classes
+   so it can't distort individual components. */
+[data-density="compact"] .page-container { padding-top: 12px !important; padding-left: 14px; padding-right: 14px; }
+[data-density="compact"] .page-header-row { margin-bottom: 22px !important; }
+[data-density="compact"] .space-y-6 > * + * { margin-top: 14px !important; }
 
 /* Standard page header — icon + title + subtitle */
 /* ============ Unified page header ============ */
@@ -1369,7 +1378,10 @@ svg circle {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  /* Gap below the header drops the page's first content row down to line up
+     with the sidebar's nav items (mirrors the role-card → nav spacing in the
+     rail). Matches the front-desk dashboard treatment. */
+  margin-bottom: 40px;
   flex-wrap: wrap;
 }
 .page-header {
@@ -1947,3 +1959,45 @@ svg circle {
 .rbc-tamam .rbc-event:focus { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
 .rbc-tamam .rbc-current-time-indicator { background: var(--color-danger, #C44536); height: 2px; }
 .rbc-tamam .rbc-show-more { color: var(--accent-text); font-weight: 600; }
+
+/* Time-grid (day / week) — Google-Calendar-style hour rows + readable events.
+   Taller hour rows give short (30-min) appointments room to show their label,
+   and overflow clipping stops event text from spilling over the grid. */
+.rbc-tamam .rbc-time-view .rbc-timeslot-group { min-height: 64px; }
+.rbc-tamam .rbc-time-view .rbc-time-gutter .rbc-timeslot-group { font-size: 12px; }
+
+/* Keep the time-gutter and the header gutter the same width so the vertical
+   divider between the hour labels and the day columns lines up top-to-bottom
+   (react-big-calendar measures these independently and they drift otherwise). */
+.rbc-tamam .rbc-time-gutter,
+.rbc-tamam .rbc-time-header-gutter {
+  width: 64px !important;
+  min-width: 64px !important;
+  max-width: 64px !important;
+  flex: none !important;
+}
+.rbc-tamam .rbc-time-gutter .rbc-timeslot-group,
+.rbc-tamam .rbc-time-gutter .rbc-time-slot { border-left: none; }
+/* Right-align the hour labels against the divider for a clean gutter edge. */
+.rbc-tamam .rbc-time-gutter .rbc-label { padding: 0 8px 0 6px; }
+.rbc-tamam .rbc-time-header-gutter { border-bottom: 1px solid var(--border-light); }
+.rbc-tamam .rbc-day-slot .rbc-event {
+  padding: 2px 6px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.rbc-tamam .rbc-day-slot .rbc-event-label {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.92;
+  flex-shrink: 0;
+}
+.rbc-tamam .rbc-day-slot .rbc-event-content {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

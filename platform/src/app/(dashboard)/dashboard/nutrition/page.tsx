@@ -81,8 +81,23 @@ export default function NutritionDashboard() {
 
         {IS_DEMO && <DemoModeBanner />}
 
-        {/* KPI strip */}
-        <div className="kpi-grid mb-4">
+        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
+        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-primary)' }}>
+              <Utensils className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('nutrition.title')}</h1>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {currentUser.hospitalName || currentUser.hospital?.name || ''}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI tiles */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {[
             { label: t('nutrition.kpiScreenings'), value: stats.total, icon: Scale, color: ACCENT },
             { label: t('nutrition.kpiSamCases'), value: stats.sam, icon: AlertTriangle, color: 'var(--color-danger)' },
@@ -93,12 +108,14 @@ export default function NutritionDashboard() {
             { label: t('nutrition.kpiAncMothers'), value: stats.anc, icon: HeartPulse, color: '#EC4899' },
             { label: t('nutrition.kpiSupplyAlerts'), value: stats.criticalSupply, icon: Droplets, color: stats.criticalSupply > 0 ? 'var(--color-danger)' : 'var(--color-success)' },
           ].map(k => (
-            <div key={k.label} className="kpi">
-              <div className="kpi__icon" style={{ background: `${k.color}15` }}><k.icon style={{ color: k.color }} /></div>
-              <div className="kpi__body">
-                <div className="kpi__value">{k.value}</div>
-                <div className="kpi__label">{k.label}</div>
+            <div key={k.label} className="dash-card" style={{ padding: '14px 16px' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <k.icon className="w-3.5 h-3.5" style={{ color: k.color }} />
+                </div>
+                <span className="kpi-card-title">{k.label}</span>
               </div>
+              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{k.value}</div>
             </div>
           ))}
         </div>

@@ -164,6 +164,47 @@ export async function createBill(data: CreateBillInput): Promise<BillingDoc> {
   const resp = await db.put(doc);
   doc._rev = resp.rev;
 
+  // Mirror the bill into the append-only ledger so patient balances, the
+  // front-desk checkout gate, and Collect-Payment — all of which read the
+  // ledger, not the billing store — reflect this charge. We post the gross as
+  // a `charge` debit and, when insurance covers part of it, an
+  // `insurance_payment` credit, so the patient's running balance nets to their
+  // own responsibility (balanceDue). Best-effort: a ledger write must never
+  // abort bill creation.
+  try {
+    const { createLedgerEntry } = await import('./ledger-service');
+    await createLedgerEntry({
+      patientId: doc.patientId,
+      encounterId: doc.encounterId,
+      entryType: 'charge',
+      amount: doc.totalAmount,
+      description: `Invoice ${invoiceNumber}`,
+      referenceId: doc._id,
+      referenceType: 'billing',
+      currency: doc.currency,
+      facilityId: doc.facilityId,
+      orgId: doc.orgId,
+      createdBy: doc.generatedBy,
+    });
+    if (doc.amountPaid > 0) {
+      await createLedgerEntry({
+        patientId: doc.patientId,
+        encounterId: doc.encounterId,
+        entryType: 'insurance_payment',
+        amount: -doc.amountPaid,
+        description: `Insurance coverage — ${invoiceNumber}`,
+        referenceId: doc._id,
+        referenceType: 'billing',
+        currency: doc.currency,
+        facilityId: doc.facilityId,
+        orgId: doc.orgId,
+        createdBy: doc.generatedBy,
+      });
+    }
+  } catch (err) {
+    console.warn('[billing] ledger mirror failed for', doc._id, err);
+  }
+
   await logAuditSafe(
     'BILL_CREATED', data.generatedBy, data.generatedByName,
     `Invoice ${invoiceNumber}: ${data.patientName} total=${totalAmount} ${doc.currency}`
@@ -222,6 +263,27 @@ export async function recordPayment(
     bill.updatedAt = now;
     const resp = await db.put(bill);
     bill._rev = resp.rev;
+
+    // Credit the ledger so the patient balance drops to match the bill.
+    // Best-effort — the bill payment is already persisted above.
+    try {
+      const { createLedgerEntry } = await import('./ledger-service');
+      await createLedgerEntry({
+        patientId: bill.patientId,
+        encounterId: bill.encounterId,
+        entryType: 'payment',
+        amount: -amount,
+        description: `Payment — ${bill.invoiceNumber}`,
+        referenceId: bill._id,
+        referenceType: 'billing',
+        currency: bill.currency,
+        facilityId: bill.facilityId,
+        orgId: bill.orgId,
+        createdBy: receivedBy,
+      });
+    } catch (err) {
+      console.warn('[billing] ledger payment mirror failed for', bill._id, err);
+    }
 
     await logAuditSafe(
       'PAYMENT_RECORDED', receivedBy, receivedByName,

@@ -53,6 +53,7 @@ export default function Sidebar() {
       '/births': 'nav.births', '/deaths': 'nav.deaths', '/surveillance': 'nav.surveillance',
       '/hospitals': 'nav.hospitals', '/reports': 'nav.reports', '/messages': 'nav.messages',
       '/settings': 'nav.settings', '/telehealth': 'nav.telehealth', '/government': 'nav.government',
+      '/facility-settings': 'nav.facilitySettings',
     };
     const key = keyMap[item.href];
     if (key) {

@@ -142,6 +142,29 @@ for pat in "${generic_patterns[@]}"; do
   fi
 done
 [ "$generic_hits" -eq 0 ] && ok "no AWS / GitHub / Doppler / PEM credential patterns in tracked files"
+
+# Production env hygiene — the three mistakes that turn a clinic deploy unsafe.
+if [ -f platform/.env.production ]; then
+  if grep -qE '^NEXT_PUBLIC_DEMO_MODE=true' platform/.env.production; then
+    fail "platform/.env.production has NEXT_PUBLIC_DEMO_MODE=true — this seeds the full demo staff roster and exposes /api/demo-credentials. Set it to false for production."
+  else
+    ok "demo mode is off in platform/.env.production"
+  fi
+  # The JWT signing key must stay server-only. A NEXT_PUBLIC_ copy is baked into
+  # the browser bundle, letting anyone with the client JS forge tokens for any role.
+  if grep -qE '^NEXT_PUBLIC_JWT_SECRET=' platform/.env.production; then
+    fail "platform/.env.production sets NEXT_PUBLIC_JWT_SECRET — the signing key must stay server-only (JWT_SECRET). Remove the public copy."
+  else
+    ok "JWT signing key is server-only in platform/.env.production"
+  fi
+fi
+# Plaintext secret backups must never sit in the deploy tree (e.g. *.real.bak).
+if ls platform/.env*.bak platform/.env*.real* >/dev/null 2>&1; then
+  fail "plaintext secret backup file(s) present — delete before deploy:"
+  ls platform/.env*.bak platform/.env*.real* 2>/dev/null | sed 's/^/      /'
+else
+  ok "no plaintext env backups in the deploy tree"
+fi
 echo
 
 # ── 4. platform pipeline ─────────────────────────────────────────────────────

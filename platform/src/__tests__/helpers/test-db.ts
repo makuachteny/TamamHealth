@@ -78,6 +78,7 @@ export function createDBMock() {
     conflictQueueDB: () => getTestDB('test_tamamhealth_conflict_queue'),
     syncEventsDB: () => getTestDB('test_tamamhealth_sync_events'),
     biometricTemplatesDB: () => getTestDB('test_tamamhealth_biometric_templates'),
+    encountersDB: () => getTestDB('test_tamamhealth_encounters'),
     SEED_VERSION: 12,
     isSeeded: async () => false,
     markSeeded: async () => {},

@@ -199,7 +199,7 @@ export default function OrgBrandingPage() {
           {/* Editor Panel */}
           <div className="space-y-5">
             {/* Organization Name */}
-            <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="dash-card p-4">
               <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                 {t('branding.orgName')}
               </label>
@@ -213,7 +213,7 @@ export default function OrgBrandingPage() {
             </div>
 
             {/* Logo */}
-            <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="dash-card p-4">
               <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                 {t('branding.logo')}
               </label>
@@ -265,9 +265,12 @@ export default function OrgBrandingPage() {
             </div>
 
             {/* Color Pickers */}
-            <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>{t('branding.brandColors')}</h3>
-              <div className="space-y-4">
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <Palette className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('branding.brandColors')}</h3>
+              </div>
+              <div className="p-4 space-y-4">
                 {/* Primary */}
                 <div>
                   <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
@@ -345,11 +348,12 @@ export default function OrgBrandingPage() {
 
           {/* Live Preview */}
           <div>
-            <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <div className="flex items-center gap-2 mb-4">
-                <Eye className="w-4 h-4" style={{ color: brandColor }} />
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <Eye className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('branding.livePreview')}</h3>
               </div>
+              <div className="p-4">
 
               {/* Simulated sidebar + header */}
               <div className="rounded-xl overflow-hidden shadow-lg" style={{ border: '1px solid var(--border-light)' }}>
@@ -470,6 +474,7 @@ export default function OrgBrandingPage() {
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
           </div>

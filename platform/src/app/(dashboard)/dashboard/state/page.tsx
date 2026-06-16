@@ -2,10 +2,9 @@
 
 import { useApp } from '@/lib/context';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import RoleGuard from '@/components/RoleGuard';
 import {
-  Baby, Skull, HeartPulse, Syringe, Building2,
+  Baby, Skull, HeartPulse, Syringe, Building2, MapPin,
 } from '@/components/icons/lucide';
 import { useMCHAnalytics } from '@/lib/hooks/useMCHAnalytics';
 import { useBirths } from '@/lib/hooks/useBirths';
@@ -77,28 +76,47 @@ export default function StateDashboardPage() {
   return (
     <RoleGuard>
       <TopBar title={t('state.title')} />
-      <main className="page-container page-enter">
-        <PageHeader
-          icon={Building2}
-          title={stateName || t('state.title')}
-          subtitle={stateName ? t('state.subtitle', { facilities: facilitiesInState.length, counties: counties.length }) : t('state.noStateAssigned')}
-        />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
+        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-primary)' }}>
+              <Building2 className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{stateName || t('state.title')}</h1>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {stateName ? t('state.subtitle', { facilities: facilitiesInState.length, counties: counties.length }) : t('state.noStateAssigned')}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ═══ KPI TILES ═══ */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           <Kpi label={t('state.birthsThisMonth')} value={stateBirthsThisMonth} icon={Baby} />
           <Kpi label={t('state.deathsThisMonth')} value={stateDeathsThisMonth} icon={Skull} />
           <Kpi label={t('state.anc1Coverage')} value={`${anc1Rate}%`} icon={HeartPulse} />
           <Kpi label={t('state.immunizationsYtd')} value={immStats?.totalVaccinations ?? 0} icon={Syringe} />
         </div>
 
-        <div className="card-elevated p-5">
-          <h3 className="font-semibold text-sm mb-3">{t('state.countiesIn', { state: stateName || '—' })}</h3>
+        {/* ═══ COUNTIES ═══ */}
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <MapPin className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('state.countiesIn', { state: stateName || '—' })}</h3>
+          </div>
           {mchLoading && counties.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</p>
+            <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
+              <MapPin className="w-8 h-8 mx-auto mb-2" style={{ opacity: 0.6 }} /> {t('status.loading')}
+            </div>
           ) : counties.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('state.noCountyData')}</p>
+            <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
+              <MapPin className="w-8 h-8 mx-auto mb-2" style={{ opacity: 0.6 }} /> {t('state.noCountyData')}
+            </div>
           ) : (
-            <div className="space-y-2">
+            <div className="p-4 space-y-2" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
               {counties.map(c => (
                 <div
                   key={c.county}
@@ -123,12 +141,14 @@ export default function StateDashboardPage() {
 
 function Kpi({ label, value, icon: Icon }: { label: string; value: string | number; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }) {
   return (
-    <div className="card-elevated p-4">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</p>
-        <Icon className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+    <div className="dash-card" style={{ padding: '14px 16px' }}>
+      <div className="flex items-center gap-2 mb-2">
+        <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+          <Icon className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+        </div>
+        <span className="kpi-card-title">{label}</span>
       </div>
-      <p className="text-2xl font-semibold">{value}</p>
+      <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{value}</div>
     </div>
   );
 }

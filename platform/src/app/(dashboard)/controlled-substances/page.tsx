@@ -149,7 +149,7 @@ export default function ControlledSubstancesPage() {
   return (
     <>
       <TopBar title="Controlled Substances" />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <PageHeader
           icon={Pill}
           title="Controlled Substance Register"
@@ -161,7 +161,7 @@ export default function ControlledSubstancesPage() {
           }
         />
 
-        <div className="dash-card">
+        <div className="dash-card flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <div className="px-5 py-3 border-b flex items-center gap-3" style={{ borderColor: 'var(--border-light)' }}>
             <span className="icon-box-sm" style={{ background: 'rgba(196, 69, 54, 0.12)' }}>
               <Pill className="w-4 h-4" style={{ color: '#C44536' }} />
@@ -172,6 +172,7 @@ export default function ControlledSubstancesPage() {
             </span>
           </div>
 
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
           {loading ? (
             <div className="p-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading log…</div>
           ) : movements.length === 0 ? (
@@ -229,6 +230,7 @@ export default function ControlledSubstancesPage() {
               </table>
             </div>
           )}
+          </div>
         </div>
 
         {open && (

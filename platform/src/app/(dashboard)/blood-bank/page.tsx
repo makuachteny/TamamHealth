@@ -138,7 +138,7 @@ export default function BloodBankPage() {
   return (
     <>
       <TopBar title="Blood Bank" />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <PageHeader
           icon={Droplets}
           title="Blood Bank"
@@ -175,7 +175,7 @@ export default function BloodBankPage() {
         </div>
 
         {/* Units table */}
-        <div className="dash-card">
+        <div className="dash-card flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <div className="flex items-center gap-3">
               <h3 className="font-semibold text-sm">Blood units</h3>
@@ -184,6 +184,7 @@ export default function BloodBankPage() {
               </span>
             </div>
           </div>
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
           {loading ? (
             <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading…</div>
           ) : units.length === 0 ? (
@@ -233,6 +234,7 @@ export default function BloodBankPage() {
               </tbody>
             </table>
           )}
+          </div>
         </div>
 
         {/* Add unit modal */}

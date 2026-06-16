@@ -8,7 +8,7 @@ import PageHeader from '@/components/PageHeader';
 import AvailabilityModal from '@/components/AvailabilityModal';
 import {
   Calendar, Plus, Clock, CheckCircle2, XCircle, User,
-  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Phone, AlertTriangle, RefreshCw,
+  ChevronDown, ChevronUp, Phone, AlertTriangle, RefreshCw,
   Video, Stethoscope, Syringe, HeartPulse, FlaskConical,
   Building2, Bell, X, UserPlus, ClipboardList,
   Filter, ExternalLink,
@@ -20,25 +20,18 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { FilterBar, SearchInput, FilterSelect } from '@/components/filters';
-import type { AppointmentType, AppointmentPriority, AppointmentStatus, FacilityLevel, AppointmentDoc } from '@/lib/db-types';
-import { Calendar as BigCalendar, dateFnsLocalizer, type View, type ToolbarProps } from 'react-big-calendar';
-import { format as dfFormat, parse as dfParse, startOfWeek as dfStartOfWeek, getDay as dfGetDay } from 'date-fns';
-import { enUS } from 'date-fns/locale';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
+import type { AppointmentType, AppointmentPriority, AppointmentStatus, FacilityLevel } from '@/lib/db-types';
+import dynamic from 'next/dynamic';
 import PortalModal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
+import { jubaDate, jubaNow, jubaTime } from '@/lib/time-juba';
 
-// Google-Calendar-style localizer (date-fns, MIT) shared by the calendar view.
-const calendarLocalizer = dateFnsLocalizer({
-  format: dfFormat,
-  parse: dfParse,
-  startOfWeek: () => dfStartOfWeek(new Date(), { weekStartsOn: 0 }),
-  getDay: dfGetDay,
-  locales: { 'en-US': enUS },
+// react-big-calendar (and its CSS) is a heavy client-only library. Split it out
+// of the route's initial bundle so it loads only when the calendar view renders.
+const AppointmentsCalendar = dynamic(() => import('./_AppointmentsCalendar'), {
+  ssr: false,
+  loading: () => <div style={{ height: '100%', minHeight: 560 }} />,
 });
-
-// Event shape fed to react-big-calendar; keeps the full appointment on `resource`.
-type CalEvent = { id: string; title: string; start: Date; end: Date; resource: AppointmentDoc };
 
 /* ─── Config ─── */
 const appointmentTypes: { value: AppointmentType; label: string; icon: typeof Calendar; color: string; bg: string }[] = [
@@ -145,12 +138,14 @@ export default function AppointmentsPage() {
   }, []);
 
   // Date the react-big-calendar view is centered on (Google-Calendar-style nav).
-  const [calDate, setCalDate] = useState<Date>(new Date());
+  // Defaults to "today" in Africa/Juba so the initial focus matches the facility
+  // timezone rather than whatever timezone the viewer's browser is set to.
+  const [calDate, setCalDate] = useState<Date>(() => jubaNow());
 
   // Form state
   const [formPatient, setFormPatient] = useState('');
   const [formProvider, setFormProvider] = useState(currentUser?.name || '');
-  const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10));
+  const [formDate, setFormDate] = useState(jubaDate());
   const [formTime, setFormTime] = useState('09:00');
   const [formDuration, setFormDuration] = useState(30);
   const [formType, setFormType] = useState<AppointmentType>('general');
@@ -176,7 +171,9 @@ export default function AppointmentsPage() {
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Africa/Juba "today" — NOT a UTC slice, which would roll to the next day
+  // after ~21:00 local and put the date picker / highlights a day ahead.
+  const today = jubaDate();
 
   // Load insurance status for all patients.
   //
@@ -272,7 +269,7 @@ export default function AppointmentsPage() {
   const pendingApprovals = useMemo(() => appointments.filter(a => a.status === 'scheduled' && a.appointmentDate >= today), [appointments, today]);
 
   const resetForm = () => {
-    setFormPatient(''); setFormDate(new Date().toISOString().slice(0, 10)); setFormTime('09:00');
+    setFormPatient(''); setFormDate(jubaDate()); setFormTime('09:00');
     setFormDuration(30); setFormType('general'); setFormPriority('routine');
     setFormDepartment('Outpatient'); setFormReason(''); setFormNotes(''); setFormRecurring(false);
   };
@@ -314,13 +311,12 @@ export default function AppointmentsPage() {
     if (!patient) { showToast(t('appointments.toastSelectValidPatientShort'), 'error'); return; }
     setSubmitting(true);
     try {
-      const now = new Date();
       await create({
         patientId: patient._id, patientName: `${patient.firstName} ${patient.surname}`,
         patientPhone: patient.phone || undefined, providerId: currentUser?._id || '',
         providerName: currentUser?.name || '', facilityId: currentUser?.hospitalId || '',
         facilityName: currentUser?.hospitalName || '', facilityLevel: 'payam' as FacilityLevel,
-        appointmentDate: today, appointmentTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+        appointmentDate: today, appointmentTime: jubaTime(),
         duration: 30, appointmentType: 'walk_in', priority: wiPriority,
         department: wiDepartment, reason: wiReason, notes: wiNotes || undefined,
         status: 'checked_in', reminderSent: false, isRecurring: false,
@@ -357,17 +353,39 @@ export default function AppointmentsPage() {
           icon={Calendar}
           title={t('appointments.title')}
           subtitle={t('appointments.subtitle')}
+          actions={
+            (canSetAvailability || canBookAppointments) ? (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {canSetAvailability && (
+                  <button onClick={() => setShowAvailability(true)} className="btn btn-secondary" style={{ gap: 6 }}>
+                    <Clock size={16} /> {t('appointments.schedule')}
+                  </button>
+                )}
+                {canBookAppointments && (
+                  <>
+                    <button onClick={() => setShowWalkIn(true)} className="btn btn-secondary" style={{ gap: 6, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }}>
+                      <UserPlus size={16} /> {t('appointments.walkIn')}
+                    </button>
+                    <button onClick={() => setShowNewForm(true)} className="btn btn-primary" style={{ gap: 6 }}>
+                      <Plus size={16} /> {t('appointments.bookAppointment')}
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : undefined
+          }
         />
 
         {/* ═══ Action Bar ═══ */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* View toggle */}
-          <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-medium)' }}>
+          <div style={{ display: 'flex', height: 36, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-medium)' }}>
             {(['calendar', 'list'] as const).map(v => (
               <button key={v} onClick={() => setView(v)} style={{
-                padding: '8px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                display: 'flex', alignItems: 'center', padding: '0 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                 background: view === v ? 'var(--accent-primary)' : 'var(--bg-card)',
                 color: view === v ? '#fff' : 'var(--text-secondary)',
+                transition: 'background 0.15s, color 0.15s',
               }}>
                 {v === 'calendar' ? t('appointments.viewCalendar') : t('appointments.viewList')}
               </button>
@@ -376,13 +394,14 @@ export default function AppointmentsPage() {
 
           {/* Calendar sub-view toggle */}
           {view === 'calendar' && (
-            <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-medium)' }}>
+            <div style={{ display: 'flex', height: 36, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-medium)' }}>
               {(['day', 'week', 'month'] as const).map(v => (
-                <button key={v} onClick={() => { setCalView(v); if (v === 'day' && !selectedDate) setSelectedDate(today); }} style={{
-                  padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                <button key={v} onClick={() => setCalView(v)} style={{
+                  display: 'flex', alignItems: 'center', padding: '0 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                   background: calView === v ? 'var(--accent-primary)' : 'var(--bg-card)',
                   color: calView === v ? '#fff' : 'var(--text-secondary)',
                   textTransform: 'capitalize',
+                  transition: 'background 0.15s, color 0.15s',
                 }}>
                   {v}
                 </button>
@@ -390,28 +409,18 @@ export default function AppointmentsPage() {
             </div>
           )}
 
-          <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary" style={{ gap: 6 }}>
+          {/* Filters — pushed right so it lines up under the header actions */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="btn btn-secondary"
+            aria-pressed={showFilters}
+            style={{
+              gap: 6, marginLeft: 'auto',
+              ...(showFilters ? { color: 'var(--accent-primary)', borderColor: 'var(--accent-border)', background: 'var(--accent-light)' } : {}),
+            }}
+          >
             <Filter size={14} /> {t('appointments.filters')}
           </button>
-
-          <div style={{ flex: 1 }} />
-
-          {canSetAvailability && (
-            <button onClick={() => setShowAvailability(true)} className="btn btn-secondary" style={{ gap: 6 }}>
-              <Clock size={16} /> {t('appointments.schedule')}
-            </button>
-          )}
-
-          {canBookAppointments && (
-            <>
-              <button onClick={() => setShowWalkIn(true)} className="btn btn-secondary" style={{ gap: 6, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }}>
-                <UserPlus size={16} /> {t('appointments.walkIn')}
-              </button>
-              <button onClick={() => setShowNewForm(true)} className="btn btn-primary" style={{ gap: 6 }}>
-                <Plus size={16} /> {t('appointments.bookAppointment')}
-              </button>
-            </>
-          )}
         </div>
 
         {/* Filters bar */}
@@ -434,25 +443,18 @@ export default function AppointmentsPage() {
 
         {/* ═══ Calendar View (react-big-calendar) ═══ */}
         {view === 'calendar' && (
-          <div className="card-elevated" style={{ padding: 16, overflow: 'hidden', marginBottom: 20, flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="card-elevated" style={{ padding: 16, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', marginBottom: -8 }}>
             <div className="rbc-tamam" style={{ flex: 1, minHeight: 560 }}>
-              <BigCalendar<CalEvent, object>
-                localizer={calendarLocalizer}
+              <AppointmentsCalendar
                 events={calendarEvents}
-                startAccessor="start"
-                endAccessor="end"
-                date={calDate}
-                onNavigate={(d: Date) => setCalDate(d)}
-                view={calView as View}
-                onView={(v: View) => setCalView(v as 'month' | 'week' | 'day')}
-                views={['month', 'week', 'day']}
-                popup
-                style={{ height: '72vh' }}
-                scrollToTime={new Date(1970, 0, 1, 7, 0, 0)}
-                components={{ toolbar: CalToolbar }}
-                onSelectEvent={(e: { resource: typeof appointments[0] }) => setEventApt(e.resource)}
-                selectable
-                onSelectSlot={(slot: { start: Date }) => {
+                calView={calView}
+                calDate={calDate}
+                today={today}
+                statusConfig={statusConfig}
+                onNavigate={(d) => setCalDate(d)}
+                onView={(v) => setCalView(v)}
+                onSelectEvent={(apt) => setEventApt(apt)}
+                onSelectSlot={(slot) => {
                   const d = slot.start;
                   const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                   setFormDate(iso);
@@ -461,24 +463,14 @@ export default function AppointmentsPage() {
                   }
                   setShowNewForm(true);
                 }}
-                eventPropGetter={(e: { resource: typeof appointments[0] }) => {
-                  const a = e.resource;
-                  const color = a.appointmentType === 'walk_in'
-                    ? '#7C3AED'
-                    : (statusConfig[a.status]?.color || 'var(--accent-primary)');
-                  return { style: { backgroundColor: color, borderColor: color, color: '#fff', borderRadius: 6, border: 'none', fontSize: 12, padding: '1px 6px' } };
-                }}
-                dayPropGetter={(d: Date) => {
-                  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                  return iso === today ? { style: { backgroundColor: 'var(--accent-light)' } } : {};
-                }}
               />
             </div>
           </div>
         )}
 
-        {/* ═══ Pending Approvals Banner ═══ */}
-        {pendingApprovals.length > 0 && (
+        {/* ═══ Pending Approvals Banner — list view only; in calendar view
+              these appointments already appear as events on the calendar. ═══ */}
+        {view === 'list' && pendingApprovals.length > 0 && (
           <div className="card-elevated" style={{
             padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12,
           }}>
@@ -498,7 +490,7 @@ export default function AppointmentsPage() {
         )}
 
         {/* ═══ Selected Date Header ═══ */}
-        {selectedDate && (
+        {view === 'list' && selectedDate && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
               {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -507,8 +499,9 @@ export default function AppointmentsPage() {
           </div>
         )}
 
-        {/* ═══ Appointment List ═══ */}
-        {(view === 'list' || selectedDate) && (
+        {/* ═══ Appointment List — list view only; calendar view shows only the
+              calendar grid (Google-Calendar style). ═══ */}
+        {view === 'list' && (
           <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {filteredAppointments.length === 0 ? (
               <div className="card-elevated" style={{ textAlign: 'center', padding: 48 }}>
@@ -929,24 +922,6 @@ function Detail({ label, value, icon }: { label: string; value: string; icon?: R
     <div>
       <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
       <div style={{ fontSize: 13, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 5 }}>{icon}{value}</div>
-    </div>
-  );
-}
-
-// Calendar toolbar: only icon prev/next + the period label. The view switcher
-// (month/week/day) and Today live in the page's own toolbar above, so they're
-// intentionally omitted here to avoid duplicate controls.
-const rbcNavBtn: React.CSSProperties = {
-  background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)',
-  borderRadius: 8, width: 34, height: 34, display: 'flex', alignItems: 'center',
-  justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)',
-};
-function CalToolbar({ label, onNavigate }: ToolbarProps<CalEvent, object>) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-      <button type="button" onClick={() => onNavigate('PREV')} aria-label="Previous" style={rbcNavBtn}><ChevronLeft size={18} /></button>
-      <button type="button" onClick={() => onNavigate('NEXT')} aria-label="Next" style={rbcNavBtn}><ChevronRight size={18} /></button>
-      <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{label}</h3>
     </div>
   );
 }

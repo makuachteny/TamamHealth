@@ -128,7 +128,7 @@ export default function WardsPage() {
   return (
     <>
       <TopBar title={t('ward.topBarTitle')} />
-      <main className="page-container page-enter">
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <PageHeader
           icon={BedDouble}
           title={t('ward.pageTitle')}
@@ -144,7 +144,7 @@ export default function WardsPage() {
 
         {/* Active admissions — now also carries the bed-occupancy numbers and
             the ward filter (the standalone ward grid + KPI strip were folded in here). */}
-        <div className="dash-card">
+        <div className="dash-card flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-3">
@@ -197,6 +197,7 @@ export default function WardsPage() {
               )}
             </div>
           </div>
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
           {filteredAdmissions.length === 0 ? (
             <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
               {filterWard ? t('ward.noActiveAdmissionsInWard') : t('ward.noActiveAdmissions')}
@@ -228,6 +229,7 @@ export default function WardsPage() {
               })}
             </div>
           )}
+          </div>
         </div>
 
         {/* Admit modal */}
