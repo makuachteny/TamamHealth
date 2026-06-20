@@ -3,17 +3,20 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import EmptyState from '@/components/EmptyState';
+import Badge, { type BadgeTone } from '@/components/Badge';
+import { FilterMenu } from '@/components/filters';
 import { useANC } from '@/lib/hooks/useANC';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { patientAge } from '@/lib/patient-utils';
 import { useBodyScrollLock } from '@/lib/hooks/useBodyScrollLock';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import type { ANCVisitDoc } from '@/lib/db-types';
 import {
-  HeartPulse, Search, Plus, X, Users,
-  Calendar, ChevronRight, ExternalLink,
+  HeartPulse, Plus, X, Users,
+  Calendar, ChevronRight, ExternalLink, Edit3,
 } from '@/components/icons/lucide';
 
 const RISK_FACTOR_OPTIONS = [
@@ -22,26 +25,33 @@ const RISK_FACTOR_OPTIONS = [
   'preeclampsia', 'bleeding', 'malaria_in_pregnancy', 'proteinuria',
 ];
 
-const riskColors = {
-  low: { color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)', label: 'Low Risk' },
-  moderate: { color: 'var(--color-warning)', bg: 'rgba(245,158,11,0.12)', label: 'Moderate' },
-  high: { color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.12)', label: 'High Risk' },
+const riskColors: Record<'low' | 'moderate' | 'high', { tone: BadgeTone; label: string }> = {
+  low: { tone: 'info', label: 'Low Risk' },
+  moderate: { tone: 'warning', label: 'Moderate' },
+  high: { tone: 'danger', label: 'High Risk' },
 };
 
 export default function ANCPage() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
-  const { visits, stats, loading, register } = useANC();
+  const { currentUser, globalSearch } = useApp();
+  const { visits, stats, loading, register, update } = useANC();
   const { patients } = usePatients();
   const { canRecordVitalEvents } = usePermissions();
   // Programme analytics (summary cards + ANC continuum funnel) are a population
   // view for facility management and the Ministry of Health. Clinical roles keep
   // the data recordings, workflow, and the mother/visit data.
   const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
-  const [search, setSearch] = useState('');
+  // Text search comes from the shared global search bar (TopBar).
+  const search = globalSearch;
   const [riskFilter, setRiskFilter] = useState<string>('all');
+  const activeFilterCount = (riskFilter !== 'all' ? 1 : 0);
+  const clearFilters = () => { setRiskFilter('all'); };
   const [showModal, setShowModal] = useState(false);
-  useBodyScrollLock(showModal);
+  // Edit/correct affordance for a saved ANC visit. Visits are corrected via
+  // updateANCVisit (audit/sync preserved), not hard-deleted from the UI.
+  const [editVisit, setEditVisit] = useState<ANCVisitDoc | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  useBodyScrollLock(showModal || !!editVisit);
   const [selectedMother, setSelectedMother] = useState<string | null>(null);
   const [patientLookup, setPatientLookup] = useState('');
 
@@ -65,7 +75,7 @@ export default function ANCPage() {
     return (patients || [])
       .filter(p => {
         if (p.gender !== 'Female') return false;
-        const age = p.estimatedAge ?? (p.dateOfBirth ? new Date().getFullYear() - new Date(p.dateOfBirth).getFullYear() : 0);
+        const age = patientAge(p) ?? 0;
         if (age < 10 || age > 55) return false;
         return (
           `${p.firstName} ${p.surname}`.toLowerCase().includes(q) ||
@@ -78,7 +88,7 @@ export default function ANCPage() {
   const selectAncPatient = (id: string) => {
     const p = patients.find(x => x._id === id);
     if (!p) return;
-    const age = p.estimatedAge ?? (p.dateOfBirth ? new Date().getFullYear() - new Date(p.dateOfBirth).getFullYear() : form.motherAge);
+    const age = patientAge(p) ?? form.motherAge;
     setLinkedPatientId(p._id);
     setForm(f => ({
       ...f,
@@ -164,6 +174,29 @@ export default function ANCPage() {
     setPatientLookup('');
   };
 
+  // Persist a correction to a saved ANC visit, then close the edit modal.
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editVisit) return;
+    setEditSaving(true);
+    try {
+      await update(editVisit._id, {
+        visitDate: editVisit.visitDate,
+        gestationalAge: editVisit.gestationalAge,
+        bloodPressure: editVisit.bloodPressure,
+        weight: editVisit.weight,
+        hemoglobin: editVisit.hemoglobin,
+        fetalHeartRate: editVisit.fetalHeartRate,
+        riskLevel: editVisit.riskLevel,
+        nextVisitDate: editVisit.nextVisitDate,
+        notes: editVisit.notes,
+      });
+      setEditVisit(null);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -182,19 +215,25 @@ export default function ANCPage() {
 
   return (
     <>
-      <TopBar title={t('anc.title')} />
+      <TopBar title={t('anc.title')} searchTrailing={
+          <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+            <FilterMenu.Field label={t('anc.allRiskLevels')}>
+              <select value={riskFilter} onChange={e => setRiskFilter(e.target.value)} className="w-full text-sm">
+                <option value="all">{t('anc.allRiskLevels')}</option>
+                <option value="high">{t('anc.riskHigh')}</option>
+                <option value="moderate">{t('anc.riskModerate')}</option>
+                <option value="low">{t('anc.riskLow')}</option>
+              </select>
+            </FilterMenu.Field>
+          </FilterMenu>
+      } actions={
+        canRecordVitalEvents && (
+          <button onClick={() => setShowModal(true)} className="btn btn-primary">
+            <Plus className="w-4 h-4" /> {t('anc.registerVisit')}
+          </button>
+        )
+      } />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={HeartPulse}
-          title={t('anc.title')}
-          subtitle={t('anc.subtitle')}
-          actions={canRecordVitalEvents && (
-            <button onClick={() => setShowModal(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('anc.registerVisit')}
-            </button>
-          )}
-        />
-
         {/* Continuum funnel */}
         {canViewCoverage && stats && stats.continuum && stats.totalMothers > 0 && (
           <div className="card-elevated p-5 mb-4">
@@ -244,34 +283,6 @@ export default function ANCPage() {
           </div>
         )}
 
-        {/* Search & Filter */}
-        <div
-          className="flex items-center mb-4 rounded-lg overflow-hidden"
-          style={{ border: '1px solid var(--border-light)', background: 'var(--surface, #fff)' }}
-        >
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input
-              type="search"
-              className="w-full bg-transparent border-0 outline-none pl-10 pr-3 py-2.5 text-sm"
-              placeholder={t('anc.searchMotherPlaceholder')}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-          <select
-            value={riskFilter}
-            onChange={e => setRiskFilter(e.target.value)}
-            className="bg-transparent border-0 outline-none py-2.5 px-3 text-sm cursor-pointer"
-            style={{ width: '180px', borderLeft: '1px solid var(--border-light)' }}
-          >
-            <option value="all">{t('anc.allRiskLevels')}</option>
-            <option value="high">{t('anc.riskHigh')}</option>
-            <option value="moderate">{t('anc.riskModerate')}</option>
-            <option value="low">{t('anc.riskLow')}</option>
-          </select>
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Mother List */}
           <div className="lg:col-span-2 card-elevated overflow-hidden">
@@ -297,20 +308,25 @@ export default function ANCPage() {
                     className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-[var(--table-row-hover)]"
                     style={{ background: isSelected ? 'var(--nav-active-bg)' : undefined }}
                   >
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                      style={{ background: 'var(--accent-primary)' }}>
-                      {latest.motherName.split(' ').map(n => n?.[0] || '').join('').slice(0, 2)}
-                    </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{latest.motherName}</p>
+                      {latest.motherId && !latest.motherId.startsWith('demo-') && !latest.motherId.startsWith('mother-new-') && !latest.motherId.includes('_demo') ? (
+                        <Link
+                          href={`/patients/${latest.motherId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm font-medium truncate block hover:underline"
+                          style={{ color: 'var(--text-primary)' }}
+                        >
+                          {latest.motherName}
+                        </Link>
+                      ) : (
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{latest.motherName}</p>
+                      )}
                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                         {t('anc.motherMeta', { age: latest.motherAge, gravida: latest.gravida, parity: latest.parity, weeks: latest.gestationalAge, facility: latest.facilityName })}
                       </p>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: risk.bg, color: risk.color }}>
-                        {risk.label}
-                      </span>
+                      <Badge tone={risk.tone}>{risk.label}</Badge>
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                         {visitCount} visit{visitCount !== 1 ? 's' : ''}
                       </span>
@@ -359,7 +375,21 @@ export default function ANCPage() {
                         <div key={v._id} className="p-3 rounded-lg border" style={{ borderColor: 'var(--border-light)' }}>
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>ANC {v.visitNumber}</span>
-                            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: risk.bg, color: risk.color }}>{risk.label}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge tone={risk.tone}>{risk.label}</Badge>
+                              {canRecordVitalEvents && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditVisit(v)}
+                                  aria-label={t('action.edit')}
+                                  title={t('action.edit')}
+                                  className="p-1 rounded hover:bg-[var(--overlay-light)]"
+                                  style={{ color: 'var(--text-muted)' }}
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 gap-y-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
                             <span>Date: {v.visitDate}</span>
@@ -628,7 +658,19 @@ export default function ANCPage() {
                       <option value="high">High</option>
                     </select>
                   </div>
-                  <label>Risk Factors</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label style={{ marginBottom: 0 }}>Risk Factors</label>
+                    {form.riskFactors.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, riskFactors: [] })}
+                        className="text-[10px] font-semibold"
+                        style={{ color: 'var(--accent-primary)' }}
+                      >
+                        {t('action.clear')}
+                      </button>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {RISK_FACTOR_OPTIONS.map(rf => (
                       <button
@@ -672,6 +714,79 @@ export default function ANCPage() {
                   <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary flex-1">Cancel</button>
                   <button type="submit" className="btn btn-primary flex-1">
                     <HeartPulse className="w-4 h-4" /> Register Visit
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit / Correct a saved ANC visit */}
+        {editVisit && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+            <div className="card-elevated p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fadeIn" style={{ margin: '20px' }}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{t('action.edit')} · ANC {editVisit.visitNumber} · {editVisit.motherName}</h3>
+                <button onClick={() => setEditVisit(null)} className="p-1 rounded-lg hover:bg-[var(--overlay-light)]">
+                  <X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
+                </button>
+              </div>
+
+              <form onSubmit={handleEditSave} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label>Visit Date</label>
+                    <input type="date" value={editVisit.visitDate} onChange={e => setEditVisit({ ...editVisit, visitDate: e.target.value })} />
+                  </div>
+                  <div>
+                    <label>GA (weeks)</label>
+                    <input type="number" min={4} max={44} value={editVisit.gestationalAge} onChange={e => setEditVisit({ ...editVisit, gestationalAge: parseInt(e.target.value, 10) || 0 })} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label>BP (mmHg)</label>
+                    <input type="text" value={editVisit.bloodPressure} onChange={e => setEditVisit({ ...editVisit, bloodPressure: e.target.value })} placeholder="120/80" />
+                  </div>
+                  <div>
+                    <label>Weight (kg)</label>
+                    <input type="number" step="0.1" value={editVisit.weight || ''} onChange={e => setEditVisit({ ...editVisit, weight: parseFloat(e.target.value) })} />
+                  </div>
+                  <div>
+                    <label>Hemoglobin</label>
+                    <input type="number" step="0.1" value={editVisit.hemoglobin || ''} onChange={e => setEditVisit({ ...editVisit, hemoglobin: parseFloat(e.target.value) })} />
+                  </div>
+                  <div>
+                    <label>Fetal HR (bpm)</label>
+                    <input type="number" value={editVisit.fetalHeartRate || ''} onChange={e => setEditVisit({ ...editVisit, fetalHeartRate: parseInt(e.target.value) })} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label>Risk Level</label>
+                    <select value={editVisit.riskLevel} onChange={e => setEditVisit({ ...editVisit, riskLevel: e.target.value as 'low' | 'moderate' | 'high' })}>
+                      <option value="low">Low</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Next Visit Date</label>
+                    <input type="date" value={editVisit.nextVisitDate || ''} onChange={e => setEditVisit({ ...editVisit, nextVisitDate: e.target.value })} />
+                  </div>
+                </div>
+
+                <div>
+                  <label>Notes</label>
+                  <textarea rows={2} value={editVisit.notes || ''} onChange={e => setEditVisit({ ...editVisit, notes: e.target.value })} placeholder="Clinical notes..." />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setEditVisit(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
+                  <button type="submit" disabled={editSaving} className="btn btn-primary flex-1">
+                    {t('action.saveChanges')}
                   </button>
                 </div>
               </form>

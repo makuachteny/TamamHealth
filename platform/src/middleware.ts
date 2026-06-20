@@ -39,6 +39,13 @@ const CSRF_EXEMPT_API_PATHS = new Set<string>([
   '/api/demo-credentials',
 ]);
 
+// The public pay-by-link checkout helper. No staff session exists (a payer
+// opens the link), so the cookie+header CSRF gate can't apply; the Origin
+// check above still guards it against cross-site abuse.
+function isCheckoutApiPath(pathname: string): boolean {
+  return pathname === '/api/checkout' || pathname.startsWith('/api/checkout/');
+}
+
 function isCsrfExemptApiPath(pathname: string): boolean {
   if (CSRF_EXEMPT_API_PATHS.has(pathname)) return true;
   // Patient portal has its own JWT scheme; it issues + checks its own
@@ -48,6 +55,9 @@ function isCsrfExemptApiPath(pathname: string): boolean {
   if (pathname === '/api/fhir/metadata') return true;
   if (pathname === '/api/country/metadata') return true;
   if (pathname.startsWith('/api/terminology/')) return true;
+  // Public pay-by-link checkout helper — unauthenticated payer, no session
+  // cookie to bind a CSRF token to.
+  if (isCheckoutApiPath(pathname)) return true;
   return false;
 }
 
@@ -202,6 +212,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Pay-by-link checkout helper — public so an unauthenticated payer can load
+  // the link details (GET) and submit a pending payment (POST). The route
+  // itself returns only payer-facing fields and never posts to the ledger.
+  if (isCheckoutApiPath(pathname)) {
+    return NextResponse.next();
+  }
+
   // Login page — always public
   if (pathname === '/login') {
     return NextResponse.next();
@@ -216,6 +233,12 @@ export async function middleware(request: NextRequest) {
     pathname === '/terms' ||
     pathname === '/privacy'
   ) {
+    return NextResponse.next();
+  }
+
+  // Pay-by-link checkout page — a patient/payer opens the link without a staff
+  // session, so the public checkout route must not redirect to /login.
+  if (pathname === '/checkout' || pathname.startsWith('/checkout/')) {
     return NextResponse.next();
   }
 

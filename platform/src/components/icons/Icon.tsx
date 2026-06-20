@@ -14,7 +14,7 @@ import {
   HeartPulse, HelpCircle, History, Home, Hospital, Image as ImageIcon, Info,
   KeyRound, Keyboard, LayoutDashboard, Languages, Layers, LineChart, List, Loader2,
   Lock, LogIn, LogOut, Mail, MapPin, Maximize2, Menu, MessageSquare,
-  Mic, MicOff, Microscope, Minus, Monitor, MonitorSmartphone, MoreVertical, Navigation,
+  Mic, MicOff, Microscope, Minus, Printer, MonitorSmartphone, MoreVertical, Navigation,
   Network, Package, Paperclip, Pause, Phone, PhoneOff, PieChart, Pill, Play, Plus, QrCode,
   Radio, RefreshCw, Receipt, RotateCw, Save, Scale, Search, Send, Server, Settings,
   Settings2, Shield, ShieldAlert, ShoppingCart, Signal, Skull, Sparkles,
@@ -308,7 +308,7 @@ const ICON_COMPONENTS: Record<IconName, LucideIcon> = {
   cloudOff: CloudOff, search: Search, alert: AlertTriangle, chevronLeft: ChevronLeft,
   chevronRight: ChevronRight, chevronDown: ChevronDown, chevronUp: ChevronUp,
   qr: QrCode, phone: Phone, mapPin: MapPin, clock: Clock, edit: Edit2,
-  printer: Monitor, download: Download, shield: Shield, sparkle: Sparkles,
+  printer: Printer, download: Download, shield: Shield, sparkle: Sparkles,
   check: Check, close: X, menu: Menu, bell: Bell, moon: LucideMoon, sun: Sun,
   globe: Globe, settings: Settings, logout: LogOut, user: User, arrowRight: ArrowRight,
   arrowRightLeft: ArrowRightLeft, plus: Plus, video: Video, bug: Bug, activity: Activity,
@@ -337,6 +337,11 @@ const ICON_COMPONENTS: Record<IconName, LucideIcon> = {
   utensils: Utensils, utensilsCrossed: UtensilsCrossed, wind: Wind, zap: Zap, zapOff: ZapOff,
 };
 
+// Global icon style switch. When false (the default), every icon renders as a
+// clean single-stroke (Tailwind-style) Lucide outline icon in its semantic
+// theme color. Flip to true to restore the illustrated Taban duotone set.
+const USE_TABAN_ICONS = false;
+
 // ───────────────────────────────────────────────────────────────────────────
 // Public component — renders a Lucide icon in its semantic color.
 // ───────────────────────────────────────────────────────────────────────────
@@ -356,8 +361,9 @@ export function Icon({
   const onClick = (rest as { onClick?: React.MouseEventHandler<SVGSVGElement> }).onClick;
   const numericSize = typeof size === 'string' ? Number(size) || 20 : size;
 
-  // First: render via the Taban illustrated library when available.
-  const tabanEntry = TABAN_ICONS[name];
+  // First: render via the Taban illustrated library when available — disabled
+  // globally via USE_TABAN_ICONS so the whole app uses flat Lucide outlines.
+  const tabanEntry = USE_TABAN_ICONS ? TABAN_ICONS[name] : undefined;
   if (tabanEntry) {
     const TabanComp = tabanEntry.Component as (p: TabanRenderProps) => React.ReactNode;
     const tabanAccent =

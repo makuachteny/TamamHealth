@@ -4197,7 +4197,7 @@ const so: TranslationMap = {
   'timeline.categoryReferral': 'Gudbin',
   'timeline.categoryAnc': 'ANC',
   'timeline.categoryAppointment': 'Ballan',
-  'timeline.titleTriage': 'Kala-saarid {{priority}}',
+  'timeline.titleTriage': 'Kala-saarid',
   'timeline.titleConsultation': 'La-tashi caafimaad',
   'timeline.titleReferral': 'Loo gudbiyay {{facility}}',
   'timeline.facilityFallback': 'xarun',

@@ -3,24 +3,21 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
-import FilterBar from '@/components/filters/FilterBar';
-import SearchInput from '@/components/filters/SearchInput';
-import FilterSelect from '@/components/filters/FilterSelect';
+import { FilterMenu } from '@/components/filters';
 import {
   Building2, Users, HeartPulse, CreditCard, ChevronRight, ChevronLeft,
   Shield, Activity, Settings, BarChart3,
-  Clock, Database, RefreshCw,
+  Database, RefreshCw,
 } from '@/components/icons/lucide';
 import type { AuditLogDoc } from '@/lib/db-types';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser, globalSearch } = useApp();
   const { organizations, loading: orgsLoading } = useOrganizations();
   const [totalUsers, setTotalUsers] = useState(0);
   const [totalPatients, setTotalPatients] = useState(0);
@@ -29,10 +26,16 @@ export default function AdminDashboardPage() {
   // Audit log state
   const [auditLogs, setAuditLogs] = useState<AuditLogDoc[]>([]);
   const [auditLoading, setAuditLoading] = useState(true);
-  const [auditSearch, setAuditSearch] = useState('');
+  // Audit-log text search comes from the shared global search bar (TopBar).
+  const auditSearch = globalSearch;
   const [auditAction, setAuditAction] = useState('all');
   const [auditPage, setAuditPage] = useState(0);
   const AUDIT_PAGE_SIZE = 20;
+  const auditFilterCount = auditAction !== 'all' ? 1 : 0;
+  const clearAuditFilters = () => { setAuditAction('all'); setAuditPage(0); };
+  // Reset to the first page whenever the search term changes (previously this
+  // was wired into the SearchInput onChange; now it follows the global search).
+  useEffect(() => { setAuditPage(0); }, [auditSearch]);
 
   // System health state
   const [dbStats, setDbStats] = useState<Array<{ name: string; docCount: number }>>([]);
@@ -218,14 +221,16 @@ export default function AdminDashboardPage() {
 
   return (
     <>
-      <TopBar title={t('admin.topBarTitle')} />
+      <TopBar title={t('admin.topBarTitle')} searchTrailing={
+        <FilterMenu activeCount={auditFilterCount} onClear={clearAuditFilters} title={t('admin.auditLog')}>
+          <FilterMenu.Field label={t('admin.filterByAction')}>
+            <select className="w-full text-sm" value={auditAction} onChange={e => { setAuditAction(e.target.value); setAuditPage(0); }}>
+              {auditActionOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </FilterMenu.Field>
+        </FilterMenu>
+      } />
       <main className="page-container page-enter">
-
-        <PageHeader
-          icon={Shield}
-          title={t('admin.pageTitle')}
-          subtitle={t('admin.pageSubtitle')}
-        />
 
         {/* KPI Stat Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
@@ -384,7 +389,8 @@ export default function AdminDashboardPage() {
                 {t('admin.viewAll')} <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full" style={{ minWidth: 600 }}>
               <thead>
                 <tr>
                   {[
@@ -448,6 +454,7 @@ export default function AdminDashboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Right Panel */}
@@ -510,24 +517,8 @@ export default function AdminDashboardPage() {
               </span>
             </div>
           </div>
-          <div className="px-5 pt-4">
-            <FilterBar>
-              <SearchInput
-                value={auditSearch}
-                onChange={v => { setAuditSearch(v); setAuditPage(0); }}
-                placeholder={t('admin.searchPlaceholder')}
-                aria-label={t('admin.searchPlaceholder')}
-              />
-              <FilterSelect
-                value={auditAction}
-                onChange={v => { setAuditAction(v); setAuditPage(0); }}
-                options={auditActionOptions}
-                aria-label={t('admin.filterByAction')}
-              />
-            </FilterBar>
-          </div>
           <div style={{ overflowX: 'auto' }}>
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 600 }}>
               <thead>
                 <tr>
                   {[
@@ -554,7 +545,6 @@ export default function AdminDashboardPage() {
                   <tr key={log._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <td className="px-4 py-3">
                       <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                        <Clock className="w-3 h-3" />
                         {formatTimestamp(log.createdAt)}
                       </span>
                     </td>

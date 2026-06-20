@@ -4217,7 +4217,7 @@ const nus: TranslationMap = {
   'timeline.categoryReferral': 'Jak',
   'timeline.categoryAnc': 'ANC',
   'timeline.categoryAppointment': 'Caŋ Bɛn',
-  'timeline.titleTriage': 'Tɛk juɔ̱c {{priority}}',
+  'timeline.titleTriage': 'Tɛk juɔ̱c',
   'timeline.titleConsultation': 'Loop akïïm',
   'timeline.titleReferral': 'Ca jak kä {{facility}}',
   'timeline.facilityFallback': 'duɔ̱ɔ̱r',

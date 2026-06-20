@@ -130,5 +130,10 @@ describe('permissions', () => {
         expect(item.href).toBeTruthy();
       }
     });
+
+    test.each(ALL_ROLES)('navItems contain no duplicate hrefs for role: %s', (role) => {
+      const hrefs = getRoleConfig(role).navItems.map(i => i.href);
+      expect(new Set(hrefs).size).toBe(hrefs.length);
+    });
   });
 });

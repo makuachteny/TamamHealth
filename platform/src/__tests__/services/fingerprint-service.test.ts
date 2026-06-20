@@ -78,6 +78,18 @@ describe('Fingerprint Service — enrollment', () => {
       .rejects.toThrow(/template/i);
   });
 
+  test('rejects enrollment with out-of-range quality', async () => {
+    await expect(enrollFingerprint(validEnrollment({ quality: 150 })))
+      .rejects.toThrow(/quality/i);
+    await expect(enrollFingerprint(validEnrollment({ quality: -1 })))
+      .rejects.toThrow(/quality/i);
+  });
+
+  test('rejects enrollment below the minimum quality floor', async () => {
+    await expect(enrollFingerprint(validEnrollment({ quality: 20 })))
+      .rejects.toThrow(/minimum/i);
+  });
+
   test('lists only active templates for a patient', async () => {
     await enrollFingerprint(validEnrollment());
     await enrollFingerprint(validEnrollment({ finger: 'left_index', template: 'dGVtcGxhdGUtMg==' }));
@@ -156,7 +168,7 @@ describe('Fingerprint Service — identification', () => {
     await enrollFingerprint(validEnrollment({ patientId: 'pat-002', patientName: 'Achol', template: 'dGVtcGxhdGUtMg==' }));
 
     mockFetch.mockResolvedValueOnce(jsonResponse({ matches: [{ id: t1._id, score: 100 }] }));
-    const matches = await identifyPatient('cHJvYmU=');
+    const matches = await identifyPatient('cHJvYmU=', { role: 'front_desk', orgId: 'org-001' });
     expect(matches).toHaveLength(1);
     expect(matches[0]).toEqual({
       patientId: 'pat-001', patientName: 'Deng Mabior', finger: 'right_index', score: 100,
@@ -175,7 +187,7 @@ describe('Fingerprint Service — identification', () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({
       matches: [{ id: t1._id, score: 95 }, { id: t2._id, score: 80 }],
     }));
-    const matches = await identifyPatient('cHJvYmU=');
+    const matches = await identifyPatient('cHJvYmU=', { role: 'front_desk', orgId: 'org-001' });
     expect(matches).toHaveLength(1);
     expect(matches[0].score).toBe(95);
   });
@@ -184,9 +196,23 @@ describe('Fingerprint Service — identification', () => {
     await enrollFingerprint(validEnrollment());
     await revokeFingerprints('pat-001');
 
-    const matches = await identifyPatient('cHJvYmU=');
+    const matches = await identifyPatient('cHJvYmU=', { role: 'front_desk', orgId: 'org-001' });
     expect(matches).toEqual([]);
     // No candidates → no bridge call at all
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  test('fails closed without a scope (no unscoped 1:N search)', async () => {
+    await enrollFingerprint(validEnrollment());
+    const matches = await identifyPatient('cHJvYmU=');
+    expect(matches).toEqual([]);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  test('fails closed for a non-national role missing orgId', async () => {
+    await enrollFingerprint(validEnrollment());
+    const matches = await identifyPatient('cHJvYmU=', { role: 'front_desk' });
+    expect(matches).toEqual([]);
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -204,6 +230,7 @@ describe('Fingerprint Service — identification', () => {
   test('surfaces bridge matching errors', async () => {
     await enrollFingerprint(validEnrollment());
     mockFetch.mockResolvedValueOnce(jsonResponse({ error: 'matcher crashed' }, 500));
-    await expect(identifyPatient('cHJvYmU=')).rejects.toThrow('matcher crashed');
+    await expect(identifyPatient('cHJvYmU=', { role: 'front_desk', orgId: 'org-001' }))
+      .rejects.toThrow('matcher crashed');
   });
 });

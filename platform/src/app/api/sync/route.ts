@@ -48,6 +48,15 @@
  *                                     sensitive biometric identifiers used
  *                                     only for in-org patient identification;
  *                                     must never flow to national analytics.
+ *   - tamamhealth_order_sets          Clinical protocol/order-set templates.
+ *                                     Org-scoped reference data, not a national
+ *                                     analytics target.
+ *   - tamamhealth_phone_notes         Patient call notes / callback workflow.
+ *                                     Facility-operational PHI, not a national
+ *                                     analytics target.
+ *   - tamamhealth_assessments         Scored intake / outcome-measure forms.
+ *                                     Facility-operational PHI, not a national
+ *                                     analytics target.
  *
  * All remaining databases land in DB_TABLE_MAP below; a missing entry causes a
  * 400 from this route, so the sync-worker surfaces a hard failure rather than

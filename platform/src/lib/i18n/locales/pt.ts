@@ -4197,7 +4197,7 @@ const pt: TranslationMap = {
   'timeline.categoryReferral': 'Referência',
   'timeline.categoryAnc': 'Pré-natal',
   'timeline.categoryAppointment': 'Marcação',
-  'timeline.titleTriage': 'Triagem {{priority}}',
+  'timeline.titleTriage': 'Triagem',
   'timeline.titleConsultation': 'Consulta clínica',
   'timeline.titleReferral': 'Referido para {{facility}}',
   'timeline.facilityFallback': 'unidade',

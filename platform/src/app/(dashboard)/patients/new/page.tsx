@@ -3,9 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
-import { Check, ArrowLeft, ArrowRight, Users } from '@/components/icons/lucide';
-import PhotoCapture from '@/components/PhotoCapture';
+import { Check, ArrowLeft, ArrowRight } from '@/components/icons/lucide';
 import FingerprintCapture, { type CapturedFingerprint } from '@/components/FingerprintCapture';
 import { statesAndCounties, states, tribes, languages, bloodTypes } from '@/data/mock';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -13,6 +11,10 @@ import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { enrollFingerprint } from '@/lib/services/fingerprint-service';
+import { isValidPhone, isValidNationalId, normalizePhone, normalizeNationalId } from '@/lib/field-formats';
+import type { AllergyEntry } from '@/data/mock';
+
+type AllergyRow = { substance: string; criticality: NonNullable<AllergyEntry['criticality']>; reaction: string };
 
 export default function NewPatientPage() {
   const { t } = useTranslation();
@@ -30,7 +32,6 @@ export default function NewPatientPage() {
     nationalId: '',
     nokName: '', nokRelationship: '', nokPhone: '', nokAddress: '',
     bloodType: 'Unknown', allergies: '' as string, chronicConditions: '' as string,
-    photoUrl: '' as string,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -38,6 +39,13 @@ export default function NewPatientPage() {
   // Fingerprint templates captured during registration (consent-gated inside
   // the component). Persisted AFTER the patient doc exists, in handleSubmit.
   const [fingerprints, setFingerprints] = useState<CapturedFingerprint[]>([]);
+  // Structured allergies captured at registration (substance + criticality +
+  // reaction). Persisted as first-class structuredAllergies on the new patient
+  // so the allergy is graded from the patient registry onward (P0.3).
+  const [allergyRows, setAllergyRows] = useState<AllergyRow[]>([]);
+  const addAllergyRow = () => setAllergyRows(rs => [...rs, { substance: '', criticality: 'unknown', reaction: '' }]);
+  const updateAllergyRow = (i: number, patch: Partial<AllergyRow>) => setAllergyRows(rs => rs.map((r, j) => j === i ? { ...r, ...patch } : r));
+  const removeAllergyRow = (i: number) => setAllergyRows(rs => rs.filter((_, j) => j !== i));
 
   const update = (field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -65,14 +73,17 @@ export default function NewPatientPage() {
     } else if (s === 1) {
       if (!form.state) errs.state = t('patientNew.errStateRequired');
       if (form.state && !form.county) errs.county = t('patientNew.errCountyRequired');
-      if (form.phone) {
-        const ph = form.phone.replace(/\s/g, '');
-        if (ph.length > 0 && !/^\+?[\d-]{7,15}$/.test(ph)) errs.phone = t('patientNew.errPhoneFormat');
-      }
+      // Phone/altPhone/whatsapp are optional — only flag a non-empty malformed
+      // value (isValidPhone returns true for empty).
+      if (!isValidPhone(form.phone)) errs.phone = t('validation.errPhone');
+      if (!isValidPhone(form.altPhone)) errs.altPhone = t('validation.errPhone');
+      if (!isValidPhone(form.whatsapp)) errs.whatsapp = t('validation.errPhone');
+      if (!isValidNationalId(form.nationalId)) errs.nationalId = t('validation.errNationalId');
     } else if (s === 2) {
       if (!form.nokName.trim()) errs.nokName = t('patientNew.errNokNameRequired');
       if (!form.nokRelationship) errs.nokRelationship = t('patientNew.errRelationshipRequired');
       if (!form.nokPhone.trim()) errs.nokPhone = t('patientNew.errNokPhoneRequired');
+      else if (!isValidPhone(form.nokPhone)) errs.nokPhone = t('validation.errPhone');
     }
     return errs;
   };
@@ -101,11 +112,20 @@ export default function NewPatientPage() {
     try {
       const nowIso = new Date().toISOString();
       const today = nowIso.split('T')[0];
+      // Normalize structured fields to canonical form before persisting so the
+      // stored value (and any review screen) matches the platform standard.
+      // patient-service re-normalizes, but normalizing here keeps the in-form
+      // state canonical too.
+      const normPhone = normalizePhone(form.phone) ?? form.phone;
+      const normAltPhone = normalizePhone(form.altPhone) ?? form.altPhone;
+      const normWhatsapp = normalizePhone(form.whatsapp) ?? form.whatsapp;
+      const normNokPhone = normalizePhone(form.nokPhone) ?? form.nokPhone;
+      const normNationalId = normalizeNationalId(form.nationalId);
       const result = await createPatient({
         hospitalNumber: '',
         geocodeId,
         householdNumber: form.householdNumber && !isNaN(parseInt(form.householdNumber, 10)) ? parseInt(form.householdNumber, 10) : undefined,
-        nationalId: form.nationalId || undefined,
+        nationalId: normNationalId || undefined,
         bomaCode: form.bomaCode || undefined,
         firstName: form.firstName.trim(),
         middleName: form.middleName.trim(),
@@ -116,9 +136,9 @@ export default function NewPatientPage() {
         gender: form.gender as 'Male' | 'Female',
         tribe: form.tribe,
         primaryLanguage: form.primaryLanguage,
-        phone: form.phone,
-        altPhone: form.altPhone,
-        whatsapp: form.whatsapp,
+        phone: normPhone,
+        altPhone: normAltPhone,
+        whatsapp: normWhatsapp,
         state: form.state,
         county: form.county,
         payam: form.payam,
@@ -126,12 +146,31 @@ export default function NewPatientPage() {
         address: form.address,
         nokName: form.nokName,
         nokRelationship: form.nokRelationship,
-        nokPhone: form.nokPhone,
+        nokPhone: normNokPhone,
         nokAddress: form.nokAddress,
         bloodType: form.bloodType,
-        allergies: form.allergies ? form.allergies.split(',').map(a => a.trim()).filter(a => a.length > 0) : ['None known'],
+        ...(() => {
+          // Merge free-text allergies (quick entry, unknown criticality) with
+          // the structured rows (graded). Structured rows win on substance match.
+          const nowIsoStr = new Date().toISOString();
+          const recordedByName = currentUser?.name || currentUser?.username;
+          const freeText = form.allergies ? form.allergies.split(',').map(a => a.trim()).filter(Boolean) : [];
+          const structured: AllergyEntry[] = [
+            ...allergyRows.filter(r => r.substance.trim()).map((r, i) => ({
+              id: `alg-reg-${i}`, substance: r.substance.trim(), criticality: r.criticality,
+              reaction: r.reaction.trim() || undefined, status: 'active' as const, recordedByName, recordedAt: nowIsoStr,
+            })),
+            ...freeText
+              .filter(s => !allergyRows.some(r => r.substance.trim().toLowerCase() === s.toLowerCase()))
+              .map((s, i) => ({ id: `alg-regf-${i}`, substance: s, criticality: 'unknown' as const, status: 'active' as const, recordedByName, recordedAt: nowIsoStr })),
+          ];
+          const names = structured.map(a => a.substance);
+          return {
+            allergies: names.length > 0 ? names : ['None known'],
+            ...(structured.length > 0 ? { structuredAllergies: structured } : {}),
+          };
+        })(),
         chronicConditions: form.chronicConditions ? form.chronicConditions.split(',').map(c => c.trim()).filter(c => c.length > 0) : ['None'],
-        photoUrl: form.photoUrl || undefined,
         registrationHospital: currentUser?.hospitalId || '',
         registrationDate: today,
         registeredAt: nowIso,
@@ -143,7 +182,11 @@ export default function NewPatientPage() {
       // Persist fingerprint enrollments now that the patient _id exists.
       // Best-effort: a biometric failure must never roll back registration.
       if (fingerprints.length > 0 && result?._id) {
+        // Consent must be attributable to a real staff member — no anonymous
+        // fallback. Without an identified user we skip enrollment entirely.
+        const consentRecordedBy = currentUser?.name || currentUser?.username;
         try {
+          if (!consentRecordedBy) throw new Error('no authenticated user to record consent');
           for (const fp of fingerprints) {
             await enrollFingerprint({
               patientId: result._id,
@@ -153,7 +196,7 @@ export default function NewPatientPage() {
               format: fp.format,
               quality: fp.quality,
               driver: fp.driver,
-              consentRecordedBy: currentUser?.name || currentUser?.username || 'unknown',
+              consentRecordedBy,
               enrolledBy: currentUser?.username,
               hospitalId: currentUser?.hospitalId,
               orgId: result.orgId,
@@ -188,12 +231,6 @@ export default function NewPatientPage() {
             <ArrowLeft className="w-4 h-4" /> {t('patientNew.backToPatients')}
           </button>
 
-          <PageHeader
-            icon={Users}
-            title={t('patientNew.pageTitle')}
-            subtitle={t('patientNew.pageSubtitle')}
-          />
-
           {/* Step Indicator — stretches across the full width of the form below */}
           <div className="flex items-center gap-0 mb-8 w-full">
             {steps.map((s, i) => (
@@ -217,10 +254,6 @@ export default function NewPatientPage() {
               <div className="space-y-5">
                 <h3 className="text-base font-semibold mb-4">{t('patientNew.demographicsHeading')}</h3>
                 <div className="flex gap-3 items-start">
-                  <PhotoCapture
-                    value={form.photoUrl || undefined}
-                    onChange={(base64) => update('photoUrl', base64 || '')}
-                  />
                   <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <label htmlFor="pt-firstName">{t('patientNew.firstName')}</label>
@@ -288,15 +321,18 @@ export default function NewPatientPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <label htmlFor="pt-phone">{t('patientNew.phone')}</label>
-                    <input id="pt-phone" type="tel" value={form.phone} onChange={e => update('phone', e.target.value)} placeholder={t('patientNew.phonePlaceholder')} aria-required="true" />
+                    <input id="pt-phone" type="tel" value={form.phone} onChange={e => update('phone', e.target.value)} placeholder={t('patientNew.phonePlaceholder')} aria-required="true" aria-invalid={!!errors.phone} style={errors.phone ? { borderColor: 'var(--color-danger)' } : {}} />
+                    {errors.phone && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.phone}</p>}
                   </div>
                   <div>
                     <label htmlFor="pt-altPhone">{t('patientNew.altPhone')}</label>
-                    <input id="pt-altPhone" type="tel" value={form.altPhone} onChange={e => update('altPhone', e.target.value)} placeholder={t('patientNew.altPhonePlaceholder')} />
+                    <input id="pt-altPhone" type="tel" value={form.altPhone} onChange={e => update('altPhone', e.target.value)} placeholder={t('patientNew.altPhonePlaceholder')} aria-invalid={!!errors.altPhone} style={errors.altPhone ? { borderColor: 'var(--color-danger)' } : {}} />
+                    {errors.altPhone && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.altPhone}</p>}
                   </div>
                   <div>
                     <label htmlFor="pt-whatsapp">{t('patientNew.whatsapp')}</label>
-                    <input id="pt-whatsapp" type="tel" value={form.whatsapp} onChange={e => update('whatsapp', e.target.value)} placeholder={t('patientNew.whatsappPlaceholder')} />
+                    <input id="pt-whatsapp" type="tel" value={form.whatsapp} onChange={e => update('whatsapp', e.target.value)} placeholder={t('patientNew.whatsappPlaceholder')} aria-invalid={!!errors.whatsapp} style={errors.whatsapp ? { borderColor: 'var(--color-danger)' } : {}} />
+                    {errors.whatsapp && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.whatsapp}</p>}
                   </div>
                 </div>
 
@@ -323,7 +359,8 @@ export default function NewPatientPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
                     <div>
                       <label htmlFor="pt-nationalId">{t('patientNew.nationalId')}</label>
-                      <input id="pt-nationalId" type="text" value={form.nationalId} onChange={e => update('nationalId', e.target.value)} placeholder={t('patientNew.nationalIdPlaceholder')} />
+                      <input id="pt-nationalId" type="text" value={form.nationalId} onChange={e => update('nationalId', e.target.value)} placeholder={t('patientNew.nationalIdPlaceholder')} aria-invalid={!!errors.nationalId} style={errors.nationalId ? { borderColor: 'var(--color-danger)' } : {}} />
+                      {errors.nationalId && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.nationalId}</p>}
                     </div>
                   </div>
                 </div>
@@ -393,7 +430,8 @@ export default function NewPatientPage() {
                   </div>
                   <div>
                     <label>{t('patientNew.nokPhone')}</label>
-                    <input type="tel" value={form.nokPhone} onChange={e => update('nokPhone', e.target.value)} placeholder={t('patientNew.phonePlaceholder')} />
+                    <input type="tel" value={form.nokPhone} onChange={e => update('nokPhone', e.target.value)} placeholder={t('patientNew.phonePlaceholder')} aria-invalid={!!errors.nokPhone} style={errors.nokPhone ? { borderColor: 'var(--color-danger)' } : {}} />
+                    {errors.nokPhone && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.nokPhone}</p>}
                   </div>
                   <div>
                     <label>{t('patientNew.nokAddress')}</label>
@@ -418,6 +456,26 @@ export default function NewPatientPage() {
                 <div>
                   <label>{t('patientNew.knownAllergies')}</label>
                   <textarea value={form.allergies} onChange={e => update('allergies', e.target.value)} rows={2} placeholder={t('patientNew.allergiesPlaceholder')} />
+                  {/* Optional graded entry for known severe/important allergies. */}
+                  <div className="mt-2 space-y-2">
+                    {allergyRows.map((r, i) => (
+                      <div key={i} className="flex items-center gap-2 flex-wrap">
+                        <input value={r.substance} onChange={e => updateAllergyRow(i, { substance: e.target.value })} placeholder="Substance"
+                          className="flex-1 min-w-[120px] p-2 rounded-md text-[13px]" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
+                        <select value={r.criticality} onChange={e => updateAllergyRow(i, { criticality: e.target.value as AllergyRow['criticality'] })}
+                          className="p-2 rounded-md text-[12px]" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
+                          <option value="unknown">Unknown</option>
+                          <option value="mild">Mild</option>
+                          <option value="moderate">Moderate</option>
+                          <option value="severe">Severe</option>
+                        </select>
+                        <input value={r.reaction} onChange={e => updateAllergyRow(i, { reaction: e.target.value })} placeholder="Reaction (optional)"
+                          className="flex-1 min-w-[120px] p-2 rounded-md text-[13px]" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
+                        <button type="button" onClick={() => removeAllergyRow(i)} className="text-xs px-2 py-1" style={{ color: 'var(--text-muted)' }}>Remove</button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={addAllergyRow} className="btn btn-secondary btn-sm">+ Add graded allergy</button>
+                  </div>
                 </div>
                 <div>
                   <label>{t('patientNew.chronicConditions')}</label>

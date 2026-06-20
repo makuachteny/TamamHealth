@@ -43,7 +43,7 @@ export default function QuickActions() {
         className={iconBtn}
         style={{ background: 'transparent' }}
       >
-        <Bell className="w-[22px] h-[22px]" />
+        <Bell className="w-[22px] h-[22px]" color="var(--text-muted)" />
         {notifCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: 'var(--color-danger, #C44536)' }}>
             {notifCount > 9 ? '9+' : notifCount}
@@ -62,7 +62,7 @@ export default function QuickActions() {
           className={iconBtn}
           style={{ background: 'transparent' }}
         >
-          <Megaphone className="w-[22px] h-[22px]" />
+          <Megaphone className="w-[22px] h-[22px]" color="var(--text-muted)" />
           {unread > 0 && (
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full" aria-hidden="true" style={{ background: 'var(--accent-primary)', boxShadow: '0 0 4px var(--accent-light)' }} />
           )}

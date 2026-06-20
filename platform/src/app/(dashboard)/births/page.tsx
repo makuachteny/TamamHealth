@@ -2,14 +2,13 @@
 
 import { useState } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useBirths } from '@/lib/hooks/useBirths';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { SearchInput, FilterSelect, FilterBar } from '@/components/filters';
+import { FilterMenu } from '@/components/filters';
 import {
   Baby, Plus, X, ChevronDown, ChevronUp,
 } from '@/components/icons/lucide';
@@ -17,12 +16,15 @@ import {
 export default function BirthsPage() {
   const { births, stats, loading, register } = useBirths();
   const { hospitals } = useHospitals();
-  const { currentUser } = useApp();
+  const { currentUser, globalSearch } = useApp();
   const { canRecordVitalEvents } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();
-  const [search, setSearch] = useState('');
+  // Text search comes from the shared global search bar (TopBar).
+  const search = globalSearch;
   const [deliveryFilter, setDeliveryFilter] = useState('all');
+  const activeFilterCount = (deliveryFilter !== 'all' ? 1 : 0);
+  const clearFilters = () => { setDeliveryFilter('all'); };
   const [showForm, setShowForm] = useState(false);
   const [expandedBirth, setExpandedBirth] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -62,36 +64,32 @@ export default function BirthsPage() {
 
   return (
     <>
-      <TopBar title={t('nav.births')} />
+      <TopBar title={t('nav.births')} searchTrailing={
+              <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+                <FilterMenu.Field label="Delivery type">
+                  <select
+                    className="w-full text-sm"
+                    value={deliveryFilter}
+                    onChange={e => setDeliveryFilter(e.target.value)}
+                  >
+                    <option value="all">All deliveries</option>
+                    <option value="normal">Normal</option>
+                    <option value="caesarean">Caesarean</option>
+                    <option value="assisted">Assisted</option>
+                  </select>
+                </FilterMenu.Field>
+              </FilterMenu>
+          } actions={
+            canRecordVitalEvents && (
+              <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
+                <Plus className="w-4 h-4" /> {t('births.registerBirth')}
+              </button>
+            )
+          } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <PageHeader
-          icon={Baby}
-          title={t('nav.births')}
-          subtitle={t('births.subtitle')}
-          actions={canRecordVitalEvents && (
-            <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
-              <Plus className="w-4 h-4" /> {t('births.registerBirth')}
-            </button>
-          )}
-        />
-
-        {/* Search + filters, with the registry stats surfaced inline on the right */}
-        <FilterBar>
-          <SearchInput value={search} onChange={setSearch} placeholder="Search by child name, mother name, or certificate..." />
-          <FilterSelect
-            value={deliveryFilter}
-            onChange={setDeliveryFilter}
-            options={[
-              { value: 'all', label: 'All deliveries' },
-              { value: 'normal', label: 'Normal' },
-              { value: 'caesarean', label: 'Caesarean' },
-              { value: 'assisted', label: 'Assisted' },
-            ]}
-            aria-label="Filter by delivery type"
-          />
-          <FilterBar.Spacer />
-          {stats && (
-            <div className="flex items-center gap-4 sm:gap-5 pr-1">
+        {/* Registry stats surfaced inline above the table. */}
+        {stats && (
+            <div className="flex items-center justify-end gap-4 sm:gap-5 pr-1 mb-3">
               {[
                 { label: 'Total Registered', value: stats.total, color: '#EC4899' },
                 { label: 'This Month', value: stats.thisMonth, color: '#3B82F6' },
@@ -105,15 +103,14 @@ export default function BirthsPage() {
               ))}
             </div>
           )}
-        </FilterBar>
 
         {/* Table */}
         <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           {loading ? (
             <div className="p-8 text-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</p></div>
           ) : (
-            <table className="data-table">
+            <table className="data-table" style={{ minWidth: 1080 }}>
               <thead>
                 <tr>
                   <th>Certificate #</th>

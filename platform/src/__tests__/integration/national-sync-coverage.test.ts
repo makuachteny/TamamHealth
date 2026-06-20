@@ -36,7 +36,11 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
   'tamamhealth_conversations',         // internal staff chat — facility-operational PHI, not national analytics
   'tamamhealth_patient_notes',         // internal clinical notes — facility-operational PHI, not national analytics
   'tamamhealth_encounters',            // in-progress consultation workflow state — facility-operational, not national analytics
+  'tamamhealth_handoffs',              // nurse shift handoffs (SBAR) — facility-operational PHI, not national analytics
   'tamamhealth_biometric_templates',   // biometric identifiers — in-org identification only, never national
+  'tamamhealth_order_sets',            // clinical protocol templates — org-scoped reference data, not national analytics
+  'tamamhealth_phone_notes',           // patient call notes / callbacks — facility-operational PHI, not national analytics
+  'tamamhealth_assessments',           // scored intake/outcome-measure forms — facility-operational PHI, not national analytics
 ]);
 
 // Local-only databases that never participate in sync at all.

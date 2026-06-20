@@ -87,7 +87,7 @@ export default function FingerprintIdentifyModal({ onSelect, onClose }: Fingerpr
 
           {ready && phase !== 'results' && (
             <div className="flex flex-col items-center gap-3 py-4">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'transparent' }}>
                 {phase === 'scanning' ? (
                   <span className="animate-spin inline-block w-6 h-6 border-2 border-t-transparent rounded-full" style={{ borderColor: 'var(--tamamhealth-blue)', borderTopColor: 'transparent' }} />
                 ) : (
@@ -122,7 +122,7 @@ export default function FingerprintIdentifyModal({ onSelect, onClose }: Fingerpr
                       className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-[var(--accent-light)]"
                       style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
                     >
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                         <UserCheck className="w-5 h-5" style={{ color: 'var(--tamamhealth-blue)' }} />
                       </div>
                       <div className="text-left">

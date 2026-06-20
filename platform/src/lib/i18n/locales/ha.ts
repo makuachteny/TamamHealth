@@ -4197,7 +4197,7 @@ const ha: TranslationMap = {
   'timeline.categoryReferral': 'Tura',
   'timeline.categoryAnc': 'ANC',
   'timeline.categoryAppointment': 'Alƙawari',
-  'timeline.titleTriage': 'Tantancewar {{priority}}',
+  'timeline.titleTriage': 'Tantancewa',
   'timeline.titleConsultation': 'Shawarar asibiti',
   'timeline.titleReferral': 'An tura zuwa {{facility}}',
   'timeline.facilityFallback': 'cibiya',

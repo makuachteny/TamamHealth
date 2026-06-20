@@ -30,7 +30,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import {
   Building2, Users, BedDouble, Package, Pill, Calendar,
   Activity, Settings, ArrowLeft, Loader2, AlertTriangle,
@@ -48,6 +47,7 @@ import type { WardDoc, AdmissionDoc } from '@/lib/db-types-ward';
 import type { AssetDoc } from '@/lib/db-types-asset';
 import type { DataScope } from '@/lib/services/data-scope';
 import { useToast } from '@/components/Toast';
+import { isValidPhone, isValidEmail, normalizePhone, normalizeEmail } from '@/lib/field-formats';
 
 // ── Permission ───────────────────────────────────────────────────────────────
 const MANAGE_ROLES: UserRole[] = [
@@ -186,19 +186,12 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
 
   return (
     <>
-      <TopBar title={t('hospitals.manageTitle', { name: hospital.name })} />
+      <TopBar title={t('hospitals.manageTitle', { name: hospital.name })} actions={
+        <Link href="/hospitals" className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
+          <ArrowLeft style={{ width: 13, height: 13 }} /> {t('hospitals.hospitalNetwork')}
+        </Link>
+      } />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Building2}
-          title={hospital.name}
-          subtitle={`${hospital.facilityType?.replace(/_/g, ' ')} · ${hospital.state}${hospital.county ? ` · ${hospital.county}` : ''}`}
-          actions={
-            <Link href="/hospitals" className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-              <ArrowLeft style={{ width: 13, height: 13 }} /> {t('hospitals.hospitalNetwork')}
-            </Link>
-          }
-        />
-
         {/* Tab bar */}
         <div className="flex gap-2 mb-4 flex-wrap">
           {TABS.map(tabItem => (
@@ -490,7 +483,7 @@ function StaffTab({ scope, hospitalId }: { scope: DataScope | undefined; hospita
         </FilterBar>
       </div>
       <div style={{ overflow: 'auto' }}>
-        <table className="data-table">
+        <table className="data-table" style={{ minWidth: 600 }}>
           <thead>
             <tr>
               <th>{t('hospitals.colName')}</th>
@@ -623,7 +616,8 @@ function WardsTab({ scope, hospitalId, hospital }: {
           <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('hospitals.emptyWards')}</p>
         </div>
       ) : (
-        <table className="data-table">
+        <div className="overflow-x-auto">
+        <table className="data-table" style={{ minWidth: 720 }}>
           <thead>
             <tr>
               <th>{t('hospitals.colName')}</th>
@@ -650,6 +644,7 @@ function WardsTab({ scope, hospitalId, hospital }: {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
@@ -722,7 +717,8 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
           {t('hospitals.countOf', { shown: filtered.length, total: assets.length })}
         </span>
       </div>
-      <table className="data-table">
+      <div className="overflow-x-auto">
+      <table className="data-table" style={{ minWidth: 720 }}>
         <thead>
           <tr>
             <th>{t('hospitals.colAsset')}</th>
@@ -758,6 +754,7 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -795,7 +792,8 @@ function InventoryTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
 
   return (
     <div className="card-elevated" style={{ overflow: 'hidden' }}>
-      <table className="data-table">
+      <div className="overflow-x-auto">
+      <table className="data-table" style={{ minWidth: 720 }}>
         <thead>
           <tr>
             <th>{t('hospitals.colMedication')}</th>
@@ -836,6 +834,7 @@ function InventoryTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -894,7 +893,8 @@ function SchedulesTab({ hospitalId }: { hospitalId: string }) {
            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('hospitals.emptySchedules')}</p>
          </div>
        ) : (
-        <table className="data-table">
+        <div className="overflow-x-auto">
+        <table className="data-table" style={{ minWidth: 720 }}>
           <thead>
             <tr>
               <th>{t('hospitals.colStaff')}</th>
@@ -922,6 +922,7 @@ function SchedulesTab({ hospitalId }: { hospitalId: string }) {
             ))}
           </tbody>
         </table>
+        </div>
        )}
     </div>
   );
@@ -1085,12 +1086,23 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ phone?: string; email?: string }>({});
 
   const handleSave = useCallback(async () => {
     if (!canWrite) return;
+    // Phone/email are optional — block save only when a non-empty value is
+    // malformed (isValid* return true for empty).
+    const fe: { phone?: string; email?: string } = {};
+    if (!isValidPhone(phone)) fe.phone = t('validation.errPhone');
+    if (!isValidEmail(email)) fe.email = t('validation.errEmail');
+    setFieldErrors(fe);
+    if (Object.keys(fe).length > 0) return;
     setSaving(true);
     setErr(null);
     try {
+      // Normalize to canonical form before persisting.
+      const normPhone = normalizePhone(phone) ?? phone;
+      const normEmail = normalizeEmail(email);
       const { updateHospitalStatus } = await import('@/lib/services/hospital-service');
       const updated = await updateHospitalStatus(hospital._id, {
         name: name.trim() || hospital.name,
@@ -1099,8 +1111,8 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
         // Phone / email are not part of the HospitalDoc type today but the
         // doc is a free-form PouchDB record — extra fields are preserved
         // round-trip without a migration.
-        ...(phone ? { phone } : {}),
-        ...(email ? { email } : {}),
+        ...(normPhone ? { phone: normPhone } : {}),
+        ...(normEmail ? { email: normEmail } : {}),
       } as Partial<HospitalDoc>);
       if (updated) {
         onSaved(updated);
@@ -1146,18 +1158,22 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
             <input
               disabled={!canWrite}
               value={phone}
-              onChange={e => setPhone(e.target.value)}
-              style={inputStyle(canWrite)}
+              onChange={e => { setPhone(e.target.value); if (fieldErrors.phone) setFieldErrors(fe => ({ ...fe, phone: undefined })); }}
+              aria-invalid={!!fieldErrors.phone}
+              style={{ ...inputStyle(canWrite), ...(fieldErrors.phone ? { borderColor: 'var(--color-danger)' } : {}) }}
             />
+            {fieldErrors.phone && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{fieldErrors.phone}</p>}
           </Field>
           <Field label={t('hospitals.fieldEmail')}>
             <input
               type="email"
               disabled={!canWrite}
               value={email}
-              onChange={e => setEmail(e.target.value)}
-              style={inputStyle(canWrite)}
+              onChange={e => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors(fe => ({ ...fe, email: undefined })); }}
+              aria-invalid={!!fieldErrors.email}
+              style={{ ...inputStyle(canWrite), ...(fieldErrors.email ? { borderColor: 'var(--color-danger)' } : {}) }}
             />
+            {fieldErrors.email && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{fieldErrors.email}</p>}
           </Field>
           <Field label={t('hospitals.operatingStatus')}>
             <select

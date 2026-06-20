@@ -7,7 +7,16 @@
 
 import { createHmac } from 'crypto';
 
-const LICENSE_SECRET = process.env.TAMAMHEALTH_LICENSE_SECRET || 'tamamhealth-2026-license-signing-key';
+/**
+ * License signing secret. In production it MUST come from the environment
+ * (validated fail-closed at boot in lib/config-validation.ts); the compiled-in
+ * fallback exists only for local dev / tooling. A missing secret in production
+ * yields an empty key, so every verification fails closed rather than trusting
+ * the public default.
+ */
+const LICENSE_SECRET =
+  process.env.TAMAMHEALTH_LICENSE_SECRET ||
+  (process.env.NODE_ENV === 'production' ? '' : 'tamamhealth-2026-license-signing-key');
 
 export type LicenseInfo = {
   org: string;

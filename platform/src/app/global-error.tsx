@@ -29,13 +29,13 @@ export default function GlobalError({
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button
                 onClick={() => { try { reset(); } catch { window.location.reload(); } }}
-                style={{ background: '#2563EB', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ background: '#2563EB', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
               >
                 Try again
               </button>
               <button
                 onClick={() => window.location.reload()}
-                style={{ background: 'transparent', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.18)', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ background: 'transparent', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.18)', padding: '12px 24px', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
               >
                 Reload page
               </button>

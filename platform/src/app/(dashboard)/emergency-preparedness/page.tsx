@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { AlertTriangle, ShieldAlert, Phone, Users, BedDouble, Activity, Plus, X } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
@@ -19,6 +18,8 @@ import type {
   EmergencyPhase,
   EmergencySeverity,
 } from '@/lib/db-types';
+import Badge, { type BadgeTone } from '@/components/Badge';
+import EmptyState from '@/components/EmptyState';
 
 const EMERGENCY_TYPES: { value: EmergencyType; label: string }[] = [
   { value: 'disease_outbreak', label: 'Disease outbreak' },
@@ -53,11 +54,15 @@ const PHASE_LABEL: Record<EmergencyPhase, string> = Object.fromEntries(
   PHASES.map(p => [p.value, p.label]),
 ) as Record<EmergencyPhase, string>;
 
-const severityColor = (s: EmergencySeverity): string =>
-  s === 'level_3' ? '#C44536' : s === 'level_2' ? '#B8741C' : '#3b82f6';
+// Severity → Badge tone (level_3 full activation → danger, level_2 → warning,
+// level_1 watch → info).
+const severityTone = (s: EmergencySeverity): BadgeTone =>
+  s === 'level_3' ? 'danger' : s === 'level_2' ? 'warning' : 'info';
 
-const phaseColor = (p: EmergencyPhase): string =>
-  p === 'response' ? '#C44536' : p === 'alert' ? '#B8741C' : p === 'recovery' ? '#3b82f6' : p === 'preparedness' ? '#15795C' : 'var(--text-muted)';
+// Phase → Badge tone (active response → danger, alert → warning,
+// recovery → info, preparedness → success, closed → neutral).
+const phaseTone = (p: EmergencyPhase): BadgeTone =>
+  p === 'response' ? 'danger' : p === 'alert' ? 'warning' : p === 'recovery' ? 'info' : p === 'preparedness' ? 'success' : 'neutral';
 
 const EMPTY_FORM = {
   planName: '',
@@ -178,33 +183,25 @@ export default function EmergencyPreparednessPage() {
 
   return (
     <>
-      <TopBar title="Emergency Preparedness" />
+      <TopBar title="Emergency Preparedness" actions={
+        <button onClick={openForm} className="btn btn-primary">
+          <Plus className="w-4 h-4" /> New plan
+        </button>
+      } />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={ShieldAlert}
-          title="Emergency Preparedness"
-          subtitle="Facility surge and emergency response plans, resource readiness, and incident-command contacts"
-          actions={
-            <button onClick={openForm} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> New plan
-            </button>
-          }
-        />
-
         {loading ? (
           <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading…</div>
         ) : plans.length === 0 ? (
-          <div className="dash-card p-10 text-center">
-            <AlertTriangle className="w-8 h-8 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-            <p className="text-sm font-semibold mb-1">No emergency plans yet</p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Create a surge plan for a cholera outbreak, mass casualty event, or other emergency.
-            </p>
+          <div className="dash-card">
+            <EmptyState
+              icon={AlertTriangle}
+              title="No emergency plans yet"
+              message="Create a surge plan for a cholera outbreak, mass casualty event, or other emergency."
+            />
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {plans.map(plan => {
-              const sev = severityColor(plan.severity);
               const isActive = plan.phase === 'response';
               return (
                 <div key={plan._id} className="dash-card p-5">
@@ -216,25 +213,19 @@ export default function EmergencyPreparednessPage() {
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span
-                        className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md whitespace-nowrap"
-                        style={{ background: `${sev}1A`, color: sev, border: `1px solid ${sev}40` }}
-                      >
+                      <Badge tone={severityTone(plan.severity)} uppercase>
                         {plan.severity.replace('_', ' ')}
-                      </span>
-                      <span
-                        className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md whitespace-nowrap"
-                        style={{ color: phaseColor(plan.phase) }}
-                      >
+                      </Badge>
+                      <Badge tone={phaseTone(plan.phase)} uppercase>
                         {PHASE_LABEL[plan.phase] ?? plan.phase}
-                      </span>
+                      </Badge>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}>
+                    <Badge tone="neutral">
                       {TYPE_LABEL[plan.emergencyType] ?? plan.emergencyType}
-                    </span>
+                    </Badge>
                   </div>
 
                   {plan.description && (

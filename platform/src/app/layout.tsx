@@ -20,7 +20,11 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // Allow pinch-zoom (accessibility — don't lock to 1) and draw under device
+  // notches / rounded corners so the PWA fills the whole screen on mobile.
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#eff6ff" },
     { media: "(prefers-color-scheme: dark)", color: "#1e3a8a" },

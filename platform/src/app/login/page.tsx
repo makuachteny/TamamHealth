@@ -12,41 +12,6 @@ import type { UserRole } from '@/lib/db-types';
 const ACCENT = '#3b82f6';
 const ACCENT_DEEP = '#1e3a8a';
 
-type IconName = Parameters<typeof Icon>[0]['name'];
-
-/**
- * Per-role personality for the adaptive login. Every role shares the same accent
- * theme; uniqueness comes from the mark + the welcome copy. Keyed by UserRole.
- */
-const ROLE_PROFILE: Record<UserRole, { icon: string; greet: string; tagline: string }> = {
-  super_admin:                { icon: 'shield',      greet: 'Platform Administration',   tagline: 'Full oversight across every organization and facility.' },
-  org_admin:                  { icon: 'building',    greet: 'Organization Console',      tagline: 'Manage your hospital group, staff, and branding.' },
-  doctor:                     { icon: 'stethoscope', greet: 'Welcome back, Doctor',      tagline: 'Your patients and consultations are ready.' },
-  clinical_officer:           { icon: 'stethoscope', greet: 'Welcome, Clinical Officer', tagline: 'Diagnose, treat, and refer with confidence.' },
-  nurse:                      { icon: 'heart',       greet: 'Welcome, Nurse',            tagline: 'Ward rounds, vitals, and patient care in one place.' },
-  midwife:                    { icon: 'heart',       greet: 'Welcome, Midwife',          tagline: 'Antenatal, delivery, and newborn care — together.' },
-  lab_tech:                   { icon: 'flask',       greet: 'Laboratory',                tagline: 'Process orders and publish results.' },
-  pharmacist:                 { icon: 'pill',        greet: 'Pharmacy',                  tagline: 'Dispense safely and keep stock in check.' },
-  front_desk:                 { icon: 'user',        greet: 'Medical Receptionist',      tagline: 'Register patients and manage appointments.' },
-  cashier:                    { icon: 'record',      greet: 'Cashier',                   tagline: 'Collect payments and issue receipts.' },
-  government:                 { icon: 'globe',       greet: 'National Health Dashboard', tagline: 'Population health and surveillance at a glance.' },
-  county_health_director:     { icon: 'mapPin',      greet: 'County Health Office',      tagline: 'Oversee facilities, data quality, and reporting.' },
-  data_entry_clerk:           { icon: 'edit',        greet: 'Data Entry',                tagline: 'Keep facility records accurate and current.' },
-  medical_superintendent:     { icon: 'shield',      greet: 'Medical Superintendent',    tagline: 'Lead clinical operations for your hospital.' },
-  hrio:                       { icon: 'record',      greet: 'Health Records',            tagline: 'Own data quality and DHIS2 reporting.' },
-  nutritionist:               { icon: 'heart',       greet: 'Nutrition',                 tagline: 'Assess, counsel, and track nutrition programs.' },
-  radiologist:                { icon: 'scan',        greet: 'Imaging',                   tagline: 'Read studies and publish imaging reports.' },
-  hospital_manager:           { icon: 'building',    greet: 'Hospital Management',       tagline: 'Run facility operations, finance, and HR.' },
-  medical_biller:             { icon: 'record',      greet: 'Billing & Claims',          tagline: 'Submit claims and manage collections.' },
-  central_registration_clerk: { icon: 'user',        greet: 'Registration Clerk',        tagline: 'Register patients, route them, run facility checkout.' },
-  clinic_clerk:               { icon: 'user',        greet: 'Clinic Clerk',              tagline: 'Clinic check-in, queue, and follow-up scheduling.' },
-  triage_nurse:               { icon: 'heart',       greet: 'Triage Nurse',              tagline: 'Assess acuity and route patients safely.' },
-  rooming_nurse:              { icon: 'heart',       greet: 'Rooming Nurse',             tagline: 'Room patients, take vitals, prepare for the clinician.' },
-  clinician:                  { icon: 'stethoscope', greet: 'Welcome, Clinician',        tagline: 'Consult, order, prescribe, and refer.' },
-  records_hmis_officer:       { icon: 'record',      greet: 'Records / HMIS Officer',    tagline: 'Data quality, registers, and DHIS2 reporting.' },
-  facility_administrator:     { icon: 'shield',      greet: 'Facility Administrator',    tagline: 'Users, configuration, and facility oversight.' },
-};
-
 // Real display names for each demo account (from the seed roster).
 const ACCOUNT_NAME: Record<string, string> = {
   'chv.ajak': 'Ajak Deng Mawien',
@@ -247,7 +212,6 @@ export default function LoginPage() {
   // ─────────────────────────── Per-user split sign-in ───────────────────────────
   if (selected) {
     const acc = selected === 'manual' ? null : selected;
-    const profile = acc ? ROLE_PROFILE[acc.roleKey] : null;
     const idx = acc ? demoAccounts.findIndex(a => a.user === acc.user) : -1;
     const hero = acc ? imageForIndex(idx) : '/assets/landing-img.jpg';
     const fullName = acc ? (ACCOUNT_NAME[acc.user] || acc.role) : '';
@@ -266,11 +230,6 @@ export default function LoginPage() {
             </header>
 
             <div className="tl-form-wrap">
-              {acc && (
-                <span className="tl-role-chip">
-                  <Icon name={(profile?.icon ?? 'user') as IconName} size={16} color={ACCENT_DEEP} />
-                </span>
-              )}
               <h1 className="tl-title">{acc ? 'Welcome back' : 'Sign in'}</h1>
               <p className="tl-subtitle">
                 {acc ? `${acc.role} · ${acc.desc}` : 'Enter your account credentials'}
@@ -485,9 +444,11 @@ const sharedStyles = (
     .tl-pane { padding: 30px 38px; display: flex; flex-direction: column; overflow-y: auto; }
     .tl-form-wrap { margin: auto 0; width: 100%; max-width: 380px; align-self: center; }
     .tl-form-pane { position: relative; }
+    /* Keep the logo in the same centered 380px column as the form body so its
+       left edge lines up with "Welcome back" and the fields (not the pane edge). */
+    .tl-form-pane .tl-brand { width: 100%; max-width: 380px; align-self: center; }
     .tl-form-close { display: none; position: absolute; top: 18px; right: 18px; z-index: 3; width: 38px; height: 38px; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #e2e8f0; background: #fff; color: #0f172a; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
     .tl-form-close:hover { background: #f8fafc; }
-    .tl-role-chip { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.22); margin-bottom: 14px; }
     .tl-form-wrap .tl-title { margin-top: 4px; }
     .tl-form { display: flex; flex-direction: column; gap: 14px; margin-top: 22px; }
     .tl-field { display: flex; flex-direction: column; gap: 7px; }

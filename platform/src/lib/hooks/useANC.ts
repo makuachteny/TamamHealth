@@ -51,5 +51,12 @@ export function useANC() {
     return doc;
   }, [load]);
 
-  return { visits, stats, loading, error, register, reload: load };
+  const update = useCallback(async (id: string, data: Partial<ANCVisitDoc>) => {
+    const { updateANCVisit } = await import('../services/anc-service');
+    const doc = await updateANCVisit(id, data);
+    await load();
+    return doc;
+  }, [load]);
+
+  return { visits, stats, loading, error, register, update, reload: load };
 }

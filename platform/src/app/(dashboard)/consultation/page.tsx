@@ -2,19 +2,18 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { LabResultDoc } from '@/lib/db-types';
+import type { LabResultDoc, OrderSetDoc } from '@/lib/db-types';
 import { labTier, specimenFor } from '@/lib/clinical-flow/lab-catalog';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { estimateDispenseQuantity } from '@/lib/clinical-flow/dispense-quantity';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import {
   ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Check, Search,
   Stethoscope, Thermometer, ClipboardList,
   FlaskConical, Pill, Calendar, Building2, FileText,
   X, AlertTriangle, UserSearch, Brain,
-  ShieldAlert, Paperclip, Clock,
-  Mic,
+  ShieldAlert, Paperclip,
+  Mic, Wallet,
 } from '@/components/icons/lucide';
 import { medications } from '@/data/mock';
 import type { Attachment } from '@/data/mock';
@@ -27,10 +26,17 @@ import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useTriage } from '@/lib/hooks/useTriage';
+import { useOrderSets } from '@/lib/hooks/useOrderSets';
+import { checkInteractions, checkAllergies, checkAllergiesStructured, findDuplicateMedications } from '@/lib/services/drug-interaction-service';
+import Modal from '@/components/Modal';
 import { useApp } from '@/lib/context';
+import { isProviderRole, isClinicalAuthorRole } from '@/lib/clinical-roles';
+import type { SuperbillPreview } from '@/lib/services/superbill-service';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { patientAgeLabel } from '@/lib/patient-utils';
+import { patientAgeLabel, patientFullName } from '@/lib/patient-utils';
+import { formatMoney } from '@/lib/format-utils';
 import PatientName from '@/components/PatientName';
+import { Icon as DuotoneInfoIcon } from '@/components/icons';
 import { useToast } from '@/components/Toast';
 import { ROS_SYSTEMS, CHRONIC_CONDITIONS, SMOKING_OPTIONS, ALCOHOL_OPTIONS, SES_OPTIONS } from '@/lib/clinical-history';
 import { saveDraft, loadDraft, dropDraft } from '@/lib/draft-storage';
@@ -150,7 +156,9 @@ export default function ConsultationPage() {
   const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
   const draftKey = (pid: string | null) => (pid ? `consultation:${pid}` : null);
   const [draftRestored, setDraftRestored] = useState(false);
-  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  // Only the setter is consumed (draft-save timestamp is recorded but the
+  // header no longer reads it after the PageHeader refactor).
+  const [, setDraftSavedAt] = useState<string | null>(null);
   const [restorePromptFor, setRestorePromptFor] = useState<{ key: string; savedAt: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextAutosave = useRef(false);
@@ -257,6 +265,12 @@ export default function ConsultationPage() {
   const [complaints, setComplaints] = useState<string[]>([]);
   const [complaintInput, setComplaintInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  // Sign (attest + lock) the consultation note on completion — the Centricity
+  // "provider signs their own encounter" step. Default on for clinicians.
+  const [signOnComplete, setSignOnComplete] = useState(true);
+  // Read-only fee-ticket preview shown on the final step so the clinician sees
+  // the charges that completing the visit will post (P2.3 consultation checkout).
+  const [chargePreview, setChargePreview] = useState<SuperbillPreview | null>(null);
   const [sendingLabs, setSendingLabs] = useState(false);
   const [sendingRx, setSendingRx] = useState(false);
   // Prescriptions already pushed to the pharmacy queue mid-visit, tracked by a
@@ -277,6 +291,9 @@ export default function ConsultationPage() {
     weight: '',
     height: '',
     muac: '',
+    painScore: '',
+    bloodGlucose: '',
+    gcs: '',
   });
 
   // Physical Examination
@@ -297,6 +314,10 @@ export default function ConsultationPage() {
   const [prescriptions, setPrescriptions] = useState<PrescriptionEntry[]>([]);
   const [rxMedSearch, setRxMedSearch] = useState('');
   const [showRxDropdown, setShowRxDropdown] = useState(false);
+
+  // Order sets / clinical protocols
+  const { orderSets } = useOrderSets();
+  const [showProtocolPicker, setShowProtocolPicker] = useState(false);
 
   // Lab Orders
   const [labOrders, setLabOrders] = useState<Record<string, boolean>>(
@@ -480,19 +501,90 @@ export default function ConsultationPage() {
     referralHospital, referralUrgency, referralReason,
   ]);
 
+  const toggleSection = (index: number) => {
+    setOpenSections(prev => prev.map((v, i) => (i === index ? !v : v)));
+  };
+
+  // Patient filtering
+  const filteredPatients = patientSearch.length >= 1
+    ? patients.filter(p =>
+        formatPatientName(p).toLowerCase().includes(patientSearch.toLowerCase()) ||
+        p.hospitalNumber.toLowerCase().includes(patientSearch.toLowerCase())
+      ).slice(0, 8)
+    : [];
+
+  const selectedPatientData = selectedPatient ? patients.find(p => p._id === selectedPatient) : null;
+
+  // Prescribing safety screen (clinical decision support): drug–drug
+  // interactions, drug–allergy conflicts (class-aware), and duplicate orders,
+  // recomputed as the clinician edits the prescription list. Advisory, not
+  // blocking — emergencies must never be gated on an alert.
+  const rxSafety = useMemo(() => {
+    const meds = prescriptions.map(p => p.medication).filter(Boolean);
+    // Prefer structured allergies (criticality-aware) when the patient has them;
+    // fold in any allergies free-typed during this visit's drug history. Falls
+    // back to the legacy string list for patients not yet migrated.
+    const structured = (selectedPatientData?.structuredAllergies || []);
+    const historyAllergies = (history.dhAllergies ? history.dhAllergies.split(',').map(s => s.trim()) : []).filter(Boolean);
+    let allergyAlerts;
+    if (structured.length > 0) {
+      const fromHistory = historyAllergies.map(substance => ({ substance, criticality: 'unknown' as const, status: 'active' }));
+      allergyAlerts = checkAllergiesStructured(meds, [...structured, ...fromHistory]);
+    } else {
+      const allergyList = [
+        ...(((selectedPatientData?.allergies as string[] | undefined)) || []),
+        ...historyAllergies,
+      ].filter(Boolean);
+      allergyAlerts = checkAllergies(meds, allergyList);
+    }
+    return {
+      interactions: checkInteractions(meds),
+      allergyAlerts,
+      duplicates: findDuplicateMedications(meds),
+    };
+  }, [prescriptions, selectedPatientData, history.dhAllergies]);
+  const hasRxWarnings = rxSafety.interactions.hasInteractions || rxSafety.allergyAlerts.length > 0 || rxSafety.duplicates.length > 0;
+  /** True when any allergy alert is a severe-criticality match needing override. */
+  const hasSevereAllergyAlert = rxSafety.allergyAlerts.some(
+    (a): a is typeof a & { requiresOverride: boolean } => 'requiresOverride' in a && a.requiresOverride === true,
+  );
+
+  // Price the visit's services (consultation + ordered labs + prescriptions)
+  // from the fee schedule so the clinician can review the fee ticket before
+  // completing. Read-only — the actual charges are posted by handleSubmit.
+  useEffect(() => {
+    if (!selectedPatient) { setChargePreview(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { buildSuperbillPreview } = await import('@/lib/services/superbill-service');
+        const selectedLabTests = Object.entries(labOrders).filter(([, c]) => c).map(([n]) => n);
+        const selections = [
+          { category: 'consultation' as const, serviceCode: 'CONS-GEN', description: 'Consultation' },
+          ...selectedLabTests.map(tn => ({ category: 'laboratory' as const, serviceCode: tn, description: tn })),
+          ...prescriptions.map(rx => ({ category: 'pharmacy' as const, serviceCode: rx.medication, description: rx.medication })),
+        ];
+        const preview = await buildSuperbillPreview(selections, { orgId: currentUser?.orgId, hospitalId: currentUser?.hospitalId, role: currentUser?.role || 'doctor' });
+        if (!cancelled) setChargePreview(preview);
+      } catch { if (!cancelled) setChargePreview(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedPatient, labOrders, prescriptions, currentUser?.orgId, currentUser?.hospitalId, currentUser?.role]);
+
   // Only roles with the consultation capability (doctor, clinical officer,
   // clinician, medical superintendent) can create consultations. Gating on
   // canConsult keeps this consistent with the capability model and the route
   // allow-list — front desk and other non-clinical roles are blocked here.
+  // NOTE: this early return MUST stay below every hook above so the hooks run
+  // unconditionally on every render (react-hooks/rules-of-hooks).
   if (currentUser && !canConsult) {
     return (
       <>
-        <TopBar title={t('action.newConsultation')} />
+        <TopBar title={t('action.newConsultation')} hideSearch />
         <main className="page-container flex items-center justify-center">
           <div className="text-center max-w-md">
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{
-              background: 'rgba(229,46,66,0.1)',
-              border: '1px solid rgba(229,46,66,0.2)',
+              background: 'transparent',
             }}>
               <ShieldAlert className="w-8 h-8" style={{ color: 'var(--color-danger)' }} />
             </div>
@@ -511,20 +603,6 @@ export default function ConsultationPage() {
       </>
     );
   }
-
-  const toggleSection = (index: number) => {
-    setOpenSections(prev => prev.map((v, i) => (i === index ? !v : v)));
-  };
-
-  // Patient filtering
-  const filteredPatients = patientSearch.length >= 1
-    ? patients.filter(p =>
-        formatPatientName(p).toLowerCase().includes(patientSearch.toLowerCase()) ||
-        p.hospitalNumber.toLowerCase().includes(patientSearch.toLowerCase())
-      ).slice(0, 8)
-    : [];
-
-  const selectedPatientData = selectedPatient ? patients.find(p => p._id === selectedPatient) : null;
 
   // ICD-11 filtering
   const filteredICD = diagSearch.length >= 1
@@ -578,6 +656,16 @@ export default function ConsultationPage() {
   };
 
   const removePrescription = (index: number) => {
+    // A prescription already pushed to the pharmacy queue can't be recalled
+    // from here (no recall transition exists from received_in_pharmacy_queue),
+    // so confirm before dropping it locally — the pharmacy order persists and
+    // the pharmacist must be told. Fresh, un-sent rows remove silently.
+    const rx = prescriptions[index];
+    if (rx && sentRxSignatures.includes(rxSignature(rx)) && typeof window !== 'undefined') {
+      if (!window.confirm(`${rx.medication} was already sent to the pharmacy. Removing it here won't recall the pharmacy order — tell the pharmacist to cancel it. Remove from this consultation?`)) {
+        return;
+      }
+    }
     setPrescriptions(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -598,6 +686,16 @@ export default function ConsultationPage() {
     setComplaints(next);
     setChiefComplaint(next.join('; '));
   };
+  // Edit a complaint before the consultation is saved: pull it back into the
+  // input for amendment and drop the original from the list (re-added on save).
+  const editComplaint = (idx: number) => {
+    const value = complaints[idx];
+    if (value == null) return;
+    const next = complaints.filter((_, i) => i !== idx);
+    setComplaints(next);
+    setChiefComplaint(next.join('; '));
+    setComplaintInput(value);
+  };
 
   // Doctor-written specific investigation (per the "special lab" workflow).
   const addCustomLab = () => {
@@ -605,6 +703,56 @@ export default function ConsultationPage() {
     if (!name) return;
     setLabOrders(prev => ({ ...prev, [name]: true }));
     setCustomLab('');
+  };
+
+  // Apply a clinical protocol / order set: merge its labs, medications,
+  // suggested diagnoses, and plan text into the in-progress consultation.
+  // Additive and non-destructive — the clinician can still edit or remove
+  // anything afterward, and duplicates are de-duplicated.
+  const applyOrderSet = (os: OrderSetDoc) => {
+    if (os.labs?.length) {
+      setLabOrders(prev => ({
+        ...prev,
+        ...Object.fromEntries(os.labs!.map(name => [name, true])),
+      }));
+    }
+    if (os.medications?.length) {
+      setPrescriptions(prev => {
+        const existing = new Set(prev.map(p => p.medication.toLowerCase()));
+        const additions: PrescriptionEntry[] = os.medications!
+          .filter(m => !existing.has(m.medication.toLowerCase()))
+          .map(m => ({
+            medication: m.medication,
+            dose: m.dose || '',
+            route: m.route || 'Oral',
+            frequency: m.frequency || '',
+            duration: m.duration || '',
+            instructions: m.instructions || '',
+            urgency: m.urgency || 'definitive',
+          }));
+        return [...prev, ...additions];
+      });
+    }
+    if (os.diagnoses?.length) {
+      setDiagnoses(prev => {
+        const seen = new Set(prev.map(d => (d.code || d.name).toLowerCase()));
+        const additions: DiagnosisEntry[] = os.diagnoses!
+          .filter(d => !seen.has((d.code || d.label).toLowerCase()))
+          .map((d, i) => ({
+            code: d.code || '',
+            name: d.label,
+            type: prev.length === 0 && i === 0 ? 'primary' : 'secondary',
+            certainty: 'suspected',
+            severity: 'moderate',
+          }));
+        return [...prev, ...additions];
+      });
+    }
+    if (os.planText) {
+      setTreatmentPlan(prev => (prev.trim() ? `${prev.trim()}\n\n${os.planText}` : os.planText!));
+    }
+    setShowProtocolPicker(false);
+    showToast(`Applied protocol: ${os.name}`, 'success');
   };
 
   // Send the selected investigations to the lab and pause the visit as
@@ -634,7 +782,7 @@ export default function ConsultationPage() {
     const patientData = patients.find(p => p._id === selectedPatient);
     const created = await enc.createEncounter({
       patientId: selectedPatient,
-      patientName: patientData ? `${patientData.firstName} ${patientData.surname}` : '',
+      patientName: patientData ? patientFullName(patientData) : '',
       hospitalNumber: patientData?.hospitalNumber || '',
       clinicianId: currentUser?._id || '',
       clinicianName: currentUser?.name || '',
@@ -678,7 +826,7 @@ export default function ConsultationPage() {
     setSendingLabs(true);
     const hospital = currentUser?.hospital;
     const patientData = patients.find(p => p._id === selectedPatient);
-    const patientName = patientData ? `${patientData.firstName} ${patientData.surname}` : '';
+    const patientName = patientData ? patientFullName(patientData) : '';
     const hospitalNumber = patientData?.hospitalNumber || '';
     const hospitalId = currentUser?.hospitalId || '';
     const hospitalName = hospital?.name || currentUser?.hospitalName || '';
@@ -780,7 +928,7 @@ export default function ConsultationPage() {
     setSendingRx(true);
     const hospital = currentUser?.hospital;
     const patientData = patients.find(p => p._id === selectedPatient);
-    const patientName = patientData ? `${patientData.firstName} ${patientData.surname}` : '';
+    const patientName = patientData ? patientFullName(patientData) : '';
     const hospitalId = currentUser?.hospitalId || '';
     const hospitalName = hospital?.name || currentUser?.hospitalName || '';
     try {
@@ -869,7 +1017,7 @@ export default function ConsultationPage() {
     const weight = parseFloat(vitals.weight) || 0;
     const height = parseFloat(vitals.height) || 0;
     const patientData = patients.find(p => p._id === selectedPatient);
-    const patientName = patientData ? `${patientData.firstName} ${patientData.surname}` : '';
+    const patientName = patientData ? patientFullName(patientData) : '';
     const hospitalNumber = patientData?.hospitalNumber || '';
     const hospitalId = currentUser?.hospitalId || '';
     const hospitalName = hospital?.name || currentUser?.hospitalName || '';
@@ -1030,6 +1178,9 @@ export default function ConsultationPage() {
           height,
           bmi: weight && height ? parseFloat((weight / ((height / 100) ** 2)).toFixed(1)) : 0,
           muac: parseFloat(vitals.muac) || undefined,
+          painScore: parseInt(vitals.painScore) || undefined,
+          bloodGlucose: parseFloat(vitals.bloodGlucose) || undefined,
+          gcs: parseInt(vitals.gcs) || undefined,
           recordedAt: now,
         },
         diagnoses: diagnoses.map(d => ({ icd10Code: d.code, name: d.name, type: d.type, certainty: d.certainty, severity: d.severity })),
@@ -1060,6 +1211,24 @@ export default function ConsultationPage() {
       // second one.
       if (activeEncounterId && savedRecord?._id && !existingRecordId) {
         try { await updateEncounter(activeEncounterId, { medicalRecordId: savedRecord._id }); } catch { /* non-fatal */ }
+      }
+
+      // Sign (attest + lock) the note on completion if the clinician opted in.
+      // A provider signs as final; a supervised trainee (e.g. clinical officer)
+      // signs and routes to a supervising provider for co-signature. Non-fatal:
+      // if it fails, the visit still saves and the note can be signed from the
+      // chart. Already-signed records (resumed visits) are left untouched.
+      if (savedRecord?._id && signOnComplete && isClinicalAuthorRole(currentUser?.role)) {
+        try {
+          const { signMedicalRecord } = await import('@/lib/services/medical-record-service');
+          await signMedicalRecord(
+            savedRecord._id,
+            { userId: currentUser?._id, userName: currentUser?.name || currentUser?.username || '', userRole: currentUser?.role },
+            { awaitingCosign: !isProviderRole(currentUser?.role) },
+          );
+        } catch {
+          postWarnings.push('Visit saved but the note could not be signed automatically — sign it from the patient chart.');
+        }
       }
       failedStage = 'finalising the visit';
 
@@ -1320,6 +1489,7 @@ export default function ConsultationPage() {
     const v = extraction.vitals;
     if (Object.values(v).some(val => val)) {
       setVitals(prev => ({
+        ...prev,
         temperature: v.temperature || prev.temperature,
         systolic: v.systolic || prev.systolic,
         diastolic: v.diastolic || prev.diastolic,
@@ -1455,7 +1625,7 @@ export default function ConsultationPage() {
         style={{ borderBottom: openSections[index] ? '1px solid var(--border-light)' : 'none' }}
       >
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(59, 130, 246,0.10)' }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
             <Icon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
           </div>
           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</span>
@@ -1520,11 +1690,25 @@ export default function ConsultationPage() {
 
   return (
     <>
-      <TopBar title={t('action.newConsultation')} />
+      <TopBar title={t('action.newConsultation')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-          <button onClick={() => router.push('/patients')} className="flex items-center gap-1.5 text-sm mb-4" style={{ color: 'var(--accent-primary)' }}>
-            <ArrowLeft className="w-4 h-4" /> {t('consultation.backToPatients')}
-          </button>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <button onClick={() => router.push('/patients')} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--accent-primary)' }}>
+              <ArrowLeft className="w-4 h-4" /> {t('consultation.backToPatients')}
+            </button>
+            <button
+              onClick={() => setScribeOpen(!scribeOpen)}
+              className="btn btn-sm flex items-center gap-2"
+              style={{
+                background: scribeOpen ? 'rgba(229,46,66,0.12)' : 'rgba(59, 130, 246,0.10)',
+                color: scribeOpen ? 'var(--color-danger)' : 'var(--accent-primary)',
+                border: `1px solid ${scribeOpen ? 'rgba(229,46,66,0.2)' : 'rgba(59, 130, 246,0.2)'}`,
+              }}
+            >
+              <Mic className="w-4 h-4" />
+              {scribeOpen ? t('consultation.closeScribe') : t('consultation.aiScribe')}
+            </button>
+          </div>
 
           {/* Draft restore banner */}
           {restorePromptFor && (
@@ -1535,7 +1719,7 @@ export default function ConsultationPage() {
                 border: '1px solid var(--accent-border, rgba(59, 130, 246,0.25))',
               }}
             >
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#fff' }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent' }}>
                 <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <div className="flex-1 min-w-[180px]">
@@ -1561,26 +1745,6 @@ export default function ConsultationPage() {
             </div>
           )}
 
-          <PageHeader
-            icon={Stethoscope}
-            title={t('consultation.pageTitle')}
-            subtitle={draftSavedAt && !restorePromptFor ? t('consultation.draftAutoSavedAt', { time: new Date(draftSavedAt).toLocaleTimeString() }) : t('consultation.pageSubtitle')}
-            actions={
-              <button
-                onClick={() => setScribeOpen(!scribeOpen)}
-                className="btn btn-sm flex items-center gap-2"
-                style={{
-                  background: scribeOpen ? 'rgba(229,46,66,0.12)' : 'rgba(59, 130, 246,0.10)',
-                  color: scribeOpen ? 'var(--color-danger)' : 'var(--accent-primary)',
-                  border: `1px solid ${scribeOpen ? 'rgba(229,46,66,0.2)' : 'rgba(59, 130, 246,0.2)'}`,
-                }}
-              >
-                <Mic className="w-4 h-4" />
-                {scribeOpen ? t('consultation.closeScribe') : t('consultation.aiScribe')}
-              </button>
-            }
-          />
-
           {/* Doctor Queue — Triaged patients waiting to be seen */}
           {!selectedPatient && (() => {
             const today = new Date().toISOString().slice(0, 10);
@@ -1594,7 +1758,7 @@ export default function ConsultationPage() {
             return (
               <div className="card-elevated p-4 mb-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.1)' }}>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                     <AlertTriangle className="w-4 h-4" style={{ color: '#EF4444' }} />
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('consultation.patientsWaiting', { count: pendingTriages.length })}</span>
@@ -1602,13 +1766,25 @@ export default function ConsultationPage() {
                 </div>
                 <div className="space-y-1.5">
                   {pendingTriages.slice(0, 6).map(triage => {
+                    const PRIO: Record<string, { color: string; bg: string }> = {
+                      RED: { color: '#EF4444', bg: 'rgba(239,68,68,0.12)' },
+                      YELLOW: { color: '#E4A84B', bg: 'rgba(228,168,75,0.16)' },
+                      GREEN: { color: '#1F9D6F', bg: 'rgba(31,157,111,0.12)' },
+                    };
+                    const prio = PRIO[triage.priority] || PRIO.GREEN;
                     return (
                       <button
                         key={triage._id}
                         onClick={() => { setSelectedPatient(triage.patientId); setPatientSearch(''); }}
-                        className="w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-all hover:bg-[var(--accent-light)]"
-                        style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
+                        className="group w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-all hover:bg-[var(--accent-light)]"
+                        style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', borderLeft: `3px solid ${prio.color}` }}
                       >
+                        <span
+                          className="flex-shrink-0 inline-flex items-center justify-center text-[10px] font-bold rounded-md px-2 py-1 uppercase tracking-wide"
+                          style={{ background: prio.bg, color: prio.color, minWidth: 56 }}
+                        >
+                          {triage.priority}
+                        </span>
                         <div className="flex-1 min-w-0">
                           <PatientName name={triage.patientName} size={36} />
                           <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -1630,48 +1806,57 @@ export default function ConsultationPage() {
               search dropdown (which overflows the card) is never hidden behind
               them. Each .card-elevated makes its own stacking context via
               backdrop-filter, so without this the later cards paint on top. */}
-          <div className="card-elevated p-5 mb-4 relative z-50">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(59, 130, 246,0.10)' }}>
-                <UserSearch className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              </div>
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('consultation.selectPatient')}</span>
-            </div>
-
-            {selectedPatientData ? (
-              <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-primary)' }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                    style={{ background: selectedPatientData.gender === 'Male' ? 'var(--accent-primary)' : 'var(--accent-primary)' }}>
-                    {(selectedPatientData.firstName || '?')[0]}{(selectedPatientData.surname || '?')[0]}
-                  </div>
-                  <div>
-                    <button
-                      onClick={() => router.push(`/patients/${selectedPatientData._id}`)}
-                      className="text-sm font-medium text-left hover:underline"
-                      title={t('payments.openPatientRecord')}
-                    >
-                      {formatPatientName(selectedPatientData)}
-                    </button>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {selectedPatientData.hospitalNumber} &middot; {selectedPatientData.gender} &middot; {selectedPatientData.state}
-                    </p>
+          <div className="card-elevated p-3 mb-4 relative z-50">
+            <div className="flex items-center gap-3">
+            {selectedPatientData ? (() => {
+              const demoBits: { icon: 'qr' | 'patient' | 'mapPin'; value: string; accent: string; mono?: boolean }[] = [
+                ...(selectedPatientData.hospitalNumber ? [{ icon: 'qr' as const, value: selectedPatientData.hospitalNumber, accent: '#1E3A8A', mono: true }] : []),
+                { icon: 'patient', value: `${patientAgeLabel(selectedPatientData)} · ${selectedPatientData.gender || '—'}`, accent: 'var(--accent-primary)' },
+                ...(selectedPatientData.state ? [{ icon: 'mapPin' as const, value: selectedPatientData.state, accent: '#1F9D6F' }] : []),
+              ];
+              return (
+              <div className="flex items-center justify-between gap-3 flex-1 p-2 rounded-xl" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-primary)' }}>
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <button
+                    onClick={() => router.push(`/patients/${selectedPatientData._id}`)}
+                    className="text-sm font-semibold text-left hover:underline flex-shrink-0"
+                    title={t('payments.openPatientRecord')}
+                  >
+                    {formatPatientName(selectedPatientData)}
+                  </button>
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    {demoBits.map(bit => (
+                      <span
+                        key={bit.value}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg min-w-0"
+                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}
+                      >
+                        <DuotoneInfoIcon name={bit.icon} size={13} color={bit.accent} accent={bit.accent} />
+                        <span
+                          title={bit.value}
+                          className="truncate"
+                          style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: bit.mono ? 'JetBrains Mono, ui-monospace, monospace' : 'inherit' }}
+                        >
+                          {bit.value}
+                        </span>
+                      </span>
+                    ))}
                   </div>
                 </div>
-                <button onClick={() => { setSelectedPatient(null); setPatientSearch(''); }} className="btn btn-secondary btn-sm">
+                <button onClick={() => { setSelectedPatient(null); setPatientSearch(''); }} className="btn btn-secondary btn-sm flex-shrink-0">
                   {t('consultation.change')}
                 </button>
               </div>
-            ) : (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+              );
+            })() : (
+              <div className="relative flex-1">
                 <input
                   type="search"
-                  placeholder={t('consultation.searchPatientPlaceholder')}
+                  placeholder={t('consultation.selectPatient')}
                   value={patientSearch}
                   onChange={e => { setPatientSearch(e.target.value); setShowPatientDropdown(true); }}
                   onFocus={() => setShowPatientDropdown(true)}
-                  className="pl-9 search-icon-input"
+                  className="search-icon-input"
                   style={{ background: 'var(--overlay-subtle)' }}
                 />
                 {showPatientDropdown && filteredPatients.length > 0 && (
@@ -1684,10 +1869,6 @@ export default function ConsultationPage() {
                           className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
                           style={{ borderBottom: '1px solid var(--border-light)' }}
                         >
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                            style={{ background: p.gender === 'Male' ? 'var(--accent-primary)' : 'var(--accent-primary)' }}>
-                            {(p.firstName || '?')[0]}{(p.surname || '?')[0]}
-                          </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{formatPatientName(p)}</p>
                             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber} &middot; {patientAgeLabel(p)} &middot; {p.gender} &middot; {p.tribe}</p>
@@ -1699,6 +1880,7 @@ export default function ConsultationPage() {
                 )}
               </div>
             )}
+            </div>
           </div>
 
           <div className="flex gap-6 flex-1 min-h-0">
@@ -1722,7 +1904,7 @@ export default function ConsultationPage() {
                 stage is a step with Back/Next below. A tick means the step has
                 data; click any step to jump to it. Fixed at the top of the form
                 column while the step's content scrolls beneath it. */}
-            <div className="card-elevated p-4 flex-shrink-0 mb-3">
+            <div className="card-elevated px-4 py-2.5 flex-shrink-0 mb-3">
               <div className="flex items-center">
                 {workflowStages.map((stage, i) => {
                   const done = stageDone(stage.sections);
@@ -1740,7 +1922,7 @@ export default function ConsultationPage() {
                             ? <Check className="w-4 h-4" />
                             : i + 1}
                         </span>
-                        <span className="text-[10px] mt-1.5 font-medium whitespace-nowrap" style={{ color: isCurrent ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+                        <span className="text-[10px] mt-1 font-medium whitespace-nowrap" style={{ color: isCurrent ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
                           {stage.label}
                         </span>
                       </button>
@@ -1770,10 +1952,9 @@ export default function ConsultationPage() {
                   )}
                   {selectedPatient && todaysTriage && (
                     <div className="flex items-center gap-2 p-2.5 mb-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded" style={{
-                        background: todaysTriage.priority === 'RED' ? 'rgba(229,46,66,0.12)' : todaysTriage.priority === 'YELLOW' ? 'rgba(217,119,6,0.12)' : 'rgba(21,121,92,0.12)',
-                        color: todaysTriage.priority === 'RED' ? 'var(--color-danger)' : todaysTriage.priority === 'YELLOW' ? 'var(--color-warning)' : 'var(--color-success)',
-                      }}>{todaysTriage.priority} priority</span>
+                      <span className="inline-block w-2.5 h-2.5 rounded-full" style={{
+                        background: todaysTriage.priority === 'RED' ? 'var(--color-danger)' : todaysTriage.priority === 'YELLOW' ? 'var(--color-warning)' : 'var(--color-success)',
+                      }} />
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Triaged today — vitals carried over below.</span>
                     </div>
                   )}
@@ -1784,7 +1965,8 @@ export default function ConsultationPage() {
                         <div key={i} className="flex items-center gap-2 p-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                           <span className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: 'var(--accent-light)', color: 'var(--accent-text)' }}>{i + 1}</span>
                           <span className="flex-1 text-sm" style={{ color: 'var(--text-primary)' }}>{c}</span>
-                          <button type="button" aria-label="Remove" onClick={() => removeComplaint(i)} className="p-1 rounded" style={{ color: 'var(--color-danger)' }}><X className="w-4 h-4" /></button>
+                          <button type="button" aria-label={t('action.edit')} title={t('action.edit')} onClick={() => editComplaint(i)} className="text-[11px] font-semibold px-1.5 py-1 rounded" style={{ color: 'var(--accent-text)' }}>{t('action.edit')}</button>
+                          <button type="button" aria-label={t('action.remove')} title={t('action.remove')} onClick={() => removeComplaint(i)} className="p-1 rounded" style={{ color: 'var(--color-danger)' }}><X className="w-4 h-4" /></button>
                         </div>
                       ))}
                     </div>
@@ -1866,6 +2048,24 @@ export default function ConsultationPage() {
                       <input type="number" step="0.1" value={vitals.muac}
                         onChange={e => setVitals(v => ({ ...v, muac: e.target.value }))}
                         placeholder="e.g. 14.5" />
+                    </div>
+                    <div>
+                      <label>{t('consultation.vitalPainScore')}</label>
+                      <input type="number" min="0" max="10" value={vitals.painScore}
+                        onChange={e => setVitals(v => ({ ...v, painScore: e.target.value }))}
+                        placeholder="e.g. 3" />
+                    </div>
+                    <div>
+                      <label>{t('consultation.vitalBloodGlucose')}</label>
+                      <input type="number" step="0.1" value={vitals.bloodGlucose}
+                        onChange={e => setVitals(v => ({ ...v, bloodGlucose: e.target.value }))}
+                        placeholder="e.g. 5.5" />
+                    </div>
+                    <div>
+                      <label>{t('consultation.vitalGcs')}</label>
+                      <input type="number" min="3" max="15" value={vitals.gcs}
+                        onChange={e => setVitals(v => ({ ...v, gcs: e.target.value }))}
+                        placeholder="e.g. 15" />
                     </div>
                   </div>
                   {vitals.weight && vitals.height && (
@@ -2005,8 +2205,15 @@ export default function ConsultationPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Review of systems</label>
-                      <button type="button" onClick={() => setRos(prev => { const next = { ...prev }; for (const s of ROS_SYSTEMS) { if (!next[s.key]) next[s.key] = { status: 'negative', findings: '' }; } return next; })}
-                        className="text-[11px] font-semibold" style={{ color: 'var(--accent-text)' }}>Mark all negative</button>
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setRos(prev => { const next = { ...prev }; for (const s of ROS_SYSTEMS) { if (!next[s.key]) next[s.key] = { status: 'negative', findings: '' }; } return next; })}
+                          className="text-[11px] font-semibold" style={{ color: 'var(--accent-text)' }}>Mark all negative</button>
+                        {Object.keys(ros).length > 0 && (
+                          // Inverse of the bulk action above — clears every ROS selection.
+                          <button type="button" onClick={() => setRos({})}
+                            className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>{t('action.clear')}</button>
+                        )}
+                      </div>
                     </div>
                     <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-light)' }}>
                       {ROS_SYSTEMS.map((s, idx) => {
@@ -2033,7 +2240,17 @@ export default function ConsultationPage() {
                                   const accent = st === 'positive' ? 'var(--color-warning)' : 'var(--accent-primary)';
                                   return (
                                     <button key={st} type="button"
-                                      onClick={() => setRos(prev => ({ ...prev, [s.key]: { status: st, findings: prev[s.key]?.findings || '' } }))}
+                                      // Re-clicking the active option deselects it, clearing this
+                                      // system back to "not assessed" — reversible toggle.
+                                      title={active ? t('action.deselect') : undefined}
+                                      onClick={() => setRos(prev => {
+                                        if (active) {
+                                          const next = { ...prev };
+                                          delete next[s.key];
+                                          return next;
+                                        }
+                                        return { ...prev, [s.key]: { status: st, findings: prev[s.key]?.findings || '' } };
+                                      })}
                                       className="text-[11px] font-semibold px-3 py-1 rounded-md transition-colors"
                                       style={{ background: active ? accent : 'transparent', color: active ? '#fff' : 'var(--text-muted)' }}>
                                       {st === 'negative' ? 'No symptoms' : 'Positive'}
@@ -2145,6 +2362,44 @@ export default function ConsultationPage() {
               <SectionHeader index={5} />
               {openSections[5] && (
                 <div className="p-5">
+                  {/* Prescribing safety advisories (CDS): allergy, interaction, duplicate */}
+                  {hasRxWarnings && (
+                    <div className="mb-4 rounded-lg overflow-hidden" style={{ border: '1px solid var(--color-danger)', background: 'var(--color-danger-bg)' }}>
+                      <div className="flex items-center gap-2 px-4 py-2" style={{ borderBottom: '1px solid var(--color-danger)' }}>
+                        <ShieldAlert className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
+                        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--color-danger)' }}>Prescribing safety check</span>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {hasSevereAllergyAlert && (
+                          <div className="text-xs font-bold rounded-md px-2.5 py-1.5" style={{ background: 'var(--color-danger)', color: '#fff' }}>
+                            ⛔ SEVERE allergy conflict — confirm an override reason before prescribing.
+                          </div>
+                        )}
+                        {rxSafety.allergyAlerts.map((a, i) => {
+                          const crit = 'criticality' in a ? (a as { criticality?: string }).criticality : undefined;
+                          const reaction = 'reaction' in a ? (a as { reaction?: string }).reaction : undefined;
+                          return (
+                          <div key={`al-${i}`} className="text-xs" style={{ color: 'var(--text-primary)' }}>
+                            <span className="font-bold" style={{ color: 'var(--color-danger)' }}>⚠ Allergy{crit && crit !== 'unknown' ? ` (${crit})` : ''}:</span> {a.medication} conflicts with recorded allergy &ldquo;{a.allergy}&rdquo;{a.reason === 'class' ? ' (same drug class)' : ''}{reaction ? ` — reaction: ${reaction}` : ''}.
+                          </div>
+                          );
+                        })}
+                        {rxSafety.interactions.interactions.map((it, i) => (
+                          <div key={`ix-${i}`} className="text-xs" style={{ color: 'var(--text-primary)' }}>
+                            <span className="font-bold" style={{ color: it.severity === 'contraindicated' ? 'var(--color-danger)' : 'var(--color-warning)' }}>
+                              ⚠ {it.severity === 'contraindicated' ? 'Contraindicated' : it.severity === 'serious' ? 'Serious interaction' : 'Interaction'}:
+                            </span> {it.drug1} + {it.drug2} — {it.description} <em style={{ color: 'var(--text-muted)' }}>{it.clinicalAdvice}</em>
+                          </div>
+                        ))}
+                        {rxSafety.duplicates.map((d, i) => (
+                          <div key={`dp-${i}`} className="text-xs" style={{ color: 'var(--text-primary)' }}>
+                            <span className="font-bold" style={{ color: 'var(--color-warning)' }}>⚠ Duplicate:</span> {d} appears more than once on this order.
+                          </div>
+                        ))}
+                        <div className="text-[10px] pt-1" style={{ color: 'var(--text-muted)' }}>Advisory only — review and override using clinical judgement.</div>
+                      </div>
+                    </div>
+                  )}
                   {/* Medication Search */}
                   <div className="relative mb-4">
                     <label>{t('consultation.searchMedicationLabel')}</label>
@@ -2303,7 +2558,7 @@ export default function ConsultationPage() {
                                 </span>
                               ) : (
                                 <span className="text-[10px] font-semibold uppercase tracking-wider inline-flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                                  <Clock className="w-3 h-3" /> Pending
+                                  Pending
                                 </span>
                               )}
                             </div>
@@ -2314,9 +2569,67 @@ export default function ConsultationPage() {
                   )}
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('consultation.selectTestsHint')}</p>
 
+                  {/* Apply a clinical protocol / order set — fills labs, meds, diagnoses, plan in one tap */}
+                  {orderSets.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowProtocolPicker(true)}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                      style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }}
+                    >
+                      <ClipboardList className="w-4 h-4" />
+                      Apply clinical protocol
+                    </button>
+                  )}
+
+                  {showProtocolPicker && (
+                    <Modal onClose={() => setShowProtocolPicker(false)} width={560}>
+                      <div className="modal-panel" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-3">
+                            <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                              <ClipboardList className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                            </div>
+                            <h3 className="text-base font-semibold">Clinical protocols</h3>
+                          </div>
+                          <button onClick={() => setShowProtocolPicker(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+                          Applying a protocol adds its labs, medications, suggested diagnoses, and plan to this consultation. You can edit or remove anything afterward.
+                        </p>
+                        <div className="space-y-2" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                          {orderSets.map(os => (
+                            <button
+                              key={os._id}
+                              type="button"
+                              onClick={() => applyOrderSet(os)}
+                              className="w-full text-left p-3 rounded-lg transition-colors"
+                              style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{os.name}</span>
+                                {os.source && (
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>{os.source}</span>
+                                )}
+                              </div>
+                              {os.description && (
+                                <div className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>{os.description}</div>
+                              )}
+                              <div className="text-[11px] mt-1.5" style={{ color: 'var(--text-secondary)' }}>
+                                {(os.labs?.length || 0)} lab{(os.labs?.length || 0) === 1 ? '' : 's'} · {(os.medications?.length || 0)} medication{(os.medications?.length || 0) === 1 ? '' : 's'}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </Modal>
+                  )}
+
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Basic panel</div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 keep-cols">
                       {basicLabs.map(test => (
                         <label key={test} className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
                           style={{ background: labOrders[test] ? 'rgba(59, 130, 246,0.10)' : 'var(--overlay-subtle)', border: `1px solid ${labOrders[test] ? 'var(--accent-primary)' : 'var(--border-light)'}` }}>
@@ -2332,7 +2645,7 @@ export default function ConsultationPage() {
 
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Special investigations</div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 keep-cols">
                       {specialLabs.map(test => (
                         <label key={test} className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
                           style={{ background: labOrders[test] ? 'rgba(59, 130, 246,0.10)' : 'var(--overlay-subtle)', border: `1px solid ${labOrders[test] ? 'var(--accent-primary)' : 'var(--border-light)'}` }}>
@@ -2501,6 +2814,35 @@ export default function ConsultationPage() {
               )}
             </div>
 
+            {/* Visit charges (fee ticket) review — shown before completing so the
+                clinician sees what will be billed (P2.3 consultation checkout). */}
+            {isLastStep && chargePreview && chargePreview.lines.length > 0 && (
+              <div className="rounded-xl p-4 mb-2" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold inline-flex items-center gap-2"><Wallet className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} /> Visit charges</h4>
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Posted when you complete the visit</span>
+                </div>
+                <table className="w-full text-[12px]">
+                  <tbody>
+                    {chargePreview.lines.map((l, i) => (
+                      <tr key={i} style={{ borderTop: i ? '1px solid var(--border-light)' : undefined }}>
+                        <td className="py-1.5" style={{ color: 'var(--text-primary)' }}>{l.description}{l.quantity > 1 ? ` ×${l.quantity}` : ''}</td>
+                        <td className="py-1.5 text-right" style={{ color: l.unpriced ? 'var(--color-warning)' : 'var(--text-secondary)' }}>
+                          {l.unpriced ? 'no catalog price' : `${chargePreview.currency} ${l.totalPrice.toLocaleString()}`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex justify-between font-bold text-[13px] mt-2 pt-2" style={{ borderTop: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
+                  <span>Total</span><span>{chargePreview.currency} {chargePreview.total.toLocaleString()}</span>
+                </div>
+                {chargePreview.unpricedCount > 0 && (
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>Items without a catalog price are not billed automatically — add a fee schedule entry to charge them.</p>
+                )}
+              </div>
+            )}
+
             {/* Step navigation — Back / Next, with Complete on the final step */}
             <div className="flex items-center justify-between pt-4 pb-8 border-t" style={{ borderColor: 'var(--border-light)' }}>
               <button onClick={() => step > 0 ? goBack() : router.push('/patients')} className="btn btn-secondary">
@@ -2514,9 +2856,17 @@ export default function ConsultationPage() {
                   {t('patientNew.next')} <ArrowRight className="w-4 h-4" />
                 </button>
               ) : (
-                <button onClick={handleSubmit} disabled={isSaving || !selectedPatient} className="btn btn-primary btn-lg" style={{ opacity: isSaving ? 0.7 : 1 }}>
-                  {isSaving ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('consultation.saving')}</> : <><Check className="w-4 h-4" /> {t('consultation.saveConsultation')}</>}
-                </button>
+                <div className="flex items-center gap-3">
+                  {isClinicalAuthorRole(currentUser?.role) && (
+                    <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: 'var(--text-secondary)' }} title="Attest and lock this note on completion">
+                      <input type="checkbox" checked={signOnComplete} onChange={e => setSignOnComplete(e.target.checked)} />
+                      {isProviderRole(currentUser?.role) ? 'Sign & lock note' : 'Sign & route for co-sign'}
+                    </label>
+                  )}
+                  <button onClick={handleSubmit} disabled={isSaving || !selectedPatient} className="btn btn-primary btn-lg" style={{ opacity: isSaving ? 0.7 : 1 }}>
+                    {isSaving ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('consultation.saving')}</> : <><Check className="w-4 h-4" /> {t('consultation.saveConsultation')}</>}
+                  </button>
+                </div>
               )}
             </div>
             </div>
@@ -2530,10 +2880,6 @@ export default function ConsultationPage() {
                   {/* Patient card */}
                   <div className="card-elevated p-5">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                        style={{ background: selectedPatientData.gender === 'Male' ? 'var(--accent-primary)' : 'var(--accent-primary)' }}>
-                        {(selectedPatientData.firstName || '?')[0]}{(selectedPatientData.surname || '?')[0]}
-                      </div>
                       <div>
                         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                           {selectedPatientData.firstName} {selectedPatientData.surname}
@@ -2603,7 +2949,7 @@ export default function ConsultationPage() {
                     <div className="card-elevated p-4">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Outstanding balance</span>
-                        <span className="text-sm font-bold" style={{ color: 'var(--color-warning)' }}>{patientBalance.toLocaleString()} SSP</span>
+                        <span className="text-sm font-bold" style={{ color: 'var(--color-warning)' }}>{formatMoney(patientBalance)}</span>
                       </div>
                       <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>Collect at checkout — ordering is not blocked.</p>
                     </div>

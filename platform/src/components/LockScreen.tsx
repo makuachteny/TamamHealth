@@ -132,7 +132,7 @@ export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, on
 
         {/* Number pad */}
         <div className="w-full">
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-3 gap-2.5 keep-cols">
             {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(key => (
               <button
                 key={key || 'empty'}

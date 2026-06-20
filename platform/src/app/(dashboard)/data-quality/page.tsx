@@ -1,10 +1,10 @@
 'use client';
 
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useDataQuality } from '@/lib/hooks/useDataQuality';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { Database, Wifi, Users, TrendingUp, BarChart3 } from '@/components/icons/lucide';
+import { Wifi, Users, TrendingUp, BarChart3 } from '@/components/icons/lucide';
+import Badge from '@/components/Badge';
 
 export default function DataQualityPage() {
   const { t } = useTranslation();
@@ -19,12 +19,6 @@ export default function DataQualityPage() {
     <>
       <TopBar title={t('dataQuality.topBarTitle')} />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Database}
-          title={t('dataQuality.headerTitle')}
-          subtitle={t('dataQuality.headerSubtitle')}
-        />
-
         {/* National indicators */}
         <div className="grid grid-cols-2 gap-3 mb-6">
           <div className="card-elevated p-4">
@@ -100,7 +94,8 @@ export default function DataQualityPage() {
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-danger)' }} /> &lt;50%</span>
             </div>
           </div>
-          <table className="data-table">
+          <div className="overflow-x-auto">
+          <table className="data-table" style={{ minWidth: 960 }}>
             <thead>
               <tr>
                 <th>{t('dataQuality.thFacility')}</th>
@@ -134,9 +129,9 @@ export default function DataQualityPage() {
                   </td>
                   <td>
                     {e.hasDHIS2 ? (
-                      <span className="badge badge-normal text-[10px]">{t('dataQuality.yes')}</span>
+                      <Badge tone="success">{t('dataQuality.yes')}</Badge>
                     ) : (
-                      <span className="badge badge-warning text-[10px]">{t('dataQuality.no')}</span>
+                      <Badge tone="warning">{t('dataQuality.no')}</Badge>
                     )}
                   </td>
                   <td className="text-sm text-center">{e.hisStaffCount}</td>
@@ -147,6 +142,7 @@ export default function DataQualityPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </main>
     </>

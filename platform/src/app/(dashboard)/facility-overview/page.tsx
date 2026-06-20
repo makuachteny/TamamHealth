@@ -15,7 +15,6 @@ import { useState, useCallback } from 'react';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import RoleGuard from '@/components/RoleGuard';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useBirths } from '@/lib/hooks/useBirths';
@@ -140,12 +139,6 @@ function FacilityOverview() {
     <>
       <TopBar title="Facility Overview" />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Building2}
-          title={hospital?.name || 'Facility Overview'}
-          subtitle={`${hospital?.state || ''} · Facility management — your facility's data, as reported to the Ministry of Health`}
-        />
-
         {/* ═══ MINISTRY OF HEALTH SUBMISSION GATE ═══ */}
         <div className="card-elevated p-5 mb-4">
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -202,15 +195,27 @@ function FacilityOverview() {
           </div>
         </div>
 
-        {/* ═══ KPI STRIP ═══ */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-          <StatCard icon={Users} label="Patients" value={String(hospital?.patientCount ?? 0)} tint="var(--accent-primary)" />
-          <StatCard icon={BedDouble} label="Beds" value={String(hospital?.totalBeds ?? 0)} tint="var(--color-warning)" />
-          <StatCard icon={Users} label="Clinical Staff" value={String(staff)} tint="var(--accent-primary)" />
-          <StatCard icon={Activity} label="Today's Visits" value={String(hospital?.todayVisits ?? 0)} tint="var(--accent-primary)" />
-          <StatCard icon={ArrowRightLeft} label="Referrals (in / out)" value={`${referralsIn} / ${referralsOut}`} tint="var(--accent-primary)" />
-          <StatCard icon={AlertTriangle} label="Active Alerts" value={String(activeAlerts)} tint={activeAlerts > 0 ? 'var(--color-danger)' : 'var(--color-success)'} />
-          <StatCard icon={CheckCircle} label="Data Quality" value={`${Math.round(dataQuality)}%`} tint={dataQuality >= 80 ? 'var(--color-success)' : dataQuality >= 50 ? 'var(--color-warning)' : 'var(--color-danger)'} />
+        {/* ═══ KEY METRICS — operational stats + vital events & care programs,
+              wrapped in one background card with quick-action style tiles ═══ */}
+        <div className="dash-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Key Metrics</h3>
+            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>· operations &amp; care programs</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+            <StatCard icon={Users} label="Patients" value={String(hospital?.patientCount ?? 0)} tint="var(--accent-primary)" />
+            <StatCard icon={BedDouble} label="Beds" value={String(hospital?.totalBeds ?? 0)} tint="var(--color-warning)" />
+            <StatCard icon={Users} label="Clinical Staff" value={String(staff)} tint="var(--accent-primary)" />
+            <StatCard icon={Activity} label="Today's Visits" value={String(hospital?.todayVisits ?? 0)} tint="var(--accent-primary)" />
+            <StatCard icon={ArrowRightLeft} label="Referrals (in / out)" value={`${referralsIn} / ${referralsOut}`} tint="var(--accent-primary)" />
+            <StatCard icon={AlertTriangle} label="Active Alerts" value={String(activeAlerts)} tint={activeAlerts > 0 ? 'var(--color-danger)' : 'var(--color-success)'} />
+            <StatCard icon={CheckCircle} label="Data Quality" value={`${Math.round(dataQuality)}%`} tint={dataQuality >= 80 ? 'var(--color-success)' : dataQuality >= 50 ? 'var(--color-warning)' : 'var(--color-danger)'} />
+            <StatCard icon={Baby} label="Births Registered" value={String(births.length)} tint="var(--accent-primary)" />
+            <StatCard icon={Skull} label="Deaths Registered" value={String(deaths.length)} tint="var(--text-muted)" />
+            <StatCard icon={HeartPulse} label="ANC Visits" value={String(ancVisits.length)} tint="#ec4899" />
+            <StatCard icon={Syringe} label="Immunizations" value={String(immunizations.length)} tint="#22c55e" />
+          </div>
         </div>
 
         {/* ═══ OPERATIONAL STATUS + PERFORMANCE GAUGES ═══ */}
@@ -261,31 +266,21 @@ function FacilityOverview() {
           )}
         </div>
 
-        {/* ═══ VITAL EVENTS ═══ */}
-        <div className="card-elevated p-5 mt-4 mb-2">
-          <SectionTitle icon={<HeartPulse className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />} title="Vital Events & Care Programs" />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3">
-            <StatCard icon={Baby} label="Births Registered" value={String(births.length)} tint="var(--accent-primary)" />
-            <StatCard icon={Skull} label="Deaths Registered" value={String(deaths.length)} tint="var(--text-muted)" />
-            <StatCard icon={HeartPulse} label="ANC Visits" value={String(ancVisits.length)} tint="#ec4899" />
-            <StatCard icon={Syringe} label="Immunizations" value={String(immunizations.length)} tint="var(--color-success)" />
-          </div>
-        </div>
       </main>
     </>
   );
 }
 
+// Matches the lab / pharmacy KPI tile: card-elevated surface with a small
+// colored icon + tiny UPPERCASE muted label on one line, value beneath.
 function StatCard({ icon: Icon, label, value, tint }: { icon: typeof Users; label: string; value: string; tint: string }) {
   return (
-    <div className="dash-card" style={{ padding: '14px 16px' }}>
-      <div className="flex items-center gap-2 mb-2">
-        <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
-          <Icon className="w-3.5 h-3.5" style={{ color: tint }} />
-        </div>
-        <span className="kpi-card-title">{label}</span>
+    <div className="card-elevated px-3 py-2.5">
+      <div className="flex items-center gap-1.5 mb-1">
+        <Icon className="w-[18px] h-[18px] flex-shrink-0" style={{ color: tint }} />
+        <span className="text-[9px] font-semibold uppercase tracking-wider truncate" style={{ color: 'var(--text-muted)' }}>{label}</span>
       </div>
-      <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800, letterSpacing: '-0.03em' }}>{value}</div>
+      <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{value}</p>
     </div>
   );
 }

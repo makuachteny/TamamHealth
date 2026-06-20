@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowUpRight, ArrowDownLeft } from '@/components/icons/lucide';
-import { getMethodConfig } from '@/lib/payment-method-config';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface PaymentHistoryTimelineProps {
@@ -45,8 +43,6 @@ export default function PaymentHistoryTimeline({ patientId, limit = 20 }: Paymen
     <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {entries.map((entry, i) => {
         const isCredit = entry.amount < 0;
-        const methodConfig = getMethodConfig(entry.method || '');
-        const Icon = methodConfig.icon || (isCredit ? ArrowDownLeft : ArrowUpRight);
         const color = entry.entryType === 'refund' ? 'var(--warning)' : isCredit ? 'var(--success)' : 'var(--text-primary)';
         const date = new Date(entry.createdAt);
         const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -57,9 +53,6 @@ export default function PaymentHistoryTimeline({ patientId, limit = 20 }: Paymen
             display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0',
             borderBottom: i < entries.length - 1 ? '1px solid var(--border-medium)' : 'none',
           }}>
-            <span className="icon-box-sm" style={{ color, flexShrink: 0 }}>
-              <Icon size={14} />
-            </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.4 }}>
                 {entry.description}

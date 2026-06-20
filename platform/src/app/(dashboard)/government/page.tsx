@@ -152,7 +152,7 @@ function ChartTooltip({ active, payload, label }: {
 }) {
   if (!active || !payload) return null;
   return (
-    <div className="card-elevated p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', fontSize: '0.75rem', borderRadius: '12px' }}>
+    <div className="card-elevated p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', fontSize: '0.75rem', borderRadius: '6px' }}>
       <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{label}</p>
       {payload.map((entry, i) => (
         <div key={i} className="flex items-center gap-2 py-0.5">
@@ -1064,7 +1064,7 @@ export default function GovernmentDashboardPage() {
               className="flex items-center gap-2.5 p-3 rounded-xl text-left transition-transform active:scale-[0.98] hover:-translate-y-0.5"
               style={{ background: stat.bg, border: `1px solid ${stat.color}22` }}
             >
-              <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${stat.color}1F` }}>
+              <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent' }}>
                 <stat.icon className="w-[18px] h-[18px]" style={{ color: stat.color }} />
               </span>
               <span className="flex flex-col justify-center min-w-0 leading-tight">
@@ -1079,7 +1079,7 @@ export default function GovernmentDashboardPage() {
         <div className="card-elevated p-3 mb-4">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                 <Filter className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{t('government.filters')}</span>
@@ -1381,7 +1381,7 @@ export default function GovernmentDashboardPage() {
         <div className="card-elevated p-4 mb-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
+              <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ background: 'transparent' }}>
                 <Download className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <div>
@@ -1430,7 +1430,7 @@ export default function GovernmentDashboardPage() {
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
+            <table className="data-table" style={{ minWidth: 840 }}>
               <thead>
                 <tr>
                   <th>{t('government.colStateHospital')}</th>
@@ -1470,9 +1470,6 @@ export default function GovernmentDashboardPage() {
                         <tr key={h._id} className="cursor-pointer" onClick={() => router.push(`/hospitals?facility=${h._id}`)}>
                           <td>
                             <div className="flex items-center gap-2 pl-6">
-                              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-light)' }}>
-                                <Building2 className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                              </div>
                               <div>
                                 <p className="font-medium text-sm">{h.name}</p>
                                 <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{typeLabel(h.facilityType)}</p>
@@ -1556,7 +1553,7 @@ export default function GovernmentDashboardPage() {
               {referrals.slice(0, 4).map(ref => (
                 <div key={ref._id} className="p-2.5 rounded-md" style={{ border: '1px solid var(--border-light)' }}>
                   <div className="flex items-center justify-between mb-0.5">
-                    <PatientName name={ref.patientName} nameClassName="text-[11px] font-semibold" />
+                    <PatientName patientId={ref.patientId} name={ref.patientName} nameClassName="text-[11px] font-semibold" />
                     <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
                       background: ref.urgency === 'emergency' ? 'rgba(229,46,66,0.12)' : ref.urgency === 'urgent' ? 'rgba(252,211,77,0.12)' : 'rgba(0,119,215,0.12)',
                       color: ref.urgency === 'emergency' ? 'var(--color-danger)' : ref.urgency === 'urgent' ? 'var(--color-warning)' : 'var(--accent-primary)',

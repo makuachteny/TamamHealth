@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
@@ -115,7 +114,7 @@ export default function AdminAnalyticsPage() {
   const tooltipStyle = {
     backgroundColor: 'var(--bg-card)',
     border: '1px solid var(--border-light)',
-    borderRadius: '8px',
+    borderRadius: '4px',
     fontSize: '12px',
   };
 
@@ -123,12 +122,6 @@ export default function AdminAnalyticsPage() {
     <>
       <TopBar title={t('analytics.title')} />
       <main className="page-container page-enter">
-
-        <PageHeader
-          icon={BarChart3}
-          title={t('analytics.title')}
-          subtitle={t('analytics.organizationMetrics')}
-        />
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
@@ -319,7 +312,8 @@ export default function AdminAnalyticsPage() {
             <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.organizationMetrics')}</h3>
           </div>
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full" style={{ minWidth: 600 }}>
             <thead>
               <tr>
                 {[t('analytics.colOrganization'), t('analytics.colPatients'), t('analytics.colUsers'), t('analytics.colPlan'), t('analytics.colStatus')].map(h => (
@@ -365,6 +359,7 @@ export default function AdminAnalyticsPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </main>
     </>

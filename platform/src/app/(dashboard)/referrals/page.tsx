@@ -1,31 +1,33 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
+import Link from 'next/link';
 import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
 import EmptyState from '@/components/EmptyState';
+import Badge, { toneForStatus } from '@/components/Badge';
 import {
-  ArrowRightLeft, Plus, Send, Eye, CheckCircle2,
+  ArrowRightLeft, Plus, Send, CheckCircle2,
   AlertTriangle, ChevronDown, ChevronUp, X,
   Stethoscope, Package, FileText, Image as ImageIcon,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   User, Activity, FlaskConical, Paperclip, XCircle, MessageSquarePlus,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  ClipboardCheck, Bell,
+  ClipboardCheck, Bell, RotateCcw,
 } from '@/components/icons/lucide';
-import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { FilterBar, SearchInput, FilterSelect } from '@/components/filters';
-import PageHeader from '@/components/PageHeader';
-import PatientName from '@/components/PatientName';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
+import { useSettings } from '@/lib/settings/SettingsProvider';
 import { useToast } from '@/components/Toast';
 import FileUpload from '@/components/FileUpload';
+import ReferralFilters, { type ReferralFilterState } from '@/components/referrals/ReferralFilters';
+import RowActionsMenu, { type RowAction } from '@/components/referrals/RowActionsMenu';
 import type { Attachment, TransferPackage, ReferralDisposition } from '@/data/mock';
+import { formatPhoneDisplay } from '@/lib/field-formats';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -33,7 +35,9 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const departments = [
+// Fallback list used only when the facility hasn't configured its departments
+// in Facility Settings (settings.departments drives the picker when present).
+const FALLBACK_DEPARTMENTS = [
   'Internal Medicine', 'Pediatrics', 'Obstetrics & Gynecology', 'Surgery',
   'Emergency', 'Cardiology', 'Orthopedics', 'Ophthalmology', 'Neurology',
   'Dermatology', 'ENT', 'Outpatient'
@@ -44,7 +48,6 @@ const DISPOSITION_OPTIONS: ReferralDisposition[] = [
 ];
 
 export default function ReferralsPage() {
-  const router = useRouter();
   const { t } = useTranslation();
   const { referrals, createWithTransfer, accept, updateStatus, updateNotes, completeWithOutcome } = useReferrals();
   const { showToast } = useToast();
@@ -52,13 +55,17 @@ export default function ReferralsPage() {
   const { patients } = usePatients();
   const { currentUser, globalSearch } = useApp();
   const { canManageReferrals } = usePermissions();
+  const { departments: facilityDepartments } = useSettings();
+  const departments = facilityDepartments.length ? facilityDepartments : FALLBACK_DEPARTMENTS;
   const OUR_HOSPITAL_ID = currentUser?.hospitalId || '';
 
   const [activeTab, setActiveTab] = useState<'incoming' | 'outgoing'>('incoming');
   const [showNewReferral, setShowNewReferral] = useState(false);
   const [expandedReferral, setExpandedReferral] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  // Structured filters — surfaced in a popover beside the platform search bar.
+  const [colFilters, setColFilters] = useState<ReferralFilterState>({ patient: '', route: '', department: '', urgency: '', status: '' });
+  const setColFilter = (k: keyof ReferralFilterState, v: string) => setColFilters(f => ({ ...f, [k]: v }));
+  const clearColFilters = () => setColFilters({ patient: '', route: '', department: '', urgency: '', status: '' });
 
   // New referral form state
   const [formPatient, setFormPatient] = useState('');
@@ -81,6 +88,25 @@ export default function ReferralsPage() {
   const [noteModalId, setNoteModalId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
   const [actionSubmitting, setActionSubmitting] = useState(false);
+
+  // Reverse a referral status transition back to its prior state. Clinical
+  // status changes are confirmed before they are undone. Backed by the existing
+  // referral-service `updateReferralStatus`, which accepts any target status.
+  const [reverseModal, setReverseModal] = useState<{ id: string; to: 'sent' | 'received'; name: string } | null>(null);
+
+  const handleReverseStatus = async () => {
+    if (!reverseModal) return;
+    try {
+      setActionSubmitting(true);
+      await updateStatus(reverseModal.id, reverseModal.to);
+      showToast(t('action.undo'), 'success');
+      setReverseModal(null);
+    } catch {
+      showToast(t('error.title'), 'error');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
 
   // Track viewed referrals for notification badge
   const [viewedReferralIds, setViewedReferralIds] = useState<Set<string>>(new Set());
@@ -114,13 +140,32 @@ export default function ReferralsPage() {
   }, [expandedReferral]);
 
   // Search filtering (+ status filter)
-  const combinedSearch = `${search} ${globalSearch}`.toLowerCase().trim();
+  const combinedSearch = `${globalSearch}`.toLowerCase().trim();
   const filteredReferrals = activeReferrals.filter(r => {
-    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
-    if (!combinedSearch) return true;
-    const haystack = `${r.patientName} ${r.fromHospital} ${r.toHospital} ${r.department} ${r.referringDoctor} ${r.notes} ${r.reason}`.toLowerCase();
-    return combinedSearch.split(/\s+/).every(term => haystack.includes(term));
+    const f = colFilters;
+    if (combinedSearch) {
+      const haystack = `${r.patientName} ${r.fromHospital} ${r.toHospital} ${r.department} ${r.referringDoctor} ${r.notes} ${r.reason}`.toLowerCase();
+      if (!combinedSearch.split(/\s+/).every(term => haystack.includes(term))) return false;
+    }
+    if (f.patient && !`${r.patientName} ${r.patientId}`.toLowerCase().includes(f.patient.toLowerCase())) return false;
+    if (f.route && !`${r.fromHospital} ${r.toHospital}`.toLowerCase().includes(f.route.toLowerCase())) return false;
+    if (f.department && !(r.department || '').toLowerCase().includes(f.department.toLowerCase())) return false;
+    if (f.urgency && r.urgency !== f.urgency) return false;
+    if (f.status && r.status !== f.status) return false;
+    return true;
   });
+
+  // Patient _id → hospital number, so the table can show the facility-facing ID
+  // (e.g. JTH-00012) rather than the internal record id.
+  const hospitalNoByPatient = new Map(patients.map(p => [p._id, p.hospitalNumber]));
+  const hospitalNoFor = (pid: string) => hospitalNoByPatient.get(pid) || pid;
+
+  // Urgency / status option lists shared by the filter popover.
+  const urgencyOptions = [
+    { v: 'routine', l: t('referrals.urgency_routine') },
+    { v: 'urgent', l: t('referrals.urgency_urgent') },
+    { v: 'emergency', l: t('referrals.urgency_emergency') },
+  ];
 
   const getStatusLabel = (status: string) => {
     const map: Record<string, string> = {
@@ -131,17 +176,6 @@ export default function ReferralsPage() {
       cancelled: t('referral.cancelled'),
     };
     return map[status] || status;
-  };
-
-  const getStatusClass = (status: string) => {
-    const map: Record<string, string> = {
-      sent: 'ref-sent',
-      received: 'ref-received',
-      seen: 'ref-seen',
-      completed: 'ref-completed',
-      cancelled: 'ref-cancelled',
-    };
-    return map[status] || '';
   };
 
   const handleSubmitReferral = async () => {
@@ -334,7 +368,7 @@ export default function ReferralsPage() {
               { l: t('referrals.demoHospitalNo'), v: demo.hospitalNumber },
               { l: t('referrals.demoDob'), v: demo.dateOfBirth },
               { l: t('patient.gender'), v: demo.gender },
-              { l: t('patient.phone'), v: demo.phone },
+              { l: t('patient.phone'), v: formatPhoneDisplay(demo.phone) },
               { l: t('patient.location'), v: `${demo.county}, ${demo.state}` },
               { l: t('patient.tribe'), v: demo.tribe },
               { l: t('patient.bloodType'), v: demo.bloodType },
@@ -392,9 +426,9 @@ export default function ReferralsPage() {
                     >
                       <div className="flex items-center gap-3">
                         <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{rec.visitDate}</span>
-                        <span className={`badge text-[10px] ${rec.visitType === 'emergency' ? 'badge-emergency' : rec.visitType === 'inpatient' ? 'badge-warning' : 'badge-normal'}`}>
+                        <Badge tone={rec.visitType === 'emergency' ? 'danger' : rec.visitType === 'inpatient' ? 'warning' : 'neutral'}>
                           {rec.visitType}
-                        </span>
+                        </Badge>
                         <span className="text-sm font-medium">{rec.department}</span>
                       </div>
                       {isExpanded ? <ChevronUp className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} /> : <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />}
@@ -457,7 +491,7 @@ export default function ReferralsPage() {
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.labResults', { count: pkg.labResults.length })}</span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-xs" style={{ minWidth: 600 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <th className="text-left py-1.5 pr-3 font-medium" style={{ color: 'var(--text-muted)' }}>{t('lab.testName')}</th>
@@ -478,11 +512,11 @@ export default function ReferralsPage() {
                       <td className="py-1.5 pr-3 font-mono" style={{ color: 'var(--text-muted)' }}>{lab.date}</td>
                       <td className="py-1.5">
                         {lab.abnormal ? (
-                          <span className={`badge text-[10px] ${lab.critical ? 'badge-emergency' : 'badge-warning'}`}>
+                          <Badge tone={lab.critical ? 'danger' : 'warning'}>
                             {lab.critical ? t('referrals.labCritical') : t('lab.abnormal')}
-                          </span>
+                          </Badge>
                         ) : (
-                          <span className="badge badge-normal text-[10px]">{t('lab.normal')}</span>
+                          <Badge tone="success">{t('lab.normal')}</Badge>
                         )}
                       </td>
                     </tr>
@@ -544,25 +578,38 @@ export default function ReferralsPage() {
 
   return (
     <>
-      <TopBar title={t('nav.referrals')} />
+      <TopBar
+            title={t('nav.referrals')}
+            searchTrailing={
+              <ReferralFilters
+                filters={colFilters}
+                setFilter={setColFilter}
+                clearAll={clearColFilters}
+                urgencyOptions={urgencyOptions}
+                statusOptions={[
+                  { v: 'sent', l: getStatusLabel('sent') },
+                  { v: 'received', l: getStatusLabel('received') },
+                  { v: 'seen', l: getStatusLabel('seen') },
+                  { v: 'completed', l: getStatusLabel('completed') },
+                  { v: 'cancelled', l: getStatusLabel('cancelled') },
+                ]}
+              />
+            }
+            actions={
+              canManageReferrals && (
+                <button
+                  onClick={() => setShowNewReferral(!showNewReferral)}
+                  className="btn btn-primary"
+                >
+                  {showNewReferral ? (
+                    <><X className="w-4 h-4" /> {t('action.cancel')}</>
+                  ) : (
+                    <><Plus className="w-4 h-4" /> {t('referrals.newReferral')}</>
+                  )}
+                </button>
+              )
+            } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-          <PageHeader
-            icon={ArrowRightLeft}
-            title={t('referrals.pageTitle')}
-            subtitle={t('referrals.pageSubtitle')}
-            actions={canManageReferrals && (
-              <button
-                onClick={() => setShowNewReferral(!showNewReferral)}
-                className="btn btn-primary"
-              >
-                {showNewReferral ? (
-                  <><X className="w-4 h-4" /> {t('action.cancel')}</>
-                ) : (
-                  <><Plus className="w-4 h-4" /> {t('referrals.newReferral')}</>
-                )}
-              </button>
-            )}
-          />
 
           {/* New Referral Form */}
           {showNewReferral && (
@@ -682,7 +729,7 @@ export default function ReferralsPage() {
                           opacity: formUrgency === level ? 1 : 0.45,
                           transform: formUrgency === level ? 'scale(1.05)' : 'scale(1)',
                           border: formUrgency === level ? '2px solid currentColor' : '2px solid transparent',
-                          borderRadius: '8px',
+                          borderRadius: '4px',
                         }}
                       >
                         {level === 'emergency' && <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />}
@@ -754,7 +801,7 @@ export default function ReferralsPage() {
           )}
 
           {/* Tabs */}
-          <div className="flex items-center gap-0 mb-4 border-b" style={{ borderColor: 'var(--border-light)', marginTop: 16 }}>
+          <div className="flex items-center gap-0 mb-4 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <button
               onClick={() => setActiveTab('incoming')}
               className={`px-5 py-3 text-sm font-medium transition-colors relative ${activeTab === 'incoming' ? 'tab-active' : ''}`}
@@ -806,28 +853,11 @@ export default function ReferralsPage() {
             </button>
           </div>
 
-          {/* Search */}
-          <FilterBar>
-            <SearchInput value={search} onChange={setSearch} placeholder={t('referrals.searchPlaceholder')} />
-            <FilterSelect
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={[
-                { value: 'all', label: 'All statuses' },
-                { value: 'sent', label: getStatusLabel('sent') },
-                { value: 'received', label: getStatusLabel('received') },
-                { value: 'seen', label: getStatusLabel('seen') },
-                { value: 'completed', label: getStatusLabel('completed') },
-                { value: 'cancelled', label: getStatusLabel('cancelled') },
-              ]}
-              aria-label="Filter by status"
-            />
-          </FilterBar>
-
-          {/* Referrals List */}
-          <div className="space-y-3" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          {/* Referrals table — search + structured filters live on the top bar */}
+          <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             {filteredReferrals.length === 0 ? (
-              <div className="card-elevated">
+              <div className="p-8">
                 <EmptyState
                   icon={ArrowRightLeft}
                   title={activeTab === 'outgoing' ? t('referrals.emptyOutgoingTitle') : t('referrals.emptyIncomingTitle')}
@@ -838,113 +868,115 @@ export default function ReferralsPage() {
                 />
               </div>
             ) : (
-              filteredReferrals.map(ref => {
+            <table className="data-table referral-table" style={{ minWidth: 1040 }}>
+              <colgroup>
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '22%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '7%' }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th>Hospital ID</th>
+                  <th>Route</th>
+                  <th>Department</th>
+                  <th>Urgency</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th className="ref-actions-col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredReferrals.map(ref => {
                 const isExpanded = expandedReferral === ref._id;
                 const tp = ref.transferPackage as TransferPackage | undefined;
                 const refAtts = ref.referralAttachments as Attachment[] | undefined;
+                // Status-driven actions, collapsed into a single kebab menu.
+                const rowActions: RowAction[] = [
+                  ...(canManageReferrals && activeTab === 'incoming' && (ref.status === 'sent' || ref.status === 'received') ? [
+                    { key: 'accept', label: t('referrals.accept'), tone: 'success' as const, icon: <CheckCircle2 className="w-4 h-4" />, onClick: async () => {
+                      try { await accept(ref._id); showToast(t('referrals.toastAccepted', { name: ref.patientName }), 'success'); }
+                      catch { showToast(t('referrals.toastAcceptFailed'), 'error'); }
+                    } },
+                    { key: 'decline', label: t('referrals.decline'), tone: 'danger' as const, icon: <XCircle className="w-4 h-4" />, onClick: () => { setDeclineModalId(ref._id); setDeclineReason(''); } },
+                  ] : []),
+                  ...(canManageReferrals && activeTab === 'incoming' && ref.status === 'seen' ? [
+                    { key: 'complete', label: t('referrals.markComplete'), tone: 'success' as const, icon: <ClipboardCheck className="w-4 h-4" />, onClick: () => { setCompleteModalId(ref._id); setCompleteOutcome(''); } },
+                    { key: 'undo', label: t('action.undo'), tone: 'default' as const, icon: <RotateCcw className="w-4 h-4" />, onClick: () => setReverseModal({ id: ref._id, to: 'received', name: ref.patientName }) },
+                  ] : []),
+                  ...(canManageReferrals && activeTab === 'incoming' && ref.status === 'cancelled' ? [
+                    { key: 'reopen', label: t('action.reopen'), tone: 'default' as const, icon: <RotateCcw className="w-4 h-4" />, onClick: () => setReverseModal({ id: ref._id, to: 'received', name: ref.patientName }) },
+                  ] : []),
+                  ...(canManageReferrals && ref.status !== 'cancelled' ? [
+                    { key: 'note', label: t('action.addNote'), tone: 'default' as const, icon: <MessageSquarePlus className="w-4 h-4" />, onClick: () => { setNoteModalId(ref._id); setNoteText(''); } },
+                  ] : []),
+                ];
                 return (
-                  <div key={ref._id} className="card-elevated overflow-hidden">
-                    {/* Referral row */}
-                    <div className="flex items-center gap-3 p-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); if (ref.patientId) router.push(`/patients/${ref.patientId}`); }}>
-                            <PatientName name={ref.patientName} size={36} />
+                  <Fragment key={ref._id}>
+                    <tr
+                      className="cursor-pointer hover:bg-[var(--table-row-hover)]"
+                      onClick={() => setExpandedReferral(isExpanded ? null : ref._id)}
+                    >
+                      <td>
+                        {ref.patientId && !ref.patientId.startsWith('demo-') && !ref.patientId.includes('_demo') ? (
+                          <Link
+                            href={`/patients/${ref.patientId}`}
+                            onClick={e => e.stopPropagation()}
+                            className="font-normal text-[13px] truncate block hover:underline"
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            {ref.patientName}
+                          </Link>
+                        ) : (
+                          <span
+                            className="font-normal text-[13px] truncate block"
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            {ref.patientName}
                           </span>
-                          <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>{ref.patientId}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {ref.fromHospital} → {ref.toHospital}
-                          <span>&middot;</span>
-                          <span>{ref.department}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className={`badge urgency-${ref.urgency} text-[11px]`}>
-                          {ref.urgency === 'emergency' && <AlertTriangle className="w-3 h-3" />}
+                        )}
+                      </td>
+                      <td className="font-mono text-[11px]" style={{ color: 'var(--text-secondary)' }}>{hospitalNoFor(ref.patientId)}</td>
+                      <td className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{ref.fromHospital} → {ref.toHospital}</td>
+                      <td className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{ref.department}</td>
+                      <td>
+                        <span className="text-[11px] font-semibold whitespace-nowrap" style={{ color: ref.urgency === 'emergency' ? '#C24435' : ref.urgency === 'urgent' ? '#8F6823' : '#157E5F' }}>
                           {t(`referrals.urgency_${ref.urgency}`)}
                         </span>
-                        <span className={`badge ${getStatusClass(ref.status)} text-[11px]`}>
+                        </td>
+                        <td>
+                        <Badge tone={toneForStatus(ref.status)}>
                           {getStatusLabel(ref.status)}
-                        </span>
+                        </Badge>
                         {tp && (
-                          <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-medium" style={{ background: 'var(--accent-light)', color: 'var(--tamamhealth-blue)', border: '1px solid var(--accent-border)' }}>
+                          <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-medium ml-1" style={{ background: 'var(--accent-light)', color: 'var(--tamamhealth-blue)', border: '1px solid var(--accent-border)' }}>
                             <Package className="w-3 h-3" /> {t('referrals.dataPackage')}
                           </span>
                         )}
-                        <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{ref.referralDate}</span>
-                        <button
-                          onClick={() => setExpandedReferral(isExpanded ? null : ref._id)}
-                          className="btn btn-secondary btn-sm"
-                          title={t('referrals.viewDetails')}
-                          style={{ padding: '5px 10px' }}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        </button>
-                        {canManageReferrals && activeTab === 'incoming' && (ref.status === 'sent' || ref.status === 'received') && (
-                          <>
-                            <button
-                              className="btn btn-success btn-sm"
-                              title={t('referrals.acceptTitle')}
-                              style={{ padding: '5px 10px' }}
-                              onClick={async () => {
-                                try {
-                                  await accept(ref._id);
-                                  showToast(t('referrals.toastAccepted', { name: ref.patientName }), 'success');
-                                } catch {
-                                  showToast(t('referrals.toastAcceptFailed'), 'error');
-                                }
-                              }}
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              {t('referrals.accept')}
-                            </button>
-                            <button
-                              className="btn btn-sm"
-                              title={t('referrals.declineTitle')}
-                              style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)', border: '1px solid rgba(239,68,68,0.25)' }}
-                              onClick={() => { setDeclineModalId(ref._id); setDeclineReason(''); }}
-                            >
-                              <XCircle className="w-3.5 h-3.5" />
-                              {t('referrals.decline')}
-                            </button>
-                          </>
-                        )}
-                        {canManageReferrals && activeTab === 'incoming' && ref.status === 'seen' && (
-                          <button
-                            className="btn btn-sm"
-                            title={t('referrals.markCompleteTitle')}
-                            style={{ padding: '5px 10px', background: 'rgba(34,197,94,0.12)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.25)' }}
-                            onClick={() => { setCompleteModalId(ref._id); setCompleteOutcome(''); }}
-                          >
-                            <ClipboardCheck className="w-3.5 h-3.5" />
-                            {t('referrals.markComplete')}
-                          </button>
-                        )}
-                        {canManageReferrals && ref.status !== 'cancelled' && (
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            title={t('referrals.addNoteTitle')}
-                            style={{ padding: '5px 10px' }}
-                            onClick={(e) => { e.stopPropagation(); setNoteModalId(ref._id); setNoteText(''); }}
-                          >
-                            <MessageSquarePlus className="w-3.5 h-3.5" />
-                            {t('action.addNote')}
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                        </td>
+                        <td className="text-xs font-mono whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{ref.referralDate}</td>
+                        <td>
+                          <div className="flex items-center justify-end">
+                            <RowActionsMenu actions={rowActions} ariaLabel="Actions" />
+                          </div>
+                        </td>
+                    </tr>
 
                     {/* Expanded View: Transfer Package */}
                     {isExpanded && (
+                      <tr><td colSpan={8} style={{ padding: 0, background: 'var(--overlay-subtle)' }}>
                       <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--border-light)' }}>
                         {ref.outcome && (
                           <div className="mt-4 p-3 rounded-lg" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
                             <div className="flex items-center gap-2 mb-2">
                               <ClipboardCheck className="w-4 h-4" style={{ color: '#16A34A' }} />
                               <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#16A34A' }}>{t('referrals.outcomeReceived')}</p>
-                              <span className="badge ref-completed text-[10px]">{t(`referrals.disposition_${ref.outcome.disposition}`)}</span>
+                              <Badge tone="success">{t(`referrals.disposition_${ref.outcome.disposition}`)}</Badge>
                             </div>
                             <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{ref.outcome.summary}</p>
                             {ref.outcome.followUp && (
@@ -978,12 +1010,40 @@ export default function ReferralsPage() {
                           </div>
                         )}
                       </div>
+                      </td></tr>
                     )}
-                  </div>
+                  </Fragment>
                 );
-              })
+              })}
+              </tbody>
+            </table>
             )}
+            </div>
           </div>
+
+          {/* Reverse status confirmation — undo an acceptance or reopen a
+              declined referral. Clinical reversals are confirmed first. */}
+          {reverseModal && (
+            <Modal onClose={() => setReverseModal(null)}>
+              <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('action.reverse')}</h3>
+                  <button onClick={() => setReverseModal(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                  {reverseModal.name} &middot; {getStatusLabel(reverseModal.to)}
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={() => setReverseModal(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
+                  <button onClick={handleReverseStatus} disabled={actionSubmitting} className="btn btn-primary flex-1">
+                    {actionSubmitting ? t('referrals.saving') : t('action.confirm')}
+                  </button>
+                </div>
+              </div>
+            </Modal>
+          )}
 
           {/* Add Note Modal */}
           {noteModalId && (

@@ -4197,7 +4197,7 @@ const am: TranslationMap = {
   'timeline.categoryReferral': 'ሪፈራል',
   'timeline.categoryAnc': 'ANC',
   'timeline.categoryAppointment': 'ቀጠሮ',
-  'timeline.titleTriage': '{{priority}} ትሪአጅ',
+  'timeline.titleTriage': 'ትሪአጅ',
   'timeline.titleConsultation': 'የክሊኒክ ምክክር',
   'timeline.titleReferral': 'ወደ {{facility}} ተላልፏል',
   'timeline.facilityFallback': 'ተቋም',

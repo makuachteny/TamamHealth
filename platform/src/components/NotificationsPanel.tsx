@@ -61,7 +61,7 @@ export default function NotificationsPanel({ onClose }: { onClose: () => void })
                     className="w-full text-left flex items-start gap-3 px-5 py-3 border-b transition-colors hover:bg-[var(--overlay-subtle)]"
                     style={{ borderColor: 'var(--border-light)' }}
                   >
-                    <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.bg, color: m.color }}>
+                    <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent', color: m.color }}>
                       <Icon className="w-4 h-4" />
                     </span>
                     <div className="flex-1 min-w-0">

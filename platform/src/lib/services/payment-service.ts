@@ -32,6 +32,7 @@ import type {
   ChargeDoc, ChargeStatus,
   PatientFinancialSummary,
 } from '../db-types-payments';
+import type { BaseDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
@@ -166,6 +167,64 @@ export async function getAllPayments(scope?: DataScope): Promise<PaymentDoc[]> {
   return scope ? filterByScope(all, scope) : all;
 }
 
+/**
+ * Look up a payment by its provider/transaction reference. Payment-gateway
+ * webhooks (M-Pesa, Airtel, Flutterwave) identify the payment by the reference
+ * we passed to the gateway (stored in `PaymentDoc.reference`), not by our `_id`.
+ */
+export async function getPaymentByReference(reference: string): Promise<PaymentDoc | null> {
+  if (!reference) return null;
+  const rows = await findByType<PaymentDoc>(paymentsDB(), 'payment', { reference }, { indexFields: ['type', 'reference'] });
+  return rows[0] || null;
+}
+
+/**
+ * Reconcile a payment's status against a payment-gateway callback.
+ *
+ * Used by the M-Pesa / Airtel / Flutterwave webhook routes: the gateway tells
+ * us a previously-initiated payment succeeded or failed, and we move the
+ * matching PaymentDoc to the corresponding `PaymentStatus`. The payment is
+ * matched by its provider `reference` (transaction id / our reference).
+ *
+ * Returns the updated doc, or `null` if no payment matches the reference (an
+ * unknown/duplicate callback) — callers should still ack the gateway.
+ */
+export async function updatePaymentStatus(
+  reference: string,
+  status: PaymentStatus,
+  details?: { providerReference?: string; reason?: string },
+): Promise<PaymentDoc | null> {
+  const db = paymentsDB();
+  const pmt = await getPaymentByReference(reference);
+  if (!pmt) return null;
+
+  // Idempotency: gateways may retry callbacks. Don't re-process an already
+  // terminal payment or churn the ledger.
+  if (pmt.status === status) return pmt;
+
+  pmt.status = status;
+  if (details?.reason) {
+    pmt.notes = pmt.notes ? `${pmt.notes}\n${details.reason}` : details.reason;
+  }
+  pmt.updatedAt = new Date().toISOString();
+  const resp = await db.put(pmt);
+  pmt._rev = resp.rev;
+
+  await logAuditSafe('PAYMENT_STATUS_UPDATED', pmt.processedBy, pmt.processedByName,
+    `Payment ${pmt.reference} -> ${status}${details?.providerReference ? ` (provider ref: ${details.providerReference})` : ''}`);
+
+  emitSyncEvent({
+    resourceType: 'payment',
+    resourceId: pmt._id,
+    operation: 'update',
+    resourceVersion: pmt._rev,
+    orgId: pmt.orgId,
+    hospitalId: pmt.facilityId,
+  });
+
+  return pmt;
+}
+
 export async function reversePayment(
   paymentId: string, reason: string, reversedBy: string, reversedByName: string
 ): Promise<PaymentDoc | null> {
@@ -208,6 +267,97 @@ export async function reversePayment(
 
     return pmt;
   } catch { return null; }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PAYMENT LINKS (pay-by-link)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * A "pay-by-link" record. There's no dedicated payment-link database, so these
+ * persist as small docs in the existing payments DB (distinguished by
+ * `type: 'payment_link'`). The link's public id doubles as the doc `_id` so a
+ * GET by id is a direct `db.get` lookup.
+ */
+export interface PaymentLinkDoc extends BaseDoc {
+  type: 'payment_link';
+  linkId: string;
+  url: string;
+  amount: number;
+  currency: string;
+  description: string;
+  expiresAt: string;
+  status: 'active' | 'expired' | 'used';
+  patientId: string;
+  facilityId: string;
+  orgId?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+}
+
+export interface CreatePaymentLinkInput {
+  linkId: string;
+  url: string;
+  patientId: string;
+  amount: number;
+  currency: string;
+  description: string;
+  expiresAt: string;
+  facilityId: string;
+  orgId?: string;
+  createdBy?: string;
+}
+
+export async function createPaymentLink(input: CreatePaymentLinkInput): Promise<PaymentLinkDoc> {
+  const db = paymentsDB();
+  const now = new Date().toISOString();
+  const doc: PaymentLinkDoc = {
+    _id: `plink-${input.linkId}`,
+    type: 'payment_link',
+    linkId: input.linkId,
+    url: input.url,
+    patientId: input.patientId,
+    amount: input.amount,
+    currency: input.currency,
+    description: input.description,
+    expiresAt: input.expiresAt,
+    status: 'active',
+    facilityId: input.facilityId,
+    orgId: input.orgId,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: input.createdBy,
+  };
+  const resp = await db.put(doc);
+  doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'payment_link',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+  return doc;
+}
+
+/**
+ * Fetch a payment link by its public id. Returns null if unknown. The stored
+ * `status` is reconciled against `expiresAt` so an expired link reads as such
+ * even if it was never explicitly marked.
+ */
+export async function getPaymentLink(linkId: string): Promise<PaymentLinkDoc | null> {
+  const db = paymentsDB();
+  try {
+    const doc = await db.get(`plink-${linkId}`) as PaymentLinkDoc;
+    if (doc.status === 'active' && doc.expiresAt && new Date(doc.expiresAt).getTime() < Date.now()) {
+      doc.status = 'expired';
+    }
+    return doc;
+  } catch {
+    return null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -351,19 +501,33 @@ export async function checkEligibility(input: CheckEligibilityInput): Promise<El
   // Get the policy to pull payer details
   const policy = await getPrimaryPolicy(input.patientId);
 
+  // This is NOT an external payer verification — we have no EDI 270/271 or
+  // payer-API integration here. We're producing a LOCAL ESTIMATE off the
+  // stored policy terms. Be honest about that: report `unverified` (the doc's
+  // status union has no `estimated` value) and record the basis in
+  // `rawResponse` so downstream consumers/auditors don't mistake this for a
+  // confirmed payer response. Only when a real external source is explicitly
+  // passed in (api/edi271/donor_list) do we treat it as verified.
+  const isExternal = input.source === 'api' || input.source === 'edi271' || input.source === 'donor_list';
+  const status: EligibilityStatus = isExternal ? 'verified' : 'unverified';
+  const source: EligibilitySource = input.source || 'manual';
+
   const doc: EligibilityCheckDoc = {
     _id: `elig-${uuidv4().slice(0, 10)}`,
     type: 'eligibility_check',
     policyId: input.policyId,
     patientId: input.patientId,
     checkDate: now,
-    status: 'verified' as EligibilityStatus,
+    status,
     deductibleRemaining: policy?.deductibleRemaining,
     copayAmount: policy?.copayAmount,
     coinsurancePct: policy?.coinsurancePct,
     oopUsed: policy?.oopUsed,
     oopMax: policy?.oopMax,
-    source: input.source || 'manual',
+    source,
+    rawResponse: isExternal
+      ? undefined
+      : JSON.stringify({ method: 'local_policy_estimate', note: 'Local estimate from stored policy terms; not confirmed with the payer.' }),
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     checkedBy: input.checkedBy,
     facilityId: input.facilityId,

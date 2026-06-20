@@ -4202,7 +4202,7 @@ const apd: TranslationMap = {
   'timeline.categoryReferral': 'الإحالة',
   'timeline.categoryAnc': 'ANC',
   'timeline.categoryAppointment': 'الموعد',
-  'timeline.titleTriage': 'فرز {{priority}}',
+  'timeline.titleTriage': 'فرز',
   'timeline.titleConsultation': 'كشف طبي',
   'timeline.titleReferral': 'محال لـ {{facility}}',
   'timeline.facilityFallback': 'المرفق',

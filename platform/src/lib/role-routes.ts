@@ -21,6 +21,7 @@ export interface RoleRouteConfig {
 export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   super_admin: {
     allowed: [
+      '/facility-management',
       '/admin', '/admin/organizations', '/admin/users', '/admin/system',
       '/admin/billing', '/admin/analytics',
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
@@ -30,25 +31,28 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/vital-statistics', '/facility-assessments', '/data-quality',
       '/dhis2-export', '/public-stats',
       '/appointments', '/telehealth',
-      '/payments', '/payments/claims', '/payments/plans',
+      '/payments', '/payments/claims',
       '/wards', '/equipment', '/hr', '/dashboard/hr',
       '/blood-bank', '/controlled-substances', '/emergency-preparedness',
     ],
-    defaultDashboard: '/admin',
+    defaultDashboard: '/facility-management',
   },
 
   org_admin: {
     allowed: [
+      '/facility-management',
       '/org-admin', '/org-admin/users', '/org-admin/hospitals',
       '/org-admin/branding', '/org-admin/settings', '/org-admin/analytics', '/org-admin/pricing',
       '/facility-settings',
       '/hospitals', '/reports', '/settings',
+      // Facility-management sidebar destinations (see FACILITY_NAV in permissions.ts).
+      '/patients', '/pharmacy', '/messages',
       '/appointments',
-      '/payments', '/payments/claims', '/payments/plans',
+      '/payments', '/payments/claims',
       '/wards', '/equipment', '/hr', '/dashboard/hr',
       '/blood-bank', '/controlled-substances', '/emergency-preparedness',
     ],
-    defaultDashboard: '/org-admin',
+    defaultDashboard: '/facility-management',
   },
 
   doctor: {
@@ -121,10 +125,10 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // Money handling moves to the dedicated cashier role; bed/ward management is
     // a nursing function. Insurance claims belong to the medical biller.
     allowed: [
-      '/dashboard/front-desk', '/patients', '/referrals', '/messages',
+      '/dashboard/front-desk', '/check-in', '/patients', '/referrals', '/messages',
       '/settings',
       '/appointments',
-      
+
     ],
     defaultDashboard: '/dashboard/front-desk',
   },
@@ -134,7 +138,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // up patient payment plans, looks up the patient/visit being billed. No
     // insurance claim adjudication (biller) and no clinical access.
     allowed: [
-      '/payments', '/payments/plans', '/payments/portal',
+      '/payments', '/payments/portal',
       '/patients', '/appointments', '/messages', '/settings',
     ],
     defaultDashboard: '/payments',
@@ -142,7 +146,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   government: {
     allowed: [
-      '/government', '/dashboard/state',
+      '/government', '/facility-management', '/dashboard/state',
       '/hospitals', '/vital-statistics', '/immunizations',
       '/anc', '/births', '/deaths', '/facility-assessments', '/data-quality',
       '/surveillance', '/reports', '/dhis2-export', '/public-stats', '/settings',
@@ -184,7 +188,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/facility-settings',
       '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
       '/appointments', '/telehealth', '/facility-assessments', '/data-quality',
-      '/payments', '/payments/claims', '/payments/plans',
+      '/payments', '/payments/claims',
       '/wards', '/equipment', '/hr', '/dashboard/hr',
       '/blood-bank', '/controlled-substances', '/emergency-preparedness',
     ],
@@ -226,7 +230,9 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   hospital_manager: {
     allowed: [
-      '/dashboard/hospital-manager',
+      // Facility Management is the manager's home dashboard (the former standalone
+      // /dashboard/hospital-manager page was merged into it and deleted).
+      '/facility-management',
       // Intelligence & population health
       '/epidemic-intelligence', '/mch-analytics', '/surveillance',
       // Network & facility
@@ -237,21 +243,21 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       // Facility operations
       '/equipment', '/hr', '/dashboard/hr', 
       // Finance oversight
-      '/payments', '/payments/claims', '/payments/plans',
+      '/payments', '/payments/claims',
       // Clinical context (read). Lab/pharmacy are operational service queues run
       // by lab techs/pharmacists; the manager sees utilisation via reports, not
       // the live work queues.
       '/patients', '/wards', '/referrals', '/appointments', '/messages',
       '/settings',
     ],
-    defaultDashboard: '/dashboard/hospital-manager',
+    defaultDashboard: '/facility-management',
   },
 
   medical_biller: {
     // The old /billing "Collections" cockpit was retired: A/R aging moved to
     // /payments and the payer mix moved to /payments/claims.
     allowed: [
-      '/payments', '/payments/claims', '/payments/plans', '/payments/portal',
+      '/payments', '/payments/claims', '/payments/portal',
       '/patients', '/appointments', '/messages', '/settings',
     ],
     defaultDashboard: '/payments',
@@ -324,7 +330,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
       '/appointments', '/facility-assessments', '/data-quality',
       '/facility-settings',
-      '/payments', '/payments/claims', '/payments/plans',
+      '/payments', '/payments/claims',
       '/wards', '/equipment', '/hr', '/dashboard/hr',
       '/blood-bank', '/controlled-substances', '/emergency-preparedness',
       '/org-admin/users',

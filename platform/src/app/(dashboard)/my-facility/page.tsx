@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import {
   Building2, BedDouble, Users, Zap,
@@ -208,40 +207,33 @@ export default function MyFacilityPage() {
 
   return (
     <>
-      <TopBar title={t('breadcrumb.myFacility')} />
+      <TopBar title={t('breadcrumb.myFacility')} actions={
+        <>
+          {error && (
+            <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--color-danger)' }}>
+              <AlertTriangle className="w-3.5 h-3.5" /> {error}
+            </span>
+          )}
+          {saved && (
+            <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--color-success)' }}>
+              <CheckCircle className="w-3.5 h-3.5" /> {t('myFacility.savedSuccessfully')}
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all"
+            style={{
+              background: saving ? 'var(--text-muted)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
+              boxShadow: '0 2px 8px rgba(0,119,215,0.3)',
+            }}
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? t('consultation.saving') : t('appointments.saveChanges')}
+          </button>
+        </>
+      } />
       <main className="page-container page-enter">
-
-        <PageHeader
-          icon={Building2}
-          title={hospital?.name || t('breadcrumb.myFacility')}
-          subtitle={`${hospital?.state || ''} · ${hospital?.facilityType?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || t('common.facility')}`}
-          actions={
-            <>
-              {error && (
-                <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--color-danger)' }}>
-                  <AlertTriangle className="w-3.5 h-3.5" /> {error}
-                </span>
-              )}
-              {saved && (
-                <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--color-success)' }}>
-                  <CheckCircle className="w-3.5 h-3.5" /> {t('myFacility.savedSuccessfully')}
-                </span>
-              )}
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all"
-                style={{
-                  background: saving ? 'var(--text-muted)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
-                  boxShadow: '0 2px 8px rgba(0,119,215,0.3)',
-                }}
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {saving ? t('consultation.saving') : t('appointments.saveChanges')}
-              </button>
-            </>
-          }
-        />
 
         {/* Form Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

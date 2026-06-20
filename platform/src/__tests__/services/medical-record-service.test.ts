@@ -15,6 +15,13 @@ import {
   updateMedicalRecord,
   deleteMedicalRecord,
   getRecentRecords,
+  signMedicalRecord,
+  cosignMedicalRecord,
+  addAddendum,
+  isRecordLocked,
+  getSigningInbox,
+  SignedRecordLockError,
+  SigningAuthorizationError,
 } from '@/lib/services/medical-record-service';
 
 type CreateMedicalRecordInput = Parameters<typeof createMedicalRecord>[0];
@@ -295,5 +302,198 @@ describe('Medical Record Service', () => {
 
     const records = await getRecordsByPatient('patient-001');
     expect(records.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('Document signing & locking (P0.1)', () => {
+  const signer = { userId: 'u-dr-kuol', userName: 'Dr. Kuol', userRole: 'doctor' };
+
+  test('a freshly created record is an editable draft (unlocked)', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    expect(rec.documentStatus).toBeUndefined();
+    expect(isRecordLocked(rec)).toBe(false);
+  });
+
+  test('signing sets status, signer identity, timestamp and locks the record', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    const signed = await signMedicalRecord(rec._id, signer);
+    expect(signed).not.toBeNull();
+    expect(signed!.documentStatus).toBe('signed');
+    expect(signed!.signedBy).toBe('u-dr-kuol');
+    expect(signed!.signedByName).toBe('Dr. Kuol');
+    expect(signed!.signedByRole).toBe('doctor');
+    expect(signed!.signedAt).toBeDefined();
+    expect(isRecordLocked(signed!)).toBe(true);
+  });
+
+  test('a signed record cannot be edited in place', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await signMedicalRecord(rec._id, signer);
+    await expect(
+      updateMedicalRecord(rec._id, { treatmentPlan: 'tampered' })
+    ).rejects.toThrow(SignedRecordLockError);
+  });
+
+  test('an unsigned record is still editable', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    const updated = await updateMedicalRecord(rec._id, { treatmentPlan: 'revised' });
+    expect(updated!.treatmentPlan).toBe('revised');
+  });
+
+  test('re-signing an already-signed record is rejected', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await signMedicalRecord(rec._id, signer);
+    await expect(signMedicalRecord(rec._id, signer)).rejects.toThrow(SignedRecordLockError);
+  });
+
+  test('signing a nonexistent record returns null', async () => {
+    expect(await signMedicalRecord('nope', signer)).toBeNull();
+  });
+
+  test('awaitingCosign signs into the awaiting_cosign state', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    const signed = await signMedicalRecord(rec._id, signer, { awaitingCosign: true });
+    expect(signed!.documentStatus).toBe('awaiting_cosign');
+    expect(signed!.signedByName).toBe('Dr. Kuol');
+  });
+
+  test('addAddendum appends an immutable note and moves status to amended', async () => {
+    const rec = await createMedicalRecord(validRecord({ treatmentPlan: 'Original plan' }));
+    await signMedicalRecord(rec._id, signer);
+    const amended = await addAddendum(rec._id, 'Patient called: tolerating meds well.', signer);
+    expect(amended!.documentStatus).toBe('amended');
+    expect(amended!.addenda).toHaveLength(1);
+    expect(amended!.addenda![0].text).toContain('tolerating meds');
+    expect(amended!.addenda![0].authorName).toBe('Dr. Kuol');
+    // Original signed content is preserved unchanged.
+    expect(amended!.treatmentPlan).toBe('Original plan');
+    expect(amended!.signedByName).toBe('Dr. Kuol');
+  });
+
+  test('addenda accumulate in order and the record stays locked to edits', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await signMedicalRecord(rec._id, signer);
+    await addAddendum(rec._id, 'First addendum', signer);
+    const second = await addAddendum(rec._id, 'Second addendum', signer);
+    expect(second!.addenda).toHaveLength(2);
+    expect(second!.addenda![1].text).toBe('Second addendum');
+    await expect(updateMedicalRecord(rec._id, { treatmentPlan: 'x' })).rejects.toThrow(SignedRecordLockError);
+  });
+
+  test('addAddendum rejects empty text', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await signMedicalRecord(rec._id, signer);
+    await expect(addAddendum(rec._id, '   ', signer)).rejects.toThrow();
+  });
+
+  test('addAddendum on an unsigned draft is rejected', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await expect(addAddendum(rec._id, 'note', signer)).rejects.toThrow();
+  });
+
+  test('addAddendum on a nonexistent record returns null', async () => {
+    expect(await addAddendum('nope', 'note', signer)).toBeNull();
+  });
+});
+
+describe('Co-signing (P0.2)', () => {
+  const trainee = { userId: 'u-co-deng', userName: 'CO Deng', userRole: 'clinical_officer' };
+  const supervisor = { userId: 'u-dr-achol', userName: 'Dr. Achol', userRole: 'doctor' };
+
+  test('a trainee-signed record can be co-signed into a fully signed record', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await signMedicalRecord(rec._id, trainee, { awaitingCosign: true });
+    const cosigned = await cosignMedicalRecord(rec._id, supervisor);
+    expect(cosigned!.documentStatus).toBe('signed');
+    expect(cosigned!.signedByName).toBe('CO Deng');
+    expect(cosigned!.cosignedByName).toBe('Dr. Achol');
+    expect(cosigned!.cosignedAt).toBeDefined();
+    expect(isRecordLocked(cosigned!)).toBe(true);
+  });
+
+  test('co-signing a record that is not awaiting co-signature is rejected', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await signMedicalRecord(rec._id, supervisor); // fully signed, not awaiting
+    await expect(cosignMedicalRecord(rec._id, supervisor)).rejects.toThrow();
+  });
+
+  test('co-signing a draft is rejected', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await expect(cosignMedicalRecord(rec._id, supervisor)).rejects.toThrow();
+  });
+
+  test('co-signing a nonexistent record returns null', async () => {
+    expect(await cosignMedicalRecord('nope', supervisor)).toBeNull();
+  });
+
+  test('an awaiting_cosign record is not yet locked against the co-sign update', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    const signed = await signMedicalRecord(rec._id, trainee, { awaitingCosign: true });
+    // awaiting_cosign is intentionally NOT locked, so cosign can complete it.
+    expect(isRecordLocked(signed!)).toBe(false);
+  });
+
+  test('a clinician cannot co-sign their own awaiting_cosign note', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await signMedicalRecord(rec._id, trainee, { awaitingCosign: true });
+    // Same userId attempting to co-sign — must be a different (supervising) provider.
+    await expect(
+      cosignMedicalRecord(rec._id, { userId: trainee.userId, userName: trainee.userName, userRole: 'doctor' }),
+    ).rejects.toThrow(SigningAuthorizationError);
+  });
+
+  test('a non-provider role cannot co-sign', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await signMedicalRecord(rec._id, trainee, { awaitingCosign: true });
+    await expect(
+      cosignMedicalRecord(rec._id, { userId: 'u-nurse', userName: 'Nurse', userRole: 'nurse' }),
+    ).rejects.toThrow(SigningAuthorizationError);
+  });
+});
+
+describe('Signing authorization (audit H1)', () => {
+  test('a non-clinical role may not sign a note', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await expect(
+      signMedicalRecord(rec._id, { userId: 'u-desk', userName: 'Front Desk', userRole: 'front_desk' }),
+    ).rejects.toThrow(SigningAuthorizationError);
+  });
+
+  test('an addendum cannot be added to an awaiting_cosign note (it must be co-signed first)', async () => {
+    const rec = await createMedicalRecord(validRecord());
+    await signMedicalRecord(rec._id, { userId: 'u-co', userName: 'CO Deng', userRole: 'clinical_officer' }, { awaitingCosign: true });
+    await expect(
+      addAddendum(rec._id, 'note', { userId: 'u-co', userName: 'CO Deng', userRole: 'clinical_officer' }),
+    ).rejects.toThrow(/co-signed/);
+  });
+});
+
+describe('Signing inbox (P1.1 query)', () => {
+  const signer = { userId: 'u-dr-kuol', userName: 'Dr. Kuol', userRole: 'doctor' };
+
+  test('separates unsigned drafts from records awaiting co-signature, excluding nursing vitals', async () => {
+    // Unsigned consult draft
+    await createMedicalRecord(validRecord({ patientId: 'p1', chiefComplaint: 'Fever draft' }));
+    // Awaiting cosign
+    const r2 = await createMedicalRecord(validRecord({ patientId: 'p2', chiefComplaint: 'Cough note' }));
+    await signMedicalRecord(r2._id, signer, { awaitingCosign: true });
+    // Fully signed (should appear in neither bucket)
+    const r3 = await createMedicalRecord(validRecord({ patientId: 'p3', chiefComplaint: 'Signed visit' }));
+    await signMedicalRecord(r3._id, signer);
+    // Nursing vitals observation (should be excluded from drafts)
+    await createMedicalRecord(validRecord({ patientId: 'p4', chiefComplaint: 'Nursing vitals observation' }));
+
+    const inbox = await getSigningInbox();
+    expect(inbox.unsignedDrafts.map((r) => r.chiefComplaint)).toEqual(['Fever draft']);
+    expect(inbox.awaitingCosign.map((r) => r.chiefComplaint)).toEqual(['Cough note']);
+  });
+
+  test('excludes nursing-vitals records by the structural recordKind marker (L4)', async () => {
+    await createMedicalRecord(validRecord({ patientId: 'p1', chiefComplaint: 'Real consult' }));
+    // A nursing vitals snapshot with a non-sentinel chief complaint must still
+    // be excluded thanks to recordKind.
+    await createMedicalRecord(validRecord({ patientId: 'p2', chiefComplaint: 'Routine obs', recordKind: 'nursing_vitals' }));
+    const inbox = await getSigningInbox();
+    expect(inbox.unsignedDrafts.map((r) => r.chiefComplaint)).toEqual(['Real consult']);
   });
 });

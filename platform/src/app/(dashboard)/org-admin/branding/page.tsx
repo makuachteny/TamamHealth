@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
@@ -26,6 +25,7 @@ export default function OrgBrandingPage() {
   const [secondaryColor, setSecondaryColor] = useState('#0F47AF');
   const [accentColor, setAccentColor] = useState('var(--accent-primary)');
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
+  const [bankDetails, setBankDetails] = useState('');
 
   const brandColor = primaryColor || '#7C3AED';
 
@@ -42,6 +42,7 @@ export default function OrgBrandingPage() {
           setSecondaryColor(o.secondaryColor || '#0F47AF');
           setAccentColor(o.accentColor || 'var(--accent-primary)');
           setLogoUrl(o.logoUrl);
+          setBankDetails(o.bankDetails || '');
         }
       } catch (err) {
         console.error('Failed to load org:', err);
@@ -87,6 +88,7 @@ export default function OrgBrandingPage() {
           secondaryColor,
           accentColor,
           logoUrl,
+          bankDetails: bankDetails.trim(),
         },
         currentUser._id,
         currentUser.username
@@ -123,6 +125,7 @@ export default function OrgBrandingPage() {
     setSecondaryColor(org.secondaryColor || '#0F47AF');
     setAccentColor(org.accentColor || 'var(--accent-primary)');
     setLogoUrl(org.logoUrl);
+    setBankDetails(org.bankDetails || '');
   };
 
   // Sidebar preview nav items
@@ -149,7 +152,31 @@ export default function OrgBrandingPage() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title="Branding" />
+      <TopBar title="Branding" actions={
+        <>
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+            style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+          >
+            <RotateCcw className="w-4 h-4" />
+            {t('branding.reset')}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90 disabled:opacity-50"
+            style={{ background: brandColor }}
+          >
+            {saving ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            {t('appointments.saveChanges')}
+          </button>
+        </>
+      } />
 
       <div className="page-container page-enter">
         {/* Banners */}
@@ -163,37 +190,6 @@ export default function OrgBrandingPage() {
             {error}
           </div>
         )}
-
-        <PageHeader
-          icon={Palette}
-          title={t('branding.heading')}
-          subtitle={t('branding.subtitle')}
-          actions={
-            <>
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
-              >
-                <RotateCcw className="w-4 h-4" />
-                {t('branding.reset')}
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90 disabled:opacity-50"
-                style={{ background: brandColor }}
-              >
-                {saving ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                {t('appointments.saveChanges')}
-              </button>
-            </>
-          }
-        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Editor Panel */}
@@ -210,6 +206,24 @@ export default function OrgBrandingPage() {
                 className="w-full px-3 py-2 rounded-lg text-sm"
                 style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
               />
+            </div>
+
+            {/* Bank Transfer Details */}
+            <div className="dash-card p-4">
+              <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                {t('branding.bankDetails')}
+              </label>
+              <textarea
+                value={bankDetails}
+                onChange={e => setBankDetails(e.target.value)}
+                rows={4}
+                placeholder={t('branding.bankDetailsPlaceholder')}
+                className="w-full px-3 py-2 rounded-lg text-sm font-mono resize-y"
+                style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+              />
+              <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+                {t('branding.bankDetailsHint')}
+              </p>
             </div>
 
             {/* Logo */}

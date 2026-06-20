@@ -4,18 +4,18 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import AvailabilityModal from '@/components/AvailabilityModal';
 import {
-  Calendar, Plus, Clock, CheckCircle2, XCircle, User,
-  ChevronDown, ChevronUp, Phone, AlertTriangle, RefreshCw,
+  Calendar, Plus, Clock, CheckCircle2, User,
+  AlertTriangle, RefreshCw,
   Video, Stethoscope, Syringe, HeartPulse, FlaskConical,
-  Building2, Bell, X, UserPlus, ClipboardList,
+  Building2, X, UserPlus, ClipboardList,
   Filter, ExternalLink,
 } from '@/components/icons/lucide';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
+import { useSettings } from '@/lib/settings/SettingsProvider';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -48,7 +48,8 @@ const appointmentTypes: { value: AppointmentType; label: string; icon: typeof Ca
   { value: 'walk_in', label: 'Walk-In', icon: UserPlus, color: '#7C3AED', bg: 'rgba(124,58,237,0.12)' },
 ];
 
-const departments = [
+// Fallback list when the facility hasn't set its departments in Facility Settings.
+const FALLBACK_DEPARTMENTS = [
   'Internal Medicine', 'Pediatrics', 'Obstetrics & Gynecology', 'Surgery',
   'Emergency', 'Cardiology', 'Orthopedics', 'Ophthalmology', 'Neurology',
   'Dermatology', 'ENT', 'Outpatient', 'Dental', 'Mental Health', 'Maternity',
@@ -82,6 +83,8 @@ export default function AppointmentsPage() {
   const { canBookAppointments } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();
+  const { departments: facilityDepartments } = useSettings();
+  const departments = facilityDepartments.length ? facilityDepartments : FALLBACK_DEPARTMENTS;
 
   // Translated label lookups for module-level config (which can't call t()).
   const typeLabelKey: Record<AppointmentType, string> = {
@@ -104,7 +107,6 @@ export default function AppointmentsPage() {
   };
 
   const router = useRouter();
-  const [view, setView] = useState<'calendar' | 'list'>('calendar');
   const [calView, setCalView] = useState<'month' | 'week' | 'day'>('month');
   // Appointment opened in the click-to-view detail popup.
   const [eventApt, setEventApt] = useState<typeof appointments[0] | null>(null);
@@ -116,12 +118,10 @@ export default function AppointmentsPage() {
   const canSetAvailability = ['doctor', 'clinical_officer', 'clinician', 'medical_superintendent', 'nurse', 'midwife'].includes(currentUser?.role ?? '');
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [editingApt, setEditingApt] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [patientInsurance, setPatientInsurance] = useState<Record<string, boolean>>({});
 
   // Deep link: TopBar "+ → Schedule appointment" routes here with ?new=1 to
   // open the booking form straight away. Read on the client to avoid needing a
@@ -175,55 +175,15 @@ export default function AppointmentsPage() {
   // after ~21:00 local and put the date picker / highlights a day ahead.
   const today = jubaDate();
 
-  // Load insurance status for all patients.
-  //
-  // The effect runs whenever the appointments list changes; we guard against
-  // a race where a slower outer fetch finishes after a newer one and clobbers
-  // the fresh state. The `cancelled` flag in the cleanup ensures only the
-  // latest invocation publishes its insuranceMap.
-  useEffect(() => {
-    if (appointments.length === 0) return;
-    let cancelled = false;
-    const loadInsurance = async () => {
-      try {
-        const { getPatientInsurancePolicies } = await import('@/lib/services/payment-service');
-        const insuranceMap: Record<string, boolean> = {};
-        const patientIds = [...new Set(appointments.map(a => a.patientId))];
-        for (const pid of patientIds) {
-          if (cancelled) return;
-          const policies = await getPatientInsurancePolicies(pid);
-          insuranceMap[pid] = policies.some((p: { isActive: boolean }) => p.isActive);
-        }
-        if (!cancelled) setPatientInsurance(insuranceMap);
-      } catch {
-        // Silently ignore errors in loading insurance
-      }
-    };
-    loadInsurance();
-    return () => { cancelled = true; };
-  }, [appointments]);
-
   // Appointments → react-big-calendar events. Each event keeps the full
   // appointment on `resource` so clicking can open the existing detail/edit flow.
-  const calendarEvents = useMemo(() => appointments.map(a => {
-    const start = new Date(`${a.appointmentDate}T${(a.appointmentTime || '00:00')}:00`);
-    const end = new Date(start.getTime() + (a.duration || 30) * 60000);
-    return {
-      id: a._id,
-      title: `${a.patientName}${a.reason ? ' · ' + a.reason : ''}`,
-      start,
-      end,
-      resource: a,
-    };
-  }), [appointments]);
-
-  // Filtered list
-  const filteredAppointments = useMemo(() => {
+  const calendarEvents = useMemo(() => {
     let list = appointments;
-    if (selectedDate) {
-      list = list.filter(a => a.appointmentDate === selectedDate);
+    if (filterStatus === 'pending_approval') {
+      list = list.filter(a => a.status === 'scheduled' && a.appointmentDate >= today);
+    } else if (filterStatus !== 'all') {
+      list = list.filter(a => a.status === filterStatus);
     }
-    if (filterStatus !== 'all') list = list.filter(a => a.status === filterStatus);
     const q = `${search} ${globalSearch}`.toLowerCase().trim();
     if (q) list = list.filter(a =>
       a.patientName.toLowerCase().includes(q) ||
@@ -231,12 +191,20 @@ export default function AppointmentsPage() {
       a.department.toLowerCase().includes(q) ||
       a.reason.toLowerCase().includes(q)
     );
-    // Copy before sorting so we never mutate the `appointments` state in-place
-    // (which would happen when no filter applies and `list === appointments`).
-    return [...list].sort((a, b) => a.appointmentTime.localeCompare(b.appointmentTime));
-  }, [appointments, selectedDate, filterStatus, search, globalSearch]);
+    return list.map(a => {
+      const start = new Date(`${a.appointmentDate}T${(a.appointmentTime || '00:00')}:00`);
+      const end = new Date(start.getTime() + (a.duration || 30) * 60000);
+      return {
+        id: a._id,
+        title: `${a.patientName}${a.reason ? ' · ' + a.reason : ''}`,
+        start,
+        end,
+        resource: a,
+      };
+    });
+  }, [appointments, filterStatus, search, globalSearch, today]);
 
-  // Same scope as the list (date + search) but WITHOUT the status filter, so the
+  // Same scope as the calendar (date + search) but WITHOUT the status filter, so the
   // status tab badges show how many appointments each status holds in the current view.
   const statusBaseList = useMemo(() => {
     let list = appointments;
@@ -333,6 +301,16 @@ export default function AppointmentsPage() {
     catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
   }, [updateStatus, showToast, t, statusLabelKey]);
 
+  // Map a status to the step it can be reversed back to. Reversing reuses the
+  // same updateAppointmentStatus path (which accepts any target status), so an
+  // accidental confirm / check-in / start can be undone, and a cancelled,
+  // completed, or no-show appointment can be reopened to 'scheduled'.
+  const PRIOR_STATUS: Partial<Record<AppointmentStatus, AppointmentStatus>> = {
+    confirmed: 'scheduled',
+    checked_in: 'confirmed',
+    in_progress: 'checked_in',
+  };
+
   const handleReschedule = async () => {
     if (!rescheduleId || !rescheduleDate || !rescheduleTime) return;
     try { await reschedule(rescheduleId, rescheduleDate, rescheduleTime); showToast(t('appointments.toastRescheduled'), 'success'); setRescheduleId(null); }
@@ -347,12 +325,31 @@ export default function AppointmentsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <TopBar />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <PageHeader
-          icon={Calendar}
-          title={t('appointments.title')}
-          subtitle={t('appointments.subtitle')}
+      <TopBar
+          searchTrailing={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Calendar granularity filter — mirrors the switcher on the calendar. */}
+              <select
+                value={calView}
+                onChange={(e) => setCalView(e.target.value as 'month' | 'week' | 'day')}
+                aria-label={t('appointments.viewCalendar')}
+                className="text-[13px] font-medium cursor-pointer"
+                style={{ height: 36, padding: '0 10px', borderRadius: 'var(--input-radius)', border: '1px solid var(--border-medium)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)' }}
+              >
+                <option value="day">Day</option>
+                <option value="week">Week</option>
+                <option value="month">Month</option>
+              </select>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`btn btn-secondary btn-filter${(selectedDate || filterStatus !== 'all') ? ' is-active' : ''}`}
+                aria-pressed={showFilters}
+                style={{ gap: 6 }}
+              >
+                <Filter size={14} /> {t('appointments.filters')}
+              </button>
+            </div>
+          }
           actions={
             (canSetAvailability || canBookAppointments) ? (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -373,55 +370,10 @@ export default function AppointmentsPage() {
                 )}
               </div>
             ) : undefined
-          }
-        />
-
-        {/* ═══ Action Bar ═══ */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* View toggle */}
-          <div style={{ display: 'flex', height: 36, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-medium)' }}>
-            {(['calendar', 'list'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)} style={{
-                display: 'flex', alignItems: 'center', padding: '0 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                background: view === v ? 'var(--accent-primary)' : 'var(--bg-card)',
-                color: view === v ? '#fff' : 'var(--text-secondary)',
-                transition: 'background 0.15s, color 0.15s',
-              }}>
-                {v === 'calendar' ? t('appointments.viewCalendar') : t('appointments.viewList')}
-              </button>
-            ))}
-          </div>
-
-          {/* Calendar sub-view toggle */}
-          {view === 'calendar' && (
-            <div style={{ display: 'flex', height: 36, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-medium)' }}>
-              {(['day', 'week', 'month'] as const).map(v => (
-                <button key={v} onClick={() => setCalView(v)} style={{
-                  display: 'flex', alignItems: 'center', padding: '0 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                  background: calView === v ? 'var(--accent-primary)' : 'var(--bg-card)',
-                  color: calView === v ? '#fff' : 'var(--text-secondary)',
-                  textTransform: 'capitalize',
-                  transition: 'background 0.15s, color 0.15s',
-                }}>
-                  {v}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Filters — pushed right so it lines up under the header actions */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="btn btn-secondary"
-            aria-pressed={showFilters}
-            style={{
-              gap: 6, marginLeft: 'auto',
-              ...(showFilters ? { color: 'var(--accent-primary)', borderColor: 'var(--accent-border)', background: 'var(--accent-light)' } : {}),
-            }}
-          >
-            <Filter size={14} /> {t('appointments.filters')}
-          </button>
-        </div>
+          } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {/* View toggle + Filters live beside the search bar above (TopBar
+            searchTrailing); the list/calendar body renders directly here. */}
 
         {/* Filters bar */}
         {showFilters && (
@@ -431,7 +383,10 @@ export default function AppointmentsPage() {
               aria-label={t('appointments.allStatus')}
               value={filterStatus}
               onChange={setFilterStatus}
-              options={statusTabs.map(tab => ({ value: tab.key, label: `${tab.label} (${tab.count})` }))}
+              options={[
+                ...(pendingApprovals.length > 0 ? [{ value: 'pending_approval', label: `${t('appointments.pendingApproval')} (${pendingApprovals.length})` }] : []),
+                ...statusTabs.map(tab => ({ value: tab.key, label: `${tab.label} (${tab.count})` })),
+              ]}
             />
             {selectedDate && (
               <button onClick={() => setSelectedDate(null)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
@@ -441,178 +396,32 @@ export default function AppointmentsPage() {
           </FilterBar>
         )}
 
-        {/* ═══ Calendar View (react-big-calendar) ═══ */}
-        {view === 'calendar' && (
-          <div className="card-elevated" style={{ padding: 16, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', marginBottom: -8 }}>
-            <div className="rbc-tamam" style={{ flex: 1, minHeight: 560 }}>
-              <AppointmentsCalendar
-                events={calendarEvents}
-                calView={calView}
-                calDate={calDate}
-                today={today}
-                statusConfig={statusConfig}
-                onNavigate={(d) => setCalDate(d)}
-                onView={(v) => setCalView(v)}
-                onSelectEvent={(apt) => setEventApt(apt)}
-                onSelectSlot={(slot) => {
-                  const d = slot.start;
-                  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                  setFormDate(iso);
-                  if (calView !== 'month') {
-                    setFormTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
-                  }
-                  setShowNewForm(true);
-                }}
-              />
-            </div>
+        {/* ═══ Calendar (react-big-calendar) — the only appointments view ═══ */}
+        <div className="card-elevated" style={{ padding: 16, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', marginBottom: -8 }}>
+          <div className="rbc-tamam" style={{ flex: 1, minHeight: 560 }}>
+            <AppointmentsCalendar
+              events={calendarEvents}
+              calView={calView}
+              calDate={calDate}
+              today={today}
+              statusConfig={statusConfig}
+              onNavigate={(d) => setCalDate(d)}
+              onView={(v) => setCalView(v)}
+              onSelectEvent={(apt) => setEventApt(apt)}
+              onSelectSlot={(slot) => {
+                const d = slot.start;
+                const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                setFormDate(iso);
+                if (calView !== 'month') {
+                  setFormTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+                }
+                setShowNewForm(true);
+              }}
+            />
           </div>
-        )}
+        </div>
 
-        {/* ═══ Pending Approvals Banner — list view only; in calendar view
-              these appointments already appear as events on the calendar. ═══ */}
-        {view === 'list' && pendingApprovals.length > 0 && (
-          <div className="card-elevated" style={{
-            padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12,
-          }}>
-            <div className="icon-box-sm" style={{ background: 'rgba(217,119,6,0.12)', flexShrink: 0 }}>
-              <Clock size={15} style={{ color: '#D97706' }} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                {t('appointments.pendingApprovalBanner', { count: pendingApprovals.length, plural: pendingApprovals.length > 1 ? 's' : '' })}
-              </span>
-            </div>
-            <button onClick={() => { setFilterStatus('scheduled'); setSelectedDate(null); setView('list'); }}
-              className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-              <ClipboardList size={14} /> {t('appointments.review')}
-            </button>
-          </div>
-        )}
 
-        {/* ═══ Selected Date Header ═══ */}
-        {view === 'list' && selectedDate && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
-              {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </h3>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('appointments.appointmentsCount', { count: filteredAppointments.length })}</span>
-          </div>
-        )}
-
-        {/* ═══ Appointment List — list view only; calendar view shows only the
-              calendar grid (Google-Calendar style). ═══ */}
-        {view === 'list' && (
-          <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {filteredAppointments.length === 0 ? (
-              <div className="card-elevated" style={{ textAlign: 'center', padding: 48 }}>
-                <Calendar size={56} style={{ color: 'var(--text-muted)', opacity: 0.3, marginBottom: 12 }} />
-                <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>{selectedDate ? t('appointments.noneOnDate') : t('appointments.noneFound')}</p>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                  {canBookAppointments && <button onClick={() => setShowNewForm(true)} className="btn btn-primary btn-sm" style={{ gap: 4 }}>
-                    <Plus size={14} /> {t('appointments.bookAppointment')}
-                  </button>}
-                  {canBookAppointments && <button onClick={() => setShowWalkIn(true)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-                    <UserPlus size={14} /> {t('appointments.walkIn')}
-                  </button>}
-                </div>
-              </div>
-            ) : (
-              filteredAppointments.map(apt => {
-                const sc = statusConfig[apt.status]; const pc = priorityConfig[apt.priority];
-                const isExpanded = expandedId === apt._id;
-                const typeInfo = appointmentTypes.find(t => t.value === apt.appointmentType);
-                const isWalkIn = apt.appointmentType === 'walk_in';
-
-                return (
-                  <div key={apt._id} className="card-elevated" style={{ overflow: 'hidden' }}>
-                    <div onClick={() => setExpandedId(isExpanded ? null : apt._id)} style={{
-                      display: 'flex', alignItems: 'center', padding: '12px 16px', cursor: 'pointer', gap: 12, flexWrap: 'wrap',
-                    }}>
-                      <div style={{ minWidth: 52, textAlign: 'center' }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{apt.appointmentTime}</div>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{t('appointments.minShort', { count: apt.duration })}</div>
-                      </div>
-                      <div className="icon-box-sm" style={{
-                        background: typeInfo?.bg || sc.bg, flexShrink: 0,
-                      }}>
-                        {typeInfo ? <typeInfo.icon size={15} style={{ color: typeInfo.color }} /> : <Calendar size={15} style={{ color: '#6366F1' }} />}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 120 }}>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          {apt.patientId ? (
-                            <Link
-                              href={`/patients/${apt.patientId}`}
-                              onClick={(e) => e.stopPropagation()}
-                              style={{ color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                              className="hover:underline"
-                              title={t('appointments.viewPatientRecord')}
-                            >
-                              <PatientName name={apt.patientName} nameClassName="text-[13px] font-semibold" />
-                              <ExternalLink size={11} style={{ opacity: 0.55 }} />
-                            </Link>
-                          ) : (
-                            <PatientName name={apt.patientName} nameClassName="text-[13px] font-semibold" />
-                          )}
-                          {isWalkIn && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)' }}>{t('appointments.walkInBadge')}</span>}
-                          {patientInsurance[apt.patientId] && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                              style={{ background: '#05966915', color: 'var(--color-success)' }}>
-                              {t('appointments.insured')}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {typeInfo ? t(typeLabelKey[apt.appointmentType]) : apt.appointmentType} &middot; {apt.department}
-                        </div>
-                      </div>
-                      {!selectedDate && <div style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 70 }}>{apt.appointmentDate}</div>}
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, color: pc.color, background: `${pc.color}12` }}>{t(priorityLabelKey[apt.priority])}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 6, color: sc.color, background: sc.bg }}>{t(statusLabelKey[apt.status])}</span>
-                      {isExpanded ? <ChevronUp size={14} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />}
-                    </div>
-
-                    {isExpanded && (
-                      <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border-medium)', paddingTop: 14 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', alignItems: 'stretch', gap: 14 }}>
-                          <Detail label={t('appointments.detailReason')} value={apt.reason} />
-                          {apt.notes && <Detail label={t('appointments.detailNotes')} value={apt.notes} />}
-                          <Detail label={t('appointments.detailProvider')} value={t('appointments.providerPrefix', { name: apt.providerName })} />
-                          <Detail label={t('appointments.detailFacility')} value={apt.facilityName || t('appointments.notAvailable')} icon={<Building2 size={13} />} />
-                          {apt.patientPhone && <Detail label={t('appointments.detailPhone')} value={apt.patientPhone} icon={<Phone size={13} />} />}
-                          <Detail label={t('appointments.detailBookedBy')} value={apt.bookedByName} />
-                          {apt.isRecurring && <Detail label={t('appointments.detailRecurrence')} value={apt.recurrencePattern || ''} icon={<RefreshCw size={13} />} />}
-                          {apt.reminderSent && <Detail label={t('appointments.detailReminder')} value={t('appointments.reminderSent')} icon={<Bell size={13} />} />}
-                        </div>
-                        {apt.status !== 'completed' && apt.status !== 'cancelled' && apt.status !== 'no_show' && (
-                          <>
-                          <hr className="section-divider" />
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {apt.status === 'scheduled' && <ActionBtn color="#7C3AED" icon={<CheckCircle2 size={13} />} label={t('appointments.actionApprove')} onClick={() => handleStatusChange(apt._id, 'confirmed')} />}
-                            {(apt.status === 'scheduled' || apt.status === 'confirmed') && <ActionBtn color="#D97706" icon={<User size={13} />} label={t('appointments.actionCheckIn')} onClick={() => handleStatusChange(apt._id, 'checked_in')} />}
-                            {apt.status === 'checked_in' && <ActionBtn color="#059669" icon={<Stethoscope size={13} />} label={t('appointments.actionStart')} onClick={() => handleStatusChange(apt._id, 'in_progress')} />}
-                            {apt.status === 'in_progress' && <ActionBtn color="#1F9D6F" icon={<CheckCircle2 size={13} />} label={t('appointments.actionComplete')} onClick={() => handleStatusChange(apt._id, 'completed')} />}
-                            <ActionBtn color="var(--accent-primary)" icon={<RefreshCw size={13} />} label={t('appointments.actionReschedule')} onClick={() => { setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); }} />
-                            {(apt.status === 'scheduled' || apt.status === 'confirmed') && <ActionBtn color="#6B7280" icon={<XCircle size={13} />} label={t('appointments.actionNoShow')} onClick={() => handleStatusChange(apt._id, 'no_show')} />}
-                            <ActionBtn color="#EF4444" icon={<X size={13} />} label={t('appointments.actionCancel')} onClick={() => setCancelId(apt._id)} />
-                          </div>
-                          </>
-                        )}
-                        {apt.status === 'cancelled' && apt.cancelledReason && (
-                          <>
-                            <hr className="section-divider" />
-                            <div style={{ padding: 10, background: 'rgba(239,68,68,0.04)', borderRadius: 8, fontSize: 12, color: 'var(--color-danger)' }}>
-                              <strong>{t('appointments.cancellationLabel')}</strong> {apt.cancelledReason}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
 
         {/* ═══ Modals ═══ */}
 
@@ -711,6 +520,13 @@ export default function AppointmentsPage() {
               </button>
               <button onClick={() => { loadEditForm(eventApt); setEditingApt(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('action.edit')}</button>
               <button onClick={() => { setRescheduleId(eventApt._id); setRescheduleDate(eventApt.appointmentDate); setRescheduleTime(eventApt.appointmentTime); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('appointments.actionReschedule')}</button>
+              {/* Undo a confirm / check-in / start, or reopen a terminal appointment. */}
+              {PRIOR_STATUS[eventApt.status] && (
+                <button onClick={() => { const id = eventApt._id; const to = PRIOR_STATUS[eventApt.status]!; setEventApt(null); handleStatusChange(id, to); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
+              )}
+              {(eventApt.status === 'completed' || eventApt.status === 'cancelled' || eventApt.status === 'no_show') && (
+                <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'scheduled'); }} className="btn btn-secondary btn-sm">{t('action.reopen')}</button>
+              )}
               {eventApt.status !== 'cancelled' && eventApt.status !== 'completed' && (
                 <button onClick={() => { setCancelId(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm" style={{ color: 'var(--color-danger)' }}>{t('appointments.actionCancel')}</button>
               )}
@@ -788,11 +604,11 @@ export default function AppointmentsPage() {
                                 className="hover:underline"
                                 title={t('appointments.viewPatientRecord')}
                               >
-                                <PatientName name={apt.patientName} nameClassName="text-[13px] font-semibold" />
+                                <PatientName name={apt.patientName} nameClassName="text-[13px] font-normal" />
                                 <ExternalLink size={10} style={{ opacity: 0.55 }} />
                               </Link>
                             ) : (
-                              <PatientName name={apt.patientName} nameClassName="text-[13px] font-semibold" />
+                              <PatientName name={apt.patientName} nameClassName="text-[13px] font-normal" />
                             )}
                             {isWI && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: 'rgba(124,58,237,0.08)', color: 'var(--accent-primary)' }}>{t('appointments.walkInBadge')}</span>}
                           </div>
@@ -923,16 +739,6 @@ function Detail({ label, value, icon }: { label: string; value: string; icon?: R
       <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
       <div style={{ fontSize: 13, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 5 }}>{icon}{value}</div>
     </div>
-  );
-}
-
-function ActionBtn({ color, icon, label, onClick }: { color: string; icon: React.ReactNode; label: string; onClick: () => void }) {
-  return (
-    <button onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px',
-      borderRadius: 8, border: `1px solid ${color}20`, background: `${color}08`,
-      color, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'background 0.15s',
-    }}>{icon} {label}</button>
   );
 }
 

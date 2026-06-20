@@ -64,6 +64,20 @@ export async function getAuthPayload(request: NextRequest): Promise<AuthPayload 
     // rather than hard-failing every request.
   }
 
+  // Tenant kill-switch (SaaS control plane). A suspended / cancelled /
+  // deactivated organization loses all access on the next request. Platform
+  // operators (super_admin) are exempt so they can lift the suspension. Fails
+  // open on a transient lookup error (don't brick a live clinic), fails closed
+  // only on an explicit operator action.
+  if (auth.role !== 'super_admin' && auth.orgId) {
+    try {
+      const { isOrgAccessAllowed } = await import('./services/tenant-control-service');
+      if (!(await isOrgAccessAllowed(auth.orgId))) return null;
+    } catch {
+      // preserve availability on a read error
+    }
+  }
+
   return auth;
 }
 

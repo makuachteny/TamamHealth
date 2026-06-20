@@ -1,20 +1,18 @@
 /**
  * Per-device user preferences (UI choices that aren't security- or
- * facility-policy-level): the page you land on after login, spacing density,
- * and whether to raise desktop notifications for new chat messages.
+ * facility-policy-level): spacing density and whether to raise desktop
+ * notifications for new chat messages.
  *
  * Stored in localStorage (per browser/device, like the theme + lock PIN) and
  * exposed as a tiny reactive store so the Settings page, the density applier,
  * and the notification watcher all stay in sync.
  */
 
-import { isPathAllowed, getDefaultDashboard } from './role-routes';
+import { getDefaultDashboard } from './role-routes';
 
 export type Density = 'comfortable' | 'compact';
 
 export interface UserPrefs {
-  /** Route to open after login. Empty string = use the role's default dashboard. */
-  startPage: string;
   /** UI spacing. 'compact' tightens page padding and header spacing. */
   density: Density;
   /** Raise a desktop notification for new chat messages while the tab is hidden. */
@@ -24,7 +22,6 @@ export interface UserPrefs {
 const KEY = 'tamamhealth.user-prefs';
 
 export const DEFAULT_USER_PREFS: UserPrefs = {
-  startPage: '',
   density: 'comfortable',
   messageNotifications: false,
 };
@@ -73,11 +70,9 @@ export function applyDensity(density: Density): void {
 }
 
 /**
- * The page a user should land on after login: their chosen start page if set
- * AND still permitted for their role, otherwise the role's default dashboard.
+ * The page a user should land on after login: always the role's default
+ * dashboard.
  */
 export function resolveLandingPage(role: string): string {
-  const sp = getUserPrefs().startPage;
-  if (sp && isPathAllowed(role, sp)) return sp;
   return getDefaultDashboard(role);
 }

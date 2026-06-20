@@ -59,9 +59,12 @@ function toneColors(tone: Tone): { bg: string; border: string; icon: string; tex
 
 function ToneIcon({ tone }: { tone: Tone }) {
   const cls = 'w-5 h-5 flex-shrink-0';
-  if (tone === 'success') return <Check className={cls} />;
-  if (tone === 'warning') return <WifiOff className={cls} />;
-  return <AlertTriangle className={cls} />;
+  // Icons sit on a solid tone background, so they take the tone's icon color
+  // (white) rather than their own semantic hue — keeps contrast clean.
+  const color = toneColors(tone).icon;
+  if (tone === 'success') return <Check className={cls} color={color} />;
+  if (tone === 'warning') return <WifiOff className={cls} color={color} />;
+  return <AlertTriangle className={cls} color={color} />;
 }
 
 export default function ConnectivityNotice() {
@@ -189,7 +192,7 @@ export default function ConnectivityNotice() {
         }}
       >
         {notice.tone === 'warning' && syncPaused && isNetworkUp ? (
-          <Pause className="w-5 h-5 flex-shrink-0" />
+          <Pause className="w-5 h-5 flex-shrink-0" color={colors.icon} />
         ) : (
           <ToneIcon tone={notice.tone} />
         )}
@@ -203,7 +206,7 @@ export default function ConnectivityNotice() {
           aria-label={t('common.dismissNotification')}
           className="p-1.5 rounded hover:bg-white/20 transition-colors flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-3.5 h-3.5" color={colors.icon} />
         </button>
       </div>
     </div>

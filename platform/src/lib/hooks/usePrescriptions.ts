@@ -68,6 +68,21 @@ export function usePrescriptions() {
     return result;
   }, [loadPrescriptions]);
 
+  // MAR: void a mis-recorded administration (append-only — marks the entry
+  // voided so its scheduled dose returns to due/overdue; nothing is deleted).
+  const voidAdministration = useCallback(async (
+    prescriptionId: string,
+    administrationId: string,
+    voidedBy: string,
+    voidedByName: string,
+    reason: string,
+  ) => {
+    const { voidAdministration } = await import('../services/prescription-service');
+    const result = await voidAdministration(prescriptionId, administrationId, voidedBy, voidedByName, reason);
+    await loadPrescriptions();
+    return result;
+  }, [loadPrescriptions]);
+
   const advance = useCallback(async (
     id: string,
     to: import('../clinical-flow/order-lifecycles').PrescriptionStatus,
@@ -79,5 +94,5 @@ export function usePrescriptions() {
     return result;
   }, [loadPrescriptions]);
 
-  return { prescriptions, loading, error, create, dispense, administer, advance, reload: loadPrescriptions };
+  return { prescriptions, loading, error, create, dispense, administer, voidAdministration, advance, reload: loadPrescriptions };
 }

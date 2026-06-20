@@ -1,7 +1,6 @@
 'use client';
 
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useVitalStatistics } from '@/lib/hooks/useVitalStatistics';
 import { Baby, Skull, AlertTriangle, Activity } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -18,11 +17,6 @@ export default function VitalStatisticsPage() {
     <>
       <TopBar title={t('vitalStats.topBarTitle')} />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Activity}
-          title={t('vitalStats.headerTitle')}
-          subtitle={t('vitalStats.headerSubtitle')}
-        />
 
         {/* Birth Statistics */}
         <h2 className="font-semibold text-sm flex items-center gap-2 mb-3"><Baby className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} /> {t('vitalStats.birthStatistics')}</h2>

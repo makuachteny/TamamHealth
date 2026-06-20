@@ -13,13 +13,15 @@
  */
 
 import { useMemo } from 'react';
-import { Printer, FileText, ShieldAlert, Heart, AlertTriangle } from '@/components/icons/lucide';
+import { Printer, FileText, ShieldAlert, Heart } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type {
   PatientDoc, MedicalRecordDoc, LabResultDoc, PrescriptionDoc, TriageDoc, ProblemDoc,
 } from '@/lib/db-types';
 import { formatDateTime } from '@/lib/format-utils';
 import { patientAge, patientFullName } from '@/lib/patient-utils';
+import { priorityColor } from '@/lib/clinical/triage-display';
+import { formatPhoneDisplay } from '@/lib/field-formats';
 
 interface PatientSBARProps {
   patient: PatientDoc;
@@ -199,12 +201,12 @@ export default function PatientSBAR({
         {latestTriage ? (
           <p className="mt-2">
             {t('sbar.currentlyTriaged')}{' '}
-            <strong style={{
-              color: latestTriage.priority === 'RED' ? 'var(--tamamhealth-red)'
-                : latestTriage.priority === 'YELLOW' ? 'var(--color-warning)'
-                : '#15795C',
-            }}>
-              {latestTriage.priority}
+            <strong style={{ color: priorityColor(latestTriage.priority) }}>
+              {latestTriage.priority === 'RED'
+                ? t('nurse.priorityRedLabel')
+                : latestTriage.priority === 'YELLOW'
+                ? t('nurse.priorityYellowLabel')
+                : t('nurse.priorityGreenLabel')}
             </strong>{' '}
             ({formatDateTime(latestTriage.triagedAt)}). {t('sbar.statusLabel')} {latestTriage.status}.
             {latestTriage.chiefComplaint && (
@@ -247,7 +249,6 @@ export default function PatientSBAR({
                       border: '1px solid rgba(124,58,237,0.20)',
                     }}
                   >
-                    <AlertTriangle className="w-3 h-3" />
                     {name}
                   </li>
                 ))}
@@ -275,7 +276,7 @@ export default function PatientSBAR({
                 {t('patient.nextOfKin')}
               </span>
               <span className="font-medium text-right">
-                {patient.nokName} <span style={{ color: 'var(--text-muted)' }}>({patient.nokRelationship}) · {patient.nokPhone}</span>
+                {patient.nokName} <span style={{ color: 'var(--text-muted)' }}>({patient.nokRelationship}) · {formatPhoneDisplay(patient.nokPhone)}</span>
               </span>
             </div>
           )}
