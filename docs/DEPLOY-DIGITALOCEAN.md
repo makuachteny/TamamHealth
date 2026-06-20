@@ -71,6 +71,20 @@ sudo bash deploy.sh
 ```
 Caddy auto-issues TLS for the three domains. Verify at https://app.tamamhealth.org.
 
+## 5b. CI/CD deploy (after first manual boot)
+
+GitHub Actions builds images to GHCR and SSH-deploys to staging on every green
+`main` build. Use [`docker-compose.ghcr.yml`](../docker-compose.ghcr.yml) on the
+droplet (see [`infra/digitalocean/`](../infra/digitalocean/) and
+[`docs/operations/jira-github-do-tracking.md`](operations/jira-github-do-tracking.md)).
+
+```bash
+# On droplet — append staging or production env snippet
+cat infra/digitalocean/staging.env.append >> .env
+docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
+docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d
+```
+
 ## 6. Build memory (if you chose a small droplet)
 If `next build` is killed (OOM) on a 2 GB droplet, add swap once:
 ```bash

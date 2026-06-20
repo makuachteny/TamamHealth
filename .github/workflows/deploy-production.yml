@@ -118,14 +118,16 @@ jobs:
           USER: ${{ secrets.PROD_SSH_USER }}
           APP_DIR: ${{ secrets.PROD_APP_DIR || '/opt/tamamhealth' }}
           SHA: ${{ needs.promote-image.outputs.sha }}
+          GH_OWNER: ${{ github.repository_owner }}
         run: |
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
           ssh "$USER@$HOST" \
             "cd $APP_DIR && \
-             docker compose pull && \
-             docker compose up -d && \
+             export GH_OWNER='$GH_OWNER' IMAGE_TAG=production && \
+             docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull && \
+             docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d && \
              docker image prune -f && \
-             echo 'Deployed sha=$SHA'"
+             echo 'Deployed sha=$SHA tag=production'"
 
   aws-deploy:
     name: cloudformation deploy to af-south-1 (aws target)

@@ -146,3 +146,11 @@ every PR. The build step catches server/client boundary mistakes — run
 | DHIS2 | National health information system TamamHealth exports to |
 | MPI | Master Patient Index — patient dedup/matching (`mpi-service.ts`) |
 | ICD-11 | WHO diagnosis coding standard used throughout |
+
+## 6. Jira, GitHub, and deploy tracking
+
+- **Jira:** taban.atlassian.net, project **SCRUM** — include `SCRUM-N` in branches, commits, and PRs ([CONTRIBUTING.md](../CONTRIBUTING.md)).
+- **Staging:** merges to `main` auto-deploy to the staging DigitalOcean droplet via GitHub Actions.
+- **Production:** manual **deploy-production** workflow after staging smoke test.
+
+Operator guide: [operations/jira-github-do-tracking.md](operations/jira-github-do-tracking.md).

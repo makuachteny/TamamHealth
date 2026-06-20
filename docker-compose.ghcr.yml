@@ -1,0 +1,27 @@
+# GHCR image override for CI/CD deploys (staging + production on DigitalOcean VPS).
+#
+# The base docker-compose.yml builds from source. GitHub Actions publishes
+# pre-built images to GHCR; the deploy workflows run `pull` + `up` with this
+# file layered on top.
+#
+# On a droplet (set in ./.env or export before compose):
+#   GH_OWNER=makuachteny
+#   IMAGE_TAG=staging          # staging droplet
+#   IMAGE_TAG=production       # production droplet
+#
+# Manual pull/up:
+#   docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d
+#
+# Or persist:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.ghcr.yml
+
+services:
+  platform:
+    image: ghcr.io/${GH_OWNER:?GH_OWNER must be set in .env}/tamamhealth-platform:${IMAGE_TAG:?IMAGE_TAG must be set (staging or production)}
+
+  website:
+    image: ghcr.io/${GH_OWNER:?GH_OWNER must be set in .env}/tamamhealth-website:${IMAGE_TAG:?IMAGE_TAG must be set (staging or production)}
+
+  sync-worker:
+    image: ghcr.io/${GH_OWNER:?GH_OWNER must be set in .env}/tamamhealth-sync-worker:${IMAGE_TAG:?IMAGE_TAG must be set (staging or production)}

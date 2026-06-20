@@ -1,6 +1,8 @@
 ## Summary
 
-<!-- What does this PR do, and why? Link the issue/task if one exists. -->
+<!-- What does this PR do, and why? -->
+
+**Jira:** <!-- e.g. SCRUM-98 — include key in title too; use "Closes SCRUM-98" below to auto-link -->
 
 ## Principles check
 
@@ -25,3 +27,5 @@
 ## Notes for reviewers
 
 <!-- Risky areas, migration/seed implications (SEED_VERSION bump?), follow-ups. -->
+
+<!-- Optional: Closes SCRUM-123 -->
