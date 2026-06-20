@@ -21,8 +21,7 @@ export default function Error({
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--bg-base, #0f1117)' }}>
       <div className="max-w-md w-full text-center">
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6" style={{
-          background: 'rgba(229, 46, 66, 0.1)',
-          border: '1px solid rgba(229, 46, 66, 0.2)',
+          background: 'transparent',
         }}>
           <AlertTriangle className="w-8 h-8" style={{ color: '#E52E42' }} />
         </div>

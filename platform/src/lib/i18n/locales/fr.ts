@@ -4220,7 +4220,7 @@ const fr: TranslationMap = {
   'timeline.categoryReferral': 'Orientation',
   'timeline.categoryAnc': 'CPN',
   'timeline.categoryAppointment': 'Rendez-vous',
-  'timeline.titleTriage': 'Triage {{priority}}',
+  'timeline.titleTriage': 'Triage',
   'timeline.titleConsultation': 'Consultation clinique',
   'timeline.titleReferral': 'Orienté vers {{facility}}',
   'timeline.facilityFallback': 'établissement',

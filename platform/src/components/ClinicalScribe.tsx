@@ -72,7 +72,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
       <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
-            background: isRecording ? 'rgba(229,46,66,0.15)' : 'rgba(59, 130, 246,0.12)',
+            background: 'transparent',
           }}>
             {isRecording ? (
               <Mic className="w-4 h-4 animate-pulse" style={{ color: 'var(--color-danger)' }} />

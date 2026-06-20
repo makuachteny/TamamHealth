@@ -144,7 +144,7 @@ export default function NutritionDashboard() {
               </div>
             ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table className="data-table">
+              <table className="data-table" style={{ minWidth: 960 }}>
                 <thead>
                   <tr>
                     <th>{t('nutrition.colPatient')}</th>

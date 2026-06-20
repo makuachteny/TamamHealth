@@ -194,9 +194,6 @@ export default function HRDashboardPage() {
                 <div>
                   {upcomingLeave.map(l => (
                     <div key={l._id} className="data-row" style={{ padding: '10px 14px' }}>
-                      <div className="data-row__icon" style={{ width: 28, height: 28 }}>
-                        <Calendar className="w-3.5 h-3.5" />
-                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-[12.5px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{l.userName}</div>
                         <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
@@ -232,10 +229,10 @@ export default function HRDashboardPage() {
         <div className="dash-card mt-4 p-4">
           <h3 className="font-semibold text-sm mb-3">{t('hr.quickActions')}</h3>
           <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', alignItems: 'stretch' }}>
-            <QuickAction href="/hr?tab=roster" icon={<Users className="w-4 h-4" />} label={t('hr.staffRoster')} subtitle={t('hr.staffCount', { count: facilityUsers.length })} />
-            <QuickAction href="/hr?tab=leave" icon={<Calendar className="w-4 h-4" />} label={t('hr.leaveQueue')} subtitle={t('hr.pendingCount', { count: pendingLeave.length })} alarm={pendingLeave.length > 0} />
-            <QuickAction href="/hr?tab=schedule" icon={<Clock className="w-4 h-4" />} label={t('hr.scheduleShifts')} subtitle={t('hr.todayCount', { count: schedules.length })} />
-            <QuickAction href="/hr?tab=payroll" icon={<Wallet className="w-4 h-4" />} label={t('hr.payrollRegister')} subtitle={t('hr.monthlyPayroll')} />
+            <QuickAction href="/hr?tab=roster" icon={<Users className="w-[22px] h-[22px]" />} label={t('hr.staffRoster')} subtitle={t('hr.staffCount', { count: facilityUsers.length })} />
+            <QuickAction href="/hr?tab=leave" icon={<Calendar className="w-[22px] h-[22px]" />} label={t('hr.leaveQueue')} subtitle={t('hr.pendingCount', { count: pendingLeave.length })} alarm={pendingLeave.length > 0} />
+            <QuickAction href="/hr?tab=schedule" icon={<Clock className="w-[22px] h-[22px]" />} label={t('hr.scheduleShifts')} subtitle={t('hr.todayCount', { count: schedules.length })} />
+            <QuickAction href="/hr?tab=payroll" icon={<Wallet className="w-[22px] h-[22px]" />} label={t('hr.payrollRegister')} subtitle={t('hr.monthlyPayroll')} />
           </div>
         </div>
       </main>
@@ -259,18 +256,17 @@ function QuickAction({ href, icon, label, subtitle, alarm }: { href: string; ico
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors"
-      style={{
-        background: alarm ? 'rgba(196, 69, 54, 0.06)' : 'var(--overlay-subtle)',
-        border: alarm ? '1px solid rgba(196, 69, 54, 0.28)' : '1px solid var(--border-light)',
-      }}
+      className="card-elevated flex items-center gap-3 px-3 py-2.5 transition-colors"
+      style={alarm ? {
+        background: 'rgba(196, 69, 54, 0.06)',
+        borderColor: 'rgba(196, 69, 54, 0.28)',
+      } : undefined}
     >
-      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{
-        background: alarm ? 'rgba(196, 69, 54, 0.12)' : 'var(--accent-light)',
+      <span className="flex-shrink-0 inline-flex items-center justify-center" style={{
         color: alarm ? '#C44536' : 'var(--accent-primary)',
       }}>
         {icon}
-      </div>
+      </span>
       <div className="flex-1 min-w-0">
         <div className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</div>
         <div className="text-[10.5px]" style={{ color: alarm ? '#8B2E24' : 'var(--text-muted)' }}>{subtitle}</div>

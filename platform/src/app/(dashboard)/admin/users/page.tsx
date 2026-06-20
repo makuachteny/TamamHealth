@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
@@ -11,6 +10,7 @@ import type { UserDoc, UserRole } from '@/lib/db-types';
 import {
   Users, Search, UserX, UserCheck, Shield, Filter
 } from '@/components/icons/lucide';
+import RowActionsMenu from '@/components/RowActionsMenu';
 
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Super Admin',
@@ -136,7 +136,7 @@ export default function AdminUsersPage() {
 
   const inputStyle: React.CSSProperties = {
     background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-    borderRadius: '10px', padding: '10px 14px', color: 'var(--text-primary)',
+    borderRadius: '4px', padding: '10px 14px', color: 'var(--text-primary)',
     fontSize: '14px', width: '100%', outline: 'none',
   };
   const selectStyle: React.CSSProperties = {
@@ -149,11 +149,6 @@ export default function AdminUsersPage() {
     <>
       <TopBar title={t('adminUsers.title')} />
       <main className="page-container page-enter">
-
-        <PageHeader
-          icon={Users}
-          title={t('adminUsers.title')}
-        />
 
         {/* Header stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
@@ -204,7 +199,7 @@ export default function AdminUsersPage() {
         {/* Table */}
         <div className="dash-card overflow-hidden">
           <div style={{ overflowX: 'auto' }}>
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 840 }}>
               <thead>
                 <tr>
                   {[
@@ -262,15 +257,18 @@ export default function AdminUsersPage() {
                           <span style={{ color: u.isActive ? 'var(--color-success)' : 'var(--text-muted)' }}>{u.isActive ? t('adminUsers.statusActive') : t('adminUsers.statusInactive')}</span>
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleToggleActive(u._id, u.isActive); }}
-                          title={u.isActive ? t('adminUsers.deactivate') : t('adminUsers.activate')}
-                          className="p-1.5 rounded-lg transition-colors"
-                          style={{ color: u.isActive ? 'var(--color-danger)' : 'var(--color-success)' }}
-                        >
-                          {u.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                        </button>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <RowActionsMenu
+                          actions={[
+                            {
+                              key: 'toggle',
+                              label: u.isActive ? t('adminUsers.deactivate') : t('adminUsers.activate'),
+                              tone: u.isActive ? 'danger' : 'success',
+                              icon: u.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />,
+                              onClick: () => handleToggleActive(u._id, u.isActive),
+                            },
+                          ]}
+                        />
                       </td>
                     </tr>
                     {isExpanded && (

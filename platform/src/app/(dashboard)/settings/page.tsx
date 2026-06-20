@@ -10,7 +10,6 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { SUPPORTED_LOCALES } from '@/lib/i18n';
 import { hasLockPin, setLockPin, clearLockPin } from '@/lib/hooks/useAutoLock';
 import { getUserPrefs, setUserPrefs, DEFAULT_USER_PREFS, type UserPrefs } from '@/lib/user-prefs';
-import { getRoleConfig } from '@/lib/permissions';
 import { useToast } from '@/components/Toast';
 import { statesAndCounties } from '@/data/mock';
 import type { UserRole } from '@/lib/db-types';
@@ -22,6 +21,8 @@ import {
   X, Eye, EyeOff, RefreshCw, Check, Bell, LayoutDashboard,
   Settings as SettingsIcon, Globe, Moon, Sun, Lock, Save, User as UserIcon,
 } from '@/components/icons/lucide';
+import RowActionsMenu from '@/components/RowActionsMenu';
+import { FacilitySettingsView } from '@/components/settings/FacilitySettingsView';
 
 const ROLES: { value: UserRole; label: string }[] = [
   { value: 'doctor', label: 'Doctor' },
@@ -61,11 +62,11 @@ export default function SettingsPage() {
   const { currentUser, theme, toggleTheme, isOnline, syncPaused, toggleOnline, syncNow, lastSync } = useApp();
   const { users, loading: usersLoading, create: createUser, update: updateUser, resetPassword, deactivate } = useUsers();
   const { hospitals, loading: hospitalsLoading, create: createHospital, reload: reloadHospitals } = useHospitals();
-  const { canManageUsers } = usePermissions();
+  const { canManageUsers, canAccess } = usePermissions();
   const { locale, setLocale } = useTranslation();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'preferences' | 'users' | 'hospitals'>('preferences');
+  const [activeTab, setActiveTab] = useState<'preferences' | 'facility' | 'users' | 'hospitals'>('preferences');
 
   // ── My account / preferences ──
   const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
@@ -114,18 +115,6 @@ export default function SettingsPage() {
   const [prefs, setPrefsState] = useState<UserPrefs>(DEFAULT_USER_PREFS);
   useEffect(() => { setPrefsState(getUserPrefs()); }, []);
   const updatePref = (patch: Partial<UserPrefs>) => setPrefsState(setUserPrefs(patch));
-
-  // Start-page options come from the role's own nav items (so every option is a
-  // page the user can actually open), plus a "default" sentinel.
-  const startPageOptions = useMemo(() => {
-    const cfg = currentUser ? getRoleConfig(currentUser.role) : null;
-    const opts: { href: string; label: string }[] = [{ href: '', label: 'Default (role dashboard)' }];
-    const seen = new Set<string>();
-    for (const it of cfg?.navItems ?? []) {
-      if (!seen.has(it.href)) { seen.add(it.href); opts.push({ href: it.href, label: it.label }); }
-    }
-    return opts;
-  }, [currentUser?.role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggleNotifications = async () => {
     if (!prefs.messageNotifications) {
@@ -357,11 +346,11 @@ export default function SettingsPage() {
   // ─── Styles ─────────────────────────────────────────────
   const card: React.CSSProperties = {
     background: 'var(--card-bg)', border: '1px solid var(--border-light)',
-    borderRadius: '16px', overflow: 'hidden',
+    borderRadius: '6px', overflow: 'hidden',
   };
   const inputStyle: React.CSSProperties = {
     background: 'var(--input-bg)', border: '1px solid var(--border-light)',
-    borderRadius: '10px', padding: '10px 14px', color: 'var(--text-primary)',
+    borderRadius: '4px', padding: '10px 14px', color: 'var(--text-primary)',
     fontSize: '14px', width: '100%', outline: 'none',
   };
   const selectStyle: React.CSSProperties = {
@@ -371,13 +360,13 @@ export default function SettingsPage() {
   };
   const btnPrimary: React.CSSProperties = {
     background: 'var(--accent-primary)', color: 'white',
-    border: 'none', borderRadius: '10px', padding: '10px 20px',
+    border: 'none', borderRadius: '4px', padding: '10px 20px',
     fontSize: '14px', fontWeight: 600, cursor: 'pointer',
     display: 'flex', alignItems: 'center', gap: '8px',
   };
   const btnSecondary: React.CSSProperties = {
     background: 'var(--input-bg)', color: 'var(--text-primary)',
-    border: '1px solid var(--border-light)', borderRadius: '10px', padding: '10px 20px',
+    border: '1px solid var(--border-light)', borderRadius: '4px', padding: '10px 20px',
     fontSize: '14px', fontWeight: 500, cursor: 'pointer',
   };
   const labelStyle: React.CSSProperties = {
@@ -390,7 +379,7 @@ export default function SettingsPage() {
   };
   const modalStyle: React.CSSProperties = {
     background: 'var(--card-bg)', border: '1px solid var(--border-light)',
-    borderRadius: '20px', width: '100%', maxWidth: '600px', maxHeight: '90vh',
+    borderRadius: '6px', width: '100%', maxWidth: '600px', maxHeight: '90vh',
     overflow: 'auto', padding: '28px',
   };
 
@@ -403,6 +392,9 @@ export default function SettingsPage() {
         <div className="flex gap-2" style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '0' }}>
           {[
             { key: 'preferences' as const, label: 'Preferences', icon: SettingsIcon },
+            ...(canAccess('/facility-settings') ? [
+              { key: 'facility' as const, label: 'Facility Settings', icon: Building2 },
+            ] : []),
             ...(canManageUsers ? [
               { key: 'users' as const, label: 'User Management', icon: Users },
               { key: 'hospitals' as const, label: 'Hospital Management', icon: Building2 },
@@ -427,6 +419,9 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
+
+        {/* ═══════════════ FACILITY SETTINGS TAB ═══════════════ */}
+        {activeTab === 'facility' && <FacilitySettingsView embedded />}
 
         {/* ═══════════════ PREFERENCES TAB (all users) ═══════════════ */}
         {activeTab === 'preferences' && (
@@ -614,26 +609,13 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Workspace — start page + density */}
+            {/* Workspace — density */}
             <div className="dash-card">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
                 <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><LayoutDashboard className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
                 <h3 className="font-semibold text-sm">Workspace</h3>
               </div>
               <div className="p-5 space-y-4">
-                <div>
-                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Start page after login</label>
-                  <select
-                    value={prefs.startPage}
-                    onChange={e => updatePref({ startPage: e.target.value })}
-                    className="w-full" style={{ background: 'var(--overlay-subtle)' }}
-                    aria-label="Start page after login"
-                  >
-                    {startPageOptions.map(o => (
-                      <option key={o.href || 'default'} value={o.href}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
                 <div>
                   <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Spacing</p>
                   <div className="flex gap-2">
@@ -719,7 +701,7 @@ export default function SettingsPage() {
             {/* Users table */}
             <div style={card}>
               <div style={{ overflowX: 'auto' }}>
-                <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 840 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                       {['Name', 'Username', 'Role', 'Hospital', 'Status', 'Created', 'Actions'].map(h => (
@@ -763,21 +745,14 @@ export default function SettingsPage() {
                           {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => openEditUser(u._id)} title="Edit"
-                              className="p-1.5 rounded-lg hover:bg-[rgba(0,119,215,0.1)] transition-colors" style={{ color: 'var(--text-muted)' }}>
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => { setResetUserId(u._id); setNewPassword(generatePassword()); setShowNewPassword(true); }} title="Reset Password"
-                              className="p-1.5 rounded-lg hover:bg-[rgba(252,211,77,0.15)] transition-colors" style={{ color: 'var(--text-muted)' }}>
-                              <KeyRound className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleToggleActive(u._id, u.isActive)} title={u.isActive ? 'Deactivate' : 'Activate'}
-                              className="p-1.5 rounded-lg transition-colors" style={{
-                                color: u.isActive ? 'var(--color-danger)' : 'var(--accent-primary)',
-                              }}>
-                              {u.isActive ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
-                            </button>
+                          <div className="flex items-center">
+                            <RowActionsMenu
+                              actions={[
+                                { key: 'edit', label: 'Edit', icon: <Edit3 className="w-4 h-4" />, onClick: () => openEditUser(u._id) },
+                                { key: 'reset', label: 'Reset Password', icon: <KeyRound className="w-4 h-4" />, onClick: () => { setResetUserId(u._id); setNewPassword(generatePassword()); setShowNewPassword(true); } },
+                                { key: 'toggle', label: u.isActive ? 'Deactivate' : 'Activate', tone: u.isActive ? 'danger' : 'default', icon: u.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />, onClick: () => handleToggleActive(u._id, u.isActive) },
+                              ]}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -818,7 +793,7 @@ export default function SettingsPage() {
             {/* Hospitals table */}
             <div style={card}>
               <div style={{ overflowX: 'auto' }}>
-                <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 720 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                       {['Name', 'State', 'Type', 'Beds', 'Staff', 'Status'].map(h => (
@@ -1109,7 +1084,7 @@ export default function SettingsPage() {
               {/* Infrastructure */}
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--accent-primary)' }}>Infrastructure</h4>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 keep-cols">
                   {[
                     { key: 'hasElectricity', label: 'Has Electricity' },
                     { key: 'hasGenerator', label: 'Has Generator' },

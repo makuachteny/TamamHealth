@@ -45,9 +45,17 @@ const config: Config = {
         mono: ['Fragment Mono', 'monospace'],
       },
       borderRadius: {
-        'glass': '20px',
-        '2xl': '16px',
-        '3xl': '24px',
+        'none': '0px',
+        'sm': '2px',
+        DEFAULT: '3px',
+        'md': '3px',
+        'lg': '4px',
+        'xl': '5px',
+        '2xl': '6px',
+        '3xl': '8px',
+        'glass': '6px',
+        // `full` kept fully round for pills, avatars, and circular badges.
+        'full': '9999px',
       },
       backdropBlur: {
         'glass': '24px',

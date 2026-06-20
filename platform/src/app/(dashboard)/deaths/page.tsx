@@ -1,19 +1,19 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import PatientName from '@/components/PatientName';
 import { useDeaths } from '@/lib/hooks/useDeaths';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { patientAge } from '@/lib/patient-utils';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { SearchInput, FilterSelect, FilterBar } from '@/components/filters';
+import { FilterBar } from '@/components/filters';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
-import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck } from '@/components/icons/lucide';
+import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck, Filter } from '@/components/icons/lucide';
 
 export default function DeathsPage() {
   const { t } = useTranslation();
@@ -23,8 +23,22 @@ export default function DeathsPage() {
   const { currentUser } = useApp();
   const { canRecordVitalEvents } = usePermissions();
   const { showToast } = useToast();
-  const [search, setSearch] = useState('');
-  const [genderFilter, setGenderFilter] = useState('all');
+  // Per-column filters (replace the old search + gender top bar).
+  const [colFilters, setColFilters] = useState({ certificate: '', name: '', sex: '', age: '', cause: '', manner: '', facility: '', registered: '' });
+  const setColFilter = (k: string, v: string) => setColFilters(f => ({ ...f, [k]: v }));
+  const anyColFilter = Object.values(colFilters).some(Boolean);
+  const clearColFilters = () => setColFilters({ certificate: '', name: '', sex: '', age: '', cause: '', manner: '', facility: '', registered: '' });
+  const ageBandOf = (age: number | null) => age == null ? null : age < 18 ? 'child' : age < 65 ? 'adult' : 'elderly';
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+  const filterRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!openFilter) return;
+    const onDown = (e: MouseEvent) => { if (filterRef.current && !filterRef.current.contains(e.target as Node)) setOpenFilter(null); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenFilter(null); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [openFilter]);
   const [showForm, setShowForm] = useState(false);
   const [expandedDeath, setExpandedDeath] = useState<string | null>(null);
   const [patientLookup, setPatientLookup] = useState('');
@@ -66,11 +80,46 @@ export default function DeathsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientLookup, patients]);
 
-  const filtered = (deaths || []).filter(d =>
-    (genderFilter === 'all' || d.deceasedGender === genderFilter) &&
-    (!search || `${d.deceasedFirstName} ${d.deceasedSurname}`.toLowerCase().includes(search.toLowerCase()) ||
-    (d.certificateNumber || '').toLowerCase().includes(search.toLowerCase()) || (d.underlyingICD11 || '').toLowerCase().includes(search.toLowerCase()))
-  );
+  const filtered = (deaths || []).filter(d => {
+    const f = colFilters;
+    if (f.certificate && !(d.certificateNumber || '').toLowerCase().includes(f.certificate.toLowerCase())) return false;
+    if (f.name && !`${d.deceasedFirstName} ${d.deceasedSurname}`.toLowerCase().includes(f.name.toLowerCase())) return false;
+    if (f.sex && d.deceasedGender !== f.sex) return false;
+    if (f.age && ageBandOf(d.ageAtDeath) !== f.age) return false;
+    if (f.cause && !`${d.underlyingICD11 || ''} ${d.underlyingCause || ''} ${d.immediateCause || ''}`.toLowerCase().includes(f.cause.toLowerCase())) return false;
+    if (f.manner && !(d.mannerOfDeath || '').replace(/_/g, ' ').toLowerCase().includes(f.manner.toLowerCase())) return false;
+    if (f.facility && !(d.facilityName || '').toLowerCase().includes(f.facility.toLowerCase())) return false;
+    if (f.registered && (f.registered === 'yes') !== !!d.deathRegistered) return false;
+    return true;
+  });
+
+  // Per-column filter controls + column config (funnel dropdown in each header).
+  type ColFilter = { field: keyof typeof colFilters; node: React.ReactNode };
+  const fieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', padding: '5px 9px', borderRadius: 8, fontSize: 11, width: '100%', minWidth: 0 } as const;
+  const textFilter = (key: keyof typeof colFilters, label: string): ColFilter => ({
+    field: key,
+    node: <input type="text" autoFocus value={colFilters[key]} onChange={(e) => setColFilter(key, e.target.value)} placeholder={label} className="normal-case font-normal tracking-normal w-full" style={fieldStyle} />,
+  });
+  const selectFilter = (key: keyof typeof colFilters, opts: { v: string; l: string }[]): ColFilter => ({
+    field: key,
+    node: (
+      <select value={colFilters[key]} onChange={(e) => setColFilter(key, e.target.value)} className="normal-case font-normal tracking-normal w-full" style={fieldStyle}>
+        <option value="">{t('patients.all')}</option>
+        {opts.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </select>
+    ),
+  });
+  const deathCols: { key: string; label: string; filter?: ColFilter }[] = [
+    { key: 'certificate', label: t('deaths.colCertificate'), filter: textFilter('certificate', t('deaths.colCertificate')) },
+    { key: 'deceased', label: t('deaths.colDeceased'), filter: textFilter('name', t('deaths.colDeceased')) },
+    { key: 'sex', label: t('nurse.colGender'), filter: selectFilter('sex', [{ v: 'Male', l: t('patient.male') }, { v: 'Female', l: t('patient.female') }]) },
+    { key: 'age', label: t('deaths.colAge'), filter: selectFilter('age', [{ v: 'child', l: t('nurse.ageChild') }, { v: 'adult', l: t('nurse.ageAdult') }, { v: 'elderly', l: t('nurse.ageElderly') }]) },
+    { key: 'dateOfDeath', label: t('deaths.colDateOfDeath') },
+    { key: 'cause', label: t('deaths.colCause'), filter: textFilter('cause', t('deaths.colCause')) },
+    { key: 'manner', label: t('deaths.colManner'), filter: textFilter('manner', t('deaths.colManner')) },
+    { key: 'facility', label: t('deaths.colFacility'), filter: textFilter('facility', t('deaths.colFacility')) },
+    { key: 'registered', label: t('deaths.colRegistered'), filter: selectFilter('registered', [{ v: 'yes', l: t('deaths.yes') }, { v: 'no', l: t('deaths.no') }]) },
+  ];
 
   const handleSubmit = async () => {
     if (!form.deceasedFirstName || !form.immediateCause) return;
@@ -101,7 +150,7 @@ export default function DeathsPage() {
     setPatientLookup('');
     // Pre-fill the form with the patient's known data
     const dob = p.dateOfBirth || '';
-    const ageAtDeath = p.estimatedAge ?? (dob ? new Date().getFullYear() - new Date(dob).getFullYear() : 0);
+    const ageAtDeath = patientAge(p) ?? 0;
     setForm(f => ({
       ...f,
       deceasedFirstName: p.firstName || f.deceasedFirstName,
@@ -126,33 +175,24 @@ export default function DeathsPage() {
 
   return (
     <>
-      <TopBar title={t('deaths.title')} />
+      <TopBar title={t('deaths.title')} actions={
+            <div className="flex gap-2">
+              {anyColFilter && (
+                <button onClick={clearColFilters} className="btn btn-secondary" title={t('nurse.clearAllFilters')} aria-label={t('nurse.clearAllFilters')}>
+                  <X className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t('nurse.clearAllFilters')}</span>
+                </button>
+              )}
+              {canRecordVitalEvents && (
+                <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
+                  <Plus className="w-4 h-4" /> {t('deaths.registerDeath')}
+                </button>
+              )}
+            </div>
+          } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <PageHeader
-          icon={FileText}
-          title={t('deaths.title')}
-          subtitle={t('deaths.subtitle')}
-          actions={canRecordVitalEvents && (
-            <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
-              <Plus className="w-4 h-4" /> {t('deaths.registerDeath')}
-            </button>
-          )}
-        />
-
-        {/* Search + filters, with the registry stats surfaced inline on the right */}
+        {/* Registry stats (filtering now lives in the column headers) */}
         <FilterBar>
-          <SearchInput value={search} onChange={setSearch} placeholder={t('deaths.searchPlaceholder')} />
-          <FilterSelect
-            value={genderFilter}
-            onChange={setGenderFilter}
-            options={[
-              { value: 'all', label: 'All sexes' },
-              { value: 'Male', label: 'Male' },
-              { value: 'Female', label: 'Female' },
-            ]}
-            aria-label="Filter by sex"
-          />
-          <FilterBar.Spacer />
           {stats && (
             <div className="flex items-center gap-4 sm:gap-5 pr-1">
               {[
@@ -173,25 +213,53 @@ export default function DeathsPage() {
 
         {/* Table */}
         <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          <table className="data-table">
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+          <table className="data-table" style={{ minWidth: 960 }}>
             <thead>
               <tr>
-                <th>{t('deaths.colCertificate')}</th>
-                <th>{t('deaths.colDeceased')}</th>
-                <th>{t('deaths.colAge')}</th>
-                <th>{t('deaths.colDateOfDeath')}</th>
-                <th>{t('deaths.colCause')}</th>
-                <th>{t('deaths.colManner')}</th>
-                <th>{t('deaths.colFacility')}</th>
-                <th>{t('deaths.colRegistered')}</th>
+                {deathCols.map(c => (
+                  <th key={c.key}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="whitespace-nowrap">{c.label}</span>
+                      {c.filter && (
+                        <span ref={openFilter === c.key ? filterRef : null} className="relative inline-flex items-center">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === c.key ? null : c.key); }}
+                            className="inline-flex items-center justify-center w-4 h-4 rounded transition-colors hover:bg-[var(--overlay-subtle)]"
+                            aria-label={`${c.label} filter`}
+                          >
+                            <Filter className="w-3 h-3" style={{ color: colFilters[c.filter.field] ? 'var(--accent-primary)' : 'var(--text-muted)', fill: colFilters[c.filter.field] ? 'var(--accent-primary)' : 'transparent' }} />
+                          </button>
+                          {openFilter === c.key && (
+                            <div className="absolute top-full right-0 mt-2 normal-case rounded-xl overflow-hidden flex flex-col" style={{ zIndex: 50, width: 220, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}>
+                              <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
+                                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{c.label}</span>
+                                <button type="button" onClick={() => setOpenFilter(null)} className="p-0.5 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
+                                  <X className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
+                                </button>
+                              </div>
+                              <div className="p-2 flex flex-col gap-1.5">
+                                {c.filter.node}
+                                {colFilters[c.filter.field] && (
+                                  <button type="button" onClick={() => setColFilter(c.filter!.field, '')} className="text-[11px] font-medium text-left px-1" style={{ color: 'var(--accent-primary)' }}>{t('nurse.filterClear')}</button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map(d => (
                 <tr key={d._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setExpandedDeath(expandedDeath === d._id ? null : d._id)}>
                   <td className="font-mono text-xs">{d.certificateNumber}</td>
-                  <td><PatientName name={`${d.deceasedFirstName} ${d.deceasedSurname}`} gender={d.deceasedGender} nameClassName="text-sm font-medium" /></td>
+                  <td><PatientName patientId={d.patientId} name={`${d.deceasedFirstName} ${d.deceasedSurname}`} gender={d.deceasedGender} nameClassName="text-sm font-medium" /></td>
+                  <td className="text-sm">{d.deceasedGender}</td>
                   <td className="text-sm">{d.ageAtDeath < 1 ? t('deaths.neonate') : `${d.ageAtDeath}y`}</td>
                   <td className="text-xs font-mono">{d.dateOfDeath}</td>
                   <td>
@@ -217,7 +285,7 @@ export default function DeathsPage() {
                 if (!d) return null;
                 return (
                   <tr>
-                    <td colSpan={8} style={{ background: 'var(--overlay-subtle)', padding: 0 }}>
+                    <td colSpan={9} style={{ background: 'var(--overlay-subtle)', padding: 0 }}>
                       <div className="p-4">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                           <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>{t('deaths.fullName')}</span>{d.deceasedFirstName} {d.deceasedSurname}</div>

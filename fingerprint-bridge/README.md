@@ -42,7 +42,21 @@ Environment variables:
 | `FINGERPRINT_DRIVER` | `mock` | Adapter to load from `./adapters/<name>.mjs` |
 | `FINGERPRINT_BRIDGE_PORT` | `7345` | Listen port |
 | `FINGERPRINT_BRIDGE_HOST` | `127.0.0.1` | Listen host (keep loopback) |
-| `FINGERPRINT_BRIDGE_ALLOWED_ORIGIN` | `*` | CORS origin pin for the browser app |
+| `FINGERPRINT_BRIDGE_ALLOWED_ORIGIN` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated browser origins allowed to call the bridge. **Set this to your real app origin in production.** `*` disables the allowlist (lets any website read biometrics — discouraged). |
+| `FINGERPRINT_BRIDGE_TOKEN` | _(unset)_ | Optional shared secret. When set, `/capture` and `/match` require header `X-Bridge-Token: <token>`. |
+| `FINGERPRINT_ALLOW_MOCK` | `false` | Allow the `mock` driver to start when `NODE_ENV=production` (otherwise the bridge refuses to start, since mock silently breaks real identification). |
+
+### Security notes
+
+The bridge is loopback-only, but loopback alone is not enough: a malicious web
+page open in the same browser, or another local process, can reach a localhost
+service. The bridge therefore also:
+
+- **validates the `Host` header is loopback** (`127.0.0.1`/`localhost`/`[::1]`),
+  defeating DNS-rebinding attacks;
+- **enforces an `Origin` allowlist server-side** before any scanner action, so a
+  hostile origin can neither read templates (CORS) nor trigger a capture;
+- **optionally requires a shared-secret token** (`FINGERPRINT_BRIDGE_TOKEN`).
 
 On the platform side, set in `platform/.env.local`:
 

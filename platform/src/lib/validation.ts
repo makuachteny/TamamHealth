@@ -1,5 +1,7 @@
 // Input validation for patient and medical record data
 
+import { isValidPhone, isValidNationalId } from './field-formats';
+
 // File upload constraints
 export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 export const MAX_TRANSFER_PACKAGE_BYTES = 20 * 1024 * 1024; // 20MB
@@ -62,10 +64,11 @@ export function sanitizePayload<T extends Record<string, unknown>>(data: T): T {
 }
 
 function validatePhone(value: unknown, fieldName: string): string | null {
-  if (!value || typeof value !== 'string') return null;
-  const phone = value.replace(/\s/g, '');
-  if (phone.length > 0 && !/^\+?[\d-]{7,15}$/.test(phone)) {
-    return `Invalid ${fieldName} format`;
+  if (!value || typeof value !== 'string' || value.trim() === '') return null;
+  // Canonical South Sudan format enforced via the shared field-formats module:
+  // accepts local/international input but must normalize to +211XXXXXXXXX.
+  if (!isValidPhone(value)) {
+    return `Invalid ${fieldName} — use a valid South Sudan number (e.g. +211 912 345 678 or 0912 345 678)`;
   }
   return null;
 }
@@ -149,13 +152,10 @@ export function validatePatientData(data: Record<string, unknown>): Record<strin
     errors.address = 'Address is too long (max 500 characters)';
   }
 
-  // Validate national ID format when provided
-  if (data.nationalId && typeof data.nationalId === 'string') {
-    const nid = data.nationalId.trim();
-    if (nid.length > 0 && nid.length < 3) {
-      errors.nationalId = 'National ID is too short';
-    } else if (nid.length > 30) {
-      errors.nationalId = 'National ID is too long';
+  // Validate national ID format when provided (alphanumeric, 3–30 chars).
+  if (data.nationalId && typeof data.nationalId === 'string' && data.nationalId.trim() !== '') {
+    if (!isValidNationalId(data.nationalId)) {
+      errors.nationalId = 'National ID must be 3–30 letters/numbers';
     }
   }
 

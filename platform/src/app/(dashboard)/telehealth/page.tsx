@@ -5,7 +5,6 @@ import PortalModal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import Link from 'next/link';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import {
   Video, Plus, Phone, PhoneOff, Clock, CheckCircle2, XCircle,
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MessageSquare, FileText,
@@ -21,6 +20,7 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { FilterBar, SearchInput } from '@/components/filters';
 import type { TelehealthType, TelehealthStatus, TelehealthSessionDoc } from '@/lib/db-types';
+import { formatMoney } from '@/lib/format-utils';
 
 /* ─── Config ─── */
 const statusConfig: Record<TelehealthStatus, { color: string; bg: string; label: string; icon: typeof Video }> = {
@@ -196,18 +196,12 @@ export default function TelehealthPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <TopBar />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <PageHeader
-          icon={Video}
-          title={t('nav.telehealth')}
-          subtitle={t('telehealth.subtitle')}
-          actions={
+      <TopBar actions={
             <button onClick={() => setShowNewForm(true)} className="btn btn-primary" style={{ gap: 6 }}>
               <Plus size={16} /> {t('telehealth.newSession')}
             </button>
-          }
-        />
+          } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
         {/* ═══ Quick Stats ═══ */}
         {stats && (
@@ -248,7 +242,7 @@ export default function TelehealthPage() {
           <div style={{ flex: 1, minWidth: 200 }}>
             <SearchInput value={search} onChange={setSearch} placeholder={t('telehealth.searchPlaceholder')} />
           </div>
-          <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary" style={{ gap: 6 }}>
+          <button onClick={() => setShowFilters(!showFilters)} className={`btn btn-secondary btn-filter${selectedDate ? ' is-active' : ''}`} aria-pressed={showFilters} style={{ gap: 6 }}>
             <Filter size={14} /> {t('patients.filters')}
           </button>
         </div>
@@ -348,8 +342,7 @@ export default function TelehealthPage() {
             {filteredAppts.map(a => (
               <div key={a._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: '1px solid var(--border-medium)' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', minWidth: 44 }}>{a.appointmentTime}</span>
-                <Calendar size={13} style={{ color: 'var(--accent-primary)' }} />
-                <span style={{ flex: 1 }}><PatientName name={a.patientName} size={24} nameClassName="text-xs" /></span>
+                <span style={{ flex: 1 }}><PatientName patientId={a.patientId} name={a.patientName} size={24} nameClassName="text-xs" /></span>
                 <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{a.department}</span>
               </div>
             ))}
@@ -418,7 +411,7 @@ export default function TelehealthPage() {
                           {session.clinicalNotes && <Detail l={t('nurse.notes')} v={session.clinicalNotes} />}
                           {session.diagnosis && <Detail l={t('telehealth.detailDiagnosis')} v={`${session.diagnosis}${session.icd10Code ? ` (${session.icd10Code})` : ''}`} />}
                           {session.consultationFee !== undefined && (
-                            <Detail l={t('telehealth.detailFee')} v={`${session.currency} ${session.consultationFee}`} badge={session.paymentStatus ? { color: paymentLabels[session.paymentStatus].color, label: t(`telehealth.payment_${session.paymentStatus}`) } : undefined} />
+                            <Detail l={t('telehealth.detailFee')} v={formatMoney(session.consultationFee, { currency: session.currency })} badge={session.paymentStatus ? { color: paymentLabels[session.paymentStatus].color, label: t(`telehealth.payment_${session.paymentStatus}`) } : undefined} />
                           )}
                           <Detail l={t('telehealth.detailConsent')} v={session.patientConsentGiven ? t('telehealth.consentGiven') : t('telehealth.consentPending')} color={session.patientConsentGiven ? 'var(--color-success)' : 'var(--color-danger)'} />
                           {session.patientRating && <Detail l={t('telehealth.detailRating')} v={`${session.patientRating}/5`} color="#F59E0B" />}

@@ -7,6 +7,32 @@ export interface PaymentMethodConfig {
   color: string;
 }
 
+/**
+ * Display config (label/icon/colour) keyed by the low-level tender/provider
+ * identifier used on `PaymentDoc.method` (see `PaymentMethodType` in
+ * db-types-payments.ts).
+ *
+ * IMPORTANT — this is NOT the list of payment *methods* that a facility
+ * offers. Two distinct concepts are deliberately conflated here only as a
+ * display lookup; keep them separate when deciding what to show:
+ *
+ *   • "Methods" — the settings-gated tabs the cashier can pick from. These are
+ *     the higher-level `PaymentMethodKey`s in facility-settings.ts
+ *     (cash, mobile_money, voucher, partial_payment, bank_transfer, card) and
+ *     are the source of truth for which payment options are *offered*.
+ *   • "Mobile-money providers" — the sub-options shown *under* the single
+ *     `mobile_money` method (mpesa / airtel / mtn_momo / m_gurush). Provider
+ *     selection is independent of method gating: enabling `mobile_money` in
+ *     settings exposes the providers below as sub-choices.
+ *
+ * `insurance` / `waiver` / `payment_plan` are payor/exemption flows, not
+ * tender types, and live here only so receipts can render an icon for them.
+ */
+
+/** Mobile-money providers — sub-options under the `mobile_money` method. */
+export const MOBILE_MONEY_PROVIDERS = ['mpesa', 'airtel', 'mtn_momo', 'm_gurush'] as const;
+export type MobileMoneyProvider = typeof MOBILE_MONEY_PROVIDERS[number];
+
 export const PAYMENT_METHOD_CONFIG: Record<string, PaymentMethodConfig> = {
   cash: { label: 'Cash', shortLabel: 'Cash', icon: Banknote, color: 'var(--color-success)' },
   mpesa: { label: 'M-Pesa', shortLabel: 'M-Pesa', icon: Smartphone, color: '#4CAF50' },

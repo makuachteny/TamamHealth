@@ -4215,7 +4215,7 @@ const din: TranslationMap = {
   'timeline.categoryReferral': 'Tuɔɔc',
   'timeline.categoryAnc': 'ANC',
   'timeline.categoryAppointment': 'Akɔl de Bɛ̈n',
-  'timeline.titleTriage': 'Tek de akïm {{priority}}',
+  'timeline.titleTriage': 'Tek de akïm',
   'timeline.titleConsultation': 'Thiëëc de akïm',
   'timeline.titleReferral': 'Cï tuɔɔc tɛ̈ {{facility}}',
   'timeline.facilityFallback': 'tɛ̈ akïm',

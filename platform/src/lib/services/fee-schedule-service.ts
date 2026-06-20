@@ -9,6 +9,7 @@
  * this module adds the CRUD + lookup + charge-generation layer on top.
  */
 import { getDB } from '../db';
+import { getSettings } from '../settings/settings-store';
 import type { FeeScheduleDoc, ChargeCategory, BillLineItem, BillingDoc } from '../db-types-billing';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
@@ -202,6 +203,8 @@ export async function chargeForServices(ctx: ChargeContext, lines: ChargeLineReq
     appointmentId: ctx.appointmentId,
     items,
     currency: ctx.currency || 'SSP',
+    // Default service tax/VAT from facility settings (0 for public facilities).
+    taxRate: getSettings().taxRatePercent || undefined,
     generatedBy: ctx.generatedBy,
     generatedByName: ctx.generatedByName,
     state: ctx.state,

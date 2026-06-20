@@ -4219,7 +4219,7 @@ const sw: TranslationMap = {
   'timeline.categoryReferral': 'Rufaa',
   'timeline.categoryAnc': 'ANC',
   'timeline.categoryAppointment': 'Miadi',
-  'timeline.titleTriage': 'Upangaji wa {{priority}}',
+  'timeline.titleTriage': 'Upangaji',
   'timeline.titleConsultation': 'Ushauri wa kliniki',
   'timeline.titleReferral': 'Imepelekwa kwa {{facility}}',
   'timeline.facilityFallback': 'kituo',

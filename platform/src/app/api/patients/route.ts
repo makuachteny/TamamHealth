@@ -14,14 +14,14 @@ import { withAuditLog } from '@/lib/audit/with-audit';
 import type { UserRole } from '@/lib/db-types';
 // Roles that may read patient lists
 const READ_ROLES: UserRole[] = [
-  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
+  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'clinician', 'nurse',
   'midwife', 'front_desk', 'cashier', 'medical_superintendent', 'hrio',
   'data_entry_clerk',
   'nutritionist', 'radiologist', 'government',
 ];
 // Roles that may create patients
 const CREATE_ROLES: UserRole[] = [
-  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
+  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'clinician', 'nurse',
   'midwife', 'front_desk', 'medical_superintendent', 'hrio',
   'data_entry_clerk',
 ];

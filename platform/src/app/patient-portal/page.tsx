@@ -13,10 +13,11 @@ import {
   Thermometer, Weight, Droplets, Eye,
   Upload, ClipboardList, Receipt,
   UserCircle, Download, Trash2,
-  Edit3, Save, Camera, FileUp,
+  Edit3, Save, FileUp,
 } from '@/components/icons/lucide';
 import type { PatientDoc, AppointmentDoc, LabResultDoc, MedicalRecordDoc, PrescriptionDoc, ImmunizationDoc } from '@/lib/db-types';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { formatMoney } from '@/lib/format-utils';
 
 type Tab = 'overview' | 'appointments' | 'records' | 'lab' | 'prescriptions' | 'radiology' | 'documents' | 'immunizations' | 'messages' | 'chat' | 'billing' | 'insurance' | 'forms' | 'uploads' | 'statements' | 'profile';
 
@@ -1156,16 +1157,16 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
               <SH icon={AlertTriangle} title={t('patientPortal.healthAlerts')} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, flex: 1 }}>
                 {(patient.allergies || []).length > 0 && (
-                  <AlertRow color="#EF4444" icon={AlertTriangle} text={t('patientPortal.allergiesList', { list: patient.allergies.join(', ') })} />
+                  <AlertRow color="#EF4444" text={t('patientPortal.allergiesList', { list: patient.allergies.join(', ') })} />
                 )}
                 {(patient.chronicConditions || []).map((c, i) => (
-                  <AlertRow key={i} color="#D97706" icon={HeartPulse} text={c} />
+                  <AlertRow key={i} color="#D97706" text={c} />
                 ))}
                 {pendingLabs > 0 && (
-                  <AlertRow color="var(--accent-primary)" icon={FlaskConical} text={t('patientPortal.pendingLabResults', { count: pendingLabs })} />
+                  <AlertRow color="var(--accent-primary)" text={t('patientPortal.pendingLabResults', { count: pendingLabs })} />
                 )}
                 {labResults.some(l => l.critical) && (
-                  <AlertRow color="#EF4444" icon={AlertTriangle} text={t('patientPortal.criticalLabAlert')} />
+                  <AlertRow color="#EF4444" text={t('patientPortal.criticalLabAlert')} />
                 )}
                 {(patient.allergies || []).length === 0 && (patient.chronicConditions || []).length === 0 && pendingLabs === 0 && (
                   <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(31, 157, 111,0.06)', border: '1px solid rgba(31, 157, 111,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1187,9 +1188,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {activeRx.map((rx, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--overlay-subtle)' }}>
-                        <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(124,58,237,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Pill size={12} style={{ color: '#7C3AED' }} />
-                        </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{rx.medication}</p>
                           <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{rx.dose} · {rx.frequency}</p>
@@ -1414,9 +1412,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {prescriptions.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(rx => (
                 <div key={rx._id} className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 8, background: rx.status === 'dispensed' ? 'rgba(31, 157, 111,0.08)' : 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Pill size={16} style={{ color: rx.status === 'dispensed' ? 'var(--color-success)' : 'var(--accent-primary)' }} />
-                  </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{rx.medication}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{rx.dose} · {rx.route} · {rx.frequency} · {rx.duration}</div>
@@ -1436,8 +1431,16 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
       {/* ═══ Radiology & Imaging ═══ */}
       {activeTab === 'radiology' && (
         <div>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>{t('patientPortal.tabRadiology')}</h2>
-          {/* Mock radiology data from lab results that are imaging-related, or show placeholder */}
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>{t('patientPortal.tabRadiology')}</h2>
+          {/* Honesty note: these are imaging-related order/report records pulled
+              from lab results — NOT the actual scan images (no PACS viewer). */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', marginBottom: 14, borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
+            <AlertTriangle size={14} style={{ color: 'var(--text-muted)', flexShrink: 0, marginTop: 1 }} />
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>{t('patientPortal.imagingDisclaimer')}</p>
+          </div>
+          {/* Imaging-related entries derived from lab results (e.g. ordered X-rays,
+              ultrasound/CT/MRI reports). This is record/report metadata, not the
+              scan images themselves. */}
           {(() => {
             const imagingTests = labResults.filter(l =>
               /x-ray|xray|mri|ct scan|ultrasound|radiology|imaging|echo|mammogram/i.test(l.testName || '')
@@ -1446,9 +1449,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {imagingTests.map(img => (
                   <div key={img._id} className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Scan size={16} style={{ color: 'var(--accent-primary)' }} />
-                    </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{img.testName}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{(img.orderedAt || img.createdAt).slice(0, 10)} · {img.orderedBy}</div>
@@ -1514,9 +1514,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             )}
             {/* Discharge summaries */}
             <div className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--overlay-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <FolderOpen size={16} style={{ color: 'var(--text-muted)' }} />
-              </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.dischargeSummaries')}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('patientPortal.dischargeSummariesDesc')}</div>
@@ -1524,9 +1521,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             </div>
             {/* Referral letters */}
             <div className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--overlay-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <ArrowRight size={16} style={{ color: 'var(--text-muted)' }} />
-              </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.referralLetters')}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('patientPortal.referralLettersDesc')}</div>
@@ -1534,9 +1528,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             </div>
             {/* Insurance / ID docs */}
             <div className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--overlay-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Shield size={16} style={{ color: 'var(--text-muted)' }} />
-              </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.insuranceIdDocuments')}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('patientPortal.insuranceIdDocumentsDesc')}</div>
@@ -1567,9 +1558,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {immunizations.sort((a, b) => b.dateGiven.localeCompare(a.dateGiven)).map(imm => (
                 <div key={imm._id} className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(31, 157, 111,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Syringe size={16} style={{ color: 'var(--color-success)' }} />
-                  </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{imm.vaccine} — {t('patientPortal.doseNumber', { number: imm.doseNumber })}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t('patientPortal.siteBatch', { site: imm.site, batch: imm.batchNumber })}</div>
@@ -1871,9 +1859,6 @@ function UploadsTab() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {uploads.map(file => (
           <div key={file.id} className="card-elevated" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {file.type.includes('pdf') ? <FileText size={16} style={{ color: 'var(--accent-primary)' }} /> : <Camera size={16} style={{ color: 'var(--accent-primary)' }} />}
-            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{file.name}</p>
               <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{file.category} · {file.size} · {file.date}</p>
@@ -1914,8 +1899,8 @@ function StatementsTab() {
       {/* Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', alignItems: 'stretch', gap: 10, marginBottom: 16 }}>
         {[
-          { label: t('patientPortal.currentBalance'), value: `${(statements[0].total - statements[0].paid).toLocaleString()} SSP`, color: 'var(--color-danger)' },
-          { label: t('patientPortal.lastPayment'), value: '10,000 SSP', color: 'var(--color-success)' },
+          { label: t('patientPortal.currentBalance'), value: formatMoney(statements[0].total - statements[0].paid), color: 'var(--color-danger)' },
+          { label: t('patientPortal.lastPayment'), value: formatMoney(10000), color: 'var(--color-success)' },
           { label: t('patientPortal.totalStatements'), value: `${statements.length}`, color: 'var(--accent-primary)' },
         ].map((s, i) => (
           <div key={i} className="card-elevated" style={{ padding: '14px 16px', borderTop: `3px solid ${s.color}` }}>
@@ -1939,9 +1924,9 @@ function StatementsTab() {
                 <Badge text={balance === 0 ? t('patientPortal.paid') : t('patientPortal.outstanding')} color={balance === 0 ? 'var(--color-success)' : 'var(--color-danger)'} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-                <Info label={t('patientPortal.totalBilled')} value={`${st.total.toLocaleString()} SSP`} />
-                <Info label={t('patientPortal.paid')} value={`${st.paid.toLocaleString()} SSP`} />
-                <Info label={t('patientPortal.balance')} value={`${balance.toLocaleString()} SSP`} />
+                <Info label={t('patientPortal.totalBilled')} value={formatMoney(st.total)} />
+                <Info label={t('patientPortal.paid')} value={formatMoney(st.paid)} />
+                <Info label={t('patientPortal.balance')} value={formatMoney(balance)} />
               </div>
               {balance > 0 && (
                 <div style={{ height: 4, borderRadius: 2, background: 'var(--border-medium)', overflow: 'hidden', marginBottom: 10 }}>
@@ -2115,6 +2100,26 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
   // an empty-state card.
   const [bills, setBills] = useState<BillItem[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Org-configured bank-transfer instructions (set on the org-admin branding
+  // page). When present we show the real details; otherwise we fall back to a
+  // "contact billing" message rather than a hardcoded account number.
+  const [bankDetails, setBankDetails] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!patient.orgId) { setBankDetails(null); return; }
+    (async () => {
+      try {
+        const { getOrganizationById } = await import('@/lib/services/organization-service');
+        const org = await getOrganizationById(patient.orgId!);
+        if (!cancelled) setBankDetails(org?.bankDetails?.trim() || null);
+      } catch (err) {
+        console.error('[patient-portal/billing] org load failed', err);
+        if (!cancelled) setBankDetails(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [patient.orgId]);
 
   // Last-payment metadata for the success screen — populated by the actual
   // recordPayment response so the reference shown is the one that ended up
@@ -2328,17 +2333,30 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
           <div style={{ padding: 16, borderRadius: 10, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', textAlign: 'left', marginBottom: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('patientPortal.reference')}</p><p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace' }}>{refNum}</p></div>
-              <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('portal.amount')}</p><p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{paidAmount.toLocaleString()} SSP</p></div>
+              <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('portal.amount')}</p><p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(paidAmount)}</p></div>
               <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('portal.method')}</p><p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{paymentMethods.find(m => m.key === payMethod)?.name}</p></div>
               <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('patientPortal.bills')}</p><p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.itemCount', { count: billCount })}</p></div>
             </div>
             {payMethod === 'bank' && (
               <div style={{ marginTop: 14, padding: 12, borderRadius: 8, background: 'rgba(0,137,123,0.06)', border: '1px solid rgba(0,137,123,0.15)' }}>
                 <p style={{ fontSize: 11, fontWeight: 700, color: '#00897B', marginBottom: 6 }}>{t('patientPortal.bankTransferDetails')}</p>
-                <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>{t('patientPortal.bankLabel')} <strong>KCB Bank South Sudan</strong></p>
-                <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>{t('patientPortal.accountLabel')} <strong>720-184-2930</strong></p>
-                <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>{t('patientPortal.nameLabel')} <strong>TamamHealth Health Services</strong></p>
-                <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>{t('patientPortal.refLabel')} <strong>{refNum}</strong></p>
+                {bankDetails ? (
+                  <>
+                    {bankDetails.split('\n').map((line, i) => (
+                      <p key={i} style={{ fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>{line}</p>
+                    ))}
+                    <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>{t('patientPortal.refLabel')} <strong>{refNum}</strong></p>
+                  </>
+                ) : IS_DEMO ? (
+                  <>
+                    <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>{t('patientPortal.bankLabel')} <strong>KCB Bank South Sudan</strong></p>
+                    <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>{t('patientPortal.accountLabel')} <strong>720-184-2930</strong></p>
+                    <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>{t('patientPortal.nameLabel')} <strong>TamamHealth Health Services</strong></p>
+                    <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>{t('patientPortal.refLabel')} <strong>{refNum}</strong></p>
+                  </>
+                ) : (
+                  <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>{t('patientPortal.bankTransferContactBilling')}</p>
+                )}
               </div>
             )}
           </div>
@@ -2357,7 +2375,7 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>{t('patientPortal.confirmPayment')}</h3>
           <div style={{ padding: 14, borderRadius: 10, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', marginBottom: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Info label={t('patientPortal.totalAmount')} value={`${selectedTotal.toLocaleString()} SSP`} />
+              <Info label={t('patientPortal.totalAmount')} value={formatMoney(selectedTotal)} />
               <Info label={t('patientPortal.paymentMethod')} value={method.name} />
               <Info label={t('patientPortal.items')} value={t('patientPortal.billCount', { count: selectedBills.length })} />
               {(payMethod === 'mpesa' || payMethod === 'mtn' || payMethod === 'airtel') && <Info label={t('patient.phone')} value={payPhone} />}
@@ -2368,7 +2386,7 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
             {safeBills.filter(b => selectedBills.includes(b.id)).map(b => (
               <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border-medium)' }}>
                 <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>{b.description}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{(b.amount - b.paid).toLocaleString()} SSP</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(b.amount - b.paid)}</span>
               </div>
             ))}
           </div>
@@ -2413,7 +2431,7 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
         <button onClick={() => setStep('bills')} style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>← {t('portal.backToBillsBtn')}</button>
         <div className="card-elevated" style={{ padding: 20 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{t('portal.choosePaymentMethod')}</h3>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>{t('patientPortal.totalLabel')} <strong style={{ color: 'var(--text-primary)' }}>{selectedTotal.toLocaleString()} SSP</strong> {t('patientPortal.forBills', { count: selectedBills.length })}</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>{t('patientPortal.totalLabel')} <strong style={{ color: 'var(--text-primary)' }}>{formatMoney(selectedTotal)}</strong> {t('patientPortal.forBills', { count: selectedBills.length })}</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
             {paymentMethods.map(m => (
               <button key={m.key} onClick={() => setPayMethod(m.key)} style={{
@@ -2633,10 +2651,10 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
           <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #1e3a8a 100%)', border: 'none' }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>{t('patientPortal.paymentSummary')}</p>
             {[
-              { label: t('patientPortal.totalBilled'), value: `${safeBills.reduce((s, b) => s + b.amount, 0).toLocaleString()} SSP` },
-              { label: t('portal.totalPaid'), value: `${totalPaid.toLocaleString()} SSP` },
-              { label: t('patientPortal.outstanding'), value: `${totalOwed.toLocaleString()} SSP` },
-              { label: t('patientPortal.overdue'), value: `${safeBills.filter(b => b.status === 'overdue').reduce((s, b) => s + (b.amount - b.paid), 0).toLocaleString()} SSP` },
+              { label: t('patientPortal.totalBilled'), value: formatMoney(safeBills.reduce((s, b) => s + b.amount, 0)) },
+              { label: t('portal.totalPaid'), value: formatMoney(totalPaid) },
+              { label: t('patientPortal.outstanding'), value: formatMoney(totalOwed) },
+              { label: t('patientPortal.overdue'), value: formatMoney(safeBills.filter(b => b.status === 'overdue').reduce((s, b) => s + (b.amount - b.paid), 0)) },
             ].map((row, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
                 <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{row.label}</span>
@@ -2676,10 +2694,9 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AlertRow({ color, icon: Icon, text }: { color: string; icon: typeof AlertTriangle; text: string }) {
+function AlertRow({ color, text }: { color: string; text: string }) {
   return (
     <div style={{ padding: '8px 10px', borderRadius: 'var(--card-radius)', background: `${color}08`, border: `1px solid ${color}18`, display: 'flex', alignItems: 'center', gap: 7 }}>
-      <Icon size={13} style={{ color, flexShrink: 0 }} />
       <span style={{ fontSize: 12, color: color === 'var(--accent-primary)' ? 'var(--accent-primary)' : color }}>{text}</span>
     </div>
   );

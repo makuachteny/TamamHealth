@@ -31,6 +31,18 @@ export function getBridgeUrl(): string {
   return (process.env.NEXT_PUBLIC_FINGERPRINT_BRIDGE_URL || 'http://127.0.0.1:7345').replace(/\/+$/, '');
 }
 
+/**
+ * Headers for bridge calls. Adds the shared-secret token (X-Bridge-Token) when
+ * one is configured, so deployments that lock the bridge down still work. Stays
+ * optional — no env var means no header and the open-bridge dev flow is unchanged.
+ */
+function bridgeHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = process.env.NEXT_PUBLIC_FINGERPRINT_BRIDGE_TOKEN;
+  if (token) headers['X-Bridge-Token'] = token;
+  return headers;
+}
+
 export interface BridgeStatus {
   available: boolean;
   scannerConnected: boolean;
@@ -68,7 +80,7 @@ export async function getBridgeStatus(): Promise<BridgeStatus> {
 export async function captureFingerprint(options: { finger?: FingerPosition; simulateId?: string } = {}): Promise<CaptureResult> {
   const res = await fetch(`${getBridgeUrl()}/capture`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: bridgeHeaders(),
     // Generous timeout — the scanner waits for a finger to be placed.
     signal: AbortSignal.timeout(30000),
     body: JSON.stringify(options),
@@ -99,10 +111,19 @@ export interface EnrollFingerprintInput {
   orgId?: string;
 }
 
+/** Below this scanner-reported quality (0-100) a template matches too poorly to trust. */
+export const MIN_ENROLL_QUALITY = 40;
+
 export async function enrollFingerprint(input: EnrollFingerprintInput): Promise<BiometricTemplateDoc> {
   if (!input.patientId) throw new Error('patientId is required');
   if (!input.template) throw new Error('template is required');
   if (!input.consentRecordedBy) throw new Error('consent must be recorded before enrolling a fingerprint');
+  if (typeof input.quality !== 'number' || !Number.isFinite(input.quality) || input.quality < 0 || input.quality > 100) {
+    throw new Error('quality must be a number between 0 and 100');
+  }
+  if (input.quality < MIN_ENROLL_QUALITY) {
+    throw new Error(`fingerprint quality ${input.quality} is below the minimum of ${MIN_ENROLL_QUALITY}; recapture`);
+  }
 
   const db = biometricTemplatesDB();
   const now = new Date().toISOString();
@@ -186,13 +207,21 @@ export interface IdentifyMatch {
  * bridge to score them. Returns ranked matches, best first.
  */
 export async function identifyPatient(probeTemplate: string, scope?: DataScope): Promise<IdentifyMatch[]> {
+  // Fail closed. A 1:N biometric search must never run unscoped: filterByScope
+  // returns ALL docs when orgId is absent for a non-national role, which would
+  // leak every tenant's patients. Require a scope, and require an orgId for any
+  // role that isn't national-level (super_admin/government search across orgs
+  // by design).
+  const isNational = scope?.role === 'super_admin' || scope?.role === 'government';
+  if (!scope || (!isNational && !scope.orgId)) return [];
+
   let templates = (await getAllTemplates()).filter(d => d.isActive);
-  if (scope) templates = filterByScope(templates, scope);
+  templates = filterByScope(templates, scope);
   if (templates.length === 0) return [];
 
   const res = await fetch(`${getBridgeUrl()}/match`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: bridgeHeaders(),
     signal: AbortSignal.timeout(30000),
     body: JSON.stringify({
       probe: probeTemplate,

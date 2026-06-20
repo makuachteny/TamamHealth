@@ -58,8 +58,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return <ForcePasswordChange userName={currentUser.name} onLogout={logout} />;
   }
 
-  // Sidebar: 256px/80px + 12px left margin = 268px/92px. Content needs matching margin.
-  const sidebarMargin = sidebarCollapsed ? '92px' : '268px';
+  // Content starts flush against the sidebar's right edge. The sidebar now fills
+  // the browser's left edge (no outer margin), so this equals its raw width.
+  const sidebarMargin = sidebarCollapsed ? '80px' : '220px';
 
   return (
     <SettingsProvider>
@@ -85,7 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             .dashboard-content-area { margin-left: ${sidebarMargin}; }
           }
         `}</style>
-        <div className="dashboard-content-area pt-3 flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="dashboard-content-area flex-1 flex flex-col min-w-0 overflow-hidden">
           <main id="main-content" className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
             <RoleGuard>{children}</RoleGuard>
             {/* First-run onboarding. Self-gates: only renders for a new user

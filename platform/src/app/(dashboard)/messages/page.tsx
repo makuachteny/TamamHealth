@@ -9,13 +9,15 @@ import { ROLE_LABEL } from '@/lib/role-display';
 import type { ConversationDoc, MessageDoc, UserRole, StaffPresence } from '@/lib/db-types';
 import {
   MessageSquare, Plus, Search, Send, Users as UsersIcon,
-  MoreVertical, Info, UserPlus, X, ChevronDown, Check, Lock, ShieldCheck,
+  MoreVertical, Info, UserPlus, X, ChevronDown, Check, ShieldCheck,
   Trash2, Edit3, ArrowLeft, Bell, BellOff, LogOut, Settings,
 } from '@/components/icons/lucide';
 
 /* ─────────────────────────── constants ─────────────────────────── */
 
-const AVATAR_PALETTE = ['#2563EB', '#7C3AED', '#0EA5E9', '#DB2777', '#059669', '#D97706', '#4F46E5', '#0891B2'];
+// On-brand identity palette — the platform's blue / teal / indigo / slate
+// family (no off-brand pinks/oranges/greens), so avatars read as part of the app.
+const AVATAR_PALETTE = ['#2563EB', '#1E40AF', '#0EA5E9', '#0891B2', '#3B82F6', '#1E3A8A', '#0E7490', '#475569'];
 const PRESENCE: Record<StaffPresence, { label: string; color: string }> = {
   active: { label: 'Active', color: 'var(--color-success)' },
   busy: { label: 'Busy', color: 'var(--color-danger)' },
@@ -62,7 +64,7 @@ function Avatar({ name, size = 38, seed, group, presence }: { name: string; size
   return (
     <div
       className="relative flex items-center justify-center flex-shrink-0 font-bold text-white"
-      style={{ width: size, height: size, borderRadius: '50%', background: group ? '#6366F1' : colorFor(seed), fontSize: size * 0.36 }}
+      style={{ width: size, height: size, borderRadius: '50%', background: group ? 'var(--accent-primary)' : colorFor(seed), fontSize: size * 0.36 }}
     >
       {group ? <UsersIcon className="text-white" style={{ width: size * 0.5, height: size * 0.5 }} /> : initials(name)}
       {!group && (
@@ -215,24 +217,17 @@ export default function MessagesPage() {
 
   return (
     <>
-      <TopBar title="Messages" />
+      <TopBar title="Messages" hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden', borderRadius: 'var(--card-radius)', border: '1px solid var(--border-light)', boxShadow: 'var(--card-shadow)', background: 'var(--bg-card-solid)' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden', borderRadius: 'var(--card-radius)', border: '1px solid var(--glass-border)', boxShadow: 'var(--card-shadow), var(--glass-highlight)', background: 'var(--glass-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
 
         {/* ── Conversation list ── */}
         <section className="flex flex-col flex-shrink-0" style={{ width: 320, borderRight: '1px solid var(--border-light)', background: 'var(--bg-card-solid)' }}>
           <div className="px-3 pt-3 pb-2 flex items-center justify-between">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <h2 className="text-base font-bold truncate" style={{ color: 'var(--text-primary)' }}>Messages</h2>
-            </div>
-            <button onClick={() => setNewChatOpen(true)} title="New chat" className="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0" style={{ background: 'var(--accent-primary)' }}>
+            <h2 className="text-sm font-bold truncate uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Conversations</h2>
+            <button onClick={() => setNewChatOpen(true)} title="New chat" className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
               <Plus className="w-4 h-4" />
             </button>
-          </div>
-
-          {/* Encryption notice */}
-          <div className="mx-4 mb-2 flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            <Lock className="w-3 h-3" /> Encrypted &amp; audit-logged · internal staff only
           </div>
 
           {/* Current-user presence selector */}
@@ -262,7 +257,7 @@ export default function MessagesPage() {
           <div className="px-3 mb-2">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-              <input value={convSearch} onChange={e => setConvSearch(e.target.value)} placeholder="Search conversations" className="w-full text-[13px]" style={{ paddingLeft: 34, paddingTop: 8, paddingBottom: 8 }} />
+              <input type="search" value={convSearch} onChange={e => setConvSearch(e.target.value)} placeholder="Search conversations" className="w-full text-[13px]" style={{ paddingLeft: 34, paddingTop: 8, paddingBottom: 8 }} />
             </div>
           </div>
 
@@ -286,7 +281,7 @@ export default function MessagesPage() {
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar name={convTitle(activeConversation)} seed={convSeed(activeConversation)} group={activeConversation.kind === 'group'} size={40} presence={activeConversation.kind === 'dm' ? otherPresence(activeConversation) : undefined} />
                   <div className="min-w-0">
-                    <p className="text-[15px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{convTitle(activeConversation)}</p>
+                    <p className="text-base font-bold truncate" style={{ color: 'var(--text-primary)' }}>{convTitle(activeConversation)}</p>
                     <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{convSubtitle(activeConversation)}</p>
                   </div>
                 </div>
@@ -422,6 +417,7 @@ export default function MessagesPage() {
                         <div className="mb-4">
                           <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Group name</label>
                           <input
+                            type="text"
                             defaultValue={activeConversation.name || ''}
                             onBlur={e => { if (e.target.value.trim() && e.target.value !== activeConversation.name) renameGroup(activeConversation._id, e.target.value); }}
                             className="w-full text-[13px] mt-1" style={{ padding: '6px 10px' }}
@@ -574,7 +570,7 @@ function StaffPickerModal({
 
         <div className="px-5 pt-4">
           {mode === 'new' && (
-            <div className="grid grid-cols-2 gap-1 p-1 mb-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+            <div className="grid grid-cols-2 gap-1 p-1 mb-3 rounded-xl keep-cols" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               {(['dm', 'group'] as const).map(m => (
                 <button key={m} onClick={() => setTab(m)} className="py-1.5 rounded-lg text-[12px] font-semibold transition-colors" style={{ background: tab === m ? 'var(--accent-primary)' : 'transparent', color: tab === m ? '#fff' : 'var(--text-muted)' }}>
                   {m === 'dm' ? 'Direct message' : 'Group chat'}
@@ -583,11 +579,11 @@ function StaffPickerModal({
             </div>
           )}
           {multi && mode === 'new' && (
-            <input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="Group name (e.g. Morning RN Shift)" className="w-full text-[13px] mb-2.5" style={{ padding: '9px 12px', borderRadius: 10 }} />
+            <input type="text" value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="Group name (e.g. Morning RN Shift)" className="w-full text-[13px] mb-2.5" style={{ padding: '9px 12px', borderRadius: 10 }} />
           )}
           <div className="relative mb-2">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search staff by name or role" className="w-full text-[13px]" style={{ paddingLeft: 34, paddingTop: 9, paddingBottom: 9, borderRadius: 10 }} />
+            <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search staff by name or role" className="w-full text-[13px]" style={{ paddingLeft: 34, paddingTop: 9, paddingBottom: 9, borderRadius: 10 }} />
           </div>
 
           {/* Selected chips (multi-select) */}

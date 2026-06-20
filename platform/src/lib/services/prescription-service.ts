@@ -238,3 +238,54 @@ export async function recordAdministration(
     return null;
   }
 }
+
+/**
+ * Void a mis-recorded administration WITHOUT deleting it. The targeted
+ * administrations[] entry is marked voided (append-only — history is
+ * preserved), so the scheduled dose returns to due/overdue. Mirrors
+ * recordAdministration's persistence + audit + sync pattern.
+ */
+export async function voidAdministration(
+  prescriptionId: string,
+  administrationId: string,
+  voidedBy: string,
+  voidedByName: string,
+  reason: string,
+): Promise<PrescriptionDoc | null> {
+  const db = prescriptionsDB();
+  try {
+    const existing = await db.get(prescriptionId) as PrescriptionDoc;
+    const now = new Date().toISOString();
+    const target = (existing.administrations || []).find(a => a.id === administrationId);
+    if (!target) return null;
+    const next: PrescriptionDoc = {
+      ...existing,
+      administrations: (existing.administrations || []).map(a =>
+        a.id === administrationId
+          ? { ...a, voided: true, voidedAt: now, voidedBy, voidedReason: reason }
+          : a,
+      ),
+      updatedAt: now,
+    };
+    const resp = await db.put(next);
+    next._rev = resp.rev;
+    await logAuditSafe(
+      'MEDICATION_ADMIN_VOIDED',
+      undefined,
+      voidedByName,
+      `Voided ${target.status.toUpperCase()} ${existing.medication} ${target.doseGiven || existing.dose} ` +
+      `for ${existing.patientName} (Rx: ${existing._id})${reason ? ` — ${reason}` : ''}`,
+    );
+    emitSyncEvent({
+      resourceType: 'prescription',
+      resourceId: next._id,
+      operation: 'update',
+      resourceVersion: next._rev,
+      hospitalId: next.hospitalId,
+      orgId: next.orgId,
+    });
+    return next;
+  } catch {
+    return null;
+  }
+}

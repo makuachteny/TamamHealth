@@ -4218,7 +4218,7 @@ const ar: TranslationMap = {
   'timeline.categoryReferral': 'الإحالة',
   'timeline.categoryAnc': 'ANC',
   'timeline.categoryAppointment': 'الموعد',
-  'timeline.titleTriage': 'فرز {{priority}}',
+  'timeline.titleTriage': 'فرز',
   'timeline.titleConsultation': 'استشارة سريرية',
   'timeline.titleReferral': 'إحالة إلى {{facility}}',
   'timeline.facilityFallback': 'منشأة',

@@ -256,7 +256,7 @@ export default function DataEntryDashboard() {
         {myHospital && (
           <div className="dash-card mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-lg flex items-center justify-center" style={{ background: `${ACCENT}15` }}>
+              <div className="w-11 h-11 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                 <Building2 className="w-5 h-5" style={{ color: ACCENT }} />
               </div>
               <div className="flex-1">
@@ -319,7 +319,7 @@ export default function DataEntryDashboard() {
                 className="flex flex-col items-center gap-2 p-3 rounded-lg transition-all active:scale-95"
                 style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}
               >
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${a.color}12` }}>
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                   <a.icon className="w-4 h-4" style={{ color: a.color }} />
                 </div>
                 <span className="text-[10px] font-semibold text-center" style={{ color: 'var(--text-primary)' }}>{a.label}</span>
@@ -427,7 +427,6 @@ export default function DataEntryDashboard() {
                 ].map(eq => (
                   <div key={eq.label} className="flex items-center justify-between py-1" style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <div className="flex items-center gap-2">
-                      <eq.icon className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
                       <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{eq.label}</span>
                     </div>
                     <span className="text-sm font-bold" style={{ color: eq.value > 0 ? 'var(--text-primary)' : 'var(--color-danger)' }}>{eq.value}</span>
@@ -488,7 +487,6 @@ export default function DataEntryDashboard() {
               {savedReports.slice(0, 7).map((r, i) => (
                 <div key={i} className="flex items-center justify-between p-2.5 rounded-md" style={{ border: '1px solid var(--border-light)' }}>
                   <div className="flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5" style={{ color: ACCENT }} />
                     <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{r.date}</span>
                   </div>
                   <div className="flex items-center gap-4 text-[10px]" style={{ color: 'var(--text-muted)' }}>

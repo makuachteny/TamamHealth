@@ -1,13 +1,12 @@
 'use client';
 
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useVitalStatistics } from '@/lib/hooks/useVitalStatistics';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useDataQuality } from '@/lib/hooks/useDataQuality';
 import { useFacilityAssessments } from '@/lib/hooks/useFacilityAssessments';
-import { Globe, Baby, Skull, Activity, Heart, Shield, Building2, Users, BedDouble, Stethoscope, Wifi } from '@/components/icons/lucide';
+import { Baby, Skull, Activity, Heart, Shield, Building2, Users, BedDouble, Stethoscope, Wifi } from '@/components/icons/lucide';
 
 export default function PublicStatsPage() {
   const { t } = useTranslation();
@@ -31,11 +30,6 @@ export default function PublicStatsPage() {
     <>
       <TopBar title={t('hospitalManager.publicStatistics')} />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Globe}
-          title={t('publicStats.headerTitle')}
-          subtitle={t('publicStats.headerSubtitle')}
-        />
 
         {/* National Overview */}
         <div className="card-elevated p-5 mb-6" style={{ background: 'rgba(59, 130, 246,0.04)' }}>

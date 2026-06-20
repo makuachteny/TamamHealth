@@ -3,10 +3,11 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import EmptyState from '@/components/EmptyState';
+import Badge, { type BadgeTone } from '@/components/Badge';
+import { FilterBar, FilterTabs } from '@/components/filters';
 import {
-  AlertTriangle, Bell, FlaskConical, Syringe, ChevronRight, CheckCircle2,
+  AlertTriangle, FlaskConical, Syringe, ChevronRight, CheckCircle2,
 } from '@/components/icons/lucide';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
@@ -54,6 +55,13 @@ const CATEGORY_ICONS = {
   surveillance: AlertTriangle,
   lab: FlaskConical,
   immunization: Syringe,
+};
+
+// Severity → Badge tone for the alert-level pill.
+const SEVERITY_TONE: Record<Severity, BadgeTone> = {
+  critical: 'danger',
+  warning: 'warning',
+  info: 'info',
 };
 
 function bucketByRecency(alerts: AlertItem[]) {
@@ -206,12 +214,9 @@ export default function AlertsPage() {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
-            <span
-              className="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full"
-              style={{ background: '#fff', color: styles.color, border: `1px solid ${styles.border}` }}
-            >
+            <Badge tone={SEVERITY_TONE[a.severity]} uppercase>
               {styles.label}
-            </span>
+            </Badge>
             {a.source && (
               <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                 · {a.source}
@@ -259,16 +264,6 @@ export default function AlertsPage() {
     <>
       <TopBar title="Clinical Alerts" />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Bell}
-          title="Clinical Alerts"
-          subtitle={
-            counts.all === 0
-              ? 'No active alerts. Looking good.'
-              : `${counts.all} active alert${counts.all === 1 ? '' : 's'} across surveillance, lab, and immunizations.`
-          }
-        />
-
         {/* Severity summary tiles */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-5">
           {([
@@ -311,31 +306,20 @@ export default function AlertsPage() {
           })}
         </div>
 
-        {/* Filter pills */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <span className="text-xs font-semibold mr-1" style={{ color: 'var(--text-muted)' }}>
-            Filter:
-          </span>
-          {([
-            { key: 'all',      label: `All (${counts.all})` },
-            { key: 'critical', label: `Critical (${counts.critical})` },
-            { key: 'warning',  label: `Warning (${counts.warning})` },
-            { key: 'info',     label: `Info (${counts.info})` },
-          ] as const).map(p => (
-            <button
-              key={p.key}
-              onClick={() => setSeverityFilter(p.key === 'all' ? 'all' : (p.key as Severity))}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
-              style={{
-                background: severityFilter === p.key ? 'var(--accent-light)' : 'var(--overlay-subtle)',
-                color: severityFilter === p.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                border: `1px solid ${severityFilter === p.key ? 'var(--accent-border)' : 'var(--border-light)'}`,
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        {/* Severity filter */}
+        <FilterBar>
+          <FilterTabs
+            ariaLabel="Filter alerts by severity"
+            active={severityFilter}
+            onChange={key => setSeverityFilter(key === 'all' ? 'all' : (key as Severity))}
+            tabs={[
+              { key: 'all',      label: 'All',      count: counts.all },
+              { key: 'critical', label: 'Critical', count: counts.critical },
+              { key: 'warning',  label: 'Warning',  count: counts.warning },
+              { key: 'info',     label: 'Info',     count: counts.info },
+            ]}
+          />
+        </FilterBar>
 
         {/* Alerts feed */}
         {visibleAlerts.length === 0 ? (

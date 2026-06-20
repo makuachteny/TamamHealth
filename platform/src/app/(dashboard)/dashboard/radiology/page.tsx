@@ -65,6 +65,17 @@ export default function RadiologyDashboard() {
     window.setTimeout(() => setSubmitToast(null), 3000);
   };
 
+  // Undo a report submitted in this session: drop the in-memory override so the
+  // study reverts to its prior (pending / in-progress) status and the findings
+  // box reappears. Only applies to findings entered here, not pre-existing ones.
+  const handleUndoReport = (studyId: string) => {
+    setSubmittedFindings(prev => {
+      const next = { ...prev };
+      delete next[studyId];
+      return next;
+    });
+  };
+
   const stats = useMemo(() => ({
     total: studies.length,
     pending: studies.filter(s => s.status === 'pending').length,
@@ -122,11 +133,9 @@ export default function RadiologyDashboard() {
             { label: t('radiology.kpiUltrasounds'), value: stats.ultrasound, icon: Eye, color: 'var(--accent-primary)' },
             { label: t('radiology.kpiAvgTat'), value: stats.avgTAT, icon: TrendingUp, color: 'var(--accent-primary)' },
           ].map(k => (
-            <div key={k.label} className="dash-card" style={{ padding: '14px 16px' }}>
+            <div key={k.label} className="card-elevated" style={{ padding: '14px 16px' }}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
-                  <k.icon className="w-3.5 h-3.5" style={{ color: k.color }} />
-                </div>
+                <k.icon className="w-[18px] h-[18px] flex-shrink-0" style={{ color: k.color }} />
                 <span className="kpi-card-title">{k.label}</span>
               </div>
               <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{k.value}</div>
@@ -145,7 +154,8 @@ export default function RadiologyDashboard() {
               </div>
               <div className="flex items-center gap-2">
                 {['all', 'pending', 'in_progress', 'completed'].map(s => (
-                  <button key={s} onClick={() => setFilterStatus(s)} style={{
+                  <button key={s} onClick={() => setFilterStatus(filterStatus === s && s !== 'all' ? 'all' : s)}
+                    title={filterStatus === s && s !== 'all' ? t('action.deselect') : undefined} style={{
                     padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700,
                     background: filterStatus === s ? ACCENT : 'var(--overlay-subtle)',
                     color: filterStatus === s ? '#fff' : 'var(--text-muted)',
@@ -176,7 +186,7 @@ export default function RadiologyDashboard() {
                   }}>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{
-                      background: study.status === 'completed' ? '#05966915' : study.priority === 'emergency' ? '#DC262615' : study.priority === 'urgent' ? '#D9770615' : `${ACCENT}15`,
+                      background: 'transparent',
                     }}>
                       {study.status === 'completed' ? <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} /> :
                        study.priority === 'emergency' ? <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} /> :
@@ -210,7 +220,18 @@ export default function RadiologyDashboard() {
 
                       {study.findings && (
                         <div className="mb-3 p-3 rounded-lg" style={{ background: '#05966908', border: '1px solid #05966920' }}>
-                          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>{t('radiology.findings')}</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>{t('radiology.findings')}</span>
+                            {submittedFindings[study.id] && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleUndoReport(study.id); }}
+                                className="text-[10px] font-semibold underline"
+                                style={{ color: ACCENT }}
+                              >
+                                {t('action.undo')}
+                              </button>
+                            )}
+                          </div>
                           <p className="text-xs mt-1" style={{ color: 'var(--text-primary)' }}>{study.findings}</p>
                         </div>
                       )}

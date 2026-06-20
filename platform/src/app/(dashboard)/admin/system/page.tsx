@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { apiFetch } from '@/lib/api-fetch';
@@ -200,7 +199,7 @@ export default function AdminSystemPage() {
 
   const inputStyle: React.CSSProperties = {
     background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-    borderRadius: '10px', padding: '10px 14px', color: 'var(--text-primary)',
+    borderRadius: '4px', padding: '10px 14px', color: 'var(--text-primary)',
     fontSize: '14px', width: '100%', outline: 'none',
   };
   const labelStyle: React.CSSProperties = {
@@ -237,12 +236,6 @@ export default function AdminSystemPage() {
     <>
       <TopBar title={t('system.title')} />
       <main className="page-container page-enter">
-
-        <PageHeader
-          icon={Settings}
-          title={t('system.title')}
-          subtitle={t('system.platformSettingsDesc')}
-        />
 
         {/* SYNC OPERATIONS — manual triggers for the same endpoints that the
             scheduled cron sidecar calls. Useful for verifying end-to-end push

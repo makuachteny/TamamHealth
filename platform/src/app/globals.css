@@ -27,10 +27,10 @@
   --section-spacing: 80px;
   --section-spacing-medium: 56px;
   --section-spacing-small: 40px;
-  --btn-radius: 12px;
-  --card-radius: 22px;
-  --input-radius: 12px;
-  --sidebar-width: 256px;
+  --btn-radius: 8px;
+  --card-radius: 12px;
+  --input-radius: 8px;
+  --sidebar-width: 220px;
   --sidebar-collapsed: 72px;
 }
 
@@ -39,12 +39,10 @@
   /* Solid backgrounds — clean neutral white */
   --bg-gradient: #FFFFFF;
 
-  /* App canvas — soft lavender→blue gradient sitting behind white cards.
-     Keeps the page airy and clean while cards/sidebar/topbar stay solid white. */
-  --bg-app:
-    radial-gradient(1200px 700px at 80% -12%, rgba(129, 140, 248, 0.13), transparent 58%),
-    radial-gradient(1100px 680px at 102% 106%, rgba(59, 130, 246, 0.13), transparent 56%),
-    linear-gradient(150deg, #ECEFFB 0%, #F2F5FD 36%, #FAFBFE 62%, #E9F0FC 100%);
+  /* App canvas — flat, cool light-gray so solid white panels read crisp and
+     clean (clinical-software look). No gradient/mesh: the page is calm and the
+     cards/topbar/sidebar are defined purely by hairline borders + soft shadow. */
+  --bg-app: #EDF1F7;
 
   /* Core palette — clear whitish page, white cards lifted by borders/shadow */
   --bg-primary: #FFFFFF;
@@ -104,21 +102,23 @@
   /* Sidebar */
   --sidebar-bg: #FFFFFF;
 
-  /* Card shadow — green-tinted for brand cohesion */
-  --card-shadow: 0 1px 3px rgba(30, 58, 138, 0.06), 0 4px 12px rgba(30, 58, 138, 0.05);
-  --card-shadow-lg: 0 8px 24px rgba(30, 58, 138, 0.10);
-  --card-shadow-xl: 0 16px 48px rgba(30, 58, 138, 0.12);
+  /* Card shadow — flat & subtle (neutral slate). Panels lean on borders, not
+     heavy shadow, so surfaces read clean and crisp rather than floating. */
+  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --card-shadow-lg: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --card-shadow-xl: 0 8px 24px rgba(15, 23, 42, 0.10);
   --card-hover-border: #bfdbfe;
 
-  /* ── Glassmorphism (frosted surfaces over the gradient app background) ── */
-  --glass-bg: rgba(255, 255, 255, 0.70);
-  --glass-bg-strong: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.75);
-  /* Blur radius kept modest — blur is the expensive part of backdrop-filter and
-     this app targets low-end hardware, so 10px reads as glass without the cost. */
-  --glass-blur: blur(10px) saturate(130%);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  --panel-shadow: 0 1px 3px rgba(30, 58, 138, 0.06), 0 4px 12px rgba(30, 58, 138, 0.05);
+  /* ── Surfaces (formerly glassmorphism) — now flat solid white panels with a
+     hairline border. Blur/translucency removed for the crisp clinical look.
+     Tokens kept (same names) so every card/topbar/modal updates in one place. */
+  --glass-bg: #FFFFFF;
+  --glass-bg-strong: #FFFFFF;
+  --glass-border: #E2E8F0;
+  --glass-blur: none;
+  /* Transparent (not `none`) so it stays composable inside comma shadow lists. */
+  --glass-highlight: 0 0 #0000;
+  --panel-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 
   /* Toggle */
   --toggle-track: #CBD5E1;
@@ -235,13 +235,13 @@
   --card-shadow-xl: 0 4px 16px rgba(0, 0, 0, 0.6);
   --card-hover-border: #2c4a82;
 
-  /* ── Glassmorphism (dark) ── */
-  --glass-bg: rgba(17, 36, 77, 0.62);
-  --glass-bg-strong: rgba(17, 36, 77, 0.84);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-blur: blur(10px) saturate(130%);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  /* ── Surfaces (dark) — flat solid navy panels, hairline border, no blur ── */
+  --glass-bg: #11244d;
+  --glass-bg-strong: #11244d;
+  --glass-border: #1e3a6b;
+  --glass-blur: none;
+  --glass-highlight: 0 0 #0000;
+  --panel-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 
   --toggle-track: #2c4a82;
 
@@ -299,15 +299,22 @@
 html {
   font-size: 15px;
   scroll-behavior: smooth;
+  /* Kill the rubber-band/overscroll bounce so scrolling up never reveals the
+     bare document background behind the app shell. */
+  overscroll-behavior: none;
 }
 
 body {
   font-family: 'Untitled Sans', Arial, sans-serif;
-  background: var(--bg-primary);
+  /* Match the app's gradient backdrop (not flat white). Even if any overscroll
+     does occur, what shows through is the same surface as the app, never a
+     white band at the top. */
+  background: var(--bg-app, var(--bg-primary));
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  overscroll-behavior: none;
   font-size: 15px;
   line-height: 1.55;
   font-weight: 450;
@@ -362,9 +369,9 @@ button, a, .nav-item, .kpi, .card-elevated, [role="button"] { transition-timing-
 svg.lucide:not([style*="color"]) {
   color: var(--icon-color);
 }
-/* Active nav items keep their white override */
+/* Active nav items: icon takes the brand color (light-tinted pill below) */
 .nav-item-active svg.lucide {
-  color: var(--nav-active-text) !important;
+  color: var(--accent-primary) !important;
 }
 /* White icons inside primary-colored buttons/elements */
 .btn-primary svg.lucide,
@@ -465,13 +472,12 @@ a.link-accent:hover {
   border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
   box-shadow: var(--card-shadow), var(--glass-highlight);
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .card-elevated:hover {
   border-color: var(--card-hover-border);
   box-shadow: var(--card-shadow-lg), var(--glass-highlight);
-  transform: translateY(-2px);
 }
 
 .card-glass {
@@ -528,6 +534,7 @@ a.link-accent:hover {
 .ref-cancelled { background: rgba(138, 158, 154, 0.12); color: #8A9E9A; border: 1px solid rgba(138, 158, 154, 0.2); }
 
 /* ============ Inputs — clean solid ============ */
+input:not([type]),
 input[type="text"],
 input[type="email"],
 input[type="tel"],
@@ -633,14 +640,13 @@ small,
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, var(--accent-primary), var(--accent-hover));
+  background: var(--accent-primary);
   color: white;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.20), 0 6px 16px rgba(59, 130, 246, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10);
 }
 .btn-primary:hover {
-  background: linear-gradient(180deg, var(--accent-hover), var(--accent-hover));
-  box-shadow: 0 3px 6px rgba(59, 130, 246, 0.24), 0 12px 28px rgba(59, 130, 246, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  transform: translateY(-1px);
+  background: var(--accent-hover);
+  box-shadow: 0 2px 6px rgba(30, 58, 138, 0.18);
 }
 
 .btn-secondary {
@@ -665,8 +671,24 @@ small,
   background: rgba(196, 69, 54, 0.2);
 }
 
-.btn-sm { padding: 7px 16px; font-size: 0.78rem; border-radius: 12px; }
-.btn-lg { padding: 14px 32px; font-size: 0.95rem; border-radius: 16px; }
+/* Filter toggle — turns clearly accent-colored when its dropdown is open
+   (aria-expanded/aria-pressed="true") or when filters are applied (.is-active).
+   Add `btn-filter` to any "Filters" button to get this behavior consistently. */
+.btn-filter[aria-expanded="true"],
+.btn-filter[aria-pressed="true"],
+.btn-filter.is-active {
+  background: var(--accent-light) !important;
+  border-color: var(--accent-primary) !important;
+  color: var(--accent-primary) !important;
+}
+.btn-filter[aria-expanded="true"] svg,
+.btn-filter[aria-pressed="true"] svg,
+.btn-filter.is-active svg {
+  color: var(--accent-primary) !important;
+}
+
+.btn-sm { padding: 7px 16px; font-size: 0.78rem; border-radius: 6px; }
+.btn-lg { padding: 14px 32px; font-size: 0.95rem; border-radius: 10px; }
 
 /* ============ Focus visible — keyboard accessibility ============ */
 :focus-visible {
@@ -698,8 +720,8 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   border-bottom: 1px solid var(--table-row-border);
   font-family: 'Untitled Sans', Arial, sans-serif;
 }
-.data-table thead th:first-child { border-radius: 12px 0 0 0; }
-.data-table thead th:last-child { border-radius: 0 12px 0 0; }
+.data-table thead th:first-child { border-radius: 4px 0 0 0; }
+.data-table thead th:last-child { border-radius: 0 4px 0 0; }
 .data-table tbody td {
   padding: 12px 16px;
   font-size: 0.82rem;
@@ -716,6 +738,50 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 [data-theme="light"] .data-table tbody td { border-bottom: 1px solid var(--border-light); }
 [data-theme="light"] .data-table thead th { border-bottom: 2px solid var(--border-medium); }
 [data-theme="light"] .data-table tbody tr:nth-child(even) { background: var(--overlay-subtle); }
+
+/* ============ Referrals Table — polished list styling ============ */
+/* Header sticks to the top of its scroll container so columns stay labelled
+   while the list scrolls; rows get a roomier rhythm and a clearer hover/active
+   accent than the shared data-table base. */
+/* Fixed layout so the <colgroup> widths hold and columns line up across rows. */
+.referral-table { table-layout: fixed; }
+.referral-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-card-solid);
+  backdrop-filter: saturate(1.1);
+  border-bottom: 1px solid var(--border-medium);
+  white-space: nowrap;
+}
+.referral-table tbody td { padding: 13px 16px; vertical-align: top; }
+.referral-table tbody tr { position: relative; }
+.referral-table tbody tr:nth-child(even) { background: transparent; }
+.referral-table tbody tr:hover { background: var(--table-row-hover); }
+/* Left rail on hover for a tactile "this row" cue. */
+.referral-table tbody tr > td:first-child { box-shadow: inset 3px 0 0 transparent; transition: box-shadow 0.15s ease; }
+.referral-table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 var(--accent-primary); }
+/* Actions column hugs the right edge. */
+.referral-table .ref-actions-col { text-align: right; }
+.referral-table tbody td:last-child { text-align: right; }
+
+/* ============ Appointments Table — compact list view ============ */
+/* Tighter, denser rows than the base data-table, with a sticky header and a
+   clear hover/active row cue. Fixed layout so the <colgroup> widths hold. */
+.appt-table { table-layout: fixed; }
+.appt-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-card-solid);
+  border-bottom: 1px solid var(--border-medium);
+  padding: 8px 14px;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+.appt-table tbody td { padding: 9px 14px; vertical-align: middle; }
+.appt-table tbody tr:nth-child(even) { background: transparent; }
+.appt-table tbody tr:hover { background: var(--table-row-hover); }
 
 /* ============ Patient Table — fixed column widths ============ */
 .patient-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -745,7 +811,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--btn-radius);
   font-size: 0.86rem;
   color: var(--nav-text);
   cursor: pointer;
@@ -761,21 +827,26 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   transform: translateX(2px);
 }
 .nav-item-active {
-  color: var(--nav-active-text) !important;
-  background: var(--nav-active-bg) !important;
-  font-weight: 700;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.30);
+  /* Solid brand-blue row with white text/icon — the selected item reads as a
+     filled pill. --accent-primary is theme-aware and org-branding responsive. */
+  color: #FFFFFF !important;
+  background: var(--accent-primary) !important;
+  font-weight: 600;
   border-left: none;
   padding-left: 14px;
 }
-.nav-item-active:hover { transform: none; }
+.nav-item-active:hover {
+  transform: none;
+  color: #FFFFFF !important;
+  background: var(--accent-primary) !important;
+}
 
 /* ============ Step Indicator ============ */
 .step-dot {
-  width: 36px; height: 36px;
+  width: 28px; height: 28px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.8rem; font-weight: 600;
+  font-size: 0.72rem; font-weight: 600;
   border: 2px solid var(--border-medium);
   color: var(--text-muted);
   background: var(--bg-card-solid);
@@ -823,7 +894,6 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 .kpi:hover {
   border-color: var(--card-hover-border);
   box-shadow: var(--card-shadow-lg);
-  transform: translateY(-1px);
 }
 .kpi__icon {
   width: 28px;
@@ -931,7 +1001,8 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   .grid-cols-3 { grid-template-columns: repeat(2, 1fr) !important; }
   .col-span-2 { grid-column: span 2; }
 
-  /* Dashboard content: remove left margin on tablet (sidebar is a drawer) */
+  /* Dashboard content: remove left margin below lg — the sidebar is an
+     off-canvas drawer (opened from the TopBar hamburger), not a persistent rail. */
   .dashboard-content-area { margin-left: 0 !important; }
 }
 
@@ -964,6 +1035,17 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   .btn-lg { padding: 10px 16px; font-size: 0.85rem; }
 }
 
+/* -- Opt-out: compact fixed grids keep their columns on mobile --
+   The blanket .grid-cols-N collapse above is right for page-content grids
+   (KPI cards, form sections) but wrong for tight UI controls — PIN/keypads,
+   segmented toggles, ABCC/AVPU pads, small numeric input grids. Add the
+   `keep-cols` class to those: the cells shrink instead of stacking into a
+   tall single column. Two-class specificity beats the single-class collapse
+   rules even though both use !important. */
+.keep-cols.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.keep-cols.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.keep-cols.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+
 /* -- Global: ensure modals/overlays respect viewport -- */
 [style*="maxWidth"] {
   max-width: min(var(--modal-max, 100%), calc(100vw - 32px)) !important;
@@ -987,7 +1069,7 @@ html, body { overflow-x: hidden; max-width: 100vw; }
 /* -- Responsive card padding -- */
 @media (max-width: 639px) {
   .card, .card-elevated, .card-glass, .glass-section {
-    border-radius: 16px;
+    border-radius: 10px;
   }
   .glass-section-body {
     padding: 12px;
@@ -1048,7 +1130,7 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   background: linear-gradient(90deg, var(--overlay-subtle) 25%, var(--overlay-light) 50%, var(--overlay-subtle) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: 12px;
+  border-radius: 4px;
 }
 
 /* ============ Focus visible ============ */
@@ -1140,7 +1222,7 @@ html, body { overflow-x: hidden; max-width: 100vw; }
 .modal-content {
   position: relative;
   width: 100%;
-  border-radius: 16px;
+  border-radius: var(--card-radius);
   background: var(--glass-bg-strong);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
@@ -1205,7 +1287,7 @@ svg circle {
 .leaflet-container {
   font-family: 'Untitled Sans', Arial, sans-serif;
   z-index: 1;
-  border-radius: 16px;
+  border-radius: var(--card-radius);
 }
 
 .facility-marker {
@@ -1216,7 +1298,7 @@ svg circle {
 .facility-popup .leaflet-popup-content-wrapper {
   background: var(--bg-card-solid);
   color: var(--text-primary);
-  border-radius: 16px;
+  border-radius: var(--btn-radius);
   box-shadow: var(--card-shadow-lg);
   border: 1px solid var(--border-medium);
   padding: 0;
@@ -1238,7 +1320,7 @@ svg circle {
   background: var(--bg-card) !important;
   color: var(--text-secondary) !important;
   border: 1px solid var(--border-panel) !important;
-  border-radius: 8px !important;
+  border-radius: 4px !important;
   padding: 3px 8px !important;
   font-size: 10px !important;
   font-family: 'Untitled Sans', Arial, sans-serif !important;
@@ -1254,7 +1336,7 @@ svg circle {
   background: var(--bg-card) !important;
   color: var(--text-secondary) !important;
   border-color: var(--border-panel) !important;
-  border-radius: 10px !important;
+  border-radius: var(--btn-radius) !important;
 }
 
 .leaflet-control-zoom a:hover {
@@ -1264,7 +1346,7 @@ svg circle {
 .leaflet-control-attribution {
   background: var(--overlay-subtle) !important;
   font-size: 9px !important;
-  border-radius: 6px !important;
+  border-radius: 3px !important;
 }
 
 [data-theme="dark"] .leaflet-control-attribution {
@@ -1357,11 +1439,24 @@ svg circle {
      every dashboard page aligns the same way. Tuned to baseline-align the page
      title with the role card's text (not just the box tops). */
   padding-top: 20px;
+  /* No bottom padding: the body's bottom edge then sits at the content area's
+     own 12px inset (pb-3), which equals the sidebar's 12px floating margin — so
+     content bottom-aligns with the sidebar. Pages tall enough to scroll still
+     scroll; they just end at this same 12px gap instead of an extra-wide one. */
+  padding-bottom: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  /* Reserve the scrollbar gutter at all times so the content width never
+     changes between a short page (no scrollbar) and a tall one (scrollbar
+     present). Without this, switching tabs makes the whole layout — including
+     the header — shift sideways as the scrollbar appears/disappears. */
+  scrollbar-gutter: stable;
+  /* Contain scroll so reaching the top of the page doesn't chain into a
+     document-level bounce that exposes white above the header. */
+  overscroll-behavior: contain;
 }
 @media (min-width: 640px) {
-  .page-container { padding: 20px; padding-top: 20px; }
+  .page-container { padding: 20px; padding-top: 20px; padding-bottom: 0; }
 }
 
 /* Compact density (Settings → Workspace → Spacing): tighten the central page
@@ -1400,7 +1495,7 @@ svg circle {
 .page-header__icon {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1487,7 +1582,7 @@ svg circle {
 .dash-stat__icon {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1545,7 +1640,7 @@ svg circle {
 .data-tile {
   background: var(--bg-tinted, #F2F5F3);
   border: 1px solid var(--border-light);
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -1620,7 +1715,7 @@ svg circle {
 }
 .data-row:last-child { border-bottom: none; }
 .data-row__icon {
-  width: 32px; height: 32px; border-radius: 9px;
+  width: 32px; height: 32px; border-radius: 4px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   background: rgba(59, 130, 246, 0.10);
@@ -1652,37 +1747,46 @@ svg circle {
 /* ============ Icon Container — matches mobile icon chips ============
    Subtle inset highlight + soft shadow gives tinted chips depth without
    competing with the icon itself. */
+/* Icon "boxes" — the colored square behind icons has been removed platform-wide.
+   These now just reserve a centered, fixed-size slot so icons stay aligned in
+   lists/cards; no background or shadow. The `background: transparent !important`
+   override neutralizes the per-instance inline tints (e.g. var(--accent-light))
+   that components still pass, so the square is gone everywhere in one place. */
+.icon-box,
+.icon-box-sm,
+.icon-box-lg {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 .icon-box {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.20);
 }
 
 .icon-box-sm {
   width: 28px;
   height: 28px;
-  border-radius: 7px;
+  border-radius: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
 .icon-box-lg {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
 /* ============ Data Row — icon + label + value layout ============ */
@@ -1726,7 +1830,7 @@ svg circle {
   background: var(--glass-bg-strong);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
-  border-radius: 12px;
+  border-radius: var(--card-radius);
   border: 1px solid var(--glass-border);
   width: 100%;
   max-height: 90vh;
@@ -1928,7 +2032,7 @@ svg circle {
 .rbc-tamam .rbc-toolbar button {
   color: var(--text-secondary);
   border: 1px solid var(--border-medium);
-  border-radius: 8px;
+  border-radius: var(--btn-radius);
   padding: 6px 12px;
   font-weight: 600;
 }
@@ -1951,7 +2055,7 @@ svg circle {
   border-bottom: 1px solid var(--border-light);
 }
 .rbc-tamam .rbc-month-view,
-.rbc-tamam .rbc-time-view { border: 1px solid var(--border-light); border-radius: 12px; overflow: hidden; }
+.rbc-tamam .rbc-time-view { border: 1px solid var(--border-light); border-radius: var(--card-radius); overflow: hidden; }
 .rbc-tamam .rbc-today { background: var(--accent-light); }
 .rbc-tamam .rbc-off-range-bg { background: var(--overlay-subtle); }
 .rbc-tamam .rbc-event,
@@ -1959,6 +2063,13 @@ svg circle {
 .rbc-tamam .rbc-event:focus { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
 .rbc-tamam .rbc-current-time-indicator { background: var(--color-danger, #C44536); height: 2px; }
 .rbc-tamam .rbc-show-more { color: var(--accent-text); font-weight: 600; }
+
+/* Fill the wrapper and keep month-view rows tall enough that events stay
+   readable rather than stacking into slivers. On a short month the grid grows
+   to fill; on a tall one it scrolls instead of clipping. */
+.rbc-tamam .rbc-calendar { height: 100%; }
+.rbc-tamam .rbc-month-view { overflow-y: auto; }
+.rbc-tamam .rbc-month-row { min-height: 96px; }
 
 /* Time-grid (day / week) — Google-Calendar-style hour rows + readable events.
    Taller hour rows give short (30-min) appointments room to show their label,
@@ -1982,18 +2093,16 @@ svg circle {
 .rbc-tamam .rbc-time-gutter .rbc-label { padding: 0 8px 0 6px; }
 .rbc-tamam .rbc-time-header-gutter { border-bottom: 1px solid var(--border-light); }
 .rbc-tamam .rbc-day-slot .rbc-event {
-  padding: 2px 6px;
+  padding: 3px 8px;
   border-radius: 6px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  justify-content: center;
 }
-.rbc-tamam .rbc-day-slot .rbc-event-label {
-  font-size: 10px;
-  font-weight: 600;
-  opacity: 0.92;
-  flex-shrink: 0;
-}
+/* Time range is conveyed by the gutter + event position, so the in-event
+   time label is hidden to avoid repetition and give the title full space. */
+.rbc-tamam .rbc-day-slot .rbc-event-label { display: none; }
 .rbc-tamam .rbc-day-slot .rbc-event-content {
   font-size: 11px;
   font-weight: 600;

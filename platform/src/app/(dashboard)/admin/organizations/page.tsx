@@ -3,18 +3,16 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
-import FilterBar from '@/components/filters/FilterBar';
-import SearchInput from '@/components/filters/SearchInput';
-import FilterSelect from '@/components/filters/FilterSelect';
+import { FilterMenu } from '@/components/filters';
 import {
   Plus, X, Edit3, Ban,
-  ToggleLeft, ToggleRight, Building2
+  ToggleLeft, ToggleRight
 } from '@/components/icons/lucide';
+import RowActionsMenu from '@/components/RowActionsMenu';
 
 type OrgFormData = {
   name: string;
@@ -49,12 +47,15 @@ const emptyForm: OrgFormData = {
 export default function AdminOrganizationsPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser, globalSearch } = useApp();
   const { organizations, loading, create, update, deactivate, getStats } = useOrganizations();
 
-  const [search, setSearch] = useState('');
+  // Text search comes from the shared global search bar (TopBar).
+  const search = globalSearch;
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterType !== 'all' ? 1 : 0);
+  const clearFilters = () => { setFilterStatus('all'); setFilterType('all'); };
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<OrgFormData>(emptyForm);
@@ -185,7 +186,7 @@ export default function AdminOrganizationsPage() {
   // Styles
   const inputStyle: React.CSSProperties = {
     background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-    borderRadius: '10px', padding: '10px 14px', color: 'var(--text-primary)',
+    borderRadius: '4px', padding: '10px 14px', color: 'var(--text-primary)',
     fontSize: '14px', width: '100%', outline: 'none',
   };
   const selectStyle: React.CSSProperties = {
@@ -200,55 +201,36 @@ export default function AdminOrganizationsPage() {
 
   return (
     <>
-      <TopBar title={t('orgAdmin.title')} />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-
-        <PageHeader
-          icon={Building2}
-          title={t('orgAdmin.title')}
-          actions={
+      <TopBar title={t('orgAdmin.title')} searchTrailing={
+            <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterMenu.Field label={t('orgAdmin.filterByType')}>
+                <select className="w-full text-sm" value={filterType} onChange={e => setFilterType(e.target.value)}>
+                  <option value="all">{t('orgAdmin.typeAll')}</option>
+                  <option value="public">{t('orgAdmin.typePublic')}</option>
+                  <option value="private">{t('orgAdmin.typePrivate')}</option>
+                </select>
+              </FilterMenu.Field>
+              <FilterMenu.Field label={t('orgAdmin.filterByStatus')}>
+                <select className="w-full text-sm" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                  <option value="all">{t('orgAdmin.statusAll')}</option>
+                  <option value="active">{t('orgAdmin.statusActive')}</option>
+                  <option value="trial">{t('orgAdmin.statusTrial')}</option>
+                  <option value="suspended">{t('orgAdmin.statusSuspended')}</option>
+                  <option value="cancelled">{t('orgAdmin.statusCancelled')}</option>
+                </select>
+              </FilterMenu.Field>
+            </FilterMenu>
+          } actions={
             <button onClick={openCreate} className="btn btn-primary">
               <Plus className="w-4 h-4" /> {t('orgAdmin.newOrganization')}
             </button>
-          }
-        />
-
-        {/* Toolbar */}
-        <FilterBar>
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder={t('orgAdmin.searchPlaceholder')}
-            aria-label={t('orgAdmin.searchPlaceholder')}
-          />
-          <FilterSelect
-            value={filterType}
-            onChange={setFilterType}
-            options={[
-              { value: 'all', label: t('orgAdmin.typeAll') },
-              { value: 'public', label: t('orgAdmin.typePublic') },
-              { value: 'private', label: t('orgAdmin.typePrivate') },
-            ]}
-            aria-label={t('orgAdmin.filterByType')}
-          />
-          <FilterSelect
-            value={filterStatus}
-            onChange={setFilterStatus}
-            options={[
-              { value: 'all', label: t('orgAdmin.statusAll') },
-              { value: 'active', label: t('orgAdmin.statusActive') },
-              { value: 'trial', label: t('orgAdmin.statusTrial') },
-              { value: 'suspended', label: t('orgAdmin.statusSuspended') },
-              { value: 'cancelled', label: t('orgAdmin.statusCancelled') },
-            ]}
-            aria-label={t('orgAdmin.filterByStatus')}
-          />
-        </FilterBar>
+          } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
         {/* Table */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 840 }}>
               <thead>
                 <tr>
                   {[
@@ -313,15 +295,13 @@ export default function AdminOrganizationsPage() {
                       {orgUserCounts[org._id] ?? '...'}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => openEdit(org)} title={t('action.edit')} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }}>
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        {org.isActive && (
-                          <button onClick={() => handleDeactivate(org)} title={t('orgAdmin.deactivate')} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-danger)' }}>
-                            <Ban className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                      <div className="flex items-center">
+                        <RowActionsMenu
+                          actions={[
+                            { key: 'edit', label: t('action.edit'), icon: <Edit3 className="w-4 h-4" />, onClick: () => openEdit(org) },
+                            ...(org.isActive ? [{ key: 'deactivate', label: t('orgAdmin.deactivate'), tone: 'danger' as const, icon: <Ban className="w-4 h-4" />, onClick: () => handleDeactivate(org) }] : []),
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -340,7 +320,7 @@ export default function AdminOrganizationsPage() {
         }} onClick={() => setShowForm(false)}>
           <div style={{
             background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-            borderRadius: '20px', width: '100%', maxWidth: '680px', maxHeight: '90vh',
+            borderRadius: '6px', width: '100%', maxWidth: '680px', maxHeight: '90vh',
             overflow: 'auto', padding: '28px',
           }} onClick={e => e.stopPropagation()}>
 

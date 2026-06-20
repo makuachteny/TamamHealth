@@ -21,20 +21,33 @@ const calendarLocalizer = dateFnsLocalizer({
 // Event shape fed to react-big-calendar; keeps the full appointment on `resource`.
 export type CalEvent = { id: string; title: string; start: Date; end: Date; resource: AppointmentDoc };
 
-// Calendar toolbar: only icon prev/next + the period label. The view switcher
-// (month/week/day) and Today live in the page's own toolbar above, so they're
-// intentionally omitted here to avoid duplicate controls.
+// Calendar toolbar: icon prev/next + the period label on the left, and the
+// day/week/month view switcher docked on the right (mirrors the same filter
+// that lives beside the search bar — both drive the calendar granularity).
 const rbcNavBtn: React.CSSProperties = {
   background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)',
   borderRadius: 8, width: 34, height: 34, display: 'flex', alignItems: 'center',
   justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)',
 };
-function CalToolbar({ label, onNavigate }: ToolbarProps<CalEvent, object>) {
+const CAL_VIEWS: ('day' | 'week' | 'month')[] = ['day', 'week', 'month'];
+function CalToolbar({ label, onNavigate, onView, view }: ToolbarProps<CalEvent, object>) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
       <button type="button" onClick={() => onNavigate('PREV')} aria-label="Previous" style={rbcNavBtn}><ChevronLeft size={18} /></button>
       <button type="button" onClick={() => onNavigate('NEXT')} aria-label="Next" style={rbcNavBtn}><ChevronRight size={18} /></button>
       <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{label}</h3>
+      {/* View switcher — right-aligned in the calendar header card. */}
+      <div style={{ marginLeft: 'auto', display: 'flex', height: 34, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-medium)' }}>
+        {CAL_VIEWS.map(v => (
+          <button key={v} type="button" onClick={() => onView(v as View)} style={{
+            display: 'flex', alignItems: 'center', padding: '0 14px', border: 'none', cursor: 'pointer',
+            fontSize: 13, fontWeight: 600, textTransform: 'capitalize',
+            background: view === v ? 'var(--accent-primary)' : 'var(--bg-card)',
+            color: view === v ? '#fff' : 'var(--text-secondary)',
+            transition: 'background 0.15s, color 0.15s',
+          }}>{v}</button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -70,6 +83,11 @@ export default function AppointmentsCalendar({
       popup
       style={{ height: '100%' }}
       scrollToTime={new Date(1970, 0, 1, 7, 0, 0)}
+      // No hover tooltip — it just repeated the time + title already shown in the
+      // event block. And blank the in-event time label in day/week views since
+      // the time gutter on the left already conveys the time (no repetition).
+      tooltipAccessor={() => ''}
+      formats={{ eventTimeRangeFormat: () => '' }}
       components={{ toolbar: CalToolbar }}
       onSelectEvent={(e: { resource: AppointmentDoc }) => onSelectEvent(e.resource)}
       selectable

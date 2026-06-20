@@ -155,7 +155,7 @@ export default function MessagingDock() {
         className="fixed z-[60] flex items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105"
         style={{ right: 20, bottom: 20, width: 56, height: 56, background: 'var(--accent-primary)', boxShadow: 'var(--card-shadow-lg)' }}
       >
-        <MessageSquare className="w-6 h-6" />
+        <MessageSquare className="w-6 h-6" color="#FFFFFF" />
         {unreadCount > 0 && (
           <span
             className="absolute flex items-center justify-center text-[10px] font-bold text-white rounded-full"
@@ -206,7 +206,7 @@ export default function MessagingDock() {
           <>
             <MessageSquare className="w-[18px] h-[18px] flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
             <h2 className="text-[14px] font-bold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>Messages</h2>
-            <button onClick={() => { setView('new'); }} className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white" style={{ background: 'var(--accent-primary)' }} aria-label="New message" title="New message">
+            <button onClick={() => { setView('new'); }} className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }} aria-label="New message" title="New message">
               <Plus className="w-4 h-4" />
             </button>
           </>

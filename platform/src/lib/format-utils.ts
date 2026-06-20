@@ -72,3 +72,39 @@ export function formatDate(iso?: string | null): string {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+/**
+ * Long, human header date: "Wednesday, 17 June 2026". Used in dashboard
+ * headers. Accepts a Date or ISO string; defaults to now.
+ */
+export function formatLongDate(input?: Date | string | null): string {
+  const d = input ? new Date(input) : new Date();
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+/**
+ * Canonical money formatter. Standardizes the previously-inconsistent
+ * "{n} SSP" / "SSP {n}" inline renderings into one symbol-prefixed form:
+ * "SSP 1,234". Null/undefined/NaN render as the zero amount.
+ *
+ * @param amount  numeric value (minor handling: undefined/null → 0)
+ * @param opts.currency  currency code/symbol (default "SSP")
+ * @param opts.decimals  fixed decimal places (default 0, matching prior `.toLocaleString()`)
+ */
+export function formatMoney(
+  amount?: number | null,
+  opts?: { currency?: string; decimals?: number },
+): string {
+  const currency = opts?.currency ?? 'SSP';
+  const decimals = opts?.decimals ?? 0;
+  const n = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0;
+  const num = n.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return `${currency} ${num}`;
+}
+
+/** Part of day for greetings. Pure function of the hour (local time). */
+export function timeOfDay(date: Date = new Date()): 'morning' | 'afternoon' | 'evening' {
+  const h = date.getHours();
+  return h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+}
+

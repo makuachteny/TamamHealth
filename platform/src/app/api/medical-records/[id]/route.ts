@@ -35,7 +35,14 @@ async function patchHandler(
     }
     const { sanitizePayload } = await import('@/lib/validation');
     const sanitized = sanitizePayload(body);
-    const { updateMedicalRecord } = await import('@/lib/services/medical-record-service');
+    const { updateMedicalRecord, getMedicalRecordById } = await import('@/lib/services/medical-record-service');
+    // Org-scope guard: a clinician may only amend records in their own org
+    // (super_admin excepted) — prevents cross-tenant tampering by record id.
+    const existing = await getMedicalRecordById(id);
+    if (!existing) return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+    if (auth.role !== 'super_admin' && auth.orgId && existing.orgId && existing.orgId !== auth.orgId) {
+      return forbidden('Access denied to this record');
+    }
     const updated = await updateMedicalRecord(id, sanitized as Parameters<typeof updateMedicalRecord>[1]);
     if (!updated) {
       return NextResponse.json({ error: 'Record not found' }, { status: 404 });
@@ -58,7 +65,13 @@ async function deleteHandler(
     if (!auth) return unauthorized();
     if (!hasRole(auth, ['super_admin', 'medical_superintendent'])) return forbidden();
     const { id } = await params;
-    const { deleteMedicalRecord } = await import('@/lib/services/medical-record-service');
+    const { deleteMedicalRecord, getMedicalRecordById } = await import('@/lib/services/medical-record-service');
+    // Org-scope guard before deletion (super_admin excepted).
+    const existing = await getMedicalRecordById(id);
+    if (!existing) return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+    if (auth.role !== 'super_admin' && auth.orgId && existing.orgId && existing.orgId !== auth.orgId) {
+      return forbidden('Access denied to this record');
+    }
     const deleted = await deleteMedicalRecord(id);
     if (!deleted) {
       return NextResponse.json({ error: 'Record not found' }, { status: 404 });

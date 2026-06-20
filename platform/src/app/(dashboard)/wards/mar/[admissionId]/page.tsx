@@ -285,12 +285,9 @@ export default function MARPage() {
             </div>
             <div className="min-w-0">
               <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                {t('mar.heading')}
+                {admission.patientName}
               </h1>
               <div className="mt-1 text-sm flex items-center flex-wrap gap-x-3 gap-y-1" style={{ color: 'var(--text-secondary)' }}>
-                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  {admission.patientName}
-                </span>
                 <span className="inline-flex items-center gap-1.5">
                   <BedDouble className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
                   {admission.wardName}{admission.bedNumber ? ` · ${admission.bedNumber}` : ''}
@@ -388,7 +385,7 @@ export default function MARPage() {
         ) : (
           <div className="card-elevated overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+              <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: 760 }}>
                 <thead>
                   <tr style={{ background: 'var(--overlay-subtle)' }}>
                     <th
@@ -533,7 +530,7 @@ export default function MARPage() {
                   <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
                     color: 'var(--text-muted)', letterSpacing: '0.06em',
                   }}>{t('mar.status')}</label>
-                  <div className="grid grid-cols-4 gap-1.5">
+                  <div className="grid grid-cols-4 gap-1.5 keep-cols">
                     {(['given', 'missed', 'refused', 'held'] as const).map(s => {
                       const tint = STATUS_TINT[s];
                       const on = modalStatus === s;

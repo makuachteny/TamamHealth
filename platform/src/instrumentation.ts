@@ -3,55 +3,18 @@
  * Used to verify the license key before the app serves requests.
  */
 
+import { validateProductionConfig } from './lib/config-validation';
+
 /**
  * Boot-time configuration safety check. Refuses to start in production if an
- * obvious placeholder / empty value leaked through — better to fail loudly on
- * deploy than to silently ship a known-bad credential.
+ * obvious placeholder / empty / missing secret leaked through — better to fail
+ * loudly on deploy than to silently ship a known-bad credential. The rules live
+ * in lib/config-validation.ts so they are unit-testable.
  */
 function assertProductionConfig(): void {
   if (process.env.NODE_ENV !== 'production') return;
 
-  const errors: string[] = [];
-
-  // Bootstrap admin password: server-only env var. If unset, the credential
-  // generator (lib/seed-credentials.ts) will mint a random one on first boot
-  // and print the file path to stdout. We accept that path here, but warn if
-  // the operator left a known-placeholder value behind.
-  const adminPass = process.env.ADMIN_INITIAL_PASSWORD || '';
-  if (adminPass && /REPLACE|CHANGE|PLACEHOLDER|ChangeMe/i.test(adminPass)) {
-    errors.push('ADMIN_INITIAL_PASSWORD still contains a placeholder — rotate it before boot.');
-  }
-
-  // Refuse to boot if a deploy still references the old browser-exposed
-  // admin-password variable. NEXT_PUBLIC_* values get bundled into every
-  // shipped JS payload, so this is never a safe place for a credential.
-  if (process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
-    errors.push('NEXT_PUBLIC_ADMIN_PASSWORD is set — remove it. Use ADMIN_INITIAL_PASSWORD (server-only) instead.');
-  }
-
-  const jwt = process.env.JWT_SECRET || '';
-  if (!jwt) {
-    // Catch the missing-entirely case at boot rather than on first auth
-    // request. auth-token.ts also refuses to fall back in production, but a
-    // boot-time refusal turns this into a deploy-time failure rather than a
-    // runtime 500 on the first login attempt.
-    errors.push('JWT_SECRET is unset — generate one with `openssl rand -base64 48`.');
-  } else if (/REPLACE|CHANGE|PLACEHOLDER|default|example|tamamhealth-south-sudan/i.test(jwt)) {
-    errors.push('JWT_SECRET still contains a placeholder / default — generate one with `openssl rand -base64 48`.');
-  } else if (jwt.length < 32) {
-    // Mirror the runtime check in auth-token.ts so deploys with a too-short
-    // secret fail loudly at boot.
-    errors.push(`JWT_SECRET must be at least 32 characters in production (got ${jwt.length}).`);
-  }
-
-  if (process.env.NEXT_PUBLIC_SYNC_ENABLED === 'true') {
-    if (!process.env.NEXT_PUBLIC_COUCHDB_URL) {
-      errors.push('NEXT_PUBLIC_SYNC_ENABLED=true but NEXT_PUBLIC_COUCHDB_URL is unset.');
-    }
-    if (!process.env.COUCHDB_WEBHOOK_SECRET) {
-      errors.push('NEXT_PUBLIC_SYNC_ENABLED=true but COUCHDB_WEBHOOK_SECRET is unset.');
-    }
-  }
+  const errors = validateProductionConfig(process.env);
 
   if (errors.length > 0) {
     console.error('');

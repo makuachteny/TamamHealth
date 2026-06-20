@@ -1,18 +1,21 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import Modal from '@/components/Modal';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import SendMessageModal from '@/components/SendMessageModal';
+// Clean single-stroke (Tailwind-style) outline icons — imported straight from
+// lucide-react so the whole patient record renders flat and uncolored rather
+// than through the app's duotone icon shim.
 import {
   ArrowLeft, Stethoscope, ArrowRightLeft,
-  Heart, AlertTriangle, FileText, FlaskConical,
+  AlertTriangle, FileText, FlaskConical,
   Pill, Activity, Brain, ChevronDown, ChevronUp,
-  ShieldAlert, TestTubes, MessageSquare, ChevronRight,
+  ShieldAlert, TestTubes, ChevronRight,
   CalendarClock, TrendingUp as TrendingUpIcon, ClipboardList,
-  User as UserIcon, Building2, Search, X, Printer, Wallet, Syringe,
-} from '@/components/icons/lucide';
+  User as UserIcon, Building2, Search, X, Wallet, Syringe,
+  Heart, Printer, Download, Pencil, Baby,
+} from 'lucide-react';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -20,7 +23,7 @@ import { usePatientReferrals } from '@/lib/hooks/useReferrals';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { useANC } from '@/lib/hooks/useANC';
-import { Package, Clock, Building2 as Building2Icon } from '@/components/icons/lucide';
+import { Package, Clock } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import dynamic from 'next/dynamic';
 // Lazy-loaded: recharts is large and only used on the Trends view, so keep it
@@ -31,37 +34,56 @@ const VitalsTrends = dynamic(() => import('@/components/VitalsTrends'), {
 });
 import PatientTimeline from '@/components/PatientTimeline';
 import VitalCard from '@/components/VitalCard';
-import { Icon as DuotoneInfoIcon } from '@/components/icons';
-import { formatDateTime, formatDate } from '@/lib/format-utils';
-import { patientFullName, patientInitials, patientAgeLabel } from '@/lib/patient-utils';
+import { formatDateTime, formatDate, formatMoney } from '@/lib/format-utils';
+import { patientFullName } from '@/lib/patient-utils';
 import { usePatientAppointments } from '@/lib/hooks/useAppointments';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useTriage } from '@/lib/hooks/useTriage';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatientPayments } from '@/lib/hooks/usePayments';
 import BillingTab from '@/components/patients/BillingTab';
-import PatientIndex from '@/components/patients/PatientIndex';
 import PatientSBAR from '@/components/patients/PatientSBAR';
 import ProblemList from '@/components/patients/ProblemList';
-import PatientCommunication from '@/components/PatientCommunication';
+import RecordSignatureBar from '@/components/patients/RecordSignatureBar';
+import AllergyList from '@/components/patients/AllergyList';
+import DirectiveList from '@/components/patients/DirectiveList';
+import ChartSummaryPanel from '@/components/patients/ChartSummaryPanel';
+import CareAlertsBanner from '@/components/patients/CareAlertsBanner';
+import ChartSafetyActions from '@/components/patients/ChartSafetyActions';
+import PhoneNotes from '@/components/patients/PhoneNotes';
+import AssessmentsPanel from '@/components/patients/AssessmentsPanel';
+import SuperbillPanel from '@/components/patients/SuperbillPanel';
 import { useProblems } from '@/lib/hooks/useProblems';
 import type { PatientNoteDoc } from '@/lib/db-types';
+import { isValidPhone, normalizePhone, formatPhoneDisplay } from '@/lib/field-formats';
+import { useApp } from '@/lib/context';
+import { OrderLabModal, PrescribeModal, ReferModal } from '@/components/patients/PatientActionModals';
 
 // Administrative tabs are the only ones a non-clinical role (e.g. Medical
 // Receptionist) may see — the "minimum necessary" rule: contact details,
 // referral follow-up, and billing/scheduling, but NOT clinical notes, test
 // results, diagnoses, vitals, or medications.
-const ADMIN_TAB_IDS = ['overview', 'referrals', 'billing', 'communication'];
+const ADMIN_TAB_IDS = ['overview', 'referrals', 'billing'];
 
 export default function PatientDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
+  const contentRef = useRef<HTMLElement>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  // Keep the content area pinned to the top when switching tabs, so cards don't
+  // appear to "jump" when a shorter/taller tab swaps in under a retained scroll
+  // position. Instant (no smooth) so it's a fixed reset, not an animation.
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [activeTab]);
   const [expandedAI, setExpandedAI] = useState<Set<string>>(new Set());
-  const [showMessageModal, setShowMessageModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPaymentPanel, setShowPaymentPanel] = useState(false);
   const [showPlanWizard, setShowPlanWizard] = useState(false);
+  // Header action modals — open in place, pre-filled with the current patient.
+  const [showOrderLabModal, setShowOrderLabModal] = useState(false);
+  const [showPrescribeModal, setShowPrescribeModal] = useState(false);
+  const [showReferModal, setShowReferModal] = useState(false);
 
   // Full History filters & expansion
   const [historySearch, setHistorySearch] = useState('');
@@ -70,6 +92,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
   const [expandedEncounters, setExpandedEncounters] = useState<Set<string>>(new Set());
 
   const { t } = useTranslation();
+  const { currentUser } = useApp();
   const { patients, loading, update: updatePatient } = usePatients();
   const { hospitals } = useHospitals();
 
@@ -92,7 +115,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
     }
   }, [canViewClinical, activeTab]);
   const { balance: patientBalance, reload: reloadPayments } = usePatientPayments(patient?._id);
-  const { problems: patientProblems, active: activeProblems } = useProblems(patient?._id);
+  const { problems: patientProblems } = useProblems(patient?._id);
 
   // Patient care notes (free-text staff notes) — surfaced on the overview only
   // when present, so the page never shows an empty "Notes" placeholder.
@@ -136,9 +159,11 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
     gender: 'Male' as 'Male' | 'Female',
   });
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
   const openEditModal = () => {
     if (!patient) return;
+    setEditErrors({});
     setEditForm({
       firstName: patient.firstName || '',
       middleName: patient.middleName || '',
@@ -154,13 +179,22 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
   const handleEditSubmit = async () => {
     if (!patient) return;
+    // Phone is optional — only block when a non-empty value is malformed.
+    if (!isValidPhone(editForm.phone)) {
+      setEditErrors({ phone: t('validation.errPhone') });
+      return;
+    }
+    setEditErrors({});
     try {
       setEditSubmitting(true);
+      // Normalize to canonical form before persisting (patient-service also
+      // re-normalizes, but keep the saved value canonical here too).
+      const normPhone = normalizePhone(editForm.phone) ?? editForm.phone.trim();
       await updatePatient(patient._id, {
         firstName: editForm.firstName.trim(),
         middleName: editForm.middleName.trim(),
         surname: editForm.surname.trim(),
-        phone: editForm.phone.trim(),
+        phone: normPhone,
         state: editForm.state.trim(),
         county: editForm.county.trim(),
         dateOfBirth: editForm.dateOfBirth,
@@ -216,7 +250,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
   if (loading || !patient) {
     return (
       <>
-        <TopBar title="Patient Record" />
+        <TopBar title="Patient Record" hideSearch />
         <main className="page-container flex items-center justify-center">
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             {loading ? t('status.loading') : t('patient.notFound')}
@@ -227,13 +261,6 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
   }
 
   const regHospital = hospitals.find(h => h._id === patient.registrationHospital);
-
-  // Counts for the "Related Records" sidebar card
-  const consultationsCount = records.length;
-  const activeReferralsCount = (patientReferrals || []).filter(r => r.status !== 'completed' && r.status !== 'cancelled').length;
-  const labOrdersCount = (allLabResults || []).filter(r => r.patientId === patient._id).length;
-  const immunizationsCount = (allImmunizations || []).filter(i => i.patientId === patient._id).length;
-  const prescriptionsCount = records.reduce((sum, r) => sum + (r.prescriptions?.length || 0), 0);
 
   // Last & next appointment (surfaced on the overview only when they exist).
   const apptTs = (a: { appointmentDate: string; appointmentTime?: string }) =>
@@ -247,7 +274,6 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
   const allTabs = [
     { id: 'overview', label: t('tab.overview'), icon: Heart },
-    { id: 'index', label: 'Index', icon: ClipboardList },
     { id: 'sbar', label: 'SBAR Handoff', icon: FileText },
     { id: 'problems', label: 'Problems', icon: AlertTriangle },
     { id: 'timeline', label: 'Timeline', icon: ClipboardList },
@@ -258,7 +284,6 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
     { id: 'prescriptions', label: t('tab.prescriptions'), icon: Pill },
     { id: 'immunizations', label: 'Immunizations', icon: Syringe },
     { id: 'referrals', label: t('tab.referrals'), icon: ArrowRightLeft },
-    { id: 'communication', label: 'Communication', icon: MessageSquare },
     { id: 'billing', label: 'Billing', icon: Wallet },
   ];
   const tabs = canViewClinical ? allTabs : allTabs.filter(tb => ADMIN_TAB_IDS.includes(tb.id));
@@ -267,14 +292,6 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
   const latestRecord = records[0];
   const latestVitals = latestRecord?.vitalSigns;
   const latestDiagnosis = latestRecord?.diagnoses?.[0];
-
-  // Prefer explicit timestamp fields, fall back to legacy date-only values.
-  const registeredAtDisplay = formatDateTime(patient.registeredAt || patient.registrationDate);
-  const lastConsultedRaw = patient.lastConsultedAt
-    || latestRecord?.consultedAt
-    || latestRecord?.visitDate
-    || patient.lastVisitDate;
-  const lastConsultedDisplay = formatDateTime(lastConsultedRaw);
 
   return (
     <>
@@ -322,14 +339,6 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             background: #fff !important;
           }
           [aria-hidden="true"][style*="gradient"] { display: none !important; }
-
-          /* Patient photo — show it in grayscale (looks like an ID photocopy) */
-          .patient-photo-card, [data-photo-card] {
-            background: #fff !important;
-            border: 1px solid #333 !important;
-            box-shadow: none !important;
-          }
-          .patient-photo-card img, [data-photo-card] img { filter: grayscale(100%) contrast(1.05); }
 
           /* Simple, consistent black-on-white typography */
           h1 { font-size: 18pt !important; font-weight: 700 !important; color: #000 !important; }
@@ -410,8 +419,8 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
           }
         }
       ` }} />
-      <TopBar title="Patient Record" />
-      <main className="page-container page-enter">
+      <TopBar title="Patient Record" hideSearch />
+      <main ref={contentRef} className="page-container">
           {/* Print-only hospital letterhead */}
           <header className="print-only print-letterhead">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -439,10 +448,10 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             <ArrowLeft className="w-4 h-4" /> {t('action.back')}
           </button>
 
-          {/* Patient Header — TamamHealth-style: avatar | name+pills+info-strip | action row */}
+          {/* Patient Header — avatar + identity (name, hospital no., status pills,
+              age/sex) on the left; consultation + clinical actions on the right.
+              Full demographics now live in the sidebar Demographics card. */}
           {(() => {
-            const initials = patientInitials(patient);
-            const isFemale = patient.gender === 'Female';
             const hasAllergy = patient.allergies?.length > 0 && patient.allergies[0] !== 'None known';
             // Pregnancy is signaled via active ANC visits — pull the most recent
             // gestational age if available. An ANC visit is considered "active"
@@ -451,211 +460,140 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             const activeANC = patientANC.find(a => !a.linkedBirthId);
             const isPregnant = !!activeANC;
 
-            const infoBits: { icon: 'qr' | 'patient' | 'phone' | 'mapPin' | 'clock'; label: string; value: string; accent: string; mono?: boolean }[] = [
-              { icon: 'qr', label: 'Geocode', value: patient.geocodeId || patient.hospitalNumber, accent: '#1E3A8A', mono: true },
-              { icon: 'patient', label: 'Age / Sex', value: `${patientAgeLabel(patient)} · ${patient.gender || '—'}`, accent: 'var(--accent-primary)' },
-              ...(patient.phone ? [{ icon: 'phone' as const, label: 'Phone', value: patient.phone, accent: '#3b82f6', mono: true }] : []),
-              { icon: 'clock', label: 'Last Visit', value: lastConsultedDisplay, accent: '#E4A84B' },
-            ];
-
-            const photoUrl = (patient as { photoUrl?: string }).photoUrl;
+            const fullName = patientFullName(patient);
+            const initials = fullName.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
 
             return (
-              <div className="card-elevated p-5 mb-5 relative overflow-hidden">
-                <div className="flex items-stretch gap-5">
-                  {/* ID-card style patient photo on the left — auto-height to match right column */}
-                  <div
-                    className="flex-shrink-0 relative overflow-hidden self-stretch"
-                    aria-hidden
-                    style={{
-                      width: 180, borderRadius: 14,
-                      background: isFemale
-                        ? 'linear-gradient(135deg, #D96E59 0%, #9A2F27 100%)'
-                        : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                      boxShadow: '0 4px 14px rgba(26, 58, 58, 0.10), inset 0 0 0 1px rgba(255,255,255,0.08)',
-                    }}
-                  >
-                    {photoUrl ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={photoUrl}
-                        alt={`${patient.firstName} ${patient.surname}`}
-                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%' }}
-                      />
-                    ) : (
-                      <div
-                        className="absolute inset-0 flex items-center justify-center text-white font-bold"
-                        style={{ fontSize: 64, letterSpacing: 1, textShadow: '0 2px 8px rgba(0,0,0,0.20)' }}
-                      >
-                        {initials}
-                      </div>
-                    )}
-                    {/* bottom gradient with patient ID for ID-card feel */}
+              <div className="card-elevated p-5 mb-5">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  {/* Identity — avatar, name, hospital no., status pills, age/sex */}
+                  <div className="flex items-center gap-4 min-w-0">
                     <div
-                      style={{
-                        position: 'absolute', left: 0, right: 0, bottom: 0,
-                        padding: '12px 12px 10px',
-                        background: 'linear-gradient(to top, rgba(0,0,0,0.6), rgba(0,0,0,0))',
-                        color: '#fff',
-                      }}
+                      className="flex-shrink-0 flex items-center justify-center font-bold text-white"
+                      style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--accent-primary)', fontSize: 18, letterSpacing: 0.5 }}
                     >
-                      <div style={{ fontSize: 9.5, letterSpacing: 0.6, opacity: 0.85, textTransform: 'uppercase' }}>Patient ID</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'JetBrains Mono, ui-monospace, monospace', marginTop: 2 }}>
-                        {patient.hospitalNumber || patient.geocodeId || '—'}
+                      {initials}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.4 }}>
+                          {fullName}
+                        </h1>
+                        {isPregnant && (
+                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-bold" style={{
+                            background: 'rgba(217, 110, 89, 0.12)', color: '#C44536', border: '1px solid rgba(217, 110, 89, 0.32)', letterSpacing: 0.2,
+                          }}>
+                            <Baby className="w-3 h-3" />
+                            Pregnant{activeANC?.gestationalAge ? ` · ${activeANC.gestationalAge} wk` : ''}
+                          </span>
+                        )}
+                        {hasAllergy && (
+                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-bold" style={{
+                            background: 'rgba(196, 69, 54, 0.12)', color: '#C44536', border: '1px solid rgba(196, 69, 54, 0.32)', letterSpacing: 0.2,
+                          }}>
+                            <AlertTriangle className="w-3 h-3" />
+                            Allergy: {patient.allergies.length === 1 ? patient.allergies[0] : `${patient.allergies[0]} +${patient.allergies.length - 1}`}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Right column */}
-                  <div className="flex-1 min-w-0">
-                    {/* Name + status pills */}
-                    <div className="flex items-center gap-2 flex-wrap mb-2">
-                      <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.4 }}>
-                        {patientFullName(patient)}
-                      </h1>
-                      {isPregnant && (
-                        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-bold" style={{
-                          background: 'rgba(217, 110, 89, 0.12)', color: '#C44536', border: '1px solid rgba(217, 110, 89, 0.32)', letterSpacing: 0.2,
-                        }}>
-                          <DuotoneInfoIcon name="pregnant" size={11} color="#C44536" accent="#C44536" />
-                          Pregnant{activeANC?.gestationalAge ? ` · ${activeANC.gestationalAge} wk` : ''}
-                        </span>
-                      )}
-                      {hasAllergy && (
-                        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-bold" style={{
-                          background: 'rgba(196, 69, 54, 0.12)', color: '#C44536', border: '1px solid rgba(196, 69, 54, 0.32)', letterSpacing: 0.2,
-                        }}>
-                          <AlertTriangle className="w-3 h-3" />
-                          {patient.allergies.length === 1 ? patient.allergies[0] : `${patient.allergies[0]} +${patient.allergies.length - 1}`} allergy
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Inline info strip — single row, all 5 items spread evenly */}
-                    <div
-                      className="grid mb-5"
-                      style={{
-                        gridTemplateColumns: `repeat(${infoBits.length}, minmax(0, 1fr))`,
-                        gap: 16,
-                        rowGap: 12,
-                      }}
+                  {/* Actions — primary consultation, clinical actions, then icon utilities */}
+                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap no-print">
+                    {canConsult && (
+                      <button
+                        onClick={() => router.push(`/consultation?patientId=${patient._id}`)}
+                        className="inline-flex items-center gap-2 px-4 rounded-lg text-sm font-semibold transition-colors"
+                        style={{ height: 40, background: 'var(--accent-primary)', border: '1px solid var(--accent-primary)', color: '#FFFFFF' }}
+                      >
+                        <Stethoscope className="w-4 h-4" /> New Consultation
+                      </button>
+                    )}
+                    {canOrderLabs && (
+                      <button
+                        onClick={() => setShowOrderLabModal(true)}
+                        className="inline-flex items-center gap-2 px-3.5 rounded-lg text-sm font-semibold transition-colors"
+                        style={{ height: 40, background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
+                      >
+                        <FlaskConical className="w-4 h-4" /> Order Lab
+                      </button>
+                    )}
+                    {canPrescribe && (
+                      <button
+                        onClick={() => setShowPrescribeModal(true)}
+                        className="inline-flex items-center gap-2 px-3.5 rounded-lg text-sm font-semibold transition-colors"
+                        style={{ height: 40, background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
+                      >
+                        <Pill className="w-4 h-4" /> Prescribe
+                      </button>
+                    )}
+                    {canViewClinical && (
+                      <button
+                        onClick={() => setShowReferModal(true)}
+                        className="inline-flex items-center gap-2 px-3.5 rounded-lg text-sm font-semibold transition-colors"
+                        style={{ height: 40, background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
+                      >
+                        <ArrowRightLeft className="w-4 h-4" /> Refer
+                      </button>
+                    )}
+                    {canViewClinical && <ChartSafetyActions patient={patient} />}
+                    <button
+                      onClick={openEditModal}
+                      className="flex items-center justify-center rounded-lg transition-colors"
+                      title="Edit demographics"
+                      style={{ width: 40, height: 40, background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)' }}
                     >
-                      {infoBits.map(bit => (
-                        <div key={bit.label} className="flex items-center gap-2.5 min-w-0">
-                          <DuotoneInfoIcon name={bit.icon} size={22} color={bit.accent} accent={bit.accent} />
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--text-muted)', lineHeight: 1.2 }}>
-                              {bit.label}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 13, fontWeight: 600, color: 'var(--text-primary)',
-                                fontFamily: bit.mono ? 'JetBrains Mono, ui-monospace, monospace' : 'inherit',
-                                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3,
-                              }}
-                            >
-                              {bit.value}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Action row — primary + secondaries spread evenly, then meta-action icons on the far right */}
-                    <div className="flex items-center justify-between gap-3 flex-wrap no-print">
-                      <div className="flex items-center gap-2 flex-wrap flex-1">
-                        {canConsult && (
-                          <button onClick={() => router.push(`/consultation?patientId=${patient._id}`)} className="btn btn-primary">
-                            <Stethoscope className="w-4 h-4" /> Start Consultation
-                          </button>
-                        )}
-                        {canOrderLabs && (
-                          <button onClick={() => setActiveTab('labs')} className="btn btn-secondary">
-                            <FlaskConical className="w-4 h-4" style={{ color: '#E4A84B' }} /> Order Lab
-                          </button>
-                        )}
-                        {canPrescribe && (
-                          <button onClick={() => setActiveTab('prescriptions')} className="btn btn-secondary">
-                            <Pill className="w-4 h-4" /> Prescribe
-                          </button>
-                        )}
-                        <button onClick={() => router.push('/referrals')} className="btn btn-secondary">
-                          <ArrowRightLeft className="w-4 h-4" /> Refer
-                        </button>
-                        <button onClick={() => setShowMessageModal(true)} className="btn btn-secondary">
-                          <MessageSquare className="w-4 h-4" style={{ color: '#1E3A8A' }} /> Message
-                        </button>
-                      </div>
-
-                      {/* Meta actions — Edit | Print (which also covers "save as PDF" in browser print dialog) */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={openEditModal}
-                          className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
-                          title="Edit demographics"
-                          style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)' }}
-                        >
-                          <DuotoneInfoIcon name="edit" size={15} />
-                        </button>
-                        <button
-                          onClick={() => { if (typeof window !== 'undefined') window.print(); }}
-                          className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
-                          title="Print patient summary"
-                          style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)' }}
-                        >
-                          <Printer className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (typeof window === 'undefined') return;
-                            // Real export — JSON snapshot of the patient record.
-                            // Export the *complete* clinical history. Previously
-                            // we sliced each collection to 20 — easy to read in
-                            // a code review, but silently truncates exports for
-                            // any patient with > 20 records / referrals / labs.
-                            // For a clinical handoff or patient-data-rights
-                            // export, partial data is worse than no export.
-                            const snapshot = {
-                              patient,
-                              latestRecord: records[0] || null,
-                              latestVitals,
-                              records,
-                              referrals: patientReferrals || [],
-                              labResults: (allLabResults || []).filter(l => l.patientId === patient._id),
-                              exportedAt: new Date().toISOString(),
-                            };
-                            const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `patient-${patient.hospitalNumber || patient._id}-${new Date().toISOString().slice(0, 10)}.json`;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                          }}
-                          className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
-                          title="Download patient record (JSON)"
-                          style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)' }}
-                        >
-                          <DuotoneInfoIcon name="download" size={15} />
-                        </button>
-                      </div>
-                    </div>
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => { if (typeof window !== 'undefined') window.print(); }}
+                      className="flex items-center justify-center rounded-lg transition-colors"
+                      title="Print patient summary"
+                      style={{ width: 40, height: 40, background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)' }}
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (typeof window === 'undefined') return;
+                        // Real export — JSON snapshot of the patient record.
+                        // Export the *complete* clinical history so a clinical
+                        // handoff or patient-data-rights export is never silently
+                        // truncated.
+                        const snapshot = {
+                          patient,
+                          latestRecord: records[0] || null,
+                          latestVitals,
+                          records,
+                          referrals: patientReferrals || [],
+                          labResults: (allLabResults || []).filter(l => l.patientId === patient._id),
+                          exportedAt: new Date().toISOString(),
+                        };
+                        const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `patient-${patient.hospitalNumber || patient._id}-${new Date().toISOString().slice(0, 10)}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="flex items-center justify-center rounded-lg transition-colors"
+                      title="Download patient record (JSON)"
+                      style={{ width: 40, height: 40, background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)' }}
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </div>
             );
           })()}
 
-          {/* Tabs — icon + label pills, tinted active surface (TamamHealth-style) */}
+          {/* Tabs — underlined text+icon tabs (active = accent text + accent rule) */}
           <div
             className="flex gap-1 mb-5 no-print overflow-x-auto"
-            style={{
-              background: 'var(--bg-card-solid)',
-              border: '1px solid var(--border-light)',
-              borderRadius: 12,
-              padding: 4,
-              boxShadow: 'var(--card-shadow)',
-            }}
+            style={{ borderBottom: '1px solid var(--border-light)' }}
           >
             {tabs.map(tab => {
               const isActive = activeTab === tab.id;
@@ -663,19 +601,22 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className="flex items-center gap-2 transition-all whitespace-nowrap"
+                  // Don't take focus on click — keeps a plain tap from drawing the
+                  // accent focus ring; keyboard Tab still focuses for a11y.
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="flex items-center justify-center gap-2 whitespace-nowrap"
                   style={{
-                    padding: '8px 14px',
-                    borderRadius: 8,
-                    fontSize: 12.5,
-                    fontWeight: isActive ? 700 : 500,
-                    background: isActive ? 'var(--bg-tinted, #F2F5F3)' : 'transparent',
-                    color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    border: 'none',
+                    padding: '10px 14px',
+                    marginBottom: -1,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    background: 'transparent',
+                    color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    borderBottom: `2px solid ${isActive ? 'var(--accent-primary)' : 'transparent'}`,
                     cursor: 'pointer',
                   }}
                 >
-                  <tab.icon className="w-4 h-4" style={{ color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
+                  <tab.icon className="w-4 h-4" />
                   {tab.label}
                 </button>
               );
@@ -685,6 +626,18 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
           {/* Overview Tab — full clinical overview (clinical roles only) */}
           {activeTab === 'overview' && canViewClinical && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+                {/* Chart-permanent care alerts — patient-safety banner shown
+                    on every visit (Centricity care alert). */}
+                <CareAlertsBanner patient={patient} hideAddButton />
+                {/* Unified chart summary — Problems, Medications, Allergies &
+                    Directives at a glance (Centricity-style chart desktop). */}
+                <ChartSummaryPanel
+                  patient={patient}
+                  problems={patientProblems}
+                  prescriptions={(allPrescriptions || []).filter(r => r.patientId === patient._id)}
+                  onOpenProblems={() => setActiveTab('problems')}
+                  hideListAddButtons
+                />
                 {/* Active triage banner — shows at top whenever a nurse has
                     triaged this patient recently (within 24h). Visible to
                     every role (nurse, doctor, med supt, etc.) so there is a
@@ -698,9 +651,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   const label = latest.priority === 'RED' ? 'Emergency — immediate care' : latest.priority === 'YELLOW' ? 'Priority — see soon' : 'Non-urgent';
                   return (
                     <div className="card-elevated p-4 flex items-center gap-4 lg:col-span-3 lg:order-1" style={{ background: bg, border: `1px solid ${color}40` }}>
-                      <div className="flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: color, color: '#fff' }}>
-                        <span className="text-base font-black">{latest.priority}</span>
-                      </div>
+                      <div className="flex-shrink-0 w-5 h-14 rounded-xl" style={{ background: color }} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>
@@ -737,7 +688,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
                 {/* Most Recent Record — hero card, first thing the doctor sees */}
                 <div
-                  className="card-elevated overflow-hidden relative lg:col-span-2 lg:order-2"
+                  className="card-elevated overflow-hidden relative lg:col-span-2 lg:order-2 lg:self-stretch"
                   style={{
                     boxShadow: '0 8px 32px -12px rgba(59, 130, 246,0.18), 0 2px 8px rgba(0,0,0,0.04)',
                   }}
@@ -760,7 +711,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                     <div className="flex items-center gap-2 flex-wrap">
                       <div
                         className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'var(--accent-light)' }}
+                        style={{ background: 'transparent' }}
                       >
                         <ClipboardList className="w-3.5 h-3.5" style={{ color: 'var(--tamamhealth-blue)' }} />
                       </div>
@@ -882,7 +833,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                             }}
                           >
                             <Wallet className="w-3 h-3" />
-                            {encounterBalance > 0 ? `SSP ${Math.round(encounterBalance).toLocaleString()} due` : 'Visit settled'}
+                            {encounterBalance > 0 ? `${formatMoney(encounterBalance)} due` : 'Visit settled'}
                           </span>
                         )}
                       </div>
@@ -904,13 +855,9 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                             Current medications
                           </p>
                           {(latestRecord.prescriptions || []).length > 0 ? (
-                            <ul className="space-y-1.5">
-                              {(latestRecord.prescriptions || []).slice(0, 4).map((p, i) => (
-                                <li key={i} className="flex items-start gap-1.5 text-xs">
-                                  <span
-                                    className="w-1 h-1 rounded-full mt-1.5 flex-shrink-0"
-                                    style={{ background: 'var(--tamamhealth-blue)' }}
-                                  />
+                            <ul className="space-y-1.5" style={{ maxHeight: 132, overflowY: 'auto', paddingRight: 4 }}>
+                              {(latestRecord.prescriptions || []).map((p, i) => (
+                                <li key={i} className="text-xs">
                                   <span>
                                     <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
                                       {p.drugName}
@@ -921,11 +868,6 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                                   </span>
                                 </li>
                               ))}
-                              {(latestRecord.prescriptions || []).length > 4 && (
-                                <li className="text-[10px] pl-2.5" style={{ color: 'var(--text-muted)' }}>
-                                  +{(latestRecord.prescriptions || []).length - 4} more
-                                </li>
-                              )}
                             </ul>
                           ) : (
                             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>None prescribed</p>
@@ -947,14 +889,19 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                             Treatment plan
                           </p>
                           {latestRecord.treatmentPlan ? (
-                            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                              {latestRecord.treatmentPlan}
-                            </p>
+                            <div style={{ maxHeight: 132, overflowY: 'auto', paddingRight: 4 }}>
+                              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                                {latestRecord.treatmentPlan}
+                              </p>
+                            </div>
                           ) : (
                             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No plan recorded</p>
                           )}
                         </div>
                       </div>
+
+                      {/* Signature & lock — sign, co-sign, or amend this note */}
+                      <RecordSignatureBar record={latestRecord} />
                     </div>
                   ) : (
                     <div className="p-8 text-center relative">
@@ -1011,7 +958,10 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   </div>
                 </div>
 
-                {/* Recent Visits */}
+                {/* Recent Visits — prior encounters only; the most recent one
+                    is already shown in full by the hero card above, so start
+                    from the second record to avoid repeating it here. */}
+                {records.length > 1 && (
                 <div className="card-elevated lg:col-span-3 lg:order-5">
                   <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
                     <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
@@ -1020,40 +970,46 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                     <h3 className="font-semibold text-sm">{t('encounters.recent')}</h3>
                   </div>
                   <div className="divide-y" style={{ borderColor: 'var(--table-row-border)' }}>
-                    {records.slice(0, 4).map(rec => {
+                    {records.slice(1, 5).map(rec => {
                       const ai = (rec as unknown as Record<string, unknown>).aiEvaluation as { suggestedDiagnoses: { icd10Code: string; name: string; confidence: number; reasoning: string; severity: string; suggestedTreatment?: string }[]; vitalSignAlerts: string[]; recommendedTests: string[]; severityAssessment: string; clinicalNotes: string; evaluatedAt: string } | undefined;
                       const isAIExpanded = expandedAI.has(rec._id);
                       return (
-                      <div key={rec._id} className="px-5 py-4 hover:bg-white/[0.03]">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className={`badge text-[10px] ${rec.visitType === 'emergency' ? 'badge-emergency' : rec.visitType === 'inpatient' ? 'badge-warning' : 'badge-normal'}`}>
-                                {rec.visitType}
-                              </span>
-                              <span className="text-sm font-medium">{rec.department}</span>
-                              {ai && (
-                                <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(139,92,246,0.12)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.2)' }}>
-                                  <Brain className="w-3 h-3" /> AI Evaluated
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm mt-1">{rec.chiefComplaint}</p>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{formatDateTime(rec.consultedAt || rec.visitDate)}</p>
-                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{rec.hospitalName}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {(rec.diagnoses || []).map((d, i) => (
-                            <span key={i} className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--accent-light)', color: 'var(--tamamhealth-blue)' }}>
-                              {d.icd10Code} {d.name}
+                      <div key={rec._id} className="px-5 py-4 hover:bg-white/[0.03] transition-colors">
+                        {/* Meta row: type + department on the left, date + facility on the right */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-center gap-2 flex-wrap min-w-0">
+                            <span className={`badge text-[10px] ${rec.visitType === 'emergency' ? 'badge-emergency' : rec.visitType === 'inpatient' ? 'badge-warning' : 'badge-normal'}`}>
+                              {rec.visitType}
                             </span>
-                          ))}
+                            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{rec.department}</span>
+                            {ai && (
+                              <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(139,92,246,0.12)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.2)' }}>
+                                <Brain className="w-3 h-3" /> AI Evaluated
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0 leading-tight">
+                            <p className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>{formatDateTime(rec.consultedAt || rec.visitDate)}</p>
+                            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{rec.hospitalName}</p>
+                          </div>
                         </div>
+
+                        {/* Chief complaint — the headline of the encounter */}
+                        <p className="text-[15px] font-semibold mt-1.5 leading-snug" style={{ color: 'var(--text-primary)' }}>{rec.chiefComplaint}</p>
+
+                        {/* Diagnoses */}
+                        {(rec.diagnoses || []).length > 0 && (
+                          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                            {(rec.diagnoses || []).map((d, i) => (
+                              <span key={i} className="text-[11px] font-medium px-2 py-0.5 rounded-md" style={{ background: 'var(--accent-light)', color: 'var(--tamamhealth-blue)', border: '1px solid var(--accent-border)' }}>
+                                <span className="font-mono">{d.icd10Code}</span> {d.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
                         <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-                          Provider: {rec.providerName} · {rec.providerRole}
+                          <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{rec.providerName}</span> · {rec.providerRole}
                         </p>
 
                         {/* Structured clinical history — surfaced for continuity */}
@@ -1119,61 +1075,53 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                     );})}
                   </div>
                 </div>
+                )}
+
+                {/* Outcome measures — scored intake assessments, held then signed (P2.2). */}
+                <div className="card-elevated lg:col-span-3 lg:order-6 p-5">
+                  <AssessmentsPanel patient={patient} />
+                </div>
+
+                {/* Phone notes — log patient calls and route to a provider (P1.4). */}
+                <div className="card-elevated lg:col-span-3 lg:order-7 p-5">
+                  <PhoneNotes patient={patient} />
+                </div>
 
               {/* Sidebar info — only data that is NOT already its own tab.
                   Allergies (header flag) and chronic conditions (Problems tab)
                   live elsewhere; records with dedicated tabs (history, referrals,
                   labs, prescriptions, immunizations, billing) are on the tab bar.
                   Cards stretch to fill the column beside the main content. */}
-              <div className="lg:col-span-1 lg:order-3 flex flex-col gap-5">
-                <div className="card-elevated">
+              <div className="lg:col-span-1 lg:order-3 lg:self-stretch flex flex-col gap-5">
+                <div className="card-elevated flex-1">
                   <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                    <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
-                      <UserIcon className="w-3.5 h-3.5" style={{ color: 'var(--tamamhealth-blue)' }} />
-                    </div>
+                    <UserIcon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                     <h3 className="font-semibold text-sm">{t('patient.demographics')}</h3>
                   </div>
-                  <div className="p-5">
-                    {/* Personal Info */}
-                    <div className="data-row-divider-sm">
-                      {[
-                        { l: t('patient.bloodType'), v: patient.bloodType },
-                        { l: t('patient.location'), v: `${patient.county}, ${patient.state}` },
-                        { l: t('patient.tribe'), v: patient.tribe },
-                        { l: t('patient.language'), v: patient.primaryLanguage },
-                      ].map(item => (
-                        <div key={item.l} className="flex justify-between">
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.l}</span>
-                          <span className="text-xs font-medium text-right max-w-[60%] truncate">{item.v}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <hr className="section-divider" />
-                    {/* Registration Info */}
-                    <div className="data-row-divider-sm">
-                      {[
-                        { l: t('patient.registered'), v: registeredAtDisplay },
-                        { l: t('patient.facility'), v: regHospital?.name || 'N/A' },
-                      ].map(item => (
-                        <div key={item.l} className="flex justify-between">
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.l}</span>
-                          <span className="text-xs font-medium text-right max-w-[60%] truncate">{item.v}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <hr className="section-divider" />
-                    {/* Next of Kin */}
-                    <div className="data-row-divider-sm">
-                      {[
-                        { l: t('patient.nextOfKin'), v: `${patient.nokName} (${patient.nokRelationship})` },
-                        { l: t('patient.nokPhone'), v: patient.nokPhone },
-                      ].map(item => (
-                        <div key={item.l} className="flex justify-between">
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.l}</span>
-                          <span className="text-xs font-medium text-right max-w-[60%] truncate">{item.v}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="p-5 data-row-divider-sm">
+                    {/* Full demographics — every contact, identity, and registration
+                        detail lives here now that the header only carries identity. */}
+                    {[
+                      { l: 'Name', v: patientFullName(patient) },
+                      { l: 'Hospital No.', v: patient.hospitalNumber },
+                      { l: 'Gender', v: patient.gender },
+                      { l: t('patient.phone'), v: patient.phone ? formatPhoneDisplay(patient.phone) : null },
+                      { l: t('patient.bloodType'), v: patient.bloodType },
+                      { l: 'Date of Birth', v: patient.dateOfBirth ? formatDate(patient.dateOfBirth) : null },
+                      { l: 'National ID', v: patient.nationalId },
+                      { l: t('patient.location'), v: [patient.county, patient.state].filter(Boolean).join(', ') || null },
+                      { l: t('patient.tribe'), v: patient.tribe },
+                      { l: t('patient.language'), v: patient.primaryLanguage },
+                      { l: t('patient.registered'), v: (patient.registrationDate || patient.registeredAt) ? formatDate(patient.registrationDate || patient.registeredAt) : null },
+                      { l: t('patient.facility'), v: regHospital?.name || patient.registrationHospital || null },
+                      { l: t('patient.nextOfKin'), v: patient.nokName ? `${patient.nokName}${patient.nokRelationship ? ` (${patient.nokRelationship})` : ''}` : null },
+                      { l: t('patient.nokPhone'), v: patient.nokPhone ? formatPhoneDisplay(patient.nokPhone) : null },
+                    ].filter(item => item.v).map(item => (
+                      <div key={item.l} className="flex justify-between gap-3">
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.l}</span>
+                        <span className="text-xs font-medium text-right max-w-[60%] truncate">{item.v}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1241,16 +1189,14 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   <h3 className="font-semibold text-sm">{t('patient.demographics')}</h3>
                 </div>
                 <div className="p-5 data-row-divider-sm">
+                  {/* Header already shows Phone, Location, Next of Kin name and
+                      Registered date — only the fields it omits are repeated here. */}
                   {[
-                    { l: t('patient.phone'), v: patient.phone },
-                    { l: t('patient.location'), v: `${patient.county}, ${patient.state}` },
                     { l: t('patient.language'), v: patient.primaryLanguage },
-                    { l: t('patient.registered'), v: registeredAtDisplay },
                     { l: t('patient.facility'), v: regHospital?.name || 'N/A' },
-                    { l: t('patient.nextOfKin'), v: `${patient.nokName} (${patient.nokRelationship})` },
                     { l: t('patient.nokPhone'), v: patient.nokPhone },
                   ].map(item => (
-                    <div key={item.l} className="flex justify-between">
+                    <div key={item.l} className="flex justify-between gap-3">
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.l}</span>
                       <span className="text-xs font-medium text-right max-w-[60%] truncate">{item.v}</span>
                     </div>
@@ -1267,46 +1213,42 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   <button onClick={() => router.push(`/appointments?patientId=${patient._id}`)} className="btn btn-secondary btn-sm"><ClipboardList className="w-4 h-4" /> {t('nav.appointments')}</button>
                 </div>
               </div>
+              {/* Intake / outcome measures — front desk enters these at check-in
+                  and they are held for the provider to review and sign (P2.2). */}
+              <div className="lg:col-span-2 card-elevated p-5">
+                <AssessmentsPanel patient={patient} />
+              </div>
             </div>
-          )}
-
-          {/* Index — Epic-style curated link grid for this patient */}
-          {activeTab === 'index' && patient && (
-            <PatientIndex
-              patient={patient}
-              counts={{
-                consultations: consultationsCount,
-                labs: labOrdersCount,
-                prescriptions: prescriptionsCount,
-                referrals: (patientReferrals || []).length,
-                immunizations: immunizationsCount,
-                activeProblems: activeProblems.length,
-                criticalLabs: (allLabResults || []).filter(l => l.patientId === patient._id && l.critical).length,
-                activeReferrals: activeReferralsCount,
-              }}
-              onJump={setActiveTab}
-              canConsult={canConsult}
-            />
           )}
 
           {/* SBAR Handoff — auto-generated from chart for shift change */}
           {activeTab === 'sbar' && patient && (
-            <PatientSBAR
-              patient={patient}
-              records={records}
-              labs={(allLabResults || []).filter(l => l.patientId === patient._id)}
-              prescriptions={(allPrescriptions || []).filter(r => r.patientId === patient._id)}
-              triages={patientTriages}
-              problems={patientProblems}
-            />
+            <div className="card-elevated p-5">
+              <PatientSBAR
+                patient={patient}
+                records={records}
+                labs={(allLabResults || []).filter(l => l.patientId === patient._id)}
+                prescriptions={(allPrescriptions || []).filter(r => r.patientId === patient._id)}
+                triages={patientTriages}
+                problems={patientProblems}
+              />
+            </div>
           )}
 
           {/* Problem List — longitudinal active/chronic/resolved */}
           {activeTab === 'problems' && patient && (
-            <ProblemList
-              patientId={patient._id}
-              patientName={`${patient.firstName} ${patient.surname}`.trim()}
-            />
+            <div className="space-y-4">
+              <ProblemList
+                patientId={patient._id}
+                patientName={patientFullName(patient)}
+              />
+              <div className="card-elevated p-5">
+                <AllergyList patient={patient} />
+              </div>
+              <div className="card-elevated p-5">
+                <DirectiveList patient={patient} />
+              </div>
+            </div>
           )}
 
           {/* Timeline Tab */}
@@ -1324,7 +1266,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
           {/* Trends Tab */}
           {activeTab === 'trends' && (
-            <div className="space-y-4">
+            <div className="card-elevated p-5 space-y-4">
               <div className="flex items-center justify-between px-1">
                 <div>
                   <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -1348,7 +1290,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                 <div className="flex items-center gap-2">
                   <div
                     className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'var(--accent-light)' }}
+                    style={{ background: 'transparent' }}
                   >
                     <FileText className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
                   </div>
@@ -1469,7 +1411,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   </button>
                 </div>
               ) : (
-              <div className="relative px-6 py-5" style={{ paddingLeft: 56 }}>
+              <div className="relative px-6 py-5" style={{ paddingLeft: 56, maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
                 {/* Vertical spine */}
                 <div
                   className="absolute top-5 bottom-5 w-0.5"
@@ -1583,8 +1525,8 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                         </p>
                         <p className="text-xs mb-3 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                           {isExpanded
-                            ? rec.historyOfPresentIllness
-                            : `${rec.historyOfPresentIllness.slice(0, 180)}${rec.historyOfPresentIllness.length > 180 ? '…' : ''}`}
+                            ? (rec.historyOfPresentIllness || '')
+                            : `${(rec.historyOfPresentIllness || '').slice(0, 180)}${(rec.historyOfPresentIllness || '').length > 180 ? '…' : ''}`}
                         </p>
                         {(rec.diagnoses || []).length > 0 && (
                           <div className="flex flex-wrap gap-1.5 mb-3">
@@ -1669,8 +1611,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                                 </p>
                                 <ul className="space-y-1">
                                   {rec.prescriptions!.map((rx, k) => (
-                                    <li key={k} className="text-xs flex items-start gap-2 p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                                      <span className="w-1 h-1 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'var(--tamamhealth-blue)' }} />
+                                    <li key={k} className="text-xs p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
                                       <span>
                                         <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{rx.drugName}</span>{' '}
                                         <span style={{ color: 'var(--text-muted)' }}>· {rx.dose} · {rx.route} · {rx.frequency} · {rx.duration}</span>
@@ -1745,6 +1686,9 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                           )}
                         </>
                       )}
+                      <div className="mt-3">
+                        <RecordSignatureBar record={rec} />
+                      </div>
                       </div>
                     </div>
                   </div>
@@ -1768,7 +1712,8 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   View in Lab Module <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <table className="data-table">
+              <div className="overflow-x-auto" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
+              <table className="data-table" style={{ minWidth: 720 }}>
                 <thead>
                   <tr>
                     <th>Date</th>
@@ -1780,6 +1725,13 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   </tr>
                 </thead>
                 <tbody>
+                  {records.every(r => (r.labResults || []).length === 0) && (
+                    <tr>
+                      <td colSpan={6} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
+                        No lab results recorded yet for this patient.
+                      </td>
+                    </tr>
+                  )}
                   {records.flatMap(r => (r.labResults || []).map(lab => ({ ...lab, visitDate: r.visitDate, hospital: r.hospitalName }))).map((lab, i) => (
                     <tr key={i}>
                       <td className="font-mono text-xs">{lab.date}</td>
@@ -1802,6 +1754,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
@@ -1834,7 +1787,14 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   </div>
                 </div>
               )}
-              {records.map(rec => (
+              <div className="space-y-4" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
+              {records.filter(rec => (rec.prescriptions || []).length > 0).length === 0 ? (
+                <div className="card-elevated p-8 text-center">
+                  <Pill className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No prescriptions recorded yet for this patient.</p>
+                </div>
+              ) : (
+                records.filter(rec => (rec.prescriptions || []).length > 0).map(rec => (
                 <div key={rec._id} className="card-elevated">
                   <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
                     <div>
@@ -1846,9 +1806,6 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   <div className="divide-y data-row-divider-sm" style={{ borderColor: 'var(--table-row-border)' }}>
                     {(rec.prescriptions || []).map((rx, i) => (
                       <div key={i} className="px-5 py-3 flex items-center gap-4">
-                        <div className="icon-box-sm flex-shrink-0" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
-                          <Pill className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
-                        </div>
                         <div className="flex-1">
                           <p className="text-sm font-medium">{rx.drugName}</p>
                           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -1860,14 +1817,17 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                     ))}
                   </div>
                 </div>
-              ))}
+                ))
+              )}
+              </div>
             </div>
           )}
 
           {/* Vitals Tab */}
           {activeTab === 'vitals' && (
             <div className="card-elevated overflow-hidden">
-              <table className="data-table">
+              <div className="overflow-x-auto" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
+              <table className="data-table" style={{ minWidth: 1080 }}>
                 <thead>
                   <tr>
                     <th>Date</th>
@@ -1882,6 +1842,13 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   </tr>
                 </thead>
                 <tbody>
+                  {records.every(rec => !rec.vitalSigns) && (
+                    <tr>
+                      <td colSpan={9} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
+                        No vitals recorded yet for this patient.
+                      </td>
+                    </tr>
+                  )}
                   {records.filter(rec => rec.vitalSigns).map(rec => {
                     const v = rec.vitalSigns;
                     return (
@@ -1900,6 +1867,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
@@ -1936,11 +1904,12 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                     <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No immunizations recorded for this patient.</p>
                   </div>
                 ) : (
-                  <table className="w-full text-left">
+                  <div className="overflow-x-auto" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
+                  <table className="w-full text-left" style={{ minWidth: 840 }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                         {['Vaccine', 'Dose', 'Date given', 'Next due', 'Site', 'Batch', 'Status'].map(h => (
-                          <th key={h} className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                          <th key={h} className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -1963,6 +1932,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                       })}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             );
@@ -1983,12 +1953,13 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                 </button>
               </div>
               {patientReferrals.length === 0 ? (
-                <div className="card-elevated p-6 text-center">
-                  <ArrowRightLeft className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+                <div className="card-elevated p-8 text-center">
+                  <ArrowRightLeft className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
                   <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('referral.none')}</p>
                 </div>
               ) : (
-                patientReferrals.map(ref => {
+                <div className="space-y-3" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
+                {patientReferrals.map(ref => {
                   const tp = ref.transferPackage as { medicalRecords?: unknown[]; labResults?: unknown[]; attachments?: unknown[]; packageSizeBytes?: number } | undefined;
                   const refAtts = ref.referralAttachments as unknown[] | undefined;
                   return (
@@ -2009,12 +1980,10 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                           )}
                         </div>
                         <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                          <Clock className="w-3 h-3" />
                           {ref.referralDate}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 text-sm mb-2">
-                        <Building2Icon className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
                         <span style={{ color: 'var(--text-secondary)' }}>{ref.fromHospital}</span>
                         <span style={{ color: 'var(--text-muted)' }}>→</span>
                         <span className="font-medium">{ref.toHospital}</span>
@@ -2041,43 +2010,34 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                       </div>
                     </div>
                   );
-                })
+                })}
+                </div>
               )}
             </div>
           )}
 
-          {activeTab === 'communication' && (
-            <PatientCommunication
-              patientId={patient._id}
-              patientName={patientFullName(patient)}
-              patientPhone={patient.phone}
-            />
-          )}
-
           {activeTab === 'billing' && (
-            <BillingTab
-              patient={patient}
-              patientBalance={patientBalance}
-              showPaymentPanel={showPaymentPanel}
-              showPlanWizard={showPlanWizard}
-              setShowPaymentPanel={setShowPaymentPanel}
-              setShowPlanWizard={setShowPlanWizard}
-              reloadPayments={reloadPayments}
-            />
+            <div className="space-y-5">
+              {/* Clinician-facing superbill / fee ticket — review + post charges (P2.3). */}
+              <div className="card-elevated p-5">
+                <SuperbillPanel
+                  patient={patient}
+                  encounterId={(records[0] as { encounterId?: string } | undefined)?.encounterId}
+                  hospitalName={hospitals.find(h => h._id === patient.registrationHospital)?.name}
+                />
+              </div>
+              <BillingTab
+                patient={patient}
+                patientBalance={patientBalance}
+                showPaymentPanel={showPaymentPanel}
+                showPlanWizard={showPlanWizard}
+                setShowPaymentPanel={setShowPaymentPanel}
+                setShowPlanWizard={setShowPlanWizard}
+                reloadPayments={reloadPayments}
+              />
+            </div>
           )}
       </main>
-
-      <SendMessageModal
-        isOpen={showMessageModal}
-        onClose={() => setShowMessageModal(false)}
-        recipient={patient ? {
-          _id: patient._id,
-          name: `${patient.firstName} ${patient.middleName || ''} ${patient.surname}`.replace(/\s+/g, ' ').trim(),
-          phone: patient.phone || '',
-          type: 'patient',
-          subtitle: `Patient · ${patient.hospitalNumber || 'No record #'}`,
-        } : null}
-      />
 
       {/* Edit Demographics Modal */}
       {showEditModal && patient && (
@@ -2119,7 +2079,8 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
               </div>
               <div>
                 <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Phone</label>
-                <input type="tel" value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} />
+                <input type="tel" value={editForm.phone} onChange={e => { setEditForm({ ...editForm, phone: e.target.value }); if (editErrors.phone) setEditErrors({}); }} aria-invalid={!!editErrors.phone} style={editErrors.phone ? { borderColor: 'var(--color-danger)' } : {}} />
+                {editErrors.phone && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{editErrors.phone}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -2141,6 +2102,26 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
           </div>
         </Modal>
       )}
+
+      {/* Header action modals — open in place, pre-filled with this patient. */}
+      <OrderLabModal
+        isOpen={showOrderLabModal}
+        onClose={() => setShowOrderLabModal(false)}
+        patient={patient}
+        currentUser={currentUser}
+      />
+      <PrescribeModal
+        isOpen={showPrescribeModal}
+        onClose={() => setShowPrescribeModal(false)}
+        patient={patient}
+        currentUser={currentUser}
+      />
+      <ReferModal
+        isOpen={showReferModal}
+        onClose={() => setShowReferModal(false)}
+        patient={patient}
+        currentUser={currentUser}
+      />
     </>
   );
 }

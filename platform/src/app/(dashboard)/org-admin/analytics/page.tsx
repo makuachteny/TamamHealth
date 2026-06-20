@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import PatientName from '@/components/PatientName';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
-  BarChart3, Users, FlaskConical, ArrowRightLeft, Building2, TrendingUp,
+  Users, FlaskConical, ArrowRightLeft, Building2, TrendingUp,
   Activity,
 } from '@/components/icons/lucide';
 import type { HospitalDoc, PatientDoc, LabResultDoc, ReferralDoc, UserRole } from '@/lib/db-types';
@@ -179,12 +178,6 @@ export default function OrgAnalyticsPage() {
       <TopBar title={t('orgAnalytics.topBarTitle')} />
 
       <div className="page-container page-enter">
-        <PageHeader
-          icon={BarChart3}
-          title={t('orgAnalytics.title')}
-          subtitle={t('orgAnalytics.subtitle', { org: currentUser?.organization?.name || t('orgAnalytics.yourOrganization') })}
-        />
-
         {/* Stat Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {statCards.map((card) => {
@@ -318,7 +311,7 @@ export default function OrgAnalyticsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 600 }}>
               <thead>
                 <tr>
                   <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgAnalytics.colPatient')}</th>
@@ -348,7 +341,7 @@ export default function OrgAnalyticsPage() {
                       <tr key={ref._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                         <td className="px-4 py-3">
                           {ref.patientName
-                            ? <PatientName name={ref.patientName} nameClassName="text-sm font-medium" />
+                            ? <PatientName patientId={ref.patientId} name={ref.patientName} nameClassName="text-sm font-medium" />
                             : <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>-</span>}
                         </td>
                         <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
