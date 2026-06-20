@@ -28,6 +28,10 @@ export function isFingerprintEnabled(): boolean {
 }
 
 export function getBridgeUrl(): string {
+  // Browser → same-origin proxy (avoids CSP / upgrade-insecure-requests on loopback HTTP).
+  if (typeof window !== 'undefined') {
+    return '/api/fingerprint-bridge';
+  }
   return (process.env.NEXT_PUBLIC_FINGERPRINT_BRIDGE_URL || 'http://127.0.0.1:7345').replace(/\/+$/, '');
 }
 

@@ -1,9 +1,32 @@
 /** @type {import('next').NextConfig} */
+import { loadEnvConfig } from '@next/env';
 import { withSentryConfig } from '@sentry/nextjs';
+
+// next.config.mjs is evaluated before Next injects .env.local into process.env.
+// Load env files explicitly so CSP connect-src can include CouchDB + bridge URLs.
+loadEnvConfig(process.cwd());
 
 // Allow CouchDB URL in Content-Security-Policy connect-src when sync is enabled
 const couchdbUrl = process.env.NEXT_PUBLIC_COUCHDB_URL || '';
 const couchdbConnectSrc = couchdbUrl ? ` ${couchdbUrl}` : '';
+
+// Fingerprint bridge runs on loopback on the registration desk PC (see fingerprint-bridge/).
+// Include both hostnames — browsers treat localhost and 127.0.0.1 as different origins.
+const fingerprintBridgeUrl = (process.env.NEXT_PUBLIC_FINGERPRINT_BRIDGE_URL || '').replace(/\/+$/, '');
+const fingerprintEnabled = process.env.NEXT_PUBLIC_FINGERPRINT_ENABLED === 'true';
+const fingerprintConnectSrc = fingerprintEnabled
+  ? [
+      fingerprintBridgeUrl,
+      'http://127.0.0.1:7345',
+      'http://localhost:7345',
+    ]
+      .filter(Boolean)
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .join(' ')
+      .replace(/^/, ' ')
+  : fingerprintBridgeUrl
+    ? ` ${fingerprintBridgeUrl}`
+    : '';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -73,13 +96,13 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob:",
-              `connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com${couchdbConnectSrc}`,
+              `connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com${couchdbConnectSrc}${fingerprintConnectSrc}`,
               "worker-src 'self' blob:",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
               "object-src 'none'",
-              "upgrade-insecure-requests",
+              ...(isProd ? ['upgrade-insecure-requests'] : []),
             ].join('; '),
           },
           {
