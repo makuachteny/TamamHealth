@@ -126,15 +126,25 @@ async function writeFile(data: CredentialsFile): Promise<void> {
   await fs.writeFile(filePath, body, { mode: 0o600 });
 }
 
-function logFreshGeneration(filePath: string, demoMode: boolean): void {
+function logFreshGeneration(
+  filePath: string,
+  demoMode: boolean,
+  generatedPasswords: Record<string, string>,
+): void {
   const banner = demoMode
     ? 'TamamHealth demo credentials generated'
     : 'TamamHealth bootstrap admin credential generated';
+  const usernameWidth = Math.max(...Object.keys(generatedPasswords).map((username) => username.length));
   console.log('');
   console.log('  ============================================================');
   console.log(`  ${banner}`);
-  console.log(`  File: ${filePath}`);
-  console.log('  Mode: 0600 (owner read/write only). Do not commit.');
+  for (const [username, password] of Object.entries(generatedPasswords)) {
+    console.log(`  ${username.padEnd(usernameWidth)}  ${password}`);
+  }
+  console.log('');
+  console.log('  These credentials will not be printed again.');
+  console.log(`  Stored in: ${filePath}`);
+  console.log('  File mode: 0600 (owner read/write only). Do not commit.');
   console.log('  ============================================================');
   console.log('');
 }
@@ -155,13 +165,16 @@ export async function getOrCreateSeedCredentials(): Promise<CredentialsFile> {
     const existing = await readFile();
     let next: CredentialsFile;
     let touched = !existing;
+    const generatedPasswords: Record<string, string> = {};
 
     if (existing) {
       next = { generatedAt: existing.generatedAt, passwords: { ...existing.passwords } };
       // Fill in any users missing from a stale file (e.g. a new role added).
       for (const username of expectedUsers) {
         if (!next.passwords[username]) {
-          next.passwords[username] = generatePassword();
+          const password = generatePassword();
+          next.passwords[username] = password;
+          generatedPasswords[username] = password;
           touched = true;
         }
       }
@@ -173,14 +186,18 @@ export async function getOrCreateSeedCredentials(): Promise<CredentialsFile> {
         if (username === 'admin' && adminOverride) {
           next.passwords[username] = adminOverride;
         } else {
-          next.passwords[username] = generatePassword();
+          const password = generatePassword();
+          next.passwords[username] = password;
+          generatedPasswords[username] = password;
         }
       }
     }
 
     if (touched) {
       await writeFile(next);
-      logFreshGeneration(credentialsFilePath(), demoMode);
+    }
+    if (Object.keys(generatedPasswords).length > 0) {
+      logFreshGeneration(credentialsFilePath(), demoMode, generatedPasswords);
     }
 
     cache = next;

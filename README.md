@@ -46,7 +46,7 @@ npm run setup
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and log in with demo credentials (e.g. `dr.wani` / `Dr.Wani@JTH2026`).
+Open [http://localhost:3000](http://localhost:3000) and log in with one of the randomly generated demo accounts. The credentials are printed once on first boot and stored in `platform/.seed-credentials.json`; see [platform setup](platform/README.md#demo-credentials).
 
 ### Run with Docker
 

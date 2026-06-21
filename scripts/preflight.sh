@@ -64,8 +64,12 @@ cyan "3/8 · secret leak scan"
 # constant is intentionally still in the codebase (the boot guard in
 # instrumentation.ts and auth-token.ts itself refuses to USE it in production)
 # — flag it only if it shows up outside its documented declaration sites.
+legacy_demo_password='Dr.Wani@JTH''2026'
+if git grep -IlF -- "$legacy_demo_password" ':!scripts/preflight.sh' >/dev/null; then
+  fail "legacy demo password is still present in a tracked file"
+fi
+
 declare -a leaks=(
-  "Dr.Wani@JTH2026"            # ticket #1 hardcoded demo password
   "TamamHealth4Lyf"            # default CouchDB password
   "Admin@TamamHealth2026!"     # old default admin password
 )
