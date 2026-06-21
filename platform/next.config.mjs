@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
-import { loadEnvConfig } from '@next/env';
+// `@next/env` is CommonJS; under Node 20's ESM loader a named import fails
+// ("Named export 'loadEnvConfig' not found"). Import the default and destructure.
+import nextEnv from '@next/env';
 import { withSentryConfig } from '@sentry/nextjs';
+
+const { loadEnvConfig } = nextEnv;
 
 // next.config.mjs is evaluated before Next injects .env.local into process.env.
 // Load env files explicitly so CSP connect-src can include CouchDB + bridge URLs.
