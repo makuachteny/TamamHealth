@@ -16,19 +16,23 @@ This test plan covers end-to-end testing of the TamamHealth Health Information S
 
 ## 2. Test Accounts
 
-| Role | Username | Password | Hospital |
-|------|----------|----------|----------|
-| Super Admin | admin | admin123 | N/A |
-| Doctor | dr.wani | doctor123 | Juba Teaching Hospital |
-| Clinical Officer | co.deng | clinical123 | Juba Teaching Hospital |
-| Nurse | nurse.ayen | nurse123 | Juba Teaching Hospital |
-| Lab Tech | lab.gatluak | lab123 | Juba Teaching Hospital |
-| Pharmacist | pharm.rose | pharma123 | Juba Teaching Hospital |
-| Front Desk | front.kuol | front123 | Juba Teaching Hospital |
-| Government | gov.minister | gov123 | N/A |
-| Boma Health Worker | bhw.dut | boma123 | N/A |
-| Payam Supervisor | payam.achol | payam123 | N/A |
-| Org Admin | orgadmin | orgadmin123 | N/A |
+Passwords are generated per installation. Read them from the one-time seed output
+or the gitignored `platform/.seed-credentials.json` file; never record them in
+this test plan.
+
+| Role | Username | Hospital |
+|------|----------|----------|
+| Super Admin | superadmin | N/A |
+| Government | admin | N/A |
+| Doctor | dr.wani | Juba Teaching Hospital |
+| Clinical Officer | co.deng | Wau State Hospital |
+| Nurse | nurse.stella | Malakal Teaching Hospital |
+| Lab Tech | lab.gatluak | Bentiu State Hospital |
+| Pharmacist | pharma.rose | Juba Teaching Hospital |
+| Front Desk | desk.amira | Juba Teaching Hospital |
+| Boma Health Worker | bhw.akol | Kajo-keji Boma PHCU |
+| Payam Supervisor | sup.mary | Kajo-keji PHCC |
+| Org Admin | org.admin | N/A |
 
 ---
 
@@ -38,7 +42,7 @@ This test plan covers end-to-end testing of the TamamHealth Health Information S
 
 | # | Test Case | Steps | Expected Result | Priority |
 |---|-----------|-------|-----------------|----------|
-| F-AUTH-01 | Login with valid credentials | Enter dr.wani / doctor123 | Redirects to doctor dashboard | Critical |
+| F-AUTH-01 | Login with valid credentials | Enter `dr.wani` and its generated seed password | Redirects to doctor dashboard | Critical |
 | F-AUTH-02 | Login with invalid password | Enter dr.wani / wrong | Shows error, no redirect | Critical |
 | F-AUTH-03 | Login with non-existent user | Enter nobody / test | Shows error | Critical |
 | F-AUTH-04 | Session persistence | Login, close tab, reopen | Still logged in | High |
