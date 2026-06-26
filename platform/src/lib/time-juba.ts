@@ -36,3 +36,30 @@ export function jubaWeekStart(d: Date | string | number = new Date()): string {
   j.setUTCDate(j.getUTCDate() - daysFromMonday);
   return `${j.getUTCFullYear()}-${String(j.getUTCMonth() + 1).padStart(2, '0')}-${String(j.getUTCDate()).padStart(2, '0')}`;
 }
+
+/**
+ * "Now" as a Date whose LOCAL fields (getHours/getDate/…) equal the current
+ * Africa/Juba wall-clock — regardless of the viewer's browser timezone.
+ *
+ * Appointment dates/times are stored as naive Juba wall-clock strings and are
+ * positioned on the calendar via their local fields, so any component that
+ * needs "now" relative to those events (the current-time indicator, the
+ * default focused date, walk-in timestamps) must use this rather than a raw
+ * `new Date()` — otherwise the clock drifts by the browser's UTC offset.
+ */
+export function jubaNow(): Date {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Juba', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date());
+  const get = (type: string) => Number(parts.find(p => p.type === type)?.value);
+  const hour = get('hour') % 24; // some engines emit "24" for midnight
+  return new Date(get('year'), get('month') - 1, get('day'), hour, get('minute'), get('second'));
+}
+
+/** Current Africa/Juba time as a "HH:MM" wall-clock string. */
+export function jubaTime(): string {
+  const n = jubaNow();
+  return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`;
+}

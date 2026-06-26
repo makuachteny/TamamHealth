@@ -8,7 +8,7 @@ import {
   Building2, Users, BedDouble, Stethoscope, Wifi, WifiOff,
   AlertTriangle, ArrowRightLeft, TrendingUp, TrendingDown,
   Minus, ChevronDown, ChevronRight, Download, Calendar,
-  GitCompareArrows, ArrowUpDown, Check, BarChart3, LineChart as LineChartIcon,
+  ArrowUpDown, Check, BarChart3, LineChart as LineChartIcon,
   PieChart as PieChartIcon, Activity, Filter,
   Layers, MapPin, Target, Sliders, X, Maximize2, ChevronLeft
 } from '@/components/icons/lucide';
@@ -20,10 +20,10 @@ import {
 } from 'recharts';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useHospitals } from '@/lib/hooks/useHospitals';
-import { usePatients } from '@/lib/hooks/usePatients';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import EmptyState from '@/components/EmptyState';
+import PatientName from '@/components/PatientName';
 import type { HospitalDoc, DiseaseAlertDoc } from '@/lib/db-types';
 
 /**
@@ -152,7 +152,7 @@ function ChartTooltip({ active, payload, label }: {
 }) {
   if (!active || !payload) return null;
   return (
-    <div className="card-elevated p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', fontSize: '0.75rem', borderRadius: '12px' }}>
+    <div className="card-elevated p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', fontSize: '0.75rem', borderRadius: '6px' }}>
       <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{label}</p>
       {payload.map((entry, i) => (
         <div key={i} className="flex items-center gap-2 py-0.5">
@@ -192,7 +192,7 @@ function CircularGauge({ value, label, color, size = 100, strokeWidth = 8 }: {
 
 function DataQualityBadge({ score }: { score: number }) {
   const color = score > 90 ? 'var(--color-success)' : score >= 70 ? 'var(--color-warning)' : 'var(--color-danger)';
-  const bg = score > 90 ? 'rgba(16,185,129,0.12)' : score >= 70 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)';
+  const bg = score > 90 ? 'rgba(31, 157, 111,0.12)' : score >= 70 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)';
   return (
     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: bg, color }}>
       {score}%
@@ -433,14 +433,14 @@ function ExpandButton({ onClick }: { onClick: () => void }) {
 
 /* ═══════════════════════════════════════════════════════════════════ */
 
-const FACILITY_COLORS = ['var(--color-success)', '#5CB8A8', '#A855F7', 'var(--color-warning)', 'var(--text-muted)'];
+const FACILITY_COLORS = ['var(--color-success)', '#2563EB', '#A855F7', 'var(--color-warning)', 'var(--text-muted)'];
 
 const DISEASE_COLORS: Record<string, string> = {
   malaria: '#E52E42', cholera: '#1B9E77', measles: '#A855F7',
-  pneumonia: '#FCD34D', diarrhea: '#5CB8A8', tb: '#F97316', hiv: '#EC4899',
+  pneumonia: '#FCD34D', diarrhea: '#2563EB', tb: '#F97316', hiv: '#EC4899',
   'Malaria': '#E52E42', 'Cholera': '#1B9E77', 'Measles': '#A855F7',
-  'Pneumonia': '#FCD34D', 'Diarrhea': '#5CB8A8', 'Tuberculosis': '#F97316',
-  'HIV/AIDS': '#EC4899', 'Acute Watery Diarrhea': '#5CB8A8',
+  'Pneumonia': '#FCD34D', 'Diarrhea': '#2563EB', 'Tuberculosis': '#F97316',
+  'HIV/AIDS': '#EC4899', 'Acute Watery Diarrhea': '#2563EB',
   'Meningitis': '#06B6D4', 'Kala-azar': '#8B5CF6', 'Hepatitis E': '#F43F5E',
 };
 
@@ -474,7 +474,6 @@ export default function GovernmentDashboardPage() {
   const router = useRouter();
   const { currentUser } = useApp();
   const { hospitals } = useHospitals();
-  const { patients: allPatients } = usePatients();
   const { alerts: diseaseAlerts } = useSurveillance();
   const { referrals } = useReferrals();
 
@@ -486,8 +485,6 @@ export default function GovernmentDashboardPage() {
   // Drill-Down + Export state
   const [expandedStates, setExpandedStates] = useState<Record<string, boolean>>({});
   const [dhis2Period, setDhis2Period] = useState<'monthly' | 'quarterly'>('monthly');
-  const [comparisonIds, setComparisonIds] = useState<string[]>([]);
-  const [compDropdownOpen, setCompDropdownOpen] = useState(false);
   const [tableSortBy, setTableSortBy] = useState<'name' | 'quality'>('name');
 
   /* ─── TABLEAU-STYLE SELECTOR STATES ──────────────────────────── */
@@ -537,7 +534,12 @@ export default function GovernmentDashboardPage() {
     return Array.from(states).sort();
   }, [hospitals, casesByState]);
 
-  // Filtered hospitals
+  // Ministry of Health reporting gate: facility data only counts toward the
+  // national picture once the facility has reviewed and submitted it from
+  // "My Facility". Facilities that have not yet submitted are excluded from
+  // every aggregate below (the banner near the filter bar reports how many are
+  // still pending).
+  // Filtered hospitals — all facilities, optionally scoped to a selected state.
   const filteredHospitals = useMemo(() => {
     if (selectedState === 'all') return hospitals;
     return hospitals.filter(h => h.state === selectedState);
@@ -545,7 +547,7 @@ export default function GovernmentDashboardPage() {
 
   // KPI aggregates
   const totalHospitals = filteredHospitals.length;
-  const totalPatients = selectedState === 'all' ? allPatients.length : filteredHospitals.reduce((s, h) => s + h.patientCount, 0);
+  const totalPatients = filteredHospitals.reduce((s, h) => s + h.patientCount, 0);
   const totalBeds = filteredHospitals.reduce((s, h) => s + h.totalBeds, 0);
   const totalDoctors = filteredHospitals.reduce((s, h) => s + h.doctors, 0);
   const totalNurses = filteredHospitals.reduce((s, h) => s + h.nurses, 0);
@@ -626,7 +628,7 @@ export default function GovernmentDashboardPage() {
   }, [filteredHospitals, sdMetric]);
 
   const staffPieData = useMemo(() => [
-    { name: 'Doctors', value: totalDoctors, color: '#5CB8A8' },
+    { name: 'Doctors', value: totalDoctors, color: '#2563EB' },
     { name: 'Nurses', value: totalNurses, color: '#1B9E77' },
     { name: 'Clinical Officers', value: totalCOs, color: '#A855F7' },
   ], [totalDoctors, totalNurses, totalCOs]);
@@ -737,14 +739,6 @@ export default function GovernmentDashboardPage() {
   }, [dhis2Period, hospitals, casesByState]);
 
   // Facility comparison
-  const comparisonFacilities = useMemo(() => hospitals.filter(h => comparisonIds.includes(h._id)), [hospitals, comparisonIds]);
-  const toggleCompFacility = useCallback((id: string) => {
-    setComparisonIds(prev => {
-      if (prev.includes(id)) return prev.filter(x => x !== id);
-      if (prev.length >= 3) return prev;
-      return [...prev, id];
-    });
-  }, []);
 
   if (!currentUser || currentUser.role !== 'government') return null;
 
@@ -764,7 +758,6 @@ export default function GovernmentDashboardPage() {
       default: return 'var(--text-muted)';
     }
   };
-  const getBest = (vals: number[], higherIsBetter = true) => higherIsBetter ? Math.max(...vals) : Math.min(...vals);
 
   /* ═══ CHART RENDERERS ═══ */
 
@@ -872,7 +865,7 @@ export default function GovernmentDashboardPage() {
   // Health Visits
   const renderVisits = () => {
     const activeVisits = hvSelectedSeries;
-    const visitColors: Record<string, string> = { 'OPD Visits': '#5CB8A8', 'ANC Visits': '#EC4899', 'Immunizations': '#A855F7' };
+    const visitColors: Record<string, string> = { 'OPD Visits': '#2563EB', 'ANC Visits': '#EC4899', 'Immunizations': '#A855F7' };
     const commonProps = { data: opdTrendData, margin: { top: 5, right: 15, left: 0, bottom: 5 } };
     const xProps = { dataKey: 'month' as const, tick: { fontSize: 10, fill: 'var(--text-muted)' }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false };
     const yProps = { tick: { fontSize: 10, fill: 'var(--text-muted)' }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false };
@@ -906,7 +899,7 @@ export default function GovernmentDashboardPage() {
 
   // Staff
   const renderStaff = () => {
-    const staffColors: Record<string, string> = { Doctors: '#5CB8A8', Nurses: '#1B9E77', 'Clinical Officers': '#A855F7' };
+    const staffColors: Record<string, string> = { Doctors: '#2563EB', Nurses: '#1B9E77', 'Clinical Officers': '#A855F7' };
     const activeRoles = sdSelectedRoles;
 
     if (sdChartType === 'stacked') {
@@ -985,7 +978,7 @@ export default function GovernmentDashboardPage() {
     }
     return (
       <div className="p-3 grid grid-cols-2 gap-2">
-        <CircularGauge value={avgReporting} label={t('government.metricReporting')} color="#5CB8A8" size={96} strokeWidth={5} />
+        <CircularGauge value={avgReporting} label={t('government.metricReporting')} color="#2563EB" size={96} strokeWidth={5} />
         <CircularGauge value={avgReadiness} label={t('government.metricReadiness')} color="#3b82f6" size={96} strokeWidth={5} />
         <CircularGauge value={avgImmCoverage} label={t('government.metricEpiCoverage')} color="#A855F7" size={96} strokeWidth={5} />
         <CircularGauge value={functionalPct} label={t('government.metricFunctional')} color="#FCD34D" size={96} strokeWidth={5} />
@@ -1053,11 +1046,40 @@ export default function GovernmentDashboardPage() {
       <TopBar title={t('government.nationalDashboard')} />
       <main className="page-container page-enter">
 
+        {/* ═══ National snapshot — distinct colour-tinted chips, spread across ═══ */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5 mb-4">
+          {[
+            { label: t('government.kpiHospitals'), value: totalHospitals.toString(), icon: Building2, color: '#2563EB', bg: 'rgba(37,99,235,0.10)', href: '/hospitals' },
+            { label: t('government.kpiPatients'), value: totalPatients.toLocaleString(), icon: Users, color: '#0E7490', bg: 'rgba(14,116,144,0.10)', href: '/hospitals' },
+            { label: t('government.kpiBeds'), value: totalBeds.toLocaleString(), icon: BedDouble, color: '#7C3AED', bg: 'rgba(124,58,237,0.10)', href: '/hospitals' },
+            { label: t('government.kpiStaff'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: '#0891B2', bg: 'rgba(8,145,178,0.10)', href: '/hospitals' },
+            { label: t('government.kpiOnline'), value: onlineHospitals.toString(), icon: Wifi, color: '#15803D', bg: 'rgba(21,128,61,0.10)', href: '/hospitals' },
+            { label: t('government.kpiOffline'), value: offlineHospitals.toString(), icon: WifiOff, color: '#64748B', bg: 'rgba(100,116,139,0.12)', href: '/hospitals' },
+            { label: t('government.kpiAlerts'), value: activeAlerts.toString(), icon: AlertTriangle, color: '#C44536', bg: 'rgba(196,69,54,0.10)', href: '/surveillance' },
+            { label: t('government.kpiReferrals'), value: pendingReferrals.toString(), icon: ArrowRightLeft, color: '#B8741C', bg: 'rgba(184,116,28,0.12)', href: '/referrals' },
+          ].map(stat => (
+            <button
+              key={stat.label}
+              onClick={() => stat.href && router.push(stat.href)}
+              className="flex items-center gap-2.5 p-3 rounded-xl text-left transition-transform active:scale-[0.98] hover:-translate-y-0.5"
+              style={{ background: stat.bg, border: `1px solid ${stat.color}22` }}
+            >
+              <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent' }}>
+                <stat.icon className="w-[18px] h-[18px]" style={{ color: stat.color }} />
+              </span>
+              <span className="flex flex-col justify-center min-w-0 leading-tight">
+                <span className="text-lg font-extrabold" style={{ color: stat.color, fontVariantNumeric: 'tabular-nums' }}>{stat.value}</span>
+                <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-secondary)' }}>{stat.label}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+
         {/* ═══ GLOBAL FILTER BAR ═══ */}
         <div className="card-elevated p-3 mb-4">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                 <Filter className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{t('government.filters')}</span>
@@ -1090,27 +1112,6 @@ export default function GovernmentDashboardPage() {
           </div>
         </div>
 
-        {/* ═══ KPI STRIP ═══ */}
-        <div className="kpi-grid mb-4">
-          {[
-            { label: t('government.kpiHospitals'), value: totalHospitals.toString(), icon: Building2, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
-            { label: t('government.kpiPatients'), value: totalPatients.toLocaleString(), icon: Users, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
-            { label: t('government.kpiBeds'), value: totalBeds.toLocaleString(), icon: BedDouble, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
-            { label: t('government.kpiStaff'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
-            { label: t('government.kpiOnline'), value: onlineHospitals.toString(), icon: Wifi, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)', href: '/hospitals' },
-            { label: t('government.kpiOffline'), value: offlineHospitals.toString(), icon: WifiOff, color: 'var(--text-muted)', bg: 'rgba(100,116,139,0.10)', href: '/hospitals' },
-            { label: t('government.kpiAlerts'), value: activeAlerts.toString(), icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.08)', href: '/surveillance' },
-            { label: t('government.kpiReferrals'), value: pendingReferrals.toString(), icon: ArrowRightLeft, color: 'var(--accent-primary)', bg: 'rgba(0,119,215,0.10)' },
-          ].map(stat => (
-            <div key={stat.label} className="kpi" onClick={() => stat.href && router.push(stat.href)}>
-              <div className="kpi__icon" style={{ background: stat.bg }}><stat.icon style={{ color: stat.color }} /></div>
-              <div className="kpi__body">
-                <div className="kpi__value">{stat.value}</div>
-                <div className="kpi__label">{stat.label}</div>
-              </div>
-            </div>
-          ))}
-        </div>
 
         {/* ═══ ROW 1: Disease Trends + Facility Distribution + Performance ═══ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
@@ -1302,7 +1303,7 @@ export default function GovernmentDashboardPage() {
               <TableauMultiSelect
                 label={t('government.metrics')}
                 options={[
-                  { value: 'OPD Visits', label: t('government.opdVisits'), color: '#5CB8A8' },
+                  { value: 'OPD Visits', label: t('government.opdVisits'), color: '#2563EB' },
                   { value: 'ANC Visits', label: t('government.ancVisits'), color: '#EC4899' },
                   { value: 'Immunizations', label: t('government.immunizations'), color: '#A855F7' },
                 ]}
@@ -1353,7 +1354,7 @@ export default function GovernmentDashboardPage() {
               <TableauMultiSelect
                 label={t('government.roles')}
                 options={[
-                  { value: 'Doctors', label: t('government.roleDoctors'), color: '#5CB8A8' },
+                  { value: 'Doctors', label: t('government.roleDoctors'), color: '#2563EB' },
                   { value: 'Nurses', label: t('government.roleNurses'), color: '#1B9E77' },
                   { value: 'Clinical Officers', label: t('government.roleClinicalOfficers'), color: '#A855F7' },
                 ]}
@@ -1380,7 +1381,7 @@ export default function GovernmentDashboardPage() {
         <div className="card-elevated p-4 mb-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
+              <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ background: 'transparent' }}>
                 <Download className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <div>
@@ -1429,7 +1430,7 @@ export default function GovernmentDashboardPage() {
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
+            <table className="data-table" style={{ minWidth: 840 }}>
               <thead>
                 <tr>
                   <th>{t('government.colStateHospital')}</th>
@@ -1469,9 +1470,6 @@ export default function GovernmentDashboardPage() {
                         <tr key={h._id} className="cursor-pointer" onClick={() => router.push(`/hospitals?facility=${h._id}`)}>
                           <td>
                             <div className="flex items-center gap-2 pl-6">
-                              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-light)' }}>
-                                <Building2 className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                              </div>
                               <div>
                                 <p className="font-medium text-sm">{h.name}</p>
                                 <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{typeLabel(h.facilityType)}</p>
@@ -1497,85 +1495,6 @@ export default function GovernmentDashboardPage() {
               </tbody>
             </table>
           </div>
-        </div>
-
-        {/* ═══ FACILITY COMPARISON ═══ */}
-        <div className="card-elevated p-4 mb-4">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
-              <GitCompareArrows className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.facilityComparisonTool')}</h3>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.facilityComparisonDesc')}</p>
-            </div>
-          </div>
-          <div className="relative mb-4">
-            <button
-              onClick={() => setCompDropdownOpen(!compDropdownOpen)}
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm"
-              style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
-            >
-              <span>{comparisonIds.length === 0 ? t('government.selectFacilitiesToCompare') : (comparisonIds.length === 1 ? t('government.facilitySelectedSingular', { count: comparisonIds.length }) : t('government.facilitiesSelectedPlural', { count: comparisonIds.length }))}</span>
-              <ChevronDown className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            </button>
-            {compDropdownOpen && (
-              <div className="absolute z-10 mt-1 w-full rounded-xl shadow-lg max-h-48 overflow-y-auto" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-                {hospitals.map(h => {
-                  const selected = comparisonIds.includes(h._id);
-                  const disabled = !selected && comparisonIds.length >= 3;
-                  return (
-                    <button key={h._id} onClick={() => toggleCompFacility(h._id)} disabled={disabled}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors"
-                      style={{
-                        color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
-                        background: selected ? 'rgba(124,58,237,0.08)' : 'transparent',
-                        borderBottom: '1px solid var(--border-light)', opacity: disabled ? 0.5 : 1,
-                      }}
-                    >
-                      <span className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0" style={{ border: selected ? '2px solid #7C3AED' : '2px solid var(--border-light)', background: selected ? '#7C3AED' : 'transparent' }}>
-                        {selected && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
-                      </span>
-                      {h.name} <span style={{ color: 'var(--text-muted)' }}>({h.state})</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          {comparisonFacilities.length >= 2 && (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="data-table">
-                <thead><tr><th>{t('government.metric')}</th>{comparisonFacilities.map(f => <th key={f._id}>{f.name}</th>)}</tr></thead>
-                <tbody>
-                  {[
-                    { label: t('government.compPatients'), values: comparisonFacilities.map(f => f.patientCount), higherBetter: true },
-                    { label: t('government.compBeds'), values: comparisonFacilities.map(f => f.totalBeds), higherBetter: true },
-                    { label: t('government.compStaff'), values: comparisonFacilities.map(f => f.doctors + f.nurses + f.clinicalOfficers), higherBetter: true },
-                    { label: t('government.compReportingPct'), values: comparisonFacilities.map(f => f.performance?.reportingCompleteness || 0), higherBetter: true },
-                    { label: t('government.compReadinessPct'), values: comparisonFacilities.map(f => f.performance?.serviceReadinessScore || 0), higherBetter: true },
-                    { label: t('government.compEpiCoveragePct'), values: comparisonFacilities.map(f => f.performance?.immunizationCoverage || 0), higherBetter: true },
-                    { label: t('government.compQualityScore'), values: comparisonFacilities.map(f => f.performance?.qualityScore || 0), higherBetter: true },
-                    { label: t('government.compMedicineAvailPct'), values: comparisonFacilities.map(f => f.performance?.tracerMedicineAvailability || 0), higherBetter: true },
-                    { label: t('government.compStockOutDays'), values: comparisonFacilities.map(f => f.performance?.stockOutDays || 0), higherBetter: false },
-                  ].map(m => {
-                    const best = getBest(m.values, m.higherBetter);
-                    return (
-                      <tr key={m.label}>
-                        <td className="font-medium text-sm">{m.label}</td>
-                        {m.values.map((v, i) => (
-                          <td key={i}><span className="font-semibold text-sm" style={{ color: v === best && comparisonFacilities.length > 1 ? 'var(--color-success)' : 'var(--text-primary)' }}>{v.toLocaleString()}</span></td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {comparisonFacilities.length < 2 && comparisonIds.length > 0 && (
-            <p className="text-xs text-center py-3" style={{ color: 'var(--text-muted)' }}>{t('government.selectAtLeast2')}</p>
-          )}
         </div>
 
         {/* ═══ BOTTOM: Alerts + Referrals ═══ */}
@@ -1608,7 +1527,7 @@ export default function GovernmentDashboardPage() {
                     <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{alert.disease}</span>
                     <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
                       background: alert.alertLevel === 'emergency' ? 'rgba(229,46,66,0.15)' : alert.alertLevel === 'warning' ? 'rgba(252,211,77,0.15)' : 'rgba(56,189,248,0.15)',
-                      color: alert.alertLevel === 'emergency' ? 'var(--color-danger)' : alert.alertLevel === 'warning' ? 'var(--color-warning)' : '#5CB8A8',
+                      color: alert.alertLevel === 'emergency' ? 'var(--color-danger)' : alert.alertLevel === 'warning' ? 'var(--color-warning)' : '#2563EB',
                     }}>{alert.alertLevel.toUpperCase()}</span>
                   </div>
                   <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.alertCasesDeaths', { state: alert.state, cases: alert.cases, deaths: alert.deaths })}</p>
@@ -1634,7 +1553,7 @@ export default function GovernmentDashboardPage() {
               {referrals.slice(0, 4).map(ref => (
                 <div key={ref._id} className="p-2.5 rounded-md" style={{ border: '1px solid var(--border-light)' }}>
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{ref.patientName}</span>
+                    <PatientName patientId={ref.patientId} name={ref.patientName} nameClassName="text-[11px] font-semibold" />
                     <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
                       background: ref.urgency === 'emergency' ? 'rgba(229,46,66,0.12)' : ref.urgency === 'urgent' ? 'rgba(252,211,77,0.12)' : 'rgba(0,119,215,0.12)',
                       color: ref.urgency === 'emergency' ? 'var(--color-danger)' : ref.urgency === 'urgent' ? 'var(--color-warning)' : 'var(--accent-primary)',

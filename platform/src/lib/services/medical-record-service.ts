@@ -1,11 +1,48 @@
 import { medicalRecordsDB } from '../db';
-import type { MedicalRecordDoc } from '../db-types';
+import type { MedicalRecordDoc, RecordAddendum } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { validateMedicalRecord, ValidationError } from '../validation';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
+import { isProviderRole, isClinicalAuthorRole } from '../clinical-roles';
+
+/**
+ * Thrown when a caller tries to mutate the clinical content of a record that
+ * has already been signed (and is therefore locked). Corrections must be made
+ * with {@link addAddendum} instead, which preserves the original attestation.
+ */
+export class SignedRecordLockError extends Error {
+  constructor(id: string) {
+    super(`Medical record ${id} is signed and locked; add an addendum instead of editing.`);
+    this.name = 'SignedRecordLockError';
+  }
+}
+
+/**
+ * Thrown when the acting user's role is not permitted to perform a signing
+ * action. Enforced at the service layer (not just the UI) so the medico-legal
+ * attestation rules can't be bypassed by another caller.
+ */
+export class SigningAuthorizationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SigningAuthorizationError';
+  }
+}
+
+/** A record is locked against in-place edits once it has been signed. */
+export function isRecordLocked(rec: Pick<MedicalRecordDoc, 'documentStatus'>): boolean {
+  return rec.documentStatus === 'signed' || rec.documentStatus === 'amended';
+}
+
+export interface SignerIdentity {
+  userId?: string;
+  userName: string;
+  userRole?: string;
+}
 
 // Track per-database "we already created the patientId index" state. Mango
 // `createIndex` is idempotent server-side but each call still issues a network
@@ -82,8 +119,19 @@ export async function createMedicalRecord(
 
 export async function updateMedicalRecord(id: string, data: Partial<MedicalRecordDoc>): Promise<MedicalRecordDoc | null> {
   const db = medicalRecordsDB();
+  let existing: MedicalRecordDoc;
   try {
-    const existing = await db.get(id) as MedicalRecordDoc;
+    existing = await db.get(id) as MedicalRecordDoc;
+  } catch {
+    return null;
+  }
+  // A signed document is locked: its clinical content must not change in place.
+  // This guard is intentionally OUTSIDE the not-found try/catch so the lock
+  // surfaces as a thrown error rather than being swallowed into a null return.
+  if (isRecordLocked(existing)) {
+    throw new SignedRecordLockError(id);
+  }
+  try {
     const updated = {
       ...existing,
       ...data,
@@ -108,15 +156,230 @@ export async function updateMedicalRecord(id: string, data: Partial<MedicalRecor
   }
 }
 
+/**
+ * Sign (attest) a clinical document and lock it against further edits.
+ *
+ * Signing is the medico-legal act that turns a draft into a permanent record.
+ * After this, {@link updateMedicalRecord} will refuse in-place edits; use
+ * {@link addAddendum} for corrections. Re-signing an already-signed record is
+ * rejected so a second clinician can't silently overwrite the attestation.
+ *
+ * Pass `awaitingCosign: true` to mark the document as signed-by-trainee and
+ * pending a supervising provider's co-signature (see {@link cosignMedicalRecord}).
+ */
+export async function signMedicalRecord(
+  id: string,
+  signer: SignerIdentity,
+  opts: { awaitingCosign?: boolean } = {}
+): Promise<MedicalRecordDoc | null> {
+  if (!isClinicalAuthorRole(signer.userRole)) {
+    throw new SigningAuthorizationError(`Role "${signer.userRole ?? 'unknown'}" may not sign clinical notes.`);
+  }
+  const db = medicalRecordsDB();
+  let existing: MedicalRecordDoc;
+  try {
+    existing = await db.get(id) as MedicalRecordDoc;
+  } catch {
+    return null;
+  }
+  if (existing.documentStatus === 'signed' || existing.documentStatus === 'amended') {
+    throw new SignedRecordLockError(id);
+  }
+  const now = new Date().toISOString();
+  const signed: MedicalRecordDoc = {
+    ...existing,
+    documentStatus: opts.awaitingCosign ? 'awaiting_cosign' : 'signed',
+    signedBy: signer.userId,
+    signedByName: signer.userName,
+    signedByRole: signer.userRole,
+    signedAt: now,
+    syncStatus: 'pending',
+    updatedAt: now,
+  };
+  const resp = await db.put(signed);
+  signed._rev = resp.rev;
+  await logAuditSafe(
+    opts.awaitingCosign ? 'SIGN_MEDICAL_RECORD_AWAITING_COSIGN' : 'SIGN_MEDICAL_RECORD',
+    signer.userId,
+    signer.userName,
+    `Signed record ${id} for patient ${signed.patientId}`,
+  );
+  emitSyncEvent({
+    resourceType: 'medical_record',
+    resourceId: signed._id,
+    operation: 'update',
+    resourceVersion: signed._rev,
+    orgId: signed.orgId,
+    hospitalId: signed.hospitalId,
+  });
+  return signed;
+}
+
+/**
+ * Append an immutable addendum to a signed record. The original signed content
+ * is never altered; the document moves to 'amended' status and keeps every
+ * addendum in chronological order.
+ */
+export async function addAddendum(
+  id: string,
+  text: string,
+  author: SignerIdentity,
+): Promise<MedicalRecordDoc | null> {
+  const trimmed = (text || '').trim();
+  if (trimmed.length === 0) {
+    throw new ValidationError({ text: 'Addendum text is required' });
+  }
+  const db = medicalRecordsDB();
+  let existing: MedicalRecordDoc;
+  try {
+    existing = await db.get(id) as MedicalRecordDoc;
+  } catch {
+    return null;
+  }
+  if (!isRecordLocked(existing)) {
+    // Addenda only apply to a finalized (signed/amended) record. A draft is
+    // edited directly; a note still awaiting co-signature must be co-signed
+    // first, otherwise amending it would orphan it from the co-sign queue.
+    const why = existing.documentStatus === 'awaiting_cosign'
+      ? `Medical record ${id} is awaiting co-signature; it must be co-signed before an addendum can be added.`
+      : `Medical record ${id} is not signed; edit the draft directly instead of adding an addendum.`;
+    throw new Error(why);
+  }
+  const now = new Date().toISOString();
+  const addendum: RecordAddendum = {
+    text: trimmed,
+    authorId: author.userId,
+    authorName: author.userName,
+    authorRole: author.userRole,
+    createdAt: now,
+  };
+  const amended: MedicalRecordDoc = {
+    ...existing,
+    addenda: [...(existing.addenda || []), addendum],
+    documentStatus: 'amended',
+    syncStatus: 'pending',
+    updatedAt: now,
+  };
+  const resp = await db.put(amended);
+  amended._rev = resp.rev;
+  await logAuditSafe('ADDENDUM_MEDICAL_RECORD', author.userId, author.userName, `Addendum on record ${id} for patient ${amended.patientId}`);
+  emitSyncEvent({
+    resourceType: 'medical_record',
+    resourceId: amended._id,
+    operation: 'update',
+    resourceVersion: amended._rev,
+    orgId: amended.orgId,
+    hospitalId: amended.hospitalId,
+  });
+  return amended;
+}
+
+/**
+ * Co-sign a record that a trainee signed into 'awaiting_cosign'. The
+ * supervising provider reviews and attests; the document then becomes a fully
+ * signed, locked record. Records not awaiting co-signature are rejected so a
+ * co-signature can't be applied out of band.
+ */
+export async function cosignMedicalRecord(
+  id: string,
+  cosigner: SignerIdentity,
+): Promise<MedicalRecordDoc | null> {
+  if (!isProviderRole(cosigner.userRole)) {
+    throw new SigningAuthorizationError(`Role "${cosigner.userRole ?? 'unknown'}" may not co-sign clinical notes.`);
+  }
+  const db = medicalRecordsDB();
+  let existing: MedicalRecordDoc;
+  try {
+    existing = await db.get(id) as MedicalRecordDoc;
+  } catch {
+    return null;
+  }
+  if (existing.documentStatus !== 'awaiting_cosign') {
+    throw new Error(`Medical record ${id} is not awaiting co-signature (status: ${existing.documentStatus ?? 'draft'}).`);
+  }
+  // A clinician cannot co-sign their own attestation — co-signature must come
+  // from a different (supervising) provider.
+  if (cosigner.userId && existing.signedBy && cosigner.userId === existing.signedBy) {
+    throw new SigningAuthorizationError('A note must be co-signed by a different provider than the author.');
+  }
+  const now = new Date().toISOString();
+  const cosigned: MedicalRecordDoc = {
+    ...existing,
+    documentStatus: 'signed',
+    cosignedBy: cosigner.userId,
+    cosignedByName: cosigner.userName,
+    cosignedAt: now,
+    syncStatus: 'pending',
+    updatedAt: now,
+  };
+  const resp = await db.put(cosigned);
+  cosigned._rev = resp.rev;
+  await logAuditSafe('COSIGN_MEDICAL_RECORD', cosigner.userId, cosigner.userName, `Co-signed record ${id} for patient ${cosigned.patientId}`);
+  emitSyncEvent({
+    resourceType: 'medical_record',
+    resourceId: cosigned._id,
+    operation: 'update',
+    resourceVersion: cosigned._rev,
+    orgId: cosigned.orgId,
+    hospitalId: cosigned.hospitalId,
+  });
+  return cosigned;
+}
+
+/**
+ * Records that still need someone's attention in the signing workflow, for the
+ * provider inbox (P1.1):
+ *  - `unsignedDrafts`     : draft/legacy records with clinical content not yet signed.
+ *  - `awaitingCosign`     : trainee-signed records pending a supervisor co-signature.
+ * Scope-filtered like the other reads so a user only sees their facility/org.
+ */
+export interface SigningInbox {
+  unsignedDrafts: MedicalRecordDoc[];
+  awaitingCosign: MedicalRecordDoc[];
+}
+
+export async function getSigningInbox(scope?: DataScope): Promise<SigningInbox> {
+  const db = medicalRecordsDB();
+  let docs = await findByType<MedicalRecordDoc>(db, 'medical_record');
+  if (scope) docs = filterByScope(docs, scope);
+  // Nursing vitals observations are standalone snapshots, not consult notes
+  // that require attestation — exclude them from the "to sign" queue. Prefer the
+  // structural marker; fall back to the legacy chief-complaint string for
+  // records written before recordKind existed.
+  const isConsultNote = (r: MedicalRecordDoc) =>
+    r.recordKind !== 'nursing_vitals' && r.chiefComplaint !== 'Nursing vitals observation';
+  const byNewest = (a: MedicalRecordDoc, b: MedicalRecordDoc) =>
+    (b.consultedAt || b.visitDate || b.createdAt || '').localeCompare(a.consultedAt || a.visitDate || a.createdAt || '');
+  const unsignedDrafts = docs
+    .filter((r) => isConsultNote(r) && (r.documentStatus === undefined || r.documentStatus === 'draft'))
+    .sort(byNewest);
+  const awaitingCosign = docs
+    .filter((r) => r.documentStatus === 'awaiting_cosign')
+    .sort(byNewest);
+  return { unsignedDrafts, awaitingCosign };
+}
+
+/** Fetch a single medical record by id, or null if not found. */
+export async function getMedicalRecordById(id: string): Promise<MedicalRecordDoc | null> {
+  try {
+    return await medicalRecordsDB().get(id) as MedicalRecordDoc;
+  } catch {
+    return null;
+  }
+}
+
 export async function deleteMedicalRecord(id: string): Promise<boolean> {
   const db = medicalRecordsDB();
   try {
-    const doc = await db.get(id);
-    await db.remove(doc);
+    const doc = await db.get(id) as MedicalRecordDoc;
+    await db.remove({ _id: doc._id, _rev: doc._rev! });
+    await logAuditSafe('DELETE_MEDICAL_RECORD', undefined, undefined, `Deleted record ${id} for patient ${doc.patientId}`);
     emitSyncEvent({
       resourceType: 'medical_record',
       resourceId: id,
       operation: 'delete',
+      orgId: doc.orgId,
+      hospitalId: doc.hospitalId,
     });
     return true;
   } catch {
@@ -124,12 +387,113 @@ export async function deleteMedicalRecord(id: string): Promise<boolean> {
   }
 }
 
+/**
+ * Record a nurse vitals observation as a real medical_record so it is
+ * retrievable on the patient chart / vitals trends and syncs to CouchDB.
+ *
+ * Replaces the previous ward-board write to an orphan `tamamhealth_vitals` DB
+ * that nothing read or synced. Reuses MedicalRecordDoc.vitalSigns — the exact
+ * shape VitalsTrends and the patient record already consume.
+ */
+export interface NursingVitalsInput {
+  patientId: string;
+  patientName: string;
+  hospitalId: string;
+  hospitalName?: string;
+  orgId?: string;
+  recordedById?: string;
+  recordedByName?: string;
+  encounterId?: string;
+  vitals: {
+    systolic?: string;
+    diastolic?: string;
+    temperature?: string;
+    pulse?: string;
+    spo2?: string;
+    weight?: string;
+    respiratoryRate?: string;
+    painScore?: string;
+    bloodGlucose?: string;
+    gcs?: string;
+    muac?: string;
+    notes?: string;
+  };
+  /** Optional intake/output (mL) captured on ward rounds. */
+  fluidBalance?: {
+    oralIntakeMl?: string;
+    ivIntakeMl?: string;
+    urineOutputMl?: string;
+    otherOutputMl?: string;
+  };
+}
+
+function numOrZero(v?: string): number {
+  const n = parseFloat((v ?? '').toString());
+  return isNaN(n) ? 0 : n;
+}
+
+/** Parse to a number, or undefined when empty/invalid (for optional fields). */
+function numOrUndef(v?: string): number | undefined {
+  if (v == null || v.toString().trim() === '') return undefined;
+  const n = parseFloat(v.toString());
+  return isNaN(n) ? undefined : n;
+}
+
+export async function recordNursingVitals(input: NursingVitalsInput): Promise<MedicalRecordDoc> {
+  const now = new Date().toISOString();
+  const weight = numOrZero(input.vitals.weight);
+  const record = {
+    patientId: input.patientId,
+    hospitalId: input.hospitalId,
+    hospitalName: input.hospitalName || '',
+    orgId: input.orgId,
+    encounterId: input.encounterId,
+    visitDate: now,
+    consultedAt: now,
+    visitType: 'inpatient' as const,
+    providerName: input.recordedByName || 'Nurse',
+    providerRole: 'nurse',
+    department: 'Nursing',
+    // Min 3 chars required by validateMedicalRecord; identifies this as a
+    // standalone nursing observation rather than a full consultation.
+    chiefComplaint: 'Nursing vitals observation',
+    recordKind: 'nursing_vitals' as const,
+    historyOfPresentIllness: input.vitals.notes?.trim() || '',
+    vitalSigns: {
+      temperature: numOrZero(input.vitals.temperature),
+      systolic: parseInt(input.vitals.systolic || '') || 0,
+      diastolic: parseInt(input.vitals.diastolic || '') || 0,
+      pulse: parseInt(input.vitals.pulse || '') || 0,
+      respiratoryRate: parseInt(input.vitals.respiratoryRate || '') || 0,
+      oxygenSaturation: parseInt(input.vitals.spo2 || '') || 0,
+      weight,
+      height: 0,
+      bmi: 0,
+      muac: numOrUndef(input.vitals.muac),
+      painScore: numOrUndef(input.vitals.painScore),
+      bloodGlucose: numOrUndef(input.vitals.bloodGlucose),
+      gcs: numOrUndef(input.vitals.gcs),
+      recordedAt: now,
+    },
+    fluidBalance: input.fluidBalance ? {
+      oralIntakeMl: numOrUndef(input.fluidBalance.oralIntakeMl),
+      ivIntakeMl: numOrUndef(input.fluidBalance.ivIntakeMl),
+      urineOutputMl: numOrUndef(input.fluidBalance.urineOutputMl),
+      otherOutputMl: numOrUndef(input.fluidBalance.otherOutputMl),
+    } : undefined,
+    diagnoses: [],
+    prescriptions: [],
+    labResults: [],
+    treatmentPlan: '',
+    syncStatus: 'pending' as const,
+  } as Omit<MedicalRecordDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>;
+
+  return createMedicalRecord(record);
+}
+
 export async function getRecentRecords(limit: number = 20, scope?: DataScope): Promise<MedicalRecordDoc[]> {
   const db = medicalRecordsDB();
-  const result = await db.allDocs({ include_docs: true });
-  let docs = result.rows
-    .map(r => r.doc as MedicalRecordDoc)
-    .filter(d => d && d.type === 'medical_record');
+  let docs = await findByType<MedicalRecordDoc>(db, 'medical_record');
   if (scope) docs = filterByScope(docs, scope);
   return docs
     .sort((a, b) => (b.visitDate || '').localeCompare(a.visitDate || ''))

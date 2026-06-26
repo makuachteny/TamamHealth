@@ -4,14 +4,13 @@ import { v4 as uuidv4 } from 'uuid';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 import { jubaDate } from '../time-juba';
+import { findByType } from './db-query';
 
 export async function getAllInventory(scope?: DataScope): Promise<PharmacyInventoryDoc[]> {
   const db = pharmacyInventoryDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as PharmacyInventoryDoc)
-    .filter(d => d && d.type === 'pharmacy_inventory')
+  const all = (await findByType<PharmacyInventoryDoc>(db, 'pharmacy_inventory'))
     .sort((a, b) => a.medicationName.localeCompare(b.medicationName));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -34,6 +33,14 @@ export async function createInventoryItem(
   await logAuditSafe('PHARMACY_STOCK_IN', undefined, undefined,
     `${data.medicationName} stocked: ${data.stockLevel} ${data.unit} (batch ${data.batchNumber})`
   );
+  emitSyncEvent({
+    resourceType: 'pharmacy_inventory',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.hospitalId,
+  });
   return doc;
 }
 
@@ -47,6 +54,14 @@ export async function updateInventoryItem(
     const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
     const resp = await db.put(updated);
     updated._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'pharmacy_inventory',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.hospitalId,
+    });
     return updated;
   } catch {
     return null;
@@ -98,7 +113,15 @@ export async function decrementStock(
       updatedAt: now,
     };
     try {
-      await db.put(updated);
+      const resp = await db.put(updated);
+      emitSyncEvent({
+        resourceType: 'pharmacy_inventory',
+        resourceId: updated._id,
+        operation: 'update',
+        resourceVersion: resp.rev,
+        orgId: updated.orgId,
+        hospitalId: updated.hospitalId,
+      });
       return;
     } catch (err: unknown) {
       // 409 = revision conflict from a concurrent put. Retry by re-reading.
@@ -113,7 +136,15 @@ export async function deleteInventoryItem(id: string): Promise<boolean> {
   const db = pharmacyInventoryDB();
   try {
     const doc = await db.get(id);
+    const typed = doc as unknown as PharmacyInventoryDoc;
     await db.remove(doc);
+    emitSyncEvent({
+      resourceType: 'pharmacy_inventory',
+      resourceId: id,
+      operation: 'delete',
+      orgId: typed.orgId,
+      hospitalId: typed.hospitalId,
+    });
     return true;
   } catch {
     return false;

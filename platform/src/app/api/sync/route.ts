@@ -36,10 +36,37 @@
  *   - tamamhealth_announcements       Staff broadcast notices. Facility-
  *                                     operational, not a national analytics
  *                                     target.
+ *   - tamamhealth_conversations       Internal staff chat. Facility-operational
+ *                                     PHI, not a national analytics target.
+ *   - tamamhealth_patient_notes       Internal clinical notes. Facility-
+ *                                     operational PHI, not a national
+ *                                     analytics target.
+ *   - tamamhealth_encounters          In-progress consultation workflow state.
+ *                                     Facility-operational; not a national
+ *                                     analytics target.
+ *   - tamamhealth_biometric_templates Fingerprint minutiae templates. Highly
+ *                                     sensitive biometric identifiers used
+ *                                     only for in-org patient identification;
+ *                                     must never flow to national analytics.
+ *   - tamamhealth_order_sets          Clinical protocol/order-set templates.
+ *                                     Org-scoped reference data, not a national
+ *                                     analytics target.
+ *   - tamamhealth_phone_notes         Patient call notes / callback workflow.
+ *                                     Facility-operational PHI, not a national
+ *                                     analytics target.
+ *   - tamamhealth_assessments         Scored intake / outcome-measure forms.
+ *                                     Facility-operational PHI, not a national
+ *                                     analytics target.
  *
  * All remaining databases land in DB_TABLE_MAP below; a missing entry causes a
  * 400 from this route, so the sync-worker surfaces a hard failure rather than
  * silently dropping data.
+ *
+ * Multi-type fan-out: a few databases co-locate several doc `type`s. The wards
+ * DB holds ward + bed + admission docs and fans out to the `wards`, `beds`, and
+ * `admissions` analytics tables (see resolveTable / WARDS_DB_TABLES) so inpatient
+ * and bed-occupancy data reaches the national level instead of being flattened
+ * into `wards`.
  * ============================================================================
  */
 
@@ -91,7 +118,6 @@ const DB_TABLE_MAP: Record<string, string> = {
   tamamhealth_deaths: 'deaths',
   tamamhealth_immunizations: 'immunizations',
   tamamhealth_anc: 'anc_visits',
-  tamamhealth_boma_visits: 'boma_visits',
   tamamhealth_facility_assessments: 'facility_assessments',
   tamamhealth_audit_log: 'audit_log',
   tamamhealth_organizations: 'organizations',
@@ -116,7 +142,6 @@ const DB_TABLE_MAP: Record<string, string> = {
   tamamhealth_staff_schedules: 'staff_schedules',
   tamamhealth_leave_requests: 'leave_requests',
   tamamhealth_payroll_entries: 'payroll_entries',
-  tamamhealth_patient_feedback: 'patient_feedback',
   tamamhealth_billing: 'billing',
   tamamhealth_fee_schedule: 'fee_schedule',
   tamamhealth_insurance_policies: 'insurance_policies',
@@ -130,6 +155,31 @@ const DB_TABLE_MAP: Record<string, string> = {
   tamamhealth_invoices: 'invoices',
   tamamhealth_ledger: 'ledger_entries',
 };
+
+// A few CouchDB databases co-locate several doc `type`s in one database. The
+// wards DB holds ward + bed + admission docs, so a single per-database table
+// would flatten inpatient and bed data into the `wards` projection (dropping
+// admissions/mortality/occupancy at the national level). These DBs fan out to
+// one analytics table per doc type instead.
+const WARDS_DB_TABLES: Record<string, string> = {
+  ward: 'wards',
+  bed: 'beds',
+  admission: 'admissions',
+};
+const WARDS_DB_ALL_TABLES = ['wards', 'beds', 'admissions'];
+
+/**
+ * Resolve the PostgreSQL table for a single change. Defaults to the per-database
+ * mapping; for multi-type databases (currently only the wards DB) it routes by
+ * the document's `type` so each type lands in its own analytics table.
+ */
+function resolveTable(db: string, doc?: Record<string, unknown>): string | undefined {
+  if (db === 'tamamhealth_wards') {
+    const t = typeof doc?.type === 'string' ? WARDS_DB_TABLES[doc.type] : undefined;
+    return t || DB_TABLE_MAP[db];
+  }
+  return DB_TABLE_MAP[db];
+}
 
 // Map CouchDB doc fields to PostgreSQL column names per table
 type FieldMapper = (doc: Record<string, unknown>) => Record<string, unknown>;
@@ -310,29 +360,6 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
     risk_level: doc.riskLevel,
     facility_id: doc.facilityId,
     state: doc.state,
-    org_id: doc.orgId,
-    created_at: doc.createdAt,
-    updated_at: doc.updatedAt,
-  }),
-
-  boma_visits: (doc) => ({
-    id: doc._id,
-    worker_id: doc.workerId,
-    worker_name: doc.workerName,
-    patient_name: doc.patientName,
-    geocode_id: doc.geocodeId,
-    chief_complaint: doc.chiefComplaint,
-    suspected_condition: doc.suspectedCondition,
-    icd11_code: doc.icd11Code,
-    action: doc.action,
-    outcome: doc.outcome,
-    state: doc.state,
-    county: doc.county,
-    payam: doc.payam,
-    boma: doc.boma,
-    visit_date: doc.visitDate,
-    gps_latitude: doc.gpsLatitude,
-    gps_longitude: doc.gpsLongitude,
     org_id: doc.orgId,
     created_at: doc.createdAt,
     updated_at: doc.updatedAt,
@@ -597,6 +624,65 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
     updated_at: doc.updatedAt,
   }),
 
+  beds: (doc) => ({
+    id: doc._id,
+    bed_number: doc.bedNumber,
+    ward_id: doc.wardId,
+    ward_name: doc.wardName,
+    facility_id: doc.facilityId,
+    status: doc.status,
+    current_patient_id: doc.currentPatientId,
+    current_patient_name: doc.currentPatientName,
+    current_admission_id: doc.currentAdmissionId,
+    last_cleaned_at: doc.lastCleanedAt,
+    org_id: doc.orgId,
+    created_at: doc.createdAt,
+    updated_at: doc.updatedAt,
+  }),
+
+  admissions: (doc) => ({
+    id: doc._id,
+    patient_id: doc.patientId,
+    patient_name: doc.patientName,
+    hospital_number: doc.hospitalNumber,
+    admission_date: doc.admissionDate,
+    admitting_diagnosis: doc.admittingDiagnosis,
+    icd11_code: doc.icd11Code,
+    severity: doc.severity,
+    admitted_by: doc.admittedBy,
+    admitted_by_name: doc.admittedByName,
+    ward_id: doc.wardId,
+    ward_name: doc.wardName,
+    bed_id: doc.bedId,
+    bed_number: doc.bedNumber,
+    facility_id: doc.facilityId,
+    facility_name: doc.facilityName,
+    facility_level: doc.facilityLevel,
+    attending_physician: doc.attendingPhysician,
+    attending_physician_name: doc.attendingPhysicianName,
+    nurse_assigned: doc.nurseAssigned,
+    nurse_assigned_name: doc.nurseAssignedName,
+    isolation_required: doc.isolationRequired,
+    isolation_reason: doc.isolationReason,
+    status: doc.status,
+    discharge_date: doc.dischargeDate,
+    discharge_type: doc.dischargeType,
+    discharge_diagnosis: doc.dischargeDiagnosis,
+    discharge_icd11: doc.dischargeIcd11,
+    discharged_by: doc.dischargedBy,
+    discharged_by_name: doc.dischargedByName,
+    follow_up_required: doc.followUpRequired,
+    follow_up_date: doc.followUpDate,
+    length_of_stay: doc.lengthOfStay,
+    transferred_from: doc.transferredFrom,
+    transferred_to: doc.transferredTo,
+    state: doc.state,
+    county: doc.county,
+    org_id: doc.orgId,
+    created_at: doc.createdAt,
+    updated_at: doc.updatedAt,
+  }),
+
   emergency_plans: (doc) => ({
     id: doc._id,
     plan_name: doc.planName,
@@ -706,30 +792,6 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
     status: doc.status,
     paid_at: doc.paidAt,
     paid_by: doc.paidBy,
-    org_id: doc.orgId,
-    created_at: doc.createdAt,
-    updated_at: doc.updatedAt,
-  }),
-
-  patient_feedback: (doc) => ({
-    id: doc._id,
-    patient_id: doc.patientId,
-    patient_name: doc.patientName,
-    facility_id: doc.facilityId,
-    facility_name: doc.facilityName,
-    department: doc.department,
-    visit_date: doc.visitDate,
-    rating: doc.rating,
-    nps_score: doc.npsScore,
-    sentiment: doc.sentiment,
-    category: doc.category,
-    comment: doc.comment,
-    channel: doc.channel,
-    follow_up_required: doc.followUpRequired,
-    follow_up_status: doc.followUpStatus,
-    resolved_at: doc.resolvedAt,
-    state: doc.state,
-    county: doc.county,
     org_id: doc.orgId,
     created_at: doc.createdAt,
     updated_at: doc.updatedAt,
@@ -1050,14 +1112,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid payload: requires db and changes array' }, { status: 400 });
     }
 
-    const table = DB_TABLE_MAP[db];
-    if (!table) {
+    const baseTable = DB_TABLE_MAP[db];
+    if (!baseTable) {
       return NextResponse.json({ error: `Unknown database: ${db}` }, { status: 400 });
-    }
-
-    const mapper = FIELD_MAPPERS[table];
-    if (!mapper) {
-      return NextResponse.json({ error: `No field mapper for table: ${table}` }, { status: 400 });
     }
 
     let processed = 0;
@@ -1067,10 +1124,23 @@ export async function POST(request: NextRequest) {
     for (const change of changes) {
       try {
         if (change.deleted) {
-          await deleteDocument(table, change.id);
+          // A deleted change carries no doc, so for multi-type databases the
+          // type is unknown — clear the id from every projection the DB feeds.
+          // Document ids are globally unique, so the extra deletes are no-ops.
+          const targets = db === 'tamamhealth_wards' ? WARDS_DB_ALL_TABLES : [baseTable];
+          for (const tbl of targets) await deleteDocument(tbl, change.id);
         } else if (change.doc) {
           // Skip design documents
           if (change.id.startsWith('_design/')) continue;
+
+          const table = resolveTable(db, change.doc) || baseTable;
+          const mapper = FIELD_MAPPERS[table];
+          if (!mapper) {
+            console.error(`[Sync] No field mapper for table: ${table} (db ${db}, doc ${change.id})`);
+            errors++;
+            lastSeq = change.seq;
+            continue;
+          }
 
           const mapped = mapper(change.doc);
           // Filter out undefined values

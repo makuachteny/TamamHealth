@@ -1,6 +1,7 @@
 import { auditLogDB } from '../db';
 import type { AuditLogDoc } from '../db-types';
 import { v4 as uuidv4 } from 'uuid';
+import { findByType } from './db-query';
 
 export async function logAuditSafe(...args: Parameters<typeof logAudit>): Promise<void> {
   try {
@@ -59,10 +60,7 @@ export async function logDataAccess(
 
 export async function getRecentAuditLogs(limit: number = 50): Promise<AuditLogDoc[]> {
   const db = auditLogDB();
-  const result = await db.allDocs({ include_docs: true });
-  const docs = result.rows
-    .map(r => r.doc as AuditLogDoc)
-    .filter(d => d && d.type === 'audit_log');
+  const docs = await findByType<AuditLogDoc>(db, 'audit_log');
   /* istanbul ignore next -- defensive null-safety in sort comparator */
   docs.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   return docs.slice(0, limit);

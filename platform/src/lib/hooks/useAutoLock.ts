@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { getSettings, subscribeSettings } from '@/lib/settings/settings-store';
 
 /**
  * Auto-lock hook for shared device security.
@@ -21,6 +22,10 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll'] as const;
 
+/** Fired when the lock PIN is set/cleared so a mounted useAutoLock can update
+ *  its `hasPin` state immediately (otherwise it'd be stale until remount). */
+export const PIN_CHANGED_EVENT = 'tamamhealth:pin-changed';
+
 async function hashPin(pin: string): Promise<string> {
   const salted = pin + 'tamamhealth-salt-2026';
   // Use crypto.subtle when available (HTTPS / localhost)
@@ -40,26 +45,61 @@ async function hashPin(pin: string): Promise<string> {
   return 'fb-' + Math.abs(hash).toString(16).padStart(8, '0');
 }
 
+/** Whether a screen-lock PIN is currently set on this device. */
+export function hasLockPin(): boolean {
+  return typeof window !== 'undefined' && !!localStorage.getItem(PIN_HASH_KEY);
+}
+
+/** Set (or replace) the screen-lock PIN for this device. */
+export async function setLockPin(pin: string): Promise<void> {
+  localStorage.setItem(PIN_HASH_KEY, await hashPin(pin));
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(PIN_CHANGED_EVENT));
+}
+
+/** Remove the screen-lock PIN from this device. */
+export function clearLockPin(): void {
+  localStorage.removeItem(PIN_HASH_KEY);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(PIN_CHANGED_EVENT));
+}
+
 export function useAutoLock(isAuthenticated: boolean, orgLockTimeoutMinutes?: number) {
   const [isLocked, setIsLocked] = useState(false);
   const [hasPin, setHasPin] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLockedRef = useRef(false);
   const isAuthRef = useRef(isAuthenticated);
+  // Facility setting (from the global settings store) takes precedence over the
+  // org value. Kept in React state + subscribed so an admin change to the lock
+  // timeout in Facility Settings re-arms the idle timer live.
+  const [facilityLockMin, setFacilityLockMin] = useState<number | undefined>(() => getSettings().lockTimeoutMinutes);
 
   // Keep refs in sync for use in event handlers (avoids stale closures)
   useEffect(() => { isLockedRef.current = isLocked; }, [isLocked]);
   useEffect(() => { isAuthRef.current = isAuthenticated; }, [isAuthenticated]);
-
-  // Check if user has a PIN set
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setHasPin(!!localStorage.getItem(PIN_HASH_KEY));
-    }
+    setFacilityLockMin(getSettings().lockTimeoutMinutes);
+    return subscribeSettings(s => setFacilityLockMin(s.lockTimeoutMinutes));
+  }, []);
+
+  // Check if user has a PIN set — and stay in sync when it changes (e.g. the
+  // user sets/removes their PIN from the Settings page, or another tab does).
+  useEffect(() => {
+    const sync = () => setHasPin(hasLockPin());
+    sync();
+    if (typeof window === 'undefined') return;
+    window.addEventListener(PIN_CHANGED_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener(PIN_CHANGED_EVENT, sync);
+      window.removeEventListener('storage', sync);
+    };
   }, []);
 
   const getTimeout = useCallback((): number => {
-    // Priority: org config > localStorage > default
+    // Priority: facility setting > org config > localStorage > default
+    if (facilityLockMin && facilityLockMin > 0) {
+      return facilityLockMin * 60_000;
+    }
     if (orgLockTimeoutMinutes && orgLockTimeoutMinutes > 0) {
       return orgLockTimeoutMinutes * 60_000;
     }
@@ -70,7 +110,7 @@ export function useAutoLock(isAuthenticated: boolean, orgLockTimeoutMinutes?: nu
       if (!isNaN(parsed) && parsed > 0) return parsed;
     }
     return DEFAULT_TIMEOUT_MS;
-  }, [orgLockTimeoutMinutes]);
+  }, [facilityLockMin, orgLockTimeoutMinutes]);
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);

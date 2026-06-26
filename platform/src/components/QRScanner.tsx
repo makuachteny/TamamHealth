@@ -129,7 +129,7 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
 
           {error && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(229,46,66,0.1)' }}>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'transparent' }}>
                 <X className="w-6 h-6" style={{ color: 'var(--color-danger)' }} />
               </div>
               <p className="text-sm" style={{ color: 'var(--color-danger)' }}>{error}</p>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import {
-  ProductHero, ProductModuleGrid, ProductBenefits, ProductCTA, ProductIllustration,
+  ProductHero, ProductModuleGrid, ProductBenefits, ProductIllustration,
 } from "@/components/marketing/ProductPage";
 
 export const metadata: Metadata = {
@@ -19,7 +19,6 @@ export default function PharmacyManagementPage() {
           subtitle="Tight inventory control with batch + expiry tracking, electronic prescription dispensing, POS for over-the-counter sales, and a clean audit trail for controlled substances."
           accentColor="var(--tb-green-dark)"
           primaryCta={{ label: "Request a demo", href: "/about/contact" }}
-          secondaryCta={{ label: "See pricing", href: "/pricing" }}
           illustration={<ProductIllustration accent="var(--tb-green-dark)" variant="pharmacy" />}
         />
 
@@ -50,12 +49,6 @@ export default function PharmacyManagementPage() {
             { title: "Donor-supplied stock support", description: "Tag stock by donor (UNICEF, Global Fund, etc.) and report consumption back to the donor automatically." },
             { title: "Counter-friendly UX", description: "Keyboard-only flow for high-volume counters. A trained dispenser can clear a 10-line prescription in under 90 seconds." },
           ]}
-        />
-
-        <ProductCTA
-          heading="See PMS at your counter"
-          subtitle="We'll set up your formulary, import your current stock list, and show your team the dispense flow in under an hour."
-          primaryCta={{ label: "Request a demo", href: "/about/contact" }}
         />
       </main>
       

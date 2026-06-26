@@ -322,14 +322,15 @@ describe('patient-service', () => {
     expect(patient.orgId).toBeUndefined();
   });
 
-  test('checkDuplicates with short phone number does not match', async () => {
-    // Phone with exactly 7 digits (minimum valid length)
-    const patient1 = await createPatient({ ...validPatient(), phone: '+2119999' });
-    // Different patient with 7-digit phone should be allowed (different number)
-    const patient2 = await createPatient({ ...validPatient(), phone: '+2118888', firstName: 'Another' });
+  test('two different valid phone numbers do not collide', async () => {
+    // Distinct canonical South Sudan numbers should both create.
+    const patient1 = await createPatient({ ...validPatient(), phone: '+211912345671' });
+    const patient2 = await createPatient({ ...validPatient(), phone: '+211912345672', firstName: 'Another' });
     expect(patient1._id).toBeDefined();
     expect(patient2._id).toBeDefined();
     expect(patient1._id).not.toBe(patient2._id);
+    // Phones are stored canonical.
+    expect(patient1.phone).toBe('+211912345671');
   });
 
   test('checkDuplicates with short nationalId does not match', async () => {
@@ -390,12 +391,12 @@ describe('patient-service', () => {
     expect(updated!.orgId).toBe('updated-org-456');
   });
 
-  test('checkDuplicates skips check for very short phone numbers', async () => {
-    // The code checks `phone.length >= 7` before comparing duplicates
-    // This verifies that the length check is enforced correctly
-    const patient1 = await createPatient({ ...validPatient(), phone: '+211912345' });
-    expect(patient1._id).toBeDefined();
-    expect(patient1.phone).toBe('+211912345');
+  test('rejects a malformed (too short) phone number', async () => {
+    // Under the canonical South Sudan format, an incomplete number is invalid
+    // and must be rejected at creation rather than silently stored.
+    await expect(
+      createPatient({ ...validPatient(), phone: '+211912345' }),
+    ).rejects.toThrow(ValidationError);
   });
 
   test('checkDuplicates detects name and DOB duplicates', async () => {
@@ -451,20 +452,20 @@ describe('patient-service', () => {
     expect(patient.orgId).toBe('test-org-123');
   });
 
-  // ---- Line 111: Test checkDuplicates phone match with valid length ----
-  test('checkDuplicates detects phone duplicates with 7+ digit length (line 111)', async () => {
-    // Create first patient with 7-digit phone
+  // ---- checkDuplicates phone match on canonical numbers ----
+  test('checkDuplicates detects phone duplicates (canonical number)', async () => {
+    // Create first patient with a valid canonical phone.
     await createPatient({
       ...validPatient(),
       firstName: 'John',
-      phone: '+211912345',  // 7 digits in the main number
+      phone: '+211912345673',
     });
 
-    // Try to create second patient with same phone (should fail)
+    // Second patient with the SAME phone should be rejected as a duplicate.
     const data = {
       ...validPatient(),
       firstName: 'Jane',
-      phone: '+211912345',  // Same phone number
+      phone: '+211912345673',
     };
     await expect(createPatient(data)).rejects.toThrow(ValidationError);
   });

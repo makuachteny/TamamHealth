@@ -11,8 +11,8 @@ import { withAuditLog } from '@/lib/audit/with-audit';
 import type { UserRole } from '@/lib/db-types';
 const READ_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
-  'front_desk', 'boma_health_worker', 'medical_superintendent', 'hrio',
-  'payam_supervisor', 'data_entry_clerk', 'community_health_volunteer',
+  'front_desk', 'medical_superintendent', 'hrio',
+  'data_entry_clerk',
   'nutritionist', 'radiologist',
 ];
 const WRITE_ROLES: UserRole[] = [
@@ -63,7 +63,14 @@ async function patchHandler(
     delete body.createdAt;
     const { sanitizePayload } = await import('@/lib/validation');
     const sanitized = sanitizePayload(body);
-    const { updatePatient } = await import('@/lib/services/patient-service');
+    const { updatePatient, getPatientById } = await import('@/lib/services/patient-service');
+    // Org-scope guard (mirrors the GET handler above): a user may only edit a
+    // patient in their own org (super_admin excepted) — no cross-tenant writes.
+    const existing = await getPatientById(params.id);
+    if (!existing) return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+    if (auth.role !== 'super_admin' && auth.orgId && existing.orgId && existing.orgId !== auth.orgId) {
+      return forbidden('Access denied to this patient record');
+    }
     const updated = await updatePatient(params.id, sanitized);
     if (!updated) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 });

@@ -34,6 +34,17 @@ export interface Hospital {
   todayVisits: number;
   ownership?: 'public' | 'ngo' | 'private' | 'faith_based';
   operationalStatus?: 'functional' | 'partially_functional' | 'non_functional' | 'closed';
+  /**
+   * Facility-level review gate for reporting to the Ministry of Health.
+   * Facility data is reviewed and explicitly submitted from "My Facility"
+   * rather than flowing to the Ministry automatically. Absent = not yet
+   * submitted (draft).
+   */
+  mohSubmission?: {
+    submittedAt: string;
+    submittedBy: string;
+    submittedByName?: string;
+  };
   county?: string;
   serviceFlags?: {
     epi: boolean;
@@ -1613,6 +1624,89 @@ const zandeFirstNames = ['Bazungula', 'Ezibon', 'Khamis', 'Samson', 'Zakaria', '
 const bariFirstNames = ['Ladu', 'Wani', 'Tombe', 'Lemi', 'Soro', 'Loro', 'Keji', 'Lado', 'Modi', 'TamamHealth', 'Bakhita', 'Hellen', 'Janet', 'Monica', 'Stella', 'Viola', 'Lucy', 'Tabitha', 'Cecilia', 'Patricia'];
 const familyNames = ['Deng', 'Garang', 'Mabior', 'Kuol', 'Bol', 'Atem', 'Kiir', 'Machar', 'Wani', 'TamamHealth', 'Lado', 'Laku', 'Gore', 'Tombura', 'Gbudue', 'Akot', 'Ajith', 'Mayom', 'Nyuon', 'Gatdet', 'Koang', 'Jok', 'Ring', 'Aguer', 'Achien', 'Makuei', 'Thiik', 'Ayuel', 'Malual', 'Madhol', 'Arou', 'Ngor', 'Biel', 'Ruot', 'Gai', 'Puok', 'Duoth'];
 
+/**
+ * Structured allergy / adverse-reaction record (P0.3). Replaces the meaning of
+ * the legacy `Patient.allergies: string[]`, which is now kept only as a
+ * denormalised list of active substance names so existing read sites (chart
+ * banner, SBAR, MAR, referrals) keep working unchanged. `structuredAllergies`
+ * is the source of truth for reaction, criticality and status.
+ */
+export interface AllergyEntry {
+  /** Stable id for keys + removal (uuid). */
+  id: string;
+  substance: string;
+  classification?: 'drug' | 'food' | 'environmental' | 'biologic' | 'other';
+  /** Clinical criticality — drives prescribing-time escalation. */
+  criticality?: 'mild' | 'moderate' | 'severe' | 'unknown';
+  /** Free-text description of the reaction (e.g. "anaphylaxis", "rash"). */
+  reaction?: string;
+  /** YYYY-MM-DD when the reaction was first noted, if known. */
+  onsetDate?: string;
+  status: 'active' | 'inactive' | 'resolved' | 'entered_in_error';
+  /** Required when status moves away from active — preserves the audit trail. */
+  removalReason?: string;
+  recordedBy?: string;
+  recordedByName?: string;
+  recordedAt: string;
+}
+
+/**
+ * Patient directive / consent record (P2.1). Holds informed consent, ABN /
+ * non-covered-service acknowledgement, privacy preferences and advance
+ * directives ON the patient chart so they aren't re-collected every visit
+ * (mirrors the Centricity "Directives" chart window). Stored on the patient
+ * document like {@link AllergyEntry}.
+ */
+export type DirectiveType =
+  | 'informed_consent'
+  | 'abn_noncovered'
+  | 'privacy_consent'
+  | 'advance_directive'
+  | 'release_of_information'
+  | 'other';
+
+export interface DirectiveEntry {
+  id: string;
+  type: DirectiveType;
+  /** Human-readable description (free text or a picked predefined option). */
+  description: string;
+  /** YYYY-MM-DD the directive takes effect. */
+  startDate?: string;
+  status: 'active' | 'inactive' | 'expired' | 'revoked';
+  /** Required when the directive is removed/revoked — preserves the audit trail. */
+  removalReason?: string;
+  recordedBy?: string;
+  recordedByName?: string;
+  recordedAt: string;
+}
+
+/**
+ * Care alert (P1.2) — chart-permanent patient-safety information that should be
+ * visible on every visit (e.g. "High fall risk", "Difficult IV access", "Do not
+ * use right arm for BP"). Mirrors the Centricity "care alert" (the sticky note
+ * with a red plus that stays attached to the chart). Stored on the patient
+ * document like {@link AllergyEntry} / {@link DirectiveEntry}.
+ */
+export type CareAlertCategory =
+  | 'clinical_risk'
+  | 'safety'
+  | 'infection_control'
+  | 'administrative'
+  | 'other';
+
+export interface CareAlertEntry {
+  id: string;
+  category: CareAlertCategory;
+  message: string;
+  priority: 'high' | 'normal';
+  status: 'active' | 'resolved';
+  /** Required when resolving — preserves the audit trail. */
+  resolutionReason?: string;
+  recordedBy?: string;
+  recordedByName?: string;
+  recordedAt: string;
+}
+
 export interface Patient {
   id: string;
   hospitalNumber: string;
@@ -1630,6 +1724,12 @@ export interface Patient {
   phone: string;
   altPhone?: string;
   whatsapp?: string;
+  /** Patient's preferred pharmacy for prescription pickup / e-prescribing. */
+  preferredPharmacy?: {
+    name: string;
+    address?: string;
+    phone?: string;
+  };
   state: string;
   county: string;
   payam?: string;
@@ -1641,7 +1741,15 @@ export interface Patient {
   tribe: string;
   primaryLanguage: string;
   bloodType: string;
+  /** Denormalised mirror: active substance names only. Source of truth is
+   *  `structuredAllergies`. Kept for backward-compatible read sites. */
   allergies: string[];
+  /** Structured allergy/adverse-reaction records (P0.3). */
+  structuredAllergies?: AllergyEntry[];
+  /** Directives / consent records on the chart (P2.1). */
+  directives?: DirectiveEntry[];
+  /** Chart-permanent care alerts / safety flags (P1.2). */
+  careAlerts?: CareAlertEntry[];
   chronicConditions: string[];
   nokName: string;
   nokRelationship: string;
@@ -1691,9 +1799,17 @@ function generateHospitalNumber(index: number): string {
   return `JTH-${String(index + 1).padStart(6, '0')}`;
 }
 
+// Hospitals that have seeded staff accounts (mirrors the db-seed.ts user roster,
+// which only staffs hosp-001..004). Generated patients are distributed across
+// these so every demo user — at whichever of these facilities — sees a
+// populated registry, instead of being scattered across unstaffed hospitals.
+const STAFFED_HOSPITAL_IDS = ['hosp-001', 'hosp-002', 'hosp-003', 'hosp-004'];
+
 function generatePhone(): string {
-  const prefixes = ['0912', '0916', '0921', '0925', '0955', '0977'];
-  return `${randomFrom(prefixes)}${Math.floor(100000 + Math.random() * 900000)}`;
+  // Canonical stored form: E.164 with no separators (+211 + 9 national digits).
+  // National prefixes drop their leading 0 so the result is always +2119XXXXXXXX.
+  const prefixes = ['912', '916', '921', '925', '955', '977'];
+  return `+211${randomFrom(prefixes)}${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
 function generateDOB(): string {
@@ -1757,7 +1873,12 @@ function generatePatient(index: number): Patient {
   const dob = generateDOB();
   const state = randomFrom(states);
   const counties = statesAndCounties[state];
-  const hospital = randomFrom(hospitals);
+  // Place each patient at one of the STAFFED hospitals (round-robin by index),
+  // not a random one of all facilities. Only these hospitals have seeded user
+  // accounts, so a patient registered at an unstaffed facility would be visible
+  // to nobody. Deterministic distribution guarantees every staff login lands on
+  // a hospital with a populated patient registry.
+  const hospital = STAFFED_HOSPITAL_IDS[index % STAFFED_HOSPITAL_IDS.length];
 
   const numAllergies = Math.random() > 0.7 ? Math.floor(1 + Math.random() * 2) : 0;
   const allergies: string[] = numAllergies > 0
@@ -1789,21 +1910,23 @@ function generatePatient(index: number): Patient {
     nokName: `${randomFrom([...dinkaFirstNamesMale, ...nuerFirstNamesMale, ...bariFirstNames])} ${randomFrom(familyNames)}`,
     nokRelationship: randomFrom(relationships),
     nokPhone: generatePhone(),
-    registrationHospital: hospital.id,
-    registrationDate: (() => {
-      const m = String(Math.floor(1 + Math.random() * 12)).padStart(2, '0');
-      const d = String(Math.floor(1 + Math.random() * 28)).padStart(2, '0');
-      return `2025-${m}-${d}`;
-    })(),
-    registeredAt: (() => {
+    registrationHospital: hospital,
+    // registrationDate and registeredAt must describe the SAME event, so derive
+    // the timestamp from the date rather than rolling two independent randoms
+    // (which previously let a patient's two registration fields disagree).
+    ...(() => {
       const m = String(Math.floor(1 + Math.random() * 12)).padStart(2, '0');
       const d = String(Math.floor(1 + Math.random() * 28)).padStart(2, '0');
       const hh = String(Math.floor(7 + Math.random() * 12)).padStart(2, '0');
       const mm = String(Math.floor(Math.random() * 60)).padStart(2, '0');
-      return `2025-${m}-${d}T${hh}:${mm}:00.000Z`;
+      const registrationDate = `2025-${m}-${d}`;
+      return {
+        registrationDate,
+        registeredAt: `${registrationDate}T${hh}:${mm}:00.000Z`,
+      };
     })(),
     lastVisitDate: `2026-0${Math.floor(1 + Math.random() * 2)}-${String(Math.floor(1 + Math.random() * 9)).padStart(2, '0')}`,
-    lastVisitHospital: hospital.id,
+    lastVisitHospital: hospital,
     lastConsultedAt: (() => {
       const mo = Math.floor(1 + Math.random() * 2);
       const d = String(Math.floor(1 + Math.random() * 9)).padStart(2, '0');
@@ -1816,7 +1939,14 @@ function generatePatient(index: number): Patient {
   };
 }
 
-const _generatedPatients: Patient[] = Array.from({ length: 50 }, (_, i) => generatePatient(i));
+const _generatedPatients: Patient[] = [
+  // Core roster: pat-00001..pat-00050.
+  ...Array.from({ length: 50 }, (_, i) => generatePatient(i)),
+  // Extra roster: ids start at index 86 (→ pat-00087, JTH-000087) so they never
+  // collide with the hand-seeded patients pat-00051..pat-00086 in db-seed.ts.
+  // Gives every registry/list page a fuller, fully-detailed patient list.
+  ...Array.from({ length: 50 }, (_, i) => generatePatient(i + 86)),
+];
 
 // Override first 3 patients with deterministic data for Patient Portal demo login
 _generatedPatients[0] = {
@@ -1824,7 +1954,7 @@ _generatedPatients[0] = {
   firstName: 'Deng',
   middleName: 'Mabior',
   surname: 'Garang',
-  phone: '0912345678',
+  phone: '+211912345678',
   gender: 'Male',
   dateOfBirth: '1988-03-15',
   bloodType: 'O+',
@@ -1832,13 +1962,14 @@ _generatedPatients[0] = {
   chronicConditions: ['Hypertension'],
   registrationHospital: 'hosp-001',
   photoUrl: '/assets/patients/portrait-man-camera.jpg',
+  preferredPharmacy: { name: 'Konyokonyo Pharmacy', address: 'Konyokonyo Market, Juba', phone: '+211911220145' },
 };
 _generatedPatients[1] = {
   ..._generatedPatients[1],
   firstName: 'Nyabol',
   middleName: 'Gatdet',
   surname: 'Koang',
-  phone: '0916111222',
+  phone: '+211916111222',
   gender: 'Female',
   dateOfBirth: '1995-07-22',
   bloodType: 'A+',
@@ -1852,7 +1983,7 @@ _generatedPatients[2] = {
   firstName: 'Achol',
   middleName: 'Mayen',
   surname: 'Deng',
-  phone: '0921333444',
+  phone: '+211921333444',
   gender: 'Female',
   dateOfBirth: '2001-11-05',
   bloodType: 'B+',
@@ -1860,7 +1991,41 @@ _generatedPatients[2] = {
   chronicConditions: ['Asthma'],
   registrationHospital: 'hosp-001',
   photoUrl: '/assets/patients/doctor-prescription.jpg',
+  preferredPharmacy: { name: 'Juba Pharmacy', address: 'Airport Road, Juba', phone: '+211922778301' },
 };
+
+// Dedicated end-to-end demo patient (pat-00004 / JTH-000004). Fully populated —
+// chronic conditions, allergies and a chronic medication — so the consultation
+// wizard pre-fills the history and every step can be exercised start to finish.
+_generatedPatients[3] = {
+  ..._generatedPatients[3],
+  firstName: 'Mary',
+  middleName: 'Nyandeng',
+  surname: 'Lado',
+  phone: '+211912000004',
+  gender: 'Female',
+  dateOfBirth: '1979-06-12',
+  bloodType: 'O+',
+  allergies: ['Penicillin', 'Sulfa'],
+  chronicConditions: ['Diabetes Type 2', 'Hypertension'],
+  registrationHospital: 'hosp-001',
+  preferredPharmacy: { name: 'Konyokonyo Pharmacy', address: 'Konyokonyo Market, Juba', phone: '+211911220145' },
+};
+
+// Showcase patients that already carry seeded insurance policies (pat-00012 /
+// pat-00022) — give them a preferred pharmacy so the summary strip is complete.
+if (_generatedPatients[11]) {
+  _generatedPatients[11] = {
+    ..._generatedPatients[11],
+    preferredPharmacy: { name: 'All Heart Pharmacy', address: 'Hai Cinema, Juba', phone: '+211918540922' },
+  };
+}
+if (_generatedPatients[21]) {
+  _generatedPatients[21] = {
+    ..._generatedPatients[21],
+    preferredPharmacy: { name: 'Nimra Talata Pharmacy', address: 'Nimra Talata, Juba', phone: '+211915332110' },
+  };
+}
 
 export const patients: Patient[] = _generatedPatients;
 
@@ -1917,6 +2082,12 @@ export interface VitalSigns {
   height: number;
   bmi: number;
   muac?: number;
+  /** Pain score, 0–10 numeric rating scale. */
+  painScore?: number;
+  /** Capillary blood glucose, mmol/L. */
+  bloodGlucose?: number;
+  /** Glasgow Coma Scale, 3–15. */
+  gcs?: number;
   recordedAt: string;
 }
 
@@ -1936,6 +2107,13 @@ export interface Prescription {
   frequency: string;
   duration: string;
   instructions: string;
+  /**
+   * Clinical timing of the order. 'immediate' = emergency/stat treatment given
+   * before lab results return (IV fluids for hypotension, antipyretics for
+   * fever, anticonvulsants for paediatric seizures). 'definitive' = treatment
+   * started after a diagnosis is established. Defaults to definitive.
+   */
+  urgency?: 'immediate' | 'definitive';
 }
 
 export interface LabResult {
@@ -1946,6 +2124,50 @@ export interface LabResult {
   abnormal: boolean;
   critical: boolean;
   date: string;
+  /**
+   * 'basic' = routine panels ordered broadly (CBC, urinalysis). 'special' =
+   * targeted investigations the clinician selects per case (ANA, rheumatoid
+   * factor, vitamin D, uric acid, cultures). Defaults to basic.
+   */
+  tier?: 'basic' | 'special';
+}
+
+/** Per-system entry for the Review of Systems (14-system CMS standard). */
+export type ROSStatus = 'not_reviewed' | 'negative' | 'positive';
+export interface ReviewOfSystemEntry {
+  status: ROSStatus;
+  /** Free-text positive findings when status is 'positive'. */
+  findings?: string;
+}
+
+/** Structured past medical history. */
+export interface PastMedicalHistory {
+  /** Chronic conditions: diabetes, hypertension, hyperlipidemia, asthma, etc. */
+  chronicConditions: string[];
+  pastAdmissions?: string;
+  pastSurgeries?: string;
+  bloodTransfusion?: boolean;
+  notes?: string;
+}
+
+/** Social history — includes insurance + socioeconomic status, which drive
+ *  affordability of chronic medications in the South Sudan / regional context. */
+export interface SocialHistory {
+  smoking?: 'never' | 'former' | 'current';
+  alcohol?: 'never' | 'occasional' | 'regular';
+  substanceUse?: string;
+  occupation?: string;
+  hasHealthInsurance?: boolean;
+  insuranceProvider?: string;
+  socioeconomicStatus?: 'low' | 'middle' | 'high';
+  notes?: string;
+}
+
+/** Drug history and allergies. */
+export interface DrugHistory {
+  chronicMedications?: string;
+  allergies: string[];
+  noKnownAllergies?: boolean;
 }
 
 export interface MedicalRecord {
@@ -1964,6 +2186,13 @@ export interface MedicalRecord {
   department: string;
   chiefComplaint: string;
   historyOfPresentIllness: string;
+  /** Structured clinical history (history-taking workflow). All optional/additive. */
+  chiefComplaints?: string[];
+  reviewOfSystems?: Record<string, ReviewOfSystemEntry>;
+  pastMedicalHistory?: PastMedicalHistory;
+  familyHistory?: string;
+  socialHistory?: SocialHistory;
+  drugHistory?: DrugHistory;
   vitalSigns: VitalSigns;
   diagnoses: Diagnosis[];
   prescriptions: Prescription[];
@@ -2124,6 +2353,28 @@ export function generateMedicalRecords(patientId: string, count: number): Medica
 }
 
 // Referrals
+/**
+ * Structured close-out the receiving facility sends back to the referrer when
+ * a referral is completed — so the sender learns what actually happened to
+ * their patient, not just that the status flipped to `completed`.
+ */
+export type ReferralDisposition =
+  | 'treated_discharged'
+  | 'admitted'
+  | 'referred_onward'
+  | 'did_not_arrive'
+  | 'deceased';
+
+export interface ReferralOutcome {
+  disposition: ReferralDisposition;
+  /** Diagnosis + treatment/management summary for the referring clinician. */
+  summary: string;
+  /** Optional follow-up instructions handed back to the referring facility. */
+  followUp?: string;
+  recordedBy: string;
+  recordedAt: string;
+}
+
 export interface Referral {
   id: string;
   patientId: string;
@@ -2139,6 +2390,7 @@ export interface Referral {
   status: 'sent' | 'received' | 'seen' | 'completed' | 'cancelled';
   referringDoctor: string;
   notes: string;
+  outcome?: ReferralOutcome;
   transferPackage?: TransferPackage;
   referralAttachments?: Attachment[];
 }
@@ -2175,7 +2427,38 @@ export interface DiseaseAlert {
   trend: 'increasing' | 'stable' | 'decreasing';
 }
 
+// Weekly time-series so the surveillance / government "Weekly Disease Trends"
+// line chart renders a real wavelike trend. Those charts bucket alerts by ISO
+// week, so a single week of data would draw a flat (straight) line — this
+// spreads each tracked disease across 8 recent weeks with a rise/dip pattern.
+const WEEKLY_TREND_SERIES: { disease: string; state: string; county: string; cases: number[]; deaths: number[] }[] = [
+  { disease: 'Malaria',               state: 'Jonglei',           county: 'Bor South', cases: [1200, 1450, 1100, 1600, 1300, 1750, 1400, 1900], deaths: [8, 11, 7, 14, 9, 16, 10, 18] },
+  { disease: 'Cholera',               state: 'Upper Nile',        county: 'Malakal',   cases: [45, 89, 52, 102, 60, 130, 70, 95],              deaths: [4, 9, 5, 12, 6, 15, 7, 10] },
+  { disease: 'Measles',               state: 'Unity',             county: 'Rubkona',   cases: [78, 110, 85, 156, 95, 180, 120, 140],           deaths: [2, 3, 2, 4, 3, 5, 3, 4] },
+  { disease: 'Pneumonia',             state: 'Warrap',            county: 'Kuajok',    cases: [234, 289, 210, 301, 250, 330, 270, 360],        deaths: [5, 6, 4, 7, 5, 8, 6, 9] },
+  { disease: 'Acute Watery Diarrhea', state: 'Central Equatoria', county: 'Juba',      cases: [567, 678, 512, 645, 590, 720, 600, 760],        deaths: [5, 7, 4, 6, 5, 9, 6, 10] },
+];
+const WEEKLY_TREND_DATES = ['2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11', '2026-05-18', '2026-05-25', '2026-06-01', '2026-06-08'];
+const weeklyTrendAlerts: DiseaseAlert[] = WEEKLY_TREND_SERIES.flatMap((d, di) =>
+  WEEKLY_TREND_DATES.map((reportDate, wi): DiseaseAlert => {
+    const cases = d.cases[wi];
+    const prev = wi > 0 ? d.cases[wi - 1] : cases;
+    return {
+      id: `alert-wk-${di}-${wi}`,
+      disease: d.disease,
+      state: d.state,
+      county: d.county,
+      cases,
+      deaths: d.deaths[wi],
+      alertLevel: cases > prev * 1.3 ? 'warning' : 'watch',
+      reportDate,
+      trend: cases > prev ? 'increasing' : cases < prev ? 'decreasing' : 'stable',
+    };
+  })
+);
+
 export const diseaseAlerts: DiseaseAlert[] = [
+  ...weeklyTrendAlerts,
   { id: 'alert-001', disease: 'Malaria', state: 'Jonglei', county: 'Bor South', cases: 342, deaths: 8, alertLevel: 'warning', reportDate: '2026-02-09', trend: 'increasing' },
   { id: 'alert-002', disease: 'Cholera', state: 'Upper Nile', county: 'Malakal', cases: 87, deaths: 12, alertLevel: 'emergency', reportDate: '2026-02-09', trend: 'increasing' },
   { id: 'alert-003', disease: 'Measles', state: 'Unity', county: 'Rubkona', cases: 156, deaths: 3, alertLevel: 'warning', reportDate: '2026-02-08', trend: 'stable' },

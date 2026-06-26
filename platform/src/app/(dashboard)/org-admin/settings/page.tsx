@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import {
-  Settings, Mail, CreditCard, Building2,
+  Mail, CreditCard, Building2,
   CheckCircle, XCircle, Zap, Lock, Info, Shield, Timer,
 } from '@/components/icons/lucide';
 import type { OrganizationDoc } from '@/lib/db-types';
@@ -77,12 +76,6 @@ export default function OrgSettingsPage() {
       <TopBar title="Organization Settings" />
 
       <div className="page-container page-enter">
-        <PageHeader
-          icon={Settings}
-          title={t('orgSettings.title')}
-          subtitle={t('orgSettings.subtitle')}
-        />
-
         {/* Read-only notice */}
         <div className="mb-6 p-3 rounded-lg flex items-center gap-2" style={{ background: `${brandColor}08`, border: `1px solid ${brandColor}20` }}>
           <Lock className="w-4 h-4 flex-shrink-0" style={{ color: brandColor }} />
@@ -93,13 +86,12 @@ export default function OrgSettingsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Organization Info */}
-          <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Building2 className="w-5 h-5" style={{ color: brandColor }} />
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgSettings.organizationInfo')}</h2>
+          <div className="dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgSettings.organizationInfo')}</h3>
             </div>
-
-            <div className="space-y-3">
+            <div className="p-4 space-y-3">
               <InfoRow label={t('orgSettings.fieldName')} value={org?.name || '-'} />
               <InfoRow label={t('orgSettings.fieldSlug')} value={org?.slug || '-'} mono />
               <InfoRow label={t('orgSettings.fieldType')} value={org?.orgType === 'public' ? t('orgSettings.publicSector') : t('orgSettings.privateSector')} />
@@ -115,13 +107,12 @@ export default function OrgSettingsPage() {
           </div>
 
           {/* Subscription */}
-          <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <CreditCard className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgSettings.subscription')}</h2>
+          <div className="dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <CreditCard className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgSettings.subscription')}</h3>
             </div>
-
-            <div className="space-y-3">
+            <div className="p-4 space-y-3">
               <InfoRow
                 label={t('orgSettings.fieldPlan')}
                 value={planLabels[org?.subscriptionPlan || ''] || '-'}
@@ -148,13 +139,12 @@ export default function OrgSettingsPage() {
           </div>
 
           {/* Security — Screen Lock */}
-          <div className="lg:col-span-2 p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Shield className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgSettings.security')}</h2>
+          <div className="lg:col-span-2 dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <Shield className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgSettings.security')}</h3>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Lock timeout setting */}
               <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                 <div className="flex items-center gap-2 mb-2">
@@ -232,15 +222,15 @@ export default function OrgSettingsPage() {
           </div>
 
           {/* Feature Flags */}
-          <div className="lg:col-span-2 p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Zap className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgSettings.featureFlags')}</h2>
-              <span className="text-xs px-2 py-0.5 rounded-full ml-2" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border-light)' }}>
+          <div className="lg:col-span-2 dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <Zap className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgSettings.featureFlags')}</h3>
+              <span className="text-[11px] font-medium px-2.5 py-1 rounded-full ml-2" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>
                 {t('orgSettings.readOnlyBadge')}
               </span>
             </div>
-
+            <div className="p-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {featureFlags.map((flag) => {
                 const enabled = org?.featureFlags?.[flag.key as keyof typeof org.featureFlags] || false;
@@ -249,8 +239,8 @@ export default function OrgSettingsPage() {
                     key={flag.key}
                     className="flex items-start gap-3 p-3 rounded-lg"
                     style={{
-                      background: enabled ? 'rgba(43,111,224,0.05)' : 'var(--overlay-subtle)',
-                      border: `1px solid ${enabled ? 'rgba(43,111,224,0.15)' : 'var(--border-light)'}`,
+                      background: enabled ? 'rgba(59, 130, 246,0.05)' : 'var(--overlay-subtle)',
+                      border: `1px solid ${enabled ? 'rgba(59, 130, 246,0.15)' : 'var(--border-light)'}`,
                     }}
                   >
                     <div className="pt-0.5">
@@ -284,6 +274,7 @@ export default function OrgSettingsPage() {
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 {t('orgSettings.featureFlagsInfo')}
               </p>
+            </div>
             </div>
           </div>
         </div>

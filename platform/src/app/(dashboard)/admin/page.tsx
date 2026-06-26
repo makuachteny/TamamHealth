@@ -3,21 +3,21 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
+import { FilterMenu } from '@/components/filters';
 import {
   Building2, Users, HeartPulse, CreditCard, ChevronRight, ChevronLeft,
-  TrendingUp, Shield, Activity, Settings, BarChart3,
-  Search, Clock, Database, RefreshCw,
+  Shield, Activity, Settings, BarChart3,
+  Database, RefreshCw,
 } from '@/components/icons/lucide';
 import type { AuditLogDoc } from '@/lib/db-types';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser, globalSearch } = useApp();
   const { organizations, loading: orgsLoading } = useOrganizations();
   const [totalUsers, setTotalUsers] = useState(0);
   const [totalPatients, setTotalPatients] = useState(0);
@@ -26,9 +26,16 @@ export default function AdminDashboardPage() {
   // Audit log state
   const [auditLogs, setAuditLogs] = useState<AuditLogDoc[]>([]);
   const [auditLoading, setAuditLoading] = useState(true);
-  const [auditSearch, setAuditSearch] = useState('');
+  // Audit-log text search comes from the shared global search bar (TopBar).
+  const auditSearch = globalSearch;
+  const [auditAction, setAuditAction] = useState('all');
   const [auditPage, setAuditPage] = useState(0);
   const AUDIT_PAGE_SIZE = 20;
+  const auditFilterCount = auditAction !== 'all' ? 1 : 0;
+  const clearAuditFilters = () => { setAuditAction('all'); setAuditPage(0); };
+  // Reset to the first page whenever the search term changes (previously this
+  // was wired into the SearchInput onChange; now it follows the global search).
+  useEffect(() => { setAuditPage(0); }, [auditSearch]);
 
   // System health state
   const [dbStats, setDbStats] = useState<Array<{ name: string; docCount: number }>>([]);
@@ -131,16 +138,27 @@ export default function AdminDashboardPage() {
     }
   }, [organizations, orgsLoading]);
 
+  // Distinct action types present in the loaded logs (for the filter dropdown)
+  const auditActionOptions = useMemo(() => {
+    const actions = Array.from(new Set(auditLogs.map(l => l.action).filter(Boolean))).sort();
+    return [
+      { value: 'all', label: t('admin.allActions') },
+      ...actions.map(a => ({ value: a, label: a })),
+    ];
+  }, [auditLogs, t]);
+
   // Filtered & paginated audit logs
   const filteredAuditLogs = useMemo(() => {
-    if (!auditSearch.trim()) return auditLogs;
-    const q = auditSearch.toLowerCase();
-    return auditLogs.filter(log =>
-      (log.username?.toLowerCase().includes(q)) ||
-      (log.action?.toLowerCase().includes(q)) ||
-      (log.details?.toLowerCase().includes(q))
-    );
-  }, [auditLogs, auditSearch]);
+    const q = auditSearch.trim().toLowerCase();
+    return auditLogs.filter(log => {
+      const matchSearch = !q ||
+        (log.username?.toLowerCase().includes(q)) ||
+        (log.action?.toLowerCase().includes(q)) ||
+        (log.details?.toLowerCase().includes(q));
+      const matchAction = auditAction === 'all' || log.action === auditAction;
+      return matchSearch && matchAction;
+    });
+  }, [auditLogs, auditSearch, auditAction]);
 
   const totalAuditPages = Math.ceil(filteredAuditLogs.length / AUDIT_PAGE_SIZE);
   const paginatedLogs = filteredAuditLogs.slice(auditPage * AUDIT_PAGE_SIZE, (auditPage + 1) * AUDIT_PAGE_SIZE);
@@ -203,17 +221,19 @@ export default function AdminDashboardPage() {
 
   return (
     <>
-      <TopBar title={t('admin.topBarTitle')} />
+      <TopBar title={t('admin.topBarTitle')} searchTrailing={
+        <FilterMenu activeCount={auditFilterCount} onClear={clearAuditFilters} title={t('admin.auditLog')}>
+          <FilterMenu.Field label={t('admin.filterByAction')}>
+            <select className="w-full text-sm" value={auditAction} onChange={e => { setAuditAction(e.target.value); setAuditPage(0); }}>
+              {auditActionOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </FilterMenu.Field>
+        </FilterMenu>
+      } />
       <main className="page-container page-enter">
 
-        <PageHeader
-          icon={Shield}
-          title={t('admin.pageTitle')}
-          subtitle={t('admin.pageSubtitle')}
-        />
-
         {/* KPI Stat Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {[
             {
               id: 'totalOrgs',
@@ -248,29 +268,29 @@ export default function AdminDashboardPage() {
               accent: 'var(--accent-primary)',
             },
           ].map((stat) => (
-            <div key={stat.id} className="p-5 rounded-xl cursor-pointer" onClick={() => {
+            <button key={stat.id} type="button" className="dash-card text-left" style={{ padding: '14px 16px', cursor: 'pointer' }} onClick={() => {
               const routes: Record<string, string> = { totalOrgs: '/admin/organizations', totalUsers: '/admin/users', totalPatients: '/patients', activeSubs: '/admin/billing' };
               if (routes[stat.id]) router.push(routes[stat.id]);
-            }} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="icon-box-sm" style={{ background: `${stat.accent}15` }}>
-                  <stat.icon className="w-5 h-5" style={{ color: stat.accent }} />
+            }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <stat.icon className="w-3.5 h-3.5" style={{ color: stat.accent }} />
                 </div>
-                <TrendingUp className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                <span className="kpi-card-title">{stat.label}</span>
               </div>
-              <p className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{stat.value}</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{stat.label}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{stat.sub}</p>
-            </div>
+              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{stat.value}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{stat.sub}</div>
+            </button>
           ))}
         </div>
 
         {/* SYSTEM HEALTH DASHBOARD */}
-        <div className="rounded-2xl p-5 mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <Activity className="w-5 h-5" style={{ color: 'var(--color-success)' }} />
-            <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('admin.systemHealthDashboard')}</h2>
+        <div className="dash-card overflow-hidden mb-4">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('admin.systemHealthDashboard')}</h3>
           </div>
+          <div className="p-4">
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {/* Database Health */}
@@ -353,12 +373,13 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
           {/* Recent Organizations Table */}
-          <div className="lg:col-span-2 rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+          <div className="lg:col-span-2 dash-card overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
@@ -368,7 +389,8 @@ export default function AdminDashboardPage() {
                 {t('admin.viewAll')} <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full" style={{ minWidth: 600 }}>
               <thead>
                 <tr>
                   {[
@@ -432,13 +454,14 @@ export default function AdminDashboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Right Panel */}
           <div className="space-y-4">
 
             {/* Quick Links */}
-            <div className="rounded-xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="dash-card p-4">
               <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('admin.quickActions')}</p>
               <div className="data-row-divider-sm">
                 {quickLinks.map(link => (
@@ -457,7 +480,7 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Plan Distribution */}
-            <div className="rounded-xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="dash-card p-4">
               <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('admin.planDistribution')}</p>
               <div className="data-row-divider-sm">
                 {[
@@ -484,8 +507,8 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* AUDIT LOG VIEWER */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+        <div className="dash-card overflow-hidden">
+          <div className="flex items-center justify-between p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('admin.auditLog')}</span>
@@ -493,22 +516,9 @@ export default function AdminDashboardPage() {
                 {t('admin.auditEntries', { count: filteredAuditLogs.length })}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-                <input
-                  type="text"
-                  value={auditSearch}
-                  onChange={e => { setAuditSearch(e.target.value); setAuditPage(0); }}
-                  placeholder={t('admin.searchPlaceholder')}
-                  className="text-xs pl-8 pr-3 py-2 rounded-lg outline-none"
-                  style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', width: '200px' }}
-                />
-              </div>
-            </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 600 }}>
               <thead>
                 <tr>
                   {[
@@ -535,7 +545,6 @@ export default function AdminDashboardPage() {
                   <tr key={log._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <td className="px-4 py-3">
                       <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                        <Clock className="w-3 h-3" />
                         {formatTimestamp(log.createdAt)}
                       </span>
                     </td>
@@ -550,7 +559,7 @@ export default function AdminDashboardPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{
-                        background: log.success ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                        background: log.success ? 'rgba(31, 157, 111,0.12)' : 'rgba(239,68,68,0.12)',
                         color: log.success ? 'var(--color-success)' : 'var(--color-danger)',
                       }}>
                         {log.success ? t('admin.statusSuccess') : t('admin.statusFailed')}

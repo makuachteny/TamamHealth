@@ -12,6 +12,7 @@ import {
   FileText, BarChart3, TrendingUp, Eye,
   Image, Activity,
 } from '@/components/icons/lucide';
+import PatientName from '@/components/PatientName';
 
 const ACCENT = '#7C3AED';
 
@@ -64,6 +65,17 @@ export default function RadiologyDashboard() {
     window.setTimeout(() => setSubmitToast(null), 3000);
   };
 
+  // Undo a report submitted in this session: drop the in-memory override so the
+  // study reverts to its prior (pending / in-progress) status and the findings
+  // box reappears. Only applies to findings entered here, not pre-existing ones.
+  const handleUndoReport = (studyId: string) => {
+    setSubmittedFindings(prev => {
+      const next = { ...prev };
+      delete next[studyId];
+      return next;
+    });
+  };
+
   const stats = useMemo(() => ({
     total: studies.length,
     pending: studies.filter(s => s.status === 'pending').length,
@@ -94,8 +106,23 @@ export default function RadiologyDashboard() {
           </div>
         )}
 
-        {/* KPI strip */}
-        <div className="kpi-grid mb-4">
+        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
+        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-primary)' }}>
+              <Scan className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('radiology.title')}</h1>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {currentUser.hospitalName || currentUser.hospital?.name || ''}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI tiles */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {[
             { label: t('radiology.kpiTotalStudies'), value: stats.total, icon: Scan, color: 'var(--accent-primary)' },
             { label: t('radiology.kpiPending'), value: stats.pending, icon: Clock, color: 'var(--accent-primary)' },
@@ -106,17 +133,17 @@ export default function RadiologyDashboard() {
             { label: t('radiology.kpiUltrasounds'), value: stats.ultrasound, icon: Eye, color: 'var(--accent-primary)' },
             { label: t('radiology.kpiAvgTat'), value: stats.avgTAT, icon: TrendingUp, color: 'var(--accent-primary)' },
           ].map(k => (
-            <div key={k.label} className="kpi">
-              <div className="kpi__icon" style={{ background: `${k.color}15` }}><k.icon style={{ color: k.color }} /></div>
-              <div className="kpi__body">
-                <div className="kpi__value">{k.value}</div>
-                <div className="kpi__label">{k.label}</div>
+            <div key={k.label} className="card-elevated" style={{ padding: '14px 16px' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <k.icon className="w-[18px] h-[18px] flex-shrink-0" style={{ color: k.color }} />
+                <span className="kpi-card-title">{k.label}</span>
               </div>
+              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{k.value}</div>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
           {/* Study worklist */}
           <div className="lg:col-span-2 dash-card" style={{ padding: '16px', maxHeight: 'none', overflow: 'auto' }}>
@@ -127,7 +154,8 @@ export default function RadiologyDashboard() {
               </div>
               <div className="flex items-center gap-2">
                 {['all', 'pending', 'in_progress', 'completed'].map(s => (
-                  <button key={s} onClick={() => setFilterStatus(s)} style={{
+                  <button key={s} onClick={() => setFilterStatus(filterStatus === s && s !== 'all' ? 'all' : s)}
+                    title={filterStatus === s && s !== 'all' ? t('action.deselect') : undefined} style={{
                     padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700,
                     background: filterStatus === s ? ACCENT : 'var(--overlay-subtle)',
                     color: filterStatus === s ? '#fff' : 'var(--text-muted)',
@@ -158,7 +186,7 @@ export default function RadiologyDashboard() {
                   }}>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{
-                      background: study.status === 'completed' ? '#05966915' : study.priority === 'emergency' ? '#DC262615' : study.priority === 'urgent' ? '#D9770615' : `${ACCENT}15`,
+                      background: 'transparent',
                     }}>
                       {study.status === 'completed' ? <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} /> :
                        study.priority === 'emergency' ? <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} /> :
@@ -166,7 +194,7 @@ export default function RadiologyDashboard() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{study.patientName}</span>
+                        <PatientName name={study.patientName} nameClassName="text-sm font-semibold" />
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
                           background: study.priority === 'emergency' ? '#DC262615' : study.priority === 'urgent' ? '#D9770615' : 'var(--overlay-subtle)',
                           color: study.priority === 'emergency' ? 'var(--color-danger)' : study.priority === 'urgent' ? 'var(--color-warning)' : 'var(--text-muted)',
@@ -192,7 +220,18 @@ export default function RadiologyDashboard() {
 
                       {study.findings && (
                         <div className="mb-3 p-3 rounded-lg" style={{ background: '#05966908', border: '1px solid #05966920' }}>
-                          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>{t('radiology.findings')}</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>{t('radiology.findings')}</span>
+                            {submittedFindings[study.id] && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleUndoReport(study.id); }}
+                                className="text-[10px] font-semibold underline"
+                                style={{ color: ACCENT }}
+                              >
+                                {t('action.undo')}
+                              </button>
+                            )}
+                          </div>
                           <p className="text-xs mt-1" style={{ color: 'var(--text-primary)' }}>{study.findings}</p>
                         </div>
                       )}

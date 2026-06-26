@@ -94,7 +94,7 @@ export default function FileUpload({ attachments, onAdd, onRemove, uploaderName,
         className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all"
         style={{
           borderColor: dragOver ? 'var(--tamamhealth-blue)' : 'var(--border-light)',
-          background: dragOver ? 'rgba(43,111,224,0.08)' : 'var(--overlay-subtle)',
+          background: dragOver ? 'rgba(59, 130, 246,0.08)' : 'var(--overlay-subtle)',
         }}
       >
         <Upload className="w-8 h-8 mx-auto mb-2" style={{ color: dragOver ? 'var(--tamamhealth-blue)' : 'var(--text-muted)' }} />

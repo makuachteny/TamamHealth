@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import { Reveal } from "@/components/marketing/MarketingShared";
 import { DuoIcon } from "@/components/marketing/DuoIcon";
 
@@ -33,6 +33,11 @@ export default function AboutPage() {
             <p className="mk-body-lg" style={{ color: "var(--tb-text-inv-m)", marginTop: 14 }}>
               TamamHealth began with one observation: across South Sudan, brilliant clinicians lose patients to broken paper systems — not to a lack of skill. We&apos;re here to change that.
             </p>
+            <div className="mk-hero-buttons" style={{ justifyContent: "center", marginTop: 28 }}>
+              <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
+                Get in touch
+              </Link>
+            </div>
           </Reveal>
         </div>
       </section>
@@ -216,32 +221,6 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── CTA SECTION ─────────────────────────────────────────────── */}
-      <section className="mk-section mk-section-cream">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-divider-gold" style={{ marginBottom: 40 }} />
-          </Reveal>
-          <Reveal>
-            <div style={{ textAlign: "center", maxWidth: 640, margin: "0 auto" }}>
-              <h2 className="mk-h2">Join us</h2>
-              <p className="mk-body-lg" style={{ marginTop: 14, marginBottom: 28, color: "var(--tb-text-sec)" }}>
-                We&apos;re building the digital health platform for clinics across Africa. Whether
-                you&apos;re a provider ready to go digital, a partner interested in collaboration,
-                or someone who wants to build technology that saves lives — we&apos;d love to hear from you.
-              </p>
-              <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-                <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
-                  Get in touch
-                </Link>
-                <Link href="/ehr" className="mk-btn mk-btn-outline-green mk-btn-lg">
-                  Learn about our platform
-                </Link>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
     </>
   );
 }

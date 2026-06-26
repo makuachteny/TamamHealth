@@ -30,15 +30,15 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import {
   Building2, Users, BedDouble, Package, Pill, Calendar,
-  Activity, Settings, Search, ArrowLeft, Loader2, AlertTriangle,
+  Activity, Settings, ArrowLeft, Loader2, AlertTriangle,
   CheckCircle, Save, Clock, MapPin, Stethoscope, Plus,
   FlaskConical, Syringe,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { FilterBar, SearchInput, FilterSelect } from '@/components/filters';
 import type {
   HospitalDoc, UserDoc, UserRole, AppointmentDoc, PrescriptionDoc,
   ImmunizationDoc, LabResultDoc, StaffScheduleDoc, PharmacyInventoryDoc,
@@ -47,6 +47,7 @@ import type { WardDoc, AdmissionDoc } from '@/lib/db-types-ward';
 import type { AssetDoc } from '@/lib/db-types-asset';
 import type { DataScope } from '@/lib/services/data-scope';
 import { useToast } from '@/components/Toast';
+import { isValidPhone, isValidEmail, normalizePhone, normalizeEmail } from '@/lib/field-formats';
 
 // ── Permission ───────────────────────────────────────────────────────────────
 const MANAGE_ROLES: UserRole[] = [
@@ -185,19 +186,12 @@ export default function HospitalManagePage({ params }: { params: { hospitalId: s
 
   return (
     <>
-      <TopBar title={t('hospitals.manageTitle', { name: hospital.name })} />
+      <TopBar title={t('hospitals.manageTitle', { name: hospital.name })} actions={
+        <Link href="/hospitals" className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
+          <ArrowLeft style={{ width: 13, height: 13 }} /> {t('hospitals.hospitalNetwork')}
+        </Link>
+      } />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Building2}
-          title={hospital.name}
-          subtitle={`${hospital.facilityType?.replace(/_/g, ' ')} · ${hospital.state}${hospital.county ? ` · ${hospital.county}` : ''}`}
-          actions={
-            <Link href="/hospitals" className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-              <ArrowLeft style={{ width: 13, height: 13 }} /> {t('hospitals.hospitalNetwork')}
-            </Link>
-          }
-        />
-
         {/* Tab bar */}
         <div className="flex gap-2 mb-4 flex-wrap">
           {TABS.map(tabItem => (
@@ -462,37 +456,34 @@ function StaffTab({ scope, hospitalId }: { scope: DataScope | undefined; hospita
 
   return (
     <div className="card-elevated" style={{ overflow: 'hidden' }}>
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative' }}>
-          <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: 'var(--text-muted)' }} />
-          <input
-            type="text"
-            placeholder={t('hospitals.searchNameUsername')}
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)' }}>
+        <FilterBar>
+          <SearchInput
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ paddingLeft: 30, width: 240 }}
+            onChange={setSearch}
+            placeholder={t('hospitals.searchNameUsername')}
+            aria-label={t('hospitals.searchNameUsername')}
           />
-        </div>
-        <select
-          value={roleFilter}
-          onChange={e => setRoleFilter(e.target.value)}
-          style={{
-            background: 'var(--bg-card)', color: 'var(--text-primary)',
-            border: '1px solid var(--border-light)', borderRadius: 'var(--input-radius)',
-            padding: '5px 12px', fontSize: 12, minHeight: 30,
-          }}
-        >
-          <option value="all">{t('hospitals.allRoles')}</option>
-          {Object.keys(roleCounts).map(r => (
-            <option key={r} value={r}>{r.replace(/_/g, ' ')} ({roleCounts[r]})</option>
-          ))}
-        </select>
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
-          {t('hospitals.countOf', { shown: filtered.length, total: users.length })}
-        </span>
+          <FilterSelect
+            value={roleFilter}
+            onChange={setRoleFilter}
+            options={[
+              { value: 'all', label: t('hospitals.allRoles') },
+              ...Object.keys(roleCounts).map(r => ({
+                value: r,
+                label: `${r.replace(/_/g, ' ')} (${roleCounts[r]})`,
+              })),
+            ]}
+            aria-label={t('hospitals.colRole')}
+          />
+          <FilterBar.Spacer />
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {t('hospitals.countOf', { shown: filtered.length, total: users.length })}
+          </span>
+        </FilterBar>
       </div>
       <div style={{ overflow: 'auto' }}>
-        <table className="data-table">
+        <table className="data-table" style={{ minWidth: 600 }}>
           <thead>
             <tr>
               <th>{t('hospitals.colName')}</th>
@@ -625,7 +616,8 @@ function WardsTab({ scope, hospitalId, hospital }: {
           <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('hospitals.emptyWards')}</p>
         </div>
       ) : (
-        <table className="data-table">
+        <div className="overflow-x-auto">
+        <table className="data-table" style={{ minWidth: 720 }}>
           <thead>
             <tr>
               <th>{t('hospitals.colName')}</th>
@@ -652,6 +644,7 @@ function WardsTab({ scope, hospitalId, hospital }: {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
@@ -724,7 +717,8 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
           {t('hospitals.countOf', { shown: filtered.length, total: assets.length })}
         </span>
       </div>
-      <table className="data-table">
+      <div className="overflow-x-auto">
+      <table className="data-table" style={{ minWidth: 720 }}>
         <thead>
           <tr>
             <th>{t('hospitals.colAsset')}</th>
@@ -760,6 +754,7 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -797,7 +792,8 @@ function InventoryTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
 
   return (
     <div className="card-elevated" style={{ overflow: 'hidden' }}>
-      <table className="data-table">
+      <div className="overflow-x-auto">
+      <table className="data-table" style={{ minWidth: 720 }}>
         <thead>
           <tr>
             <th>{t('hospitals.colMedication')}</th>
@@ -838,6 +834,7 @@ function InventoryTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -896,7 +893,8 @@ function SchedulesTab({ hospitalId }: { hospitalId: string }) {
            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('hospitals.emptySchedules')}</p>
          </div>
        ) : (
-        <table className="data-table">
+        <div className="overflow-x-auto">
+        <table className="data-table" style={{ minWidth: 720 }}>
           <thead>
             <tr>
               <th>{t('hospitals.colStaff')}</th>
@@ -924,6 +922,7 @@ function SchedulesTab({ hospitalId }: { hospitalId: string }) {
             ))}
           </tbody>
         </table>
+        </div>
        )}
     </div>
   );
@@ -1037,11 +1036,11 @@ function PerformanceTab({ scope, hospitalId }: { scope: DataScope | undefined; h
   const cards: { label: string; value: number | string; icon: typeof Calendar; tint: string }[] = [
     { label: t('hospitals.kpiVisitsToday'),       value: kpis.visitsToday,                  icon: Calendar,    tint: '#3b82f6' },
     { label: t('hospitals.kpiActiveAdmissions'),  value: kpis.activeAdmissions,             icon: BedDouble,   tint: '#A78BFA' },
-    { label: t('hospitals.kpiDischargesToday'),   value: kpis.dischargesToday,              icon: CheckCircle, tint: '#10B981' },
+    { label: t('hospitals.kpiDischargesToday'),   value: kpis.dischargesToday,              icon: CheckCircle, tint: '#1F9D6F' },
     { label: t('hospitals.kpiTransfersToday'),    value: kpis.transfersToday,               icon: ArrowLeft,   tint: '#3B82F6' },
     { label: t('hospitals.kpiAvgLabTat'),         value: kpis.labTatHours || '—',           icon: FlaskConical, tint: '#F59E0B' },
     { label: t('hospitals.kpiRxDispensedToday'),  value: kpis.prescriptionsDispensedToday,  icon: Pill,        tint: '#EC4899' },
-    { label: t('hospitals.kpiImmunizationsToday'), value: kpis.immunizationsToday,          icon: Syringe,     tint: '#14B8A6' },
+    { label: t('hospitals.kpiImmunizationsToday'), value: kpis.immunizationsToday,          icon: Syringe,     tint: '#3B82F6' },
   ];
 
   return (
@@ -1087,12 +1086,23 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ phone?: string; email?: string }>({});
 
   const handleSave = useCallback(async () => {
     if (!canWrite) return;
+    // Phone/email are optional — block save only when a non-empty value is
+    // malformed (isValid* return true for empty).
+    const fe: { phone?: string; email?: string } = {};
+    if (!isValidPhone(phone)) fe.phone = t('validation.errPhone');
+    if (!isValidEmail(email)) fe.email = t('validation.errEmail');
+    setFieldErrors(fe);
+    if (Object.keys(fe).length > 0) return;
     setSaving(true);
     setErr(null);
     try {
+      // Normalize to canonical form before persisting.
+      const normPhone = normalizePhone(phone) ?? phone;
+      const normEmail = normalizeEmail(email);
       const { updateHospitalStatus } = await import('@/lib/services/hospital-service');
       const updated = await updateHospitalStatus(hospital._id, {
         name: name.trim() || hospital.name,
@@ -1101,8 +1111,8 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
         // Phone / email are not part of the HospitalDoc type today but the
         // doc is a free-form PouchDB record — extra fields are preserved
         // round-trip without a migration.
-        ...(phone ? { phone } : {}),
-        ...(email ? { email } : {}),
+        ...(normPhone ? { phone: normPhone } : {}),
+        ...(normEmail ? { email: normEmail } : {}),
       } as Partial<HospitalDoc>);
       if (updated) {
         onSaved(updated);
@@ -1148,18 +1158,22 @@ function SettingsTab({ hospital, canWrite, onSaved }: {
             <input
               disabled={!canWrite}
               value={phone}
-              onChange={e => setPhone(e.target.value)}
-              style={inputStyle(canWrite)}
+              onChange={e => { setPhone(e.target.value); if (fieldErrors.phone) setFieldErrors(fe => ({ ...fe, phone: undefined })); }}
+              aria-invalid={!!fieldErrors.phone}
+              style={{ ...inputStyle(canWrite), ...(fieldErrors.phone ? { borderColor: 'var(--color-danger)' } : {}) }}
             />
+            {fieldErrors.phone && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{fieldErrors.phone}</p>}
           </Field>
           <Field label={t('hospitals.fieldEmail')}>
             <input
               type="email"
               disabled={!canWrite}
               value={email}
-              onChange={e => setEmail(e.target.value)}
-              style={inputStyle(canWrite)}
+              onChange={e => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors(fe => ({ ...fe, email: undefined })); }}
+              aria-invalid={!!fieldErrors.email}
+              style={{ ...inputStyle(canWrite), ...(fieldErrors.email ? { borderColor: 'var(--color-danger)' } : {}) }}
             />
+            {fieldErrors.email && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{fieldErrors.email}</p>}
           </Field>
           <Field label={t('hospitals.operatingStatus')}>
             <select

@@ -1,16 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
-import { Search, Filter, ChevronRight, UserPlus, Users, ScanLine, Hash, X, ArrowRight, Stethoscope } from '@/components/icons/lucide';
+import { comparePatients, patientFullName, patientAgeLabel, patientAge } from '@/lib/patient-utils';
+import { UserPlus, Users, ScanLine, Hash, X, ArrowRight, Stethoscope, Filter, ChevronRight } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { states } from '@/data/mock';
-import QRScanner from '@/components/QRScanner';
+import dynamic from 'next/dynamic';
+// Lazy-loaded: html5-qrcode is heavy and only needed when the scanner opens,
+// so it stays out of the patients-route bundle until used.
+const QRScanner = dynamic(() => import('@/components/QRScanner'), { ssr: false });
+import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
+import RowActionsMenu from '@/components/RowActionsMenu';
+import { formatRelativeShort, formatDate, formatMoney } from '@/lib/format-utils';
+import FingerprintIdentifyModal from '@/components/FingerprintIdentifyModal';
+import { isFingerprintEnabled } from '@/lib/services/fingerprint-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import EmptyState from '@/components/EmptyState';
 
 // Pagination cap — capped to keep DOM-node count manageable on low-end devices.
 // Each row produces ~20 DOM nodes; 100 rows ≈ 2k nodes which renders smoothly.
@@ -22,19 +31,65 @@ export default function PatientsPage() {
   const { t } = useTranslation();
   const { globalSearch, currentUser } = useApp();
   const { patients } = usePatients();
-  const { canRegisterPatients } = usePermissions();
-  const [search, setSearch] = useState('');
-  const [filterState, setFilterState] = useState('');
-  const [filterGender, setFilterGender] = useState('');
-  const [assignedToMe, setAssignedToMe] = useState(false);
-  // Only clinicians who can be the responsible provider get the "assigned to me" toggle.
-  const canBeAssigned = ['doctor', 'clinical_officer', 'medical_superintendent'].includes(currentUser?.role ?? '');
-  const assignedToMeCount = canBeAssigned
-    ? patients.filter(p => p.assignedDoctor === currentUser?._id).length
-    : 0;
+  const { canRegisterPatients, canViewClinical, isMedicalBiller, isCashier } = usePermissions();
+  // Billing-desk roles see money (outstanding balance) instead of clinical detail.
+  const isBilling = isMedicalBiller || isCashier;
+  // Structured filters — a single "Filters" dropdown panel (replaces the old
+  // per-column funnels). Text search lives in the platform-wide search bar; this
+  // panel narrows by the registry's real dimensions.
+  const emptyFilters = { olderThan: '', gender: '', state: '', diagnosis: '', registeredFrom: '', registeredTo: '', allergies: false, chronic: false, recent: false, assignedMe: false, unassigned: false, outstanding: false };
+  type Filters = typeof emptyFilters;
+  const [filters, setFilters] = useState<Filters>(emptyFilters);
+  const setF = <K extends keyof Filters>(k: K, v: Filters[K]) => setFilters(f => ({ ...f, [k]: v }));
+  const activeFilterCount = Object.entries(filters).filter(([, v]) => v !== '' && v !== false).length;
+  const clearFilters = () => setFilters(emptyFilters);
+  // Shared input/select styling for the filter panel controls.
+  const fieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', borderRadius: 8, minWidth: 0 } as const;
+
+  // The Filters panel opens as a dropdown anchored to its trigger. Close on
+  // outside click / Escape; filterRef wraps the trigger + its menu.
   const [showFilters, setShowFilters] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showFilters) return;
+    const onDown = (e: MouseEvent) => { if (filterRef.current && !filterRef.current.contains(e.target as Node)) setShowFilters(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowFilters(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [showFilters]);
+  // Reception roles can assign a patient to a care provider straight from the
+  // registry. The AssignDoctorModal picks doctor vs. nurse from the facility tier.
+  const canAssignPatients = ['front_desk', 'central_registration_clerk', 'clinic_clerk'].includes(currentUser?.role ?? '');
+  const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
+
+  // Outstanding balance per patient — loaded only for billing-desk roles, so the
+  // registry shows a "Balance" column instead of clinical conditions. Aggregated
+  // from open bills (same rule the billing dashboard uses) in one pass.
+  const [balanceByPatient, setBalanceByPatient] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (!isBilling) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getAllBills } = await import('@/lib/services/billing-service');
+        const bills = await getAllBills();
+        const m = new Map<string, number>();
+        for (const b of bills) {
+          if ((b.balanceDue ?? 0) > 0 && b.status !== 'waived' && b.status !== 'cancelled') {
+            m.set(b.patientId, (m.get(b.patientId) || 0) + b.balanceDue);
+          }
+        }
+        if (!cancelled) setBalanceByPatient(m);
+      } catch (err) {
+        console.error('Failed to load patient balances:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isBilling]);
   const [showFindPatient, setShowFindPatient] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showFingerprintIdentify, setShowFingerprintIdentify] = useState(false);
   const [lookupId, setLookupId] = useState('');
   const [lookupError, setLookupError] = useState('');
   // Cap how many rows are rendered at once. "Load more" extends the window
@@ -60,297 +115,349 @@ export default function PatientsPage() {
     }
   };
 
-  const filtered = patients.filter(p => {
-    const q = search || globalSearch;
-    const matchSearch = !q ||
-      `${p.firstName} ${p.middleName || ''} ${p.surname}`.toLowerCase().includes(q.toLowerCase()) ||
-      (p.hospitalNumber || '').toLowerCase().includes(q.toLowerCase()) ||
-      (p.phone || '').includes(q);
-    const matchState = !filterState || p.state === filterState;
-    const matchGender = !filterGender || p.gender === filterGender;
-    const matchAssigned = !assignedToMe || p.assignedDoctor === currentUser?._id;
-    return matchSearch && matchState && matchGender && matchAssigned;
-  });
+  // Clinical predicates — also drive the quick-filter tab counts that replaced
+  // the old summary KPI cards.
+  const MS30 = 30 * 24 * 60 * 60 * 1000;
+  const isRecentlyVisited = (p: typeof patients[number]) =>
+    !!p.lastConsultedAt && (Date.now() - new Date(p.lastConsultedAt).getTime()) < MS30;
+  const hasChronic = (p: typeof patients[number]) =>
+    !!(p.chronicConditions?.length && p.chronicConditions[0] !== 'None');
+  const hasAllergies = (p: typeof patients[number]) =>
+    !!(p.allergies?.length && p.allergies[0] !== 'None known');
 
-  // Reset the visible window whenever the filter or search changes — otherwise
-  // narrowing the result set would leave the user looking at a stale "Load more"
-  // count that doesn't correspond to the new filtered.length.
+  const filtered = patients.filter(p => {
+    const fullName = `${p.firstName} ${p.middleName || ''} ${p.surname}`.toLowerCase();
+    // The platform-wide search bar narrows the registry by name / hospital # / phone.
+    if (globalSearch && !(fullName.includes(globalSearch.toLowerCase()) || (p.hospitalNumber || '').toLowerCase().includes(globalSearch.toLowerCase()) || (p.phone || '').includes(globalSearch))) return false;
+    const f = filters;
+    if (f.olderThan) {
+      const age = patientAge(p);
+      if (age == null || age < Number(f.olderThan)) return false;
+    }
+    if (f.gender && p.gender !== f.gender) return false;
+    if (f.state && p.state !== f.state) return false;
+    if (f.diagnosis) {
+      const q = f.diagnosis.toLowerCase();
+      const haystack = [...(p.chronicConditions || []), ...(p.allergies || [])].join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    if (f.registeredFrom || f.registeredTo) {
+      const reg = p.registeredAt || p.registrationDate;
+      if (!reg) return false;
+      const d = new Date(reg).getTime();
+      if (f.registeredFrom && d < new Date(f.registeredFrom).getTime()) return false;
+      if (f.registeredTo && d > new Date(`${f.registeredTo}T23:59:59`).getTime()) return false;
+    }
+    if (f.allergies && !hasAllergies(p)) return false;
+    if (f.chronic && !hasChronic(p)) return false;
+    if (f.recent && !isRecentlyVisited(p)) return false;
+    if (f.assignedMe && p.assignedDoctor !== currentUser?._id) return false;
+    if (f.unassigned && p.assignedDoctor) return false;
+    if (f.outstanding && isBilling && !((balanceByPatient.get(p._id) || 0) > 0)) return false;
+    return true;
+  }).sort(comparePatients('recent'));
+
+  // Reset the visible window whenever the filters change — otherwise narrowing
+  // would leave a stale "Load more" count.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [search, filterState, filterGender, globalSearch, assignedToMe]);
+  }, [filters, globalSearch]);
 
   const visible = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
 
+  // ── Role-aware columns ──────────────────────────────────────────────────
+  // Every role sees the common identity columns (who + how to reach + where +
+  // recency). Beyond that the registry adapts to what the role needs to act on:
+  //   • clinical roles  → Conditions (allergies / chronic) for safe care
+  //   • billing desk    → Balance (outstanding) for collections
+  //   • reception       → an Assign action to route the patient to a provider
+  // Non-billing roles keep the Registered date; billers swap it for Balance.
+  type PatientCol = { key: string; label: string; width: number; align?: 'right'; render: (p: typeof patients[number]) => React.ReactNode };
+  const columns: PatientCol[] = [
+    {
+      key: 'patient', label: t('nurse.colPatientName'), width: 16,
+      render: (p) => <span className="text-[12px] font-medium block truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>,
+    },
+    {
+      key: 'gender', label: t('nurse.colGender'), width: 9,
+      render: (p) => <span className="text-[12px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.gender || '—'}</span>,
+    },
+    {
+      key: 'age', label: t('nurse.colAge'), width: 8,
+      render: (p) => <span className="text-[12px] tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{patientAgeLabel(p)}</span>,
+    },
+    { key: 'hospitalNo', label: t('patients.colHospitalNo'), width: 11, render: (p) => <span className="text-[12px] font-mono tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.hospitalNumber || '—'}</span> },
+    { key: 'phone', label: t('patient.phone'), width: 11, render: (p) => <span className="text-[12px] font-mono whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.phone || '—'}</span> },
+    { key: 'location', label: t('patient.location'), width: 13, render: (p) => <span className="text-[12px] block truncate" style={{ color: 'var(--text-secondary)' }}>{[p.county, p.state].filter(Boolean).join(', ') || '—'}</span> },
+    {
+      key: 'lastVisit', label: t('frontDesk.lastVisit'), width: 11,
+      render: (p) => {
+        const lastVisit = p.lastConsultedAt ? new Date(p.lastConsultedAt) : null;
+        const daysAgo = lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / 86400000) : null;
+        return lastVisit ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium" title={formatRelativeShort(p.lastConsultedAt)} style={{ color: daysAgo != null && daysAgo > 90 ? '#C44536' : daysAgo != null && daysAgo > 30 ? '#B8741C' : 'var(--text-secondary)' }}>
+            {lastVisit.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+          </span>
+        ) : <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>—</span>;
+      },
+    },
+  ];
+
+  if (canViewClinical) {
+    columns.push({
+      key: 'conditions', label: t('patients.colConditions'), width: 14,
+      render: (p) => {
+        const hasAllergy = !!(p.allergies?.length && p.allergies[0] !== 'None known');
+        const chronic = (p.chronicConditions || []).filter(c => c && c !== 'None');
+        const hasChronic = chronic.length > 0;
+        if (!hasAllergy && !hasChronic) return <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>;
+        const moreCount = hasAllergy ? chronic.length : chronic.length - 1;
+        const tooltip = [hasAllergy ? t('patients.allergyTitle', { list: p.allergies.join(', ') }) : null, ...chronic].filter(Boolean).join(' · ');
+        return (
+          <div className="flex items-center gap-1 whitespace-nowrap" title={tooltip}>
+            {hasAllergy ? (
+              <span className="text-[11px] font-semibold whitespace-nowrap" style={{ color: '#C44536' }}>{t('patients.allergyBadge')}</span>
+            ) : (
+              <span className="text-[11px] font-semibold whitespace-nowrap" style={{ color: '#B8741C' }}>{chronic[0]}</span>
+            )}
+            {moreCount > 0 && <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>+{moreCount}</span>}
+          </div>
+        );
+      },
+    });
+  }
+
+  if (isBilling) {
+    columns.push({
+      key: 'balance', label: t('patients.colBalance'), width: 13,
+      render: (p) => {
+        const bal = balanceByPatient.get(p._id) || 0;
+        return bal > 0
+          ? <span className="text-[12px] font-bold whitespace-nowrap" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(bal)}</span>
+          : <span className="text-[11px]" style={{ color: 'var(--color-success)' }}>{t('billing.paidInFull')}</span>;
+      },
+    });
+  } else {
+    columns.push({
+      key: 'registered', label: t('patient.registered'), width: 11,
+      render: (p) => <span className="text-[11px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.registeredAt || p.registrationDate ? formatDate(p.registeredAt || p.registrationDate) : '—'}</span>,
+    });
+  }
+
+  columns.push({
+    key: 'assigned', label: t('patients.colAssigned'), width: 12,
+    render: (p) => p.assignedDoctorName
+      ? <span className="text-[12px] block truncate" style={{ color: 'var(--text-secondary)' }}>{p.assignedDoctorName}</span>
+      : <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>—</span>,
+  });
+
+  // The whole row is clickable (navigates to the patient), so there is no bare
+  // chevron column. An action column is added only when the role actually has a
+  // row action — the reception "Assign to provider" button.
+  if (canAssignPatients) {
+    columns.push({
+      key: 'action', label: t('frontDesk.colAction'), width: 12, align: 'right',
+      render: (p) => (
+        <div className="flex items-center justify-end">
+          <RowActionsMenu
+            ariaLabel={t('frontDesk.colAction')}
+            actions={[
+              {
+                key: 'assign',
+                label: p.assignedDoctor ? t('frontDesk.reassign') : t('frontDesk.assign'),
+                icon: <Stethoscope className="w-4 h-4" />,
+                onClick: () => setAssignTarget({ patientId: p._id, patientName: patientFullName(p), hospitalNumber: p.hospitalNumber, currentDoctorId: p.assignedDoctor }),
+              },
+            ]}
+          />
+        </div>
+      ),
+    });
+  }
+
+  const totalColWidth = columns.reduce((s, c) => s + c.width, 0);
+
   return (
     <>
-      <TopBar title={t('nav.patients')} />
-      <main className="page-container page-enter">
-          <PageHeader
-            icon={Users}
-            title={t('patients.registryTitle')}
-            subtitle={t('patients.patientsFound', { count: filtered.length })}
-            actions={
+      <TopBar
+        title={t('nav.patients')}
+        splitActions
+        searchTrailing={
+                /* Filters — single dropdown panel (replaces the old per-column funnels) */
+                <div className="relative" ref={filterRef}>
+                  <button
+                    onClick={() => setShowFilters(s => !s)}
+                    className={`btn btn-secondary btn-filter${activeFilterCount ? ' is-active' : ''}`}
+                    title={t('patients.filtersTitle')}
+                    aria-expanded={showFilters}
+                  >
+                    <Filter className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t('patients.filtersTitle')}</span>
+                    {activeFilterCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: 'var(--accent-primary)', color: '#fff' }}>
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </button>
+                  {showFilters && (
+                    <div
+                      className="absolute right-0 mt-2 rounded-2xl overflow-hidden z-50"
+                      style={{ width: 'min(92vw, 560px)', background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg, 0 16px 48px rgba(0,0,0,0.2))' }}
+                    >
+                      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('patients.filtersTitle')}</span>
+                        <div className="flex items-center gap-2">
+                          {activeFilterCount > 0 && (
+                            <button onClick={clearFilters} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('nurse.clearAllFilters')}</button>
+                          )}
+                          <button type="button" onClick={() => setShowFilters(false)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
+                            <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                        {/* Older than (age) */}
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterOlderThan')}</span>
+                          <div className="relative">
+                            <input type="number" min={0} max={120} value={filters.olderThan} onChange={e => setF('olderThan', e.target.value)} placeholder="—" className="w-full text-sm py-2 pl-3 pr-12" style={fieldStyle} />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('patients.filterYears')}</span>
+                          </div>
+                        </label>
+                        {/* Gender */}
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('nurse.colGender')}</span>
+                          <select value={filters.gender} onChange={e => setF('gender', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
+                            <option value="">{t('patients.all')}</option>
+                            <option value="Male">{t('patient.male')}</option>
+                            <option value="Female">{t('patient.female')}</option>
+                          </select>
+                        </label>
+                        {/* Diagnosis / condition */}
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterDiagnosis')}</span>
+                          <input type="text" value={filters.diagnosis} onChange={e => setF('diagnosis', e.target.value)} placeholder={t('patients.filterDiagnosisPlaceholder')} className="w-full text-sm py-2 px-3" style={fieldStyle} />
+                        </label>
+                        {/* Location (state) */}
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patient.location')}</span>
+                          <select value={filters.state} onChange={e => setF('state', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
+                            <option value="">{t('patients.all')}</option>
+                            {states.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </label>
+                        {/* Registered date range */}
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterRegisteredFrom')}</span>
+                          <input type="date" value={filters.registeredFrom} onChange={e => setF('registeredFrom', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle} />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterRegisteredTo')}</span>
+                          <input type="date" value={filters.registeredTo} onChange={e => setF('registeredTo', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle} />
+                        </label>
+                      </div>
+                      {/* Show patients with — checkbox group */}
+                      <div className="px-4 pb-4">
+                        <span className="text-[11px] font-semibold block mb-2" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterShowWith')}</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
+                          {([
+                            ['allergies', t('patients.kpiAllergiesFlagged')],
+                            ['chronic', t('patient.chronicConditions')],
+                            ['recent', t('patients.kpiVisitedLast30d')],
+                            ['assignedMe', t('patients.assignedMe')],
+                            ['unassigned', t('patients.assignedUnassigned')],
+                            ...(isBilling ? [['outstanding', t('patients.filterOutstanding')] as const] : []),
+                          ] as const).map(([key, label]) => (
+                            <label key={key} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-primary)' }}>
+                              <input type="checkbox" checked={filters[key]} onChange={e => setF(key, e.target.checked)} className="w-4 h-4 rounded" style={{ accentColor: 'var(--accent-primary)' }} />
+                              {label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              }
+              actions={
               <div className="flex gap-2">
-                <button onClick={() => setShowFindPatient(true)} className="btn btn-secondary">
+                <button onClick={() => setShowFindPatient(true)} className="btn btn-secondary" title={t('boma.findPatient')}>
                   <Hash className="w-4 h-4" />
-                  {t('boma.findPatient')}
+                  <span className="hidden sm:inline">{t('boma.findPatient')}</span>
+                  <span className="sm:hidden">{t('patients.findShort')}</span>
                 </button>
                 {canRegisterPatients && (
-                  <button onClick={() => router.push('/patients/new')} className="btn btn-primary">
+                  <button onClick={() => router.push('/patients/new')} className="btn btn-primary" title={t('frontDesk.registerNewPatient')}>
                     <UserPlus className="w-4 h-4" />
-                    {t('frontDesk.registerNewPatient')}
+                    <span className="hidden sm:inline">{t('frontDesk.registerNewPatient')}</span>
+                    <span className="sm:hidden">{t('patients.registerShort')}</span>
                   </button>
                 )}
               </div>
-            }
-          />
-
-          {/* Summary KPI strip */}
-          {(() => {
-            const now = Date.now();
-            const MS30 = 30 * 24 * 60 * 60 * 1000;
-            const visitedRecently = patients.filter(p => p.lastConsultedAt && (now - new Date(p.lastConsultedAt).getTime()) < MS30).length;
-            const withConditions = patients.filter(p => p.chronicConditions?.length && p.chronicConditions[0] !== 'None').length;
-            const withAllergies = patients.filter(p => p.allergies?.length && p.allergies[0] !== 'None known').length;
-            const kpis = [
-              { label: t('patients.kpiTotalPatients'), value: patients.length, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
-              { label: t('patients.kpiVisitedLast30d'), value: visitedRecently, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
-              { label: t('patient.chronicConditions'), value: withConditions, accent: '#B8741C', bg: 'rgba(228, 168, 75, 0.10)', border: 'rgba(228, 168, 75, 0.28)' },
-              { label: t('patients.kpiAllergiesFlagged'), value: withAllergies, accent: '#C44536', bg: 'rgba(196, 69, 54, 0.08)', border: 'rgba(196, 69, 54, 0.28)' },
-            ];
-            return (
-              <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', alignItems: 'stretch' }}>
-                {kpis.map(k => (
-                  <div key={k.label} style={{
-                    padding: '14px 16px', borderRadius: 10,
-                    background: k.bg, border: `1px solid ${k.border}`,
-                    height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                  }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: k.accent }}>
-                      {k.label}
-                    </div>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, marginTop: 2 }}>
-                      {k.value.toLocaleString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-
-          {/* Search & Filter */}
-          <div className="dash-card p-4 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                <input
-                  type="search"
-                  placeholder={t('patients.searchPlaceholder')}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 search-icon-input"
-                  style={{ background: 'var(--overlay-subtle)' }}
-                />
-              </div>
-              {canBeAssigned && (
-                <button
-                  onClick={() => setAssignedToMe(v => !v)}
-                  className="btn btn-sm"
-                  aria-pressed={assignedToMe}
-                  title="Show only patients assigned to you"
-                  style={assignedToMe
-                    ? { background: 'var(--accent-primary)', color: '#fff', border: '1px solid var(--accent-primary)' }
-                    : { background: 'var(--btn-secondary-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)' }}
-                >
-                  <Stethoscope className="w-4 h-4" /> Assigned to me
-                  <span
-                    className="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
-                    style={assignedToMe
-                      ? { background: 'rgba(255,255,255,0.25)' }
-                      : { background: 'var(--accent-light)', color: 'var(--accent-primary)' }}
-                  >
-                    {assignedToMeCount}
-                  </span>
-                </button>
-              )}
-              <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary btn-sm">
-                <Filter className="w-4 h-4" /> {t('patients.filters')}
-              </button>
-            </div>
-            {showFilters && (
-              <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="w-full sm:w-48">
-                  <label>{t('patients.state')}</label>
-                  <select value={filterState} onChange={(e) => setFilterState(e.target.value)}>
-                    <option value="">{t('patients.allStates')}</option>
-                    {states.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div className="w-full sm:w-36">
-                  <label>{t('patient.gender')}</label>
-                  <select value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
-                    <option value="">{t('patients.all')}</option>
-                    <option value="Male">{t('patient.male')}</option>
-                    <option value="Female">{t('patient.female')}</option>
-                  </select>
-                </div>
-                <div className="flex items-end">
-                  <button onClick={() => { setFilterState(''); setFilterGender(''); }} className="btn btn-secondary btn-sm">
-                    {t('patients.clear')}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Patient Table */}
-          <div className="dash-card overflow-hidden">
-            <div className="patient-table-wrap">
-              <table className="data-table patient-table">
+            } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          {/* Patient Table — filtering lives in the Filters panel + search bar */}
+          <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+            <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+              <table className="w-full" style={{ tableLayout: 'fixed', minWidth: 880 }}>
+                <colgroup>
+                  {columns.map(c => (
+                    <col key={c.key} style={{ width: `${(c.width / totalColWidth * 100).toFixed(2)}%` }} />
+                  ))}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th className="col-patient">{t('frontDesk.colPatient')}</th>
-                    <th className="col-hospital">{t('patients.colHospitalNo')}</th>
-                    <th className="col-age">{t('patients.colAgeGender')}</th>
-                    <th className="col-state">{t('patients.state')}</th>
-                    <th className="col-phone hide-mobile">{t('patient.phone')}</th>
-                    <th className="col-visit hide-mobile">{t('frontDesk.lastVisit')}</th>
-                    <th className="col-cond hide-mobile">{t('patients.colConditions')}</th>
-                    <th className="col-arrow"></th>
+                    {columns.map(c => (
+                      <th
+                        key={c.key}
+                        className={`${c.align === 'right' ? 'text-right' : 'text-left'} px-4 py-2.5`}
+                        style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}
+                      >
+                        <div className={`flex items-center gap-1.5 ${c.align === 'right' ? 'justify-end' : ''}`}>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap">{c.label}</span>
+                        </div>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map(patient => {
-                    const age = patient.estimatedAge || (patient.dateOfBirth ? (new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear()) : 0);
-                    const isFemale = patient.gender === 'Female';
-                    const initials = `${(patient.firstName || '?')[0]}${(patient.surname || '?')[0]}`.toUpperCase();
-                    const hasAllergy = patient.allergies?.length && patient.allergies[0] !== 'None known';
-                    const chronic = (patient.chronicConditions || []).filter(c => c && c !== 'None');
-                    const hasChronic = chronic.length > 0;
-                    const lastVisit = patient.lastConsultedAt
-                      ? new Date(patient.lastConsultedAt)
-                      : null;
-                    const daysAgo = lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / 86400000) : null;
-                    // Data-freshness indicator: how long ago was this record's data last
-                    // touched (locally or via sync replication)? Offline edits bump
-                    // updatedAt instantly; replicated changes arrive with the origin
-                    // updatedAt intact, so this is a real "data vintage" signal.
-                    const updatedAt = patient.updatedAt ? new Date(patient.updatedAt) : null;
-                    const updatedMinsAgo = updatedAt ? Math.floor((Date.now() - updatedAt.getTime()) / 60000) : null;
-                    const freshnessLabel = updatedMinsAgo == null
-                      ? '—'
-                      : updatedMinsAgo < 2 ? t('sync.justNow')
-                      : updatedMinsAgo < 60 ? t('sync.minutesAgo', { count: updatedMinsAgo })
-                      : updatedMinsAgo < 1440 ? t('sync.hoursAgo', { count: Math.floor(updatedMinsAgo / 60) })
-                      : t('sync.daysAgo', { count: Math.floor(updatedMinsAgo / 1440) });
-                    const isStale = updatedMinsAgo != null && updatedMinsAgo > 60 * 24 * 30; // >30d
-                    const isVeryStale = updatedMinsAgo != null && updatedMinsAgo > 60 * 24 * 90; // >90d
-                    return (
-                      <tr key={patient._id} className="cursor-pointer" onClick={() => router.push(`/patients/${patient._id}`)}>
-                        <td className="col-patient">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div
-                              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white"
-                              style={{
-                                background: isFemale
-                                  ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)'
-                                  : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)',
-                                letterSpacing: 0.3,
-                              }}
-                              aria-hidden
-                            >
-                              {initials}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>
-                                {patient.firstName} {patient.surname}
-                              </p>
-                              <p className="text-[11px] truncate flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                                <span>{patient.tribe || '—'}</span>
-                                <span
-                                  aria-hidden
-                                  className="w-1 h-1 rounded-full flex-shrink-0"
-                                  style={{ background: 'var(--border-medium)' }}
-                                />
-                                <span
-                                  title={t('patients.lastUpdated', { value: patient.updatedAt || t('patients.unknown') })}
-                                  style={{
-                                    fontSize: 10, fontWeight: 600, letterSpacing: 0.2,
-                                    color: isVeryStale ? '#C44536' : isStale ? '#B8741C' : 'var(--text-muted)',
-                                  }}
-                                >
-                                  {freshnessLabel}
-                                </span>
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="col-hospital">
-                          <span
-                            className="font-mono text-[11px] whitespace-nowrap px-2 py-0.5 rounded-md"
-                            style={{ background: 'rgba(59, 130, 246, 0.10)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.20)', fontWeight: 600 }}
-                          >
-                            {patient.hospitalNumber}
-                          </span>
-                        </td>
-                        <td className="col-age whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-primary)' }}>
-                            <span
-                              aria-hidden
-                              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                              style={{ background: isFemale ? '#D96E59' : '#3b82f6' }}
-                            />
-                            <span className="font-semibold">{age}y</span>
-                            <span style={{ color: 'var(--text-muted)' }}>· {patient.gender?.[0] ?? '?'}</span>
-                          </span>
-                        </td>
-                        <td className="col-state text-xs" style={{ color: 'var(--text-secondary)' }}>{patient.state || '—'}</td>
-                        <td className="col-phone hide-mobile font-mono text-[11px]" style={{ color: 'var(--text-secondary)' }}>{patient.phone || '—'}</td>
-                        <td className="col-visit hide-mobile text-xs">
-                          {lastVisit ? (
-                            <div>
-                              <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                                {lastVisit.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                              </div>
-                              {daysAgo != null && (
-                                <div className="text-[10px]" style={{ color: daysAgo > 90 ? '#C44536' : daysAgo > 30 ? '#B8741C' : 'var(--text-muted)' }}>
-                                  {daysAgo === 0 ? t('time.today') : daysAgo === 1 ? t('time.yesterday') : t('sync.daysAgo', { count: daysAgo })}
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)' }}>{patient.lastVisitDate || '—'}</span>
-                          )}
-                        </td>
-                        <td className="col-cond hide-mobile">
-                          <div className="flex flex-wrap items-center gap-1">
-                            {hasAllergy && (
-                              <span
-                                className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded-md whitespace-nowrap"
-                                style={{ background: 'rgba(196, 69, 54, 0.14)', color: '#8B2E24', border: '1px solid rgba(196, 69, 54, 0.30)' }}
-                                title={t('patients.allergyTitle', { list: patient.allergies.join(', ') })}
-                              >
-                                ⚠ {t('patients.allergyBadge')}
-                              </span>
+                  {visible.length === 0 && (
+                    <tr>
+                      <td colSpan={columns.length}>
+                        <EmptyState
+                          icon={Users}
+                          title={t('patients.registryTitle')}
+                          message={t('patients.patientsFound', { count: 0 })}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                  {visible.map(patient => (
+                    <tr
+                      key={patient._id}
+                      role="button"
+                      tabIndex={0}
+                      className="group cursor-pointer transition-colors hover:bg-[var(--table-row-hover)]"
+                      onClick={() => router.push(`/patients/${patient._id}`)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${patient._id}`); } }}
+                      style={{ borderBottom: '1px solid var(--border-light)' }}
+                    >
+                      {columns.map((col, ci) => {
+                        const isLast = ci === columns.length - 1;
+                        return (
+                          <td key={col.key} className={`px-4 py-2.5 ${isLast ? 'relative' : ''}`}>
+                            {col.render(patient)}
+                            {/* Subtle hover affordance: the whole row is clickable, so for roles
+                                without an explicit action button we fade in a chevron on hover. */}
+                            {isLast && !canAssignPatients && (
+                              <ChevronRight className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ color: 'var(--text-muted)' }} />
                             )}
-                            {hasChronic ? (
-                              <span
-                                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap"
-                                style={{ background: 'rgba(228, 168, 75, 0.14)', color: '#B8741C', border: '1px solid rgba(228, 168, 75, 0.30)' }}
-                                title={chronic.join(', ')}
-                              >
-                                {chronic[0]}{chronic.length > 1 ? ` +${chronic.length - 1}` : ''}
-                              </span>
-                            ) : !hasAllergy ? (
-                              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="col-arrow"><ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} /></td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -372,7 +479,7 @@ export default function PatientsPage() {
       </main>
 
       {/* Find Patient Modal — Hospital ID lookup + QR scan */}
-      {showFindPatient && !showQRScanner && (
+      {showFindPatient && !showQRScanner && !showFingerprintIdentify && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
           <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'var(--card-bg, var(--bg-card))' }}>
             <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
@@ -424,7 +531,7 @@ export default function PatientsPage() {
                 className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-[var(--accent-light)]"
                 style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
               >
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                   <ScanLine className="w-5 h-5" style={{ color: 'var(--tamamhealth-blue)' }} />
                 </div>
                 <div className="text-left">
@@ -433,9 +540,38 @@ export default function PatientsPage() {
                 </div>
                 <ArrowRight className="w-4 h-4 ml-auto" style={{ color: 'var(--text-muted)' }} />
               </button>
+
+              {/* Fingerprint identification (feature-flagged, needs local bridge) */}
+              {isFingerprintEnabled() && (
+                <button
+                  onClick={() => setShowFingerprintIdentify(true)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-[var(--accent-light)]"
+                  style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
+                >
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
+                    <ScanLine className="w-5 h-5" style={{ color: 'var(--tamamhealth-blue)' }} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('fingerprint.identifyTitle')}</p>
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('fingerprint.identifyOptionDesc')}</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 ml-auto" style={{ color: 'var(--text-muted)' }} />
+                </button>
+              )}
             </div>
           </div>
         </div>
+      )}
+
+      {showFingerprintIdentify && (
+        <FingerprintIdentifyModal
+          onSelect={(patientId) => {
+            setShowFingerprintIdentify(false);
+            setShowFindPatient(false);
+            router.push(`/patients/${patientId}`);
+          }}
+          onClose={() => setShowFingerprintIdentify(false)}
+        />
       )}
 
       {showQRScanner && (
@@ -446,6 +582,13 @@ export default function PatientsPage() {
             router.push(`/patients/${data.id}`);
           }}
           onClose={() => setShowQRScanner(false)}
+        />
+      )}
+
+      {assignTarget && (
+        <AssignDoctorModal
+          target={assignTarget}
+          onClose={() => setAssignTarget(null)}
         />
       )}
     </>

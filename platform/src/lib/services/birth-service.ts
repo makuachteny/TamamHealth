@@ -2,9 +2,11 @@ import { birthsDB, ancDB } from '../db';
 import type { BirthRegistrationDoc, ANCVisitDoc } from '../db-types';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { jubaYearMonth, jubaIsInMonth } from '../time-juba';
+import { findByType } from './db-query';
 
 /**
  * Look up ANC visits for a mother by name (case-insensitive). Used after a
@@ -17,12 +19,10 @@ async function findAncVisitsForMother(motherName: string): Promise<ANCVisitDoc[]
   if (!motherName) return [];
   try {
     const db = ancDB();
-    const result = await db.allDocs({ include_docs: true });
     const target = motherName.trim().toLowerCase();
-    const docs = result.rows
-      .map(r => r.doc as ANCVisitDoc);
+    const docs = await findByType<ANCVisitDoc>(db, 'anc_visit');
     /* istanbul ignore next -- defensive null-safety in filter */
-    return docs.filter(d => d && d.type === 'anc_visit' && d.isDeleted !== true && (d.motherName || '').trim().toLowerCase() === target);
+    return docs.filter(d => d && d.isDeleted !== true && (d.motherName || '').trim().toLowerCase() === target);
   } catch {
     return [];
   }
@@ -30,10 +30,8 @@ async function findAncVisitsForMother(motherName: string): Promise<ANCVisitDoc[]
 
 export async function getAllBirths(scope?: DataScope): Promise<BirthRegistrationDoc[]> {
   const db = birthsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as BirthRegistrationDoc)
-    .filter(d => d && d.type === 'birth' && d.isDeleted !== true);
+  const all = (await findByType<BirthRegistrationDoc>(db, 'birth'))
+    .filter(d => d.isDeleted !== true);
   /* istanbul ignore next -- defensive null-safety in sort */
   all.sort((a, b) => new Date(b.dateOfBirth || '').getTime() - new Date(a.dateOfBirth || '').getTime());
   return scope ? filterByScope(all, scope) : all;
@@ -80,6 +78,14 @@ export async function createBirth(data: Omit<BirthRegistrationDoc, '_id' | '_rev
   const resp = await db.put(doc);
   doc._rev = resp.rev;
   await logAuditSafe('REGISTER_BIRTH', undefined, undefined, `Registered birth ${doc._id}: ${data.childFirstName} ${data.childSurname}, gender: ${data.childGender}`);
+  emitSyncEvent({
+    resourceType: 'birth',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
 
   // Write the birth id back onto every matching ANC visit so the ANC module
   // can flag the mother as "Delivered" without a separate query.
@@ -111,6 +117,14 @@ export async function updateBirth(id: string, data: Partial<BirthRegistrationDoc
     };
     const resp = await db.put(updated);
     updated._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'birth',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;
@@ -121,7 +135,15 @@ export async function deleteBirth(id: string): Promise<boolean> {
   const db = birthsDB();
   try {
     const doc = await db.get(id);
+    const typed = doc as unknown as BirthRegistrationDoc;
     await db.remove(doc);
+    emitSyncEvent({
+      resourceType: 'birth',
+      resourceId: id,
+      operation: 'delete',
+      orgId: typed.orgId,
+      hospitalId: typed.facilityId,
+    });
     return true;
   } catch {
     return false;

@@ -91,11 +91,16 @@ export default function ContactPage() {
             <p className="mk-body-lg" style={{ color: "var(--tb-text-inv-m)", marginTop: 16, maxWidth: 560, margin: "16px auto 0" }}>
               Whether you run a clinic, lead a health system, or want to build with us — we read every message, and we&apos;ll write back within one business day.
             </p>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 28, padding: "8px 16px", borderRadius: 999, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.22)", backdropFilter: "blur(4px)" }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--tb-green)", boxShadow: "0 0 0 4px rgba(45,155,106,0.25)" }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", letterSpacing: "0.02em" }}>
-                Typical response: under 4 business hours
-              </span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, marginTop: 28 }}>
+              <a href="#contact-form" className="mk-btn mk-btn-green mk-btn-lg">
+                Send us a message
+              </a>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 16px", borderRadius: 999, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.22)", backdropFilter: "blur(4px)" }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--tb-green)", boxShadow: "0 0 0 4px rgba(45,155,106,0.25)" }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", letterSpacing: "0.02em" }}>
+                  Typical response: under 4 business hours
+                </span>
+              </div>
             </div>
           </Reveal>
         </div>

@@ -1,15 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import {
   Reveal,
   FAQItem,
-  DemoForm,
   TestimonialSwoosh,
-  PricingBannerIcon,
 } from "@/components/marketing/MarketingShared";
 import { DuoIcon } from "@/components/marketing/DuoIcon";
-import Link from "next/link";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth — Pricing / Get Pricing Page
@@ -32,13 +30,15 @@ export default function PricingPage() {
               </Reveal>
               <Reveal delay={0.1}>
                 <p className="mk-body-lg">
-                  Every practice is different. That&apos;s why we customize your plan based on your size, specialty, and the modules you need. No hidden fees, no long-term lock-in — just pricing that makes sense.
+                  Every practice is different. We tailor your plan to your size, specialty, and the modules you need — no hidden fees, no long-term lock-in, just pricing that makes sense.
                 </p>
               </Reveal>
               <Reveal delay={0.2}>
-                <p className="mk-body" style={{ color: "var(--tb-text-sec)", marginTop: 32 }}>
-                  Fill out the form to get a personalized quote and schedule a free walkthrough of TamamHealth.
-                </p>
+                <div className="mk-hero-buttons" style={{ marginTop: 32 }}>
+                  <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
+                    Request a quote
+                  </Link>
+                </div>
               </Reveal>
             </div>
 
@@ -53,13 +53,6 @@ export default function PricingPage() {
                   style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
                   priority
                 />
-              </Reveal>
-            </div>
-
-            {/* Right: DemoForm */}
-            <div className="mk-hero-form">
-              <Reveal delay={0.2}>
-                <DemoForm />
               </Reveal>
             </div>
           </div>
@@ -251,7 +244,6 @@ export default function PricingPage() {
                 "Email support",
                 "Offline-first functionality"
               ]}
-              cta="Start free"
               highlight={false}
             />
             <PricingCard
@@ -269,7 +261,6 @@ export default function PricingPage() {
                 "Priority email support",
                 "Custom SOAP templates"
               ]}
-              cta="Get started"
               highlight={true}
               badge="Most popular"
             />
@@ -288,7 +279,6 @@ export default function PricingPage() {
                 "Dedicated account manager",
                 "Custom integrations"
               ]}
-              cta="Contact sales"
               highlight={false}
             />
           </div>
@@ -445,43 +435,18 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* ── CTA SECTION ──────────────────────────────────────────────– */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-pricing-banner">
-              <div>
-                <PricingBannerIcon />
-              </div>
-              <div>
-                <h3 className="mk-h3" style={{ margin: "0 0 8px", fontSize: "1.5rem" }}>
-                  See TamamHealth in action
-                </h3>
-                <p className="mk-body" style={{ margin: 0, color: "var(--tb-text-sec)" }}>
-                  Schedule a personalized demo and get a custom quote for your practice.
-                </p>
-              </div>
-              <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
-                Get Your Quote
-              </Link>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
     </>
   );
 }
 
 /* ── Components ──────────────────────────────────────────────────── */
 
-function PricingCard({ name, price, period, description, features, cta, highlight, badge }: {
+function PricingCard({ name, price, period, description, features, highlight, badge }: {
   name: string;
   price: string;
   period: string;
   description: string;
   features: string[];
-  cta: string;
   highlight: boolean;
   badge?: string;
 }) {
@@ -519,9 +484,6 @@ function PricingCard({ name, price, period, description, features, cta, highligh
           <span style={{ fontSize: "2.5rem", fontFamily: "var(--tb-serif)", fontWeight: 700 }}>{price}</span>
           <span style={{ fontSize: 14, color: "var(--tb-text-sec)", marginLeft: 8 }}>{period}</span>
         </div>
-        <button className="mk-btn mk-btn-green mk-btn-lg" style={{ width: "100%", marginBottom: 32 }}>
-          {cta}
-        </button>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {features.map((feature, idx) => (
             <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>

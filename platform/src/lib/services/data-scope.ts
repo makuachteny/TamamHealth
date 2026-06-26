@@ -1,5 +1,35 @@
 import type { UserRole } from '../db-types';
 
+/**
+ * Document `type`s that are legitimately stored WITHOUT any hospital field and
+ * are meant to be visible org-wide (or platform-wide) to every user. These are
+ * reference/configuration records, not facility-scoped operational data:
+ *   - 'organization'    — the tenant org record itself
+ *   - 'hospital'        — facility directory (users pick/see other facilities)
+ *   - 'platform_config' — global platform settings + service-price catalog
+ * Any other no-hospital doc is only allowed through on an orgId match (see the
+ * hospital-scoping rule below), which keeps genuinely shared org data (e.g.
+ * announcements, disease alerts/surveillance) visible without leaking it across
+ * tenants.
+ */
+const GLOBAL_NO_HOSPITAL_TYPES = new Set([
+  'organization',
+  'hospital',
+  'platform_config',
+]);
+
+/**
+ * National/government roles that operate above any single facility. Their
+ * `user` account docs carry no hospitalId, so under the old "no hospital field"
+ * fallback they leaked into every facility's staff directory. These accounts
+ * must never be surfaced as facility staff to hospital-scoped users.
+ */
+const NATIONAL_ROLES = new Set<UserRole>([
+  'super_admin',
+  'government',
+  'county_health_director',
+]);
+
 export interface DataScope {
   orgId?: string;
   hospitalId?: string;
@@ -24,14 +54,6 @@ export function filterByScope<T extends Record<string, any>>(
     filtered = filtered.filter(d => d.orgId === scope.orgId);
   }
 
-  // Payam supervisors are scoped to their payam, not their hospital — they
-  // oversee every facility in the payam (P0 tier-isolation fix).
-  if (scope.role === 'payam_supervisor' && scope.payam) {
-    const sPayam = scope.payam;
-    filtered = filtered.filter(d => d.payam === sPayam);
-    return filtered;
-  }
-
   // Non-admin roles that have a hospitalId are further scoped
   const ADMIN_ROLES: UserRole[] = ['super_admin', 'org_admin', 'government'];
   if (!ADMIN_ROLES.includes(scope.role) && scope.hospitalId) {
@@ -44,8 +66,36 @@ export function filterByScope<T extends Record<string, any>>(
         d.fromHospitalId === hospId ||
         d.toHospitalId === hospId ||
         d.facilityId === hospId;
-      // Only allow docs that explicitly match this hospital or have no hospital field
-      return matches || (!d.hospitalId && !d.registrationHospital && !d.facilityId);
+      if (matches) return true;
+
+      // No-hospital docs: tightened to close the cross-facility leak where ANY
+      // hospital-less record was visible to EVERY scoped user.
+      const noHospital =
+        !d.hospitalId && !d.registrationHospital && !d.facilityId;
+      if (!noHospital) return false;
+
+      // (a) Genuinely global reference types (organization/hospital/
+      //     platform_config) stay visible regardless of org so users can see
+      //     the facility directory and platform config.
+      if (typeof d.type === 'string' && GLOBAL_NO_HOSPITAL_TYPES.has(d.type)) {
+        return true;
+      }
+
+      // (b) National-role user accounts (super_admin/government/
+      //     county_health_director) must NOT appear as facility staff — they
+      //     have no hospitalId and previously leaked into every directory.
+      if (d.type === 'user' && NATIONAL_ROLES.has(d.role as UserRole)) {
+        return false;
+      }
+
+      // (c) Otherwise keep the no-hospital doc only when it belongs to the same
+      //     org (when both orgIds are present). This preserves legitimate
+      //     org-wide data (announcements, surveillance, generic records) while
+      //     blocking cross-tenant leakage. Docs lacking orgId already failed the
+      //     earlier orgId filter, so this is conservative — favouring not hiding
+      //     data over strictness when the org can't be compared.
+      if (scope.orgId && d.orgId && d.orgId !== scope.orgId) return false;
+      return true;
     });
   }
 

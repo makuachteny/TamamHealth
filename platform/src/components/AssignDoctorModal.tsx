@@ -11,6 +11,8 @@ import { useApp } from '@/lib/context';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useToast } from '@/components/Toast';
 import { Stethoscope, X, Check, Search } from '@/components/icons/lucide';
+import Modal from '@/components/Modal';
+import { ROLE_LABEL } from '@/lib/role-display';
 import type { UserRole } from '@/lib/db-types';
 
 export interface AssignDoctorTarget {
@@ -23,8 +25,12 @@ export interface AssignDoctorTarget {
   currentDoctorId?: string;
 }
 
-// Clinicians who can be the responsible care provider for a patient.
-const ASSIGNABLE_ROLES: UserRole[] = ['doctor', 'clinical_officer', 'medical_superintendent'];
+// The responsible-provider role differs by facility tier. Hospitals are
+// doctor-led; primary-care facilities (PHCC / PHCU / primary) are nurse and
+// clinical-officer-led, so reception assigns a nurse there instead of a doctor.
+const DOCTOR_ROLES: UserRole[] = ['doctor', 'clinical_officer', 'medical_superintendent', 'clinician'];
+const NURSE_ROLES: UserRole[] = ['nurse', 'midwife', 'clinical_officer', 'triage_nurse', 'rooming_nurse'];
+const HOSPITAL_FACILITY_TYPES = ['national_referral', 'state_hospital', 'county_hospital', 'secondary', 'teaching_hospital'];
 
 export default function AssignDoctorModal({
   target,
@@ -44,12 +50,19 @@ export default function AssignDoctorModal({
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Doctors at the nurse's facility; fall back to all active clinicians if the
-  // facility has none (or the nurse has no facility set) so the picker is never
-  // empty.
+  // Pick the provider type from the facility tier. Default to doctor-led when
+  // the facility type is unknown so hospitals always offer doctors.
+  const facilityType = currentUser?.hospital?.facilityType as string | undefined;
+  const isHospital = !facilityType || HOSPITAL_FACILITY_TYPES.includes(facilityType);
+  const assignableRoles = isHospital ? DOCTOR_ROLES : NURSE_ROLES;
+  const providerLabel = isHospital ? 'doctor' : 'nurse';
+  const providerLabelCap = isHospital ? 'Doctor' : 'Nurse';
+
+  // Providers at the assigner's facility; fall back to all active providers of
+  // the right type if the facility has none, so the picker is never empty.
   const doctors = useMemo(() => {
     const clinicians = users.filter(
-      u => ASSIGNABLE_ROLES.includes(u.role) && u.isActive !== false,
+      u => assignableRoles.includes(u.role) && u.isActive !== false,
     );
     const sameFacility = currentUser?.hospitalId
       ? clinicians.filter(u => u.hospitalId === currentUser.hospitalId)
@@ -60,12 +73,12 @@ export default function AssignDoctorModal({
       ? base.filter(u => u.name.toLowerCase().includes(q) || (u.specialty ?? '').toLowerCase().includes(q))
       : base;
     return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
-  }, [users, currentUser?.hospitalId, search]);
+  }, [users, currentUser?.hospitalId, search, assignableRoles]);
 
   const handleAssign = async () => {
     const doctor = doctors.find(d => d._id === selectedId) || users.find(u => u._id === selectedId);
     if (!doctor) {
-      showToast('Select a doctor to assign', 'error');
+      showToast(`Select a ${providerLabel} to assign`, 'error');
       return;
     }
     setSaving(true);
@@ -106,18 +119,17 @@ export default function AssignDoctorModal({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <Modal onClose={onClose} width={480}>
       <div
         className="modal-content card-elevated"
-        style={{ maxWidth: 480, width: '100%' }}
-        onClick={e => e.stopPropagation()}
+        style={{ width: '100%' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
           <div className="flex items-center gap-2">
             <Stethoscope className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
             <div>
-              <h2 className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>Assign to doctor</h2>
+              <h2 className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>Assign to {providerLabel}</h2>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 {target.patientName}{target.hospitalNumber ? ` · ${target.hospitalNumber}` : ''}
               </p>
@@ -136,7 +148,7 @@ export default function AssignDoctorModal({
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search doctors…"
+              placeholder={`Search ${providerLabel}s…`}
               className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm"
               style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-input, var(--bg-card-solid))', color: 'var(--text-primary)' }}
             />
@@ -145,9 +157,9 @@ export default function AssignDoctorModal({
           {/* Doctor list */}
           <div className="max-h-64 overflow-y-auto rounded-lg border" style={{ borderColor: 'var(--border-light)' }}>
             {loading ? (
-              <p className="p-4 text-sm text-center" style={{ color: 'var(--text-muted)' }}>Loading doctors…</p>
+              <p className="p-4 text-sm text-center" style={{ color: 'var(--text-muted)' }}>Loading {providerLabel}s…</p>
             ) : doctors.length === 0 ? (
-              <p className="p-4 text-sm text-center" style={{ color: 'var(--text-muted)' }}>No doctors available to assign.</p>
+              <p className="p-4 text-sm text-center" style={{ color: 'var(--text-muted)' }}>No {providerLabel}s available to assign.</p>
             ) : (
               <ul className="divide-y" style={{ borderColor: 'var(--border-light)' }}>
                 {doctors.map(d => {
@@ -162,7 +174,7 @@ export default function AssignDoctorModal({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{d.name}</p>
                           <p className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
-                            {d.specialty || (d.role === 'clinical_officer' ? 'Clinical Officer' : d.role === 'medical_superintendent' ? 'Medical Superintendent' : 'Doctor')}
+                            {d.specialty || ROLE_LABEL[d.role] || providerLabelCap}
                             {d.hospitalName ? ` · ${d.hospitalName}` : ''}
                           </p>
                         </div>
@@ -211,6 +223,6 @@ export default function AssignDoctorModal({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

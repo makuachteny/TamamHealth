@@ -2,12 +2,13 @@
 
 import { useState, useMemo } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import {
   FileText, Download, Users, Activity, Pill, BedDouble, TrendingUp,
   ChevronUp, Loader2, BarChart3, AlertTriangle
 } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import EmptyState from '@/components/EmptyState';
+import { FilterSelect } from '@/components/filters';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useReferrals } from '@/lib/hooks/useReferrals';
@@ -106,6 +107,14 @@ export default function ReportsPage() {
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  // Reporting period selector. Reports regenerate on demand from live data, so
+  // this is presentational only — it does not (yet) filter the underlying rows.
+  const periodOptions = [
+    { value: 'feb2026', label: t('reports.monthFeb2026') },
+    { value: 'jan2026', label: t('reports.monthJan2026') },
+    { value: 'dec2025', label: t('reports.monthDec2025') },
+  ];
+  const [reportPeriod, setReportPeriod] = useState('feb2026');
 
   /* ── Summary stats ──────────────────────────────────────────── */
   const totalPatients = patients.length;
@@ -450,16 +459,12 @@ export default function ReportsPage() {
 
     if (placeholder || rows.length === 0) {
       return (
-        <div
-          className="mt-3 p-4 rounded-lg"
-          style={{ background: 'var(--overlay-light)', border: '1px solid var(--overlay-medium)' }}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              {placeholder || t('reports.noDataForReport')}
-            </span>
-          </div>
+        <div className="mt-3">
+          <EmptyState
+            icon={AlertTriangle}
+            title={title}
+            message={placeholder || t('reports.noDataForReport')}
+          />
         </div>
       );
     }
@@ -499,7 +504,7 @@ export default function ReportsPage() {
 
         {/* Report table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" style={{ minWidth: 760 }}>
             <thead>
               <tr style={{ background: 'var(--overlay-light)' }}>
                 {headers.map(h => (
@@ -523,7 +528,7 @@ export default function ReportsPage() {
                     style={{
                       borderBottom: '1px solid var(--overlay-light)',
                       background: isTotal
-                        ? 'rgba(43,111,224,0.06)'
+                        ? 'rgba(59, 130, 246,0.06)'
                         : isSection
                           ? 'var(--overlay-light)'
                           : 'transparent',
@@ -553,27 +558,23 @@ export default function ReportsPage() {
 
   return (
     <>
-      <TopBar title={t('nav.reports')} />
+      <TopBar title={t('nav.reports')} actions={
+            <FilterSelect
+              value={reportPeriod}
+              onChange={setReportPeriod}
+              options={periodOptions}
+              neutralValue="feb2026"
+              aria-label={t('reports.pageTitle')}
+            />
+          } />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={BarChart3}
-          title={t('reports.pageTitle')}
-          subtitle={t('reports.pageSubtitle')}
-          actions={
-            <select className="text-sm" style={{ width: '180px' }}>
-              <option>{t('reports.monthFeb2026')}</option>
-              <option>{t('reports.monthJan2026')}</option>
-              <option>{t('reports.monthDec2025')}</option>
-            </select>
-          }
-        />
 
         {/* ── Summary stats cards ─────────────────────────────── */}
         <div className="kpi-grid mb-6">
           {[
-            { id: 'totalPatients', label: t('patients.kpiTotalPatients'), value: totalPatients, icon: Users, color: 'var(--tamamhealth-blue)', bg: 'rgba(43,111,224,0.12)' },
+            { id: 'totalPatients', label: t('patients.kpiTotalPatients'), value: totalPatients, icon: Users, color: 'var(--tamamhealth-blue)', bg: 'rgba(59, 130, 246,0.12)' },
             { id: 'totalReferrals', label: t('referrals.statTotal'), value: totalReferrals, icon: BedDouble, color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
-            { id: 'labResults', label: t('reports.statLabResults'), value: totalLabResults, icon: FileText, color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+            { id: 'labResults', label: t('reports.statLabResults'), value: totalLabResults, icon: FileText, color: '#1F9D6F', bg: 'rgba(31, 157, 111,0.12)' },
             { id: 'diseaseAlerts', label: t('reports.statDiseaseAlerts'), value: totalDiseaseAlerts, icon: Activity, color: '#E4A84B', bg: 'rgba(245,158,11,0.12)' },
           ].map(stat => (
             <div key={stat.id} className="kpi">
@@ -618,7 +619,7 @@ export default function ReportsPage() {
                       >
                         <div
                           className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ background: 'var(--accent-light)' }}
+                          style={{ background: 'transparent' }}
                         >
                           <FileText className="w-5 h-5" style={{ color: 'var(--tamamhealth-blue)' }} />
                         </div>

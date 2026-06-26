@@ -83,7 +83,6 @@ export default function AdminSystemPage() {
           { key: 'tamamhealth_deaths', label: t('system.dbDeaths') },
           { key: 'tamamhealth_immunizations', label: t('system.dbImmunizations') },
           { key: 'tamamhealth_anc', label: t('system.dbAncVisits') },
-          { key: 'tamamhealth_boma_visits', label: t('system.dbBomaVisits') },
           { key: 'tamamhealth_follow_ups', label: t('system.dbFollowUps') },
           { key: 'tamamhealth_organizations', label: t('system.dbOrganizations') },
           { key: 'tamamhealth_platform_config', label: t('system.dbPlatformConfig') },
@@ -200,7 +199,7 @@ export default function AdminSystemPage() {
 
   const inputStyle: React.CSSProperties = {
     background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-    borderRadius: '10px', padding: '10px 14px', color: 'var(--text-primary)',
+    borderRadius: '4px', padding: '10px 14px', color: 'var(--text-primary)',
     fontSize: '14px', width: '100%', outline: 'none',
   };
   const labelStyle: React.CSSProperties = {
@@ -241,11 +240,12 @@ export default function AdminSystemPage() {
         {/* SYNC OPERATIONS — manual triggers for the same endpoints that the
             scheduled cron sidecar calls. Useful for verifying end-to-end push
             after a config change without waiting for the next scheduled run. */}
-        <div className="rounded-2xl p-5 mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="flex items-center gap-2 mb-1">
-            <RefreshCw className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-            <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('system.syncOperations')}</h2>
+        <div className="dash-card overflow-hidden mb-4">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <RefreshCw className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('system.syncOperations')}</h3>
           </div>
+          <div className="p-4">
           <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
             {t('system.syncOperationsDesc')}
           </p>
@@ -279,14 +279,16 @@ export default function AdminSystemPage() {
               {dhis2Pushing ? t('system.pushing') : t('system.dhis2Push')}
             </button>
           </div>
+          </div>
         </div>
 
         {/* SYSTEM HEALTH DASHBOARD */}
-        <div className="rounded-2xl p-5 mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <Activity className="w-5 h-5" style={{ color: 'var(--color-success)' }} />
-            <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('system.systemHealth')}</h2>
+        <div className="dash-card overflow-hidden mb-4">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('system.systemHealth')}</h3>
           </div>
+          <div className="p-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             {/* Database */}
             <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
@@ -352,25 +354,21 @@ export default function AdminSystemPage() {
               ))}
             </div>
           )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
           {/* Left: Configuration Form */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 flex flex-col gap-4">
 
             {/* Platform Settings */}
-            <div className="rounded-2xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(124,58,237,0.1)' }}>
-                  <Settings className="w-5 h-5" style={{ color: '#7C3AED' }} />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('system.platformSettings')}</h2>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('system.platformSettingsDesc')}</p>
-                </div>
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <Settings className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('system.platformSettings')}</h3>
               </div>
-
+              <div className="p-4">
               {loading ? (
                 <p className="text-sm py-4" style={{ color: 'var(--text-muted)' }}>{t('system.loadingConfiguration')}</p>
               ) : (
@@ -402,19 +400,16 @@ export default function AdminSystemPage() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
 
             {/* Toggles */}
-            <div className="rounded-2xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(220,38,38,0.1)' }}>
-                  <Shield className="w-5 h-5" style={{ color: 'var(--color-danger)' }} />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('system.featureToggles')}</h2>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('system.featureTogglesDesc')}</p>
-                </div>
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <Shield className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('system.featureToggles')}</h3>
               </div>
+              <div className="p-4">
 
               <div className="space-y-4">
                 {/* Maintenance Mode */}
@@ -465,6 +460,7 @@ export default function AdminSystemPage() {
                   </div>
                 </div>
               </div>
+              </div>
             </div>
 
             {/* Save Button */}
@@ -480,12 +476,13 @@ export default function AdminSystemPage() {
           </div>
 
           {/* Right: DB Statistics */}
-          <div className="space-y-4">
-            <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <div className="flex items-center gap-2 mb-4">
-                <Database className="w-4 h-4" style={{ color: '#7C3AED' }} />
-                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('system.databaseStatistics')}</span>
+          <div className="flex flex-col gap-4">
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <Database className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('system.databaseStatistics')}</h3>
               </div>
+              <div className="p-4">
 
               {/* Total docs */}
               <div className="p-4 rounded-xl mb-4" style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)' }}>
@@ -514,11 +511,16 @@ export default function AdminSystemPage() {
                   ))
                 )}
               </div>
+              </div>
             </div>
 
             {/* System Info */}
-            <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('system.systemInfo')}</p>
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <Server className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('system.systemInfo')}</h3>
+              </div>
+              <div className="p-4">
               <div className="space-y-2.5">
                 {[
                   { label: t('system.storageEngine'), value: 'PouchDB (IndexedDB)' },
@@ -531,6 +533,7 @@ export default function AdminSystemPage() {
                     <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{item.value}</span>
                   </div>
                 ))}
+              </div>
               </div>
             </div>
           </div>

@@ -2,14 +2,13 @@ import { diseaseAlertsDB } from '../db';
 import type { DiseaseAlertDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
+import { emitSyncEvent } from './sync-event-service';
 
 export async function getAllAlerts(scope?: DataScope): Promise<DiseaseAlertDoc[]> {
   const db = diseaseAlertsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as DiseaseAlertDoc)
-    .filter(d => d && d.type === 'disease_alert')
+  const all = (await findByType<DiseaseAlertDoc>(db, 'disease_alert'))
     .sort((a, b) => (b.reportDate || '').localeCompare(a.reportDate || ''));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -32,6 +31,13 @@ export async function updateAlert(id: string, data: Partial<DiseaseAlertDoc>): P
     };
     const resp = await db.put(updated);
     updated._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'disease_alert',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+    });
     return updated;
   } catch {
     return null;
@@ -42,7 +48,14 @@ export async function deleteAlert(id: string): Promise<boolean> {
   const db = diseaseAlertsDB();
   try {
     const doc = await db.get(id);
+    const typed = doc as unknown as DiseaseAlertDoc;
     await db.remove(doc);
+    emitSyncEvent({
+      resourceType: 'disease_alert',
+      resourceId: id,
+      operation: 'delete',
+      orgId: typed.orgId,
+    });
     return true;
   } catch {
     return false;
@@ -63,5 +76,12 @@ export async function createAlert(
   } as DiseaseAlertDoc;
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'disease_alert',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+  });
   return doc;
 }

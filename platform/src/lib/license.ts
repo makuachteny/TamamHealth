@@ -2,12 +2,21 @@
  * TamamHealth License Validation — runtime license key verification.
  *
  * License keys are HMAC-SHA256 signed and verified offline (no network needed).
- * Format: TamamHealth-<org-slug>-<YYYYMMDD>-<plan>-<signature>
+ * Format: TAMAMHEALTH-<org-slug>-<YYYYMMDD>-<plan>-<signature>
  */
 
 import { createHmac } from 'crypto';
 
-const LICENSE_SECRET = process.env.TAMAMHEALTH_LICENSE_SECRET || 'tamamhealth-2026-license-signing-key';
+/**
+ * License signing secret. In production it MUST come from the environment
+ * (validated fail-closed at boot in lib/config-validation.ts); the compiled-in
+ * fallback exists only for local dev / tooling. A missing secret in production
+ * yields an empty key, so every verification fails closed rather than trusting
+ * the public default.
+ */
+const LICENSE_SECRET =
+  process.env.TAMAMHEALTH_LICENSE_SECRET ||
+  (process.env.NODE_ENV === 'production' ? '' : 'tamamhealth-2026-license-signing-key');
 
 export type LicenseInfo = {
   org: string;
@@ -22,7 +31,7 @@ export type LicenseInfo = {
  * Works fully offline — no network call.
  */
 export function verifyLicenseKey(key: string | undefined): LicenseInfo | null {
-  if (!key || !key.startsWith('TamamHealth-')) return null;
+  if (!key || !/^TAMAMHEALTH-/i.test(key)) return null;
 
   const parts = key.split('-');
   if (parts.length < 5) return null;

@@ -7,7 +7,10 @@ import { getDB } from '../db';
 import type { LedgerEntryDoc, LedgerEntryType, PaymentMethodType } from '../db-types-payments';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
+import { emitSyncEvent } from './sync-event-service';
+import { getSettings } from '../settings/settings-store';
 
 const ledgerDB = () => getDB('tamamhealth_ledger');
 
@@ -17,6 +20,15 @@ const ledgerDB = () => getDB('tamamhealth_ledger');
  * override via `NEXT_PUBLIC_DEFAULT_CURRENCY` for other countries.
  */
 const DEFAULT_CURRENCY = process.env.NEXT_PUBLIC_DEFAULT_CURRENCY || 'SSP';
+
+/**
+ * Effective default currency: prefer the live facility setting, then the
+ * env-configured default, then 'SSP'. Used when a ledger entry doesn't carry
+ * its own currency.
+ */
+function currencyDefault(): string {
+  return getSettings().currency || DEFAULT_CURRENCY;
+}
 
 // ═══ Create Ledger Entry ═══════════════════════════════════════════
 
@@ -55,7 +67,7 @@ export async function createLedgerEntry(input: CreateLedgerEntryInput): Promise<
     referenceId: input.referenceId,
     referenceType: input.referenceType,
     method: input.method,
-    currency: input.currency || DEFAULT_CURRENCY,
+    currency: input.currency || currencyDefault(),
     facilityId: input.facilityId,
     orgId: input.orgId,
     createdAt: now,
@@ -65,6 +77,14 @@ export async function createLedgerEntry(input: CreateLedgerEntryInput): Promise<
 
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'ledger_entry',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
@@ -73,8 +93,12 @@ export async function createLedgerEntry(input: CreateLedgerEntryInput): Promise<
 export async function getPatientBalance(patientId: string): Promise<number> {
   const entries = await getPatientLedger(patientId);
   if (entries.length === 0) return 0;
-  // Use the running balance from the most recent entry
-  return entries[0].runningBalance;
+  // Sum all entry amounts (debits positive, credits negative). This is robust
+  // to entries that share a createdAt timestamp — e.g. a bill that posts a
+  // charge and an insurance credit in the same millisecond — whereas reading
+  // the most-recent entry's stored runningBalance depends on a stable sort of
+  // tied timestamps and could return the wrong figure.
+  return Math.round(entries.reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
 }
 
 export async function getEncounterBalance(encounterId: string): Promise<number> {
@@ -84,20 +108,14 @@ export async function getEncounterBalance(encounterId: string): Promise<number> 
 
 export async function getPatientLedger(patientId: string, limit?: number): Promise<LedgerEntryDoc[]> {
   const db = ledgerDB();
-  const result = await db.allDocs({ include_docs: true });
-  const entries = result.rows
-    .map(r => r.doc as LedgerEntryDoc)
-    .filter(d => d && d.type === 'ledger_entry' && d.patientId === patientId);
+  const entries = await findByType<LedgerEntryDoc>(db, 'ledger_entry', { patientId }, { indexFields: ['type', 'patientId'] });
   entries.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   return limit ? entries.slice(0, limit) : entries;
 }
 
 export async function getEncounterLedger(encounterId: string): Promise<LedgerEntryDoc[]> {
   const db = ledgerDB();
-  const result = await db.allDocs({ include_docs: true });
-  const entries = result.rows
-    .map(r => r.doc as LedgerEntryDoc)
-    .filter(d => d && d.type === 'ledger_entry' && d.encounterId === encounterId);
+  const entries = await findByType<LedgerEntryDoc>(db, 'ledger_entry', { encounterId }, { indexFields: ['type', 'encounterId'] });
   entries.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
   return entries;
 }
@@ -106,10 +124,7 @@ export async function getEncounterLedger(encounterId: string): Promise<LedgerEnt
 
 export async function getAllLedgerEntries(scope?: DataScope): Promise<LedgerEntryDoc[]> {
   const db = ledgerDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as LedgerEntryDoc)
-    .filter(d => d && d.type === 'ledger_entry');
+  const all = await findByType<LedgerEntryDoc>(db, 'ledger_entry');
   all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -124,7 +139,7 @@ export async function getLedgerSummary(scope?: DataScope): Promise<{
   currency: string;
 }> {
   const entries = await getAllLedgerEntries(scope);
-  const currency = entries[0]?.currency || DEFAULT_CURRENCY;
+  const currency = entries[0]?.currency || currencyDefault();
 
   const totalCharged = entries
     .filter(e => e.entryType === 'charge')

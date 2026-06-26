@@ -12,6 +12,7 @@
  *
  * Based on WHO Essential Medicines interactions and BNF/BNFC guidelines.
  */
+import { isNoAllergySentinel } from '../clinical-roles';
 
 export type InteractionSeverity = 'contraindicated' | 'serious' | 'moderate';
 
@@ -250,4 +251,172 @@ export function getInteractionsForDrug(medication: string): DrugInteraction[] {
     normalize(i.drug1).includes(med) || normalize(i.drug2).includes(med) ||
     med.includes(normalize(i.drug1)) || med.includes(normalize(i.drug2))
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Drug–allergy checking
+// Maps a recorded allergy term to the drug names / class members it should
+// flag. Both directions are substring-matched so "penicillin allergy" trips on
+// "Amoxicillin 500mg" and a recorded "amoxicillin" allergy trips on the same.
+// ─────────────────────────────────────────────────────────────────────────
+const ALLERGY_CLASS_MEMBERS: Record<string, string[]> = {
+  penicillin: ['penicillin', 'amoxicillin', 'ampicillin', 'flucloxacillin', 'cloxacillin', 'co-amoxiclav', 'amoxiclav', 'benzylpenicillin', 'piperacillin'],
+  sulfa: ['cotrimoxazole', 'co-trimoxazole', 'sulfamethoxazole', 'sulfadoxine', 'sulfasalazine'],
+  sulfonamide: ['cotrimoxazole', 'co-trimoxazole', 'sulfamethoxazole', 'sulfadoxine', 'sulfasalazine'],
+  nsaid: ['ibuprofen', 'diclofenac', 'aspirin', 'naproxen', 'indomethacin'],
+  aspirin: ['aspirin', 'acetylsalicylic'],
+  cephalosporin: ['ceftriaxone', 'cefixime', 'cefuroxime', 'cephalexin', 'cefotaxime'],
+  quinine: ['quinine', 'quinidine'],
+  sulphonamide: ['cotrimoxazole', 'co-trimoxazole', 'sulfamethoxazole', 'sulfadoxine'],
+};
+
+export interface AllergyAlert {
+  medication: string;
+  allergy: string;
+  /** Why it matched: direct name hit vs same drug-class member. */
+  reason: 'direct' | 'class';
+}
+
+/** Criticality-aware allergy alert (P0.3) used by the structured check. */
+export interface StructuredAllergyAlert extends AllergyAlert {
+  criticality: 'mild' | 'moderate' | 'severe' | 'unknown';
+  /** Free-text reaction recorded for the allergy, if any. */
+  reaction?: string;
+  /**
+   * Severe-criticality matches set this. The prescribing UI should require an
+   * explicit, reasoned override before proceeding rather than silently warning
+   * — without hard-blocking, so emergency care is never gated (see consultation
+   * page: alerts are advisory by design).
+   */
+  requiresOverride: boolean;
+}
+
+/** Minimal shape this module needs from a structured allergy entry. */
+export interface AllergyLike {
+  substance: string;
+  criticality?: 'mild' | 'moderate' | 'severe' | 'unknown';
+  reaction?: string;
+  status?: string;
+}
+
+/** Returns the drug-name fragments an allergy term should flag. */
+function allergyTargets(allergy: string): string[] {
+  const a = normalize(allergy);
+  const targets = new Set<string>([a]);
+  for (const [klass, members] of Object.entries(ALLERGY_CLASS_MEMBERS)) {
+    if (a.includes(klass) || members.some(m => a.includes(m))) {
+      members.forEach(m => targets.add(m));
+      targets.add(klass);
+    }
+  }
+  return [...targets].filter(Boolean);
+}
+
+const NO_ALLERGY_SENTINELS = ['none', 'nkda', 'no known', 'nil', 'n/a', 'na'];
+
+/**
+ * Cross-check a list of medications against a patient's recorded allergies.
+ * Class-aware (penicillin allergy flags amoxicillin, etc.).
+ */
+export function checkAllergies(medications: string[], allergies: string[]): AllergyAlert[] {
+  const alerts: AllergyAlert[] = [];
+  const meds = (medications || []).filter(Boolean);
+  const allgs = (allergies || [])
+    .filter(Boolean)
+    .filter(a => !NO_ALLERGY_SENTINELS.some(s => normalize(a) === s || normalize(a).startsWith(s)));
+  for (const allergy of allgs) {
+    const targets = allergyTargets(allergy);
+    for (const med of meds) {
+      const m = normalize(med);
+      const direct = m.includes(normalize(allergy)) || normalize(allergy).includes(m);
+      const klass = targets.some(t => t.length >= 4 && m.includes(t));
+      if (direct || klass) {
+        alerts.push({ medication: med, allergy, reason: direct ? 'direct' : 'class' });
+      }
+    }
+  }
+  return alerts;
+}
+
+/**
+ * Criticality-aware drug–allergy check (P0.3). Same class-aware matching as
+ * {@link checkAllergies}, but driven by structured allergy entries so each
+ * alert carries the recorded criticality and reaction, and severe matches are
+ * flagged `requiresOverride` for the prescribing UI to escalate.
+ *
+ * Only `active` allergies are considered. Inactive / resolved / entered-in-error
+ * entries are ignored.
+ */
+export function checkAllergiesStructured(
+  medications: string[],
+  allergies: AllergyLike[],
+): StructuredAllergyAlert[] {
+  const alerts: StructuredAllergyAlert[] = [];
+  const meds = (medications || []).filter(Boolean);
+  const allgs = (allergies || [])
+    .filter((a) => a && a.substance && (a.status === undefined || a.status === 'active'))
+    .filter((a) => !isNoAllergySentinel(a.substance));
+  for (const allergy of allgs) {
+    const targets = allergyTargets(allergy.substance);
+    for (const med of meds) {
+      const m = normalize(med);
+      const direct = m.includes(normalize(allergy.substance)) || normalize(allergy.substance).includes(m);
+      const klass = targets.some((t) => t.length >= 4 && m.includes(t));
+      if (direct || klass) {
+        const criticality = allergy.criticality ?? 'unknown';
+        alerts.push({
+          medication: med,
+          allergy: allergy.substance,
+          reason: direct ? 'direct' : 'class',
+          criticality,
+          reaction: allergy.reaction,
+          // Fail-safe: a severe match clearly needs an override, but so does an
+          // 'unknown'-criticality match (common for migrated/legacy allergies) —
+          // we must not silently treat "we don't know" as safe. Only explicitly
+          // mild/moderate matches stay advisory.
+          requiresOverride: criticality === 'severe' || criticality === 'unknown',
+        });
+      }
+    }
+  }
+  return alerts;
+}
+
+/** Dose/strength/form tokens to drop when keying a medication by its drug name. */
+const DOSE_FORM_TOKENS = new Set([
+  'mg', 'g', 'mcg', 'ug', 'ml', 'l', 'iu', 'u', 'meq', 'mmol', '%',
+  'tab', 'tabs', 'tablet', 'tablets', 'cap', 'caps', 'capsule', 'capsules',
+  'syrup', 'suspension', 'susp', 'solution', 'soln', 'drops', 'cream', 'ointment',
+  'injection', 'inj', 'vial', 'amp', 'ampoule', 'sachet', 'suppository',
+  'oral', 'iv', 'im', 'sc', 'po', 'pr', 'od', 'bd', 'tds', 'qds', 'prn', 'stat', 'x',
+]);
+
+/**
+ * Key a medication on its full drug name, stripping dose/strength/form tokens.
+ * Keeps multi-word/combination names intact ("artemether-lumefantrine"), so
+ * "Amoxicillin 250mg" and "Amoxicillin 500mg" collide (same drug) while
+ * "Artemether-Lumefantrine" and "Artemether" do NOT (different drugs).
+ */
+function drugNameKey(med: string): string {
+  return normalize(med)
+    .split(/[\s,]+/)
+    .filter((tok) => tok && !/\d/.test(tok) && !DOSE_FORM_TOKENS.has(tok))
+    .join(' ')
+    .trim();
+}
+
+/**
+ * Detect duplicate / therapeutic-overlap orders within a single medication
+ * list (same drug ordered twice). Returns the duplicated drug display names.
+ */
+export function findDuplicateMedications(medications: string[]): string[] {
+  const seen = new Map<string, string>();
+  const dupes = new Set<string>();
+  for (const med of (medications || []).filter(Boolean)) {
+    const key = drugNameKey(med);
+    if (!key) continue;
+    if (seen.has(key)) dupes.add(seen.get(key)!);
+    else seen.set(key, med);
+  }
+  return [...dupes];
 }

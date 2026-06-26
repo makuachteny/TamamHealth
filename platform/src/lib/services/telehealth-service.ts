@@ -2,16 +2,15 @@ import { telehealthDB } from '../db';
 import type { TelehealthSessionDoc, TelehealthStatus } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 import { jubaDate } from '../time-juba';
 
 export async function getAllSessions(scope?: DataScope): Promise<TelehealthSessionDoc[]> {
   const db = telehealthDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as TelehealthSessionDoc)
-    .filter(d => d && d.type === 'telehealth_session')
+  const all = (await findByType<TelehealthSessionDoc>(db, 'telehealth_session'))
     .sort((a, b) => {
       const dateA = `${a.scheduledDate}T${a.scheduledTime}`;
       const dateB = `${b.scheduledDate}T${b.scheduledTime}`;
@@ -73,6 +72,14 @@ export async function createSession(
   await logAuditSafe('CREATE_TELEHEALTH', data.providerId, data.providerName,
     `Telehealth session ${doc._id}: ${data.patientName} with ${data.providerName} on ${data.scheduledDate} at ${data.scheduledTime}`
   );
+  emitSyncEvent({
+    resourceType: 'telehealth_session',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
@@ -104,6 +111,14 @@ export async function updateSessionStatus(
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_TELEHEALTH', undefined, undefined, `Telehealth session ${id} status changed to ${status}`);
+    emitSyncEvent({
+      resourceType: 'telehealth_session',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;
@@ -121,6 +136,14 @@ export async function updateSession(
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_TELEHEALTH', undefined, undefined, `Telehealth session ${id} updated`);
+    emitSyncEvent({
+      resourceType: 'telehealth_session',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;

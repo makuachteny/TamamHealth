@@ -18,6 +18,7 @@
  */
 import { patientsDB } from '../db';
 import type { PatientDoc } from '../db-types';
+import { findByType } from './db-query';
 
 export interface MpiCandidate {
   patient: PatientDoc;
@@ -95,8 +96,7 @@ export function jaroWinkler(a: string, b: string): number {
  */
 export async function matchPatient(query: MpiQuery, limit = 10): Promise<MpiCandidate[]> {
   const db = patientsDB();
-  const all = await db.allDocs({ include_docs: true });
-  const patients = all.rows.map((r) => r.doc as PatientDoc).filter((d) => d && d.type === 'patient');
+  const patients = await findByType<PatientDoc>(db, 'patient');
 
   const candidates: MpiCandidate[] = [];
 

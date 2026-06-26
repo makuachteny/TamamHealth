@@ -6,6 +6,28 @@ import { v4 as uuidv4 } from 'uuid';
 import { validatePatientData, ValidationError } from '../validation';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
+import { getSettings } from '../settings/settings-store';
+import { normalizePhone, normalizeEmail, normalizeNationalId } from '../field-formats';
+
+/**
+ * Canonicalize contact/identity fields before validation + storage so every
+ * patient record holds the same format (phones as +211XXXXXXXXX, email
+ * lower-cased, national ID upper-cased). Invalid phones are left untouched so
+ * validation surfaces a clear error rather than silently dropping the value.
+ */
+function normalizePatientContact<T extends Record<string, unknown>>(data: T): T {
+  const out = { ...data } as Record<string, unknown>;
+  for (const f of ['phone', 'altPhone', 'whatsapp', 'nokPhone']) {
+    if (out[f]) {
+      const n = normalizePhone(out[f]);
+      if (n) out[f] = n;
+    }
+  }
+  if (out.email) out.email = normalizeEmail(out.email);
+  if (out.nationalId) out.nationalId = normalizeNationalId(out.nationalId);
+  return out as T;
+}
 
 /**
  * Generate a geocode ID from boma code and household number.
@@ -19,10 +41,7 @@ export function generateGeocodeId(bomaCode: string, householdNumber: number): st
 
 export async function getAllPatients(scope?: DataScope): Promise<PatientDoc[]> {
   const db = patientsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as PatientDoc)
-    .filter(d => d && d.type === 'patient');
+  const all = await findByType<PatientDoc>(db, 'patient');
   /* istanbul ignore next -- scope filter: tested with and without */
   return scope ? filterByScope(all, scope) : all;
 }
@@ -60,6 +79,15 @@ const DEFAULT_HOSPITAL_PREFIX =
   process.env.NEXT_PUBLIC_HOSPITAL_NUMBER_DEFAULT_PREFIX || 'TAB';
 
 /**
+ * Effective default hospital-number prefix: prefer the live facility setting,
+ * then the env-configured default, then 'TAB'. The settings default mirrors
+ * 'TAB', so behaviour is identical until an admin changes it.
+ */
+function defaultHospitalPrefix(): string {
+  return getSettings().hospitalNumberPrefix || DEFAULT_HOSPITAL_PREFIX;
+}
+
+/**
  * Derive a 3-letter prefix from a hospital's display name when no explicit
  * `code` field exists on the doc. Picks initials of the first three words
  * (e.g. "Juba Teaching Hospital" -> "JTH"). Falls back to the first three
@@ -76,7 +104,7 @@ function deriveHospitalPrefix(name: string): string {
 
 /* istanbul ignore next -- private utility: hospital prefix lookup */
 async function getHospitalPrefix(hospitalId?: string): Promise<string> {
-  if (!hospitalId) return DEFAULT_HOSPITAL_PREFIX;
+  if (!hospitalId) return defaultHospitalPrefix();
 
   // Prefer the hospital's own `code` (or derived from name) when the doc is
   // present in hospitalsDB. This works for any deployment, not just the demo
@@ -95,7 +123,7 @@ async function getHospitalPrefix(hospitalId?: string): Promise<string> {
   if (hospitalId.startsWith('phcc-')) return 'PHC';
   if (hospitalId.startsWith('phcu-')) return 'BMU';
   if (hospitalId.startsWith('county-')) return 'CTY';
-  return DEFAULT_HOSPITAL_PREFIX;
+  return defaultHospitalPrefix();
 }
 
 /* istanbul ignore next -- private utility: org ID inference */
@@ -159,7 +187,8 @@ async function checkDuplicates(data: Record<string, unknown>, scope?: DataScope)
   return null;
 }
 
-export async function createPatient(data: Omit<PatientDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>): Promise<PatientDoc> {
+export async function createPatient(rawData: Omit<PatientDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>): Promise<PatientDoc> {
+  const data = normalizePatientContact(rawData as unknown as Record<string, unknown>) as typeof rawData;
   const errors = validatePatientData(data as unknown as Record<string, unknown>);
 
   // Check for duplicate patients
@@ -200,7 +229,8 @@ export async function createPatient(data: Omit<PatientDoc, '_id' | '_rev' | 'typ
   return doc;
 }
 
-export async function updatePatient(id: string, data: Partial<PatientDoc>): Promise<PatientDoc | null> {
+export async function updatePatient(id: string, rawData: Partial<PatientDoc>): Promise<PatientDoc | null> {
+  const data = normalizePatientContact(rawData as unknown as Record<string, unknown>) as Partial<PatientDoc>;
   const db = patientsDB();
   let existing: PatientDoc;
   try {
@@ -240,6 +270,66 @@ export async function updatePatient(id: string, data: Partial<PatientDoc>): Prom
   return updated;
 }
 
+/**
+ * Atomically read-modify-write a patient document with optimistic-concurrency
+ * retry. The `mutate` callback receives the LATEST persisted patient on each
+ * attempt and returns the field patch to apply (or null to abort as a no-op).
+ * On a revision conflict (concurrent write) the read+mutate is retried against
+ * fresh data, so two simultaneous edits to array fields like `structuredAllergies`
+ * can't silently drop each other (audit finding H2).
+ *
+ * Used for the on-chart structured lists (allergies, directives, care alerts).
+ */
+export async function mutatePatient(
+  id: string,
+  mutate: (patient: PatientDoc) => Partial<PatientDoc> | null,
+  maxRetries = 5,
+): Promise<PatientDoc | null> {
+  const db = patientsDB();
+  for (let attempt = 0; ; attempt++) {
+    let existing: PatientDoc;
+    try {
+      existing = await db.get(id) as PatientDoc;
+    } catch (err) {
+      const e = err as { name?: string; status?: number } | undefined;
+      if (e && (e.name === 'not_found' || e.status === 404)) return null;
+      throw err;
+    }
+    const patch = mutate(existing);
+    if (patch === null) return existing;
+    const updated = {
+      ...existing,
+      ...patch,
+      _id: existing._id,
+      _rev: existing._rev,
+      updatedAt: new Date().toISOString(),
+    } as PatientDoc;
+    const errors = validatePatientData(updated as unknown as Record<string, unknown>);
+    if (Object.keys(errors).length > 0) {
+      throw new ValidationError(errors);
+    }
+    try {
+      const resp = await db.put(updated);
+      updated._rev = resp.rev;
+      emitSyncEvent({
+        resourceType: 'patient',
+        resourceId: updated._id,
+        operation: 'update',
+        resourceVersion: updated._rev,
+        orgId: updated.orgId,
+        hospitalId: updated.registrationHospital,
+      });
+      return updated;
+    } catch (err) {
+      const e = err as { name?: string; status?: number } | undefined;
+      if (e && (e.name === 'conflict' || e.status === 409) && attempt < maxRetries) {
+        continue; // re-read latest revision and re-apply the mutation
+      }
+      throw err;
+    }
+  }
+}
+
 // One-shot per-process index creation. Mango createIndex is idempotent
 // server-side but each call costs an HTTP round-trip, so we cache.
 const hospitalIndexCreated = { done: false };
@@ -266,8 +356,14 @@ export async function getPatientsByHospital(hospitalId: string): Promise<Patient
 
 export async function archivePatient(id: string, actor?: string): Promise<PatientDoc | null> {
   const db = patientsDB();
-  const existing = await db.get(id) as PatientDoc;
-  if (!existing) return null;
+  // PouchDB.get throws on not-found (it never returns falsy), so translate that
+  // into the documented null contract instead of letting it propagate.
+  let existing: PatientDoc;
+  try {
+    existing = await db.get(id) as PatientDoc;
+  } catch {
+    return null;
+  }
   const updated: PatientDoc = {
     ...existing,
     isActive: false,
@@ -290,8 +386,12 @@ export async function archivePatient(id: string, actor?: string): Promise<Patien
 
 export async function unarchivePatient(id: string, actor?: string): Promise<PatientDoc | null> {
   const db = patientsDB();
-  const existing = await db.get(id) as PatientDoc;
-  if (!existing) return null;
+  let existing: PatientDoc;
+  try {
+    existing = await db.get(id) as PatientDoc;
+  } catch {
+    return null;
+  }
   const updated: PatientDoc = {
     ...existing,
     isActive: true,

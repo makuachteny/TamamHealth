@@ -1,17 +1,27 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import {
-  Search, X, Wallet, Activity, AlertCircle, ChevronRight, ExternalLink, ArrowRight, Receipt, Shield, Clock,
+  X, Wallet, Activity, AlertCircle, ChevronRight, ExternalLink, Receipt, Shield, Clock, Banknote,
+  RotateCcw, Ban, AlertTriangle,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { SearchInput, FilterMenu } from '@/components/filters';
+import { computePlanKpis } from '@/components/payments/PlanKpiCards';
+import DataTile from '@/components/DataTile';
+import Modal from '@/components/Modal';
+import PaymentPanel from '@/components/payments/PaymentPanel';
 import { getMethodConfig } from '@/lib/payment-method-config';
 import type { PaymentDoc, ClaimDoc, PaymentPlanDoc } from '@/lib/db-types-payments';
 import type { BillingDoc } from '@/lib/db-types-billing';
+import { formatMoney } from '@/lib/format-utils';
 
-const fmt = (n: number) => 'SSP ' + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+// Shared grid template for the patient-account list so the column header row and
+// every data row line up: Patient | Payments | Claims | Plans | Last activity | Balance | ›
+const PAYMENTS_COLS = 'minmax(0, 1fr) 120px 90px 80px 80px 130px 120px 110px 24px';
 
 interface PatientLine {
   patientId: string;
@@ -35,12 +45,32 @@ interface PaymentsData {
 
 export default function PaymentsPage() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const router = useRouter();
+  const { currentUser, globalSearch } = useApp();
   const [data, setData] = useState<PaymentsData>({ payments: [], claims: [], plans: [], bills: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState<PatientLine | null>(null);
+  // Text search comes from the shared global search bar (TopBar).
+  const search = globalSearch;
+  const [balanceFilter, setBalanceFilter] = useState('all');
+  const activeFilterCount = balanceFilter !== 'all' ? 1 : 0;
+  const clearFilters = () => setBalanceFilter('all');
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [payingLine, setPayingLine] = useState<PatientLine | null>(null);
+  // Inline "Collect payment" launcher: a header button opens a patient picker,
+  // and choosing a patient drops straight into the record-payment panel.
+  const [collectPickerOpen, setCollectPickerOpen] = useState(false);
+  const [collectSearch, setCollectSearch] = useState('');
+  // Installment recording for a payment plan (folded in from the old Plans page).
+  const [recordPlanFor, setRecordPlanFor] = useState<PaymentPlanDoc | null>(null);
+  const [planAmount, setPlanAmount] = useState('');
+  const [planNotes, setPlanNotes] = useState('');
+  const [savingPlan, setSavingPlan] = useState(false);
+  // Undo a recorded payment — Void (reverse) or Refund. Money is sensitive, so
+  // both go through a confirm dialog and the existing audited services.
+  const [reverseFor, setReverseFor] = useState<{ payment: PaymentDoc; mode: 'void' | 'refund' } | null>(null);
+  const [reverseReason, setReverseReason] = useState('');
+  const [reversing, setReversing] = useState(false);
 
   const scope = useMemo(() => (
     currentUser ? { orgId: currentUser.orgId, hospitalId: currentUser.hospitalId, role: currentUser.role } : undefined
@@ -140,12 +170,102 @@ export default function PaymentsPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return patientLines;
-    return patientLines.filter(l =>
-      l.patientName.toLowerCase().includes(q) ||
-      (l.hospitalNumber || '').toLowerCase().includes(q)
-    );
-  }, [patientLines, search]);
+    return patientLines.filter(l => {
+      if (balanceFilter === 'outstanding' && !(l.outstanding > 0)) return false;
+      if (balanceFilter === 'paid' && l.outstanding > 0) return false;
+      if (!q) return true;
+      return l.patientName.toLowerCase().includes(q) ||
+        (l.hospitalNumber || '').toLowerCase().includes(q);
+    });
+  }, [patientLines, search, balanceFilter]);
+
+  // A/R aging buckets — days since the encounter, over every bill still carrying
+  // a balance. Relocated from the old Billing cockpit so the biller sees how old
+  // the receivables are right on the bills screen.
+  const aging = useMemo(() => {
+    const buckets = { current: 0, d31: 0, d61: 0, d91: 0, d120: 0 };
+    const now = Date.now();
+    for (const b of data.bills) {
+      if ((b.balanceDue ?? 0) <= 0 || b.status === 'waived' || b.status === 'cancelled') continue;
+      const dateStr = b.encounterDate || b.createdAt;
+      const days = Math.floor((now - new Date(dateStr).getTime()) / 86_400_000);
+      if (days <= 30) buckets.current += b.balanceDue;
+      else if (days <= 60) buckets.d31 += b.balanceDue;
+      else if (days <= 90) buckets.d61 += b.balanceDue;
+      else if (days <= 120) buckets.d91 += b.balanceDue;
+      else buckets.d120 += b.balanceDue;
+    }
+    return buckets;
+  }, [data.bills]);
+
+  // Derive the open patient's line from the live aggregates so the drawer's
+  // balance/totals refresh automatically after a payment is recorded.
+  const selectedLine = useMemo(
+    () => (selectedPatientId ? patientLines.find(l => l.patientId === selectedPatientId) || null : null),
+    [selectedPatientId, patientLines],
+  );
+
+  // Record an installment against a payment plan (folded in from the old
+  // standalone Plans page so the cashier manages plans from the same screen).
+  const handleRecordPlanPayment = async () => {
+    if (!recordPlanFor) return;
+    const amount = parseFloat(planAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    setSavingPlan(true);
+    try {
+      const { recordPlanPayment } = await import('@/lib/services/payment-service');
+      const installmentNumber = recordPlanFor.monthlyAmount > 0
+        ? Math.floor(recordPlanFor.paidToDate / recordPlanFor.monthlyAmount) + 1
+        : 1;
+      const paymentId = `PAY-${Date.now()}`;
+      await recordPlanPayment(recordPlanFor._id, installmentNumber, paymentId, amount);
+      setRecordPlanFor(null);
+      setPlanAmount('');
+      setPlanNotes('');
+      loadData();
+    } catch (err) {
+      console.error('Failed to record plan payment:', err);
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
+  // Confirm + perform a payment reversal. Void uses reversePayment (status →
+  // reversed); Refund uses issueRefund. Both write an audit trail in-service.
+  const handleConfirmReverse = async () => {
+    if (!reverseFor) return;
+    const reason = reverseReason.trim();
+    if (!reason) return;
+    setReversing(true);
+    try {
+      const { reversePayment, issueRefund } = await import('@/lib/services/payment-service');
+      const p = reverseFor.payment;
+      if (reverseFor.mode === 'void') {
+        await reversePayment(p._id, reason, currentUser?._id || 'system', currentUser?.name || 'System');
+      } else {
+        await issueRefund({
+          paymentId: p._id,
+          patientId: p.patientId,
+          patientName: p.patientName,
+          amount: p.amount,
+          currency: p.currency,
+          method: p.method,
+          reason,
+          processedBy: currentUser?._id || 'system',
+          processedByName: currentUser?.name || 'System',
+          facilityId: p.facilityId || currentUser?.hospitalId || '',
+          orgId: p.orgId ?? currentUser?.orgId,
+        });
+      }
+      setReverseFor(null);
+      setReverseReason('');
+      loadData();
+    } catch (err) {
+      console.error('Failed to reverse payment:', err);
+    } finally {
+      setReversing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -163,8 +283,22 @@ export default function PaymentsPage() {
 
   return (
     <>
-      <TopBar title={t('payments.title')} />
-      <main className="page-container page-enter">
+      <TopBar title={t('payments.title')} searchTrailing={
+            <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterMenu.Field label="All Accounts">
+                <select className="w-full text-sm" value={balanceFilter} onChange={e => setBalanceFilter(e.target.value)}>
+                  <option value="all">All Accounts</option>
+                  <option value="outstanding">Has Balance</option>
+                  <option value="paid">Paid Up</option>
+                </select>
+              </FilterMenu.Field>
+            </FilterMenu>
+          } actions={
+            <button onClick={() => { setCollectSearch(''); setCollectPickerOpen(true); }} className="btn btn-primary">
+              <Banknote className="w-4 h-4" /> {t('billing.collectPayment')}
+            </button>
+          } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {error && (
           <div style={{
             background: 'rgba(196, 69, 54, 0.08)', borderLeft: '4px solid #C44536',
@@ -176,106 +310,335 @@ export default function PaymentsPage() {
           </div>
         )}
 
-        {/* Page header */}
-        <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>{t('payments.title')}</h1>
-            <p className="text-[12px]" style={{ color: 'var(--text-muted)', marginTop: 2 }}>
-              {filtered.length} {filtered.length === 1 ? t('payments.patient') : t('payments.patients')}
-              {filtered.filter(l => l.outstanding > 0).length > 0 && (
-                <> · <span style={{ color: '#C44536', fontWeight: 600 }}>{t('payments.withOutstandingBalance', { count: filtered.filter(l => l.outstanding > 0).length })}</span></>
-              )}
-            </p>
-          </div>
-          <div className="relative" style={{ minWidth: 280 }}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input
-              className="pl-9 search-icon-input w-full"
-              placeholder={t('payments.searchPlaceholder')}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ background: 'var(--overlay-subtle)' }}
-            />
-          </div>
-        </div>
+        {/* Payment Plans + A/R Aging — side by side, styled like the front-desk
+            Quick Actions / Appointments cards (dash-card + uppercase header). */}
+        {(() => {
+          const k = computePlanKpis(data.plans);
+          // Compact, neutral tiles (no colour tints) so the two cards stay short.
+          const tile = { minHeight: 56, padding: '7px 12px' } as const;
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4 lg:items-start">
+              {/* Payment plans */}
+              <div className="dash-card p-2.5 flex flex-col lg:self-start">
+                <h3 className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('plans.title')}</h3>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <DataTile style={tile} label={t('plans.kpiActivePlans')} value={k.activePlans} />
+                  <DataTile style={tile} label={t('plans.kpiTotalOutstanding')} value={formatMoney(k.totalOutstanding)} />
+                  <DataTile style={tile} label={t('plans.kpiDelinquentPlans')} value={k.delinquentPlans} />
+                  <DataTile style={tile} label={t('plans.kpiCompletedThisMonth')} value={k.completedThisMonth} />
+                </div>
+              </div>
 
-        {/* People list */}
-        <div className="dash-card overflow-hidden">
+              {/* A/R aging — how old the outstanding receivables are. */}
+              <div className="dash-card p-2.5 flex flex-col lg:self-start">
+                <h3 className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('billing.arAging')}</h3>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <DataTile style={tile} label={t('billing.agingCurrent')} value={formatMoney(aging.current)} />
+                  <DataTile style={tile} label={t('billing.agingFollowUp')} value={formatMoney(aging.d61)} />
+                  <DataTile style={tile} label={t('billing.agingAtRisk')} value={formatMoney(aging.d91)} />
+                  <DataTile style={tile} label={t('billing.agingCollections')} value={formatMoney(aging.d120)} />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* People list — fills the remaining viewport height; rows scroll inside. */}
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           {filtered.length === 0 ? (
             <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
               <Wallet className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
               {search ? t('payments.noPatientsMatch') : t('payments.noBillingActivity')}
             </div>
           ) : (
-            <div>
-              {filtered.map(line => {
-                const initials = line.patientName.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
-                const owing = line.outstanding > 0;
-                return (
-                  <button
-                    key={line.patientId}
-                    onClick={() => setSelectedPatient(line)}
-                    className="w-full text-left data-row hover:opacity-95 transition-opacity"
-                    style={owing ? { background: 'rgba(196, 69, 54, 0.04)' } : undefined}
-                  >
-                    <div
-                      className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[12px] font-bold text-white"
+            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+              <div style={{ minWidth: 900 }}>
+                {/* Column headers */}
+                <div
+                  className="grid items-center gap-3 px-4 py-2.5"
+                  style={{
+                    gridTemplateColumns: PAYMENTS_COLS,
+                    position: 'sticky', top: 0, zIndex: 1,
+                    background: 'var(--bg-card-solid)',
+                    borderBottom: '1px solid var(--border-light)',
+                  }}
+                >
+                  {[
+                    { label: t('payments.colPatient'), align: 'left' as const },
+                    { label: 'Patient ID', align: 'left' as const },
+                    { label: t('payments.colPayments'), align: 'right' as const },
+                    { label: t('payments.colClaims'), align: 'right' as const },
+                    { label: t('payments.colPlans'), align: 'right' as const },
+                    { label: t('payments.colLastActivity'), align: 'left' as const },
+                    { label: t('payments.colBalance'), align: 'right' as const },
+                    { label: 'Status', align: 'right' as const },
+                    { label: '', align: 'left' as const },
+                  ].map((h, i) => (
+                    <span
+                      key={i}
+                      className="text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap"
+                      style={{ color: 'var(--text-muted)', textAlign: h.align }}
+                    >
+                      {h.label}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Rows */}
+                {filtered.map(line => {
+                  const owing = line.outstanding > 0;
+                  return (
+                    <button
+                      key={line.patientId}
+                      onClick={() => setSelectedPatientId(line.patientId)}
+                      className="w-full text-left grid items-center gap-3 px-4 py-3 border-b hover:opacity-95 transition-opacity"
                       style={{
-                        background: owing
-                          ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)'
-                          : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)',
+                        gridTemplateColumns: PAYMENTS_COLS,
+                        borderColor: 'var(--border-light)',
+                        ...(owing ? { background: 'rgba(196, 69, 54, 0.04)' } : {}),
                       }}
                     >
-                      {initials || '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <div className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{line.patientName}</div>
-                        {line.hospitalNumber && (
-                          <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.10)', color: '#3b82f6', fontWeight: 600 }}>
-                            {line.hospitalNumber}
+                      {/* Patient */}
+                      <div className="min-w-0">
+                        {line.patientId && !line.patientId.startsWith('demo-') && !line.patientId.includes('_demo') ? (
+                          <span
+                            role="link"
+                            tabIndex={0}
+                            onClick={e => { e.stopPropagation(); router.push(`/patients/${line.patientId}`); }}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); router.push(`/patients/${line.patientId}`); } }}
+                            className="font-semibold text-sm truncate block hover:underline"
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            {line.patientName}
                           </span>
+                        ) : (
+                          <div className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>{line.patientName}</div>
                         )}
                       </div>
-                      <div className="text-[11px] mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {line.paymentCount > 0 && <span>{line.paymentCount} {line.paymentCount === 1 ? t('payments.payment') : t('payments.payments')}</span>}
-                        {line.openClaims > 0 && <span>· {line.openClaims === 1 ? t('payments.openClaim', { count: line.openClaims }) : t('payments.openClaims', { count: line.openClaims })}</span>}
-                        {line.activePlans > 0 && <span>· {line.activePlans === 1 ? t('payments.activePlan', { count: line.activePlans }) : t('payments.activePlans', { count: line.activePlans })}</span>}
-                        {line.lastActivity && <span>· {t('payments.lastActivity', { date: new Date(line.lastActivity).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) })}</span>}
+
+                      {/* Patient ID */}
+                      <div className="font-mono text-[12px] truncate" style={{ color: line.hospitalNumber ? '#3b82f6' : 'var(--text-muted)', fontWeight: 600 }}>
+                        {line.hospitalNumber || '—'}
                       </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      {owing ? (
-                        <>
-                          <div className="font-bold text-sm" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{fmt(line.outstanding)}</div>
-                          <div className="text-[10px] font-bold uppercase" style={{ color: '#C44536' }}>{t('billing.kpiOutstanding')}</div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="font-bold text-sm" style={{ color: '#15795C', fontVariantNumeric: 'tabular-nums' }}>{fmt(line.totalCollected)}</div>
-                          <div className="text-[10px] font-bold uppercase" style={{ color: '#15795C' }}>{t('payments.paid')}</div>
-                        </>
-                      )}
-                    </div>
-                    <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
-                  </button>
-                );
-              })}
+
+                      {/* Payments */}
+                      <div className="text-right text-[13px]" style={{ color: line.paymentCount > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                        {line.paymentCount > 0 ? line.paymentCount : '—'}
+                      </div>
+
+                      {/* Open claims */}
+                      <div className="text-right text-[13px]" style={{ color: line.openClaims > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                        {line.openClaims > 0 ? line.openClaims : '—'}
+                      </div>
+
+                      {/* Active plans */}
+                      <div className="text-right text-[13px]" style={{ color: line.activePlans > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                        {line.activePlans > 0 ? line.activePlans : '—'}
+                      </div>
+
+                      {/* Last activity */}
+                      <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                        {line.lastActivity ? new Date(line.lastActivity).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      </div>
+
+                      {/* Balance */}
+                      <div className="text-right font-bold text-sm" style={{ color: owing ? '#8B2E24' : '#15795C', fontVariantNumeric: 'tabular-nums' }}>
+                        {formatMoney(owing ? line.outstanding : line.totalCollected)}
+                      </div>
+
+                      {/* Status */}
+                      <div className="text-right text-[10px] font-bold uppercase tracking-wider" style={{ color: owing ? '#C44536' : '#15795C' }}>
+                        {owing ? t('billing.kpiOutstanding') : t('payments.paid')}
+                      </div>
+
+                      <ChevronRight className="w-4 h-4 flex-shrink-0 justify-self-end" style={{ color: 'var(--text-muted)' }} />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
       </main>
 
-      {/* Detail drawer */}
-      {selectedPatient && (
+      {/* Account detail — centered modal */}
+      {selectedLine && (
         <PatientBillingDetail
-          line={selectedPatient}
-          payments={data.payments.filter(p => p.patientId === selectedPatient.patientId)}
-          claims={data.claims.filter(c => c.patientId === selectedPatient.patientId)}
-          plans={data.plans.filter(p => p.patientId === selectedPatient.patientId)}
-          bills={data.bills.filter(b => b.patientId === selectedPatient.patientId)}
-          onClose={() => setSelectedPatient(null)}
+          line={selectedLine}
+          payments={data.payments.filter(p => p.patientId === selectedLine.patientId)}
+          claims={data.claims.filter(c => c.patientId === selectedLine.patientId)}
+          plans={data.plans.filter(p => p.patientId === selectedLine.patientId)}
+          bills={data.bills.filter(b => b.patientId === selectedLine.patientId)}
+          onClose={() => setSelectedPatientId(null)}
+          onRecordPayment={() => setPayingLine(selectedLine)}
+          onRecordPlanPayment={(plan) => { setRecordPlanFor(plan); setPlanAmount(''); setPlanNotes(''); }}
+          onReversePayment={(payment, mode) => { setReverseFor({ payment, mode }); setReverseReason(''); }}
         />
+      )}
+
+      {/* Confirm a payment reversal (Void or Refund) — money is sensitive, so the
+          biller must state a reason; the action runs through the audited service. */}
+      {reverseFor && (
+        <Modal onClose={() => { if (!reversing) setReverseFor(null); }} width={420}>
+          <div className="card-elevated" style={{ background: 'var(--bg-card-solid)', borderRadius: 16, padding: 0, overflow: 'hidden' }}>
+            <div className="px-5 py-4 border-b flex items-center gap-2.5" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
+                <AlertTriangle className="w-4 h-4" style={{ color: '#C44536' }} />
+              </div>
+              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                {reverseFor.mode === 'void' ? t('action.reverse') : t('action.undo')}
+              </h2>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                <div className="min-w-0">
+                  <div className="text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{reverseFor.payment.patientName}</div>
+                  <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                    {getMethodConfig(reverseFor.payment.method).label}
+                    {reverseFor.payment.reference && <span className="font-mono"> · {reverseFor.payment.reference}</span>}
+                  </div>
+                </div>
+                <div className="text-[14px] font-bold font-mono" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(reverseFor.payment.amount)}</div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('billing.reason')}</label>
+                <textarea
+                  value={reverseReason}
+                  onChange={(e) => setReverseReason(e.target.value)}
+                  rows={2}
+                  autoFocus
+                  className="w-full resize-none rounded-lg border px-3 py-2.5 text-sm"
+                  style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-input, var(--bg-card-solid))', color: 'var(--text-primary)' }}
+                />
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t flex items-center justify-end gap-2" style={{ borderColor: 'var(--border-light)' }}>
+              <button onClick={() => setReverseFor(null)} disabled={reversing} className="btn btn-secondary">{t('action.cancel')}</button>
+              <button
+                onClick={handleConfirmReverse}
+                disabled={!reverseReason.trim() || reversing}
+                className="btn inline-flex items-center gap-1.5 text-white"
+                style={{ background: '#C44536' }}
+              >
+                {reverseFor.mode === 'void' ? <Ban className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+                {t('action.confirm')}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Collect-payment patient picker (opened from the header button) */}
+      {collectPickerOpen && (
+        <Modal onClose={() => setCollectPickerOpen(false)} width={460}>
+          <div className="card-elevated" style={{ background: 'var(--bg-card-solid)', borderRadius: 16, padding: 0, overflow: 'hidden' }}>
+            <div className="px-5 py-4 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="flex items-center gap-2">
+                <Banknote className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+                <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('billing.collectPayment')}</h2>
+              </div>
+              <button onClick={() => setCollectPickerOpen(false)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-3">
+              <SearchInput value={collectSearch} onChange={setCollectSearch} placeholder={t('payments.searchPlaceholder')} />
+              <div className="mt-2 space-y-1" style={{ maxHeight: 360, overflowY: 'auto' }}>
+                {(() => {
+                  const q = collectSearch.trim().toLowerCase();
+                  const list = patientLines
+                    .filter(l => l.outstanding > 0)
+                    .filter(l => !q || l.patientName.toLowerCase().includes(q) || (l.hospitalNumber || '').toLowerCase().includes(q))
+                    .sort((a, b) => b.outstanding - a.outstanding);
+                  if (list.length === 0) {
+                    return <p className="text-center text-[12px] py-8" style={{ color: 'var(--text-muted)' }}>{t('payments.noOutstanding')}</p>;
+                  }
+                  return list.map(line => (
+                    <button
+                      key={line.patientId}
+                      onClick={() => { setPayingLine(line); setCollectPickerOpen(false); }}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-[var(--overlay-subtle)]"
+                      style={{ border: '1px solid var(--border-light)' }}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{line.patientName}</div>
+                        {line.hospitalNumber && <div className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{line.hospitalNumber}</div>}
+                      </div>
+                      <div className="text-[13px] font-bold flex-shrink-0" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(line.outstanding)}</div>
+                    </button>
+                  ));
+                })()}
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Record-payment form (cash / mobile money / card / insurance) */}
+      {payingLine && (
+        <PaymentPanel
+          patientId={payingLine.patientId}
+          patientName={payingLine.patientName}
+          amountDue={payingLine.outstanding}
+          onCancel={() => setPayingLine(null)}
+          onSuccess={() => { setPayingLine(null); loadData(); }}
+        />
+      )}
+
+      {/* Record an installment against a payment plan */}
+      {recordPlanFor && (
+        <Modal onClose={() => setRecordPlanFor(null)} width={440}>
+          <div className="card-elevated" style={{ background: 'var(--bg-card-solid)', borderRadius: 16, padding: 0, overflow: 'hidden' }}>
+            <div className="px-5 py-4 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="flex items-center gap-2">
+                <Receipt className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+                <div>
+                  <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('plans.recordPayment')}</h2>
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{recordPlanFor.patientName}</p>
+                </div>
+              </div>
+              <button onClick={() => setRecordPlanFor(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('plans.paymentAmountLabel')}</label>
+                <input
+                  type="number"
+                  value={planAmount}
+                  onChange={(e) => setPlanAmount(e.target.value)}
+                  placeholder={t('plans.paymentAmountPlaceholder')}
+                  autoFocus
+                  className="w-full rounded-lg border px-3 py-2.5 text-sm"
+                  style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-input, var(--bg-card-solid))', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('plans.notesLabel')}</label>
+                <textarea
+                  value={planNotes}
+                  onChange={(e) => setPlanNotes(e.target.value)}
+                  placeholder={t('plans.notesPlaceholder')}
+                  rows={3}
+                  className="w-full resize-none rounded-lg border px-3 py-2.5 text-sm"
+                  style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-input, var(--bg-card-solid))', color: 'var(--text-primary)' }}
+                />
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t flex items-center justify-end gap-2" style={{ borderColor: 'var(--border-light)' }}>
+              <button onClick={() => setRecordPlanFor(null)} className="btn btn-secondary">{t('action.cancel')}</button>
+              <button
+                onClick={handleRecordPlanPayment}
+                disabled={!planAmount || savingPlan}
+                className="btn btn-primary inline-flex items-center gap-1.5"
+              >
+                <Receipt className="w-4 h-4" />
+                {t('plans.recordPayment')}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </>
   );
@@ -283,21 +646,19 @@ export default function PaymentsPage() {
 
 // ═══ Detail drawer ═══════════════════════════════════════════════════
 
-function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }: {
+function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, onRecordPayment, onRecordPlanPayment, onReversePayment }: {
   line: PatientLine;
   payments: PaymentDoc[];
   claims: ClaimDoc[];
   plans: PaymentPlanDoc[];
   bills: BillingDoc[];
   onClose: () => void;
+  onRecordPayment: () => void;
+  onRecordPlanPayment: (plan: PaymentPlanDoc) => void;
+  onReversePayment: (payment: PaymentDoc, mode: 'void' | 'refund') => void;
 }) {
   const { t } = useTranslation();
-  // Lock body scroll while drawer is open
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, []);
+  const router = useRouter();
 
   // Saved payment methods (loaded on demand)
   const [methods, setMethods] = useState<{ id: string; label: string; type: string; brand?: string; isDefault: boolean }[]>([]);
@@ -327,39 +688,33 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
   }, [line.patientId]);
 
   const sortedPayments = [...payments].sort((a, b) => (b.processedAt || '').localeCompare(a.processedAt || ''));
-  const initials = line.patientName.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
   const owing = line.outstanding > 0;
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{ alignItems: 'stretch', justifyContent: 'flex-end' }}>
+    <Modal onClose={onClose} width={600} labelledBy="billing-detail-name">
       <div
         className="card-elevated"
-        onClick={e => e.stopPropagation()}
         style={{
-          width: 'min(640px, 100vw)',
-          height: '100vh',
           background: 'var(--bg-card-solid)',
-          overflow: 'auto',
-          borderRadius: 0,
+          overflow: 'hidden',
+          borderRadius: 16,
           padding: 0,
-          animation: 'modalSlideUp 0.25s ease-out',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: 'calc(100vh - 32px)',
         }}
       >
         {/* Header */}
         <div className="px-5 py-4 border-b flex items-start justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
           <div className="flex items-center gap-3">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center text-[14px] font-bold text-white flex-shrink-0"
-              style={{
-                background: owing
-                  ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)'
-                  : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)',
-              }}
-            >
-              {initials || '?'}
-            </div>
             <div>
-              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{line.patientName}</h2>
+              <button
+                onClick={() => router.push(`/patients/${line.patientId}`)}
+                className="text-left hover:underline"
+                title={t('payments.openPatientRecord')}
+              >
+                <h2 id="billing-detail-name" className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{line.patientName}</h2>
+              </button>
               {line.hospitalNumber && (
                 <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.10)', color: '#3b82f6', fontWeight: 600 }}>
                   {line.hospitalNumber}
@@ -385,15 +740,18 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
                 {owing ? t('billing.outstandingBalance') : t('billing.accountStatus')}
               </div>
               <div className="text-2xl font-extrabold" style={{ letterSpacing: -0.5, color: owing ? '#8B2E24' : '#15795C', fontVariantNumeric: 'tabular-nums' }}>
-                {owing ? fmt(line.outstanding) : t('billing.paidInFull')}
+                {owing ? formatMoney(line.outstanding) : t('billing.paidInFull')}
               </div>
             </div>
             <div className="text-right text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              <div>{t('payments.charged')}: <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{fmt(line.totalCharged)}</span></div>
-              <div>{t('payments.collected')}: <span className="font-mono" style={{ color: '#15795C' }}>{fmt(line.totalCollected)}</span></div>
+              <div>{t('payments.charged')}: <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{formatMoney(line.totalCharged)}</span></div>
+              <div>{t('payments.collected')}: <span className="font-mono" style={{ color: '#15795C' }}>{formatMoney(line.totalCollected)}</span></div>
             </div>
           </div>
         </div>
+
+        {/* Scrollable account sections */}
+        <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
 
         {/* Saved payment methods */}
         <Section title={t('payments.paymentMethods')} icon={<Shield className="w-4 h-4" />} count={methods.length}>
@@ -440,9 +798,9 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[12px] font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>{fmt(b.totalAmount)}</div>
+                    <div className="text-[12px] font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>{formatMoney(b.totalAmount)}</div>
                     <div className="text-[10px]" style={{ color: b.balanceDue > 0 ? '#C44536' : '#15795C' }}>
-                      {b.balanceDue > 0 ? t('payments.amountDue', { amount: fmt(b.balanceDue) }) : t('payments.paid')}
+                      {b.balanceDue > 0 ? t('payments.amountDue', { amount: formatMoney(b.balanceDue) }) : t('payments.paid')}
                     </div>
                   </div>
                 </div>
@@ -466,7 +824,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
                     background: reversed ? 'rgba(196, 69, 54, 0.06)' : 'var(--overlay-subtle)',
                     border: reversed ? '1px solid rgba(196, 69, 54, 0.25)' : 'none',
                   }}>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${cfg.color}1A` }}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent' }}>
                       <MIcon size={15} style={{ color: cfg.color }} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -485,8 +843,30 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
                         </div>
                       )}
                     </div>
-                    <div className={`text-[13px] font-bold font-mono`} style={{ color: reversed ? '#8B2E24' : '#15795C', fontVariantNumeric: 'tabular-nums', textDecoration: reversed ? 'line-through' : 'none' }}>
-                      {fmt(p.amount)}
+                    <div className="flex flex-col items-end gap-1.5">
+                      <div className={`text-[13px] font-bold font-mono`} style={{ color: reversed ? '#8B2E24' : '#15795C', fontVariantNumeric: 'tabular-nums', textDecoration: reversed ? 'line-through' : 'none' }}>
+                        {formatMoney(p.amount)}
+                      </div>
+                      {/* Undo a recorded payment — Void reverses it, Refund gives money
+                          back. Both go through a confirm dialog + audited service. */}
+                      {!reversed && p.status === 'posted' && (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => onReversePayment(p, 'void')}
+                            className="text-[10.5px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-opacity hover:opacity-80"
+                            style={{ border: '1px solid var(--border-medium)', color: 'var(--text-secondary)' }}
+                          >
+                            <Ban className="w-3 h-3" /> {t('action.reverse')}
+                          </button>
+                          <button
+                            onClick={() => onReversePayment(p, 'refund')}
+                            className="text-[10.5px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-opacity hover:opacity-80"
+                            style={{ border: '1px solid rgba(196, 69, 54, 0.30)', color: '#C44536' }}
+                          >
+                            <RotateCcw className="w-3 h-3" /> {t('action.undo')}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -529,38 +909,65 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose }:
             <Empty>{t('payments.noPaymentPlans')}</Empty>
           ) : (
             <div className="space-y-1.5">
-              {plans.map(p => (
-                <div key={p._id} className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {t('payments.planMonthly', { amount: fmt(p.monthlyAmount), months: p.termMonths })}
+              {plans.map(p => {
+                const planOutstanding = Math.max(0, p.totalBalance - p.paidToDate);
+                return (
+                  <div key={p._id} className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {t('payments.planMonthly', { amount: formatMoney(p.monthlyAmount), months: p.termMonths })}
+                        </div>
+                        <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                          {p.startDate.slice(0, 10)} → {p.endDate.slice(0, 10)} · {p.apr === 0 ? t('payments.interestFree') : t('payments.aprValue', { apr: p.apr })}
+                        </div>
                       </div>
-                      <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
-                        {p.startDate.slice(0, 10)} → {p.endDate.slice(0, 10)} · {p.apr === 0 ? t('payments.interestFree') : t('payments.aprValue', { apr: p.apr })}
-                      </div>
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
+                        background: p.status === 'active' ? 'rgba(59, 130, 246, 0.14)' : p.status === 'completed' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(228, 168, 75, 0.14)',
+                        color: p.status === 'active' ? '#15795C' : p.status === 'completed' ? '#3b82f6' : '#B8741C',
+                      }}>
+                        {p.status}
+                      </span>
                     </div>
-                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
-                      background: p.status === 'active' ? 'rgba(59, 130, 246, 0.14)' : p.status === 'completed' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(228, 168, 75, 0.14)',
-                      color: p.status === 'active' ? '#15795C' : p.status === 'completed' ? '#3b82f6' : '#B8741C',
-                    }}>
-                      {p.status}
-                    </span>
+                    <div className="flex items-center justify-between gap-3 mt-2 pt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
+                      <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                        {t('payments.paid')}: <span className="font-mono" style={{ color: '#15795C' }}>{formatMoney(p.paidToDate)}</span>
+                        {' · '}{t('billing.kpiOutstanding')}: <span className="font-mono" style={{ color: planOutstanding > 0 ? '#C44536' : 'var(--text-secondary)' }}>{formatMoney(planOutstanding)}</span>
+                      </div>
+                      {p.status === 'active' && (
+                        <button
+                          onClick={() => onRecordPlanPayment(p)}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg inline-flex items-center gap-1 whitespace-nowrap transition-opacity hover:opacity-90 text-white"
+                          style={{ background: 'var(--accent-primary)' }}
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                          {t('plans.recordPayment')}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Section>
 
+        </div>{/* /scrollable account sections */}
+
         {/* Footer actions */}
-        <div className="px-5 py-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
-          <a href={`/patients/${line.patientId}`} className="btn btn-secondary w-full inline-flex items-center justify-center gap-2">
-            {t('payments.openPatientRecord')} <ExternalLink className="w-3.5 h-3.5" /> <ArrowRight className="w-3.5 h-3.5" />
-          </a>
+        <div className="px-5 py-3 border-t flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+          <button onClick={() => router.push(`/patients/${line.patientId}`)} className="btn btn-secondary flex-1 inline-flex items-center justify-center gap-2">
+            {t('payments.openPatientRecord')} <ExternalLink className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onRecordPayment}
+            className="btn btn-primary flex-1 inline-flex items-center justify-center gap-2"
+          >
+            <Banknote className="w-4 h-4" /> {t('billing.collectPayment')}
+          </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -569,7 +976,7 @@ function Section({ title, icon, count, children }: { title: string; icon: React.
     <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-light)' }}>
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'transparent', color: 'var(--accent-primary)' }}>
             {icon}
           </div>
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h3>

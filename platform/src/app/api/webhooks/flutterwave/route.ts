@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuditLog } from '@/lib/audit/with-audit';
+import { updatePaymentStatus } from '@/lib/services/payment-service';
 import crypto from 'crypto';
 
 interface FlutterWaveCustomer {
@@ -88,9 +89,17 @@ async function postHandler(req: NextRequest) {
           timestamp: new Date().toISOString(),
         });
 
-        // In production, this would match the txRef to a pending payment
-        // and update the payment status via the payment service
-        // Example: await PaymentService.updatePaymentStatus(data.tx_ref, 'completed', { amount: data.amount, flutterWaveId: data.id })
+        // Match the txRef to the pending payment (stored as the payment's
+        // `reference`) and mark it posted. Unknown match is logged but still
+        // acked — never throw back at the gateway.
+        try {
+          const updated = await updatePaymentStatus(data.tx_ref, 'posted', { providerReference: String(data.id) });
+          if (!updated) {
+            console.warn('[Flutterwave Webhook] No matching payment for reference:', data.tx_ref);
+          }
+        } catch (persistErr) {
+          console.error('[Flutterwave Webhook] Failed to persist payment status:', persistErr);
+        }
 
         return NextResponse.json({
           status: 'ok',
@@ -105,8 +114,15 @@ async function postHandler(req: NextRequest) {
           timestamp: new Date().toISOString(),
         });
 
-        // In production, update payment status to failed
-        // Example: await PaymentService.updatePaymentStatus(data.tx_ref, 'failed', { reason: data.status })
+        // Mark the matching payment failed; ack the gateway regardless.
+        try {
+          const updated = await updatePaymentStatus(data.tx_ref, 'failed', { reason: data.status });
+          if (!updated) {
+            console.warn('[Flutterwave Webhook] No matching payment for reference:', data.tx_ref);
+          }
+        } catch (persistErr) {
+          console.error('[Flutterwave Webhook] Failed to persist payment status:', persistErr);
+        }
 
         return NextResponse.json({
           status: 'ok',

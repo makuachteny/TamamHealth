@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { makeCoalescer } from './live-reload';
 import type { ProblemDoc, ProblemStatus } from '../db-types';
 import { problemsDB } from '../db';
 import { useDataScope } from './useDataScope';
@@ -29,11 +30,13 @@ export function useProblems(patientId?: string) {
 
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) load(); });
     const changes = problemsDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) load(); })
+      .on('change', () => reload.trigger())
       .on('error', () => { /* swallow */ });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [load]);
@@ -59,6 +62,13 @@ export function useProblems(patientId?: string) {
     return doc;
   }, [load]);
 
+  const remove = useCallback(async (id: string) => {
+    const { deleteProblem } = await import('../services/problem-service');
+    const ok = await deleteProblem(id);
+    await load();
+    return ok;
+  }, [load]);
+
   // Filtered to a single patient when caller passes a patientId.
   const patientProblems = useMemo(
     () => patientId ? problems.filter(p => p.patientId === patientId) : problems,
@@ -78,6 +88,7 @@ export function useProblems(patientId?: string) {
     create,
     update,
     setStatus,
+    remove,
     reload: load,
   };
 }

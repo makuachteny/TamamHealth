@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
-import { Package, Plus, X, Search, AlertTriangle, CheckCircle2, Clock, Settings as Wrench } from '@/components/icons/lucide';
+import { Plus, X, CheckCircle2, Settings as Wrench } from '@/components/icons/lucide';
+import RowActionsMenu from '@/components/RowActionsMenu';
 import { useApp } from '@/lib/context';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { FilterMenu } from '@/components/filters';
 import type { AssetDoc, AssetCategory, AssetStatus } from '@/lib/db-types-asset';
 
 const CATEGORIES: { id: AssetCategory; labelKey: string }[] = [
@@ -32,14 +34,17 @@ const STATUS_TOKENS: Record<AssetStatus, { labelKey: string; color: string; bg: 
 };
 
 export default function AssetsPage() {
-  const { currentUser } = useApp();
+  const { currentUser, globalSearch } = useApp();
   const { assets, summary, create, setStatus, logService } = useAssets();
   const { showToast } = useToast();
   const { t } = useTranslation();
 
   const [filter, setFilter] = useState<AssetCategory | ''>('');
   const [statusFilter, setStatusFilter] = useState<AssetStatus | ''>('');
-  const [q, setQ] = useState('');
+  // Text search comes from the shared global search bar (TopBar).
+  const q = globalSearch;
+  const activeFilterCount = (filter ? 1 : 0) + (statusFilter ? 1 : 0);
+  const clearFilters = () => { setFilter(''); setStatusFilter(''); };
   const [createOpen, setCreateOpen] = useState(false);
   const [serviceFor, setServiceFor] = useState<AssetDoc | null>(null);
 
@@ -131,19 +136,27 @@ export default function AssetsPage() {
 
   return (
     <>
-      <TopBar title={t('equipment.topBarTitle')} />
-      <main className="page-container page-enter">
-        <PageHeader
-          icon={Package}
-          title={t('equipment.pageTitle')}
-          subtitle={t('equipment.pageSubtitle', { facility: facility.name, count: summary?.total ?? 0 })}
-          actions={
-            <button onClick={() => setCreateOpen(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('equipment.registerAsset')}
-            </button>
-          }
-        />
-
+      <TopBar title={t('equipment.topBarTitle')} searchTrailing={
+        <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+          <FilterMenu.Field label={t('equipment.allCategories')}>
+            <select value={filter} onChange={e => setFilter(e.target.value as AssetCategory | '')} className="w-full text-sm">
+              <option value="">{t('equipment.allCategories')}</option>
+              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{t(c.labelKey)}</option>)}
+            </select>
+          </FilterMenu.Field>
+          <FilterMenu.Field label={t('equipment.allStatuses')}>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as AssetStatus | '')} className="w-full text-sm">
+              <option value="">{t('equipment.allStatuses')}</option>
+              {(Object.entries(STATUS_TOKENS) as [AssetStatus, typeof STATUS_TOKENS[AssetStatus]][]).map(([id, tok]) => <option key={id} value={id}>{t(tok.labelKey)}</option>)}
+            </select>
+          </FilterMenu.Field>
+        </FilterMenu>
+      } actions={
+        <button onClick={() => setCreateOpen(true)} className="btn btn-primary">
+          <Plus className="w-4 h-4" /> {t('equipment.registerAsset')}
+        </button>
+      } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* KPI strip */}
         {summary && (
           <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch' }}>
@@ -162,29 +175,10 @@ export default function AssetsPage() {
           </div>
         )}
 
-        {/* Search + filters */}
-        <div className="dash-card p-3 mb-3">
-          <div className="flex gap-3 items-center flex-wrap">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-              <input className="pl-9 search-icon-input" placeholder={t('equipment.searchPlaceholder')} value={q} onChange={e => setQ(e.target.value)} style={{ background: 'var(--overlay-subtle)' }} />
-            </div>
-            <select value={filter} onChange={e => setFilter(e.target.value as AssetCategory | '')} className="text-sm">
-              <option value="">{t('equipment.allCategories')}</option>
-              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{t(c.labelKey)}</option>)}
-            </select>
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as AssetStatus | '')} className="text-sm">
-              <option value="">{t('equipment.allStatuses')}</option>
-              {(Object.entries(STATUS_TOKENS) as [AssetStatus, typeof STATUS_TOKENS[AssetStatus]][]).map(([id, tok]) => (
-                <option key={id} value={id}>{t(tok.labelKey)}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
         {/* Asset table */}
-        <div className="dash-card overflow-hidden">
-          <table className="data-table">
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+          <table className="data-table" style={{ minWidth: 720 }}>
             <thead>
               <tr>
                 <th>{t('equipment.colAsset')}</th>
@@ -223,19 +217,18 @@ export default function AssetsPage() {
                     <td className="text-xs">
                       {a.nextServiceDueAt ? (
                         <span style={{ color: dueSoon ? '#C44536' : 'var(--text-secondary)' }} className="inline-flex items-center gap-1">
-                          {dueSoon ? <AlertTriangle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                           {a.nextServiceDueAt}
                         </span>
                       ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                     </td>
                     <td>
-                      <div className="flex gap-1">
-                        <button className="btn btn-secondary btn-sm" onClick={() => setServiceFor(a)} title={t('equipment.logServiceTitle')}><Wrench className="w-3 h-3" /></button>
-                        {a.status !== 'operational' && (
-                          <button className="btn btn-secondary btn-sm" onClick={() => setStatus(a._id, 'operational', { id: currentUser?._id || 'unknown', name: currentUser?.name || 'Staff' })} title={t('equipment.markOperationalTitle')}>
-                            <CheckCircle2 className="w-3 h-3" />
-                          </button>
-                        )}
+                      <div className="flex">
+                        <RowActionsMenu
+                          actions={[
+                            { key: 'service', label: t('equipment.logServiceTitle'), icon: <Wrench className="w-4 h-4" />, onClick: () => setServiceFor(a) },
+                            ...(a.status !== 'operational' ? [{ key: 'operational', label: t('equipment.markOperationalTitle'), tone: 'success' as const, icon: <CheckCircle2 className="w-4 h-4" />, onClick: () => setStatus(a._id, 'operational', { id: currentUser?._id || 'unknown', name: currentUser?.name || 'Staff' }) }] : []),
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -243,11 +236,12 @@ export default function AssetsPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Register modal */}
         {createOpen && (
-          <div className="modal-backdrop" onClick={() => setCreateOpen(false)}>
+          <Modal onClose={() => setCreateOpen(false)}>
             <div className="modal-content card-elevated p-6 max-w-2xl w-full" style={{ maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold">{t('equipment.registerModalTitle')}</h3>
@@ -323,12 +317,12 @@ export default function AssetsPage() {
                 <button onClick={handleCreate} className="btn btn-primary flex-1">{t('equipment.register')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
 
         {/* Maintenance modal */}
         {serviceFor && (
-          <div className="modal-backdrop" onClick={() => setServiceFor(null)}>
+          <Modal onClose={() => setServiceFor(null)}>
             <div className="modal-content card-elevated p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -364,7 +358,7 @@ export default function AssetsPage() {
                 <button onClick={handleLogService} className="btn btn-primary flex-1">{t('equipment.saveLog')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </main>
     </>

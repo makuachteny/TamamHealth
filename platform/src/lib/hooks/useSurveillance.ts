@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { makeCoalescer } from './live-reload';
 import type { DiseaseAlertDoc } from '../db-types';
 import { diseaseAlertsDB } from '../db';
 import { useApp } from '../context';
@@ -36,11 +37,13 @@ export function useSurveillance() {
   // Live PouchDB subscription: re-load on any disease alert change.
   useEffect(() => {
     let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) loadAlerts(); });
     const changes = diseaseAlertsDB().changes({ since: 'now', live: true, include_docs: false })
-      .on('change', () => { if (!cancelled) loadAlerts(); })
+      .on('change', () => reload.trigger())
       .on('error', () => { /* swallow */ });
     return () => {
       cancelled = true;
+      reload.cancel();
       try { changes.cancel(); } catch { /* noop */ }
     };
   }, [loadAlerts]);

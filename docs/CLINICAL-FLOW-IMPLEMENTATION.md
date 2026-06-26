@@ -27,6 +27,7 @@ Guarded by `platform/src/__tests__/clinical-flow/state-machines.test.ts`
 | §2.7 / §2.7.1 | `patient-identity.ts` | Geocode ID `BOMA-{bomaCode}-HH{householdNumber}-{patientSuffix}`, temp/unknown IDs, stability assumptions |
 
 ### Role reconciliation note
+
 The document defines 11 *functional* roles (registration clerk, clinic clerk,
 triage nurse, rooming nurse, clinician, lab tech, pharmacist, cashier,
 records/HMIS officer, facility administrator, BHW). The platform's existing
@@ -35,6 +36,7 @@ via `mapsToUserRoles` rather than renamed in a single breaking change. Migration
 to capability-based checks happens in Phase 2.
 
 ## Phase 2 — Capability-based access (NEXT)
+
 - Replace title-based permission checks with capability checks
   (`hasCapability`) in `usePermissions.ts`, `role-routes.ts`, and the API
   `READ/WRITE/CREATE_ROLES` arrays.
@@ -43,6 +45,7 @@ to capability-based checks happens in Phase 2.
 - Add the **central vs. clinic clerk** split (today both map to `front_desk`).
 
 ## Phase 3 — Encounter engine + stations
+
 - Persist `encounterStatus` on the visit/encounter doc; expose a single
   `transitionEncounter()` service that enforces `ENCOUNTER_TRANSITIONS` and
   writes an audit entry (status, role-at-time, station, channel).
@@ -53,18 +56,21 @@ to capability-based checks happens in Phase 2.
 - Acuity-weighted, time-aged queues (`queuePriorityScore`) for every queue.
 
 ## Phase 4 — Orders, pharmacy, payment
+
 - Wire the lab/procedure/prescription lifecycles to the order docs; enforce
   "every result is reviewed" with the review SLAs and escalation.
 - Per-service payor tagging + facility payor registry + exemption auth workflow;
   checkout bill summary; Tier-1 medication safety flag.
 
 ## Phase 5 — BHW community workflow (mobile)
+
 - Catchment dashboard, household detail, visit templates per `BHW_VISIT_TYPES`,
   task/visit/surveillance state machines, offline-first with opportunistic sync,
   multi-channel referral capture (incl. front-desk proxy via BHW ID code),
   channel-preserving merge, supervision dashboards.
 
 ## Phase 6 — Cross-cutting & printing
+
 - Printing as a first-class channel (§2.6) for every patient-facing artifact.
 - Post-visit workflows (§6 Stage 11): result return, recall, referral tracking,
   adherence monitoring, BHW follow-up, surveillance/HMIS aggregation.

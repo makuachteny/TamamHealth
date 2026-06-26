@@ -3,7 +3,7 @@
  * GET  — List patients (supports ?q=search&hospitalId=xxx)
  * POST — Create a new patient
  *
- * Access: doctor, clinical_officer, nurse, front_desk, boma_health_worker,
+ * Access: doctor, clinical_officer, nurse, front_desk,
  *         medical_superintendent, hrio, super_admin, org_admin
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,15 +14,15 @@ import { withAuditLog } from '@/lib/audit/with-audit';
 import type { UserRole } from '@/lib/db-types';
 // Roles that may read patient lists
 const READ_ROLES: UserRole[] = [
-  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
-  'midwife', 'front_desk', 'cashier', 'boma_health_worker', 'medical_superintendent', 'hrio',
-  'payam_supervisor', 'data_entry_clerk', 'community_health_volunteer',
+  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'clinician', 'nurse',
+  'midwife', 'front_desk', 'cashier', 'medical_superintendent', 'hrio',
+  'data_entry_clerk',
   'nutritionist', 'radiologist', 'government',
 ];
 // Roles that may create patients
 const CREATE_ROLES: UserRole[] = [
-  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
-  'midwife', 'front_desk', 'boma_health_worker', 'medical_superintendent', 'hrio',
+  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'clinician', 'nurse',
+  'midwife', 'front_desk', 'medical_superintendent', 'hrio',
   'data_entry_clerk',
 ];
 export async function GET(request: NextRequest) {

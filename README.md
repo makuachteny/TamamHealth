@@ -400,21 +400,29 @@ tamamhealth/
 
 ## Security Notes
 
-**Current security posture (MVP stage):**
+**Implemented controls:**
 
-- CSP, HSTS, X-Frame-Options, X-Content-Type-Options headers configured
-- bcrypt password hashing (12 rounds)
-- JWT authentication with role-based middleware
-- Rate limiting on login (5 attempts / 15-min lockout)
-- Input validation on patient data, vital signs, file uploads
+- CSP, HSTS, X-Frame-Options, X-Content-Type-Options headers (`next.config.mjs`)
+- bcrypt password hashing; admin-issued credentials force a password change on first use
+- Server-issued JWT (HS256, env `JWT_SECRET`, 8h) with role-based middleware; the
+  server refuses to start on the default secret in production
+- Token revocation enforced at `/api/auth/me` and every `/api/*` route
+- Two-layer CSRF: Origin/Host check + HMAC double-submit token (`middleware.ts`)
+- Rate limiting on login (shared store via Upstash when configured; in-memory fallback)
+- Server-side persistence + sync (CouchDB) with org-scoped replication filters
+- Per-tab AES-GCM encryption of in-progress PHI drafts; full local DB wipe on logout
+- Demo mode and the demo-credentials endpoint gated by `NEXT_PUBLIC_DEMO_MODE`
 
-**Known gaps for production hardening:**
+**Remaining hardening for a real PHI / in-country deployment** — see
+[`docs/operations/production-hardening.md`](docs/operations/production-hardening.md),
+enforced by [`scripts/preflight.sh`](scripts/preflight.sh):
 
-- JWT secret should be moved to environment variable
-- Demo credentials should be behind NODE_ENV guard
-- CSRF tokens needed for state-changing operations
-- Server-side database (CouchDB) needed for data persistence
-- Audit log integrity needs server-side protection
+- TLS termination for **CouchDB** (not just the app) and encryption-at-rest for the
+  CouchDB/Postgres volumes on an in-country / MoH-approved host (data residency)
+- Nightly **encrypted, offsite** backups with a tested restore drill
+- Secret rotation procedure + a secrets manager (avoid plaintext env files on disk)
+- CouchDB per-database `_security` for multi-tenant isolation (defence-in-depth)
+- A shared rate-limit store before running more than one app instance
 
 ---
 

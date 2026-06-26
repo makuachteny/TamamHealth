@@ -1,27 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#eff6ff"/>
-  <svg x="76" y="76" width="360" height="360" viewBox="90 -11 316 316">
+  <svg x="0" y="0" width="512" height="512" viewBox="0 0 203 203">
     <g fill="#3b82f6">
-      <circle cx="127.67" cy="28.84" r="28.84"/>
-      <circle cx="218.69" cy="46.28" r="28.84"/>
-      <circle cx="296.1" cy="97.22" r="28.84"/>
-      <circle cx="348.12" cy="173.91" r="28.84"/>
-      <circle cx="366.84" cy="264.67" r="28.84"/>
-      <circle cx="130.25" cy="103.54" r="24.99"/>
-      <circle cx="192.48" cy="116.29" r="24.99"/>
-      <circle cx="245.1" cy="151.87" r="24.99"/>
-      <circle cx="280.09" cy="204.88" r="24.99"/>
-      <circle cx="292.14" cy="267.26" r="24.99"/>
-      <circle cx="129.41" cy="171.67" r="14.53"/>
-      <circle cx="165.64" cy="178.9" r="14.53"/>
-      <circle cx="196.34" cy="199.45" r="14.53"/>
-      <circle cx="216.83" cy="230.18" r="14.53"/>
-      <circle cx="224.01" cy="266.42" r="14.53"/>
-      <circle cx="129.38" cy="213.9" r="8.05"/>
-      <circle cx="149.44" cy="217.9" r="8.05"/>
-      <circle cx="166.45" cy="229.28" r="8.05"/>
-      <circle cx="177.81" cy="246.31" r="8.05"/>
-      <circle cx="181.78" cy="266.38" r="8.05"/>
+      <circle cx="19.7" cy="19.7" r="19.7"/>
+      <circle cx="81.88" cy="31.62" r="19.7"/>
+      <circle cx="134.77" cy="66.42" r="19.7"/>
+      <circle cx="170.31" cy="118.81" r="19.7"/>
+      <circle cx="183.1" cy="180.82" r="19.7"/>
+      <circle cx="21.47" cy="70.74" r="17.07"/>
+      <circle cx="63.98" cy="79.44" r="17.07"/>
+      <circle cx="99.93" cy="103.75" r="17.07"/>
+      <circle cx="123.83" cy="139.97" r="17.07"/>
+      <circle cx="132.06" cy="182.58" r="17.07"/>
+      <circle cx="20.89" cy="117.28" r="9.93"/>
+      <circle cx="45.64" cy="122.22" r="9.93"/>
+      <circle cx="66.61" cy="136.26" r="9.93"/>
+      <circle cx="80.62" cy="157.25" r="9.93"/>
+      <circle cx="85.52" cy="182.01" r="9.93"/>
+      <circle cx="20.87" cy="146.13" r="5.5"/>
+      <circle cx="34.58" cy="148.86" r="5.5"/>
+      <circle cx="46.2" cy="156.64" r="5.5"/>
+      <circle cx="53.95" cy="168.27" r="5.5"/>
+      <circle cx="56.67" cy="181.98" r="5.5"/>
     </g>
   </svg>
 </svg>

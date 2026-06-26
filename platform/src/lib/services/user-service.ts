@@ -2,15 +2,17 @@ import { usersDB } from '../db';
 import type { UserDoc, UserRole } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
+import { ROLE_LABEL } from '../role-display';
 
-const VALID_ROLES: UserRole[] = ['super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife', 'lab_tech', 'pharmacist', 'front_desk', 'cashier', 'government', 'county_health_director', 'boma_health_worker', 'payam_supervisor', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'community_health_volunteer', 'nutritionist', 'radiologist', 'hospital_manager', 'medical_biller'];
+// Single source of truth: every role defined in ROLE_LABEL (a
+// Record<UserRole, …>) is a valid role. Deriving the list here means new roles
+// can never go stale/missing in user validation again.
+const VALID_ROLES = Object.keys(ROLE_LABEL) as UserRole[];
 
 export async function getAllUsers(scope?: DataScope): Promise<UserDoc[]> {
   const db = usersDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as UserDoc)
-    .filter(d => d && d.type === 'user');
+  const all = await findByType<UserDoc>(db, 'user');
   /* istanbul ignore next -- scope filter: tested with and without */
   return scope ? filterByScope(all, scope) : all;
 }
@@ -106,6 +108,7 @@ export async function createUser(
 
 interface UpdateUserData {
   name?: string;
+  phone?: string;
   role?: UserRole;
   hospitalId?: string;
   hospitalName?: string;

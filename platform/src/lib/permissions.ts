@@ -5,44 +5,45 @@ import {
   isPathAllowed as isPathAllowedFromTable,
   getDefaultDashboard as getDefaultDashboardFromTable,
 } from './role-routes';
+// Clean single-stroke (Tailwind-style) outline icons straight from lucide-react
+// so the sidebar nav renders flat blue icons rather than the duotone shim.
 import {
-  DuotoneLayoutDashboard as LayoutDashboard,
-  DuotoneUsers as Users,
-  DuotoneFileText as FileText,
-  DuotoneArrowRightLeft as ArrowRightLeft,
-  DuotoneFlask as FlaskConical,
-  DuotonePill as Pill,
-  DuotoneActivity as Activity,
-  DuotoneBarChart as BarChart3,
-  DuotoneBuilding as Building2,
-  DuotoneHospital as HospitalIcon,
-  DuotoneMessage as MessageSquare,
-  DuotoneBaby as Baby,
-  DuotoneSkull as Skull,
-  DuotoneHeart as Heart,
-  DuotoneServer as Database,
-  DuotoneDownload as Download,
-  DuotoneClaim as ClipboardCheck,
-  DuotoneVaccine as Syringe,
-  DuotoneMCH as HeartPulse,
-  DuotoneGlobe as Globe,
-  DuotoneBug as Bug,
-  DuotoneHome as Home,
-  DuotonePalette as Palette,
-  DuotoneCreditCard as CreditCard,
-  DuotoneSettings as Settings,
-  DuotoneCalendar as Calendar,
-  DuotoneVideo as Video,
-  DuotoneQR as Scan,
-  DuotoneServer as Server,
-  DuotoneGauge as Gauge,
-  DuotoneReceipt as Receipt,
-  DuotoneWallet as Wallet,
-  DuotoneBedDouble as BedDouble,
-  DuotonePackage as Package,
-  DuotoneThumbsUp as ThumbsUp,
-  DuotoneAlert as AlertTriangle,
-} from '@/components/icons';
+  LayoutDashboard,
+  Users,
+  FileText,
+  ArrowRightLeft,
+  FlaskConical,
+  Pill,
+  Activity,
+  BarChart3,
+  Building2,
+  Hospital as HospitalIcon,
+  MessageSquare,
+  Baby,
+  Skull,
+  Heart,
+  Database,
+  Download,
+  ClipboardCheck,
+  Syringe,
+  HeartPulse,
+  Globe,
+  Bug,
+  Palette,
+  CreditCard,
+  Settings,
+  Calendar,
+  Video,
+  Scan,
+  Server,
+  Gauge,
+  Receipt,
+  Wallet,
+  BedDouble,
+  Stethoscope,
+  Package,
+  AlertTriangle,
+} from 'lucide-react';
 
 // Lenient shape so either lucide or our duotone wrappers type-check.
 export type NavIcon = ComponentType<
@@ -61,6 +62,13 @@ export interface NavItem {
   label: string;
   icon: NavIcon;
   section?: string;
+  /**
+   * When set, the item is rendered as an in-place trigger rather than a route
+   * link. 'availability' opens the "Add availability" modal so providers can
+   * publish bookable windows from the sidebar's Schedule tab. `href` is then
+   * just a stable React key / sentinel and is never navigated to.
+   */
+  action?: 'availability';
 }
 
 export interface RoleConfig {
@@ -74,21 +82,43 @@ export interface RoleConfig {
   badgeLabel: string;
 }
 
+/**
+ * Facility-management sidebar (the hospital-admin nav from the reference design),
+ * mapped to the platform's real routes. Shared by the roles that own the
+ * Facility Management dashboard so the nav is defined once (no duplicates).
+ * Duplicate reference items are collapsed onto a single real feature:
+ * "Medicines" → Pharmacy (with Prescriptions), "IPD/OPD" → Wards (with Bed
+ * Management).
+ */
+const FACILITY_NAV: NavItem[] = [
+  { href: '/facility-management', label: 'Dashboard', icon: HospitalIcon, section: 'HOSPITAL' },
+  { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'HOSPITAL' },
+  { href: '/wards', label: 'Bed Management', icon: BedDouble, section: 'HOSPITAL' },
+  { href: '/hr', label: 'Doctors & Staff', icon: Stethoscope, section: 'HOSPITAL' },
+  { href: '/patients', label: 'Patients', icon: Users, section: 'HOSPITAL' },
+  { href: '/pharmacy', label: 'Prescriptions & Medicines', icon: Pill, section: 'SERVICES' },
+  { href: '/blood-bank', label: 'Blood Bank', icon: Heart, section: 'SERVICES' },
+  { href: '/messages', label: 'Enquiries', icon: MessageSquare, section: 'SERVICES' },
+  { href: '/reports', label: 'Reports', icon: BarChart3, section: 'SERVICES' },
+];
+
 export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
   super_admin: {
     label: 'Super Admin',
     defaultDashboard: ROLE_ROUTE_TABLE.super_admin.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.super_admin.allowed],
     navItems: [
-      { href: '/admin', label: 'Platform Dashboard', icon: Gauge, section: 'OVERVIEW' },
-      { href: '/admin/organizations', label: 'Organizations', icon: Building2, section: 'MANAGEMENT' },
-      { href: '/admin/users', label: 'All Users', icon: Users, section: 'MANAGEMENT' },
-      { href: '/admin/billing', label: 'Billing', icon: CreditCard, section: 'MANAGEMENT' },
-      { href: '/payments', label: 'Payments', icon: Wallet, section: 'MANAGEMENT' },
-      { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'MANAGEMENT' },
-      { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, section: 'INSIGHTS' },
-      { href: '/sync-conflicts', label: 'Sync Conflicts', icon: AlertTriangle, section: 'SYSTEM' },
-      { href: '/admin/system', label: 'System Config', icon: Server, section: 'SYSTEM' },
+      ...FACILITY_NAV,
+      // Platform-operator controls (kept so super-admin never loses tenant /
+      // system access); no href duplicates the facility nav above.
+      { href: '/admin', label: 'Platform Dashboard', icon: Gauge, section: 'PLATFORM' },
+      { href: '/admin/organizations', label: 'Organizations', icon: Building2, section: 'PLATFORM' },
+      { href: '/admin/users', label: 'All Users', icon: Users, section: 'PLATFORM' },
+      { href: '/admin/billing', label: 'Billing', icon: CreditCard, section: 'PLATFORM' },
+      { href: '/payments', label: 'Payments', icon: Wallet, section: 'PLATFORM' },
+      { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'PLATFORM' },
+      { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, section: 'PLATFORM' },
+      { href: '/admin/system', label: 'System Config', icon: Server, section: 'PLATFORM' },
     ],
     color: '#1e3a8a',
     gradientFrom: '#172554',
@@ -101,22 +131,19 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     defaultDashboard: ROLE_ROUTE_TABLE.org_admin.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.org_admin.allowed],
     navItems: [
+      ...FACILITY_NAV,
+      // Organization administration (no href duplicates the facility nav above).
       { href: '/org-admin', label: 'Org Dashboard', icon: LayoutDashboard, section: 'ORGANIZATION' },
       { href: '/org-admin/users', label: 'Manage Users', icon: Users, section: 'ORGANIZATION' },
-      { href: '/org-admin/hospitals', label: 'Facilities', icon: HospitalIcon, section: 'ORGANIZATION' },
-      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'ORGANIZATION' },
+      { href: '/hospitals', label: 'Hospital Network', icon: HospitalIcon, section: 'ORGANIZATION' },
       { href: '/equipment', label: 'Assets', icon: Package, section: 'ORGANIZATION' },
       { href: '/org-admin/branding', label: 'Branding', icon: Palette, section: 'ORGANIZATION' },
+      { href: '/org-admin/pricing', label: 'Service Pricing', icon: Receipt, section: 'ORGANIZATION' },
+      { href: '/emergency-preparedness', label: 'Emergency Prep', icon: Activity, section: 'ORGANIZATION' },
       { href: '/org-admin/analytics', label: 'Analytics', icon: BarChart3, section: 'ORGANIZATION' },
       { href: '/payments', label: 'Bills', icon: Wallet, section: 'ORGANIZATION' },
       { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'ORGANIZATION' },
-      { href: '/feedback', label: 'Patient Feedback', icon: ThumbsUp, section: 'ORGANIZATION' },
-      { href: '/sync-conflicts', label: 'Sync Conflicts', icon: AlertTriangle, section: 'ORGANIZATION' },
-      { href: '/org-admin/settings', label: 'Settings', icon: Settings, section: 'ORGANIZATION' },
-      { href: '/hospitals', label: 'Hospital Network', icon: HospitalIcon, section: 'OVERVIEW' },
-      { href: '/reports', label: 'Reports', icon: BarChart3, section: 'OVERVIEW' },
-      { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'OVERVIEW' },
-    ],
+      { href: '/org-admin/settings', label: 'Settings', icon: Settings, section: 'ORGANIZATION' },    ],
     color: '#3b82f6',
     gradientFrom: '#1e3a8a',
     gradientTo: '#3b82f6',
@@ -138,6 +165,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/telehealth', label: 'Telehealth', icon: Video, section: 'CLINICAL' },
       { href: '/lab', label: 'Laboratory', icon: FlaskConical, section: 'SERVICES' },
       { href: '/pharmacy', label: 'Pharmacy', icon: Pill, section: 'SERVICES' },
+      { href: '/blood-bank', label: 'Blood Bank', icon: Heart, section: 'SERVICES' },
       { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'VITAL EVENTS' },
       { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'VITAL EVENTS' },
       { href: '/births', label: 'Births', icon: Baby, section: 'VITAL EVENTS' },
@@ -163,12 +191,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
       { href: '/lab', label: 'Laboratory', icon: FlaskConical, section: 'SERVICES' },
       { href: '/pharmacy', label: 'Pharmacy', icon: Pill, section: 'SERVICES' },
+      { href: '/blood-bank', label: 'Blood Bank', icon: Heart, section: 'SERVICES' },
       { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'VITAL EVENTS' },
       { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'VITAL EVENTS' },
       { href: '/births', label: 'Births', icon: Baby, section: 'VITAL EVENTS' },
       { href: '/deaths', label: 'Deaths', icon: Skull, section: 'VITAL EVENTS' },
-      { href: '/surveillance', label: 'Surveillance', icon: Activity, section: 'MORE' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
     color: '#3b82f6',
     gradientFrom: '#1e3a8a',
@@ -182,6 +209,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     allowedRoutes: [...ROLE_ROUTE_TABLE.nurse.allowed],
     navItems: [
       { href: '/dashboard/nurse', label: 'Nurse Station', icon: LayoutDashboard, section: 'CLINICAL' },
+      { href: '/dashboard/nurse/ward', label: 'Ward Patients', icon: BedDouble, section: 'STATION' },
+      { href: '/dashboard/nurse/mar', label: 'Medication Admin', icon: Pill, section: 'STATION' },
+      { href: '/dashboard/nurse/triage', label: 'Triage (ETAT)', icon: AlertTriangle, section: 'STATION' },
+      { href: '/dashboard/nurse/handoff', label: 'Shift Handoff', icon: FileText, section: 'STATION' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
@@ -191,7 +222,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/births', label: 'Births', icon: Baby, section: 'VITAL EVENTS' },
       { href: '/deaths', label: 'Deaths', icon: Skull, section: 'VITAL EVENTS' },
       { href: '/lab', label: 'Lab Results', icon: FlaskConical, section: 'MORE' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
     color: '#3b82f6',
     gradientFrom: '#1e3a8a',
@@ -214,7 +244,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/referrals', label: 'Referrals', icon: ArrowRightLeft, section: 'CARE' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CARE' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
     color: '#3b82f6',
     gradientFrom: '#1e3a8a',
@@ -229,6 +258,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     navItems: [
       { href: '/dashboard/lab', label: 'Lab Command Center', icon: LayoutDashboard, section: 'LABORATORY' },
       { href: '/lab', label: 'Lab Orders & Results', icon: FlaskConical, section: 'LABORATORY' },
+      { href: '/blood-bank', label: 'Blood Bank', icon: Heart, section: 'LABORATORY' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
     ],
     color: '#3b82f6',
@@ -244,6 +274,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     navItems: [
       { href: '/dashboard/pharmacy', label: 'Pharmacy Ops', icon: LayoutDashboard, section: 'PHARMACY' },
       { href: '/pharmacy', label: 'Dispensing', icon: Pill, section: 'PHARMACY' },
+      { href: '/controlled-substances', label: 'Controlled Substances', icon: ClipboardCheck, section: 'PHARMACY' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
     ],
     color: '#3b82f6',
@@ -253,22 +284,21 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
   },
 
   front_desk: {
-    label: 'Front Desk',
+    label: 'Medical Receptionist',
     defaultDashboard: ROLE_ROUTE_TABLE.front_desk.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.front_desk.allowed],
     navItems: [
       { href: '/dashboard/front-desk', label: 'Reception', icon: LayoutDashboard, section: 'RECEPTION' },
+      { href: '/check-in', label: 'Check-In', icon: ClipboardCheck, section: 'RECEPTION' },
       { href: '/patients', label: 'Patient Registry', icon: Users, section: 'RECEPTION' },
       { href: '/referrals', label: 'Referrals', icon: ArrowRightLeft, section: 'RECEPTION' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'RECEPTION' },
-      { href: '/feedback', label: 'Feedback', icon: ThumbsUp, section: 'MORE' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
     color: '#3b82f6',
     gradientFrom: '#1e3a8a',
     gradientTo: '#3b82f6',
-    badgeLabel: 'Front Desk',
+    badgeLabel: 'Medical Receptionist',
   },
 
   cashier: {
@@ -277,7 +307,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     allowedRoutes: [...ROLE_ROUTE_TABLE.cashier.allowed],
     navItems: [
       { href: '/payments', label: 'Collect Payment', icon: Wallet, section: 'CASHIER' },
-      { href: '/payments/plans', label: 'Payment Plans', icon: CreditCard, section: 'CASHIER' },
       { href: '/patients', label: 'Patient Lookup', icon: Users, section: 'CASHIER' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CASHIER' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
@@ -288,57 +317,13 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     badgeLabel: 'Cashier',
   },
 
-  boma_health_worker: {
-    label: 'Boma Health Worker',
-    defaultDashboard: ROLE_ROUTE_TABLE.boma_health_worker.defaultDashboard,
-    allowedRoutes: [...ROLE_ROUTE_TABLE.boma_health_worker.allowed],
-    navItems: [
-      { href: '/dashboard/boma', label: 'My Community', icon: Home, section: 'COMMUNITY' },
-      { href: '/patients', label: 'Households', icon: Users, section: 'COMMUNITY' },
-      { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'HEALTH' },
-      { href: '/anc', label: 'ANC Visits', icon: HeartPulse, section: 'HEALTH' },
-      { href: '/births', label: 'Births', icon: Baby, section: 'HEALTH' },
-      { href: '/deaths', label: 'Deaths', icon: Skull, section: 'HEALTH' },
-      { href: '/surveillance', label: 'Surveillance', icon: Activity, section: 'HEALTH' },
-      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-    ],
-    color: '#3b82f6',
-    gradientFrom: '#1e3a8a',
-    gradientTo: '#3b82f6',
-    badgeLabel: 'BHW',
-  },
-
-  payam_supervisor: {
-    label: 'Payam Supervisor',
-    defaultDashboard: ROLE_ROUTE_TABLE.payam_supervisor.defaultDashboard,
-    allowedRoutes: [...ROLE_ROUTE_TABLE.payam_supervisor.allowed],
-    navItems: [
-      { href: '/dashboard/payam', label: 'Payam Overview', icon: LayoutDashboard, section: 'OVERSIGHT' },
-      { href: '/patients', label: 'Patients', icon: Users, section: 'OVERSIGHT' },
-      { href: '/referrals', label: 'Referrals', icon: ArrowRightLeft, section: 'OVERSIGHT' },
-      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'OVERSIGHT' },
-      { href: '/dashboard/boma', label: 'BHW Dashboard', icon: Home, section: 'SUPERVISION' },
-      { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'HEALTH PROGRAMS' },
-      { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'HEALTH PROGRAMS' },
-      { href: '/births', label: 'Births', icon: Baby, section: 'HEALTH PROGRAMS' },
-      { href: '/deaths', label: 'Deaths', icon: Skull, section: 'HEALTH PROGRAMS' },
-      { href: '/surveillance', label: 'Surveillance', icon: Activity, section: 'MONITORING' },
-      { href: '/facility-assessments', label: 'Facility Checks', icon: ClipboardCheck, section: 'MONITORING' },
-      { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'MONITORING' },
-      { href: '/reports', label: 'Reports', icon: BarChart3, section: 'MORE' },
-    ],
-    color: '#3b82f6',
-    gradientFrom: '#1e3a8a',
-    gradientTo: '#3b82f6',
-    badgeLabel: 'Payam Supervisor',
-  },
-
   government: {
     label: 'Government Admin',
     defaultDashboard: ROLE_ROUTE_TABLE.government.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.government.allowed],
     navItems: [
       { href: '/government', label: 'National Dashboard', icon: LayoutDashboard, section: 'OVERVIEW' },
+      { href: '/facility-management', label: 'Hospital Management', icon: HospitalIcon, section: 'OVERVIEW' },
       { href: '/hospitals', label: 'Hospital Network', icon: HospitalIcon, section: 'OVERVIEW' },
       { href: '/vital-statistics', label: 'Vital Statistics', icon: Heart, section: 'POPULATION HEALTH' },
       { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'POPULATION HEALTH' },
@@ -366,7 +351,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     allowedRoutes: [...ROLE_ROUTE_TABLE.county_health_director.allowed],
     navItems: [
       { href: '/dashboard/state', label: 'County Overview', icon: LayoutDashboard, section: 'OVERSIGHT' },
-      { href: '/dashboard/payam', label: 'Payam Rollups', icon: Home, section: 'OVERSIGHT' },
       { href: '/hospitals', label: 'Facility Network', icon: HospitalIcon, section: 'OVERSIGHT' },
       { href: '/surveillance', label: 'Surveillance', icon: Activity, section: 'INTELLIGENCE' },
       { href: '/epidemic-intelligence', label: 'Epidemic Intelligence', icon: Bug, section: 'INTELLIGENCE' },
@@ -396,7 +380,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     navItems: [
       { href: '/dashboard/data-entry', label: 'Data Entry', icon: LayoutDashboard, section: 'FACILITY DATA' },
       { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'FACILITY DATA' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'FACILITY DATA' },
       { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'FACILITY DATA' },
       { href: '/vital-statistics', label: 'Vital Statistics', icon: Heart, section: 'RECORDS' },
       { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'RECORDS' },
@@ -419,11 +402,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/dashboard', label: 'Hospital Dashboard', icon: LayoutDashboard, section: 'ADMINISTRATION' },
       { href: '/hospitals', label: 'Hospital Network', icon: HospitalIcon, section: 'ADMINISTRATION' },
       { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'ADMINISTRATION' },
-      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'ADMINISTRATION' },
+      { href: '/facility-overview', label: 'Facility Overview', icon: Gauge, section: 'ADMINISTRATION' },      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'ADMINISTRATION' },
       { href: '/equipment', label: 'Assets', icon: Package, section: 'ADMINISTRATION' },
       { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'ADMINISTRATION' },
+      { href: '/emergency-preparedness', label: 'Emergency Prep', icon: Activity, section: 'ADMINISTRATION' },
+      { href: '/controlled-substances', label: 'Controlled Substances', icon: ClipboardCheck, section: 'SERVICES' },
       { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'ADMINISTRATION' },
-      { href: '/sync-conflicts', label: 'Sync Conflicts', icon: AlertTriangle, section: 'ADMINISTRATION' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/consultation', label: 'Consultation', icon: FileText, section: 'CLINICAL' },
@@ -432,9 +416,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/telehealth', label: 'Telehealth', icon: Video, section: 'CLINICAL' },
       { href: '/lab', label: 'Laboratory', icon: FlaskConical, section: 'SERVICES' },
       { href: '/pharmacy', label: 'Pharmacy', icon: Pill, section: 'SERVICES' },
+      { href: '/blood-bank', label: 'Blood Bank', icon: Heart, section: 'SERVICES' },
       { href: '/payments', label: 'Bills', icon: Wallet, section: 'SERVICES' },
       { href: '/payments/claims', label: 'Claims', icon: Receipt, section: 'SERVICES' },
-      { href: '/feedback', label: 'Patient Feedback', icon: ThumbsUp, section: 'SERVICES' },
       { href: '/epidemic-intelligence', label: 'Epidemic Intel', icon: Bug, section: 'INTELLIGENCE' },
       { href: '/mch-analytics', label: 'MCH Analytics', icon: HeartPulse, section: 'INTELLIGENCE' },
       { href: '/surveillance', label: 'Surveillance', icon: Activity, section: 'INTELLIGENCE' },
@@ -455,7 +439,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/dashboard/data-entry', label: 'Records Dashboard', icon: LayoutDashboard, section: 'RECORDS' },
       { href: '/patients', label: 'Patient Registry', icon: Users, section: 'RECORDS' },
       { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'RECORDS' },
-      { href: '/sync-conflicts', label: 'Sync Conflicts', icon: AlertTriangle, section: 'RECORDS' },
       { href: '/reports', label: 'Reports', icon: BarChart3, section: 'RECORDS' },
       { href: '/vital-statistics', label: 'Vital Statistics', icon: Heart, section: 'VITAL EVENTS' },
       { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'VITAL EVENTS' },
@@ -466,31 +449,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/hospitals', label: 'Facility Network', icon: Building2, section: 'GOVERNANCE' },
       { href: '/dhis2-export', label: 'DHIS2 Export', icon: Download, section: 'GOVERNANCE' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
     color: '#3b82f6',
     gradientFrom: '#1e3a8a',
     gradientTo: '#3b82f6',
     badgeLabel: 'HRIO',
-  },
-
-  community_health_volunteer: {
-    label: 'Community Health Volunteer',
-    defaultDashboard: ROLE_ROUTE_TABLE.community_health_volunteer.defaultDashboard,
-    allowedRoutes: [...ROLE_ROUTE_TABLE.community_health_volunteer.allowed],
-    navItems: [
-      { href: '/dashboard/boma', label: 'My Community', icon: Home, section: 'COMMUNITY' },
-      { href: '/patients', label: 'Households', icon: Users, section: 'COMMUNITY' },
-      { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'HEALTH' },
-      { href: '/anc', label: 'ANC Visits', icon: HeartPulse, section: 'HEALTH' },
-      { href: '/births', label: 'Births', icon: Baby, section: 'HEALTH' },
-      { href: '/deaths', label: 'Deaths', icon: Skull, section: 'HEALTH' },
-      { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-    ],
-    color: '#3b82f6',
-    gradientFrom: '#1e3a8a',
-    gradientTo: '#3b82f6',
-    badgeLabel: 'CHV',
   },
 
   nutritionist: {
@@ -502,7 +465,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/patients', label: 'Patients', icon: Users, section: 'NUTRITION' },
       { href: '/mch-analytics', label: 'MCH Analytics', icon: HeartPulse, section: 'PROGRAMS' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
     color: '#3b82f6',
     gradientFrom: '#1e3a8a',
@@ -519,7 +481,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/patients', label: 'Patients', icon: Users, section: 'IMAGING' },
       { href: '/lab', label: 'Lab & Imaging', icon: Scan, section: 'IMAGING' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
     color: '#3b82f6',
     gradientFrom: '#1e3a8a',
@@ -532,15 +493,15 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     defaultDashboard: ROLE_ROUTE_TABLE.hospital_manager.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.hospital_manager.allowed],
     navItems: [
-      { href: '/dashboard/hospital-manager', label: 'Management', icon: LayoutDashboard, section: 'OVERVIEW' },
+      { href: '/facility-management', label: 'Dashboard', icon: LayoutDashboard, section: 'OVERVIEW' },
       { href: '/epidemic-intelligence', label: 'Epidemic Intelligence', icon: Bug, section: 'INTELLIGENCE' },
       { href: '/mch-analytics', label: 'MCH Analytics', icon: HeartPulse, section: 'INTELLIGENCE' },
       { href: '/surveillance', label: 'Surveillance', icon: Activity, section: 'INTELLIGENCE' },
       { href: '/hospitals', label: 'Hospital Network', icon: HospitalIcon, section: 'FACILITY' },
       { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'FACILITY' },
+      { href: '/facility-overview', label: 'Facility Overview', icon: Gauge, section: 'FACILITY' },
       { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'FACILITY' },
-      { href: '/equipment', label: 'Assets & Equipment', icon: Package, section: 'FACILITY' },
-      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'FACILITY' },
+      { href: '/equipment', label: 'Assets & Equipment', icon: Package, section: 'FACILITY' },      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'FACILITY' },
       { href: '/payments', label: 'Revenue & Bills', icon: Wallet, section: 'FINANCE' },
       { href: '/payments/claims', label: 'Insurance Claims', icon: Receipt, section: 'FINANCE' },
       { href: '/reports', label: 'Reports', icon: BarChart3, section: 'REPORTING' },
@@ -551,7 +512,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/referrals', label: 'Referrals', icon: ArrowRightLeft, section: 'CLINICAL' },
-      { href: '/feedback', label: 'Patient Feedback', icon: ThumbsUp, section: 'MORE' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
     ],
     color: '#1e3a8a',
@@ -565,10 +525,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     defaultDashboard: ROLE_ROUTE_TABLE.medical_biller.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.medical_biller.allowed],
     navItems: [
-      { href: '/billing', label: 'Collections', icon: Wallet, section: 'BILLING' },
       { href: '/payments', label: 'Bills & Invoices', icon: Receipt, section: 'BILLING' },
       { href: '/payments/claims', label: 'Insurance Claims', icon: ClipboardCheck, section: 'BILLING' },
-      { href: '/payments/plans', label: 'Payment Plans', icon: CreditCard, section: 'BILLING' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'PATIENTS' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'PATIENTS' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
@@ -585,12 +543,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     defaultDashboard: ROLE_ROUTE_TABLE.central_registration_clerk.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.central_registration_clerk.allowed],
     navItems: [
+      { href: '/dashboard/front-desk', label: 'Reception', icon: LayoutDashboard, section: 'RECEPTION' },
       { href: '/patients', label: 'Patient Registry', icon: Users, section: 'RECEPTION' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'RECEPTION' },
       { href: '/referrals', label: 'Referrals', icon: ArrowRightLeft, section: 'RECEPTION' },
       { href: '/payments', label: 'Checkout Payments', icon: Wallet, section: 'CHECKOUT' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
     color: '#3b82f6', gradientFrom: '#1e3a8a', gradientTo: '#3b82f6', badgeLabel: 'Registration',
   },
@@ -600,10 +558,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     defaultDashboard: ROLE_ROUTE_TABLE.clinic_clerk.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.clinic_clerk.allowed],
     navItems: [
+      { href: '/dashboard/front-desk', label: 'Reception', icon: LayoutDashboard, section: 'CLINIC' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINIC' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINIC' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
     color: '#3b82f6', gradientFrom: '#1e3a8a', gradientTo: '#3b82f6', badgeLabel: 'Clinic Clerk',
   },
@@ -613,10 +571,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     defaultDashboard: ROLE_ROUTE_TABLE.triage_nurse.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.triage_nurse.allowed],
     navItems: [
+      { href: '/dashboard/nurse', label: 'Triage Station', icon: LayoutDashboard, section: 'TRIAGE' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'TRIAGE' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'TRIAGE' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
     color: '#3b82f6', gradientFrom: '#1e3a8a', gradientTo: '#3b82f6', badgeLabel: 'Triage',
   },
@@ -626,12 +584,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     defaultDashboard: ROLE_ROUTE_TABLE.rooming_nurse.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.rooming_nurse.allowed],
     navItems: [
+      { href: '/dashboard/nurse', label: 'Rooming Station', icon: LayoutDashboard, section: 'CLINIC' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINIC' },
       { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'CARE' },
       { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'CARE' },
       { href: '/lab', label: 'Lab', icon: FlaskConical, section: 'MORE' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'MORE' },
     ],
     color: '#3b82f6', gradientFrom: '#1e3a8a', gradientTo: '#3b82f6', badgeLabel: 'Rooming',
   },
@@ -650,6 +608,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/telehealth', label: 'Telehealth', icon: Video, section: 'CLINICAL' },
       { href: '/lab', label: 'Laboratory', icon: FlaskConical, section: 'SERVICES' },
       { href: '/pharmacy', label: 'Pharmacy', icon: Pill, section: 'SERVICES' },
+      { href: '/blood-bank', label: 'Blood Bank', icon: Heart, section: 'SERVICES' },
       { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'VITAL EVENTS' },
       { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'VITAL EVENTS' },
       { href: '/births', label: 'Births', icon: Baby, section: 'VITAL EVENTS' },
@@ -681,15 +640,16 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     defaultDashboard: ROLE_ROUTE_TABLE.facility_administrator.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.facility_administrator.allowed],
     navItems: [
-      { href: '/dashboard', label: 'Hospital Dashboard', icon: LayoutDashboard, section: 'ADMINISTRATION' },
-      { href: '/hospitals', label: 'Hospital Network', icon: HospitalIcon, section: 'ADMINISTRATION' },
-      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'ADMINISTRATION' },
-      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'ADMINISTRATION' },
+      { href: '/facility-overview', label: 'Facility Dashboard', icon: LayoutDashboard, section: 'ADMINISTRATION' },
+      { href: '/my-facility', label: 'My Facility', icon: Building2, section: 'ADMINISTRATION' },      { href: '/hr', label: 'HR & Leave', icon: Users, section: 'ADMINISTRATION' },
       { href: '/equipment', label: 'Assets', icon: Package, section: 'ADMINISTRATION' },
       { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'ADMINISTRATION' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/referrals', label: 'Referrals', icon: ArrowRightLeft, section: 'CLINICAL' },
+      { href: '/blood-bank', label: 'Blood Bank', icon: Heart, section: 'CLINICAL' },
+      { href: '/emergency-preparedness', label: 'Emergency Prep', icon: Activity, section: 'CLINICAL' },
+      { href: '/controlled-substances', label: 'Controlled Substances', icon: ClipboardCheck, section: 'COMPLIANCE' },
       { href: '/payments', label: 'Bills', icon: Wallet, section: 'FINANCE' },
       { href: '/reports', label: 'Reports', icon: BarChart3, section: 'REPORTING' },
       { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'REPORTING' },
@@ -728,7 +688,7 @@ export const CONFLICT_RESOLUTION_ROLES: UserRole[] = [
 
 const WORKFLOW_ROLES: UserRole[] = ['central_registration_clerk', 'clinic_clerk', 'triage_nurse', 'rooming_nurse', 'clinician', 'records_hmis_officer', 'facility_administrator'];
 const PRIVATE_SECTOR_ROLES: UserRole[] = ['org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife', 'lab_tech', 'pharmacist', 'front_desk', 'cashier', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'nutritionist', 'radiologist', 'hospital_manager', 'medical_biller', ...WORKFLOW_ROLES];
-const ALL_ROLES: UserRole[] = ['super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife', 'lab_tech', 'pharmacist', 'front_desk', 'cashier', 'government', 'county_health_director', 'boma_health_worker', 'payam_supervisor', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'community_health_volunteer', 'nutritionist', 'radiologist', 'hospital_manager', 'medical_biller', ...WORKFLOW_ROLES];
+const ALL_ROLES: UserRole[] = ['super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse', 'midwife', 'lab_tech', 'pharmacist', 'front_desk', 'cashier', 'government', 'county_health_director', 'data_entry_clerk', 'medical_superintendent', 'hrio', 'nutritionist', 'radiologist', 'hospital_manager', 'medical_biller', ...WORKFLOW_ROLES];
 
 export function getAvailableRoles(orgType: 'public' | 'private', isSuperAdmin = false): UserRole[] {
   if (isSuperAdmin) return ALL_ROLES;

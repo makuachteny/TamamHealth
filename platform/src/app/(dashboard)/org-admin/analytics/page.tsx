@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
+import PatientName from '@/components/PatientName';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
-  BarChart3, Users, FlaskConical, ArrowRightLeft, Building2, TrendingUp,
+  Users, FlaskConical, ArrowRightLeft, Building2, TrendingUp,
   Activity,
 } from '@/components/icons/lucide';
 import type { HospitalDoc, PatientDoc, LabResultDoc, ReferralDoc, UserRole } from '@/lib/db-types';
@@ -20,7 +20,7 @@ const RechartsBarChart = dynamic(
     const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } = mod;
 
     function ChartComponent({ data, brandColor }: { data: { name: string; patients: number }[]; brandColor: string }) {
-      const barColors = [brandColor, 'var(--accent-primary)', 'var(--color-success)', 'var(--color-warning)', '#EC4899', '#06B6D4', '#8B5CF6', '#14B8A6'];
+      const barColors = [brandColor, 'var(--accent-primary)', 'var(--color-success)', 'var(--color-warning)', '#EC4899', '#06B6D4', '#8B5CF6', '#3B82F6'];
 
       return (
         <ResponsiveContainer width="100%" height={300}>
@@ -178,42 +178,28 @@ export default function OrgAnalyticsPage() {
       <TopBar title={t('orgAnalytics.topBarTitle')} />
 
       <div className="page-container page-enter">
-        <PageHeader
-          icon={BarChart3}
-          title={t('orgAnalytics.title')}
-          subtitle={t('orgAnalytics.subtitle', { org: currentUser?.organization?.name || t('orgAnalytics.yourOrganization') })}
-        />
-
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {statCards.map((card) => {
             const Icon = card.icon;
             return (
               <div
                 key={card.label}
-                className="p-5 rounded-xl"
-                style={{
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border-light)',
-                }}
+                className="dash-card"
+                style={{ padding: '14px 16px' }}
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{ background: `${card.color}15` }}
-                  >
-                    <Icon className="w-5 h-5" style={{ color: card.color }} />
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                    <Icon className="w-3.5 h-3.5" style={{ color: card.color }} />
                   </div>
-                  <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                    {card.label}
-                  </span>
+                  <span className="kpi-card-title">{card.label}</span>
                 </div>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>
                   {card.value.toLocaleString()}
-                </p>
-                <div className="flex items-center gap-1 mt-1">
+                </div>
+                <div className="flex items-center gap-1" style={{ marginTop: 6 }}>
                   <TrendingUp className="w-3 h-3" style={{ color: card.trendUp ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
-                  <span className="text-xs" style={{ color: card.trendUp ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+                  <span style={{ fontSize: 11, color: card.trendUp ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
                     {card.trend}
                   </span>
                 </div>
@@ -222,16 +208,16 @@ export default function OrgAnalyticsPage() {
           })}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Patients Per Hospital Chart */}
-          <div className="lg:col-span-2 p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Activity className="w-5 h-5" style={{ color: brandColor }} />
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="lg:col-span-2 dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {t('orgAnalytics.patientsPerHospital')}
-              </h2>
+              </h3>
             </div>
-
+            <div className="p-4">
             {patientsPerHospital.length > 0 ? (
               <RechartsBarChart data={patientsPerHospital} brandColor={brandColor} />
             ) : (
@@ -239,19 +225,20 @@ export default function OrgAnalyticsPage() {
                 {t('orgAnalytics.noHospitalData')}
               </div>
             )}
+            </div>
           </div>
 
           {/* Right Column */}
-          <div className="space-y-6">
+          <div className="flex flex-col gap-4">
             {/* Lab Results Breakdown */}
-            <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <div className="flex items-center gap-2 mb-4">
-                <FlaskConical className="w-5 h-5" style={{ color: '#06B6D4' }} />
-                <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <FlaskConical className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                   {t('orgAnalytics.labResults')}
-                </h2>
+                </h3>
               </div>
-
+              <div className="p-4">
               <div className="space-y-3">
                 <ProgressRow label={t('orgAnalytics.statusCompleted')} count={labCompleted} total={labTotal} color="#3b82f6" />
                 <ProgressRow label={t('orgAnalytics.statusInProgress')} count={labInProgress} total={labTotal} color="#F59E0B" />
@@ -264,17 +251,18 @@ export default function OrgAnalyticsPage() {
                   <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{labResults.length}</span>
                 </div>
               </div>
+              </div>
             </div>
 
             {/* Top Hospitals by Activity */}
-            <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <div className="flex items-center gap-2 mb-4">
-                <Building2 className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-                <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                   {t('orgAnalytics.topFacilitiesToday')}
-                </h2>
+                </h3>
               </div>
-
+              <div className="p-4">
               <div className="space-y-2">
                 {topHospitals.length > 0 ? (
                   topHospitals.map((h, i) => (
@@ -305,24 +293,25 @@ export default function OrgAnalyticsPage() {
                   <p className="text-sm py-2 text-center" style={{ color: 'var(--text-muted)' }}>{t('orgAnalytics.noFacilities')}</p>
                 )}
               </div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Referrals Overview Table */}
-        <div className="mt-6 p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <ArrowRightLeft className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <div className="dash-card overflow-hidden mt-4">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <ArrowRightLeft className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
               {t('government.recentReferrals')}
-            </h2>
-            <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: `${brandColor}10`, color: brandColor }}>
+            </h3>
+            <span className="ml-auto text-[11px] font-medium px-2.5 py-1 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>
               {t('orgAnalytics.totalCount', { count: referrals.length })}
             </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 600 }}>
               <thead>
                 <tr>
                   <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgAnalytics.colPatient')}</th>
@@ -350,8 +339,10 @@ export default function OrgAnalyticsPage() {
                     };
                     return (
                       <tr key={ref._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                        <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                          {ref.patientName || '-'}
+                        <td className="px-4 py-3">
+                          {ref.patientName
+                            ? <PatientName patientId={ref.patientId} name={ref.patientName} nameClassName="text-sm font-medium" />
+                            : <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>-</span>}
                         </td>
                         <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
                           {ref.fromHospital || '-'}

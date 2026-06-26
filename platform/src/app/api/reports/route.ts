@@ -15,7 +15,7 @@ import {
 import type { UserRole } from '@/lib/db-types';
 const REPORT_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'government', 'county_health_director', 'medical_superintendent',
-  'hrio', 'data_entry_clerk', 'payam_supervisor',
+  'hrio', 'data_entry_clerk',
 ];
 function escapeCSV(val: string | number | boolean | null | undefined): string {
   const s = String(val ?? '');
@@ -108,8 +108,8 @@ export async function GET(request: NextRequest) {
       case 'dhis2': {
         // DHIS2 dataset is national-aggregate (orgUnit "SS") — the export
         // ignores org boundaries by design. An org_admin / data_entry_clerk
-        // / payam_supervisor scoped to a single tenant must NOT receive the
-        // cross-tenant aggregate. Only national-scope reporters get it.
+        // scoped to a single tenant must NOT receive the cross-tenant
+        // aggregate. Only national-scope reporters get it.
         const NATIONAL_DHIS2_ROLES: UserRole[] = ['super_admin', 'government', 'hrio', 'medical_superintendent'];
         if (!hasRole(auth, NATIONAL_DHIS2_ROLES)) return forbidden();
         const period = url.searchParams.get('period') || new Date().toISOString().slice(0, 7);

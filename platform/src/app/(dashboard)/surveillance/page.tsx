@@ -1,14 +1,17 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import {
-  AlertTriangle, Shield, Eye, Bell, TrendingUp, TrendingDown,
+  AlertTriangle, Shield, TrendingUp, TrendingDown,
   Minus, MapPin, Activity, FileText, Calendar, ChevronRight,
   Download, Plus, X, BarChart3,
 } from '@/components/icons/lucide';
 import EmptyState from '@/components/EmptyState';
+import Badge, { type BadgeTone } from '@/components/Badge';
+import { FilterMenu } from '@/components/filters';
+import { formatDate } from '@/lib/format-utils';
 // `states` is a static reference list (28 states/oblasts) used only to
 // populate a dropdown. It contains no PHI, so importing from the mock
 // module is fine. The disease aggregates that used to come from the same
@@ -30,7 +33,7 @@ const COLORS = {
   malaria: 'var(--accent-primary)',
   cholera: 'var(--color-danger)',
   measles: 'var(--color-warning)',
-  pneumonia: '#5CB8A8',
+  pneumonia: '#2563EB',
   diarrhea: 'var(--color-success)',
   tb: '#D4A843',
   hiv: '#7C3AED',
@@ -65,6 +68,15 @@ function latLngToSvg(lat: number, lng: number): { x: number; y: number } {
   return { x, y };
 }
 
+
+// Alert level → semantic Badge tone (emergency→danger, warning/watch→warning,
+// normal→success).
+const alertLevelTone: Record<string, BadgeTone> = {
+  emergency: 'danger',
+  warning: 'warning',
+  watch: 'warning',
+  normal: 'success',
+};
 
 const alertDotColors: Record<string, string> = {
   emergency: 'var(--color-danger)',
@@ -249,6 +261,9 @@ export default function SurveillancePage() {
 
   const uniqueDiseases = [...new Set((diseaseAlerts || []).map(a => a.disease))];
 
+  const activeFilterCount = (selectedDisease !== 'all' ? 1 : 0);
+  const clearFilters = () => { setSelectedDisease('all'); };
+
   // ── Aggregations derived from the live alert feed (replaces the
   // previous hard-coded weeklyDiseaseData / casesByState / idsrSummary).
   const idsrSummary = useMemo(() => buildIDSRSummary(diseaseAlerts || []), [diseaseAlerts]);
@@ -348,22 +363,22 @@ export default function SurveillancePage() {
     URL.revokeObjectURL(url);
   };
 
-  const summaryCards = [
-    { label: t('surveillance.totalAlerts'), value: totalAlerts.toString(), icon: Bell, color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)' },
-    { label: t('surveillance.emergencies'), value: emergencies.toString(), icon: AlertTriangle, color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.10)' },
-    { label: t('surveillance.warnings'), value: warnings.toString(), icon: Shield, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.10)' },
-    { label: t('surveillance.watchItems'), value: watchItems.toString(), icon: Eye, color: '#5CB8A8', bg: 'rgba(43,111,224,0.10)' },
-  ];
-
   return (
     <>
-      <TopBar title={t('nav.surveillance')} />
-      <main className="page-container page-enter">
-          <PageHeader
-            icon={Activity}
-            title={t('surveillance.dashboardTitle')}
-            subtitle={t('surveillance.dashboardSubtitle', { week: reportingWeek })}
-            actions={
+      <TopBar title={t('nav.surveillance')} searchTrailing={
+                <FilterMenu activeCount={activeFilterCount} onClear={clearFilters} size="sm">
+                  <FilterMenu.Field label={t('surveillance.allDiseases')}>
+                    <select
+                      className="w-full text-sm"
+                      value={selectedDisease}
+                      onChange={e => setSelectedDisease(e.target.value)}
+                    >
+                      <option value="all">{t('surveillance.allDiseases')}</option>
+                      {uniqueDiseases.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </FilterMenu.Field>
+                </FilterMenu>
+              } actions={
               <>
                 {canReportAlert && (
                   <button className="btn btn-primary btn-sm" onClick={() => setShowNewAlert(true)}>
@@ -376,30 +391,15 @@ export default function SurveillancePage() {
                   {t('surveillance.exportReport')}
                 </button>
               </>
-            }
-          />
-
-          {/* Summary Cards */}
-          <div className="kpi-grid mb-6">
-            {summaryCards.map(stat => (
-              <div key={stat.label} className="kpi cursor-pointer" onClick={() => setSelectedDisease('all')}>
-                <div className="kpi__icon" style={{ background: stat.bg }}>
-                  <stat.icon style={{ color: stat.color }} />
-                </div>
-                <div className="kpi__body">
-                  <div className="kpi__value">{stat.value}</div>
-                  <div className="kpi__label">{stat.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+            } />
+      <main className="page-container page-enter">
 
           {/* Aggregate summary strip */}
           <div className="card-elevated p-4 mb-6 flex items-center justify-between">
             <div className="flex items-center gap-8">
               <div className="flex items-center gap-2">
-                <div className="icon-box-sm" style={{ background: 'rgba(20,184,166,0.12)' }}>
-                  <Activity className="w-3.5 h-3.5" style={{ color: '#5CB8A8' }} />
+                <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+                  <Activity className="w-3.5 h-3.5" style={{ color: '#2563EB' }} />
                 </div>
                 <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('surveillance.totalCasesThisWeek')}</span>
                 <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{totalCases.toLocaleString()}</span>
@@ -431,7 +431,7 @@ export default function SurveillancePage() {
             </div>
             <div className="flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('surveillance.updated', { date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) })}</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('surveillance.updated', { date: formatDate(new Date().toISOString()) })}</span>
             </div>
           </div>
 
@@ -460,7 +460,7 @@ export default function SurveillancePage() {
                   <svg viewBox="0 0 600 400" className="w-full" style={{ maxHeight: '340px' }}>
                     {/* Background - South Sudan shape approximation */}
                     <rect x="30" y="20" width="540" height="360" rx="24" ry="24"
-                      fill="rgba(43,111,224,0.08)" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+                      fill="rgba(59, 130, 246,0.08)" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
 
                     {/* Country label */}
                     <text x="300" y="55" textAnchor="middle" fontSize="16" fontWeight="600"
@@ -476,8 +476,8 @@ export default function SurveillancePage() {
 
                     {/* White Nile approximation */}
                     <path d="M 410 60 Q 380 120 360 180 Q 340 240 300 280 Q 270 310 240 340"
-                      fill="none" stroke="rgba(43,111,224,0.15)" strokeWidth="2" opacity="1" strokeLinecap="round" />
-                    <text x="370" y="150" fontSize="9" fill="rgba(43,111,224,0.15)" opacity="1" fontStyle="italic">
+                      fill="none" stroke="rgba(59, 130, 246,0.15)" strokeWidth="2" opacity="1" strokeLinecap="round" />
+                    <text x="370" y="150" fontSize="9" fill="rgba(59, 130, 246,0.15)" opacity="1" fontStyle="italic">
                       White Nile
                     </text>
 
@@ -587,7 +587,7 @@ export default function SurveillancePage() {
               <div className="card-elevated">
                 <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                   <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                    <Activity className="w-4 h-4" style={{ color: '#5CB8A8' }} />
+                    <Activity className="w-4 h-4" style={{ color: '#2563EB' }} />
                     {t('surveillance.casesByStateTitle')}
                   </h3>
                   <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('surveillance.top5Diseases')}</span>
@@ -629,23 +629,6 @@ export default function SurveillancePage() {
                     <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
                     {t('surveillance.activeAlertsTitle')}
                   </h3>
-                  <select
-                    value={selectedDisease}
-                    onChange={e => setSelectedDisease(e.target.value)}
-                    className="text-xs py-1 px-2 rounded-md"
-                    style={{
-                      width: 'auto',
-                      border: '1px solid var(--border-light)',
-                      background: 'var(--overlay-subtle)',
-                      fontSize: '0.7rem',
-                      padding: '4px 28px 4px 8px',
-                    }}
-                  >
-                    <option value="all">{t('surveillance.allDiseases')}</option>
-                    {uniqueDiseases.map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
                 </div>
                 <div className="p-3 data-row-divider-sm" style={{ maxHeight: '480px', overflowY: 'auto' }}>
                   {filteredAlerts.map(alert => {
@@ -663,9 +646,9 @@ export default function SurveillancePage() {
                             </div>
                             <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{alert.disease}</span>
                           </div>
-                          <span className={`badge badge-${alert.alertLevel} text-[10px]`}>
+                          <Badge tone={alertLevelTone[alert.alertLevel] ?? 'neutral'} uppercase>
                             {alert.alertLevel.toUpperCase()}
-                          </span>
+                          </Badge>
                         </div>
                         <p className="text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                           {alert.county}, {alert.state}
@@ -696,7 +679,7 @@ export default function SurveillancePage() {
                         </div>
                         <hr className="section-divider" />
                         <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                          {t('surveillance.reported', { date: new Date(alert.reportDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) })}
+                          {t('surveillance.reported', { date: formatDate(alert.reportDate) })}
                         </p>
                       </div>
                     );
@@ -716,7 +699,7 @@ export default function SurveillancePage() {
                   </span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                  <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 720 }}>
                     <thead>
                       <tr>
                         <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-3 py-2.5"
@@ -827,7 +810,7 @@ export default function SurveillancePage() {
                 </div>
                 <div className="px-4 py-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
                   <button onClick={handleExport} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--tamamhealth-blue)' }}>
-                    <div className="icon-box-sm" style={{ background: 'rgba(43,111,224,0.12)' }}>
+                    <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
                       <FileText className="w-3.5 h-3.5" />
                     </div>
                     {t('surveillance.downloadFullReport')}
@@ -840,7 +823,7 @@ export default function SurveillancePage() {
 
           {/* Report Disease Alert Modal */}
           {showNewAlert && (
-            <div className="modal-backdrop" onClick={() => !alertSubmitting && setShowNewAlert(false)}>
+            <Modal onClose={() => !alertSubmitting && setShowNewAlert(false)}>
               <div className="modal-content card-elevated p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -912,7 +895,7 @@ export default function SurveillancePage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )}
       </main>
     </>

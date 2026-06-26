@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Modal from '@/components/Modal';
 import { X, CheckCircle2, ArrowRight, Loader2 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { formatMoney } from '@/lib/format-utils';
 
 interface PaymentPlanWizardProps {
   patientId: string;
@@ -67,7 +69,7 @@ export default function PaymentPlanWizard({
 
   if (success) {
     return (
-      <div className="modal-backdrop">
+      <Modal onClose={onCancel} width={360}>
         <div className="modal-content" style={{ padding: 48, textAlign: 'center', maxWidth: 360 }}>
           <CheckCircle2 size={64} style={{ color: 'var(--success)', marginBottom: 16 }} />
           <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700 }}>{t('payments.planCreated')}</h3>
@@ -75,12 +77,12 @@ export default function PaymentPlanWizard({
             {t('payments.planCreatedSummary', { amount: monthlyAmount.toLocaleString(), currency, months: termMonths })}
           </p>
         </div>
-      </div>
+      </Modal>
     );
   }
 
   return (
-    <div className="modal-backdrop" onClick={onCancel}>
+    <Modal onClose={onCancel} width={440}>
       <div className="modal-content" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border-medium)' }}>
@@ -96,7 +98,7 @@ export default function PaymentPlanWizard({
         {/* Balance */}
         <div style={{ padding: '16px 20px', background: 'var(--bg-secondary)', textAlign: 'center' }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('payments.totalBalance')}</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)' }}>{balance.toLocaleString()} {currency}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(balance, { currency })}</div>
         </div>
 
         <div style={{ padding: 20 }}>
@@ -133,7 +135,7 @@ export default function PaymentPlanWizard({
               <div style={{ padding: 16, borderRadius: 12, background: 'var(--bg-secondary)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('payments.monthlyPayment')}</span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)' }}>{monthlyAmount.toLocaleString()} {currency}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)' }}>{formatMoney(monthlyAmount, { currency })}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('payments.term')}</span>
@@ -169,6 +171,6 @@ export default function PaymentPlanWizard({
           )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

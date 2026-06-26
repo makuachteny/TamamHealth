@@ -161,16 +161,6 @@ export default function CaseStudiesIndex() {
           </div>
         </section>
 
-        <section className="mk-cta-banner">
-          <div className="mk-container mk-cta-narrow">
-            <h2 className="mk-h2" style={{ marginBottom: 16 }}>Could your facility be the next one?</h2>
-            <p style={{ fontSize: 17, lineHeight: 1.55, color: "var(--tb-text-sec)", marginBottom: 28 }}>
-              We&rsquo;ll build a tailored proposal for your patient volume, current workflows, and budget — at no charge.
-            </p>
-            <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">Talk to our team</Link>
-          </div>
-        </section>
-
       </main>
       
     </>

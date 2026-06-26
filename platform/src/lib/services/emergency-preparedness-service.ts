@@ -17,17 +17,16 @@ import { emergencyPlansDB } from '../db';
 import type { EmergencyPlanDoc, EmergencyPhase, EmergencySeverity } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 
 // ===== CRUD =====
 
 export async function getAllPlans(scope?: DataScope): Promise<EmergencyPlanDoc[]> {
   const db = emergencyPlansDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as EmergencyPlanDoc)
-    .filter(d => d && d.type === 'emergency_plan')
+  const all = (await findByType<EmergencyPlanDoc>(db, 'emergency_plan'))
     .sort((a, b) => {
       // Active emergencies first, then by severity (level_3 > level_2 > level_1)
       const phaseOrder: Record<string, number> = { response: 0, alert: 1, recovery: 2, preparedness: 3, closed: 4 };
@@ -76,6 +75,14 @@ export async function createPlan(
   await logAuditSafe('CREATE_EMERGENCY_PLAN', undefined, undefined,
     `Emergency plan ${doc._id}: ${data.planName} (${data.emergencyType}, ${data.severity}) at ${data.facilityName}`
   );
+  emitSyncEvent({
+    resourceType: 'emergency_plan',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
@@ -90,6 +97,14 @@ export async function updatePlan(
     const resp = await db.put(updated);
     updated._rev = resp.rev;
     await logAuditSafe('UPDATE_EMERGENCY_PLAN', undefined, undefined, `Emergency plan ${id} updated`);
+    emitSyncEvent({
+      resourceType: 'emergency_plan',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.facilityId,
+    });
     return updated;
   } catch {
     return null;
@@ -104,6 +119,13 @@ export async function deletePlan(id: string): Promise<boolean> {
     if (!existing._rev) throw new Error('Missing revision');
     await db.remove(existing._id, existing._rev);
     await logAuditSafe('DELETE_EMERGENCY_PLAN', undefined, undefined, `Emergency plan ${id} deleted`);
+    emitSyncEvent({
+      resourceType: 'emergency_plan',
+      resourceId: id,
+      operation: 'delete',
+      orgId: (existing as EmergencyPlanDoc).orgId,
+      hospitalId: (existing as EmergencyPlanDoc).facilityId,
+    });
     return true;
   } catch {
     return false;

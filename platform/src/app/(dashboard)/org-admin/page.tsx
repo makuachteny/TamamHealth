@@ -3,14 +3,13 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import RoleGuard from '@/components/RoleGuard';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Users, Building2, UserCheck, CreditCard, Shield,
   TrendingUp, TrendingDown, CheckCircle, XCircle, Zap, BarChart3,
-  Activity, Clock, ArrowUpDown, Minus, AlertTriangle, Palette, Settings,
+  Activity, ArrowUpDown, Minus, AlertTriangle, Palette, Settings,
 } from '@/components/icons/lucide';
 import type { OrganizationDoc, AuditLogDoc, HospitalDoc } from '@/lib/db-types';
 
@@ -258,14 +257,7 @@ function OrgAdminDashboard() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title={t('orgAdmin.pageTitle')} />
-
-      <div className="page-container page-enter">
-        <PageHeader
-          icon={Building2}
-          title={org?.name || currentUser?.branding?.name || t('orgAdmin.organization')}
-          subtitle={t('orgAdmin.subtitle')}
-          actions={org?.subscriptionPlan ? (
+      <TopBar title={t('orgAdmin.pageTitle')} actions={org?.subscriptionPlan ? (
             <div
               className="px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider"
               style={{
@@ -276,55 +268,47 @@ function OrgAdminDashboard() {
             >
               {t('orgAdmin.planBadge', { plan: planLabels[org.subscriptionPlan] || org.subscriptionPlan })}
             </div>
-          ) : null}
-        />
+          ) : null} />
 
+      <div className="page-container page-enter">
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {statCards.map((card) => {
             const Icon = card.icon;
             return (
-              <div
+              <button
                 key={card.label}
-                className="p-5 rounded-xl cursor-pointer"
+                type="button"
+                className="dash-card text-left"
+                style={{ padding: '14px 16px', cursor: 'pointer' }}
                 onClick={() => {
                   const routes: Record<string, string> = { 'Total Users': '/org-admin/users', 'Hospitals': '/org-admin/hospitals', 'Patients': '/patients', 'Subscription': '/org-admin/settings' };
                   if (routes[card.label]) router.push(routes[card.label]);
                 }}
-                style={{
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border-light)',
-                }}
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className="icon-box-sm"
-                    style={{ background: `${card.color}${card.bgOpacity}` }}
-                  >
-                    <Icon className="w-5 h-5" style={{ color: card.color }} />
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                    <Icon className="w-3.5 h-3.5" style={{ color: card.color }} />
                   </div>
-                  <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                    {card.displayLabel}
-                  </span>
+                  <span className="kpi-card-title">{card.displayLabel}</span>
                 </div>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>
                   {card.value}
-                </p>
-              </div>
+                </div>
+              </button>
             );
           })}
         </div>
 
         {/* USAGE DASHBOARD */}
-        <div className="p-5 rounded-xl mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="w-5 h-5" style={{ color: brandColor }} />
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <div className="dash-card overflow-hidden mb-4">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <BarChart3 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
               {t('orgAdmin.usageThisMonth')}
-            </h2>
+            </h3>
           </div>
-          <hr className="section-divider" />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Patients registered */}
             <div className="p-4 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-2">
@@ -366,15 +350,15 @@ function OrgAdminDashboard() {
         </div>
 
         {/* FACILITY PERFORMANCE COMPARISON */}
-        <div className="rounded-xl overflow-hidden mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+        <div className="dash-card overflow-hidden mb-4">
+          <div className="flex items-center justify-between p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4" style={{ color: brandColor }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgAdmin.facilityComparison')}</span>
+              <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgAdmin.facilityComparison')}</h3>
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 520 }}>
               <thead>
                 <tr>
                   {[
@@ -408,12 +392,12 @@ function OrgAdminDashboard() {
                   return (
                     <tr key={h._id} style={{
                       borderBottom: '1px solid var(--border-light)',
-                      background: isTop ? 'rgba(16,185,129,0.04)' : isBottom ? 'rgba(239,68,68,0.04)' : 'transparent',
+                      background: isTop ? 'rgba(31, 157, 111,0.04)' : isBottom ? 'rgba(239,68,68,0.04)' : 'transparent',
                     }}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{h.name}</span>
-                          {isTop && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.12)', color: 'var(--color-success)' }}>{t('orgAdmin.badgeTop')}</span>}
+                          {isTop && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(31, 157, 111,0.12)', color: 'var(--color-success)' }}>{t('orgAdmin.badgeTop')}</span>}
                           {isBottom && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>{t('orgAdmin.badgeLow')}</span>}
                         </div>
                       </td>
@@ -421,7 +405,7 @@ function OrgAdminDashboard() {
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-primary)' }}>{staffCount}</td>
                       <td className="px-4 py-3">
                         <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
-                          background: occupancy > 90 ? 'rgba(239,68,68,0.12)' : occupancy > 70 ? 'rgba(245,158,11,0.12)' : 'rgba(16,185,129,0.12)',
+                          background: occupancy > 90 ? 'rgba(239,68,68,0.12)' : occupancy > 70 ? 'rgba(245,158,11,0.12)' : 'rgba(31, 157, 111,0.12)',
                           color: occupancy > 90 ? 'var(--color-danger)' : occupancy > 70 ? 'var(--color-warning)' : 'var(--color-success)',
                         }}>{occupancy}%</span>
                       </td>
@@ -434,17 +418,16 @@ function OrgAdminDashboard() {
         </div>
 
         {/* Plan & Limits + Feature Flags */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
           {/* Plan Details */}
-          <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Shield className="w-5 h-5" style={{ color: brandColor }} />
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <Shield className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {t('orgAdmin.subscriptionDetails')}
-              </h2>
+              </h3>
             </div>
-
-            <div className="data-row-divider-sm">
+            <div className="p-4 data-row-divider-sm">
               <div className="flex justify-between items-center py-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.rowPlan')}</span>
                 <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -456,7 +439,7 @@ function OrgAdminDashboard() {
                 <span
                   className="text-xs font-medium px-2 py-0.5 rounded-full"
                   style={{
-                    background: org?.subscriptionStatus === 'active' ? 'rgba(43,111,224,0.12)' : 'rgba(245,158,11,0.12)',
+                    background: org?.subscriptionStatus === 'active' ? 'rgba(59, 130, 246,0.12)' : 'rgba(245,158,11,0.12)',
                     color: org?.subscriptionStatus === 'active' ? 'var(--accent-primary)' : 'var(--color-warning)',
                   }}
                 >
@@ -499,15 +482,14 @@ function OrgAdminDashboard() {
           </div>
 
           {/* Feature Flags */}
-          <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Zap className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <Zap className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {t('orgAdmin.enabledFeatures')}
-              </h2>
+              </h3>
             </div>
-
-            <div className="data-row-divider-sm">
+            <div className="p-4 data-row-divider-sm">
               {featureFlags.map((flag) => (
                 <div
                   key={flag.key}
@@ -541,11 +523,11 @@ function OrgAdminDashboard() {
         </div>
 
         {/* USER ACTIVITY LOG */}
-        <div className="rounded-xl overflow-hidden mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+        <div className="dash-card overflow-hidden mb-4">
+          <div className="flex items-center justify-between p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgAdmin.userActivityLog')}</span>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgAdmin.userActivityLog')}</h3>
             </div>
             {inactiveUsers.length > 0 && (
               <span className="text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--color-warning)' }}>
@@ -555,11 +537,11 @@ function OrgAdminDashboard() {
             )}
           </div>
           <div style={{ overflowX: 'auto', maxHeight: '320px', overflowY: 'auto' }}>
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 520 }}>
               <thead>
                 <tr>
                   {[t('orgAdmin.colUser'), t('orgAdmin.colAction'), t('orgAdmin.colTimestamp'), t('orgAdmin.colStatus')].map(header => (
-                    <th key={header} className="text-left px-4 py-3 text-xs uppercase tracking-wider sticky top-0" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)' }}>
+                    <th key={header} className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider sticky top-0" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card-solid)' }}>
                       {header}
                     </th>
                   ))}
@@ -588,13 +570,12 @@ function OrgAdminDashboard() {
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{log.action}</td>
                       <td className="px-4 py-3">
                         <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                          <Clock className="w-3 h-3" />
                           {formatTimestamp(log.createdAt)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{
-                          background: log.success ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                          background: log.success ? 'rgba(31, 157, 111,0.12)' : 'rgba(239,68,68,0.12)',
                           color: log.success ? 'var(--color-success)' : 'var(--color-danger)',
                         }}>
                           {log.success ? t('orgAdmin.statusSuccess') : t('orgAdmin.statusFailed')}
@@ -609,16 +590,14 @@ function OrgAdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="w-5 h-5" style={{ color: brandColor }} />
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <div className="dash-card overflow-hidden">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <BarChart3 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
               {t('dashboard.quickActions')}
-            </h2>
+            </h3>
           </div>
-
-          <hr className="section-divider" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
               { href: '/org-admin/users', label: t('orgAdmin.actionManageUsers'), icon: Users, desc: t('orgAdmin.actionManageUsersDesc') },
               { href: '/org-admin/hospitals', label: t('orgAdmin.actionFacilities'), icon: Building2, desc: t('orgAdmin.actionFacilitiesDesc') },

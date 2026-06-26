@@ -3,8 +3,6 @@
 import {
   Reveal,
   FAQItem,
-  DemoForm,
-  CheckItem,
 } from "@/components/marketing/MarketingShared";
 import { DuoIcon } from "@/components/marketing/DuoIcon";
 import Link from "next/link";
@@ -77,10 +75,10 @@ export default function MarketingHome() {
               </Reveal>
             </div>
 
-            {/* Center: Hero Photo */}
-            <div className="mk-hide-tablet" style={{ flex: "0 0 240px", borderRadius: 16, overflow: "hidden" }}>
+            {/* Right: Hero Photo */}
+            <div className="mk-hide-tablet" style={{ flex: "0 0 480px", borderRadius: 16, overflow: "hidden" }}>
               <Reveal delay={0.2}>
-                <div style={{ position: "relative", height: 450 }}>
+                <div style={{ position: "relative", height: 520 }}>
                   <Image
                     src="/assets/doctor-tablet-smiling.jpg"
                     alt="Healthcare worker using TamamHealth digital health records on a tablet"
@@ -89,13 +87,6 @@ export default function MarketingHome() {
                     priority
                   />
                 </div>
-              </Reveal>
-            </div>
-
-            {/* Right: Demo Form */}
-            <div className="mk-hero-form">
-              <Reveal delay={0.25}>
-                <DemoForm />
               </Reveal>
             </div>
           </div>
@@ -474,14 +465,6 @@ export default function MarketingHome() {
               </div>
             </div>
           </Reveal>
-
-          <Reveal delay={0.2}>
-            <div style={{ textAlign: "center", marginTop: 48 }}>
-              <Link href="/about/contact" className="mk-btn mk-btn-gold mk-btn-lg">
-                Get started today
-              </Link>
-            </div>
-          </Reveal>
         </div>
       </section>
 
@@ -575,113 +558,6 @@ export default function MarketingHome() {
           </Reveal>
         </div>
       </section>
-
-      {/* ── FUND OUR PILOT BANNER ───────────────────────────── */}
-      <section style={{
-        padding: "64px 0",
-        background: "linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #1E3A8A 100%)",
-      }}>
-        <div className="mk-container">
-          <Reveal>
-            <div style={{
-              display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-              gap: 48, alignItems: "center",
-            }}>
-              <div>
-                <div style={{
-                  display: "inline-flex", alignItems: "center", gap: 8,
-                  background: "rgba(228,168,75,0.15)", border: "1px solid rgba(228,168,75,0.3)",
-                  borderRadius: 20, padding: "5px 14px", marginBottom: 20,
-                }}>
-                  <DuoIcon name="heart" size={14} />
-                  <span style={{ color: "#E4A84B", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em" }}>FUNDRAISING</span>
-                </div>
-                <h2 style={{
-                  fontFamily: "var(--tb-serif)", fontSize: "clamp(28px, 3vw, 38px)",
-                  fontWeight: 700, color: "#fff", lineHeight: 1.2, marginBottom: 16,
-                }}>
-                  Help us pilot TamamHealth in 10 clinics across South Sudan
-                </h2>
-                <p style={{ fontSize: 16, color: "rgba(255,255,255,0.75)", lineHeight: 1.7, marginBottom: 28 }}>
-                  We&apos;re raising $100,000 to bring offline-first digital health records to 10 clinics across South Sudan. Every dollar goes directly to equipment, training, and 12 months of support for healthcare workers.
-                </p>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <Link
-                    href="/donate"
-                    className="mk-btn mk-btn-gold mk-btn-lg"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
-                  >
-                    <DuoIcon name="heart" size={16} />
-                    Fund Our Pilot
-                  </Link>
-                  <Link href="/about/contact" className="mk-btn mk-btn-outline-white mk-btn-lg">
-                    Request a Demo
-                  </Link>
-                </div>
-              </div>
-              <div style={{
-                display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16,
-              }}>
-                {[
-                  { amount: "$50", label: "Digitize a clinic week" },
-                  { amount: "$250", label: "Train a health worker" },
-                  { amount: "$2,500", label: "Equip a full clinic" },
-                  { amount: "$10,000", label: "Launch a pilot site" },
-                ].map((tier) => (
-                  <div key={tier.amount} style={{
-                    background: "rgba(255,255,255,0.06)", borderRadius: 14,
-                    padding: "20px 18px", border: "1px solid rgba(255,255,255,0.1)",
-                    textAlign: "center",
-                  }}>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: "var(--tb-gold)", marginBottom: 4 }}>{tier.amount}</div>
-                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{tier.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── CTA BANNER ───────────────────────────────────────── */}
-      <section className="mk-cta-banner">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-cta-banner-inner">
-              <div className="mk-cta-banner-image">
-                <Image
-                  src="/assets/doctor-nurse-consultation.jpg"
-                  alt="Healthcare professionals collaborating with TamamHealth"
-                  width={580}
-                  height={420}
-                  style={{ width: "100%", height: "auto" }}
-                />
-              </div>
-              <div className="mk-cta-banner-content">
-                <h2 className="mk-h2">
-                  Modern EHR designed for Africa. Ready to transform
-                  your clinic?
-                </h2>
-                <p>
-                  TamamHealth brings offline-first technology, open standards support,
-                  and world-class support to clinics across Africa. Schedule your
-                  free personalized demo today.
-                </p>
-                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                  <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
-                    Request a demo
-                  </Link>
-                  <Link href="/ehr" className="mk-btn mk-btn-outline mk-btn-lg">
-                    Learn more
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <div className="mk-divider"></div>
 
       {/* ── FAQ SECTION ─────────────────────────────────────────── */}
       <section className="mk-faq-section">
@@ -856,53 +732,6 @@ export default function MarketingHome() {
               </div>
             </div>
           </Reveal>
-        </div>
-      </section>
-
-      <div className="mk-divider"></div>
-
-      {/* ── BOTTOM CTA HERO ──────────────────────────────────── */}
-      <section className="mk-hero">
-        <div className="mk-container">
-          <div className="mk-hero-flex">
-            <div className="mk-hero-content">
-              <Reveal>
-                <h1 className="mk-h1" style={{ fontSize: "clamp(30px, 3.5vw, 48px)" }}>
-                  Healthcare providers across Africa are transforming care with TamamHealth.
-                  It&apos;s your turn.
-                </h1>
-              </Reveal>
-              <Reveal delay={0.1}>
-                <p style={{ marginBottom: 20 }}>
-                  Schedule your customized demo and:
-                </p>
-                <ul className="mk-check-list">
-                  <CheckItem>Get a free data-driven practice assessment</CheckItem>
-                  <CheckItem>See how TamamHealth fits your specific workflows</CheckItem>
-                  <CheckItem>No strings attached — no commitment required</CheckItem>
-                </ul>
-                <div className="mk-hero-buttons" style={{ marginTop: 28 }}>
-                  <Link
-                    href="/about/contact"
-                    className="mk-btn mk-btn-green mk-btn-lg"
-                    style={{ animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite" }}
-                  >
-                    Schedule Demo
-                  </Link>
-                  <Link href="/ehr" className="mk-btn mk-btn-outline mk-btn-lg">
-                    Learn more
-                  </Link>
-                </div>
-              </Reveal>
-            </div>
-
-            {/* Right: Demo form */}
-            <div>
-              <Reveal delay={0.15}>
-                <DemoForm />
-              </Reveal>
-            </div>
-          </div>
         </div>
       </section>
 

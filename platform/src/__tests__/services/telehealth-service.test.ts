@@ -9,6 +9,7 @@ jest.mock('uuid', () => ({ v4: () => `${String(++uuidCounter).padStart(8, '0')}-
 jest.mock('@/lib/db', () => require('../helpers/test-db').createDBMock());
 
 import { teardownTestDBs } from '../helpers/test-db';
+import { jubaDate } from '@/lib/time-juba';
 import {
   getAllSessions,
   getSessionsByPatient,
@@ -28,7 +29,7 @@ afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 type CreateSessionInput = Parameters<typeof createSession>[0];
 
 function validSession(overrides: Partial<CreateSessionInput> = {}): CreateSessionInput {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = jubaDate();
 
   return {
     patientId: 'pat-001',
@@ -104,8 +105,8 @@ describe('Telehealth Service', () => {
   });
 
   test('retrieves upcoming sessions excluding completed and cancelled', async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const today = jubaDate();
+    const tomorrow = jubaDate(Date.now() + 86400000);
 
     // Create scheduled session for tomorrow
     await createSession(validSession({
@@ -131,8 +132,8 @@ describe('Telehealth Service', () => {
   });
 
   test('retrieves today sessions', async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const today = jubaDate();
+    const tomorrow = jubaDate(Date.now() + 86400000);
 
     await createSession(validSession({
       scheduledDate: today,
@@ -225,8 +226,8 @@ describe('Telehealth Service', () => {
   });
 
   test('calculates telehealth stats correctly', async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const today = jubaDate();
+    const tomorrow = jubaDate(Date.now() + 86400000);
 
     // Create scheduled session for today
     await createSession(validSession({
@@ -276,8 +277,8 @@ describe('Telehealth Service', () => {
   });
 
   test('sorts sessions by most recent first by default', async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const today = jubaDate();
+    const yesterday = jubaDate(Date.now() - 86400000);
 
     await createSession(validSession({
       patientId: 'pat-001',
@@ -318,7 +319,7 @@ describe('Telehealth Service', () => {
   });
 
   test('getUpcomingSessions sorts by date and time ascending', async () => {
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const tomorrow = jubaDate(Date.now() + 86400000);
 
     // Create sessions out of order
     await createSession(validSession({
@@ -346,7 +347,7 @@ describe('Telehealth Service', () => {
   });
 
   test('getUpcomingSessions with scope parameter', async () => {
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const tomorrow = jubaDate(Date.now() + 86400000);
     await createSession(validSession({
       scheduledDate: tomorrow,
       status: 'scheduled',
@@ -357,7 +358,7 @@ describe('Telehealth Service', () => {
   });
 
   test('getTelehealthStats includes failed sessions', async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = jubaDate();
     await createSession(validSession({
       scheduledDate: today,
       status: 'failed',

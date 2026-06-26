@@ -100,6 +100,21 @@ async function postHandler(req: NextRequest) {
     // Generate payment URL
     const paymentUrl = generatePaymentUrl(linkId);
 
+    // Persist the link so it can be looked up later (GET) and reconciled.
+    const { createPaymentLink } = await import('@/lib/services/payment-service');
+    await createPaymentLink({
+      linkId,
+      url: paymentUrl,
+      patientId,
+      amount,
+      currency: DEFAULT_CURRENCY,
+      description,
+      expiresAt: expiresAt.toISOString(),
+      facilityId: auth.hospitalId || '',
+      orgId: auth.orgId,
+      createdBy: auth.sub,
+    });
+
     const response: PaymentLinkResponse = {
       linkId,
       url: paymentUrl,
@@ -111,9 +126,6 @@ async function postHandler(req: NextRequest) {
       createdAt: createdAt.toISOString(),
       patientId,
     };
-
-    // In production, this would save the payment link to the database
-    // Example: await PaymentLinkService.create({ linkId, patientId, amount, description, expiresAt })
 
     console.log('[Payment Link API] Payment link created:', {
       linkId,
@@ -146,30 +158,34 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // In production, this would fetch the payment link from the database
-    // and check its status (active, expired, or used)
-    // Example: const link = await PaymentLinkService.getById(linkId)
+    // Fetch the persisted link; 404 for an unknown id rather than fabricating.
+    const { getPaymentLink } = await import('@/lib/services/payment-service');
+    const link = await getPaymentLink(linkId);
 
-    // Return a simulated response
-    const createdAt = new Date();
-    const expiresAt = new Date(createdAt.getTime() + 72 * 60 * 60 * 1000);
-
-    const response = {
-      linkId,
-      status: 'active',
-      amount: 5000,
-      currency: DEFAULT_CURRENCY,
-      createdAt: createdAt.toISOString(),
-      expiresAt: expiresAt.toISOString(),
-      message: 'Use POST method to create a new payment link',
-    };
+    if (!link) {
+      return NextResponse.json(
+        { error: 'Payment link not found' },
+        { status: 404 }
+      );
+    }
 
     console.log('[Payment Link API] GET request for link:', {
       linkId,
+      status: link.status,
       timestamp: new Date().toISOString(),
     });
 
-    return NextResponse.json(response);
+    return NextResponse.json({
+      linkId: link.linkId,
+      url: link.url,
+      status: link.status,
+      amount: link.amount,
+      currency: link.currency,
+      description: link.description,
+      patientId: link.patientId,
+      createdAt: link.createdAt,
+      expiresAt: link.expiresAt,
+    });
   } catch (error) {
     logApiError('[API /payment-link GET]', error);
     return serverError();

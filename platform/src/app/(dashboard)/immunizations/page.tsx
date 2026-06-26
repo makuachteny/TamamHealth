@@ -4,18 +4,22 @@ import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import EmptyState from '@/components/EmptyState';
+import PatientName from '@/components/PatientName';
+import Badge, { type BadgeTone } from '@/components/Badge';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { patientAge } from '@/lib/patient-utils';
 import { useBodyScrollLock } from '@/lib/hooks/useBodyScrollLock';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { FilterMenu } from '@/components/filters';
 import type { ImmunizationDefaulter } from '@/lib/services/immunization-service';
+import type { ImmunizationDoc } from '@/lib/db-types';
 import {
   Syringe, Search, Plus, X, CheckCircle2, Clock, AlertTriangle,
-  XCircle, ChevronDown, ChevronUp, Users, ExternalLink,
+  XCircle, ChevronDown, ChevronUp, Users, ExternalLink, Edit3,
 } from '@/components/icons/lucide';
 
 const VACCINES = ['BCG', 'OPV', 'Penta', 'PCV', 'Rota', 'Measles', 'Yellow Fever', 'Vitamin A'];
@@ -31,13 +35,25 @@ const statusConfig = {
 export default function ImmunizationsPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser } = useApp();
-  const { immunizations, stats, coverage, loading, register } = useImmunizations();
+  const { currentUser, globalSearch } = useApp();
+  const { immunizations, stats, coverage, loading, register, update } = useImmunizations();
   const { patients } = usePatients();
   const { canRecordVitalEvents } = usePermissions();
-  const [search, setSearch] = useState('');
+  // Coverage analytics (summary cards, coverage-by-antigen, coverage-by-age) are
+  // a population-health view for facility management and the Ministry of Health.
+  // Clinical roles (doctors, nurses, etc.) just work the records and defaulters.
+  const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
+  // Text search comes from the shared global search bar (TopBar).
+  const search = globalSearch;
+  const [vaccineFilter, setVaccineFilter] = useState('all');
+  const activeFilterCount = (vaccineFilter !== 'all' ? 1 : 0);
+  const clearFilters = () => { setVaccineFilter('all'); };
   const [showModal, setShowModal] = useState(false);
-  useBodyScrollLock(showModal);
+  // Edit/correct affordance for a saved dose. Clinical records are corrected
+  // (via updateImmunization), never hard-deleted, so a fix preserves audit/sync.
+  const [editDose, setEditDose] = useState<ImmunizationDoc | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  useBodyScrollLock(showModal || !!editDose);
   const [expandedChild, setExpandedChild] = useState<string | null>(null);
   const [patientLookup, setPatientLookup] = useState('');
   const [activeTab, setActiveTab] = useState<'records' | 'defaulters'>('records');
@@ -91,7 +107,7 @@ export default function ImmunizationsPage() {
     const q = patientLookup.toLowerCase();
     return (patients || [])
       .filter(p => {
-        const age = p.estimatedAge ?? (p.dateOfBirth ? new Date().getFullYear() - new Date(p.dateOfBirth).getFullYear() : 99);
+        const age = patientAge(p) ?? 99;
         if (age > 15) return false; // immunizations are pediatric
         return (
           `${p.firstName} ${p.surname}`.toLowerCase().includes(q) ||
@@ -126,12 +142,12 @@ export default function ImmunizationsPage() {
 
   const filteredChildren = useMemo(() => {
     const entries = Array.from(childGroups.entries());
-    if (!search) return entries;
     const q = search.toLowerCase();
     return entries.filter(([, records]) =>
-      records[0]?.patientName?.toLowerCase().includes(q)
+      (!search || records[0]?.patientName?.toLowerCase().includes(q)) &&
+      (vaccineFilter === 'all' || records.some(r => r.vaccine === vaccineFilter))
     );
-  }, [childGroups, search]);
+  }, [childGroups, search, vaccineFilter]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +174,27 @@ export default function ImmunizationsPage() {
     setForm({ patientId: '', patientName: '', gender: 'Male', dateOfBirth: '', vaccine: 'BCG', doseNumber: 1, dateGiven: new Date().toISOString().slice(0, 10), nextDueDate: '', batchNumber: '', site: 'left arm', adverseReaction: false, adverseReactionDetails: '' });
   };
 
+  // Persist a correction to a saved dose, then close the edit modal.
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editDose) return;
+    setEditSaving(true);
+    try {
+      await update(editDose._id, {
+        vaccine: editDose.vaccine,
+        doseNumber: editDose.doseNumber,
+        dateGiven: editDose.dateGiven,
+        nextDueDate: editDose.nextDueDate,
+        batchNumber: editDose.batchNumber,
+        site: editDose.site,
+        status: editDose.status,
+      });
+      setEditDose(null);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -176,41 +213,25 @@ export default function ImmunizationsPage() {
 
   return (
     <>
-      <TopBar title={t('immun.title')} />
+      <TopBar title={t('immun.title')} searchTrailing={
+          activeTab === 'records' && (
+            <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterMenu.Field label="Filter by vaccine">
+                <select value={vaccineFilter} onChange={e => setVaccineFilter(e.target.value)} className="w-full text-sm">
+                  <option value="all">All vaccines</option>
+                  {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </FilterMenu.Field>
+            </FilterMenu>
+          )
+      } actions={
+        canRecordVitalEvents && (
+          <button onClick={() => setShowModal(true)} className="btn btn-primary">
+            <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}
+          </button>
+        )
+      } />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Syringe}
-          title={t('immun.trackerTitle')}
-          subtitle={t('immun.trackerSubtitle')}
-          actions={canRecordVitalEvents && (
-            <button onClick={() => setShowModal(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}
-            </button>
-          )}
-        />
-
-        {/* Stats Row */}
-        {stats && (
-          <div className="kpi-grid mb-6">
-            {[
-              { label: t('immun.totalVaccinations'), value: stats.totalVaccinations.toString(), color: '#059669', bg: 'rgba(5,150,105,0.12)', icon: Syringe },
-              { label: t('immun.childrenTracked'), value: stats.totalChildren.toString(), color: 'var(--accent-primary)', bg: 'rgba(43,111,224,0.12)', icon: Users },
-              { label: t('immun.overdueDoses'), value: stats.overdue.toString(), color: 'var(--color-danger)', bg: 'rgba(229,46,66,0.12)', icon: AlertTriangle },
-              { label: t('immun.coverageRate'), value: `${stats.coverageRate}%`, color: '#059669', bg: 'rgba(5,150,105,0.12)', icon: CheckCircle2 },
-            ].map(stat => (
-              <div key={stat.label} className="kpi">
-                <div className="icon-box-sm" style={{ background: stat.bg }}>
-                  <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
-                </div>
-                <div className="kpi__body">
-                  <div className="kpi__value">{stat.value}</div>
-                  <div className="kpi__label">{stat.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Tab switcher */}
         <div className="flex gap-0 border-b mb-5" style={{ borderColor: 'var(--border-light)' }}>
           <button onClick={() => setActiveTab('records')}
@@ -231,7 +252,7 @@ export default function ImmunizationsPage() {
         </div>
 
         {/* Coverage by Antigen */}
-        {activeTab === 'records' && coverage && (
+        {activeTab === 'records' && canViewCoverage && coverage && (
           <div className="card-elevated p-5 mb-6">
             <h3 className="font-semibold text-sm mb-0 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <span className="icon-box-sm" style={{ background: 'rgba(5,150,105,0.12)' }}>
@@ -265,7 +286,7 @@ export default function ImmunizationsPage() {
         )}
 
         {/* Coverage by Age Cohort heatmap */}
-        {activeTab === 'records' && cohortRows.length > 0 && (
+        {activeTab === 'records' && canViewCoverage && cohortRows.length > 0 && (
           <div className="card-elevated p-5 mb-6">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -277,7 +298,7 @@ export default function ImmunizationsPage() {
               <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>{t('immun.epiScheduleAlignment')}</span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-xs" style={{ minWidth: 720 }}>
                 <thead>
                   <tr>
                     <th className="text-left p-2" style={{ color: 'var(--text-muted)' }}>{t('immun.colVaccine')}</th>
@@ -313,44 +334,9 @@ export default function ImmunizationsPage() {
           </div>
         )}
 
-        {/* Search */}
-        {activeTab === 'records' && (
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-          <input
-            type="search"
-            className="search-icon-input"
-            placeholder={t('immun.searchByChildName')}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-        )}
-
         {/* Defaulters Panel */}
         {activeTab === 'defaulters' && (
           <>
-            {defaulterStats && (
-              <div className="kpi-grid mb-4">
-                {[
-                  { label: t('immun.critical30Days'), value: defaulterStats.critical, bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)', filter: 'critical' as const },
-                  { label: t('immun.high14Days'), value: defaulterStats.high, bg: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)', filter: 'high' as const },
-                  { label: t('immun.medium0Days'), value: defaulterStats.medium, bg: 'rgba(43,111,224,0.12)', color: 'var(--accent-primary)', filter: 'medium' as const },
-                  { label: t('immun.uniqueChildren'), value: defaulterStats.uniqueChildren, bg: 'rgba(43,111,224,0.08)', color: 'var(--accent-primary)', filter: 'all' as const },
-                ].map(k => (
-                  <div key={k.label} className="kpi cursor-pointer" onClick={() => setDefaulterFilter(k.filter)}>
-                    <div className="icon-box-sm" style={{ background: k.bg }}>
-                      <AlertTriangle className="w-4 h-4" style={{ color: k.color }} />
-                    </div>
-                    <div className="kpi__body">
-                      <div className="kpi__value">{k.value}</div>
-                      <div className="kpi__label">{k.label}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div className="card-elevated overflow-hidden">
               <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
                 <div className="flex items-center gap-2">
@@ -365,7 +351,8 @@ export default function ImmunizationsPage() {
                   <button onClick={() => setDefaulterFilter('all')} className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>{t('immun.clearFilter')}</button>
                 )}
               </div>
-              <table className="data-table">
+              <div className="overflow-x-auto">
+              <table className="data-table" style={{ minWidth: 1080 }}>
                 <thead>
                   <tr>
                     <th>{t('immun.colChild')}</th>
@@ -386,10 +373,10 @@ export default function ImmunizationsPage() {
                     </td></tr>
                   ) : defaulters.filter(d => defaulterFilter === 'all' || d.urgency === defaulterFilter).map((d, i) => {
                     const urgencyColor = d.urgency === 'critical' ? 'var(--color-danger)' : d.urgency === 'high' ? 'var(--color-warning)' : 'var(--accent-primary)';
-                    const urgencyBg = d.urgency === 'critical' ? 'rgba(229,46,66,0.10)' : d.urgency === 'high' ? 'rgba(252,211,77,0.10)' : 'rgba(43,111,224,0.10)';
+                    const urgencyTone: BadgeTone = d.urgency === 'critical' ? 'danger' : d.urgency === 'high' ? 'warning' : 'info';
                     return (
                       <tr key={`${d.patientId}-${d.vaccine}-${i}`} className="cursor-pointer" onClick={() => router.push(`/patients/${d.patientId}`)}>
-                        <td className="font-medium text-sm" style={{ color: 'var(--accent-primary)' }}>{d.patientName}</td>
+                        <td><PatientName patientId={d.patientId} name={d.patientName} gender={d.gender} nameClassName="font-medium text-sm" /></td>
                         <td className="text-xs">{Math.floor(d.ageMonths / 12)}y {d.ageMonths % 12}m</td>
                         <td className="text-xs">{d.gender}</td>
                         <td className="text-sm font-medium">{d.vaccine}</td>
@@ -398,15 +385,14 @@ export default function ImmunizationsPage() {
                         <td className="text-sm font-bold" style={{ color: urgencyColor }}>{d.daysOverdue}d</td>
                         <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{d.facilityName}</td>
                         <td>
-                          <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full" style={{ background: urgencyBg, color: urgencyColor }}>
-                            {d.urgency}
-                          </span>
+                          <Badge tone={urgencyTone} uppercase>{d.urgency}</Badge>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           </>
         )}
@@ -439,10 +425,6 @@ export default function ImmunizationsPage() {
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
                   className="w-full flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--table-row-hover)] cursor-pointer"
                 >
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                    style={{ background: 'var(--accent-primary)' }}>
-                    {child.patientName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  </div>
                   <div className="flex-1 text-left min-w-0">
                     <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{child.patientName}</p>
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -450,13 +432,9 @@ export default function ImmunizationsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
-                      {t('immun.given', { count: completedCount })}
-                    </span>
+                    <Badge tone="accent">{t('immun.given', { count: completedCount })}</Badge>
                     {overdueCount > 0 && (
-                      <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>
-                        {t('immun.overdueCount', { count: overdueCount })}
-                      </span>
+                      <Badge tone="danger">{t('immun.overdueCount', { count: overdueCount })}</Badge>
                     )}
                     <Link
                       href={`/patients/${childId}`}
@@ -487,8 +465,19 @@ export default function ImmunizationsPage() {
                           return (
                             <div key={dose._id} className="p-2 rounded-lg border" style={{ borderColor: 'var(--border-light)', background: cfg.bg }}>
                               <div className="flex items-center gap-1 mb-1">
-                                <cfg.icon className="w-3 h-3" style={{ color: cfg.color }} />
-                                <p className="text-xs font-medium" style={{ color: cfg.color }}>{dose.vaccine} {dose.doseNumber > 0 ? `#${dose.doseNumber}` : ''}</p>
+                                <p className="text-xs font-medium flex-1 min-w-0" style={{ color: cfg.color }}>{dose.vaccine} {dose.doseNumber > 0 ? `#${dose.doseNumber}` : ''}</p>
+                                {canRecordVitalEvents && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setEditDose(dose); }}
+                                    aria-label={t('action.edit')}
+                                    title={t('action.edit')}
+                                    className="p-0.5 rounded hover:bg-[var(--overlay-light)] shrink-0"
+                                    style={{ color: 'var(--text-muted)' }}
+                                  >
+                                    <Edit3 size={12} />
+                                  </button>
+                                )}
                               </div>
                               <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
                                 {dose.status === 'completed' ? dose.dateGiven : dose.status === 'scheduled' ? t('immun.due', { date: dose.nextDueDate }) : t(`immun.status${dose.status.charAt(0).toUpperCase()}${dose.status.slice(1)}`)}
@@ -530,7 +519,7 @@ export default function ImmunizationsPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Link to existing patient (recommended) */}
-                <div className="rounded-lg p-3" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(43,111,224,0.25))' }}>
+                <div className="rounded-lg p-3" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(59, 130, 246,0.25))' }}>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--accent-primary)', textTransform: 'uppercase' }}>
                     <Users className="w-3 h-3" />
                     {t('immun.linkToExistingChild')}
@@ -655,6 +644,66 @@ export default function ImmunizationsPage() {
                   <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary flex-1">{t('immun.cancel')}</button>
                   <button type="submit" className="btn btn-primary flex-1">
                     <Syringe className="w-4 h-4" /> {t('immun.recordVaccination')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit / Correct a saved dose */}
+        {editDose && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+            <div className="card-elevated p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fadeIn" style={{ margin: '20px' }}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{t('action.edit')} · {editDose.patientName}</h3>
+                <button onClick={() => setEditDose(null)} className="p-1 rounded-lg hover:bg-[var(--overlay-light)]">
+                  <X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
+                </button>
+              </div>
+
+              <form onSubmit={handleEditSave} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label>{t('immun.vaccine')}</label>
+                    <select value={editDose.vaccine} onChange={e => setEditDose({ ...editDose, vaccine: e.target.value })}>
+                      {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label>{t('immun.doseNumber')}</label>
+                    <input type="number" min={0} max={5} value={editDose.doseNumber} onChange={e => setEditDose({ ...editDose, doseNumber: parseInt(e.target.value, 10) || 0 })} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label>{t('immun.dateGiven')}</label>
+                    <input type="date" value={editDose.dateGiven} onChange={e => setEditDose({ ...editDose, dateGiven: e.target.value })} />
+                  </div>
+                  <div>
+                    <label>{t('immun.nextDueDate')}</label>
+                    <input type="date" value={editDose.nextDueDate || ''} onChange={e => setEditDose({ ...editDose, nextDueDate: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label>{t('immun.batchNumber')}</label>
+                    <input type="text" value={editDose.batchNumber || ''} onChange={e => setEditDose({ ...editDose, batchNumber: e.target.value })} placeholder={t('immun.batchNumberPlaceholder')} />
+                  </div>
+                  <div>
+                    <label>{t('immun.site')}</label>
+                    <select value={editDose.site} onChange={e => setEditDose({ ...editDose, site: e.target.value as typeof SITES[number] })}>
+                      {SITES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setEditDose(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
+                  <button type="submit" disabled={editSaving} className="btn btn-primary flex-1">
+                    {t('action.saveChanges')}
                   </button>
                 </div>
               </form>

@@ -14,7 +14,6 @@ import {
   FlaskConical, ClipboardList,
   type LucideIcon,
 } from "lucide-react";
-import { TABAN_ICONS, TABAN_CATEGORY_ACCENTS, type TabanIconProps } from "./taban";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Marketing — Icon wrapper
@@ -119,47 +118,6 @@ type DuoIconProps = Omit<SVGProps<SVGSVGElement>, "color" | "name"> & {
   className?: string;
 };
 
-// Map website icon names → Taban icon registry keys.
-// Anything not listed falls back to lucide rendering below.
-const TABAN_NAME_MAP: Partial<Record<IconName, string>> = {
-  heart: "heart",
-  "heart-pulse": "pulse",
-  hospital: "building",
-  clinic: "building",
-  lab: "flask",
-  microscope: "microscope",
-  pharmacy: "pill",
-  pill: "pill",
-  syringe: "syringe",
-  stethoscope: "stethoscope",
-  patient: "patient",
-  prescription: "prescription",
-  "health-data": "pulse",
-  ehr: "record",
-  document: "record",
-  notes: "record",
-  shield: "shield",
-  "shield-check": "shield",
-  warning: "alert",
-  chart: "chart",
-  analytics: "chart",
-  dashboard: "chart",
-  calendar: "calendar",
-  clock: "clock",
-  message: "message",
-  search: "search",
-  check: "check",
-  plus: "plus",
-  download: "download",
-  receipt: "receipt",
-  billing: "creditCard",
-  money: "mobileMoney",
-  phone: "phone",
-  map: "mapPin",
-  location: "mapPin",
-  offline: "wifi",
-  sync: "wifi",
-};
 
 export function DuoIcon({
   name,
@@ -173,35 +131,7 @@ export function DuoIcon({
   const numericSize = typeof size === "string" ? Number(size) || 32 : size;
   const ariaLabel = (rest as { "aria-label"?: string })["aria-label"];
 
-  // First: render via the Taban illustrated library when there's a mapping.
-  const tabanKey = TABAN_NAME_MAP[name];
-  const tabanEntry = tabanKey ? TABAN_ICONS[tabanKey] : undefined;
-  if (tabanEntry) {
-    const TabanComp = tabanEntry.Component as (
-      p: TabanIconProps,
-    ) => React.ReactNode;
-    const tabanAccent =
-      color || ICON_COLORS[name] || TABAN_CATEGORY_ACCENTS[tabanEntry.category].base;
-    return (
-      <TabanComp
-        size={numericSize}
-        accent={tabanAccent}
-        className={className}
-        style={{
-          color: tabanAccent,
-          display: "inline-block",
-          verticalAlign: "middle",
-          flexShrink: 0,
-          ...style,
-        }}
-        data-icon={name}
-        aria-label={ariaLabel}
-        aria-hidden={ariaLabel ? undefined : true}
-      />
-    );
-  }
-
-  // Fallback: lucide rendering for icons not yet covered by Taban.
+  // Clean, consistent line icons via lucide-react (shared with the platform).
   const Lu = ICON_COMPONENTS[name];
   if (!Lu) return null;
   const chosen = color || ICON_COLORS[name] || GRAY;

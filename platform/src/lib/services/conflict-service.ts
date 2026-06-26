@@ -16,6 +16,7 @@
  */
 import { conflictQueueDB } from '../db';
 import type { ConflictQueueDoc } from '../db-types';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 
 /** Resource types that must never auto-merge on conflict. */
@@ -134,9 +135,8 @@ export async function listConflicts(filter?: {
   orgId?: string;
 }): Promise<ConflictQueueDoc[]> {
   const db = conflictQueueDB();
-  const res = await db.allDocs({ include_docs: true });
-  return res.rows
-    .map((r) => r.doc as ConflictQueueDoc)
+  const rows = await findByType<ConflictQueueDoc>(db, 'conflict_queue');
+  return rows
     .filter((d) => {
       if (!d || d.type !== 'conflict_queue') return false;
       if (filter?.status && d.status !== filter.status) return false;

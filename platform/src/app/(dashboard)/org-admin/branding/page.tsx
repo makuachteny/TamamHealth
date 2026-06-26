@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
@@ -26,6 +25,7 @@ export default function OrgBrandingPage() {
   const [secondaryColor, setSecondaryColor] = useState('#0F47AF');
   const [accentColor, setAccentColor] = useState('var(--accent-primary)');
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
+  const [bankDetails, setBankDetails] = useState('');
 
   const brandColor = primaryColor || '#7C3AED';
 
@@ -42,6 +42,7 @@ export default function OrgBrandingPage() {
           setSecondaryColor(o.secondaryColor || '#0F47AF');
           setAccentColor(o.accentColor || 'var(--accent-primary)');
           setLogoUrl(o.logoUrl);
+          setBankDetails(o.bankDetails || '');
         }
       } catch (err) {
         console.error('Failed to load org:', err);
@@ -87,6 +88,7 @@ export default function OrgBrandingPage() {
           secondaryColor,
           accentColor,
           logoUrl,
+          bankDetails: bankDetails.trim(),
         },
         currentUser._id,
         currentUser.username
@@ -123,6 +125,7 @@ export default function OrgBrandingPage() {
     setSecondaryColor(org.secondaryColor || '#0F47AF');
     setAccentColor(org.accentColor || 'var(--accent-primary)');
     setLogoUrl(org.logoUrl);
+    setBankDetails(org.bankDetails || '');
   };
 
   // Sidebar preview nav items
@@ -149,7 +152,31 @@ export default function OrgBrandingPage() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title="Branding" />
+      <TopBar title="Branding" actions={
+        <>
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+            style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+          >
+            <RotateCcw className="w-4 h-4" />
+            {t('branding.reset')}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90 disabled:opacity-50"
+            style={{ background: brandColor }}
+          >
+            {saving ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            {t('appointments.saveChanges')}
+          </button>
+        </>
+      } />
 
       <div className="page-container page-enter">
         {/* Banners */}
@@ -164,42 +191,11 @@ export default function OrgBrandingPage() {
           </div>
         )}
 
-        <PageHeader
-          icon={Palette}
-          title={t('branding.heading')}
-          subtitle={t('branding.subtitle')}
-          actions={
-            <>
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
-              >
-                <RotateCcw className="w-4 h-4" />
-                {t('branding.reset')}
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90 disabled:opacity-50"
-                style={{ background: brandColor }}
-              >
-                {saving ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                {t('appointments.saveChanges')}
-              </button>
-            </>
-          }
-        />
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Editor Panel */}
           <div className="space-y-5">
             {/* Organization Name */}
-            <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="dash-card p-4">
               <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                 {t('branding.orgName')}
               </label>
@@ -212,8 +208,26 @@ export default function OrgBrandingPage() {
               />
             </div>
 
+            {/* Bank Transfer Details */}
+            <div className="dash-card p-4">
+              <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                {t('branding.bankDetails')}
+              </label>
+              <textarea
+                value={bankDetails}
+                onChange={e => setBankDetails(e.target.value)}
+                rows={4}
+                placeholder={t('branding.bankDetailsPlaceholder')}
+                className="w-full px-3 py-2 rounded-lg text-sm font-mono resize-y"
+                style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+              />
+              <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+                {t('branding.bankDetailsHint')}
+              </p>
+            </div>
+
             {/* Logo */}
-            <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="dash-card p-4">
               <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                 {t('branding.logo')}
               </label>
@@ -265,9 +279,12 @@ export default function OrgBrandingPage() {
             </div>
 
             {/* Color Pickers */}
-            <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>{t('branding.brandColors')}</h3>
-              <div className="space-y-4">
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <Palette className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('branding.brandColors')}</h3>
+              </div>
+              <div className="p-4 space-y-4">
                 {/* Primary */}
                 <div>
                   <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
@@ -345,11 +362,12 @@ export default function OrgBrandingPage() {
 
           {/* Live Preview */}
           <div>
-            <div className="p-5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <div className="flex items-center gap-2 mb-4">
-                <Eye className="w-4 h-4" style={{ color: brandColor }} />
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <Eye className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('branding.livePreview')}</h3>
               </div>
+              <div className="p-4">
 
               {/* Simulated sidebar + header */}
               <div className="rounded-xl overflow-hidden shadow-lg" style={{ border: '1px solid var(--border-light)' }}>
@@ -470,6 +488,7 @@ export default function OrgBrandingPage() {
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
           </div>

@@ -35,6 +35,12 @@ yarn-error.log*
 # auto-generated seed credentials — never commit (lib/seed-credentials.ts)
 .seed-credentials.json
 
+# local license key written by scripts/setup.mjs — never commit
+.license
+
+# generated API documentation (npm run docs:api)
+/docs-api
+
 # persisted JWT revocation list — never commit (lib/token-blacklist.ts)
 .token-blacklist.json
 

@@ -114,7 +114,7 @@ export default function AdminAnalyticsPage() {
   const tooltipStyle = {
     backgroundColor: 'var(--bg-card)',
     border: '1px solid var(--border-light)',
-    borderRadius: '8px',
+    borderRadius: '4px',
     fontSize: '12px',
   };
 
@@ -124,37 +124,35 @@ export default function AdminAnalyticsPage() {
       <main className="page-container page-enter">
 
         {/* Summary Cards */}
-        <div className="kpi-grid mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {[
-            { label: t('analytics.totalOrganizations'), value: organizations.length, icon: Building2, color: 'var(--color-danger)', bg: '#DC262615' },
-            { label: t('analytics.totalUsers'), value: totalUsersAll, icon: Users, color: '#3b82f6', bg: '#3b82f615' },
-            { label: t('patients.kpiTotalPatients'), value: totalPatientsAll, icon: HeartPulse, color: 'var(--color-success)', bg: '#05966915' },
-            { label: t('analytics.avgPatientsPerOrg'), value: organizations.length > 0 ? Math.round(totalPatientsAll / organizations.length) : 0, icon: TrendingUp, color: 'var(--color-warning)', bg: '#D9770615' },
+            { label: t('analytics.totalOrganizations'), value: organizations.length, icon: Building2, color: 'var(--color-danger)' },
+            { label: t('analytics.totalUsers'), value: totalUsersAll, icon: Users, color: '#3b82f6' },
+            { label: t('patients.kpiTotalPatients'), value: totalPatientsAll, icon: HeartPulse, color: 'var(--color-success)' },
+            { label: t('analytics.avgPatientsPerOrg'), value: organizations.length > 0 ? Math.round(totalPatientsAll / organizations.length) : 0, icon: TrendingUp, color: 'var(--color-warning)' },
           ].map(stat => (
-            <div key={stat.label} className="kpi">
-              <div className="icon-box-sm" style={{ background: stat.bg }}>
-                <stat.icon size={16} style={{ color: stat.color }} />
+            <div key={stat.label} className="dash-card" style={{ padding: '14px 16px' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <stat.icon className="w-3.5 h-3.5" style={{ color: stat.color }} />
+                </div>
+                <span className="kpi-card-title">{stat.label}</span>
               </div>
-              <div className="kpi__body">
-                <div className="kpi__value">{stat.value.toLocaleString()}</div>
-                <div className="kpi__label">{stat.label}</div>
-              </div>
+              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{stat.value.toLocaleString()}</div>
             </div>
           ))}
         </div>
 
         {/* Charts Row 1: Bar Chart + Pie Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
           {/* Patients per Org Bar Chart */}
-          <div className="lg:col-span-2 rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="icon-box-sm" style={{ background: '#3b82f615' }}>
-                <BarChart3 size={14} style={{ color: '#3b82f6' }} />
-              </div>
-              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.patientsPerOrganization')}</span>
+          <div className="lg:col-span-2 dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <BarChart3 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.patientsPerOrganization')}</h3>
             </div>
-            <hr className="section-divider" />
+            <div className="p-4">
             {dataLoading || orgsLoading ? (
               <div className="flex items-center justify-center h-64">
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('analytics.loadingChartData')}</p>
@@ -173,23 +171,21 @@ export default function AdminAnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
             )}
+            </div>
           </div>
 
           {/* Pie Charts */}
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4">
             {/* Plan Distribution */}
-            <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="icon-box-sm" style={{ background: '#7C3AED15' }}>
-                  <PieChartIcon size={14} style={{ color: '#7C3AED' }} />
-                </div>
-                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.plansHeading')}</span>
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <PieChartIcon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.plansHeading')}</h3>
               </div>
+              <div className="p-4">
               {planDistribution.length === 0 ? (
                 <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>{t('analytics.noDataShort')}</p>
               ) : (
-                <>
-                <hr className="section-divider" />
                 <div className="flex items-center gap-4">
                   <ResponsiveContainer width={120} height={120}>
                     <PieChart>
@@ -210,23 +206,20 @@ export default function AdminAnalyticsPage() {
                     ))}
                   </div>
                 </div>
-                </>
               )}
+              </div>
             </div>
 
             {/* Status Distribution */}
-            <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="icon-box-sm" style={{ background: '#05966915' }}>
-                  <PieChartIcon size={14} style={{ color: 'var(--color-success)' }} />
-                </div>
-                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.statusHeading')}</span>
+            <div className="dash-card overflow-hidden">
+              <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <PieChartIcon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.statusHeading')}</h3>
               </div>
+              <div className="p-4">
               {statusDistribution.length === 0 ? (
                 <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>{t('analytics.noDataShort')}</p>
               ) : (
-                <>
-                <hr className="section-divider" />
                 <div className="flex items-center gap-4">
                   <ResponsiveContainer width={120} height={120}>
                     <PieChart>
@@ -247,24 +240,22 @@ export default function AdminAnalyticsPage() {
                     ))}
                   </div>
                 </div>
-                </>
               )}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Charts Row 2: Growth Line Chart + Users per Org */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
           {/* Growth Over Time */}
-          <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="icon-box-sm" style={{ background: '#05966915' }}>
-                <TrendingUp size={14} style={{ color: 'var(--color-success)' }} />
-              </div>
-              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.growthTrendSimulated')}</span>
+          <div className="dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <TrendingUp className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.growthTrendSimulated')}</h3>
             </div>
-            <hr className="section-divider" />
+            <div className="p-4">
             {growthData.length === 0 || growthData.every(d => !d.users && !d.patients && !d.organizations) ? (
               <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <EmptyState icon={TrendingUp} title="No data yet" message="No growth data to display for this period." />
@@ -283,17 +274,16 @@ export default function AdminAnalyticsPage() {
               </LineChart>
             </ResponsiveContainer>
             )}
+            </div>
           </div>
 
           {/* Users per Org Bar Chart */}
-          <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="icon-box-sm" style={{ background: '#D9770615' }}>
-                <Users size={14} style={{ color: 'var(--color-warning)' }} />
-              </div>
-              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.usersPerOrganization')}</span>
+          <div className="dash-card overflow-hidden">
+            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.usersPerOrganization')}</h3>
             </div>
-            <hr className="section-divider" />
+            <div className="p-4">
             {dataLoading || orgsLoading ? (
               <div className="flex items-center justify-center h-64">
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</p>
@@ -312,15 +302,18 @@ export default function AdminAnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
             )}
+            </div>
           </div>
         </div>
 
         {/* Per-Org Data Table */}
-        <div className="mt-6 rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('analytics.organizationMetrics')}</span>
+        <div className="dash-card overflow-hidden">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.organizationMetrics')}</h3>
           </div>
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full" style={{ minWidth: 600 }}>
             <thead>
               <tr>
                 {[t('analytics.colOrganization'), t('analytics.colPatients'), t('analytics.colUsers'), t('analytics.colPlan'), t('analytics.colStatus')].map(h => (
@@ -366,6 +359,7 @@ export default function AdminAnalyticsPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </main>
     </>

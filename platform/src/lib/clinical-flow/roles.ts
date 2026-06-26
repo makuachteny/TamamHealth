@@ -57,13 +57,9 @@ export type Capability =
   | 'user_management'
   | 'facility_configuration'
   | 'oversight'
-  // Community / BHW (Section 10)
-  | 'community_visit' // household visits, member encounters
-  | 'community_referral' // BHW-initiated referrals (multi-channel)
-  | 'surveillance_reporting' // case-based surveillance capture
-  | 'proxy_referral_capture'; // front-desk capture of phoned-in BHW referral (10.6.1)
+  | 'proxy_referral_capture'; // front-desk capture of phoned-in referral (10.6.1)
 
-/** The 11 roles the system supports (Section 4). */
+/** The roles the system supports (Section 4). */
 export type ClinicalFlowRole =
   | 'central_registration_clerk' // 1
   | 'clinic_clerk' // 2 — clinic reception
@@ -74,8 +70,7 @@ export type ClinicalFlowRole =
   | 'pharmacist' // 7 — pharmacist / pharmacy technician
   | 'cashier' // 8
   | 'records_hmis_officer' // 9
-  | 'facility_administrator' // 10
-  | 'boma_health_worker'; // 11 — BHW
+  | 'facility_administrator'; // 10
 
 export interface RoleDefinition {
   role: ClinicalFlowRole;
@@ -85,7 +80,7 @@ export interface RoleDefinition {
   primaryFunction: string;
   capabilities: Capability[];
   /** What clinical content this role may see (Section 4 clerk table, Stage interfaces). */
-  clinicalVisibility: 'none' | 'identity_billing_only' | 'light_clinical' | 'full_chart' | 'community';
+  clinicalVisibility: 'none' | 'identity_billing_only' | 'light_clinical' | 'full_chart';
   /** Existing platform UserRole(s) this maps onto during migration. */
   mapsToUserRoles: UserRole[];
 }
@@ -160,13 +155,6 @@ export const CLINICAL_FLOW_ROLES: Readonly<Record<ClinicalFlowRole, RoleDefiniti
     capabilities: ['user_management', 'facility_configuration', 'oversight', 'exemption_authorization'],
     clinicalVisibility: 'full_chart',
     mapsToUserRoles: ['facility_administrator', 'medical_superintendent', 'hospital_manager', 'org_admin', 'super_admin'],
-  },
-  boma_health_worker: {
-    role: 'boma_health_worker', number: 11, label: 'Boma Health Worker (BHW)',
-    primaryFunction: 'Household visits, wellness checks, vaccine delivery, medication accompaniment, contact tracing, surveillance reporting, referrals to facility',
-    capabilities: ['community_visit', 'community_referral', 'surveillance_reporting', 'vitals_capture'],
-    clinicalVisibility: 'community',
-    mapsToUserRoles: ['boma_health_worker', 'community_health_volunteer', 'payam_supervisor', 'county_health_director'],
   },
 };
 

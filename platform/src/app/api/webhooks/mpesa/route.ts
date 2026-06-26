@@ -1,5 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuditLog } from '@/lib/audit/with-audit';
+import { updatePaymentStatus } from '@/lib/services/payment-service';
+import crypto from 'crypto';
+
+/**
+ * Optional HMAC verification. Daraja/M-Pesa doesn't sign STK callbacks the way
+ * Flutterwave does, but operators commonly front the webhook with a gateway
+ * that adds an `x-webhook-signature` HMAC. Mirror Flutterwave's pattern: if a
+ * secret is configured, reject mismatched signatures; if it isn't, log a
+ * warning and proceed (preserving current dev behaviour).
+ */
+function verifyMpesaSignature(rawBody: string, signature: string | null): boolean {
+  const secret = process.env.MPESA_WEBHOOK_SECRET;
+  if (!secret) {
+    console.warn('[M-Pesa Webhook] MPESA_WEBHOOK_SECRET not configured — skipping signature verification');
+    return true;
+  }
+  if (!signature) {
+    console.warn('[M-Pesa Webhook] Missing signature header while MPESA_WEBHOOK_SECRET is set');
+    return false;
+  }
+  const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+  return computed === signature;
+}
 
 interface CallbackMetadataItem {
   Name: string;
@@ -24,7 +47,24 @@ interface MPesaWebhookBody {
 
 async function postHandler(req: NextRequest) {
   try {
-    const body: MPesaWebhookBody = await req.json();
+    const rawBody = await req.text();
+
+    // Verify signature when a secret is configured (no-op in dev otherwise).
+    const signature = req.headers.get('x-webhook-signature');
+    if (!verifyMpesaSignature(rawBody, signature)) {
+      console.warn('[M-Pesa Webhook] Invalid signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+
+    let body: MPesaWebhookBody;
+    try {
+      body = JSON.parse(rawBody) as MPesaWebhookBody;
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid callback format' },
+        { status: 400 }
+      );
+    }
 
     // Validate M-Pesa STK Push callback structure
     if (!body?.Body?.stkCallback) {
@@ -63,9 +103,19 @@ async function postHandler(req: NextRequest) {
         timestamp: new Date().toISOString(),
       });
 
-      // In production, this would match the checkoutRequestId to a pending payment
-      // and update the payment status via the payment service
-      // Example: await PaymentService.updatePaymentStatus(checkoutRequestId, 'completed', { amount, receipt: mpesaReceiptNumber })
+      // Match the checkoutRequestId to the pending payment (stored as the
+      // payment's `reference`) and mark it posted. A missing/unknown match is
+      // logged but still acked — never throw back at the gateway.
+      try {
+        const updated = await updatePaymentStatus(checkoutRequestId, 'posted', {
+          providerReference: typeof mpesaReceiptNumber === 'string' ? mpesaReceiptNumber : undefined,
+        });
+        if (!updated) {
+          console.warn('[M-Pesa Webhook] No matching payment for reference:', checkoutRequestId);
+        }
+      } catch (persistErr) {
+        console.error('[M-Pesa Webhook] Failed to persist payment status:', persistErr);
+      }
 
       return NextResponse.json({
         ResultCode: 0,
@@ -81,8 +131,15 @@ async function postHandler(req: NextRequest) {
         timestamp: new Date().toISOString(),
       });
 
-      // In production, update payment status to failed
-      // Example: await PaymentService.updatePaymentStatus(checkoutRequestId, 'failed', { reason: resultDesc })
+      // Mark the matching payment failed; ack the gateway regardless.
+      try {
+        const updated = await updatePaymentStatus(checkoutRequestId, 'failed', { reason: resultDesc });
+        if (!updated) {
+          console.warn('[M-Pesa Webhook] No matching payment for reference:', checkoutRequestId);
+        }
+      } catch (persistErr) {
+        console.error('[M-Pesa Webhook] Failed to persist payment status:', persistErr);
+      }
 
       return NextResponse.json({
         ResultCode: 0,

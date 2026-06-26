@@ -13,8 +13,10 @@ import { controlledSubstanceLogDB } from '../db';
 import type { ControlledSubstanceLogDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 
 export interface RecordMovementInput {
   inventoryId: string;
@@ -87,24 +89,33 @@ export async function recordMovement(input: RecordMovementInput): Promise<Contro
     `${input.movement.toUpperCase()} ${input.quantity} ${input.unit} of ${input.medicationName} (Schedule ${input.schedule}) — witness: ${input.witnessName}`,
   );
 
+  emitSyncEvent({
+    resourceType: 'controlled_substance_log',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
 export async function getMovementsForInventory(inventoryId: string): Promise<ControlledSubstanceLogDoc[]> {
   const db = controlledSubstanceLogDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as ControlledSubstanceLogDoc)
-    .filter(d => d && d.type === 'controlled_substance_log' && d.inventoryId === inventoryId)
+  const rows = await findByType<ControlledSubstanceLogDoc>(
+    db,
+    'controlled_substance_log',
+    { inventoryId },
+    { indexFields: ['type', 'inventoryId'] },
+  );
+  return rows
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 }
 
 export async function getAllMovements(scope?: DataScope): Promise<ControlledSubstanceLogDoc[]> {
   const db = controlledSubstanceLogDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as ControlledSubstanceLogDoc)
-    .filter(d => d && d.type === 'controlled_substance_log')
+  const all = (await findByType<ControlledSubstanceLogDoc>(db, 'controlled_substance_log'))
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   return scope ? filterByScope(all, scope) : all;
 }

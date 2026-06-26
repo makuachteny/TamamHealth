@@ -5,10 +5,8 @@ import Image from "next/image";
 import {
   Reveal,
   FAQItem,
-  DemoForm,
   CheckItem,
   TestimonialSwoosh,
-  PricingBannerIcon,
 } from "@/components/marketing/MarketingShared";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -41,7 +39,7 @@ export default function BillingPage() {
                 </div>
               </div>
               <div style={{ marginTop: 32 }}>
-                <Link href="#demo" className="mk-btn mk-btn-green mk-btn-lg">
+                <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
                   Calculate your savings
                 </Link>
               </div>
@@ -58,13 +56,6 @@ export default function BillingPage() {
                   style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
                   priority
                 />
-              </Reveal>
-            </div>
-
-            {/* Right: Demo Form */}
-            <div className="mk-hero-form">
-              <Reveal delay={0.2}>
-                <DemoForm />
               </Reveal>
             </div>
           </div>
@@ -194,9 +185,6 @@ export default function BillingPage() {
                   <CheckItem>Pre-submission compliance checking</CheckItem>
                   <CheckItem>Reduces claim denials from 12% to under 5%</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -231,9 +219,6 @@ export default function BillingPage() {
                   <CheckItem>Automatic payment plan workflows for uninsured patients</CheckItem>
                   <CheckItem>Pre-authorization and referral checking</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -267,9 +252,6 @@ export default function BillingPage() {
                   <CheckItem>Encrypted API connectivity to payment providers</CheckItem>
                   <CheckItem>Increases collection rates by 37-45%</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -303,9 +285,6 @@ export default function BillingPage() {
                   <CheckItem>Recovery tracking and analytics by denial type</CheckItem>
                   <CheckItem>Recovers $2-5 per $1 invested in appeals</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -339,9 +318,6 @@ export default function BillingPage() {
                   <CheckItem>Flexible payment plan setup and management</CheckItem>
                   <CheckItem>Automated reminders and multi-language invoices</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -375,9 +351,6 @@ export default function BillingPage() {
                   <CheckItem>Revenue by provider, payer, and procedure type</CheckItem>
                   <CheckItem>Predictive cash flow forecasting and trend analysis</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -516,30 +489,6 @@ export default function BillingPage() {
                   Learn more
                 </Link>
               </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── PRICING CTA BANNER ──────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-pricing-banner">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 48, height: 48 }}>
-                <PricingBannerIcon />
-              </div>
-              <div>
-                <h3 className="mk-h3" style={{ margin: "0 0 4px" }}>
-                  Billing & Payments pricing built for growth
-                </h3>
-                <p style={{ margin: 0, color: "var(--tb-text-sec)" }}>
-                  Scale your revenue cycle from startup to health system.
-                </p>
-              </div>
-              <Link href="/pricing" className="mk-btn mk-btn-outline-green mk-btn-lg">
-                View pricing
-              </Link>
             </div>
           </Reveal>
         </div>

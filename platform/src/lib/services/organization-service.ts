@@ -1,12 +1,11 @@
 import { organizationsDB } from '../db';
 import type { OrganizationDoc } from '../db-types';
+import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
 
 export async function getAllOrganizations(): Promise<OrganizationDoc[]> {
   const db = organizationsDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as OrganizationDoc)
-    .filter(d => d && d.type === 'organization');
+  return findByType<OrganizationDoc>(db, 'organization');
 }
 
 export async function getOrganizationById(id: string): Promise<OrganizationDoc | null> {
@@ -51,6 +50,15 @@ export async function createOrganization(
   doc._rev = resp.rev;
   const { logAudit } = await import('./audit-service');
   await logAudit('organization_created', actorId, actorUsername, `Created organization "${data.name}"`, true);
+  emitSyncEvent({
+    resourceType: 'organization',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    userId: actorId,
+    username: actorUsername,
+    orgId: doc._id,
+  });
   return doc;
 }
 
@@ -75,6 +83,15 @@ export async function updateOrganization(
   updated._rev = resp.rev;
   const { logAudit } = await import('./audit-service');
   await logAudit('organization_updated', actorId, actorUsername, `Updated organization "${existing.name}"`, true);
+  emitSyncEvent({
+    resourceType: 'organization',
+    resourceId: updated._id,
+    operation: 'update',
+    resourceVersion: updated._rev,
+    userId: actorId,
+    username: actorUsername,
+    orgId: updated._id,
+  });
   return updated;
 }
 
@@ -92,9 +109,19 @@ export async function deactivateOrganization(
     updatedAt: new Date().toISOString(),
   };
 
-  await db.put(updated);
+  const resp = await db.put(updated);
+  updated._rev = resp.rev;
   const { logAudit } = await import('./audit-service');
   await logAudit('organization_deactivated', actorId, actorUsername, `Deactivated organization "${existing.name}"`, true);
+  emitSyncEvent({
+    resourceType: 'organization',
+    resourceId: updated._id,
+    operation: 'update',
+    resourceVersion: updated._rev,
+    userId: actorId,
+    username: actorUsername,
+    orgId: updated._id,
+  });
 }
 
 // One-shot per-DB "we tried to create the orgId index" cache. createIndex is

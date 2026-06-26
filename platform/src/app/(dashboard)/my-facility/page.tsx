@@ -4,11 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import {
   Building2, BedDouble, Users, Zap,
-  Activity, Save, CheckCircle, AlertTriangle, Loader2,
+  Activity, Save, CheckCircle, AlertTriangle, Loader2, Send, Clock,
 } from '@/components/icons/lucide';
 
 export default function MyFacilityPage() {
@@ -18,6 +17,8 @@ export default function MyFacilityPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   // Form state
   const [operationalStatus, setOperationalStatus] = useState<string>('functional');
@@ -97,6 +98,25 @@ export default function MyFacilityPage() {
       setSaving(false);
     }
   }, [hospitalId, update, operationalStatus, totalBeds, icuBeds, maternityBeds, pediatricBeds, doctors, nurses, clinicalOfficers, labTechnicians, pharmacists, hasElectricity, electricityHours, hasGenerator, hasSolar, hasInternet, internetType, hasAmbulance, emergency24hr, serviceFlags]);
+
+  const handleSubmitToMoH = useCallback(async () => {
+    if (!hospitalId) return;
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      await update(hospitalId, {
+        mohSubmission: {
+          submittedAt: new Date().toISOString(),
+          submittedBy: currentUser?._id || '',
+          submittedByName: currentUser?.name,
+        },
+      });
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Could not submit to the Ministry of Health.');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [hospitalId, update, currentUser]);
 
   const toggleService = (key: keyof typeof serviceFlags) => {
     setServiceFlags(prev => ({ ...prev, [key]: !prev[key] }));
@@ -187,40 +207,33 @@ export default function MyFacilityPage() {
 
   return (
     <>
-      <TopBar title={t('breadcrumb.myFacility')} />
+      <TopBar title={t('breadcrumb.myFacility')} actions={
+        <>
+          {error && (
+            <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--color-danger)' }}>
+              <AlertTriangle className="w-3.5 h-3.5" /> {error}
+            </span>
+          )}
+          {saved && (
+            <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--color-success)' }}>
+              <CheckCircle className="w-3.5 h-3.5" /> {t('myFacility.savedSuccessfully')}
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all"
+            style={{
+              background: saving ? 'var(--text-muted)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
+              boxShadow: '0 2px 8px rgba(0,119,215,0.3)',
+            }}
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? t('consultation.saving') : t('appointments.saveChanges')}
+          </button>
+        </>
+      } />
       <main className="page-container page-enter">
-
-        <PageHeader
-          icon={Building2}
-          title={hospital?.name || t('breadcrumb.myFacility')}
-          subtitle={`${hospital?.state || ''} · ${hospital?.facilityType?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || t('common.facility')}`}
-          actions={
-            <>
-              {error && (
-                <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--color-danger)' }}>
-                  <AlertTriangle className="w-3.5 h-3.5" /> {error}
-                </span>
-              )}
-              {saved && (
-                <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--color-success)' }}>
-                  <CheckCircle className="w-3.5 h-3.5" /> {t('myFacility.savedSuccessfully')}
-                </span>
-              )}
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all"
-                style={{
-                  background: saving ? 'var(--text-muted)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
-                  boxShadow: '0 2px 8px rgba(0,119,215,0.3)',
-                }}
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {saving ? t('consultation.saving') : t('appointments.saveChanges')}
-              </button>
-            </>
-          }
-        />
 
         {/* Form Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -340,6 +353,81 @@ export default function MyFacilityPage() {
                 {toggle(t('lab.laboratory'), serviceFlags.laboratory, () => toggleService('laboratory'))}
                 {toggle(t('nav.pharmacy'), serviceFlags.pharmacy, () => toggleService('pharmacy'))}
               </div>
+            </div>
+          </div>
+
+          {/* Ministry of Health reporting — facility-level review gate. Data is
+              reviewed and explicitly submitted here rather than syncing to the
+              Ministry automatically. */}
+          <div className="lg:col-span-2">
+            <div className={sectionClass}>
+              {sectionTitle(<Send className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />, 'Ministry of Health Reporting')}
+
+              {(() => {
+                const submission = hospital?.mohSubmission;
+                const submittedAt = submission?.submittedAt;
+                const hasPendingChanges = !!submittedAt && !!hospital?.updatedAt && hospital.updatedAt > submittedAt;
+
+                return (
+                  <>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      Review the facility profile above, then submit it to the Ministry of Health.
+                      Facility data is not sent automatically — it is only reported once you submit it here.
+                    </p>
+
+                    <div className="flex items-center gap-2 text-xs">
+                      {!submittedAt ? (
+                        <span className="inline-flex items-center gap-1.5 font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)' }}>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--text-muted)' }} />
+                          Not yet submitted
+                        </span>
+                      ) : hasPendingChanges ? (
+                        <span className="inline-flex items-center gap-1.5 font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)' }}>
+                          <Clock className="w-3 h-3" />
+                          Changes pending submission
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(74,222,128,0.12)', color: 'var(--color-success)' }}>
+                          <CheckCircle className="w-3 h-3" />
+                          Submitted to Ministry of Health
+                        </span>
+                      )}
+                    </div>
+
+                    {submittedAt && (
+                      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        Last submitted {new Date(submittedAt).toLocaleString()}
+                        {submission?.submittedByName ? ` by ${submission.submittedByName}` : ''}.
+                        {hasPendingChanges ? ' The profile has been edited since — submit again to report the latest data.' : ''}
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        onClick={handleSubmitToMoH}
+                        disabled={submitting || (!!submittedAt && !hasPendingChanges)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                          background: submitting ? 'var(--text-muted)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
+                          boxShadow: '0 2px 8px rgba(0,119,215,0.3)',
+                        }}
+                      >
+                        {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        {submittedAt && !hasPendingChanges ? 'Submitted' : 'Submit to Ministry of Health'}
+                      </button>
+                      {submitError && (
+                        <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--color-danger)' }}>
+                          <AlertTriangle className="w-3.5 h-3.5" /> {submitError}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-[11px] flex items-center gap-1.5 pt-1" style={{ color: 'var(--text-muted)' }}>
+                      <AlertTriangle className="w-3 h-3" /> Save your changes before submitting so the Ministry receives the latest data.
+                    </p>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

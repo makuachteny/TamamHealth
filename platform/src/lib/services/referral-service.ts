@@ -1,12 +1,13 @@
-import { referralsDB, hospitalsDB } from '../db';
-import type { ReferralDoc, HospitalDoc } from '../db-types';
+import { referralsDB, hospitalsDB, medicalRecordsDB } from '../db';
+import type { ReferralDoc, HospitalDoc, MedicalRecordDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
-import type { Attachment } from '@/data/mock';
+import type { Attachment, ReferralOutcome } from '@/data/mock';
 import { v4 as uuidv4 } from 'uuid';
 import { assembleTransferPackage } from './transfer-service';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
 
 /* istanbul ignore next -- private utility: org ID inference from hospital IDs */
 async function inferOrgId(fromHospitalId?: string, toHospitalId?: string): Promise<string | undefined> {
@@ -28,10 +29,7 @@ async function inferOrgId(fromHospitalId?: string, toHospitalId?: string): Promi
 
 export async function getAllReferrals(scope?: DataScope): Promise<ReferralDoc[]> {
   const db = referralsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as ReferralDoc)
-    .filter(d => d && d.type === 'referral');
+  const all = await findByType<ReferralDoc>(db, 'referral');
   /* istanbul ignore next -- defensive null-safety in sort */
   all.sort((a, b) => (b.referralDate || '').localeCompare(a.referralDate || ''));
   /* istanbul ignore next -- scope ternary: depends on caller context */
@@ -160,6 +158,48 @@ export async function updateReferralStatus(
   }
 }
 
+/**
+ * Close a referral out with a structured outcome the referring facility can
+ * read back: disposition, a diagnosis/management summary, and optional
+ * follow-up instructions. Sets status `completed`, stores the structured
+ * `outcome`, and (for backward-compatible display) also appends a
+ * human-readable outcome line to the running notes thread.
+ */
+export async function completeReferralWithOutcome(
+  id: string,
+  outcome: ReferralOutcome
+): Promise<ReferralDoc | null> {
+  const db = referralsDB();
+  try {
+    const existing = await db.get(id) as ReferralDoc;
+    const dispositionLabel = outcome.disposition.replace(/_/g, ' ');
+    const noteLine =
+      `[${outcome.recordedAt.slice(0, 10)} ${outcome.recordedBy}] OUTCOME (${dispositionLabel}): ${outcome.summary}`
+      + (outcome.followUp ? ` | Follow-up: ${outcome.followUp}` : '');
+    const updated: ReferralDoc = {
+      ...existing,
+      status: 'completed',
+      outcome,
+      notes: existing.notes ? `${existing.notes}\n\n${noteLine}` : noteLine,
+      updatedAt: new Date().toISOString(),
+    };
+    const resp = await db.put(updated);
+    updated._rev = resp.rev;
+    await logAuditSafe('UPDATE_REFERRAL', undefined, undefined, `Referral ${id} completed with outcome (${outcome.disposition})`);
+    emitSyncEvent({
+      resourceType: 'referral',
+      resourceId: updated._id,
+      operation: 'update',
+      resourceVersion: updated._rev,
+      orgId: updated.orgId,
+      hospitalId: updated.fromHospitalId,
+    });
+    return updated;
+  } catch {
+    return null;
+  }
+}
+
 export async function updateReferralNotes(
   id: string,
   notes: string
@@ -171,6 +211,82 @@ export async function updateReferralNotes(
   updated._rev = resp.rev;
   await logAuditSafe('UPDATE_REFERRAL', undefined, undefined, `Referral ${id} notes updated`);
   return updated;
+}
+
+/**
+ * Materialise a "referral intake" encounter in the receiving facility's EHR
+ * so the accepted patient has a durable record of arriving via referral —
+ * reason, urgency, origin facility, referring clinician, and any handover
+ * notes — sitting alongside the prior history that is already visible by
+ * patientId. Idempotent: keyed on a deterministic `_id` derived from the
+ * referral, so re-running acceptance never spawns duplicate intake rows.
+ *
+ * The patient's PRIOR clinical records are intentionally NOT copied — every
+ * facility shares the same record store and the chart fetches history by
+ * patientId, so copying would only duplicate the timeline.
+ */
+export async function recordReferralIntake(
+  referral: ReferralDoc,
+  toOrgId?: string
+): Promise<MedicalRecordDoc | null> {
+  if (!referral.patientId || !referral.toHospitalId) return null;
+  const db = medicalRecordsDB();
+  const intakeId = `rec-refin-${referral._id}`;
+  try {
+    // Already recorded for this referral → idempotent no-op.
+    await db.get(intakeId);
+    return null;
+  } catch {
+    // Not found → create it below.
+  }
+  const now = new Date().toISOString();
+  const handover = referral.notes?.trim();
+  const doc: MedicalRecordDoc = {
+    _id: intakeId,
+    type: 'medical_record',
+    patientId: referral.patientId,
+    hospitalId: referral.toHospitalId,
+    hospitalName: referral.toHospital,
+    orgId: toOrgId,
+    visitDate: referral.referralDate || now.slice(0, 10),
+    consultedAt: now,
+    visitType: 'referral',
+    providerName: referral.referringDoctor || 'Referral intake',
+    providerRole: 'referral',
+    department: referral.department || 'General',
+    chiefComplaint: `Referral intake: ${referral.reason || 'inter-facility transfer'}`,
+    historyOfPresentIllness:
+      `Patient received via ${referral.urgency || 'routine'} referral from ${referral.fromHospital || 'referring facility'}`
+      + (referral.referringDoctor ? ` (referring clinician: ${referral.referringDoctor})` : '')
+      + (handover ? `. Handover notes: ${handover}` : '.'),
+    vitalSigns: {} as MedicalRecordDoc['vitalSigns'],
+    diagnoses: [],
+    prescriptions: [],
+    labResults: [],
+    treatmentPlan: '',
+    syncStatus: 'pending',
+    createdAt: now,
+    updatedAt: now,
+  } as MedicalRecordDoc;
+  try {
+    const resp = await db.put(doc);
+    doc._rev = resp.rev;
+    await logAuditSafe(
+      'CREATE_MEDICAL_RECORD', undefined, undefined,
+      `Referral intake encounter ${intakeId} for patient ${referral.patientId} at ${referral.toHospital}`
+    );
+    emitSyncEvent({
+      resourceType: 'medical_record',
+      resourceId: doc._id,
+      operation: 'create',
+      resourceVersion: doc._rev,
+      orgId: doc.orgId,
+      hospitalId: doc.hospitalId,
+    });
+    return doc;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -209,15 +325,37 @@ export async function acceptReferral(referralId: string): Promise<ReferralDoc | 
     // The clinician can always re-run acceptance, which re-attempts the
     // transfer; the referral list reflects the action either way.
     if (referral.patientId && referral.toHospitalId) {
+      // Re-home the patient to the receiving hospital AND its org. Passing
+      // only the hospital fields is not enough for a cross-org referral:
+      // updatePatient keeps the existing orgId, and data-scope filters on
+      // orgId first — so the patient would stay invisible to the receiving
+      // org's users. Look up the destination org and hand it over explicitly.
+      let toOrgId: string | undefined;
+      try {
+        const to = await hospitalsDB().get(referral.toHospitalId) as HospitalDoc;
+        toOrgId = to?.orgId;
+      } catch {
+        // Destination hospital unreachable (offline) — fall back to leaving
+        // the orgId as-is; same-org referrals are unaffected.
+      }
       try {
         const { updatePatient } = await import('./patient-service');
         await updatePatient(referral.patientId, {
           registrationHospital: referral.toHospitalId,
           lastVisitHospital: referral.toHospitalId,
+          ...(toOrgId ? { orgId: toOrgId } : {}),
         });
       } catch (err) {
         console.error('Failed to transfer patient on referral acceptance:', err);
         // Intentionally swallow: re-running acceptance is idempotent.
+      }
+      // Drop an intake encounter into the receiver's EHR (idempotent). Failure
+      // here must not block acceptance — the patient transfer above is the
+      // user-visible outcome, and re-running acceptance re-attempts this.
+      try {
+        await recordReferralIntake(referral, toOrgId);
+      } catch (err) {
+        console.error('Failed to record referral intake encounter:', err);
       }
     }
 

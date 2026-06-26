@@ -4,12 +4,14 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import Sidebar from '@/components/Sidebar';
-import AssistantChat from '@/components/AssistantChat';
 import RoleGuard from '@/components/RoleGuard';
+import { SettingsProvider } from '@/lib/settings/SettingsProvider';
+import PreferenceEffects from '@/components/PreferenceEffects';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
-import Breadcrumbs from '@/components/Breadcrumbs';
 import LockScreen from '@/components/LockScreen';
 import ConnectivityNotice from '@/components/ConnectivityNotice';
+import MessagingDock from '@/components/MessagingDock';
+import { MessagingDockProvider } from '@/lib/messaging-dock-context';
 import GetStartedCard from '@/components/onboarding/GetStartedCard';
 import ForcePasswordChange from '@/components/ForcePasswordChange';
 import { useAutoLock } from '@/lib/hooks/useAutoLock';
@@ -56,10 +58,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return <ForcePasswordChange userName={currentUser.name} onLogout={logout} />;
   }
 
-  // Sidebar: 256px/80px + 12px left margin = 268px/92px. Content needs matching margin.
-  const sidebarMargin = sidebarCollapsed ? '92px' : '268px';
+  // Content starts flush against the sidebar's right edge. The sidebar now fills
+  // the browser's left edge (no outer margin), so this equals its raw width.
+  const sidebarMargin = sidebarCollapsed ? '80px' : '220px';
 
   return (
+    <SettingsProvider>
+    <MessagingDockProvider>
     <div className="flex h-screen overflow-hidden gradient-mesh-bg">
       {isLocked && currentUser && (
         <LockScreen
@@ -81,8 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             .dashboard-content-area { margin-left: ${sidebarMargin}; }
           }
         `}</style>
-        <div className="dashboard-content-area flex-1 flex flex-col min-w-0 overflow-hidden pt-3">
-          <Breadcrumbs />
+        <div className="dashboard-content-area flex-1 flex flex-col min-w-0 overflow-hidden">
           <main id="main-content" className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
             <RoleGuard>{children}</RoleGuard>
             {/* First-run onboarding. Self-gates: only renders for a new user
@@ -91,9 +95,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </main>
         </div>
       </div>
-      <AssistantChat />
+      <PreferenceEffects />
       <KeyboardShortcuts />
       <ConnectivityNotice />
+      <MessagingDock />
     </div>
+    </MessagingDockProvider>
+    </SettingsProvider>
   );
 }

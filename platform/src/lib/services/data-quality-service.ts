@@ -3,6 +3,7 @@ import type { HospitalDoc } from '../db-types';
 import { getAllAssessments } from './facility-assessment-service';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 
 export interface DataCompletenessEntry {
   facilityId: string;
@@ -31,10 +32,7 @@ export interface NationalDataQuality {
 
 export async function getNationalDataQuality(scope?: DataScope): Promise<NationalDataQuality> {
   const hDB = hospitalsDB();
-  const hResult = await hDB.allDocs({ include_docs: true });
-  let hospitals = hResult.rows
-    .map(r => r.doc as HospitalDoc)
-    .filter(d => d && d.type === 'hospital');
+  let hospitals = await findByType<HospitalDoc>(hDB, 'hospital');
 
   // Tenant scoping — non-government users only see their own org/hospital.
   // Hospitals docs don't always have an explicit hospitalId field; the data

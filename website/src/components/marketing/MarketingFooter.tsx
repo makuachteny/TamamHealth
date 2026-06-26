@@ -1,49 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Marketing — Footer (Simplified 3-column layout)
-   Brand column + 3 link columns + newsletter + bottom bar
+   Brand column + 3 link columns + bottom bar
    ═══════════════════════════════════════════════════════════════════ */
 
 // Fundraising entry points are locked off for now. Flip to true to re-enable.
 const SHOW_FUNDRAISING = false;
 
 export default function MarketingFooter() {
-  const [nlEmail, setNlEmail] = useState("");
-  const [nlStatus, setNlStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
-  const [nlError, setNlError] = useState("");
-
-  const handleNewsletterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nlEmail.trim() || !/\S+@\S+\.\S+/.test(nlEmail)) {
-      setNlError("Please enter a valid email");
-      setNlStatus("error");
-      return;
-    }
-    setNlStatus("submitting");
-    setNlError("");
-    try {
-      const res = await fetch("/api/newsletter", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: nlEmail.trim() }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: "Something went wrong" }));
-        throw new Error(data.error || "Failed to subscribe");
-      }
-      setNlStatus("success");
-      setNlEmail("");
-    } catch (err: unknown) {
-      setNlError(err instanceof Error ? err.message : "Something went wrong");
-      setNlStatus("error");
-    }
-  };
-
   return (
     <footer className="mk-footer">
       <div className="mk-container">
@@ -51,10 +19,14 @@ export default function MarketingFooter() {
         <div className="mk-footer-inner">
           {/* Brand column */}
           <div className="mk-footer-brand">
-            <Link href="/" className="mk-nav-logo" style={{ textDecoration: "none" }}>
-              <span className="mk-nav-logo-text">
-                Tamam<span style={{ color: "#0d8844" }}>Health</span>
-              </span>
+            <Link href="/" className="mk-nav-logo" style={{ textDecoration: "none" }} aria-label="TamamHealth — home">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/assets/tamamhealth-logo-name.svg"
+                alt="Tamam Healthcare System"
+                height={40}
+                style={{ height: 40, width: "auto", display: "block" }}
+              />
             </Link>
 
             <p style={{ fontSize: 14, color: "var(--tb-text-sec)", lineHeight: 1.6, margin: 0, maxWidth: 260 }}>
@@ -97,13 +69,11 @@ export default function MarketingFooter() {
             <nav className="mk-footer-nav">
               <Link href="/about">Our Story</Link>
               <Link href="/about/team">Team</Link>
-              <Link href="/about/careers">Careers</Link>
               <Link href="/about/contact">Contact</Link>
               {SHOW_FUNDRAISING && (
                 <Link href="/donate" style={{ color: "var(--tb-gold)", fontWeight: 600 }}>Fund Our Pilot</Link>
               )}
-              <Link href="/resources/blog">Blog</Link>
-              <Link href="/resources/case-studies">Case Studies</Link>
+              <Link href="/case-studies">Case Studies</Link>
             </nav>
           </div>
 
@@ -113,93 +83,6 @@ export default function MarketingFooter() {
             <a href="mailto:hello@tamamhealth.org" style={{ fontSize: 14, color: "var(--tb-text-sec)", textDecoration: "none", display: "block" }}>
               hello@tamamhealth.org
             </a>
-          </div>
-        </div>
-
-        {/* Newsletter signup section */}
-        <div style={{
-          background: "linear-gradient(135deg, var(--tb-blue-50) 0%, var(--tb-cream-50) 100%)",
-          borderRadius: 12,
-          padding: "40px",
-          marginBottom: 40,
-          border: "1px solid var(--tb-cream-300)",
-        }}>
-          <div style={{
-            maxWidth: 500,
-            margin: "0 auto",
-            textAlign: "center",
-          }}>
-            <h3 style={{
-              fontSize: 18,
-              fontWeight: 700,
-              color: "var(--tb-text-pri)",
-              marginBottom: 12,
-            }}>
-              Stay updated
-            </h3>
-            <p style={{
-              fontSize: 14,
-              color: "var(--tb-text-sec)",
-              marginBottom: 20,
-              lineHeight: 1.6,
-            }}>
-              Get the latest updates, insights, and product news delivered to your inbox.
-            </p>
-            {nlStatus === "success" ? (
-              <div style={{
-                background: "var(--tb-tint-green, #E8F5E9)",
-                border: "1px solid var(--tb-green, #3B82F6)",
-                borderRadius: 8,
-                padding: "14px 20px",
-                fontSize: 14,
-                fontWeight: 600,
-                color: "var(--tb-green, #3B82F6)",
-                textAlign: "center",
-              }}>
-                You&apos;re subscribed! Check your inbox for a welcome email.
-              </div>
-            ) : (
-              <form onSubmit={handleNewsletterSubmit} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input
-                    type="email"
-                    placeholder="your@email.com"
-                    value={nlEmail}
-                    onChange={(e) => { setNlEmail(e.target.value); if (nlStatus === "error") setNlStatus("idle"); }}
-                    style={{
-                      flex: 1,
-                      padding: "12px 16px",
-                      border: `1px solid ${nlStatus === "error" ? "#DC2626" : "var(--tb-cream-300)"}`,
-                      borderRadius: 6,
-                      fontSize: 14,
-                      fontFamily: "inherit",
-                      background: "var(--tb-white)",
-                    }}
-                    required
-                  />
-                  <button
-                    type="submit"
-                    disabled={nlStatus === "submitting"}
-                    style={{
-                      padding: "12px 24px",
-                      background: "var(--tb-green)",
-                      color: "var(--tb-white)",
-                      border: "none",
-                      borderRadius: 6,
-                      fontSize: 14,
-                      fontWeight: 600,
-                      cursor: nlStatus === "submitting" ? "not-allowed" : "pointer",
-                      opacity: nlStatus === "submitting" ? 0.7 : 1,
-                      transition: "background 0.2s ease",
-                    }}>
-                    {nlStatus === "submitting" ? "..." : "Subscribe"}
-                  </button>
-                </div>
-                {nlError && (
-                  <span style={{ fontSize: 12, color: "#DC2626" }}>{nlError}</span>
-                )}
-              </form>
-            )}
           </div>
         </div>
 

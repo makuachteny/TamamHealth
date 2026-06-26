@@ -1,18 +1,28 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useHospitals } from '@/lib/hooks/useHospitals';
+import { usePermissions } from '@/lib/hooks/usePermissions';
+import { useTranslation } from '@/lib/i18n/useTranslation';
+import { SUPPORTED_LOCALES } from '@/lib/i18n';
+import { hasLockPin, setLockPin, clearLockPin } from '@/lib/hooks/useAutoLock';
+import { getUserPrefs, setUserPrefs, DEFAULT_USER_PREFS, type UserPrefs } from '@/lib/user-prefs';
 import { useToast } from '@/components/Toast';
 import { statesAndCounties } from '@/data/mock';
 import type { UserRole } from '@/lib/db-types';
+import FilterBar from '@/components/filters/FilterBar';
+import SearchInput from '@/components/filters/SearchInput';
+import FilterSelect from '@/components/filters/FilterSelect';
 import {
   Users, Building2, Plus, Search, Edit3, KeyRound, UserX, UserCheck,
-  X, Eye, EyeOff, RefreshCw, Check
+  X, Eye, EyeOff, RefreshCw, Check, Bell, LayoutDashboard,
+  Settings as SettingsIcon, Globe, Moon, Sun, Lock, Save, User as UserIcon,
 } from '@/components/icons/lucide';
+import RowActionsMenu from '@/components/RowActionsMenu';
+import { FacilitySettingsView } from '@/components/settings/FacilitySettingsView';
 
 const ROLES: { value: UserRole; label: string }[] = [
   { value: 'doctor', label: 'Doctor' },
@@ -20,7 +30,7 @@ const ROLES: { value: UserRole; label: string }[] = [
   { value: 'nurse', label: 'Nurse' },
   { value: 'lab_tech', label: 'Lab Technician' },
   { value: 'pharmacist', label: 'Pharmacist' },
-  { value: 'front_desk', label: 'Front Desk' },
+  { value: 'front_desk', label: 'Medical Receptionist' },
   { value: 'government', label: 'Government Admin' },
 ];
 
@@ -49,16 +59,117 @@ function generatePassword(): string {
 }
 
 export default function SettingsPage() {
-  const router = useRouter();
-  const { currentUser } = useApp();
+  const { currentUser, theme, toggleTheme, isOnline, syncPaused, toggleOnline, syncNow, lastSync } = useApp();
   const { users, loading: usersLoading, create: createUser, update: updateUser, resetPassword, deactivate } = useUsers();
   const { hospitals, loading: hospitalsLoading, create: createHospital, reload: reloadHospitals } = useHospitals();
+  const { canManageUsers, canAccess } = usePermissions();
+  const { locale, setLocale } = useTranslation();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'hospitals'>('users');
+  const [activeTab, setActiveTab] = useState<'preferences' | 'facility' | 'users' | 'hospitals'>('preferences');
+
+  // ── My account / preferences ──
+  const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [pwForm, setPwForm] = useState({ next: '', confirm: '' });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [showSelfPw, setShowSelfPw] = useState(false);
+
+  // ── Screen-lock PIN (per device — for shared workstations) ──
+  const [pinForm, setPinForm] = useState({ next: '', confirm: '' });
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinIsSet, setPinIsSet] = useState(false);
+  useEffect(() => { setPinIsSet(hasLockPin()); }, []);
+
+  const handleSetPin = async () => {
+    if (!/^\d{4,6}$/.test(pinForm.next)) { showToast('PIN must be 4–6 digits', 'error'); return; }
+    if (pinForm.next !== pinForm.confirm) { showToast('PINs do not match', 'error'); return; }
+    setPinSaving(true);
+    try {
+      await setLockPin(pinForm.next);
+      setPinIsSet(true);
+      setPinForm({ next: '', confirm: '' });
+      showToast('Screen-lock PIN set', 'success');
+    } finally {
+      setPinSaving(false);
+    }
+  };
+
+  const handleClearPin = () => {
+    clearLockPin();
+    setPinIsSet(false);
+    setPinForm({ next: '', confirm: '' });
+    showToast('Screen-lock PIN removed', 'success');
+  };
+
+  // ── Sync & connectivity ──
+  const [syncing, setSyncing] = useState(false);
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    try { await syncNow(); showToast('Sync started', 'success'); }
+    catch { showToast('Could not start sync', 'error'); }
+    finally { setSyncing(false); }
+  };
+
+  // ── Workspace + notification preferences (per device) ──
+  const [prefs, setPrefsState] = useState<UserPrefs>(DEFAULT_USER_PREFS);
+  useEffect(() => { setPrefsState(getUserPrefs()); }, []);
+  const updatePref = (patch: Partial<UserPrefs>) => setPrefsState(setUserPrefs(patch));
+
+  const handleToggleNotifications = async () => {
+    if (!prefs.messageNotifications) {
+      if (typeof Notification === 'undefined') { showToast('This browser does not support notifications', 'error'); return; }
+      if (Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { showToast('Allow notifications in your browser to enable this', 'error'); return; }
+      }
+      updatePref({ messageNotifications: true });
+      showToast('Desktop notifications on', 'success');
+    } else {
+      updatePref({ messageNotifications: false });
+      showToast('Desktop notifications off', 'success');
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+      setProfileForm({ name: currentUser.name || '', phone: (currentUser as { phone?: string }).phone || '' });
+    }
+  }, [currentUser]);
+
+  const handleSaveProfile = async () => {
+    if (!currentUser?._id || !profileForm.name.trim()) { showToast('Name is required', 'error'); return; }
+    setProfileSaving(true);
+    try {
+      await updateUser(currentUser._id, { name: profileForm.name.trim(), phone: profileForm.phone.trim() }, currentUser._id, currentUser.username);
+      showToast('Profile updated', 'success');
+    } catch {
+      showToast('Failed to update profile', 'error');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleChangeOwnPassword = async () => {
+    if (!currentUser?._id) return;
+    if (pwForm.next.length < 6) { showToast('Password must be at least 6 characters', 'error'); return; }
+    if (pwForm.next !== pwForm.confirm) { showToast('Passwords do not match', 'error'); return; }
+    setPwSaving(true);
+    try {
+      await resetPassword(currentUser._id, pwForm.next);
+      setPwForm({ next: '', confirm: '' });
+      showToast('Password changed', 'success');
+    } catch {
+      showToast('Failed to change password', 'error');
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterHospital, setFilterHospital] = useState<string>('all');
+  const [filterFacilityType, setFilterFacilityType] = useState<string>('all');
 
   // User form state
   const [showUserForm, setShowUserForm] = useState(false);
@@ -89,12 +200,10 @@ export default function SettingsPage() {
   });
   const [hospitalFormLoading, setHospitalFormLoading] = useState(false);
 
-  // Access control
-  useEffect(() => {
-    if (currentUser && currentUser.role !== 'government') {
-      router.push('/dashboard');
-    }
-  }, [currentUser, router]);
+  // Access: every authenticated user can open Settings for their own
+  // Preferences (theme, language, profile, password, screen-lock, sync,
+  // workspace, notifications). The User/Hospital management tabs are gated
+  // separately by `canManageUsers`, so no page-level role redirect is needed.
 
   // Filtered users
   const filteredUsers = useMemo(() => {
@@ -107,7 +216,7 @@ export default function SettingsPage() {
     });
   }, [users, search, filterRole, filterHospital]);
 
-  if (!currentUser || currentUser.role !== 'government') return null;
+  if (!currentUser) return null;
 
   const roleLabel = (role: string) => ROLES.find(r => r.value === role)?.label || role;
 
@@ -237,11 +346,11 @@ export default function SettingsPage() {
   // ─── Styles ─────────────────────────────────────────────
   const card: React.CSSProperties = {
     background: 'var(--card-bg)', border: '1px solid var(--border-light)',
-    borderRadius: '16px', overflow: 'hidden',
+    borderRadius: '6px', overflow: 'hidden',
   };
   const inputStyle: React.CSSProperties = {
     background: 'var(--input-bg)', border: '1px solid var(--border-light)',
-    borderRadius: '10px', padding: '10px 14px', color: 'var(--text-primary)',
+    borderRadius: '4px', padding: '10px 14px', color: 'var(--text-primary)',
     fontSize: '14px', width: '100%', outline: 'none',
   };
   const selectStyle: React.CSSProperties = {
@@ -251,13 +360,13 @@ export default function SettingsPage() {
   };
   const btnPrimary: React.CSSProperties = {
     background: 'var(--accent-primary)', color: 'white',
-    border: 'none', borderRadius: '10px', padding: '10px 20px',
+    border: 'none', borderRadius: '4px', padding: '10px 20px',
     fontSize: '14px', fontWeight: 600, cursor: 'pointer',
     display: 'flex', alignItems: 'center', gap: '8px',
   };
   const btnSecondary: React.CSSProperties = {
     background: 'var(--input-bg)', color: 'var(--text-primary)',
-    border: '1px solid var(--border-light)', borderRadius: '10px', padding: '10px 20px',
+    border: '1px solid var(--border-light)', borderRadius: '4px', padding: '10px 20px',
     fontSize: '14px', fontWeight: 500, cursor: 'pointer',
   };
   const labelStyle: React.CSSProperties = {
@@ -270,7 +379,7 @@ export default function SettingsPage() {
   };
   const modalStyle: React.CSSProperties = {
     background: 'var(--card-bg)', border: '1px solid var(--border-light)',
-    borderRadius: '20px', width: '100%', maxWidth: '600px', maxHeight: '90vh',
+    borderRadius: '6px', width: '100%', maxWidth: '600px', maxHeight: '90vh',
     overflow: 'auto', padding: '28px',
   };
 
@@ -282,12 +391,18 @@ export default function SettingsPage() {
         {/* Tab bar */}
         <div className="flex gap-2" style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '0' }}>
           {[
-            { key: 'users' as const, label: 'User Management', icon: Users },
-            { key: 'hospitals' as const, label: 'Hospital Management', icon: Building2 },
+            { key: 'preferences' as const, label: 'Preferences', icon: SettingsIcon },
+            ...(canAccess('/facility-settings') ? [
+              { key: 'facility' as const, label: 'Facility Settings', icon: Building2 },
+            ] : []),
+            ...(canManageUsers ? [
+              { key: 'users' as const, label: 'User Management', icon: Users },
+              { key: 'hospitals' as const, label: 'Hospital Management', icon: Building2 },
+            ] : []),
           ].map(tab => (
             <button
               key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setSearch(''); }}
+              onClick={() => { setActiveTab(tab.key); setSearch(''); setFilterFacilityType('all'); }}
               className="flex items-center gap-2 px-5 py-3 font-medium text-sm transition-colors"
               style={{
                 color: activeTab === tab.key ? 'var(--accent-primary)' : 'var(--text-muted)',
@@ -304,6 +419,257 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
+
+        {/* ═══════════════ FACILITY SETTINGS TAB ═══════════════ */}
+        {activeTab === 'facility' && <FacilitySettingsView embedded />}
+
+        {/* ═══════════════ PREFERENCES TAB (all users) ═══════════════ */}
+        {activeTab === 'preferences' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Appearance */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Sun className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Appearance</h3>
+              </div>
+              <div className="p-5">
+                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Theme</p>
+                <div className="flex gap-2">
+                  {[
+                    { v: 'light' as const, label: 'Light', Icon: Sun },
+                    { v: 'dark' as const, label: 'Dark', Icon: Moon },
+                  ].map(opt => {
+                    const active = theme === opt.v;
+                    return (
+                      <button
+                        key={opt.v}
+                        onClick={() => { if (theme !== opt.v) toggleTheme(); }}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                        style={active
+                          ? { background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }
+                          : { background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                      >
+                        <opt.Icon className="w-4 h-4" /> {opt.label}
+                        {active && <Check className="w-3.5 h-3.5" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Language */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Globe className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Language</h3>
+              </div>
+              <div className="p-5">
+                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Display language</p>
+                <select
+                  value={locale}
+                  onChange={(e) => setLocale(e.target.value as typeof locale)}
+                  className="w-full"
+                  style={{ background: 'var(--overlay-subtle)' }}
+                  aria-label="Display language"
+                >
+                  {SUPPORTED_LOCALES.map(l => (
+                    <option key={l.code} value={l.code}>{l.nativeName || l.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* My profile */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><UserIcon className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">My profile</h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Full name</label>
+                  <input value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} className="w-full" style={{ background: 'var(--overlay-subtle)' }} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Phone</label>
+                  <input value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))} className="w-full" style={{ background: 'var(--overlay-subtle)' }} />
+                </div>
+                <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  Role: <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>{currentUser?.role}</span>
+                  {currentUser?.username && <> · Username: <span className="font-mono">{currentUser.username}</span></>}
+                </div>
+                <button onClick={handleSaveProfile} disabled={profileSaving} className="btn btn-primary btn-sm">
+                  <Save className="w-4 h-4" /> {profileSaving ? 'Saving…' : 'Save profile'}
+                </button>
+              </div>
+            </div>
+
+            {/* Security — change my password */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Lock className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Security</h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>New password</label>
+                  <div className="relative">
+                    <input
+                      type={showSelfPw ? 'text' : 'password'}
+                      value={pwForm.next}
+                      onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))}
+                      className="w-full pr-9"
+                      style={{ background: 'var(--overlay-subtle)' }}
+                      autoComplete="new-password"
+                    />
+                    <button type="button" onClick={() => setShowSelfPw(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
+                      {showSelfPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Confirm password</label>
+                  <input
+                    type={showSelfPw ? 'text' : 'password'}
+                    value={pwForm.confirm}
+                    onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))}
+                    className="w-full"
+                    style={{ background: 'var(--overlay-subtle)' }}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <button onClick={handleChangeOwnPassword} disabled={pwSaving || !pwForm.next} className="btn btn-secondary btn-sm">
+                  <KeyRound className="w-4 h-4" /> {pwSaving ? 'Updating…' : 'Change password'}
+                </button>
+              </div>
+            </div>
+
+            {/* Screen lock — per-device unlock PIN for shared workstations */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Lock className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Screen lock</h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  The screen locks automatically when idle. Set a PIN so it can&apos;t be unlocked without it — recommended on shared front-desk devices.
+                  {pinIsSet && <span className="ml-1 font-semibold" style={{ color: 'var(--color-success)' }}>PIN is active.</span>}
+                </p>
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>{pinIsSet ? 'New PIN' : 'PIN'} (4–6 digits)</label>
+                  <input inputMode="numeric" maxLength={6} type="password" value={pinForm.next}
+                    onChange={e => setPinForm(p => ({ ...p, next: e.target.value.replace(/\D/g, '') }))}
+                    className="w-full" style={{ background: 'var(--overlay-subtle)' }} autoComplete="off" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Confirm PIN</label>
+                  <input inputMode="numeric" maxLength={6} type="password" value={pinForm.confirm}
+                    onChange={e => setPinForm(p => ({ ...p, confirm: e.target.value.replace(/\D/g, '') }))}
+                    className="w-full" style={{ background: 'var(--overlay-subtle)' }} autoComplete="off" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleSetPin} disabled={pinSaving || !pinForm.next} className="btn btn-primary btn-sm">
+                    <Lock className="w-4 h-4" /> {pinSaving ? 'Saving…' : pinIsSet ? 'Update PIN' : 'Set PIN'}
+                  </button>
+                  {pinIsSet && (
+                    <button onClick={handleClearPin} className="btn btn-secondary btn-sm">Remove PIN</button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Sync & connectivity */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Sync &amp; data</h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: isOnline ? 'var(--color-success)' : syncPaused ? 'var(--color-warning)' : 'var(--text-muted)' }} />
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                    {isOnline ? 'Online — syncing' : syncPaused ? 'Sync paused' : 'Offline'}
+                  </span>
+                </div>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Last synced: {lastSync ? new Date(lastSync).toLocaleString() : '—'}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleSyncNow} disabled={syncing || !isOnline} className="btn btn-primary btn-sm">
+                    <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} /> {syncing ? 'Syncing…' : 'Sync now'}
+                  </button>
+                  <button onClick={toggleOnline} className="btn btn-secondary btn-sm">
+                    {syncPaused ? 'Resume sync' : 'Pause sync'}
+                  </button>
+                </div>
+                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  Your work is always saved on this device first and syncs when you&apos;re online.
+                </p>
+              </div>
+            </div>
+
+            {/* Workspace — density */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><LayoutDashboard className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Workspace</h3>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Spacing</p>
+                  <div className="flex gap-2">
+                    {([
+                      { v: 'comfortable' as const, label: 'Comfortable' },
+                      { v: 'compact' as const, label: 'Compact' },
+                    ]).map(opt => {
+                      const active = prefs.density === opt.v;
+                      return (
+                        <button
+                          key={opt.v}
+                          onClick={() => updatePref({ density: opt.v })}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                          style={active
+                            ? { background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }
+                            : { background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                        >
+                          {opt.label}{active && <Check className="w-3.5 h-3.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Notifications */}
+            <div className="dash-card">
+              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Bell className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <h3 className="font-semibold text-sm">Notifications</h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                    Desktop alerts for new messages
+                    <span className="block text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      Pops a notification when a message arrives and this tab isn&apos;t in focus.
+                    </span>
+                  </span>
+                  <button
+                    role="switch"
+                    aria-checked={prefs.messageNotifications}
+                    onClick={handleToggleNotifications}
+                    className="relative flex-shrink-0"
+                    style={{ width: 42, height: 24, borderRadius: 999, background: prefs.messageNotifications ? 'var(--accent-primary)' : 'var(--border-medium)', transition: 'background .15s', border: 'none', cursor: 'pointer' }}
+                  >
+                    <span style={{ position: 'absolute', top: 2, left: prefs.messageNotifications ? 20 : 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+                  </button>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ═══════════════ USER MANAGEMENT TAB ═══════════════ */}
         {activeTab === 'users' && (
@@ -335,7 +701,7 @@ export default function SettingsPage() {
             {/* Users table */}
             <div style={card}>
               <div style={{ overflowX: 'auto' }}>
-                <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 840 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                       {['Name', 'Username', 'Role', 'Hospital', 'Status', 'Created', 'Actions'].map(h => (
@@ -379,21 +745,14 @@ export default function SettingsPage() {
                           {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => openEditUser(u._id)} title="Edit"
-                              className="p-1.5 rounded-lg hover:bg-[rgba(0,119,215,0.1)] transition-colors" style={{ color: 'var(--text-muted)' }}>
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => { setResetUserId(u._id); setNewPassword(generatePassword()); setShowNewPassword(true); }} title="Reset Password"
-                              className="p-1.5 rounded-lg hover:bg-[rgba(252,211,77,0.15)] transition-colors" style={{ color: 'var(--text-muted)' }}>
-                              <KeyRound className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleToggleActive(u._id, u.isActive)} title={u.isActive ? 'Deactivate' : 'Activate'}
-                              className="p-1.5 rounded-lg transition-colors" style={{
-                                color: u.isActive ? 'var(--color-danger)' : 'var(--accent-primary)',
-                              }}>
-                              {u.isActive ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
-                            </button>
+                          <div className="flex items-center">
+                            <RowActionsMenu
+                              actions={[
+                                { key: 'edit', label: 'Edit', icon: <Edit3 className="w-4 h-4" />, onClick: () => openEditUser(u._id) },
+                                { key: 'reset', label: 'Reset Password', icon: <KeyRound className="w-4 h-4" />, onClick: () => { setResetUserId(u._id); setNewPassword(generatePassword()); setShowNewPassword(true); } },
+                                { key: 'toggle', label: u.isActive ? 'Deactivate' : 'Activate', tone: u.isActive ? 'danger' : 'default', icon: u.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />, onClick: () => handleToggleActive(u._id, u.isActive) },
+                              ]}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -409,25 +768,32 @@ export default function SettingsPage() {
         {activeTab === 'hospitals' && (
           <div className="space-y-4">
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1" style={{ minWidth: '200px', maxWidth: '360px' }}>
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                <input
-                  type="text" placeholder="Search hospitals..."
-                  value={search} onChange={e => setSearch(e.target.value)}
-                  style={{ ...inputStyle, paddingLeft: '36px' }}
-                />
-              </div>
-              <div className="flex-1" />
+            <FilterBar>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search hospitals..."
+                aria-label="Search hospitals"
+              />
+              <FilterSelect
+                value={filterFacilityType}
+                onChange={setFilterFacilityType}
+                options={[
+                  { value: 'all', label: 'All Types' },
+                  ...FACILITY_TYPES,
+                ]}
+                aria-label="Filter by facility type"
+              />
+              <FilterBar.Spacer />
               <button onClick={openCreateHospital} style={btnPrimary}>
                 <Plus className="w-4 h-4" /> Add Hospital
               </button>
-            </div>
+            </FilterBar>
 
             {/* Hospitals table */}
             <div style={card}>
               <div style={{ overflowX: 'auto' }}>
-                <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 720 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                       {['Name', 'State', 'Type', 'Beds', 'Staff', 'Status'].map(h => (
@@ -443,8 +809,9 @@ export default function SettingsPage() {
                       <tr><td colSpan={6} className="px-4 py-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading hospitals...</td></tr>
                     ) : hospitals.filter(h => {
                       const q = search.toLowerCase();
-                      if (!q) return true;
-                      return h.name.toLowerCase().includes(q) || h.state.toLowerCase().includes(q);
+                      const matchSearch = !q || h.name.toLowerCase().includes(q) || h.state.toLowerCase().includes(q);
+                      const matchType = filterFacilityType === 'all' || h.facilityType === filterFacilityType;
+                      return matchSearch && matchType;
                     }).map(h => (
                       <tr key={h._id} style={{ borderBottom: '1px solid var(--border-light)' }}
                           className="hover:bg-[rgba(0,119,215,0.03)] transition-colors">
@@ -717,7 +1084,7 @@ export default function SettingsPage() {
               {/* Infrastructure */}
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--accent-primary)' }}>Infrastructure</h4>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 keep-cols">
                   {[
                     { key: 'hasElectricity', label: 'Has Electricity' },
                     { key: 'hasGenerator', label: 'Has Generator' },

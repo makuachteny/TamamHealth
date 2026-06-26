@@ -33,7 +33,6 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_facility_assessments',  direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_immunizations',         direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_anc',                   direction: 'both', orgScoped: true },
-  { localName: 'tamamhealth_boma_visits',           direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_follow_ups',            direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_hospitals',             direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_problems',              direction: 'both', orgScoped: true },
@@ -41,7 +40,17 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_appointments',          direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_availability',          direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_announcements',         direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_conversations',         direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_patient_notes',         direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_encounters',            direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_handoffs',              direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_order_sets',            direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_phone_notes',           direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_assessments',           direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_telehealth',            direction: 'both', orgScoped: true },
+  // Fingerprint templates — synced so identification works at any facility in
+  // the org, scoped to the org like other patient-identifying data.
+  { localName: 'tamamhealth_biometric_templates',   direction: 'both', orgScoped: true },
 
   // ----- Operational / facility -----
   { localName: 'tamamhealth_pharmacy_inventory',    direction: 'both', orgScoped: true },
@@ -52,7 +61,6 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_staff_schedules',       direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_leave_requests',        direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_payroll_entries',       direction: 'both', orgScoped: true },
-  { localName: 'tamamhealth_patient_feedback',      direction: 'both', orgScoped: true },
 
   // ----- Billing / payments / insurance -----
   { localName: 'tamamhealth_billing',               direction: 'both', orgScoped: true },
@@ -80,7 +88,13 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   // ----- Append-only audit trails (push only) -----
   { localName: 'tamamhealth_audit_log',             direction: 'push', orgScoped: true },
   { localName: 'tamamhealth_controlled_substance_log', direction: 'push', orgScoped: true },
-  { localName: 'tamamhealth_ledger',                direction: 'push', orgScoped: true },
+
+  // ----- Financial ledger (append-only, but READ for live balances) -----
+  // Must replicate BOTH ways: a charge raised at one station (e.g. the clinic)
+  // and a payment taken at another (the cashier) have to converge so every
+  // device computes the same patient balance. Unlike the audit/controlled logs
+  // (write-only trails), the ledger is read at the point of care.
+  { localName: 'tamamhealth_ledger',                direction: 'both', orgScoped: true },
 ];
 
 /** Build the full CouchDB remote URL for a given database name */

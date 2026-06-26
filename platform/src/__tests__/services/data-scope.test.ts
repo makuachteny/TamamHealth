@@ -49,28 +49,6 @@ describe('Data Scope - Multi-Tenant Isolation', () => {
     expect(referral).toBeDefined();
   });
 
-  test('payam_supervisor without payam falls back to hospital scoping', () => {
-    // No scope.payam → payam_supervisor is no longer in ADMIN_ROLES, so the
-    // hospitalId filter applies as a defence-in-depth fallback (P0 fix).
-    const scope: DataScope = { role: 'payam_supervisor', orgId: 'org-001', hospitalId: 'hosp-001' };
-    const filtered = filterByScope(docs, scope);
-    // hosp-002 docs must NOT leak through.
-    expect(filtered.find(d => d.hospitalId === 'hosp-002')).toBeUndefined();
-  });
-
-  test('payam_supervisor with payam is scoped to that payam', () => {
-    // Per-payam tier isolation: supervisor only sees docs matching scope.payam.
-    const payamDocs = [
-      { _id: '1', orgId: 'org-001', payam: 'Kajo-keji', name: 'In payam' },
-      { _id: '2', orgId: 'org-001', payam: 'Kator', name: 'Other payam' },
-      { _id: '3', orgId: 'org-001', name: 'No payam' },
-    ];
-    const scope: DataScope = { role: 'payam_supervisor', orgId: 'org-001', payam: 'Kajo-keji' };
-    const filtered = filterByScope(payamDocs, scope);
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0]._id).toBe('1');
-  });
-
   test('different org sees nothing from other org', () => {
     const scope: DataScope = { role: 'doctor', orgId: 'org-002', hospitalId: 'hosp-003' };
     const filtered = filterByScope(docs, scope);

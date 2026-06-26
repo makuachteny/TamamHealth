@@ -205,7 +205,7 @@ function buildBPMetric(records: MedicalRecordDoc[], t: TFn): MetricSummary | nul
     normalLabel: '90–120 / 60–80',
     normalRange: [90, 120],
     message,
-    color: '#5CB8A8',
+    color: '#2563EB',
   };
 }
 
@@ -247,7 +247,7 @@ export default function VitalsTrends({ records }: VitalsTrendsProps) {
     if (pulse) out.push(pulse);
 
     const weight = buildMetric(
-      records, 'weight', t('vitals.weight'), 'kg', '#10b981',
+      records, 'weight', t('vitals.weight'), 'kg', '#1F9D6F',
       // Weight has no universal normal range; treat anything as normal and
       // highlight only big swings via the warning path.
       [0, 500], '—',

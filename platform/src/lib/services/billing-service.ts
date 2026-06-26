@@ -13,6 +13,8 @@ import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
+import { findByType } from './db-query';
 
 const billingDB = () => getDB('tamamhealth_billing');
 
@@ -45,10 +47,7 @@ function calculateTotals(items: BillLineItem[], discount: number, taxRate: numbe
 
 export async function getAllBills(scope?: DataScope): Promise<BillingDoc[]> {
   const db = billingDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as BillingDoc)
-    .filter(d => d && d.type === 'billing');
+  const all = await findByType<BillingDoc>(db, 'billing');
   /* istanbul ignore next -- defensive null-safety in sort */
   all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   return scope ? filterByScope(all, scope) : all;
@@ -64,8 +63,7 @@ export async function getBillById(id: string): Promise<BillingDoc | null> {
 }
 
 export async function getBillsByPatient(patientId: string): Promise<BillingDoc[]> {
-  const all = await getAllBills();
-  return all.filter(b => b.patientId === patientId);
+  return findByType<BillingDoc>(billingDB(), 'billing', { patientId }, { indexFields: ['type', 'patientId'] });
 }
 
 export async function getUnpaidBills(scope?: DataScope): Promise<BillingDoc[]> {
@@ -166,10 +164,60 @@ export async function createBill(data: CreateBillInput): Promise<BillingDoc> {
   const resp = await db.put(doc);
   doc._rev = resp.rev;
 
+  // Mirror the bill into the append-only ledger so patient balances, the
+  // front-desk checkout gate, and Collect-Payment — all of which read the
+  // ledger, not the billing store — reflect this charge. We post the gross as
+  // a `charge` debit and, when insurance covers part of it, an
+  // `insurance_payment` credit, so the patient's running balance nets to their
+  // own responsibility (balanceDue). Best-effort: a ledger write must never
+  // abort bill creation.
+  try {
+    const { createLedgerEntry } = await import('./ledger-service');
+    await createLedgerEntry({
+      patientId: doc.patientId,
+      encounterId: doc.encounterId,
+      entryType: 'charge',
+      amount: doc.totalAmount,
+      description: `Invoice ${invoiceNumber}`,
+      referenceId: doc._id,
+      referenceType: 'billing',
+      currency: doc.currency,
+      facilityId: doc.facilityId,
+      orgId: doc.orgId,
+      createdBy: doc.generatedBy,
+    });
+    if (doc.amountPaid > 0) {
+      await createLedgerEntry({
+        patientId: doc.patientId,
+        encounterId: doc.encounterId,
+        entryType: 'insurance_payment',
+        amount: -doc.amountPaid,
+        description: `Insurance coverage — ${invoiceNumber}`,
+        referenceId: doc._id,
+        referenceType: 'billing',
+        currency: doc.currency,
+        facilityId: doc.facilityId,
+        orgId: doc.orgId,
+        createdBy: doc.generatedBy,
+      });
+    }
+  } catch (err) {
+    console.warn('[billing] ledger mirror failed for', doc._id, err);
+  }
+
   await logAuditSafe(
     'BILL_CREATED', data.generatedBy, data.generatedByName,
     `Invoice ${invoiceNumber}: ${data.patientName} total=${totalAmount} ${doc.currency}`
   );
+
+  emitSyncEvent({
+    resourceType: 'billing',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
 
   return doc;
 }
@@ -216,10 +264,40 @@ export async function recordPayment(
     const resp = await db.put(bill);
     bill._rev = resp.rev;
 
+    // Credit the ledger so the patient balance drops to match the bill.
+    // Best-effort — the bill payment is already persisted above.
+    try {
+      const { createLedgerEntry } = await import('./ledger-service');
+      await createLedgerEntry({
+        patientId: bill.patientId,
+        encounterId: bill.encounterId,
+        entryType: 'payment',
+        amount: -amount,
+        description: `Payment — ${bill.invoiceNumber}`,
+        referenceId: bill._id,
+        referenceType: 'billing',
+        currency: bill.currency,
+        facilityId: bill.facilityId,
+        orgId: bill.orgId,
+        createdBy: receivedBy,
+      });
+    } catch (err) {
+      console.warn('[billing] ledger payment mirror failed for', bill._id, err);
+    }
+
     await logAuditSafe(
       'PAYMENT_RECORDED', receivedBy, receivedByName,
       `Payment ${payment.id}: ${amount} ${bill.currency} via ${method} for ${bill.invoiceNumber}`
     );
+
+    emitSyncEvent({
+      resourceType: 'billing',
+      resourceId: bill._id,
+      operation: 'update',
+      resourceVersion: bill._rev,
+      orgId: bill.orgId,
+      hospitalId: bill.facilityId,
+    });
 
     return bill;
   } catch {
@@ -247,6 +325,15 @@ export async function waiveBill(
       'BILL_WAIVED', waivedBy, waivedByName,
       `Waived ${bill.invoiceNumber}: ${bill.totalAmount} ${bill.currency} — ${reason}`
     );
+
+    emitSyncEvent({
+      resourceType: 'billing',
+      resourceId: bill._id,
+      operation: 'update',
+      resourceVersion: bill._rev,
+      orgId: bill.orgId,
+      hospitalId: bill.facilityId,
+    });
 
     return bill;
   } catch {

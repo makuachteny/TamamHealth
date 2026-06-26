@@ -11,12 +11,10 @@ import { withAuditLog } from '@/lib/audit/with-audit';
 import type { UserRole } from '@/lib/db-types';
 const READ_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
-  'medical_superintendent', 'boma_health_worker', 'payam_supervisor',
-  'community_health_volunteer',
+  'medical_superintendent',
 ];
 const WRITE_ROLES: UserRole[] = [
   'super_admin', 'doctor', 'clinical_officer', 'nurse',
-  'boma_health_worker', 'payam_supervisor', 'community_health_volunteer',
 ];
 export async function GET(request: NextRequest) {
   try {

@@ -7,6 +7,8 @@
  * encodes them verbatim so order UIs and APIs validate against them.
  */
 
+import { getSettings } from '../settings/settings-store';
+
 // ── Stage 6 — Diagnostics: lab/imaging order lifecycle ──────────────────────
 //
 // "ordered → specimen collected → received at lab (or rejected, needs
@@ -43,6 +45,15 @@ export const RESULT_REVIEW_SLA = {
   routineHours: 7 * 24, // unreviewed routine results escalate after 7 days
   criticalHours: 24, // unreviewed critical results escalate after 24 hours
 } as const;
+
+/**
+ * Live result-review SLA from facility settings (defaults to RESULT_REVIEW_SLA
+ * until the settings store is hydrated). Use this in non-React service code so
+ * admin changes to the SLA timers propagate.
+ */
+export function getResultReviewSLA(): { criticalHours: number; routineHours: number } {
+  return getSettings().resultReviewSLA;
+}
 
 // ── Stage 7 — Treatment / In-Clinic Procedures ──────────────────────────────
 //

@@ -51,8 +51,8 @@ describe('Seed Data Integrity', () => {
       });
     });
 
-    test('generates exactly 50 patients', () => {
-      expect(patients).toHaveLength(50);
+    test('generates exactly 100 patients', () => {
+      expect(patients).toHaveLength(100);
     });
   });
 

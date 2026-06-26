@@ -1,4 +1,5 @@
 import { prescriptionsDB } from '../db';
+import { findByType } from './db-query';
 import type { PrescriptionDoc, MedicationAdministration } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
@@ -7,21 +8,51 @@ import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { validatePrescription, ValidationError } from '../validation';
 import { checkNewPrescription, type InteractionCheckResult } from './drug-interaction-service';
+import { prescription as rxLifecycle, type PrescriptionStatus } from '../clinical-flow/order-lifecycles';
+
+/** Granular pharmacy lifecycle stage, defaulting legacy docs from coarse status. */
+export function effectivePrescriptionStatus(
+  doc: Pick<PrescriptionDoc, 'orderStatus' | 'status'>,
+): PrescriptionStatus {
+  if (doc.orderStatus) return doc.orderStatus;
+  return doc.status === 'dispensed' ? 'dispensed' : 'prescribed';
+}
+
+/** Coarse `status` derived from the granular lifecycle stage. */
+function coarseFromRxStatus(s: PrescriptionStatus): PrescriptionDoc['status'] {
+  return (s === 'dispensed' || s === 'counseled' || s === 'complete') ? 'dispensed' : 'pending';
+}
+
+/**
+ * Advance a prescription to the next lifecycle stage, validated against
+ * PRESCRIPTION_TRANSITIONS. Keeps the coarse `status` in sync. Throws on an
+ * illegal transition.
+ */
+export async function advancePrescription(
+  id: string,
+  to: PrescriptionStatus,
+  extra?: Partial<PrescriptionDoc>,
+): Promise<PrescriptionDoc | null> {
+  const db = prescriptionsDB();
+  const existing = await db.get(id) as PrescriptionDoc;
+  const from = effectivePrescriptionStatus(existing);
+  if (from !== to && !rxLifecycle.can(from, to)) {
+    throw new Error(`Illegal prescription transition: ${from} → ${to}`);
+  }
+  return updatePrescription(id, { ...extra, orderStatus: to, status: coarseFromRxStatus(to) });
+}
 
 export async function getAllPrescriptions(scope?: DataScope): Promise<PrescriptionDoc[]> {
   const db = prescriptionsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as PrescriptionDoc)
-    .filter(d => d && d.type === 'prescription');
+  const all = await findByType<PrescriptionDoc>(db, 'prescription');
   /* istanbul ignore next -- defensive null-safety in sort */
   all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   return scope ? filterByScope(all, scope) : all;
 }
 
 export async function getPrescriptionsByPatient(patientId: string, scope?: DataScope): Promise<PrescriptionDoc[]> {
-  const all = await getAllPrescriptions(scope);
-  return all.filter(p => p.patientId === patientId);
+  const rows = await findByType<PrescriptionDoc>(prescriptionsDB(), 'prescription', { patientId }, { indexFields: ['type', 'patientId'] });
+  return scope ? filterByScope(rows, scope) : rows;
 }
 
 export interface PrescriptionCreateResult {
@@ -126,6 +157,7 @@ export async function dispensePrescription(id: string, dispensedBy?: string): Pr
   const now = new Date().toISOString();
   const result = await updatePrescription(id, {
     status: 'dispensed',
+    orderStatus: 'dispensed',
     dispensedAt: now,
   });
   if (result) {
@@ -192,6 +224,57 @@ export async function recordAdministration(
       `${entry.status.toUpperCase()} ${existing.medication} ${entry.doseGiven} ` +
       `to ${existing.patientName} (Rx: ${existing._id})` +
       (entry.witnessName ? ` witnessed by ${entry.witnessName}` : ''),
+    );
+    emitSyncEvent({
+      resourceType: 'prescription',
+      resourceId: next._id,
+      operation: 'update',
+      resourceVersion: next._rev,
+      hospitalId: next.hospitalId,
+      orgId: next.orgId,
+    });
+    return next;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Void a mis-recorded administration WITHOUT deleting it. The targeted
+ * administrations[] entry is marked voided (append-only — history is
+ * preserved), so the scheduled dose returns to due/overdue. Mirrors
+ * recordAdministration's persistence + audit + sync pattern.
+ */
+export async function voidAdministration(
+  prescriptionId: string,
+  administrationId: string,
+  voidedBy: string,
+  voidedByName: string,
+  reason: string,
+): Promise<PrescriptionDoc | null> {
+  const db = prescriptionsDB();
+  try {
+    const existing = await db.get(prescriptionId) as PrescriptionDoc;
+    const now = new Date().toISOString();
+    const target = (existing.administrations || []).find(a => a.id === administrationId);
+    if (!target) return null;
+    const next: PrescriptionDoc = {
+      ...existing,
+      administrations: (existing.administrations || []).map(a =>
+        a.id === administrationId
+          ? { ...a, voided: true, voidedAt: now, voidedBy, voidedReason: reason }
+          : a,
+      ),
+      updatedAt: now,
+    };
+    const resp = await db.put(next);
+    next._rev = resp.rev;
+    await logAuditSafe(
+      'MEDICATION_ADMIN_VOIDED',
+      undefined,
+      voidedByName,
+      `Voided ${target.status.toUpperCase()} ${existing.medication} ${target.doseGiven || existing.dose} ` +
+      `for ${existing.patientName} (Rx: ${existing._id})${reason ? ` — ${reason}` : ''}`,
     );
     emitSyncEvent({
       resourceType: 'prescription',

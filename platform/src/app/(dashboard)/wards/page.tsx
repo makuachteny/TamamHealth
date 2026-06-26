@@ -1,8 +1,12 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
+import PatientName from '@/components/PatientName';
+import Badge from '@/components/Badge';
+import { FilterMenu } from '@/components/filters';
+import EmptyState from '@/components/EmptyState';
 import { BedDouble, ChevronRight, Plus, X, AlertTriangle, CheckCircle2 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -11,9 +15,13 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { AdmissionDoc } from '@/lib/db-types-ward';
 
+// Shared column template for the admissions table header + rows:
+// Patient · Ward · Diagnosis · Severity · Discharge action
+const ADMISSION_GRID = 'minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 2fr) 96px 132px';
+
 export default function WardsPage() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser, globalSearch } = useApp();
   const { patients } = usePatients();
   const { wards, activeAdmissions, totalBeds, occupiedBeds, availableBeds, occupancyRate, admit, discharge } = useWards();
   const { showToast } = useToast();
@@ -21,6 +29,10 @@ export default function WardsPage() {
   const [admitOpen, setAdmitOpen] = useState(false);
   const [dischargeFor, setDischargeFor] = useState<AdmissionDoc | null>(null);
   const [filterWard, setFilterWard] = useState<string>('');
+  // Text search comes from the shared global search bar (TopBar).
+  const admissionSearch = globalSearch;
+  const activeFilterCount = filterWard ? 1 : 0;
+  const clearFilters = () => { setFilterWard(''); };
 
   const [admitForm, setAdmitForm] = useState({
     patientId: '',
@@ -38,14 +50,21 @@ export default function WardsPage() {
   });
 
   const facilityId = currentUser?.hospitalId || currentUser?.hospital?._id;
-  const facilityName = currentUser?.hospital?.name || currentUser?.hospitalName || t('ward.facilityFallback');
   const facilityWards = useMemo(
     () => facilityId ? wards.filter(w => w.facilityId === facilityId) : wards,
     [wards, facilityId],
   );
   const filteredAdmissions = useMemo(
-    () => filterWard ? activeAdmissions.filter(a => a.wardId === filterWard) : activeAdmissions,
-    [activeAdmissions, filterWard],
+    () => {
+      const q = admissionSearch.trim().toLowerCase();
+      return activeAdmissions.filter(a => {
+        const matchesWard = !filterWard || a.wardId === filterWard;
+        const haystack = `${a.patientName} ${a.admittingDiagnosis} ${a.wardName} ${a.bedNumber || ''} ${a.severity}`.toLowerCase();
+        const matchesSearch = !q || q.split(/\s+/).every(term => haystack.includes(term));
+        return matchesWard && matchesSearch;
+      });
+    },
+    [activeAdmissions, filterWard, admissionSearch],
   );
 
   const handleAdmit = async () => {
@@ -116,133 +135,122 @@ export default function WardsPage() {
 
   return (
     <>
-      <TopBar title={t('ward.topBarTitle')} />
-      <main className="page-container page-enter">
-        <PageHeader
-          icon={BedDouble}
-          title={t('ward.pageTitle')}
-          subtitle={facilityWards.length === 1
-            ? t('ward.subtitleSingular', { facility: facilityName, count: facilityWards.length })
-            : t('ward.subtitlePlural', { facility: facilityName, count: facilityWards.length })}
-          actions={
+      <TopBar title={t('ward.topBarTitle')} searchTrailing={
+            facilityWards.length > 0 && (
+              <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+                <FilterMenu.Field label="Filter by ward">
+                  <select className="w-full text-sm" value={filterWard} onChange={e => setFilterWard(e.target.value)}>
+                    <option value="">All wards</option>
+                    {facilityWards.map(w => (
+                      <option key={w._id} value={w._id}>{`${w.name} (${w.occupiedBeds}/${w.totalBeds})`}</option>
+                    ))}
+                  </select>
+                </FilterMenu.Field>
+              </FilterMenu>
+            )
+          } actions={
             <button onClick={() => setAdmitOpen(true)} className="btn btn-primary">
               <Plus className="w-4 h-4" /> {t('ward.admitPatient')}
             </button>
-          }
-        />
+          } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
-        {/* Census KPIs */}
-        <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', alignItems: 'stretch' }}>
-          {[
-            { label: t('ward.kpiTotalBeds'), value: totalBeds, accent: 'var(--accent-primary)', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
-            { label: t('ward.kpiOccupied'), value: occupiedBeds, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
-            { label: t('ward.kpiAvailable'), value: availableBeds, accent: '#15795C', bg: 'rgba(27, 158, 119, 0.10)', border: 'rgba(27, 158, 119, 0.30)' },
-            { label: t('ward.kpiOccupancy'), value: `${occupancyRate}%`, accent: occupancyRate > 90 ? '#C44536' : occupancyRate > 75 ? '#B8741C' : 'var(--accent-primary)', bg: occupancyRate > 90 ? 'rgba(196, 69, 54, 0.10)' : occupancyRate > 75 ? 'rgba(228, 168, 75, 0.12)' : 'rgba(59, 130, 246, 0.08)', border: occupancyRate > 90 ? 'rgba(196, 69, 54, 0.30)' : occupancyRate > 75 ? 'rgba(228, 168, 75, 0.30)' : 'rgba(59, 130, 246, 0.22)' },
-          ].map(k => (
-            <div key={k.label} style={{ padding: '14px 16px', borderRadius: 10, background: k.bg, border: `1px solid ${k.border}` }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: k.accent }}>{k.label}</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, marginTop: 2 }}>{k.value}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Ward grid */}
-        <div className="dash-card mb-4">
-          <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-            <h3 className="font-semibold text-sm">{t('ward.wards')}</h3>
-          </div>
-          {facilityWards.length === 0 ? (
-            <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
-              {t('ward.noWardsConfigured', { facility: facilityName })}
-            </div>
-          ) : (
-            <div className="p-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', alignItems: 'stretch' }}>
-              {facilityWards.map(w => {
-                const occ = w.totalBeds > 0 ? Math.round((w.occupiedBeds / w.totalBeds) * 100) : 0;
-                const accent = occ > 90 ? '#C44536' : occ > 75 ? '#B8741C' : '#15795C';
-                return (
-                  <button
-                    key={w._id}
-                    onClick={() => setFilterWard(filterWard === w._id ? '' : w._id)}
-                    className="text-left"
-                    style={{
-                      padding: 14,
-                      borderRadius: 10,
-                      background: filterWard === w._id ? 'var(--accent-light)' : 'var(--overlay-subtle)',
-                      border: filterWard === w._id ? `1px solid var(--accent-primary)` : '1px solid var(--border-light)',
-                      cursor: 'pointer',
-                    }}
+        {/* Active admissions — now also carries the bed-occupancy numbers and
+            the ward filter (the standalone ward grid + KPI strip were folded in here). */}
+        <div className="dash-card flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <h3 className="font-semibold text-sm">{t('ward.currentAdmissions')}</h3>
+                <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
+                  {t('ward.activeCount', { count: filteredAdmissions.length })}
+                </span>
+              </div>
+              {/* Bed occupancy numbers — bordered pill tiles, aligned like the
+                  filter chips / action buttons used across the app. */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {[
+                  { label: t('ward.kpiTotalBeds'), value: totalBeds, color: 'var(--accent-primary)' },
+                  { label: t('ward.kpiOccupied'), value: occupiedBeds, color: '#3b82f6' },
+                  { label: t('ward.kpiAvailable'), value: availableBeds, color: '#15795C' },
+                  { label: t('ward.kpiOccupancy'), value: `${occupancyRate}%`, color: occupancyRate > 90 ? '#C44536' : occupancyRate > 75 ? '#B8741C' : 'var(--accent-primary)' },
+                ].map(s => (
+                  <div
+                    key={s.label}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg flex-shrink-0"
+                    style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{w.name}</span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: accent }}>{occ}%</span>
-                    </div>
-                    <div className="text-[11px] capitalize" style={{ color: 'var(--text-muted)' }}>{w.wardType.replace(/_/g, ' ')}</div>
-                    <div className="mt-2 flex items-baseline gap-1.5">
-                      <span className="text-lg font-bold" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{w.occupiedBeds}</span>
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('ward.bedsOccupied', { count: w.totalBeds })}</span>
-                    </div>
-                    <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
-                      <div style={{ width: `${occ}%`, height: '100%', background: accent }} />
-                    </div>
-                  </button>
-                );
-              })}
+                    <span className="text-sm font-bold" style={{ color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{s.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
-        </div>
-
-        {/* Active admissions */}
-        <div className="dash-card">
-          <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-            <div>
-              <h3 className="font-semibold text-sm">{t('ward.currentAdmissions')}</h3>
-              {filterWard && (
-                <p className="text-[11px]" style={{ color: 'var(--text-muted)', marginTop: 1 }}>
-                  {t('ward.filteredByWard')}<button onClick={() => setFilterWard('')} className="underline">{t('ward.clear')}</button>
-                </p>
-              )}
-            </div>
-            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
-              {t('ward.activeCount', { count: filteredAdmissions.length })}
-            </span>
           </div>
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
           {filteredAdmissions.length === 0 ? (
-            <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
-              {filterWard ? t('ward.noActiveAdmissionsInWard') : t('ward.noActiveAdmissions')}
-            </div>
+            <EmptyState
+              icon={BedDouble}
+              title={t('ward.currentAdmissions')}
+              message={filterWard ? t('ward.noActiveAdmissionsInWard') : t('ward.noActiveAdmissions')}
+            />
           ) : (
             <div>
+              {/* Table header */}
+              <div
+                className="grid items-center gap-3 px-4 py-2.5 sticky top-0 z-10"
+                style={{
+                  gridTemplateColumns: ADMISSION_GRID,
+                  background: 'var(--bg-card-solid)',
+                  borderBottom: '1px solid var(--border-light)',
+                }}
+              >
+                {[t('ward.colPatient'), t('ward.colWard'), t('ward.colDiagnosis'), t('ward.severity'), ''].map((h, i) => (
+                  <div key={i} className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</div>
+                ))}
+              </div>
               {filteredAdmissions.map(a => {
-                const sev = a.severity === 'critical' ? '#C44536' : a.severity === 'severe' ? '#B8741C' : a.severity === 'moderate' ? '#3b82f6' : '#15795C';
+                const sevTone = a.severity === 'critical' ? 'danger' : a.severity === 'severe' ? 'warning' : a.severity === 'moderate' ? 'info' : 'success';
                 const days = Math.max(1, Math.ceil((Date.now() - new Date(a.admissionDate).getTime()) / 86400000));
                 return (
-                  <div key={a._id} className="data-row">
-                    <div className="data-row__icon" style={{ background: `${sev}1A`, color: sev }}>
-                      <BedDouble className="w-4 h-4" />
+                  <div
+                    key={a._id}
+                    className="grid items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--table-row-hover)]"
+                    style={{
+                      gridTemplateColumns: ADMISSION_GRID,
+                      borderBottom: '1px solid var(--border-light)',
+                      background: a.severity === 'critical' ? 'rgba(196, 69, 54, 0.04)' : 'transparent',
+                    }}
+                  >
+                    {/* Patient */}
+                    <div className="min-w-0">
+                      <PatientName patientId={a.patientId} name={a.patientName} nameClassName="!font-normal text-[12.5px]" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="data-row__label">{a.wardName}{a.bedNumber ? t('ward.bedLabel', { bed: a.bedNumber }) : ''}</div>
-                      <div className="data-row__value truncate">{a.patientName}</div>
-                      <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {t('ward.diagnosisDay', { diagnosis: a.admittingDiagnosis, day: days })}
-                        {a.isolationRequired && <span className="ml-2 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(196, 69, 54, 0.14)', color: '#8B2E24' }}>{t('ward.isolation')}</span>}
-                      </div>
+                    {/* Ward */}
+                    <div className="text-[12px] truncate" style={{ color: 'var(--text-secondary)' }}>{a.wardName}</div>
+                    {/* Diagnosis + day */}
+                    <div className="flex items-center gap-2 min-w-0 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="truncate">{a.admittingDiagnosis}</span>
+                      <span className="text-[11px] whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>· {t('ward.dayCount', { day: days })}</span>
+                      {a.isolationRequired && <Badge tone="danger" uppercase className="justify-self-start">{t('ward.isolation')}</Badge>}
                     </div>
-                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{ background: `${sev}1A`, color: sev, border: `1px solid ${sev}40` }}>
-                      {a.severity}
+                    {/* Severity */}
+                    <span className="justify-self-start">
+                      <Badge tone={sevTone} uppercase>{a.severity}</Badge>
                     </span>
-                    <button onClick={() => setDischargeFor(a)} className="btn btn-secondary btn-sm">{t('ward.discharge')} <ChevronRight className="w-3 h-3" /></button>
+                    {/* Action */}
+                    <button onClick={() => setDischargeFor(a)} className="btn btn-secondary btn-sm justify-self-end">{t('ward.discharge')} <ChevronRight className="w-3 h-3" /></button>
                   </div>
                 );
               })}
             </div>
           )}
+          </div>
         </div>
 
         {/* Admit modal */}
         {admitOpen && (
-          <div className="modal-backdrop" onClick={() => setAdmitOpen(false)}>
+          <Modal onClose={() => setAdmitOpen(false)}>
             <div className="modal-content card-elevated p-6 max-w-lg w-full" style={{ maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold">{t('ward.admitPatient')}</h3>
@@ -301,12 +309,12 @@ export default function WardsPage() {
                 <button onClick={handleAdmit} className="btn btn-primary flex-1">{t('ward.admit')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
 
         {/* Discharge modal */}
         {dischargeFor && (
-          <div className="modal-backdrop" onClick={() => setDischargeFor(null)}>
+          <Modal onClose={() => setDischargeFor(null)}>
             <div className="modal-content card-elevated p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -352,7 +360,7 @@ export default function WardsPage() {
                 <button onClick={handleDischarge} className="btn btn-primary flex-1">{t('ward.discharge')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </main>
     </>

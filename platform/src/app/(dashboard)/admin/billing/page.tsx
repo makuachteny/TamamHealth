@@ -7,18 +7,23 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
+import { FilterMenu } from '@/components/filters';
+import DataTile from '@/components/DataTile';
 import {
-  CreditCard, Search, Edit3, Check, X,
-  Building2, Users, TrendingUp
+  CreditCard, Edit3, Check, X,
 } from '@/components/icons/lucide';
 
 export default function AdminBillingPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser, globalSearch } = useApp();
   const { organizations, loading, update } = useOrganizations();
 
-  const [search, setSearch] = useState('');
+  // Text search comes from the shared global search bar (TopBar).
+  const search = globalSearch;
+  const [filterStatus, setFilterStatus] = useState('all');
+  const activeFilterCount = filterStatus !== 'all' ? 1 : 0;
+  const clearFilters = () => { setFilterStatus('all'); };
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPlan, setEditPlan] = useState<'basic' | 'professional' | 'enterprise'>('basic');
   const [editStatus, setEditStatus] = useState<'trial' | 'active' | 'suspended' | 'cancelled'>('trial');
@@ -34,10 +39,13 @@ export default function AdminBillingPage() {
   }, [currentUser, router]);
 
   const filteredOrgs = useMemo(() => {
-    if (!search) return organizations;
     const q = search.toLowerCase();
-    return organizations.filter(o => o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q));
-  }, [organizations, search]);
+    return organizations.filter(o => {
+      const matchSearch = !q || o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q);
+      const matchStatus = filterStatus === 'all' || o.subscriptionStatus === filterStatus;
+      return matchSearch && matchStatus;
+    });
+  }, [organizations, search, filterStatus]);
 
   if (!currentUser || currentUser.role !== 'super_admin') return null;
 
@@ -84,7 +92,7 @@ export default function AdminBillingPage() {
 
   const inputStyle: React.CSSProperties = {
     background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-    borderRadius: '8px', padding: '6px 10px', color: 'var(--text-primary)',
+    borderRadius: '4px', padding: '6px 10px', color: 'var(--text-primary)',
     fontSize: '13px', outline: 'none',
   };
   const selectStyle: React.CSSProperties = {
@@ -95,33 +103,36 @@ export default function AdminBillingPage() {
 
   return (
     <>
-      <TopBar title={t('adminBilling.title')} />
-      <main className="page-container page-enter">
+      <TopBar title={t('adminBilling.title')} searchTrailing={
+            <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterMenu.Field label={t('adminBilling.filterByStatus')}>
+                <select className="w-full text-sm" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                  <option value="all">{t('adminBilling.statusAll')}</option>
+                  <option value="trial">{t('adminBilling.statusTrial')}</option>
+                  <option value="active">{t('adminBilling.statusActive')}</option>
+                  <option value="suspended">{t('adminBilling.statusSuspended')}</option>
+                  <option value="cancelled">{t('adminBilling.statusCancelled')}</option>
+                </select>
+              </FilterMenu.Field>
+            </FilterMenu>
+          } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
         {/* KPI Cards */}
-        <div className="kpi-grid mb-6">
-          {[
-            { key: 'activeSubscriptions', label: t('adminBilling.kpiActiveSubscriptions'), value: totalActive, icon: CreditCard, color: 'var(--color-success)', bg: '#05966915' },
-            { key: 'trialOrganizations', label: t('adminBilling.kpiTrialOrganizations'), value: totalTrial, icon: TrendingUp, color: 'var(--color-warning)', bg: '#D9770615' },
-            { key: 'suspended', label: t('adminBilling.kpiSuspended'), value: totalSuspended, icon: Building2, color: 'var(--color-danger)', bg: '#EF444415' },
-            { key: 'totalLicensedUsers', label: t('adminBilling.kpiTotalLicensedUsers'), value: totalMaxUsers, icon: Users, color: '#3b82f6', bg: '#3b82f615' },
-          ].map(stat => (
-            <div key={stat.key} className="kpi">
-              <div className="kpi__icon" style={{ background: stat.bg }}>
-                <stat.icon style={{ color: stat.color }} />
-              </div>
-              <div className="kpi__body">
-                <div className="kpi__value">{stat.value}</div>
-                <div className="kpi__label">{stat.label}</div>
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+          <DataTile label={t('adminBilling.kpiActiveSubscriptions')} value={totalActive} tone={totalActive > 0 ? 'ok' : 'default'} />
+          <DataTile label={t('adminBilling.kpiTrialOrganizations')} value={totalTrial} tone={totalTrial > 0 ? 'warning' : 'default'} />
+          <DataTile label={t('adminBilling.kpiSuspended')} value={totalSuspended} tone={totalSuspended > 0 ? 'danger' : 'default'} />
+          <DataTile label={t('adminBilling.kpiTotalLicensedUsers')} value={totalMaxUsers} />
         </div>
 
         {/* Plan Breakdown */}
-        <div className="rounded-xl p-5 mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>{t('adminBilling.activeSubscriptionsByPlan')}</p>
-          <div className="flex gap-6">
+        <div className="dash-card overflow-hidden mb-4">
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <CreditCard className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('adminBilling.activeSubscriptionsByPlan')}</h3>
+          </div>
+          <div className="p-4 flex flex-col sm:flex-row gap-3">
             {Object.entries(planRevenue).map(([plan, info]) => (
               <div key={plan} className="flex items-center gap-3 px-4 py-3 rounded-xl flex-1" style={{ background: `${info.color}08`, border: `1px solid ${info.color}20` }}>
                 <div className="w-3 h-3 rounded-full" style={{ background: info.color }} />
@@ -134,22 +145,10 @@ export default function AdminBillingPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex-1" style={{ maxWidth: '360px' }}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input
-              type="text" placeholder={t('adminBilling.searchPlaceholder')}
-              value={search} onChange={e => setSearch(e.target.value)}
-              style={{ ...inputStyle, paddingLeft: '36px', width: '100%', padding: '10px 14px 10px 36px', borderRadius: '10px', fontSize: '14px' }}
-            />
-          </div>
-        </div>
-
         {/* Table */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="w-full">
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+            <table className="w-full" style={{ minWidth: 720 }}>
               <thead>
                 <tr>
                   {[

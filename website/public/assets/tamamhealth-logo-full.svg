@@ -2,8 +2,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 685.03 200" role="img" aria-label="Tamam Healthcare System">
   <defs>
     <style>
-      .tam-dot { fill: #0d8844; }
-      .tam-word { fill: #0e4724; }
+      .tam-dot { fill: #3b82f6; }
+      .tam-word { fill: #1e3a8a; }
     </style>
   </defs>
   <g class="tam-dot">

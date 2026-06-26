@@ -13,7 +13,6 @@
 export * from './encounter-journey';
 export * from './roles';
 export * from './order-lifecycles';
-export * from './bhw-workflow';
 export * from './payment-model';
 export * from './patient-identity';
 export * from './capabilities';

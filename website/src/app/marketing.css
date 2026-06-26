@@ -26,10 +26,11 @@
   --tb-blue-100: #DBEAFE;
   --tb-blue-50:  #EFF6FF;
 
-  /* ─ Action: Sage Green (CTAs, success — muted & trustworthy) ─ */
-  --tb-green:       #1B9E77;
-  --tb-green-dark:  #1B6B45;
-  --tb-green-light: #5CB88A;
+  /* ─ Action: Platform Blue (CTAs/success) — matched to the app's accent
+     (#3b82f6 / #1E3A8A) so the marketing site and product share one brand. ─ */
+  --tb-green:       #3b82f6;
+  --tb-green-dark:  #1E3A8A;
+  --tb-green-light: #60A5FA;
 
   /* ─ Accent: Warm Amber (highlights, badges — African warmth) ─ */
   --tb-gold:       #E4A84B;
@@ -382,7 +383,8 @@
   align-items: center;
   padding-top: 72px;
   padding-bottom: 80px;
-  min-height: calc(100vh - var(--navbar-height));
+  min-height: 100vh; /* fallback */
+  min-height: calc(100svh - var(--navbar-height));
 }
 @media (max-width:959.98px) {
   .mk-hero-2col {
@@ -390,7 +392,8 @@
     gap: 40px;
     padding-top: 48px;
     padding-bottom: 56px;
-    min-height: auto;
+    min-height: 100vh;
+    min-height: calc(100svh - var(--navbar-height));
   }
 }
 .mk-hero-text {
@@ -470,11 +473,12 @@
   padding-top: 64px;
   padding-bottom: 0;
   gap: 32px;
-  min-height: 520px;
+  min-height: 100vh; /* fallback */
+  min-height: calc(100svh - var(--navbar-height));
   position: relative;
 }
 @media (max-width:639.98px) {
-  .mk-hero-flex { display: block; padding-top: 32px; padding-bottom: 40px; gap: 0; min-height: auto; }
+  .mk-hero-flex { display: block; padding-top: 32px; padding-bottom: 40px; gap: 0; min-height: 100svh; }
 }
 .mk-hero-content {
   flex: 1 1 0%;
@@ -1528,14 +1532,16 @@
 /* ── Hero with Background Photo ──────────────────────────────── */
 .mk-hero-photo-bg {
   position: relative;
-  min-height: 520px;
+  min-height: 100vh; /* fallback */
+  min-height: calc(100svh - var(--navbar-height));
   display: flex;
   align-items: center;
   overflow: hidden;
   padding: 72px 0 80px;
 }
 .mk-hero-photo-bg--tall {
-  min-height: calc(72vh - var(--navbar-height));
+  min-height: 100vh; /* fallback */
+  min-height: calc(100svh - var(--navbar-height));
 }
 .mk-hero-photo-bg::before {
   content: '';
@@ -1572,7 +1578,7 @@
   letter-spacing: 0.15em;
 }
 @media (max-width:639.98px) {
-  .mk-hero-photo-bg { min-height: 400px; padding: 48px 0 56px; }
+  .mk-hero-photo-bg { min-height: 100svh; padding: 48px 0 56px; }
 }
 
 
@@ -2190,7 +2196,8 @@
    ═══════════════════════════════════════════════════════════════════ */
 .mk-hero-split {
   background: var(--tb-cream-100);
-  min-height: calc(78vh - var(--navbar-height));
+  min-height: 100vh; /* fallback */
+  min-height: calc(100svh - var(--navbar-height));
   display: flex;
   align-items: center;
   padding: 64px 0 72px;

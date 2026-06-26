@@ -80,7 +80,7 @@ function findAdministration(
 }
 
 const STATUS_TINT: Record<MedicationAdministration['status'], { bg: string; color: string; ring: string; label: string }> = {
-  given:     { bg: 'rgba(16,185,129,0.12)',  color: '#047857',                ring: 'rgba(16,185,129,0.30)', label: 'Given' },
+  given:     { bg: 'rgba(31, 157, 111,0.12)',  color: '#047857',                ring: 'rgba(31, 157, 111,0.30)', label: 'Given' },
   missed:    { bg: 'rgba(196,69,54,0.12)',   color: 'var(--tamamhealth-red)', ring: 'rgba(196,69,54,0.30)',  label: 'Missed' },
   refused:   { bg: 'rgba(228,168,75,0.18)',  color: 'var(--color-warning)',   ring: 'rgba(228,168,75,0.32)', label: 'Refused' },
   held:      { bg: 'rgba(100,116,139,0.12)', color: '#475569',                ring: 'rgba(100,116,139,0.26)', label: 'Held' },
@@ -285,12 +285,9 @@ export default function MARPage() {
             </div>
             <div className="min-w-0">
               <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                {t('mar.heading')}
+                {admission.patientName}
               </h1>
               <div className="mt-1 text-sm flex items-center flex-wrap gap-x-3 gap-y-1" style={{ color: 'var(--text-secondary)' }}>
-                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  {admission.patientName}
-                </span>
                 <span className="inline-flex items-center gap-1.5">
                   <BedDouble className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
                   {admission.wardName}{admission.bedNumber ? ` · ${admission.bedNumber}` : ''}
@@ -388,7 +385,7 @@ export default function MARPage() {
         ) : (
           <div className="card-elevated overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+              <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: 760 }}>
                 <thead>
                   <tr style={{ background: 'var(--overlay-subtle)' }}>
                     <th
@@ -436,8 +433,8 @@ export default function MARPage() {
                         }}
                       >
                         <div className="flex items-start gap-2">
-                          <div className="icon-box-sm shrink-0" style={{ background: 'rgba(20,184,166,0.14)' }}>
-                            <Pill className="w-3.5 h-3.5" style={{ color: '#0D9488' }} />
+                          <div className="icon-box-sm shrink-0" style={{ background: 'rgba(59, 130, 246,0.14)' }}>
+                            <Pill className="w-3.5 h-3.5" style={{ color: '#1E3A8A' }} />
                           </div>
                           <div className="min-w-0">
                             <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -505,8 +502,8 @@ export default function MARPage() {
                 style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}
               >
                 <div className="flex items-start gap-3 min-w-0">
-                  <div className="icon-box" style={{ background: 'rgba(20,184,166,0.14)' }}>
-                    <Pill className="w-4 h-4" style={{ color: '#0D9488' }} />
+                  <div className="icon-box" style={{ background: 'rgba(59, 130, 246,0.14)' }}>
+                    <Pill className="w-4 h-4" style={{ color: '#1E3A8A' }} />
                   </div>
                   <div className="min-w-0">
                     <div className="text-[10.5px] font-bold uppercase" style={{
@@ -533,7 +530,7 @@ export default function MARPage() {
                   <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
                     color: 'var(--text-muted)', letterSpacing: '0.06em',
                   }}>{t('mar.status')}</label>
-                  <div className="grid grid-cols-4 gap-1.5">
+                  <div className="grid grid-cols-4 gap-1.5 keep-cols">
                     {(['given', 'missed', 'refused', 'held'] as const).map(s => {
                       const tint = STATUS_TINT[s];
                       const on = modalStatus === s;

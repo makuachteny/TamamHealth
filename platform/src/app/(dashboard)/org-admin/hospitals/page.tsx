@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import {
   Building2, Plus, X, MapPin, ChevronDown, AlertCircle, Users,
@@ -154,9 +153,18 @@ export default function OrgHospitalsPage() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title={t('orgHospitals.topBarTitle')} />
+      <TopBar title={t('orgHospitals.topBarTitle')} actions={
+        <button
+          onClick={() => { setError(''); setShowCreateModal(true); }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
+          style={{ background: brandColor }}
+        >
+          <Plus className="w-4 h-4" />
+          {t('orgHospitals.addFacility')}
+        </button>
+      } />
 
-      <div className="page-container page-enter">
+      <div className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Success/Error */}
         {success && (
           <div className="mb-4 p-3 rounded-lg text-sm font-medium" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-border)' }}>
@@ -169,25 +177,14 @@ export default function OrgHospitalsPage() {
           </div>
         )}
 
-        <PageHeader
-          icon={Building2}
-          title={t('orgHospitals.headerTitle')}
-          subtitle={t('orgHospitals.headerSubtitle', { count: hospitals.length })}
-          actions={
-            <button
-              onClick={() => { setError(''); setShowCreateModal(true); }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
-              style={{ background: brandColor }}
-            >
-              <Plus className="w-4 h-4" />
-              {t('orgHospitals.addFacility')}
-            </button>
-          }
-        />
-
         {/* Hospitals Table */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <table className="w-full">
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgHospitals.headerTitle')}</h3>
+          </div>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <table className="w-full" style={{ minWidth: 720 }}>
             <thead>
               <tr>
                 <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('hospitals.colName')}</th>
@@ -212,7 +209,7 @@ export default function OrgHospitalsPage() {
                       <div className="flex items-center gap-3">
                         <div
                           className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ background: `${facilityColor(hospital.facilityType)}15` }}
+                          style={{ background: 'transparent' }}
                         >
                           <Building2 className="w-4 h-4" style={{ color: facilityColor(hospital.facilityType) }} />
                         </div>
@@ -258,6 +255,7 @@ export default function OrgHospitalsPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 

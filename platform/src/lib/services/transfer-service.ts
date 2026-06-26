@@ -1,6 +1,7 @@
 import { patientsDB, medicalRecordsDB, labResultsDB } from '../db';
 import type { PatientDoc, MedicalRecordDoc, LabResultDoc } from '../db-types';
 import type { TransferPackage, Attachment } from '@/data/mock';
+import { findByType } from './db-query';
 
 export async function assembleTransferPackage(
   patientId: string,
@@ -19,18 +20,12 @@ export async function assembleTransferPackage(
 
   // Get all medical records for patient
   const mrDb = medicalRecordsDB();
-  const allRecords = await mrDb.allDocs({ include_docs: true });
-  const medicalRecords = allRecords.rows
-    .map(r => r.doc as MedicalRecordDoc)
-    .filter(d => d && d.type === 'medical_record' && d.patientId === patientId)
+  const medicalRecords = (await findByType<MedicalRecordDoc>(mrDb, 'medical_record', { patientId }, { indexFields: ['type', 'patientId'] }))
     .sort((a, b) => (b.visitDate || '').localeCompare(a.visitDate || ''));
 
   // Get all lab results for patient
   const labDb = labResultsDB();
-  const allLabs = await labDb.allDocs({ include_docs: true });
-  const labResults = allLabs.rows
-    .map(r => r.doc as LabResultDoc)
-    .filter(d => d && d.type === 'lab_result' && d.patientId === patientId)
+  const labResults = (await findByType<LabResultDoc>(labDb, 'lab_result', { patientId }, { indexFields: ['type', 'patientId'] }))
     .map(lab => ({
       testName: lab.testName,
       result: lab.result,

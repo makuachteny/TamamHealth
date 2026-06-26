@@ -237,11 +237,26 @@ export default function DataEntryDashboard() {
       <TopBar title={t('dataEntry.title')} />
       <main className="page-container page-enter">
 
+        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
+        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-primary)' }}>
+              <ClipboardCheck className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.title')}</h1>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {myHospital?.name || currentUser.hospitalName || ''}{myHospital?.state ? ` · ${myHospital.state}` : ''}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Facility banner */}
         {myHospital && (
           <div className="dash-card mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-lg flex items-center justify-center" style={{ background: `${ACCENT}15` }}>
+              <div className="w-11 h-11 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                 <Building2 className="w-5 h-5" style={{ color: ACCENT }} />
               </div>
               <div className="flex-1">
@@ -267,21 +282,21 @@ export default function DataEntryDashboard() {
         )}
 
         {/* KPI strip from latest report */}
-        <div className="kpi-grid mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {[
             { label: t('dataEntry.kpiFacilityScore'), value: facilityStats ? `${facilityStats.pct}%` : '--', icon: BarChart3, color: facilityStats && facilityStats.pct >= 80 ? 'var(--color-success)' : 'var(--color-warning)' },
             { label: t('dashboard.bedOccupancy'), value: latest ? `${bedOccupancy}%` : '--', icon: BedDouble, color: bedOccupancy > 90 ? 'var(--color-danger)' : bedOccupancy > 70 ? 'var(--color-warning)' : 'var(--color-success)' },
             { label: t('dataEntry.kpiMedicineAvail'), value: latest ? `${medAvailability}%` : '--', icon: Pill, color: medAvailability >= 80 ? 'var(--color-success)' : medAvailability >= 50 ? 'var(--color-warning)' : 'var(--color-danger)' },
             { label: t('dataEntry.kpiReportsFiled'), value: savedReports.length, icon: FileText, color: ACCENT },
           ].map(k => (
-            <div key={k.label} className="kpi">
-              <div className="kpi__icon" style={{ background: `${k.color}15` }}>
-                <k.icon style={{ color: k.color }} />
+            <div key={k.label} className="dash-card" style={{ padding: '14px 16px' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <k.icon className="w-3.5 h-3.5" style={{ color: k.color }} />
+                </div>
+                <span className="kpi-card-title">{k.label}</span>
               </div>
-              <div className="kpi__body">
-                <div className="kpi__value">{k.value}</div>
-                <div className="kpi__label">{k.label}</div>
-              </div>
+              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{k.value}</div>
             </div>
           ))}
         </div>
@@ -304,7 +319,7 @@ export default function DataEntryDashboard() {
                 className="flex flex-col items-center gap-2 p-3 rounded-lg transition-all active:scale-95"
                 style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}
               >
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${a.color}12` }}>
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                   <a.icon className="w-4 h-4" style={{ color: a.color }} />
                 </div>
                 <span className="text-[10px] font-semibold text-center" style={{ color: 'var(--text-primary)' }}>{a.label}</span>
@@ -315,7 +330,7 @@ export default function DataEntryDashboard() {
 
         {/* Latest report visualization */}
         {latest ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
             {/* Patient summary */}
             <div className="glass-section">
               <div className="glass-section-header">
@@ -412,7 +427,6 @@ export default function DataEntryDashboard() {
                 ].map(eq => (
                   <div key={eq.label} className="flex items-center justify-between py-1" style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <div className="flex items-center gap-2">
-                      <eq.icon className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
                       <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{eq.label}</span>
                     </div>
                     <span className="text-sm font-bold" style={{ color: eq.value > 0 ? 'var(--text-primary)' : 'var(--color-danger)' }}>{eq.value}</span>
@@ -473,7 +487,6 @@ export default function DataEntryDashboard() {
               {savedReports.slice(0, 7).map((r, i) => (
                 <div key={i} className="flex items-center justify-between p-2.5 rounded-md" style={{ border: '1px solid var(--border-light)' }}>
                   <div className="flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5" style={{ color: ACCENT }} />
                     <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{r.date}</span>
                   </div>
                   <div className="flex items-center gap-4 text-[10px]" style={{ color: 'var(--text-muted)' }}>

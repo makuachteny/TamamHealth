@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Modal from '@/components/Modal';
 import { useSearchParams, useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import {
-  Users, Plus, X, Calendar, CheckCircle2, AlertCircle, Clock, Trash2,
+  Users, Plus, X, Trash2, Search,
 } from '@/components/icons/lucide';
+import RowActionsMenu from '@/components/RowActionsMenu';
 import { useApp } from '@/lib/context';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useToast } from '@/components/Toast';
@@ -15,6 +16,7 @@ import type { LeaveRequestDoc, LeaveType, PayrollEntryDoc } from '@/lib/db-types
 import type { LeaveSummary } from '@/lib/services/leave-service';
 import type { PayrollSummary } from '@/lib/services/payroll-service';
 import type { StaffScheduleDoc } from '@/lib/db-types';
+import { formatMoney } from '@/lib/format-utils';
 
 const LEAVE_TYPES: { id: LeaveType; label: string }[] = [
   { id: 'annual', label: 'Annual' },
@@ -45,8 +47,6 @@ const SHIFT_TYPES: StaffScheduleDoc['shiftType'][] = ['morning', 'afternoon', 'n
 
 type TabId = 'roster' | 'leave' | 'schedule' | 'payroll';
 
-const fmtMoney = (n: number, currency = 'SSP') => `${currency} ${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-
 export default function HRPage() {
   const { t } = useTranslation();
   const { currentUser } = useApp();
@@ -57,6 +57,10 @@ export default function HRPage() {
 
   const initialTab = (searchParams?.get('tab') as TabId) || 'roster';
   const [tab, setTab] = useState<TabId>(initialTab);
+
+  // Roster search + role filter
+  const [rosterSearch, setRosterSearch] = useState('');
+  const [rosterRole, setRosterRole] = useState('all');
 
   // Sync tab → URL so deep links from dashboard work both ways
   useEffect(() => { setTab((searchParams?.get('tab') as TabId) || 'roster'); }, [searchParams]);
@@ -144,6 +148,20 @@ export default function HRPage() {
     for (const u of facilityUsers) counts[u.role] = (counts[u.role] || 0) + 1;
     return counts;
   }, [facilityUsers]);
+
+  const filteredRosterUsers = useMemo(() => {
+    const q = rosterSearch.trim().toLowerCase();
+    return facilityUsers.filter(u => {
+      if (rosterRole !== 'all' && u.role !== rosterRole) return false;
+      if (!q) return true;
+      return (
+        u.name.toLowerCase().includes(q) ||
+        u.username.toLowerCase().includes(q) ||
+        u.role.replace(/_/g, ' ').toLowerCase().includes(q) ||
+        (u.hospitalName || '').toLowerCase().includes(q)
+      );
+    });
+  }, [facilityUsers, rosterSearch, rosterRole]);
 
   // ── Handlers ────────────────────────────────────────────────────────
   const handleRequestLeave = async () => {
@@ -272,33 +290,26 @@ export default function HRPage() {
 
   return (
     <>
-      <TopBar title={t('hr.topBarTitle')} />
+      <TopBar title={t('hr.topBarTitle')} actions={
+        <div className="flex gap-2">
+          {tab === 'leave' && (
+            <button onClick={() => setLeaveOpen(true)} className="btn btn-primary">
+              <Plus className="w-4 h-4" /> {t('hr.requestLeave')}
+            </button>
+          )}
+          {tab === 'schedule' && (
+            <button onClick={() => setScheduleOpen(true)} className="btn btn-primary">
+              <Plus className="w-4 h-4" /> {t('hr.scheduleShift')}
+            </button>
+          )}
+          {tab === 'payroll' && (
+            <button onClick={() => setPayrollOpen(true)} className="btn btn-primary">
+              <Plus className="w-4 h-4" /> {t('hr.addPayrollEntry')}
+            </button>
+          )}
+        </div>
+      } />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Users}
-          title={t('hr.pageTitle')}
-          subtitle={t('hr.pageSubtitle', { facility: facilityName, count: facilityUsers.length })}
-          actions={
-            <div className="flex gap-2">
-              {tab === 'leave' && (
-                <button onClick={() => setLeaveOpen(true)} className="btn btn-primary">
-                  <Plus className="w-4 h-4" /> {t('hr.requestLeave')}
-                </button>
-              )}
-              {tab === 'schedule' && (
-                <button onClick={() => setScheduleOpen(true)} className="btn btn-primary">
-                  <Plus className="w-4 h-4" /> {t('hr.scheduleShift')}
-                </button>
-              )}
-              {tab === 'payroll' && (
-                <button onClick={() => setPayrollOpen(true)} className="btn btn-primary">
-                  <Plus className="w-4 h-4" /> {t('hr.addPayrollEntry')}
-                </button>
-              )}
-            </div>
-          }
-        />
-
         {/* Summary KPIs (leave-focused — stays useful across tabs) */}
         {leaveSummary && (
           <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch' }}>
@@ -323,33 +334,64 @@ export default function HRPage() {
             { id: 'leave', label: t('hr.leaveRequests') },
             { id: 'schedule', label: t('hr.shiftSchedule') },
             { id: 'payroll', label: t('hr.payrollTab') },
-          ] as { id: TabId; label: string }[]).map(tabItem => (
-            <button
-              key={tabItem.id}
-              onClick={() => setTabAndUrl(tabItem.id)}
-              className={`btn btn-sm ${tab === tabItem.id ? 'btn-primary' : 'btn-secondary'}`}
-            >
-              {tabItem.label}
-            </button>
-          ))}
+          ] as { id: TabId; label: string }[]).map(tabItem => {
+            const isActive = tab === tabItem.id;
+            return (
+              <button
+                key={tabItem.id}
+                onClick={() => setTabAndUrl(tabItem.id)}
+                className="text-[12px] font-semibold px-3.5 py-1.5 rounded-full transition-colors"
+                style={{
+                  background: isActive ? 'var(--accent-primary)' : 'var(--overlay-subtle)',
+                  color: isActive ? '#fff' : 'var(--text-secondary)',
+                  border: `1px solid ${isActive ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+                }}
+              >
+                {tabItem.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* ── ROSTER ──────────────────────────────────────── */}
         {tab === 'roster' && (
           <div className="dash-card overflow-hidden">
-            <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+            <div className="p-4 pb-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <h3 className="font-semibold text-sm">{t('hr.activeRoster')}</h3>
-                <div className="flex gap-1.5 flex-wrap">
-                  {Object.entries(roleCounts).map(([role, count]) => (
-                    <span key={role} className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}>
-                      {role.replace(/_/g, ' ')} · {count}
-                    </span>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('hr.activeRoster')}</h3>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                    <input
+                      type="text"
+                      value={rosterSearch}
+                      onChange={e => setRosterSearch(e.target.value)}
+                      placeholder={t('hr.searchStaffPlaceholder')}
+                      className="text-[12px] rounded-full pl-7 pr-3 py-1.5 outline-none"
+                      style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', minWidth: 200 }}
+                    />
+                  </div>
+                  <select
+                    value={rosterRole}
+                    onChange={e => setRosterRole(e.target.value)}
+                    className="text-[12px] font-medium capitalize rounded-full px-3 py-1.5 outline-none"
+                    style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                  >
+                    <option value="all">{t('hr.allRoles')} ({facilityUsers.length})</option>
+                    {Object.entries(roleCounts).sort((a, b) => a[0].localeCompare(b[0])).map(([role, count]) => (
+                      <option key={role} value={role} className="capitalize">
+                        {role.replace(/_/g, ' ')} ({count})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
-            <table className="data-table">
+            <div className="overflow-x-auto">
+            <table className="data-table" style={{ minWidth: 600 }}>
               <thead>
                 <tr>
                   <th>{t('hr.colStaff')}</th>
@@ -360,10 +402,12 @@ export default function HRPage() {
                 </tr>
               </thead>
               <tbody>
-                {facilityUsers.length === 0 && (
-                  <tr><td colSpan={5} className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>{t('hr.noStaffForFacility')}</td></tr>
+                {filteredRosterUsers.length === 0 && (
+                  <tr><td colSpan={5} className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
+                    {facilityUsers.length === 0 ? t('hr.noStaffForFacility') : t('hr.noStaffMatchFilters')}
+                  </td></tr>
                 )}
-                {facilityUsers.map(u => {
+                {filteredRosterUsers.map(u => {
                   const initials = u.name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
                   return (
                     <tr key={u._id}>
@@ -392,6 +436,7 @@ export default function HRPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
@@ -412,9 +457,6 @@ export default function HRPage() {
                   const tok = STATUS_TOKENS[r.status];
                   return (
                     <div key={r._id} className={`data-row ${r.status === 'pending' ? 'data-row--warning' : ''}`}>
-                      <div className="data-row__icon" style={{ background: tok.bg, color: tok.color }}>
-                        {r.status === 'pending' ? <Clock className="w-4 h-4" /> : r.status === 'approved' ? <CheckCircle2 className="w-4 h-4" /> : r.status === 'rejected' ? <AlertCircle className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
-                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="data-row__label">{r.userName} · <span className="capitalize">{r.role.replace(/_/g, ' ')}</span></div>
                         <div className="data-row__value">
@@ -427,9 +469,13 @@ export default function HRPage() {
                         {t(`hr.leaveStatus_${r.status}`)}
                       </span>
                       {isApprover && r.status === 'pending' && (
-                        <div className="flex gap-1 ml-2">
-                          <button onClick={() => decideLeave(r._id, 'approved')} className="btn btn-primary btn-sm">{t('hr.approve')}</button>
-                          <button onClick={() => decideLeave(r._id, 'rejected')} className="btn btn-secondary btn-sm">{t('hr.reject')}</button>
+                        <div className="ml-2">
+                          <RowActionsMenu
+                            actions={[
+                              { key: 'approve', label: t('hr.approve'), tone: 'success', onClick: () => decideLeave(r._id, 'approved') },
+                              { key: 'reject', label: t('hr.reject'), tone: 'danger', onClick: () => decideLeave(r._id, 'rejected') },
+                            ]}
+                          />
                         </div>
                       )}
                     </div>
@@ -471,9 +517,6 @@ export default function HRPage() {
                       </div>
                       {list.map(s => (
                         <div key={s._id} className="data-row">
-                          <div className="data-row__icon" style={{ background: `${shiftColor}1A`, color: shiftColor }}>
-                            <Clock className="w-4 h-4" />
-                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="data-row__value">{s.userName}</div>
                             <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
@@ -483,9 +526,11 @@ export default function HRPage() {
                               {s.isOnCall && <span className="ml-2 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(59, 130, 246, 0.16)', color: '#3b82f6' }}>{t('hr.onCall')}</span>}
                             </div>
                           </div>
-                          <button onClick={() => removeShift(s._id)} className="btn btn-secondary btn-sm" title={t('hr.removeShift')}>
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                          <RowActionsMenu
+                            actions={[
+                              { key: 'remove', label: t('hr.removeShift'), tone: 'danger', icon: <Trash2 className="w-4 h-4" />, onClick: () => removeShift(s._id) },
+                            ]}
+                          />
                         </div>
                       ))}
                     </div>
@@ -505,9 +550,9 @@ export default function HRPage() {
               {payrollSummary && (
                 <div className="flex gap-2 flex-wrap ml-auto">
                   <Pill label={t('hr.pillEntries')} value={String(payrollSummary.total)} />
-                  <Pill label={t('hr.pillGross')} value={fmtMoney(payrollSummary.totalGross)} accent="#3b82f6" />
-                  <Pill label={t('hr.pillDeductions')} value={fmtMoney(payrollSummary.totalDeductions)} accent="#B8741C" />
-                  <Pill label={t('hr.pillNet')} value={fmtMoney(payrollSummary.totalNet)} accent="#15795C" />
+                  <Pill label={t('hr.pillGross')} value={formatMoney(payrollSummary.totalGross)} accent="#3b82f6" />
+                  <Pill label={t('hr.pillDeductions')} value={formatMoney(payrollSummary.totalDeductions)} accent="#B8741C" />
+                  <Pill label={t('hr.pillNet')} value={formatMoney(payrollSummary.totalNet)} accent="#15795C" />
                   <Pill label={t('hr.pillPaid')} value={`${payrollSummary.paid}/${payrollSummary.total}`} accent="#15795C" />
                 </div>
               )}
@@ -522,7 +567,8 @@ export default function HRPage() {
                   {t('hr.noPayrollEntries', { period: payrollPeriod })} <strong>{t('hr.addPayrollEntry')}</strong> {t('hr.aboveToStartRegister')}
                 </div>
               ) : (
-                <table className="data-table">
+                <div className="overflow-x-auto">
+                <table className="data-table" style={{ minWidth: 840 }}>
                   <thead>
                     <tr>
                       <th>{t('hr.colStaff')}</th>
@@ -543,26 +589,24 @@ export default function HRPage() {
                             <div className="font-semibold text-sm">{e.userName}</div>
                             <div className="text-[11px] capitalize" style={{ color: 'var(--text-muted)' }}>{e.role.replace(/_/g, ' ')}</div>
                           </td>
-                          <td className="text-xs text-right font-mono" style={{ color: 'var(--text-primary)' }}>{fmtMoney(e.baseSalary, e.currency)}</td>
-                          <td className="text-xs text-right font-mono" style={{ color: '#3b82f6' }}>+{fmtMoney(e.allowances, e.currency)}</td>
-                          <td className="text-xs text-right font-mono" style={{ color: '#B8741C' }}>-{fmtMoney(e.deductions, e.currency)}</td>
-                          <td className="text-sm text-right font-mono font-bold" style={{ color: '#15795C' }}>{fmtMoney(e.netPay, e.currency)}</td>
+                          <td className="text-xs text-right font-mono" style={{ color: 'var(--text-primary)' }}>{formatMoney(e.baseSalary, { currency: e.currency })}</td>
+                          <td className="text-xs text-right font-mono" style={{ color: '#3b82f6' }}>+{formatMoney(e.allowances, { currency: e.currency })}</td>
+                          <td className="text-xs text-right font-mono" style={{ color: '#B8741C' }}>-{formatMoney(e.deductions, { currency: e.currency })}</td>
+                          <td className="text-sm text-right font-mono font-bold" style={{ color: '#15795C' }}>{formatMoney(e.netPay, { currency: e.currency })}</td>
                           <td>
                             <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md" style={{ background: tok.bg, color: tok.color, border: `1px solid ${tok.color}40` }}>
                               {t(`hr.payrollStatus_${e.status}`)}
                             </span>
                           </td>
                           <td>
-                            <div className="flex gap-1 justify-end">
-                              {e.status === 'draft' && isApprover && (
-                                <button onClick={() => setPayStatus(e._id, 'approved')} className="btn btn-secondary btn-sm">{t('hr.approve')}</button>
-                              )}
-                              {e.status === 'approved' && isApprover && (
-                                <button onClick={() => setPayStatus(e._id, 'paid')} className="btn btn-primary btn-sm">{t('hr.markPaid')}</button>
-                              )}
-                              {e.status === 'paid' && isApprover && (
-                                <button onClick={() => setPayStatus(e._id, 'reversed')} className="btn btn-secondary btn-sm">{t('hr.reverse')}</button>
-                              )}
+                            <div className="flex justify-end">
+                              <RowActionsMenu
+                                actions={[
+                                  ...(e.status === 'draft' && isApprover ? [{ key: 'approve', label: t('hr.approve'), tone: 'success' as const, onClick: () => setPayStatus(e._id, 'approved') }] : []),
+                                  ...(e.status === 'approved' && isApprover ? [{ key: 'paid', label: t('hr.markPaid'), tone: 'success' as const, onClick: () => setPayStatus(e._id, 'paid') }] : []),
+                                  ...(e.status === 'paid' && isApprover ? [{ key: 'reverse', label: t('hr.reverse'), onClick: () => setPayStatus(e._id, 'reversed') }] : []),
+                                ]}
+                              />
                             </div>
                           </td>
                         </tr>
@@ -570,6 +614,7 @@ export default function HRPage() {
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </>
@@ -577,7 +622,7 @@ export default function HRPage() {
 
         {/* ── Modals ────────────────────────────────────── */}
         {leaveOpen && (
-          <div className="modal-backdrop" onClick={() => setLeaveOpen(false)}>
+          <Modal onClose={() => setLeaveOpen(false)}>
             <div className="modal-content card-elevated p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold">{t('hr.requestLeave')}</h3>
@@ -622,11 +667,11 @@ export default function HRPage() {
                 <button onClick={handleRequestLeave} className="btn btn-primary flex-1">{t('hr.submit')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
 
         {scheduleOpen && (
-          <div className="modal-backdrop" onClick={() => setScheduleOpen(false)}>
+          <Modal onClose={() => setScheduleOpen(false)}>
             <div className="modal-content card-elevated p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold">{t('hr.scheduleShift')}</h3>
@@ -683,11 +728,11 @@ export default function HRPage() {
                 <button onClick={handleAddShift} className="btn btn-primary flex-1">{t('hr.saveShift')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
 
         {payrollOpen && (
-          <div className="modal-backdrop" onClick={() => setPayrollOpen(false)}>
+          <Modal onClose={() => setPayrollOpen(false)}>
             <div className="modal-content card-elevated p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold">{t('hr.addPayrollEntryPeriod', { period: payrollPeriod })}</h3>
@@ -726,7 +771,7 @@ export default function HRPage() {
                   </div>
                 </div>
                 <div className="px-3 py-2 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                  <div className="flex justify-between text-[12px]"><span style={{ color: 'var(--text-muted)' }}>{t('hr.netPay')}</span><span className="font-bold font-mono" style={{ color: '#15795C' }}>{fmtMoney(payrollForm.baseSalary + payrollForm.allowances - payrollForm.deductions, payrollForm.currency)}</span></div>
+                  <div className="flex justify-between text-[12px]"><span style={{ color: 'var(--text-muted)' }}>{t('hr.netPay')}</span><span className="font-bold font-mono" style={{ color: '#15795C' }}>{formatMoney(payrollForm.baseSalary + payrollForm.allowances - payrollForm.deductions, { currency: payrollForm.currency })}</span></div>
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('hr.labelNotes')}</label>
@@ -739,7 +784,7 @@ export default function HRPage() {
                 <button onClick={handleAddPayroll} className="btn btn-primary flex-1">{t('hr.addEntry')}</button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </main>
     </>

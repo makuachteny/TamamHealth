@@ -58,7 +58,7 @@ describe('TABLE_CONFLICT_POLICY map', () => {
   it('classifies patients and other reference tables as LAST_WRITE_WINS', () => {
     for (const t of [
       'patients', 'hospitals', 'organizations', 'facility_assessments',
-      'sync_metadata', 'immunizations', 'anc_visits', 'boma_visits',
+      'sync_metadata', 'immunizations', 'anc_visits',
     ]) {
       expect(TABLE_CONFLICT_POLICY[t]).toBe(ConflictPolicy.LAST_WRITE_WINS);
     }

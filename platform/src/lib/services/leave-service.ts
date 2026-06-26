@@ -6,16 +6,15 @@ import { leaveRequestsDB } from '../db';
 import type { LeaveRequestDoc, LeaveStatus } from '../db-types-hr';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
+import { findByType } from './db-query';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 import { jubaDate, jubaYearMonth } from '../time-juba';
 
 export async function getAllLeaveRequests(scope?: DataScope): Promise<LeaveRequestDoc[]> {
   const db = leaveRequestsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as LeaveRequestDoc)
-    .filter(d => d && d.type === 'leave_request')
+  const all = (await findByType<LeaveRequestDoc>(db, 'leave_request'))
     .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -64,6 +63,15 @@ export async function requestLeave(input: CreateLeaveInput): Promise<LeaveReques
   await logAuditSafe('LEAVE_REQUESTED', input.userId, input.userName,
     `${input.userName} requested ${doc.days}d ${input.leaveType} leave (${input.startDate} → ${input.endDate})`);
 
+  emitSyncEvent({
+    resourceType: 'leave_request',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
@@ -88,6 +96,15 @@ export async function decideLeave(
       decision.decidedBy, decision.decidedByName,
       `${decision.status} ${existing.days}d ${existing.leaveType} for ${existing.userName}`);
 
+    emitSyncEvent({
+      resourceType: 'leave_request',
+      resourceId: existing._id,
+      operation: 'update',
+      resourceVersion: existing._rev,
+      orgId: existing.orgId,
+      hospitalId: existing.facilityId,
+    });
+
     return existing;
   } catch {
     return null;
@@ -108,6 +125,14 @@ export async function cancelLeave(id: string, actor: { id: string; name: string 
     existing._rev = resp.rev;
     await logAuditSafe('LEAVE_CANCELLED', actor.id, actor.name,
       `Cancelled ${existing.days}d ${existing.leaveType} for ${existing.userName}`);
+    emitSyncEvent({
+      resourceType: 'leave_request',
+      resourceId: existing._id,
+      operation: 'update',
+      resourceVersion: existing._rev,
+      orgId: existing.orgId,
+      hospitalId: existing.facilityId,
+    });
     return existing;
   } catch {
     return null;

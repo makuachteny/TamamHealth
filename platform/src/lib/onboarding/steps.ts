@@ -67,7 +67,6 @@ const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: number }> 
   '/deaths': { verb: 'Record a death', desc: 'Document a death notification for vital statistics reporting.', est: 2 },
   '/surveillance': { verb: 'Report disease surveillance', desc: 'File a case or outbreak alert and watch community disease trends.', est: 2 },
   '/my-facility': { verb: 'Review your facility profile', desc: 'Confirm your facility’s details, beds, services, and staff.', est: 2 },
-  '/feedback': { verb: 'Collect patient feedback', desc: 'Capture and review patient satisfaction responses.', est: 1 },
   '/reports': { verb: 'Run a report', desc: 'Generate the routine reports your role is responsible for.', est: 2 },
   '/hospitals': { verb: 'Explore the facility network', desc: 'Browse facilities, their status, and capacity across the network.', est: 2 },
   '/vital-statistics': { verb: 'Review vital statistics', desc: 'See births, deaths, and population-health indicators.', est: 2 },
@@ -81,9 +80,6 @@ const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: number }> 
   '/hr': { verb: 'Manage HR & leave', desc: 'Review staff records and approve leave requests.', est: 2 },
   '/payments': { verb: 'Take a payment', desc: 'Record a payment, issue a receipt, and view outstanding bills.', est: 2 },
   '/payments/claims': { verb: 'Submit an insurance claim', desc: 'Create and track claims through to adjudication.', est: 2 },
-  '/payments/plans': { verb: 'Set up a payment plan', desc: 'Arrange instalments for a patient’s balance.', est: 2 },
-  '/billing': { verb: 'Work the collections queue', desc: 'Review balances and drive bills and claims to closure.', est: 2 },
-  '/sync-conflicts': { verb: 'Resolve sync conflicts', desc: 'Reconcile records that changed on more than one device.', est: 2 },
   // Admin / org-admin
   '/admin/organizations': { verb: 'Set up organizations', desc: 'Create and configure the organizations on the platform.', est: 2 },
   '/admin/users': { verb: 'Manage all users', desc: 'Create accounts and assign roles across the platform.', est: 2 },

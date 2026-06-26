@@ -11,6 +11,8 @@ const BUILD_VERSION = (() => {
 const CACHE_NAME = `tamamhealth-${BUILD_VERSION}`;
 const STATIC_ASSETS = [
   '/',
+  '/login',
+  '/patient-portal',
   '/dashboard',
   '/patients',
   '/consultation',

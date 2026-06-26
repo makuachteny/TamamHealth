@@ -3,14 +3,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useMessagingDock } from '@/lib/messaging-dock-context';
 import {
-  Pill, AlertTriangle, Package, Clock, ShieldCheck, Archive,
+  Pill, AlertTriangle, Package, Clock, ShieldCheck,
   MessageSquare, Activity, Radio, Zap, Wifi, ChevronRight,
-  Search, ClipboardList, Send, TrendingDown, CheckCircle2, XCircle,
-  AlertOctagon, Calendar, User, History, Printer, Trash2, X, Check,
-  ShoppingCart, FileText,
+  Search, ClipboardList, Send, CheckCircle2, XCircle,
+  AlertOctagon, X, Check, Plus, Filter,
 } from '@/components/icons/lucide';
 
 const ACCENT = 'var(--accent-primary)';
@@ -20,13 +19,13 @@ const ACCENT = 'var(--accent-primary)';
 const PHARMACY_LIVE_FEED_ENABLED = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 const EVENT_TYPES = [
-  { type: 'rx_received', label: 'Prescription Received', color: '#5CB8A8', icon: ClipboardList },
+  { type: 'rx_received', label: 'Prescription Received', color: '#2563EB', icon: ClipboardList },
   { type: 'dispensed', label: 'Medication Dispensed', color: 'var(--color-success)', icon: CheckCircle2 },
   { type: 'stock_alert', label: 'Stock Alert Triggered', color: '#F87171', icon: AlertTriangle },
   { type: 'controlled', label: 'Controlled Substance Logged', color: '#A855F7', icon: ShieldCheck },
   { type: 'expired', label: 'Expired Item Flagged', color: 'var(--color-danger)', icon: XCircle },
   { type: 'pickup', label: 'Awaiting Patient Pickup', color: ACCENT, icon: Clock },
-  { type: 'restock', label: 'Restock Order Placed', color: '#5CB8A8', icon: Package },
+  { type: 'restock', label: 'Restock Order Placed', color: '#2563EB', icon: Package },
   { type: 'message', label: 'Pharmacist Message', color: '#EC4899', icon: MessageSquare },
 ];
 
@@ -61,7 +60,7 @@ const DRUG_INTERACTIONS: DrugInteraction[] = [
 const INTERACTION_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   HIGH: { bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)', text: 'var(--color-danger)' },
   MODERATE: { bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)', text: 'var(--color-warning)' },
-  LOW: { bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.3)', text: '#5CB8A8' },
+  LOW: { bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.3)', text: '#2563EB' },
 };
 
 function checkDrugInteractions(medication: string, patientMedications: string[]): DrugInteraction[] {
@@ -82,92 +81,6 @@ function checkDrugInteractions(medication: string, patientMedications: string[])
   }
   return found;
 }
-
-// ===================== EXPIRY DATA =====================
-interface ExpiryItem {
-  id: string;
-  name: string;
-  batch: string;
-  stock: number;
-  unit: string;
-  expiryDate: string;
-}
-
-const today = new Date();
-const EXPIRY_DATA: ExpiryItem[] = [
-  { id: 'exp-1', name: 'Amoxicillin 250mg Susp', batch: 'AMX-2024-001', stock: 15, unit: 'bottles', expiryDate: new Date(today.getTime() - 15 * 86400000).toISOString().slice(0, 10) },
-  { id: 'exp-2', name: 'Paracetamol Syrup', batch: 'PCM-2024-033', stock: 8, unit: 'bottles', expiryDate: new Date(today.getTime() - 5 * 86400000).toISOString().slice(0, 10) },
-  { id: 'exp-3', name: 'ORS Sachets (Lot A)', batch: 'ORS-2024-100', stock: 30, unit: 'sachets', expiryDate: new Date(today.getTime() + 10 * 86400000).toISOString().slice(0, 10) },
-  { id: 'exp-4', name: 'Ferrous Sulfate', batch: 'FES-2024-044', stock: 100, unit: 'tablets', expiryDate: new Date(today.getTime() + 25 * 86400000).toISOString().slice(0, 10) },
-  { id: 'exp-5', name: 'Ciprofloxacin 500mg', batch: 'CIP-2024-012', stock: 60, unit: 'tablets', expiryDate: new Date(today.getTime() + 45 * 86400000).toISOString().slice(0, 10) },
-  { id: 'exp-6', name: 'Diazepam 5mg', batch: 'DZP-2024-007', stock: 20, unit: 'ampoules', expiryDate: new Date(today.getTime() + 75 * 86400000).toISOString().slice(0, 10) },
-  { id: 'exp-7', name: 'Insulin Glargine', batch: 'INS-2024-055', stock: 5, unit: 'vials', expiryDate: new Date(today.getTime() + 120 * 86400000).toISOString().slice(0, 10) },
-  { id: 'exp-8', name: 'Morphine 10mg', batch: 'MOR-2024-009', stock: 10, unit: 'ampoules', expiryDate: new Date(today.getTime() + 200 * 86400000).toISOString().slice(0, 10) },
-];
-
-function getExpiryStatus(expiryDate: string): { expired: boolean; days: number; color: string; bgColor: string } {
-  const exp = new Date(expiryDate);
-  const diffDays = Math.ceil((exp.getTime() - today.getTime()) / 86400000);
-  if (diffDays <= 0) return { expired: true, days: diffDays, color: 'var(--color-danger)', bgColor: 'rgba(239,68,68,0.1)' };
-  if (diffDays <= 30) return { expired: false, days: diffDays, color: '#F97316', bgColor: 'rgba(249,115,22,0.1)' };
-  if (diffDays <= 90) return { expired: false, days: diffDays, color: 'var(--color-warning)', bgColor: 'rgba(251,191,36,0.1)' };
-  return { expired: false, days: diffDays, color: 'var(--color-success)', bgColor: 'rgba(74,222,128,0.1)' };
-}
-
-// ===================== PATIENT MEDICATION HISTORY =====================
-interface PatientHistoryEntry {
-  date: string;
-  medication: string;
-  dose: string;
-  prescriber: string;
-  status: 'dispensed' | 'pending' | 'awaiting_pickup';
-}
-
-const PATIENT_HISTORY: Record<string, PatientHistoryEntry[]> = {
-  'Deng Mabior': [
-    { date: '2026-03-12', medication: 'Artemether-Lumefantrine', dose: '80/480mg BD x 3d', prescriber: 'Dr. James Wani', status: 'pending' },
-    { date: '2026-02-20', medication: 'Paracetamol 1g', dose: '1g QDS x 3d', prescriber: 'Dr. Achol Mayen', status: 'dispensed' },
-    { date: '2026-01-10', medication: 'Amoxicillin 500mg', dose: '500mg TDS x 7d', prescriber: 'Dr. James Wani', status: 'dispensed' },
-    { date: '2025-11-05', medication: 'ORS Sachets', dose: '1 sachet per litre x 3d', prescriber: 'CO Deng Mabior', status: 'dispensed' },
-  ],
-  'Nyamal Koang': [
-    { date: '2026-03-12', medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg OD x 30d', prescriber: 'Dr. Achol Mayen', status: 'pending' },
-    { date: '2026-02-10', medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg OD x 30d', prescriber: 'Dr. Achol Mayen', status: 'dispensed' },
-    { date: '2025-12-15', medication: 'Metformin 500mg', dose: '500mg BD x 30d', prescriber: 'Dr. TamamHealth Ladu', status: 'dispensed' },
-  ],
-  'Gatluak Ruot': [
-    { date: '2026-03-12', medication: 'TDF/3TC/DTG', dose: '300/300/50mg OD x 90d', prescriber: 'Dr. TamamHealth Ladu', status: 'dispensed' },
-    { date: '2025-12-12', medication: 'TDF/3TC/DTG', dose: '300/300/50mg OD x 90d', prescriber: 'Dr. TamamHealth Ladu', status: 'dispensed' },
-    { date: '2025-09-12', medication: 'TDF/3TC/DTG', dose: '300/300/50mg OD x 90d', prescriber: 'Dr. TamamHealth Ladu', status: 'dispensed' },
-  ],
-  'Rose Gbudue': [
-    { date: '2026-03-12', medication: 'Metformin', dose: '500mg BD x 30d', prescriber: 'CO Deng Mabior', status: 'pending' },
-    { date: '2026-02-10', medication: 'Metformin', dose: '500mg BD x 30d', prescriber: 'CO Deng Mabior', status: 'dispensed' },
-    { date: '2026-01-08', medication: 'Ciprofloxacin 500mg', dose: '500mg BD x 5d', prescriber: 'Dr. Nyamal Koang', status: 'dispensed' },
-  ],
-  'Kuol Akot': [
-    { date: '2026-03-12', medication: 'Morphine 10mg', dose: 'PRN q4h x 3d', prescriber: 'Dr. Nyamal Koang', status: 'pending' },
-    { date: '2026-03-01', medication: 'Paracetamol 1g', dose: '1g QDS x 5d', prescriber: 'Dr. Nyamal Koang', status: 'dispensed' },
-  ],
-  'Achol Mayen': [
-    { date: '2026-03-12', medication: 'Amoxicillin', dose: '500mg TDS x 7d', prescriber: 'Dr. James Wani', status: 'awaiting_pickup' },
-    { date: '2026-01-20', medication: 'Artemether-Lumefantrine', dose: '80/480mg BD x 3d', prescriber: 'Dr. TamamHealth Ladu', status: 'dispensed' },
-  ],
-  'Majok Chol': [
-    { date: '2026-03-12', medication: 'Insulin Glargine', dose: '20 IU OD', prescriber: 'Dr. TamamHealth Ladu', status: 'pending' },
-    { date: '2026-02-12', medication: 'Insulin Glargine', dose: '18 IU OD', prescriber: 'Dr. TamamHealth Ladu', status: 'dispensed' },
-    { date: '2026-01-12', medication: 'Metformin 500mg', dose: '500mg BD x 30d', prescriber: 'Dr. TamamHealth Ladu', status: 'dispensed' },
-  ],
-  'Ayen Dut': [
-    { date: '2026-02-28', medication: 'Salbutamol Inhaler', dose: '2 puffs PRN', prescriber: 'Dr. James Wani', status: 'dispensed' },
-  ],
-  'Ladu Tombe': [
-    { date: '2026-02-15', medication: 'Paracetamol 1g', dose: '1g QDS x 3d', prescriber: 'CO Deng Mabior', status: 'dispensed' },
-  ],
-  'Nyandit Dut': [
-    { date: '2026-03-05', medication: 'Ferrous Sulfate', dose: '200mg OD x 30d', prescriber: 'Dr. Achol Mayen', status: 'dispensed' },
-  ],
-};
 
 // ===================== PRESCRIPTION & STOCK DATA =====================
 
@@ -200,6 +113,14 @@ interface StockItem {
   status: 'critical' | 'low' | 'adequate';
 }
 
+// Re-classify a stock line after its quantity changes (dispense out / receive in)
+// so the status badge and progress bar stay in sync with the new level.
+function computeStockStatus(stock: number, reorder: number): StockItem['status'] {
+  if (stock === 0 || stock <= reorder * 0.25) return 'critical';
+  if (stock <= reorder) return 'low';
+  return 'adequate';
+}
+
 const INITIAL_STOCK: StockItem[] = [
   { name: 'Artemether-Lumefantrine', stock: 12, reorder: 100, unit: 'packs', status: 'critical' },
   { name: 'ORS Sachets', stock: 28, reorder: 200, unit: 'sachets', status: 'critical' },
@@ -207,15 +128,6 @@ const INITIAL_STOCK: StockItem[] = [
   { name: 'Diazepam 5mg', stock: 8, reorder: 30, unit: 'ampoules', status: 'critical' },
   { name: 'Ferrous Sulfate', stock: 67, reorder: 100, unit: 'tablets', status: 'low' },
   { name: 'Paracetamol Syrup', stock: 15, reorder: 50, unit: 'bottles', status: 'critical' },
-];
-
-const INVENTORY_OVERVIEW = [
-  { category: 'Antimalarials', total: 340, adequate: 280, low: 48, critical: 12 },
-  { category: 'Antibiotics', total: 520, adequate: 410, low: 85, critical: 25 },
-  { category: 'ARVs', total: 180, adequate: 165, low: 15, critical: 0 },
-  { category: 'Analgesics', total: 290, adequate: 245, low: 30, critical: 15 },
-  { category: 'Controlled', total: 45, adequate: 32, low: 8, critical: 5 },
-  { category: 'Maternal Health', total: 160, adequate: 130, low: 22, critical: 8 },
 ];
 
 interface LiveEvent {
@@ -239,7 +151,7 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   }, [onClose]);
   return (
     <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg" style={{
-      background: '#065F46', color: '#D1FAE5', border: '1px solid #10B981',
+      background: '#065F46', color: '#D1FAE5', border: '1px solid #1F9D6F',
     }}>
       <CheckCircle2 className="w-4 h-4" style={{ color: '#34D399' }} />
       <span className="text-sm font-medium">{message}</span>
@@ -322,77 +234,82 @@ function DispenseModal({ rx, onConfirm, onCancel, interactions }: {
   );
 }
 
-// ===================== PURCHASE ORDER MODAL =====================
-function PurchaseOrderModal({ items, onClose }: {
+// ===================== RECEIVE STOCK MODAL =====================
+// Record a delivery of purchased drugs and add the received quantity to the
+// matching stock line ("on what you have"). New items can also be added.
+function ReceiveStockModal({ items, onConfirm, onClose }: {
   items: StockItem[];
+  onConfirm: (name: string, qty: number, unit: string) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const printRef = useRef<HTMLDivElement>(null);
-  const handlePrint = () => {
-    const content = printRef.current;
-    if (!content) return;
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(`<html><head><title>${t('pharmacy.purchaseOrder')}</title><style>
-      body { font-family: Arial, sans-serif; padding: 30px; }
-      h1 { font-size: 18px; margin-bottom: 5px; }
-      h2 { font-size: 14px; color: #666; margin-bottom: 20px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-      th, td { border: 1px solid var(--border-medium); padding: 8px; text-align: left; font-size: 13px; color: var(--text-primary); }
-      th { background: var(--overlay-subtle); font-weight: bold; }
-      .footer { margin-top: 40px; font-size: 12px; color: #888; }
-    </style></head><body>${content.innerHTML}</body></html>`);
-    w.document.close();
-    w.print();
-  };
+  const [name, setName] = useState('');
+  const [qty, setQty] = useState('');
+  const selected = items.find(i => i.name === name);
+  const unit = selected?.unit || 'units';
+  const qtyNum = parseInt(qty) || 0;
+  const canSave = name.trim().length > 0 && qtyNum > 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="dash-card rounded-2xl p-5 w-full max-w-lg mx-4" style={{
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-      }}>
+      <div className="dash-card rounded-2xl p-5 w-full max-w-md mx-4" style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5" style={{ color: ACCENT }} />
-            <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.purchaseOrder')}</h3>
+            <Package className="w-5 h-5" style={{ color: ACCENT }} />
+            <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.receiveStock')}</h3>
           </div>
           <button onClick={onClose} aria-label={t('action.close')}><X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} /></button>
         </div>
-        <div ref={printRef}>
-          <h1>{t('pharmacy.purchaseOrderRestock')}</h1>
-          <h2>{t('pharmacy.dateLabel')}: {new Date().toLocaleDateString('en-GB')}</h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ borderBottom: '2px solid var(--border-medium)', padding: '6px', textAlign: 'left' }}>{t('pharmacy.medication')}</th>
-                <th style={{ borderBottom: '2px solid var(--border-medium)', padding: '6px', textAlign: 'left' }}>{t('pharmacy.currentStock')}</th>
-                <th style={{ borderBottom: '2px solid var(--border-medium)', padding: '6px', textAlign: 'left' }}>{t('pharmacy.orderQty')}</th>
-                <th style={{ borderBottom: '2px solid var(--border-medium)', padding: '6px', textAlign: 'left' }}>{t('pharmacy.unit')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, i) => (
-                <tr key={i}>
-                  <td style={{ borderBottom: '1px solid var(--border-medium)', padding: '6px', color: 'var(--text-primary)' }}>{item.name}</td>
-                  <td style={{ borderBottom: '1px solid var(--border-medium)', padding: '6px', color: 'var(--text-primary)' }}>{item.stock}</td>
-                  <td style={{ borderBottom: '1px solid var(--border-medium)', padding: '6px', color: 'var(--text-primary)' }}>{item.reorder * 2}</td>
-                  <td style={{ borderBottom: '1px solid var(--border-medium)', padding: '6px', color: 'var(--text-primary)' }}>{item.unit}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="footer" style={{ marginTop: '20px', fontSize: '11px', color: '#888' }}>
-            {t('pharmacy.authorizedBy')}: _____________________ {t('pharmacy.dateLabel')}: _____________________
+
+        <div className="space-y-3 mb-5">
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.medication')}</label>
+            <input
+              list="receive-stock-list"
+              type="text"
+              value={name}
+              autoFocus
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('pharmacy.medication')}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all"
+              style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+            />
+            <datalist id="receive-stock-list">
+              {items.map(i => <option key={i.name} value={i.name}>{i.stock} {i.unit}</option>)}
+            </datalist>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>
+              {t('pharmacy.quantityReceived', { unit })}
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              placeholder="0"
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all"
+              style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+            />
+            {selected && qtyNum > 0 && (
+              <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                {selected.stock} → <strong style={{ color: 'var(--color-success)' }}>{selected.stock + qtyNum}</strong> {unit}
+              </p>
+            )}
           </div>
         </div>
-        <div className="flex gap-2 mt-4">
+
+        <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 py-2 rounded-lg text-sm font-medium transition-all" style={{
             background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)',
-          }}>{t('action.close')}</button>
-          <button onClick={handlePrint} className="flex-1 py-2 rounded-lg text-sm font-bold text-white transition-all flex items-center justify-center gap-1.5" style={{
-            background: ACCENT,
-          }}>
-            <Printer className="w-4 h-4" /> {t('pharmacy.printOrder')}
+          }}>{t('action.cancel')}</button>
+          <button
+            onClick={() => canSave && onConfirm(name.trim(), qtyNum, unit)}
+            disabled={!canSave}
+            className="flex-1 py-2 rounded-lg text-sm font-bold text-white transition-all flex items-center justify-center gap-1.5"
+            style={{ background: canSave ? 'var(--color-success)' : 'var(--text-muted)', opacity: canSave ? 1 : 0.6 }}
+          >
+            <Plus className="w-4 h-4" /> {t('pharmacy.addToStock')}
           </button>
         </div>
       </div>
@@ -405,7 +322,7 @@ function PurchaseOrderModal({ items, onClose }: {
 export default function PharmacyDashboardPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser } = useApp();
+  const { openDock } = useMessagingDock();
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [eventCounter, setEventCounter] = useState(0);
   const [dataRate, setDataRate] = useState(0);
@@ -418,13 +335,23 @@ export default function PharmacyDashboardPage() {
   const [dispenseTarget, setDispenseTarget] = useState<PrescriptionItem | null>(null);
   // Toast
   const [toast, setToast] = useState<string | null>(null);
-  // Purchase order modal
-  const [showPurchaseOrder, setShowPurchaseOrder] = useState(false);
-  // Expiry items
-  const [expiryItems, setExpiryItems] = useState<ExpiryItem[]>(EXPIRY_DATA);
-  // Patient lookup
-  const [patientSearch, setPatientSearch] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
+  // Receive stock modal (record purchased drugs arriving)
+  const [showReceiveStock, setShowReceiveStock] = useState(false);
+  // Prescription queue status filter
+  const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'dispensed' | 'awaiting_pickup' | 'controlled'>('all');
+  // Inline search + the filter-icon dropdown that houses both the search and the
+  // status chips (replaces the platform-wide top search bar on this dashboard).
+  const [queueSearch, setQueueSearch] = useState('');
+  const [showQueueFilter, setShowQueueFilter] = useState(false);
+  const queueFilterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showQueueFilter) return;
+    const onDown = (e: MouseEvent) => {
+      if (queueFilterRef.current && !queueFilterRef.current.contains(e.target as Node)) setShowQueueFilter(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [showQueueFilter]);
 
   const generateEvent = useCallback((): LiveEvent => {
     const evtType = EVENT_TYPES[Math.floor(Math.random() * EVENT_TYPES.length)];
@@ -465,20 +392,24 @@ export default function PharmacyDashboardPage() {
   const lowStockCount = stockAlerts.filter(a => a.status === 'low').length;
   const criticalCount = stockAlerts.filter(a => a.status === 'critical').length;
   const awaitingPickup = prescriptionQueue.filter(r => r.status === 'awaiting_pickup').length;
-  const controlledCount = prescriptionQueue.filter(r => r.medication.includes('Morphine') || r.medication.includes('Diazepam')).length;
-  const totalMeds = INVENTORY_OVERVIEW.reduce((s, c) => s + c.total, 0);
+  const isControlled = (rx: PrescriptionItem) => rx.medication.includes('Morphine') || rx.medication.includes('Diazepam');
+  const controlledCount = prescriptionQueue.filter(isControlled).length;
 
-  // Expiry computed
-  const expiredCount = expiryItems.filter(e => new Date(e.expiryDate) <= today).length;
-  const expiringCount = expiryItems.filter(e => {
-    const d = new Date(e.expiryDate);
-    return d > today && d <= new Date(today.getTime() + 90 * 86400000);
-  }).length;
-
-  // Reorder items: stock <= reorder level
-  const reorderItems = stockAlerts
-    .filter(s => s.stock <= s.reorder)
-    .sort((a, b) => a.stock - b.stock);
+  // Queue filtered by the selected status chip and the inline search query.
+  const queueQuery = queueSearch.trim().toLowerCase();
+  const visibleQueue = prescriptionQueue.filter(rx => {
+    const statusOk =
+      queueFilter === 'all' ? true :
+      queueFilter === 'controlled' ? isControlled(rx) :
+      rx.status === queueFilter;
+    if (!statusOk) return false;
+    if (!queueQuery) return true;
+    return (
+      rx.patient.toLowerCase().includes(queueQuery) ||
+      rx.medication.toLowerCase().includes(queueQuery) ||
+      (rx.prescriber || '').toLowerCase().includes(queueQuery)
+    );
+  });
 
   // Dispense handler
   const handleDispense = (rx: PrescriptionItem) => {
@@ -494,8 +425,7 @@ export default function PharmacyDashboardPage() {
     setStockAlerts(prev => prev.map(s => {
       if (dispenseTarget.medication.toLowerCase().includes(s.name.toLowerCase().split(' ')[0].toLowerCase())) {
         const newStock = Math.max(0, s.stock - 1);
-        const newStatus: 'critical' | 'low' | 'adequate' = newStock === 0 ? 'critical' : newStock <= s.reorder * 0.25 ? 'critical' : newStock <= s.reorder ? 'low' : 'adequate';
-        return { ...s, stock: newStock, status: newStatus };
+        return { ...s, stock: newStock, status: computeStockStatus(newStock, s.reorder) };
       }
       return s;
     }));
@@ -503,38 +433,58 @@ export default function PharmacyDashboardPage() {
     setDispenseTarget(null);
   };
 
-  // Drug interaction check for dispense modal
+  // Undo a dispense recorded in this session: restore the prescription to
+  // pending and return the deducted unit to stock. Local-state only (this
+  // dashboard does not persist), so the reversal is exact.
+  const handleUndoDispense = (rx: PrescriptionItem) => {
+    setPrescriptionQueue(prev => prev.map(r =>
+      r.id === rx.id ? { ...r, status: 'pending' as const } : r
+    ));
+    setStockAlerts(prev => prev.map(s => {
+      if (rx.medication.toLowerCase().includes(s.name.toLowerCase().split(' ')[0].toLowerCase())) {
+        const newStock = s.stock + 1;
+        return { ...s, stock: newStock, status: computeStockStatus(newStock, s.reorder) };
+      }
+      return s;
+    }));
+    setToast(t('pharmacy.dispensedToast', { medication: rx.medication, patient: rx.patient }));
+  };
+
+  // Drug interaction check for dispense modal — compare against the patient's
+  // other medications currently in the queue.
   const getInteractionsForRx = (rx: PrescriptionItem): DrugInteraction[] => {
-    const patientName = rx.patient.split(' ').slice(0, 2).join(' ');
-    const history = Object.entries(PATIENT_HISTORY).find(([k]) =>
-      patientName.toLowerCase().includes(k.split(' ')[0].toLowerCase())
-    );
-    const currentMeds = history ? history[1].filter(h => h.status === 'dispensed').map(h => h.medication) : [];
+    const currentMeds = prescriptionQueue
+      .filter(r => r.patient === rx.patient && r.id !== rx.id)
+      .map(r => r.medication);
     return checkDrugInteractions(rx.medication, currentMeds);
   };
 
-  // Remove expired batch action
-  const handleRemoveExpired = () => {
-    setExpiryItems(prev => prev.filter(e => new Date(e.expiryDate) > today));
-    setToast(t('pharmacy.removedExpiredToast', { count: expiredCount }));
+  // Receive purchased stock: add the delivered quantity to a matching line, or
+  // create a new line if it's a drug we don't carry yet.
+  const handleReceiveStock = (name: string, qty: number, unit: string) => {
+    setStockAlerts(prev => {
+      const idx = prev.findIndex(s => s.name.toLowerCase() === name.toLowerCase());
+      if (idx === -1) {
+        const reorder = Math.max(qty, 50);
+        return [...prev, { name, stock: qty, reorder, unit, status: computeStockStatus(qty, reorder) }];
+      }
+      return prev.map((s, i) => {
+        if (i !== idx) return s;
+        const newStock = s.stock + qty;
+        return { ...s, stock: newStock, status: computeStockStatus(newStock, s.reorder) };
+      });
+    });
+    setToast(t('pharmacy.stockedMedication', { medication: name }));
+    setShowReceiveStock(false);
   };
-
-  // Patient history search
-  const matchingPatients = patientSearch.length > 0
-    ? Object.keys(PATIENT_HISTORY).filter(p => p.toLowerCase().includes(patientSearch.toLowerCase()))
-    : [];
-  const patientHistory = selectedPatient ? PATIENT_HISTORY[selectedPatient] || [] : [];
-
-  // Sorted expiry items (FEFO)
-  const sortedExpiry = [...expiryItems].sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
 
   return (
     <>
-      <TopBar title={t('pharmacy.operations')} />
+      <TopBar title={t('pharmacy.operations')} hideSearch />
       <main className="page-container page-enter">
 
         {/* Command Center Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
               background: 'var(--accent-primary)',
@@ -545,10 +495,6 @@ export default function PharmacyDashboardPage() {
               <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
                 {t('nav.pharmacy')}
               </h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                {currentUser?.hospitalName ? ` · ${currentUser.hospitalName}` : ''}
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -559,56 +505,157 @@ export default function PharmacyDashboardPage() {
           </div>
         </div>
 
-        {/* KPI Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
-          {[
-            { label: t('pharmacy.kpiPendingRx'), value: pendingRx, icon: ClipboardList, color: ACCENT },
-            { label: t('pharmacy.kpiDispensed'), value: dispensedToday, icon: CheckCircle2, color: 'var(--color-success)' },
-            { label: t('pharmacy.kpiLowStock'), value: lowStockCount, icon: TrendingDown, color: 'var(--color-warning)' },
-            { label: t('pharmacy.kpiExpired'), value: expiredCount, icon: XCircle, color: '#F87171' },
-            { label: t('pharmacy.kpiExpiring'), value: expiringCount, icon: Calendar, color: '#F97316' },
-            { label: t('pharmacy.kpiPickup'), value: awaitingPickup, icon: Clock, color: '#5CB8A8' },
-            { label: t('pharmacy.kpiControlled'), value: controlledCount, icon: ShieldCheck, color: '#A855F7' },
-            { label: t('pharmacy.kpiTotalMeds'), value: totalMeds.toLocaleString(), icon: Archive, color: '#5CB8A8' },
-          ].map((kpi) => (
-            <div key={kpi.label} className="dash-card relative px-3 py-2.5 transition-all cursor-pointer overflow-hidden">
-              <div className="flex items-center gap-1.5 mb-1">
-                <kpi.icon className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />
-                <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{kpi.label}</span>
-              </div>
-              <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{kpi.value}</p>
+        {/* Quick Actions (moved up to the top of the dashboard) */}
+        <div className="dash-card rounded-2xl p-3 mb-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.quickActions')}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { label: t('pharmacy.dispense'), icon: Pill, color: ACCENT },
+              { label: t('pharmacy.checkStock'), icon: Search, href: '/pharmacy', color: '#2563EB' },
+              { label: t('pharmacy.message'), icon: Send, href: '/messages', color: '#EC4899' },
+              { label: t('pharmacy.inventory'), icon: Package, href: '/pharmacy', color: 'var(--color-success)' },
+            ].map(action => (
+              <button key={action.label} onClick={() => action.href === '/messages' ? openDock() : action.href ? router.push(action.href) : undefined}
+                className="card-elevated flex items-center gap-3 px-3.5 py-3 text-left transition-all">
+                <action.icon className="w-[22px] h-[22px] flex-shrink-0" style={{ color: action.color }} />
+                <span className="text-[12px] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Dispensing Pipeline — medication journey from shelf to patient,
+            styled as a left-to-right stage chain. */}
+        <div className="dash-card rounded-2xl overflow-hidden mb-4">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: 'var(--border-light)' }}>
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4" style={{ color: ACCENT }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.dispensingPipeline')}</span>
             </div>
-          ))}
+            <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.pendingBadge', { count: pendingRx })}</span>
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <div className="flex items-center gap-1 min-w-[680px]">
+              {[
+                { key: 'stock', label: t('pharmacy.inStock'), icon: Package, color: ACCENT, count: stockAlerts.filter(s => s.status === 'adequate').length },
+                { key: 'received', label: t('pharmacy.stageReceived'), icon: ClipboardList, color: ACCENT, count: prescriptionQueue.length },
+                { key: 'pending', label: t('pharmacy.pending'), icon: Clock, color: 'var(--color-warning)', count: pendingRx },
+                { key: 'dispensed', label: t('pharmacy.kpiDispensed'), icon: CheckCircle2, color: 'var(--color-success)', count: dispensedToday },
+                { key: 'pickup', label: t('pharmacy.kpiPickup'), icon: Send, color: '#2563EB', count: awaitingPickup },
+                { key: 'reorder', label: t('pharmacy.reorderNeeded'), icon: AlertTriangle, color: 'var(--color-danger)', count: criticalCount + lowStockCount },
+              ].map((stage, idx, arr) => (
+                <div key={stage.key} className="flex items-center flex-1">
+                  <div className="flex-1 p-2.5 rounded-xl transition-all" style={{
+                    background: stage.count > 0 ? 'var(--overlay-subtle)' : 'transparent',
+                    border: `1px solid ${stage.count > 0 ? 'var(--border-light)' : 'transparent'}`,
+                    opacity: stage.count > 0 ? 1 : 0.5,
+                  }}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <stage.icon className="w-3.5 h-3.5" style={{ color: stage.color }} />
+                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: stage.color }}>{stage.label}</span>
+                    </div>
+                    <span className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{stage.count}</span>
+                  </div>
+                  {idx < arr.length - 1 && (
+                    <div className="px-1 flex-shrink-0">
+                      <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)', opacity: 0.45 }} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
 
           {/* Prescription Queue with One-Tap Dispense - 2 cols */}
-          <div className="md:col-span-2 dash-card rounded-2xl overflow-hidden">
+          <div className="md:col-span-2 dash-card rounded-2xl overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 380px)', minHeight: 320 }}>
             <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <ClipboardList className="w-4 h-4" style={{ color: ACCENT }} />
                 <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.prescriptionQueue')}</span>
-                <span className="px-2 py-0.5 rounded text-[9px] font-bold tracking-wider" style={{
-                  background: `${ACCENT}15`, color: ACCENT, border: `1px solid ${ACCENT}30`,
-                }}>{t('pharmacy.pendingBadge', { count: pendingRx })}</span>
               </div>
-              <button onClick={() => router.push('/pharmacy')} className="text-[10px] font-medium flex items-center gap-1" style={{ color: ACCENT }}>
-                {t('pharmacy.viewAll')} <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Search + status filters live behind this filter icon, between the
+                    queue title and "View all". */}
+                <div className="relative" ref={queueFilterRef}>
+                  <button
+                    onClick={() => setShowQueueFilter(o => !o)}
+                    title={t('pharmacy.prescriptionQueue')}
+                    aria-label={t('pharmacy.prescriptionQueue')}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                    style={{
+                      background: (queueSearch || queueFilter !== 'all') ? `${ACCENT}18` : 'var(--overlay-subtle)',
+                      border: `1px solid ${(queueSearch || queueFilter !== 'all') ? ACCENT : 'var(--border-light)'}`,
+                      color: (queueSearch || queueFilter !== 'all') ? ACCENT : 'var(--text-muted)',
+                    }}
+                  >
+                    <Filter className="w-3.5 h-3.5" />
+                  </button>
+                  {showQueueFilter && (
+                    <div
+                      className="absolute right-0 top-full mt-1.5 z-30 p-2.5 rounded-xl"
+                      style={{ width: 260, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}
+                    >
+                      {/* Search */}
+                      <div className="relative mb-2">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                        <input
+                          type="search"
+                          value={queueSearch}
+                          onChange={e => setQueueSearch(e.target.value)}
+                          placeholder={t('topbar.searchPlaceholder')}
+                          className="w-full !pl-8 !pr-2 !py-1.5 text-[12px]"
+                          style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', borderRadius: 8, color: 'var(--text-primary)' }}
+                        />
+                      </div>
+                      {/* Status filter chips — pending / dispensed / pickup / controlled counts */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {([
+                          { key: 'all', label: t('pharmacy.viewAll'), count: prescriptionQueue.length, color: 'var(--text-secondary)' },
+                          { key: 'pending', label: t('pharmacy.kpiPendingRx'), count: pendingRx, color: ACCENT },
+                          { key: 'dispensed', label: t('pharmacy.kpiDispensed'), count: dispensedToday, color: 'var(--color-success)' },
+                          { key: 'awaiting_pickup', label: t('pharmacy.kpiPickup'), count: awaitingPickup, color: '#2563EB' },
+                          { key: 'controlled', label: t('pharmacy.kpiControlled'), count: controlledCount, color: '#A855F7' },
+                        ] as const).map(chip => {
+                          const active = queueFilter === chip.key;
+                          return (
+                            <button
+                              key={chip.key}
+                              onClick={() => setQueueFilter(active && chip.key !== 'all' ? 'all' : chip.key)}
+                              title={active && chip.key !== 'all' ? t('action.deselect') : undefined}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all"
+                              style={{
+                                background: active ? `${chip.color}18` : 'var(--overlay-subtle)',
+                                border: `1px solid ${active ? chip.color : 'var(--border-light)'}`,
+                                color: active ? chip.color : 'var(--text-secondary)',
+                              }}
+                            >
+                              {chip.label}
+                              <span className="px-1 rounded text-[9px] font-bold" style={{ background: `${chip.color}20`, color: chip.color }}>{chip.count}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => router.push('/pharmacy')} className="text-[10px] font-medium flex items-center gap-1" style={{ color: ACCENT }}>
+                  {t('pharmacy.viewAll')} <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-            <div className="p-3 space-y-1.5" style={{ maxHeight: '380px', overflowY: 'auto' }}>
-              {prescriptionQueue.map(rx => (
+            <div className="p-3 space-y-1.5 flex-1" style={{ overflowY: 'auto', minHeight: 0 }}>
+              {visibleQueue.length === 0 && (
+                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.noPrescriptionsFound')}</p>
+              )}
+              {visibleQueue.map(rx => (
                 <div key={rx.id} className="flex items-center gap-3 p-2.5 rounded-xl transition-all" style={{
                   background: rx.priority === 'urgent' ? `${ACCENT}08` : 'var(--overlay-subtle)',
                   border: `1px solid ${rx.priority === 'urgent' ? `${ACCENT}25` : 'var(--border-light)'}`,
                 }}>
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0" style={{
-                    background: 'var(--accent-primary)',
-                  }}>
-                    {rx.patient.split(' ').slice(0, 2).map(n => n[0]).join('')}
-                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{rx.patient}</p>
                     <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
@@ -621,7 +668,7 @@ export default function PharmacyDashboardPage() {
                       background: rx.status === 'dispensed' ? 'rgba(74,222,128,0.15)' :
                         rx.status === 'awaiting_pickup' ? 'rgba(56,189,248,0.15)' : `${ACCENT}15`,
                       color: rx.status === 'dispensed' ? 'var(--color-success)' :
-                        rx.status === 'awaiting_pickup' ? '#5CB8A8' : ACCENT,
+                        rx.status === 'awaiting_pickup' ? '#2563EB' : ACCENT,
                     }}>{rx.status === 'awaiting_pickup' ? t('pharmacy.statusPickup') : t(`pharmacy.status_${rx.status}`)}</span>
                     {rx.priority === 'urgent' && (
                       <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
@@ -637,6 +684,15 @@ export default function PharmacyDashboardPage() {
                         <Pill className="w-3 h-3" /> {t('pharmacy.dispense')}
                       </button>
                     )}
+                    {rx.status === 'dispensed' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleUndoDispense(rx); }}
+                        className="mt-1 px-3 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-90 flex items-center gap-1"
+                        style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                      >
+                        {t('action.undo')}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -645,16 +701,26 @@ export default function PharmacyDashboardPage() {
 
           {/* Stock Alerts - 1 col */}
           <div className="dash-card rounded-2xl overflow-hidden flex flex-col" style={{
-            maxHeight: '460px',
+            height: 'calc(100vh - 380px)', minHeight: 320,
           }}>
             <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" style={{ color: '#F87171' }} />
                 <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.stockAlerts')}</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
+                  background: 'rgba(248,113,113,0.12)', color: '#F87171',
+                }}>{t('pharmacy.criticalBadge', { count: criticalCount })}</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
+                  background: 'rgba(251,191,36,0.12)', color: 'var(--color-warning)',
+                }}>{lowStockCount} {t('pharmacy.kpiLowStock')}</span>
               </div>
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
-                background: 'rgba(248,113,113,0.12)', color: '#F87171',
-              }}>{t('pharmacy.criticalBadge', { count: criticalCount })}</span>
+              <button
+                onClick={() => setShowReceiveStock(true)}
+                className="text-[10px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-90"
+                style={{ background: 'var(--color-success)' }}
+              >
+                <Plus className="w-3 h-3" /> {t('pharmacy.receiveStock')}
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
               {stockAlerts.map((item, i) => {
@@ -689,7 +755,7 @@ export default function PharmacyDashboardPage() {
 
           {/* Dispensing Activity Feed - 1 col */}
           <div className="dash-card rounded-2xl overflow-hidden flex flex-col" style={{
-            maxHeight: '460px',
+            height: 'calc(100vh - 380px)', minHeight: 320,
           }}>
             <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
               <div className="flex items-center gap-2">
@@ -708,7 +774,7 @@ export default function PharmacyDashboardPage() {
                     animation: evt.isNew ? 'fadeIn 0.3s ease-out' : undefined,
                   }}>
                     <div className="flex items-start gap-2">
-                      <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: `${evt.color}15` }}>
+                      <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: 'transparent' }}>
                         <Icon className="w-3 h-3" style={{ color: evt.color }} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -732,255 +798,6 @@ export default function PharmacyDashboardPage() {
           </div>
         </div>
 
-        {/* NEW SECTIONS: Reorder Alerts + Expiry Tracker */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-
-          {/* Auto Reorder Alerts */}
-          <div className="dash-card rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4" style={{ color: '#F97316' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.reorderNeeded')}</span>
-                <span className="px-2 py-0.5 rounded text-[9px] font-bold tracking-wider" style={{
-                  background: 'rgba(249,115,22,0.12)', color: '#F97316', border: '1px solid rgba(249,115,22,0.25)',
-                }}>{t('pharmacy.itemsBadge', { count: reorderItems.length })}</span>
-              </div>
-              <button
-                onClick={() => setShowPurchaseOrder(true)}
-                className="text-[10px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-90"
-                style={{ background: ACCENT }}
-              >
-                <Printer className="w-3 h-3" /> {t('pharmacy.generateOrder')}
-              </button>
-            </div>
-            <div className="p-3 space-y-1.5" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              {reorderItems.length === 0 ? (
-                <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.allStockAdequate')}</p>
-              ) : (
-                reorderItems.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-2.5 rounded-lg" style={{
-                    background: item.stock === 0 ? 'rgba(239,68,68,0.06)' : 'rgba(249,115,22,0.06)',
-                    border: `1px solid ${item.stock === 0 ? 'rgba(239,68,68,0.15)' : 'rgba(249,115,22,0.15)'}`,
-                  }}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        {item.stock === 0 && <AlertOctagon className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-danger)' }} />}
-                        <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{item.name}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                        <span>{t('pharmacy.stockLabel')}: <strong style={{ color: item.stock === 0 ? 'var(--color-danger)' : '#F97316' }}>{item.stock}</strong></span>
-                        <span>{t('pharmacy.reorderLabel')}: {item.reorder}</span>
-                        <span>{t('pharmacy.orderLabel')}: <strong style={{ color: ACCENT }}>{item.reorder * 2}</strong> {item.unit}</span>
-                      </div>
-                    </div>
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ml-2" style={{
-                      background: item.stock === 0 ? 'rgba(239,68,68,0.15)' : 'rgba(249,115,22,0.15)',
-                      color: item.stock === 0 ? 'var(--color-danger)' : '#F97316',
-                    }}>{item.stock === 0 ? t('pharmacy.outBadge') : t('pharmacy.lowBadge')}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Expiry Tracker (FEFO) */}
-          <div className="dash-card rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.expiryTracker')}</span>
-              </div>
-              {expiredCount > 0 && (
-                <button
-                  onClick={handleRemoveExpired}
-                  className="text-[10px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-90"
-                  style={{ background: 'var(--color-danger)' }}
-                >
-                  <Trash2 className="w-3 h-3" /> {t('pharmacy.removeExpired', { count: expiredCount })}
-                </button>
-              )}
-            </div>
-            <div className="p-3 space-y-1.5" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              {sortedExpiry.map(item => {
-                const status = getExpiryStatus(item.expiryDate);
-                return (
-                  <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg" style={{
-                    background: status.bgColor,
-                    border: `1px solid ${status.color}25`,
-                  }}>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{item.name}</p>
-                      <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                        <span>{t('pharmacy.batchLabel')}: {item.batch}</span>
-                        <span>{item.stock} {item.unit}</span>
-                        <span>{t('pharmacy.expLabel')}: {item.expiryDate}</span>
-                      </div>
-                    </div>
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ml-2" style={{
-                      background: `${status.color}20`, color: status.color,
-                    }}>{status.expired ? t('pharmacy.expired') : t('pharmacy.daysLeft', { count: status.days })}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Patient Medication History Lookup */}
-        <div className="dash-card rounded-2xl overflow-hidden mb-4">
-          <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-            <div className="flex items-center gap-2">
-              <History className="w-4 h-4" style={{ color: '#A855F7' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.patientMedHistory')}</span>
-            </div>
-          </div>
-          <div className="p-3">
-            {/* Search */}
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                placeholder={t('pharmacy.searchPatientPlaceholder')}
-                value={patientSearch}
-                onChange={(e) => { setPatientSearch(e.target.value); setSelectedPatient(null); }}
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none transition-all"
-                style={{
-                  background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-                  color: 'var(--text-primary)',
-                }}
-              />
-            </div>
-
-            {/* Autocomplete dropdown */}
-            {patientSearch.length > 0 && !selectedPatient && matchingPatients.length > 0 && (
-              <div className="mb-3 rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card)' }}>
-                {matchingPatients.map(p => (
-                  <button key={p} onClick={() => { setSelectedPatient(p); setPatientSearch(p); }}
-                    className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-all hover:opacity-80"
-                    style={{ borderBottom: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
-                    <User className="w-3.5 h-3.5" style={{ color: '#A855F7' }} />
-                    {p}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {patientSearch.length > 0 && !selectedPatient && matchingPatients.length === 0 && (
-              <p className="text-xs text-center py-3" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.noPatientsFound', { query: patientSearch })}</p>
-            )}
-
-            {/* History Table */}
-            {selectedPatient && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: '#A855F7' }}>
-                    {selectedPatient.split(' ').map(n => n[0]).join('')}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{selectedPatient}</p>
-                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.prescriptionsOnRecord', { count: patientHistory.length })}</p>
-                  </div>
-                </div>
-                <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--border-light)' }}>
-                  <table className="w-full text-[11px]" style={{ minWidth: '500px' }}>
-                    <thead>
-                      <tr style={{ background: 'var(--overlay-subtle)' }}>
-                        <th className="text-left px-3 py-2 font-semibold" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.dateLabel')}</th>
-                        <th className="text-left px-3 py-2 font-semibold" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.medication')}</th>
-                        <th className="text-left px-3 py-2 font-semibold" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.dose')}</th>
-                        <th className="text-left px-3 py-2 font-semibold" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.prescriber')}</th>
-                        <th className="text-left px-3 py-2 font-semibold" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.statusLabel')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {patientHistory.map((entry, i) => (
-                        <tr key={i} style={{ borderTop: '1px solid var(--border-light)' }}>
-                          <td className="px-3 py-2" style={{ color: 'var(--text-primary)' }}>{entry.date}</td>
-                          <td className="px-3 py-2 font-medium" style={{ color: 'var(--text-primary)' }}>{entry.medication}</td>
-                          <td className="px-3 py-2" style={{ color: 'var(--text-muted)' }}>{entry.dose}</td>
-                          <td className="px-3 py-2" style={{ color: 'var(--text-muted)' }}>{entry.prescriber}</td>
-                          <td className="px-3 py-2">
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
-                              background: entry.status === 'dispensed' ? 'rgba(74,222,128,0.15)' :
-                                entry.status === 'awaiting_pickup' ? 'rgba(56,189,248,0.15)' : `${ACCENT}15`,
-                              color: entry.status === 'dispensed' ? 'var(--color-success)' :
-                                entry.status === 'awaiting_pickup' ? '#5CB8A8' : ACCENT,
-                            }}>{entry.status === 'awaiting_pickup' ? t('pharmacy.statusPickup') : t(`pharmacy.status_${entry.status}`)}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Bottom: Inventory Overview + Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-          {/* Inventory Overview - 3 cols */}
-          <div className="md:col-span-2 lg:col-span-3 dash-card rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-              <div className="flex items-center gap-2">
-                <Package className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.inventoryOverview')}</span>
-              </div>
-              <button onClick={() => router.push('/pharmacy')} className="text-[10px] font-medium flex items-center gap-1" style={{ color: ACCENT }}>
-                {t('pharmacy.fullInventory')} <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {INVENTORY_OVERVIEW.map((cat) => {
-                const adequatePct = Math.round((cat.adequate / cat.total) * 100);
-                return (
-                  <div key={cat.category} className="dash-stat rounded-xl transition-all cursor-pointer">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-semibold" style={{ color: ACCENT }}>{t(`pharmacy.cat_${cat.category.replace(/\s+/g, '')}`)}</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{
-                        background: adequatePct > 80 ? 'rgba(74,222,128,0.15)' : adequatePct > 60 ? 'rgba(251,191,36,0.15)' : 'rgba(248,113,113,0.15)',
-                        color: adequatePct > 80 ? 'var(--color-success)' : adequatePct > 60 ? 'var(--color-warning)' : '#F87171',
-                      }}>{adequatePct}%</span>
-                    </div>
-                    <p className="text-lg font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>{cat.total}</p>
-                    <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ background: 'var(--border-light)' }}>
-                      <div className="h-full rounded-full" style={{
-                        width: `${adequatePct}%`,
-                        background: adequatePct > 80 ? 'var(--color-success)' : adequatePct > 60 ? 'var(--color-warning)' : 'var(--color-danger)',
-                      }} />
-                    </div>
-                    <div className="flex justify-between text-[9px]" style={{ color: 'var(--text-muted)' }}>
-                      <span style={{ color: 'var(--color-success)' }}>{t('pharmacy.catOk', { count: cat.adequate })}</span>
-                      <span style={{ color: 'var(--color-warning)' }}>{t('pharmacy.catLow', { count: cat.low })}</span>
-                      <span style={{ color: '#F87171' }}>{t('pharmacy.catCrit', { count: cat.critical })}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Quick Actions - 1 col */}
-          <div className="dash-card rounded-2xl p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.quickActions')}</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {[
-                { label: t('pharmacy.dispense'), icon: Pill, color: ACCENT },
-                { label: t('pharmacy.checkStock'), icon: Search, color: '#5CB8A8' },
-                { label: t('pharmacy.message'), icon: Send, href: '/messages', color: '#EC4899' },
-                { label: t('pharmacy.inventory'), icon: Package, color: 'var(--color-success)' },
-              ].map(action => (
-                <button key={action.label} onClick={() => action.href ? router.push(action.href) : undefined}
-                  className="flex items-center gap-2 p-2.5 rounded-lg transition-all"
-                  style={{ background: `${action.color}08`, border: `1px solid ${action.color}15` }}>
-                  <action.icon className="w-3.5 h-3.5" style={{ color: action.color }} />
-                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
       </main>
 
       {/* Modals and Toasts */}
@@ -992,10 +809,11 @@ export default function PharmacyDashboardPage() {
           onCancel={() => setDispenseTarget(null)}
         />
       )}
-      {showPurchaseOrder && (
-        <PurchaseOrderModal
-          items={reorderItems}
-          onClose={() => setShowPurchaseOrder(false)}
+      {showReceiveStock && (
+        <ReceiveStockModal
+          items={stockAlerts}
+          onConfirm={handleReceiveStock}
+          onClose={() => setShowReceiveStock(false)}
         />
       )}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

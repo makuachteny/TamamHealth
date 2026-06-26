@@ -2,14 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
-  Users, Plus, MoreVertical, KeyRound,
+  Users, Plus, KeyRound,
   UserX, X, Eye, EyeOff, ChevronDown, AlertCircle,
   Copy, Check, RefreshCw, ShieldCheck,
 } from '@/components/icons/lucide';
+import RowActionsMenu from '@/components/RowActionsMenu';
 
 /**
  * Generate a strong, readable temporary password. Avoids look-alike
@@ -39,7 +39,6 @@ export default function OrgUsersPage() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState<string | null>(null);
-  const [actionMenu, setActionMenu] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [availableRoles, setAvailableRoles] = useState<UserRole[]>([]);
@@ -159,7 +158,6 @@ export default function OrgUsersPage() {
       const { deactivateUser } = await import('@/lib/services/user-service');
       await deactivateUser(userId, currentUser?._id, currentUser?.username);
       setSuccess(t('orgUsers.successUserDeactivated'));
-      setActionMenu(null);
       await loadData();
       setTimeout(() => setSuccess(''), 4000);
     } catch (err: unknown) {
@@ -205,12 +203,9 @@ export default function OrgUsersPage() {
       pharmacist: t('orgUsers.rolePharmacist'),
       front_desk: t('orgUsers.roleFrontDesk'),
       government: t('orgUsers.roleGovernment'),
-      boma_health_worker: t('orgUsers.roleBomaHealthWorker'),
-      payam_supervisor: t('orgUsers.rolePayamSupervisor'),
       data_entry_clerk: t('orgUsers.roleDataEntryClerk'),
       medical_superintendent: t('orgUsers.roleMedicalSuperintendent'),
       hrio: t('orgUsers.roleHrio'),
-      community_health_volunteer: t('orgUsers.roleCommunityHealthVolunteer'),
       nutritionist: t('orgUsers.roleNutritionist'),
       radiologist: t('orgUsers.roleRadiologist'),
       hospital_manager: t('orgUsers.roleHospitalManager'),
@@ -228,14 +223,11 @@ export default function OrgUsersPage() {
       nurse: '#EC4899',
       lab_tech: '#06B6D4',
       pharmacist: 'var(--color-warning)',
-      front_desk: '#14B8A6',
+      front_desk: '#3B82F6',
       government: 'var(--accent-primary)',
-      boma_health_worker: 'var(--color-success)',
-      payam_supervisor: 'var(--color-warning)',
       data_entry_clerk: '#0891B2',
       medical_superintendent: '#1E40AF',
       hrio: '#0F766E',
-      community_health_volunteer: '#16A34A',
       nutritionist: '#EA580C',
       radiologist: '#7C3AED',
       hospital_manager: '#1E3A8A',
@@ -274,9 +266,18 @@ export default function OrgUsersPage() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title={t('orgUsers.pageTitle')} />
+      <TopBar title={t('orgUsers.pageTitle')} actions={
+            <button
+              onClick={() => { setError(''); setShowCreateModal(true); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
+              style={{ background: brandColor }}
+            >
+              <Plus className="w-4 h-4" />
+              {t('orgUsers.createUser')}
+            </button>
+          } />
 
-      <div className="page-container page-enter">
+      <div className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Success/Error banners */}
         {success && (
           <div className="mb-4 p-3 rounded-lg text-sm font-medium" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-border)' }}>
@@ -288,22 +289,6 @@ export default function OrgUsersPage() {
             {error}
           </div>
         )}
-
-        <PageHeader
-          icon={Users}
-          title={t('orgUsers.heading')}
-          subtitle={t('orgUsers.subtitle', { count: users.length })}
-          actions={
-            <button
-              onClick={() => { setError(''); setShowCreateModal(true); }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
-              style={{ background: brandColor }}
-            >
-              <Plus className="w-4 h-4" />
-              {t('orgUsers.createUser')}
-            </button>
-          }
-        />
 
         {/* Filters */}
         <div className="flex items-center gap-3 mb-4">
@@ -348,8 +333,13 @@ export default function OrgUsersPage() {
         </div>
 
         {/* Users Table */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-          <table className="w-full">
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgUsers.heading')}</h3>
+          </div>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <table className="w-full" style={{ minWidth: 720 }}>
             <thead>
               <tr>
                 <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('orgUsers.colName')}</th>
@@ -400,61 +390,30 @@ export default function OrgUsersPage() {
                       <span
                         className="text-xs font-medium px-2 py-0.5 rounded-full"
                         style={{
-                          background: user.isActive ? 'rgba(43,111,224,0.1)' : 'rgba(229,46,66,0.1)',
+                          background: user.isActive ? 'rgba(59, 130, 246,0.1)' : 'rgba(229,46,66,0.1)',
                           color: user.isActive ? 'var(--accent-primary)' : 'var(--color-danger)',
                         }}
                       >
                         {user.isActive ? t('orgUsers.statusActive') : t('orgUsers.statusInactive')}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right relative">
-                      <button
-                        onClick={() => setActionMenu(actionMenu === user._id ? null : user._id)}
-                        className="p-1.5 rounded-lg hover:opacity-80 transition-all"
-                        style={{ background: 'var(--overlay-subtle)' }}
-                      >
-                        <MoreVertical className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                      </button>
-
-                      {actionMenu === user._id && (
-                        <div
-                          className="absolute right-4 top-full mt-1 z-50 rounded-lg shadow-xl py-1 min-w-[160px]"
-                          style={{
-                            background: 'var(--bg-card)',
-                            border: '1px solid var(--border-light)',
-                          }}
-                        >
-                          <button
-                            onClick={() => {
-                              setError('');
-                              setShowResetModal(user._id);
-                              setResetPassword('');
-                              setActionMenu(null);
-                            }}
-                            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:opacity-80"
-                            style={{ color: 'var(--text-primary)' }}
-                          >
-                            <KeyRound className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />
-                            {t('orgUsers.resetPassword')}
-                          </button>
-                          {user.isActive && user._id !== currentUser?._id && (
-                            <button
-                              onClick={() => handleDeactivate(user._id)}
-                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:opacity-80"
-                              style={{ color: 'var(--color-danger)' }}
-                            >
-                              <UserX className="w-3.5 h-3.5" />
-                              {t('orgUsers.deactivate')}
-                            </button>
-                          )}
-                        </div>
-                      )}
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end">
+                        <RowActionsMenu
+                          ariaLabel="Actions"
+                          actions={[
+                            { key: 'reset', label: t('orgUsers.resetPassword'), tone: 'default', icon: <KeyRound className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />, onClick: () => { setError(''); setShowResetModal(user._id); setResetPassword(''); } },
+                            ...(user.isActive && user._id !== currentUser?._id ? [{ key: 'deactivate', label: t('orgUsers.deactivate'), tone: 'danger' as const, icon: <UserX className="w-4 h-4" />, onClick: () => handleDeactivate(user._id) }] : []),
+                          ]}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -629,7 +588,7 @@ export default function OrgUsersPage() {
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-start gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent', color: 'var(--color-success)' }}>
                 <Check className="w-5 h-5" />
               </div>
               <div>
@@ -760,10 +719,6 @@ export default function OrgUsersPage() {
         </div>
       )}
 
-      {/* Click outside to close action menu */}
-      {actionMenu && (
-        <div className="fixed inset-0 z-40" onClick={() => setActionMenu(null)} />
-      )}
     </div>
   );
 }

@@ -5,10 +5,8 @@ import Image from "next/image";
 import {
   Reveal,
   FAQItem,
-  DemoForm,
   CheckItem,
   TestimonialSwoosh,
-  PricingBannerIcon,
 } from "@/components/marketing/MarketingShared";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -41,7 +39,7 @@ export default function PatientExperiencePage() {
                 </div>
               </div>
               <div style={{ marginTop: 32 }}>
-                <Link href="#demo" className="mk-btn mk-btn-green mk-btn-lg">
+                <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
                   Try the patient portal
                 </Link>
               </div>
@@ -58,13 +56,6 @@ export default function PatientExperiencePage() {
                   style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
                   priority
                 />
-              </Reveal>
-            </div>
-
-            {/* Right: Demo Form */}
-            <div className="mk-hero-form">
-              <Reveal delay={0.2}>
-                <DemoForm />
               </Reveal>
             </div>
           </div>
@@ -190,9 +181,6 @@ export default function PatientExperiencePage() {
                   <CheckItem>Configurable reminder rules</CheckItem>
                   <CheckItem>No-show reduction and rescheduling</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -225,9 +213,6 @@ export default function PatientExperiencePage() {
                   <CheckItem>Auto-population to EHR</CheckItem>
                   <CheckItem>Reduce registration time by 80%</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -259,9 +244,6 @@ export default function PatientExperiencePage() {
                   <CheckItem>Reduce phone volume 30-40%</CheckItem>
                   <CheckItem>Care team collaboration tools</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -293,9 +275,6 @@ export default function PatientExperiencePage() {
                   <CheckItem>Medication and appointment management</CheckItem>
                   <CheckItem>Visit summaries and care plans</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -327,9 +306,6 @@ export default function PatientExperiencePage() {
                   <CheckItem>Automated follow-up monitoring</CheckItem>
                   <CheckItem>Patient feedback and testimonials</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -361,9 +337,6 @@ export default function PatientExperiencePage() {
                   <CheckItem>Offline access and functionality</CheckItem>
                   <CheckItem>Low-bandwidth optimization</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -502,30 +475,6 @@ export default function PatientExperiencePage() {
                   Learn more
                 </Link>
               </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── PRICING CTA BANNER ──────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-pricing-banner">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 48, height: 48 }}>
-                <PricingBannerIcon />
-              </div>
-              <div>
-                <h3 className="mk-h3" style={{ margin: "0 0 4px" }}>
-                  Transparent pricing for patient engagement
-                </h3>
-                <p style={{ margin: 0, color: "var(--tb-text-sec)" }}>
-                  Choose a model that fits your practice size and patient volume.
-                </p>
-              </div>
-              <Link href="/pricing" className="mk-btn mk-btn-outline-green mk-btn-lg">
-                View pricing
-              </Link>
             </div>
           </Reveal>
         </div>

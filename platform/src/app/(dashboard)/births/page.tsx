@@ -2,26 +2,29 @@
 
 import { useState } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useBirths } from '@/lib/hooks/useBirths';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { FilterMenu } from '@/components/filters';
 import {
-  Baby, Plus, Search, X, ChevronDown, ChevronUp,
-  HeartPulse, CheckCircle, AlertTriangle
+  Baby, Plus, X, ChevronDown, ChevronUp,
 } from '@/components/icons/lucide';
 
 export default function BirthsPage() {
   const { births, stats, loading, register } = useBirths();
   const { hospitals } = useHospitals();
-  const { currentUser } = useApp();
+  const { currentUser, globalSearch } = useApp();
   const { canRecordVitalEvents } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();
-  const [search, setSearch] = useState('');
+  // Text search comes from the shared global search bar (TopBar).
+  const search = globalSearch;
+  const [deliveryFilter, setDeliveryFilter] = useState('all');
+  const activeFilterCount = (deliveryFilter !== 'all' ? 1 : 0);
+  const clearFilters = () => { setDeliveryFilter('all'); };
   const [showForm, setShowForm] = useState(false);
   const [expandedBirth, setExpandedBirth] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -34,8 +37,9 @@ export default function BirthsPage() {
   });
 
   const filtered = (births || []).filter(b =>
-    !search || `${b.childFirstName} ${b.childSurname}`.toLowerCase().includes(search.toLowerCase()) ||
-    (b.motherName || '').toLowerCase().includes(search.toLowerCase()) || (b.certificateNumber || '').toLowerCase().includes(search.toLowerCase())
+    (deliveryFilter === 'all' || b.deliveryType === deliveryFilter) &&
+    (!search || `${b.childFirstName} ${b.childSurname}`.toLowerCase().includes(search.toLowerCase()) ||
+    (b.motherName || '').toLowerCase().includes(search.toLowerCase()) || (b.certificateNumber || '').toLowerCase().includes(search.toLowerCase()))
   );
 
   const handleSubmit = async () => {
@@ -60,56 +64,53 @@ export default function BirthsPage() {
 
   return (
     <>
-      <TopBar title={t('nav.births')} />
-      <main className="page-container page-enter">
-        <PageHeader
-          icon={Baby}
-          title={t('nav.births')}
-          subtitle={t('births.subtitle')}
-          actions={canRecordVitalEvents && (
-            <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
-              <Plus className="w-4 h-4" /> {t('births.registerBirth')}
-            </button>
-          )}
-        />
-
-        {/* Stats */}
+      <TopBar title={t('nav.births')} searchTrailing={
+              <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+                <FilterMenu.Field label="Delivery type">
+                  <select
+                    className="w-full text-sm"
+                    value={deliveryFilter}
+                    onChange={e => setDeliveryFilter(e.target.value)}
+                  >
+                    <option value="all">All deliveries</option>
+                    <option value="normal">Normal</option>
+                    <option value="caesarean">Caesarean</option>
+                    <option value="assisted">Assisted</option>
+                  </select>
+                </FilterMenu.Field>
+              </FilterMenu>
+          } actions={
+            canRecordVitalEvents && (
+              <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
+                <Plus className="w-4 h-4" /> {t('births.registerBirth')}
+              </button>
+            )
+          } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+        {/* Registry stats surfaced inline above the table. */}
         {stats && (
-          <div className="kpi-grid mb-6">
-            {[
-              { label: 'Total Registered', value: stats.total, icon: Baby, color: '#EC4899', bg: 'rgba(236,72,153,0.12)' },
-              { label: 'This Month', value: stats.thisMonth, icon: HeartPulse, color: '#14B8A6', bg: 'rgba(20,184,166,0.12)' },
-              { label: 'Male / Female', value: <><span style={{ color: 'var(--accent-primary)' }}>{stats.byGender.male}</span><span style={{ color: 'var(--text-muted)' }}> / </span><span style={{ color: 'var(--color-danger)' }}>{stats.byGender.female}</span></>, icon: CheckCircle, color: '#059669', bg: 'rgba(5,150,105,0.12)' },
-              { label: 'Caesarean Rate', value: `${stats.total ? Math.round(stats.byDeliveryType.caesarean / stats.total * 100) : 0}%`, icon: AlertTriangle, color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
-            ].map(stat => (
-              <div key={stat.label} className="kpi">
-                <div className="icon-box-sm" style={{ background: stat.bg }}>
-                  <stat.icon style={{ color: stat.color }} />
+            <div className="flex items-center justify-end gap-4 sm:gap-5 pr-1 mb-3">
+              {[
+                { label: 'Total Registered', value: stats.total, color: '#EC4899' },
+                { label: 'This Month', value: stats.thisMonth, color: '#3B82F6' },
+                { label: 'Male / Female', value: <><span style={{ color: 'var(--accent-primary)' }}>{stats.byGender.male}</span><span style={{ color: 'var(--text-muted)' }}> / </span><span style={{ color: 'var(--color-danger)' }}>{stats.byGender.female}</span></>, color: '#059669' },
+                { label: 'Caesarean Rate', value: `${stats.total ? Math.round(stats.byDeliveryType.caesarean / stats.total * 100) : 0}%`, color: '#DC2626' },
+              ].map(s => (
+                <div key={s.label} className="text-center leading-tight">
+                  <div className="text-base font-bold" style={{ color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
                 </div>
-                <div className="kpi__body">
-                  <div className="kpi__value">{stat.value}</div>
-                  <div className="kpi__label">{stat.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Search */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-            <Search className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input type="text" placeholder="Search by child name, mother name, or certificate..." value={search} onChange={e => setSearch(e.target.value)}
-              className="flex-1 bg-transparent text-sm outline-none" style={{ color: 'var(--text-primary)' }} />
-          </div>
-        </div>
+              ))}
+            </div>
+          )}
 
         {/* Table */}
-        <div className="card-elevated overflow-hidden">
+        <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           {loading ? (
             <div className="p-8 text-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</p></div>
           ) : (
-            <table className="data-table">
+            <table className="data-table" style={{ minWidth: 1080 }}>
               <thead>
                 <tr>
                   <th>Certificate #</th>
@@ -128,7 +129,7 @@ export default function BirthsPage() {
                   <tr key={b._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setExpandedBirth(expandedBirth === b._id ? null : b._id)}>
                     <td className="font-mono text-xs">{b.certificateNumber}</td>
                     <td className="font-medium text-sm">{b.childFirstName} {b.childSurname}</td>
-                    <td><span className="badge text-[10px]" style={{ background: b.childGender === 'Male' ? 'rgba(43,111,224,0.12)' : 'rgba(229,46,66,0.12)', color: b.childGender === 'Male' ? 'var(--accent-primary)' : 'var(--color-danger)' }}>{b.childGender}</span></td>
+                    <td><span className="badge text-[10px]" style={{ background: b.childGender === 'Male' ? 'rgba(59, 130, 246,0.12)' : 'rgba(229,46,66,0.12)', color: b.childGender === 'Male' ? 'var(--accent-primary)' : 'var(--color-danger)' }}>{b.childGender}</span></td>
                     <td className="text-xs font-mono">{b.dateOfBirth}</td>
                     <td className="text-sm">{b.birthWeight}g</td>
                     <td className="text-xs capitalize">{b.deliveryType}</td>
@@ -178,6 +179,7 @@ export default function BirthsPage() {
               </tbody>
             </table>
           )}
+          </div>
         </div>
 
         {/* Registration Form Modal */}

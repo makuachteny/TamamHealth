@@ -9,6 +9,9 @@
  * model is per-service payor tagging with exemptions.
  */
 
+import { getSettings } from '../settings/settings-store';
+import type { PaymentMethodKey, PayorKey } from '../settings/facility-settings';
+
 // ── Section 5 — Payor types ──────────────────────────────────────────────────
 
 export type PayorType =
@@ -50,6 +53,19 @@ export const PAYMENT_MODEL_RULES = {
 
 /** Payment methods accepted at checkout (Stage 10). */
 export type PaymentMethod = 'cash' | 'mobile_money' | 'voucher' | 'partial_payment';
+
+/**
+ * Live, facility-configured payment methods / payors (defaults until the
+ * settings store hydrates). Use these in checkout pickers so an admin's choice
+ * of accepted methods / funding sources propagates.
+ */
+export function getEnabledPaymentMethods(): PaymentMethodKey[] {
+  return getSettings().paymentMethods;
+}
+
+export function getEnabledPayors(): PayorKey[] {
+  return getSettings().payors;
+}
 
 // ── Principle 2.11 — Medication criticality tiers ───────────────────────────
 

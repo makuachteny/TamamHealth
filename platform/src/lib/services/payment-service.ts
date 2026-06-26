@@ -4,6 +4,21 @@
  * All financial mutations create corresponding ledger entries.
  */
 import { getDB } from '../db';
+import { findByType } from './db-query';
+
+/**
+ * Referential-integrity guard: throw if an id is provided but the referenced
+ * document doesn't exist, so charges/payments can't be created pointing at a
+ * missing encounter/invoice (which would silently break reports + audit trails).
+ */
+async function assertRefExists(dbName: string, id: string | undefined, label: string): Promise<void> {
+  if (!id) return;
+  try {
+    await getDB(dbName).get(id);
+  } catch {
+    throw new Error(`${label} ${id} does not exist — refusing to create an orphaned record.`);
+  }
+}
 import type {
   PaymentDoc, PaymentMethodType, PaymentStatus, PaymentAllocation,
   InsurancePolicyDoc, PayerType,
@@ -17,12 +32,15 @@ import type {
   ChargeDoc, ChargeStatus,
   PatientFinancialSummary,
 } from '../db-types-payments';
+import type { BaseDoc } from '../db-types';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
+import { emitSyncEvent } from './sync-event-service';
 import { createLedgerEntry, getPatientBalance } from './ledger-service';
 import { jubaDate } from '../time-juba';
+import { getSettings } from '../settings/settings-store';
 
 const COLLECTION_STAGE_DAYS = {
   followUp: Number(process.env.COLLECTION_STAGE_FOLLOWUP_DAYS) || 30,
@@ -69,6 +87,9 @@ export interface CollectPaymentInput {
 export async function collectPayment(input: CollectPaymentInput): Promise<PaymentDoc> {
   const db = paymentsDB();
   const now = new Date().toISOString();
+  // Don't post a payment against an encounter/invoice that doesn't exist.
+  await assertRefExists('tamamhealth_encounters', input.encounterId, 'Encounter');
+  await assertRefExists('tamamhealth_invoices', input.invoiceId, 'Invoice');
 
   const doc: PaymentDoc = {
     _id: `pmt-${uuidv4().slice(0, 10)}`,
@@ -121,26 +142,87 @@ export async function collectPayment(input: CollectPaymentInput): Promise<Paymen
     `${input.amount} ${doc.currency} via ${input.method} from ${input.patientName} (ref: ${doc.reference})`
   );
 
+  emitSyncEvent({
+    resourceType: 'payment',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
 export async function getPaymentsByPatient(patientId: string): Promise<PaymentDoc[]> {
-  const db = paymentsDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as PaymentDoc)
-    .filter(d => d && d.type === 'payment' && d.patientId === patientId)
+  const rows = await findByType<PaymentDoc>(paymentsDB(), 'payment', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
     .sort((a, b) => (b.processedAt || '').localeCompare(a.processedAt || ''));
 }
 
 export async function getAllPayments(scope?: DataScope): Promise<PaymentDoc[]> {
   const db = paymentsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as PaymentDoc)
-    .filter(d => d && d.type === 'payment');
+  const all = await findByType<PaymentDoc>(db, 'payment');
   all.sort((a, b) => (b.processedAt || '').localeCompare(a.processedAt || ''));
   return scope ? filterByScope(all, scope) : all;
+}
+
+/**
+ * Look up a payment by its provider/transaction reference. Payment-gateway
+ * webhooks (M-Pesa, Airtel, Flutterwave) identify the payment by the reference
+ * we passed to the gateway (stored in `PaymentDoc.reference`), not by our `_id`.
+ */
+export async function getPaymentByReference(reference: string): Promise<PaymentDoc | null> {
+  if (!reference) return null;
+  const rows = await findByType<PaymentDoc>(paymentsDB(), 'payment', { reference }, { indexFields: ['type', 'reference'] });
+  return rows[0] || null;
+}
+
+/**
+ * Reconcile a payment's status against a payment-gateway callback.
+ *
+ * Used by the M-Pesa / Airtel / Flutterwave webhook routes: the gateway tells
+ * us a previously-initiated payment succeeded or failed, and we move the
+ * matching PaymentDoc to the corresponding `PaymentStatus`. The payment is
+ * matched by its provider `reference` (transaction id / our reference).
+ *
+ * Returns the updated doc, or `null` if no payment matches the reference (an
+ * unknown/duplicate callback) — callers should still ack the gateway.
+ */
+export async function updatePaymentStatus(
+  reference: string,
+  status: PaymentStatus,
+  details?: { providerReference?: string; reason?: string },
+): Promise<PaymentDoc | null> {
+  const db = paymentsDB();
+  const pmt = await getPaymentByReference(reference);
+  if (!pmt) return null;
+
+  // Idempotency: gateways may retry callbacks. Don't re-process an already
+  // terminal payment or churn the ledger.
+  if (pmt.status === status) return pmt;
+
+  pmt.status = status;
+  if (details?.reason) {
+    pmt.notes = pmt.notes ? `${pmt.notes}\n${details.reason}` : details.reason;
+  }
+  pmt.updatedAt = new Date().toISOString();
+  const resp = await db.put(pmt);
+  pmt._rev = resp.rev;
+
+  await logAuditSafe('PAYMENT_STATUS_UPDATED', pmt.processedBy, pmt.processedByName,
+    `Payment ${pmt.reference} -> ${status}${details?.providerReference ? ` (provider ref: ${details.providerReference})` : ''}`);
+
+  emitSyncEvent({
+    resourceType: 'payment',
+    resourceId: pmt._id,
+    operation: 'update',
+    resourceVersion: pmt._rev,
+    orgId: pmt.orgId,
+    hospitalId: pmt.facilityId,
+  });
+
+  return pmt;
 }
 
 export async function reversePayment(
@@ -174,8 +256,108 @@ export async function reversePayment(
     await logAuditSafe('PAYMENT_REVERSED', reversedBy, reversedByName,
       `Reversed ${pmt.amount} ${pmt.currency} — ${reason}`);
 
+    emitSyncEvent({
+      resourceType: 'payment',
+      resourceId: pmt._id,
+      operation: 'update',
+      resourceVersion: pmt._rev,
+      orgId: pmt.orgId,
+      hospitalId: pmt.facilityId,
+    });
+
     return pmt;
   } catch { return null; }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PAYMENT LINKS (pay-by-link)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * A "pay-by-link" record. There's no dedicated payment-link database, so these
+ * persist as small docs in the existing payments DB (distinguished by
+ * `type: 'payment_link'`). The link's public id doubles as the doc `_id` so a
+ * GET by id is a direct `db.get` lookup.
+ */
+export interface PaymentLinkDoc extends BaseDoc {
+  type: 'payment_link';
+  linkId: string;
+  url: string;
+  amount: number;
+  currency: string;
+  description: string;
+  expiresAt: string;
+  status: 'active' | 'expired' | 'used';
+  patientId: string;
+  facilityId: string;
+  orgId?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+}
+
+export interface CreatePaymentLinkInput {
+  linkId: string;
+  url: string;
+  patientId: string;
+  amount: number;
+  currency: string;
+  description: string;
+  expiresAt: string;
+  facilityId: string;
+  orgId?: string;
+  createdBy?: string;
+}
+
+export async function createPaymentLink(input: CreatePaymentLinkInput): Promise<PaymentLinkDoc> {
+  const db = paymentsDB();
+  const now = new Date().toISOString();
+  const doc: PaymentLinkDoc = {
+    _id: `plink-${input.linkId}`,
+    type: 'payment_link',
+    linkId: input.linkId,
+    url: input.url,
+    patientId: input.patientId,
+    amount: input.amount,
+    currency: input.currency,
+    description: input.description,
+    expiresAt: input.expiresAt,
+    status: 'active',
+    facilityId: input.facilityId,
+    orgId: input.orgId,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: input.createdBy,
+  };
+  const resp = await db.put(doc);
+  doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'payment_link',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+  return doc;
+}
+
+/**
+ * Fetch a payment link by its public id. Returns null if unknown. The stored
+ * `status` is reconciled against `expiresAt` so an expired link reads as such
+ * even if it was never explicitly marked.
+ */
+export async function getPaymentLink(linkId: string): Promise<PaymentLinkDoc | null> {
+  const db = paymentsDB();
+  try {
+    const doc = await db.get(`plink-${linkId}`) as PaymentLinkDoc;
+    if (doc.status === 'active' && doc.expiresAt && new Date(doc.expiresAt).getTime() < Date.now()) {
+      doc.status = 'expired';
+    }
+    return doc;
+  } catch {
+    return null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -236,15 +418,22 @@ export async function createInsurancePolicy(input: CreateInsurancePolicyInput): 
 
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'insurance_policy',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
 export async function getPatientInsurancePolicies(patientId: string): Promise<InsurancePolicyDoc[]> {
   const db = insurancePoliciesDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as InsurancePolicyDoc)
-    .filter(d => d && d.type === 'insurance_policy' && d.patientId === patientId && d.isActive)
+  const rows = await findByType<InsurancePolicyDoc>(db, 'insurance_policy', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
+    .filter(d => d && d.isActive)
     .sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
 }
 
@@ -260,6 +449,14 @@ export async function updateInsurancePolicy(id: string, updates: Partial<Insuran
     Object.assign(doc, updates, { updatedAt: new Date().toISOString() });
     const resp = await db.put(doc);
     doc._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'insurance_policy',
+      resourceId: doc._id,
+      operation: 'update',
+      resourceVersion: doc._rev,
+      orgId: doc.orgId,
+      hospitalId: doc.facilityId,
+    });
     return doc;
   } catch { return null; }
 }
@@ -270,7 +467,16 @@ export async function deactivateInsurancePolicy(id: string): Promise<boolean> {
     const doc = await db.get(id) as InsurancePolicyDoc;
     doc.isActive = false;
     doc.updatedAt = new Date().toISOString();
-    await db.put(doc);
+    const resp = await db.put(doc);
+    doc._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'insurance_policy',
+      resourceId: doc._id,
+      operation: 'update',
+      resourceVersion: doc._rev,
+      orgId: doc.orgId,
+      hospitalId: doc.facilityId,
+    });
     return true;
   } catch { return false; }
 }
@@ -295,19 +501,33 @@ export async function checkEligibility(input: CheckEligibilityInput): Promise<El
   // Get the policy to pull payer details
   const policy = await getPrimaryPolicy(input.patientId);
 
+  // This is NOT an external payer verification — we have no EDI 270/271 or
+  // payer-API integration here. We're producing a LOCAL ESTIMATE off the
+  // stored policy terms. Be honest about that: report `unverified` (the doc's
+  // status union has no `estimated` value) and record the basis in
+  // `rawResponse` so downstream consumers/auditors don't mistake this for a
+  // confirmed payer response. Only when a real external source is explicitly
+  // passed in (api/edi271/donor_list) do we treat it as verified.
+  const isExternal = input.source === 'api' || input.source === 'edi271' || input.source === 'donor_list';
+  const status: EligibilityStatus = isExternal ? 'verified' : 'unverified';
+  const source: EligibilitySource = input.source || 'manual';
+
   const doc: EligibilityCheckDoc = {
     _id: `elig-${uuidv4().slice(0, 10)}`,
     type: 'eligibility_check',
     policyId: input.policyId,
     patientId: input.patientId,
     checkDate: now,
-    status: 'verified' as EligibilityStatus,
+    status,
     deductibleRemaining: policy?.deductibleRemaining,
     copayAmount: policy?.copayAmount,
     coinsurancePct: policy?.coinsurancePct,
     oopUsed: policy?.oopUsed,
     oopMax: policy?.oopMax,
-    source: input.source || 'manual',
+    source,
+    rawResponse: isExternal
+      ? undefined
+      : JSON.stringify({ method: 'local_policy_estimate', note: 'Local estimate from stored policy terms; not confirmed with the payer.' }),
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     checkedBy: input.checkedBy,
     facilityId: input.facilityId,
@@ -318,15 +538,20 @@ export async function checkEligibility(input: CheckEligibilityInput): Promise<El
 
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'eligibility_check',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
 export async function getLatestEligibility(patientId: string): Promise<EligibilityCheckDoc | null> {
   const db = eligibilityChecksDB();
-  const result = await db.allDocs({ include_docs: true });
-  const checks = result.rows
-    .map(r => r.doc as EligibilityCheckDoc)
-    .filter(d => d && d.type === 'eligibility_check' && d.patientId === patientId)
+  const checks = (await findByType<EligibilityCheckDoc>(db, 'eligibility_check', { patientId }, { indexFields: ['type', 'patientId'] }))
     .sort((a, b) => (b.checkDate || '').localeCompare(a.checkDate || ''));
   return checks[0] || null;
 }
@@ -369,6 +594,8 @@ export interface CreateChargeInput {
 export async function createCharge(input: CreateChargeInput): Promise<ChargeDoc> {
   const db = chargesDB();
   const now = new Date().toISOString();
+  // Don't create a charge linked to a non-existent encounter.
+  await assertRefExists('tamamhealth_encounters', input.encounterId, 'Encounter');
 
   const doc: ChargeDoc = {
     _id: `chg-${uuidv4().slice(0, 10)}`,
@@ -398,23 +625,26 @@ export async function createCharge(input: CreateChargeInput): Promise<ChargeDoc>
     createdBy: input.createdBy,
   });
 
+  emitSyncEvent({
+    resourceType: 'charge',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
 export async function getChargesByEncounter(encounterId: string): Promise<ChargeDoc[]> {
   const db = chargesDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as ChargeDoc)
-    .filter(d => d && d.type === 'charge' && d.encounterId === encounterId);
+  return findByType<ChargeDoc>(db, 'charge', { encounterId }, { indexFields: ['type', 'encounterId'] });
 }
 
 export async function getChargesByPatient(patientId: string): Promise<ChargeDoc[]> {
-  const db = chargesDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as ChargeDoc)
-    .filter(d => d && d.type === 'charge' && d.patientId === patientId)
+  const rows = await findByType<ChargeDoc>(chargesDB(), 'charge', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
     .sort((a, b) => (b.serviceDate || '').localeCompare(a.serviceDate || ''));
 }
 
@@ -459,6 +689,15 @@ export async function submitClaim(input: SubmitClaimInput): Promise<ClaimDoc> {
   await logAuditSafe('CLAIM_SUBMITTED', input.submittedBy, input.submittedBy,
     `Claim ${doc.claimNumber}: ${input.totalBilled} to ${input.payerName}`);
 
+  emitSyncEvent({
+    resourceType: 'claim',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
@@ -486,6 +725,15 @@ export async function adjudicateClaim(
 
     const resp = await db.put(claim);
     claim._rev = resp.rev;
+
+    emitSyncEvent({
+      resourceType: 'claim',
+      resourceId: claim._id,
+      operation: 'update',
+      resourceVersion: claim._rev,
+      orgId: claim.orgId,
+      hospitalId: claim.facilityId,
+    });
 
     // Create ledger entries for insurance payment and write-off
     if (approved > 0) {
@@ -520,20 +768,14 @@ export async function adjudicateClaim(
 }
 
 export async function getClaimsByPatient(patientId: string): Promise<ClaimDoc[]> {
-  const db = claimsDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as ClaimDoc)
-    .filter(d => d && d.type === 'claim' && d.patientId === patientId)
+  const rows = await findByType<ClaimDoc>(claimsDB(), 'claim', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
     .sort((a, b) => (b.submittedDate || '').localeCompare(a.submittedDate || ''));
 }
 
 export async function getAllClaims(scope?: DataScope): Promise<ClaimDoc[]> {
   const db = claimsDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as ClaimDoc)
-    .filter(d => d && d.type === 'claim');
+  const all = await findByType<ClaimDoc>(db, 'claim');
   all.sort((a, b) => (b.submittedDate || '').localeCompare(a.submittedDate || ''));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -588,6 +830,15 @@ export async function createAdjustment(input: {
 
   await logAuditSafe('ADJUSTMENT_CREATED', input.approvedBy, input.approvedByName,
     `${input.adjustmentType} of ${input.amount}: ${input.reason}`);
+
+  emitSyncEvent({
+    resourceType: 'adjustment',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
 
   return doc;
 }
@@ -646,15 +897,21 @@ export async function issueRefund(input: {
   await logAuditSafe('REFUND_ISSUED', input.processedBy, input.processedByName,
     `Refund ${input.amount} ${doc.currency} to ${input.patientName}: ${input.reason}`);
 
+  emitSyncEvent({
+    resourceType: 'refund',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
 export async function getRefundsByPatient(patientId: string): Promise<RefundDoc[]> {
-  const db = refundsDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as RefundDoc)
-    .filter(d => d && d.type === 'refund' && d.patientId === patientId);
+  const rows = await findByType<RefundDoc>(refundsDB(), 'refund', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -736,24 +993,27 @@ export async function createPaymentPlan(input: {
   await logAuditSafe('PAYMENT_PLAN_CREATED', input.createdByStaff, input.createdByStaffName,
     `Plan for ${input.patientName}: ${input.totalBalance} over ${input.termMonths} months`);
 
+  emitSyncEvent({
+    resourceType: 'payment_plan',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
+
   return doc;
 }
 
 export async function getPaymentPlansByPatient(patientId: string): Promise<PaymentPlanDoc[]> {
-  const db = paymentPlansDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as PaymentPlanDoc)
-    .filter(d => d && d.type === 'payment_plan' && d.patientId === patientId)
+  const rows = await findByType<PaymentPlanDoc>(paymentPlansDB(), 'payment_plan', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 }
 
 export async function getAllPaymentPlans(scope?: DataScope): Promise<PaymentPlanDoc[]> {
   const db = paymentPlansDB();
-  const result = await db.allDocs({ include_docs: true });
-  const all = result.rows
-    .map(r => r.doc as PaymentPlanDoc)
-    .filter(d => d && d.type === 'payment_plan');
+  const all = await findByType<PaymentPlanDoc>(db, 'payment_plan');
   all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   return scope ? filterByScope(all, scope) : all;
 }
@@ -786,6 +1046,14 @@ export async function recordPlanPayment(planId: string, installmentNumber: numbe
     plan.updatedAt = new Date().toISOString();
     const resp = await db.put(plan);
     plan._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'payment_plan',
+      resourceId: plan._id,
+      operation: 'update',
+      resourceVersion: plan._rev,
+      orgId: plan.orgId,
+      hospitalId: plan.facilityId,
+    });
     return plan;
   } catch { return null; }
 }
@@ -852,15 +1120,20 @@ export async function generateInvoice(input: {
 
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  emitSyncEvent({
+    resourceType: 'invoice',
+    resourceId: doc._id,
+    operation: 'create',
+    resourceVersion: doc._rev,
+    orgId: doc.orgId,
+    hospitalId: doc.facilityId,
+  });
   return doc;
 }
 
 export async function getInvoicesByPatient(patientId: string): Promise<InvoiceDoc[]> {
-  const db = invoicesDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as InvoiceDoc)
-    .filter(d => d && d.type === 'invoice' && d.patientId === patientId)
+  const rows = await findByType<InvoiceDoc>(invoicesDB(), 'invoice', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows
     .sort((a, b) => (b.issuedDate || '').localeCompare(a.issuedDate || ''));
 }
 
@@ -875,6 +1148,14 @@ export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Pr
     doc.updatedAt = new Date().toISOString();
     const resp = await db.put(doc);
     doc._rev = resp.rev;
+    emitSyncEvent({
+      resourceType: 'invoice',
+      resourceId: doc._id,
+      operation: 'update',
+      resourceVersion: doc._rev,
+      orgId: doc.orgId,
+      hospitalId: doc.facilityId,
+    });
     return doc;
   } catch { return null; }
 }
@@ -926,11 +1207,21 @@ export async function savePaymentMethod(input: {
 }
 
 export async function getPatientPaymentMethods(patientId: string): Promise<SavedPaymentMethodDoc[]> {
+  const rows = await findByType<SavedPaymentMethodDoc>(savedPaymentMethodsDB(), 'saved_payment_method', { patientId }, { indexFields: ['type', 'patientId'] });
+  return rows;
+}
+
+/** Remove a saved payment method (patient-managed convenience record). */
+export async function deletePaymentMethod(id: string): Promise<boolean> {
   const db = savedPaymentMethodsDB();
-  const result = await db.allDocs({ include_docs: true });
-  return result.rows
-    .map(r => r.doc as SavedPaymentMethodDoc)
-    .filter(d => d && d.type === 'saved_payment_method' && d.patientId === patientId);
+  try {
+    const doc = await db.get(id);
+    await db.remove(doc);
+    await logAuditSafe('DELETE_PAYMENT_METHOD', undefined, undefined, `Saved payment method ${id} removed`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -958,11 +1249,12 @@ export async function getPatientFinancialSummary(patientId: string): Promise<Pat
   if (overdueBalance > 0) {
     const oldestOverdue = overdueInvoices.sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
     if (oldestOverdue) {
+      const stageDays = getSettings().collectionStageDays || COLLECTION_STAGE_DAYS;
       const daysPastDue = Math.floor((Date.now() - new Date(oldestOverdue.dueDate).getTime()) / (1000 * 60 * 60 * 24));
       if (daysPastDue > 120) collectionStage = '120_plus';
-      else if (daysPastDue > COLLECTION_STAGE_DAYS.preWriteOff) collectionStage = '90_day';
-      else if (daysPastDue > COLLECTION_STAGE_DAYS.warning) collectionStage = '60_day';
-      else if (daysPastDue > COLLECTION_STAGE_DAYS.followUp) collectionStage = '30_day';
+      else if (daysPastDue > stageDays.preWriteOff) collectionStage = '90_day';
+      else if (daysPastDue > stageDays.warning) collectionStage = '60_day';
+      else if (daysPastDue > stageDays.followUp) collectionStage = '30_day';
     }
   }
 

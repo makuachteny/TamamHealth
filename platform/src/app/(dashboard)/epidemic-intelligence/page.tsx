@@ -3,14 +3,23 @@
 import { useState } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useEpidemicIntelligence } from '@/lib/hooks/useEpidemicIntelligence';
 import {
-  Activity, AlertTriangle, TrendingUp, TrendingDown, Minus,
+  Activity, AlertTriangle, TrendingUp,
   Shield, Zap, MapPin, FileText, Radio, BarChart3,
   ChevronDown, ChevronRight, Thermometer, Bug, Eye,
 } from '@/components/icons/lucide';
 import { SOUTH_SUDAN_STATES } from '@/lib/geographic-data';
+import Badge, { type BadgeTone } from '@/components/Badge';
+import { FilterBar, FilterTabs } from '@/components/filters';
+
+// EWARS / IDSR severity → semantic Badge tone.
+const SEVERITY_TONE: Record<string, BadgeTone> = {
+  critical: 'danger',
+  high: 'warning',
+  medium: 'warning',
+  low: 'success',
+};
 
 type TabView = 'overview' | 'curves' | 'syndromic' | 'geographic' | 'idsr' | 'alerts';
 
@@ -44,7 +53,7 @@ export default function EpidemicIntelligencePage() {
         <TopBar title={t('epidemic.pageTitle')} />
         <main className="page-container flex items-center justify-center">
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.1)' }}>
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'transparent' }}>
               <Activity className="w-8 h-8" style={{ color: 'var(--color-danger)' }} />
             </div>
             <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{t('epidemic.loading')}</p>
@@ -98,31 +107,24 @@ export default function EpidemicIntelligencePage() {
 
   return (
     <>
-      <TopBar title={t('epidemic.pageTitle')} />
+      <TopBar title={t('epidemic.pageTitle')} actions={
+        <>
+          <div className="px-4 py-2 rounded-xl flex items-center gap-2" style={{
+            background: risk.bg,
+            border: `1px solid ${risk.border}`,
+          }}>
+            <Shield className="w-4 h-4" style={{ color: risk.text }} />
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: risk.text }}>
+              {t('epidemic.riskSuffix', { level: summary.overallRiskLevel })}
+            </span>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>{t('epidemic.idsrWeek')}</p>
+            <p className="text-sm font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{idsrReport.reportingWeek}</p>
+          </div>
+        </>
+      } />
       <main className="page-container page-enter">
-
-        <PageHeader
-          icon={Bug}
-          title={t('epidemic.headerTitle')}
-          subtitle={t('epidemic.headerSubtitle')}
-          actions={
-            <>
-              <div className="px-4 py-2 rounded-xl flex items-center gap-2" style={{
-                background: risk.bg,
-                border: `1px solid ${risk.border}`,
-              }}>
-                <Shield className="w-4 h-4" style={{ color: risk.text }} />
-                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: risk.text }}>
-                  {t('epidemic.riskSuffix', { level: summary.overallRiskLevel })}
-                </span>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>{t('epidemic.idsrWeek')}</p>
-                <p className="text-sm font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{idsrReport.reportingWeek}</p>
-              </div>
-            </>
-          }
-        />
 
         {/* ═══ KPI STRIP ═══ */}
         <div className="kpi-grid mb-4">
@@ -201,13 +203,6 @@ export default function EpidemicIntelligencePage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1">
-                            {rt.trend === 'growing' ? (
-                              <TrendingUp className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
-                            ) : rt.trend === 'declining' ? (
-                              <TrendingDown className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
-                            ) : (
-                              <Minus className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />
-                            )}
                             <span className="text-xs font-medium" style={{
                               color: rt.trend === 'growing' ? 'var(--color-danger)' : rt.trend === 'declining' ? 'var(--color-success)' : 'var(--color-warning)',
                             }}>
@@ -265,9 +260,9 @@ export default function EpidemicIntelligencePage() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: `${sev.text}20`, color: sev.text }}>
+                            <Badge tone={SEVERITY_TONE[alert.severity] ?? 'neutral'} uppercase>
                               {alert.severity.toUpperCase()}
-                            </span>
+                            </Badge>
                             <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{alert.alertType.replace(/_/g, ' ')}</span>
                           </div>
                           <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{alert.disease}</p>
@@ -369,29 +364,17 @@ export default function EpidemicIntelligencePage() {
         {activeTab === 'curves' && (
           <div className="space-y-4">
             {/* Disease filter */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSelectedDisease(null)}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                style={{
-                  background: !selectedDisease ? 'var(--nav-active-bg)' : 'var(--overlay-subtle)',
-                  color: !selectedDisease ? 'var(--nav-active-text)' : 'var(--text-muted)',
-                  border: !selectedDisease ? '1px solid var(--border-accent)' : '1px solid var(--border-light)',
-                }}
-              >{t('epidemic.allDiseases')}</button>
-              {diseases.map(d => (
-                <button
-                  key={d}
-                  onClick={() => setSelectedDisease(d)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                  style={{
-                    background: selectedDisease === d ? 'var(--nav-active-bg)' : 'var(--overlay-subtle)',
-                    color: selectedDisease === d ? 'var(--nav-active-text)' : 'var(--text-muted)',
-                    border: selectedDisease === d ? '1px solid var(--border-accent)' : '1px solid var(--border-light)',
-                  }}
-                >{d}</button>
-              ))}
-            </div>
+            <FilterBar>
+              <FilterTabs
+                ariaLabel={t('epidemic.allDiseases')}
+                active={selectedDisease ?? 'all'}
+                onChange={key => setSelectedDisease(key === 'all' ? null : key)}
+                tabs={[
+                  { key: 'all', label: t('epidemic.allDiseases') },
+                  ...diseases.map(d => ({ key: d, label: d })),
+                ]}
+              />
+            </FilterBar>
 
             {/* Epidemic Curve Chart (CSS bar chart) */}
             <div className="card-elevated">
@@ -442,7 +425,8 @@ export default function EpidemicIntelligencePage() {
               <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                 <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{t('epidemic.diseaseLevelBreakdown')}</h3>
               </div>
-              <table className="data-table">
+              <div className="overflow-x-auto">
+              <table className="data-table" style={{ minWidth: 840 }}>
                 <thead>
                   <tr>
                     <th>{t('epidemic.colDisease')}</th>
@@ -467,9 +451,6 @@ export default function EpidemicIntelligencePage() {
                         <td><span className="font-bold font-mono" style={{ color: rtColor }}>{rt.rt.toFixed(2)}</span></td>
                         <td>
                           <div className="flex items-center gap-1">
-                            {rt.trend === 'growing' ? <TrendingUp className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} /> :
-                             rt.trend === 'declining' ? <TrendingDown className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} /> :
-                             <Minus className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />}
                             <span className="text-xs capitalize" style={{
                               color: rt.trend === 'growing' ? 'var(--color-danger)' : rt.trend === 'declining' ? 'var(--color-success)' : 'var(--color-warning)',
                             }}>{rt.trend}</span>
@@ -479,16 +460,16 @@ export default function EpidemicIntelligencePage() {
                         <td style={{ color: '#F87171' }}>{totalDeaths}</td>
                         <td><span className="font-mono" style={{ color: parseFloat(cfr) > 5 ? '#F87171' : 'var(--text-secondary)' }}>{cfr}%</span></td>
                         <td>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{
-                            background: rt.confidence === 'high' ? 'rgba(74,222,128,0.12)' : rt.confidence === 'medium' ? 'rgba(251,191,36,0.12)' : 'rgba(248,113,113,0.12)',
-                            color: rt.confidence === 'high' ? 'var(--color-success)' : rt.confidence === 'medium' ? 'var(--color-warning)' : '#F87171',
-                          }}>{rt.confidence}</span>
+                          <Badge tone={rt.confidence === 'high' ? 'success' : rt.confidence === 'medium' ? 'warning' : 'danger'}>
+                            {rt.confidence}
+                          </Badge>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}
@@ -565,7 +546,8 @@ export default function EpidemicIntelligencePage() {
               <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                 <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{t('epidemic.fullSyndromicMatrix')}</h3>
               </div>
-              <table className="data-table">
+              <div className="overflow-x-auto">
+              <table className="data-table" style={{ minWidth: 840 }}>
                 <thead>
                   <tr>
                     <th>{t('epidemic.colSyndrome')}</th>
@@ -594,15 +576,16 @@ export default function EpidemicIntelligencePage() {
                       <td className="text-xs font-mono">{alert.threshold}</td>
                       <td>
                         {alert.exceeded ? (
-                          <span className="badge badge-emergency text-[10px]">{t('epidemic.statusExceeded')}</span>
+                          <Badge tone="danger">{t('epidemic.statusExceeded')}</Badge>
                         ) : (
-                          <span className="badge badge-normal text-[10px]">{t('epidemic.statusNormal')}</span>
+                          <Badge tone="success">{t('epidemic.statusNormal')}</Badge>
                         )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}
@@ -651,13 +634,6 @@ export default function EpidemicIntelligencePage() {
                           <div className="flex items-center gap-3">
                             <span className="font-semibold">{t('epidemic.casesCount', { count: d.cases })}</span>
                             <span style={{ color: '#F87171' }}>{t('epidemic.deathsCount', { count: d.deaths })}</span>
-                            {d.trend === 'increasing' ? (
-                              <TrendingUp className="w-3 h-3" style={{ color: 'var(--color-danger)' }} />
-                            ) : d.trend === 'decreasing' ? (
-                              <TrendingDown className="w-3 h-3" style={{ color: 'var(--color-success)' }} />
-                            ) : (
-                              <Minus className="w-3 h-3" style={{ color: 'var(--color-warning)' }} />
-                            )}
                           </div>
                         </div>
                       ))}
@@ -700,7 +676,8 @@ export default function EpidemicIntelligencePage() {
                   {t('epidemic.idsrWeeklyReport')}
                 </h3>
               </div>
-              <table className="data-table">
+              <div className="overflow-x-auto">
+              <table className="data-table" style={{ minWidth: 720 }}>
                 <thead>
                   <tr>
                     <th>{t('epidemic.colPriorityDisease')}</th>
@@ -734,19 +711,20 @@ export default function EpidemicIntelligencePage() {
                       </td>
                       <td>
                         {d.cfr > 10 ? (
-                          <span className="badge badge-emergency text-[10px]">{t('epidemic.severityCritical')}</span>
+                          <Badge tone="danger">{t('epidemic.severityCritical')}</Badge>
                         ) : d.cfr > 5 ? (
-                          <span className="badge badge-warning text-[10px]">{t('epidemic.severityHigh')}</span>
+                          <Badge tone="warning">{t('epidemic.severityHigh')}</Badge>
                         ) : d.cases > 50 ? (
-                          <span className="badge badge-watch text-[10px]">{t('epidemic.severityWatch')}</span>
+                          <Badge tone="info">{t('epidemic.severityWatch')}</Badge>
                         ) : (
-                          <span className="badge badge-normal text-[10px]">{t('epidemic.severityLow')}</span>
+                          <Badge tone="success">{t('epidemic.severityLow')}</Badge>
                         )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}
@@ -783,20 +761,19 @@ export default function EpidemicIntelligencePage() {
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{
-                          background: sev.bg,
-                          border: `1px solid ${sev.text}20`,
+                          background: 'transparent',
                         }}>
                           <AlertTriangle className="w-4 h-4" style={{ color: sev.text }} />
                         </div>
                         <div>
                           <div className="flex items-center gap-2 mb-0.5">
                             <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{alert.disease}</span>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: sev.bg, color: sev.text }}>
+                            <Badge tone={SEVERITY_TONE[alert.severity] ?? 'neutral'} uppercase>
                               {alert.severity.toUpperCase()}
-                            </span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'var(--overlay-medium)', color: 'var(--text-secondary)' }}>
+                            </Badge>
+                            <Badge tone="neutral">
                               {alert.alertType.replace(/_/g, ' ')}
-                            </span>
+                            </Badge>
                           </div>
                           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{alert.state}</p>
                         </div>

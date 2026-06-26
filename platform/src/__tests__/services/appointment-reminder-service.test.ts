@@ -10,6 +10,7 @@ jest.mock('uuid', () => ({ v4: () => `${String(++uuidCounter).padStart(8, '0')}-
 jest.mock('@/lib/db', () => require('../helpers/test-db').createDBMock());
 
 import { teardownTestDBs } from '../helpers/test-db';
+import { jubaDate } from '@/lib/time-juba';
 import { appointmentsDB } from '@/lib/db';
 import type { AppointmentDoc } from '@/lib/db-types';
 import {
@@ -22,10 +23,10 @@ import {
 
 afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 
-const today = new Date().toISOString().slice(0, 10);
-const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-const lastWeek = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+const today = jubaDate();
+const tomorrow = jubaDate(Date.now() + 86400000);
+const yesterday = jubaDate(Date.now() - 86400000);
+const lastWeek = jubaDate(Date.now() - 7 * 86400000);
 
 function validAppointment(overrides: Partial<AppointmentDoc> = {}): AppointmentDoc {
   return {
@@ -70,7 +71,7 @@ describe('Appointment Reminder Service', () => {
     await seedAppointment({ appointmentDate: tomorrow, reminderSent: false });
     await seedAppointment({ appointmentDate: today, reminderSent: false });
     // Too far in the future (default daysAhead = 1)
-    const nextWeek = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+    const nextWeek = jubaDate(Date.now() + 5 * 86400000);
     await seedAppointment({ appointmentDate: nextWeek, reminderSent: false });
 
     const reminders = await getUpcomingReminders(1);
@@ -233,7 +234,7 @@ describe('Appointment Reminder Service', () => {
   });
 
   test('getUpcomingReminders includes appointments from today through daysAhead', async () => {
-    const twoDaysAhead = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+    const twoDaysAhead = jubaDate(Date.now() + 2 * 86400000);
     await seedAppointment({ appointmentDate: today, reminderSent: false });
     await seedAppointment({ appointmentDate: tomorrow, reminderSent: false });
     await seedAppointment({ appointmentDate: twoDaysAhead, reminderSent: false });

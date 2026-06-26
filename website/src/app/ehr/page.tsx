@@ -187,9 +187,6 @@ export default function EHRPage() {
                   <CheckItem>Voice-to-text documentation</CheckItem>
                   <CheckItem>Smart autofill and shortcuts</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -225,9 +222,6 @@ export default function EHRPage() {
                   <CheckItem>Historical result tracking</CheckItem>
                   <CheckItem>Integrated lab partners</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -262,9 +256,6 @@ export default function EHRPage() {
                   <CheckItem>Allergy and contraindication alerts</CheckItem>
                   <CheckItem>Refill management and renewals</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -299,9 +290,6 @@ export default function EHRPage() {
                   <CheckItem>Offline access and sync capabilities</CheckItem>
                   <CheckItem>Secure data encryption in transit</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -336,9 +324,6 @@ export default function EHRPage() {
                   <CheckItem>Screen sharing and digital forms</CheckItem>
                   <CheckItem>Visit recordings and transcripts</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -373,9 +358,6 @@ export default function EHRPage() {
                   <CheckItem>Denial management and appeals</CheckItem>
                   <CheckItem>Patient payment portal</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -526,30 +508,6 @@ export default function EHRPage() {
                   Coming soon — contact us to learn more
                 </Link>
               </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── PRICING CTA BANNER ──────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-pricing-banner">
-              <div style={{ width: 56, height: 56, borderRadius: 14, background: "var(--tb-tint-gold)", color: "var(--tb-gold-dark)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <DuoIcon name="billing" size={56} />
-              </div>
-              <div>
-                <h3 className="mk-h3" style={{ margin: "0 0 4px" }}>
-                  Tailored pricing for practices of any size
-                </h3>
-                <p style={{ margin: 0, color: "var(--tb-text-sec)" }}>
-                  From solo practitioners to health systems, we scale with your needs.
-                </p>
-              </div>
-              <Link href="/pricing" className="mk-btn mk-btn-outline-green mk-btn-lg">
-                View pricing
-              </Link>
             </div>
           </Reveal>
         </div>

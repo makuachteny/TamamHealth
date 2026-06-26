@@ -5,10 +5,8 @@ import Image from "next/image";
 import {
   Reveal,
   FAQItem,
-  DemoForm,
   CheckItem,
   TestimonialSwoosh,
-  PricingBannerIcon,
 } from "@/components/marketing/MarketingShared";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -41,7 +39,7 @@ export default function AnalyticsPage() {
                 </div>
               </div>
               <div style={{ marginTop: 32 }}>
-                <Link href="#demo" className="mk-btn mk-btn-green mk-btn-lg">
+                <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
                   See DHIS2 dashboard demo
                 </Link>
               </div>
@@ -58,13 +56,6 @@ export default function AnalyticsPage() {
                   style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
                   priority
                 />
-              </Reveal>
-            </div>
-
-            {/* Right: Demo Form */}
-            <div className="mk-hero-form">
-              <Reveal delay={0.2}>
-                <DemoForm />
               </Reveal>
             </div>
           </div>
@@ -190,9 +181,6 @@ export default function AnalyticsPage() {
                   <CheckItem>90% reduction in manual reporting time</CheckItem>
                   <CheckItem>Comprehensive audit trail for regulatory requirements</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -225,9 +213,6 @@ export default function AnalyticsPage() {
                   <CheckItem>Healthcare-associated infection rate dashboards</CheckItem>
                   <CheckItem>Patient satisfaction metrics with actionable insights</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -259,9 +244,6 @@ export default function AnalyticsPage() {
                   <CheckItem>Predictive risk scores for early intervention</CheckItem>
                   <CheckItem>Geographic and demographic analysis capabilities</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -293,9 +275,6 @@ export default function AnalyticsPage() {
                   <CheckItem>Collection rate optimization by payor and provider</CheckItem>
                   <CheckItem>Budget vs actuals comparison and cash flow forecasting</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -327,9 +306,6 @@ export default function AnalyticsPage() {
                   <CheckItem>Scheduled automated delivery via email and SMS</CheckItem>
                   <CheckItem>Export to Excel, PDF, PowerPoint, and other formats</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -361,9 +337,6 @@ export default function AnalyticsPage() {
                   <CheckItem>Automated training need identification</CheckItem>
                   <CheckItem>Data quality trend analysis and improvement tracking</CheckItem>
                 </ul>
-                <Link href="#demo" className="mk-btn mk-btn-outline-green">
-                  Learn more
-                </Link>
               </div>
               <div className="mk-split-image">
                 <Image
@@ -502,30 +475,6 @@ export default function AnalyticsPage() {
                   View all modules
                 </Link>
               </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── PRICING CTA BANNER ──────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-pricing-banner">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 48, height: 48 }}>
-                <PricingBannerIcon />
-              </div>
-              <div>
-                <h3 className="mk-h3" style={{ margin: "0 0 4px" }}>
-                  Flexible pricing for any health system size
-                </h3>
-                <p style={{ margin: 0, color: "var(--tb-text-sec)" }}>
-                  From district hospitals to national health systems, we scale with your needs.
-                </p>
-              </div>
-              <Link href="/pricing" className="mk-btn mk-btn-outline-green mk-btn-lg">
-                View pricing
-              </Link>
             </div>
           </Reveal>
         </div>
