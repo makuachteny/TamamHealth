@@ -57,6 +57,21 @@
  *   - tamamhealth_assessments         Scored intake / outcome-measure forms.
  *                                     Facility-operational PHI, not a national
  *                                     analytics target.
+ *   - tamamhealth_clinical_favorites  Per-clinician picker shortcuts. Personal
+ *                                     preference data, not a national analytics
+ *                                     target.
+ *   - tamamhealth_consultation_templates  Clinician-saved consultation bundles.
+ *                                     Personal templates, not a national
+ *                                     analytics target.
+ *   - tamamhealth_clinician_tasks     Per-clinician personal to-dos. Personal
+ *                                     operational data, not a national analytics
+ *                                     target.
+ *   - tamamhealth_patient_documents   Scanned chart documents (films, letters,
+ *                                     IDs). Facility-operational PHI blobs, not
+ *                                     a national analytics target.
+ *   - tamamhealth_patient_reminders   Queued patient reminders. Facility-
+ *                                     operational, not a national analytics
+ *                                     target.
  *
  * All remaining databases land in DB_TABLE_MAP below; a missing entry causes a
  * 400 from this route, so the sync-worker surfaces a hard failure rather than

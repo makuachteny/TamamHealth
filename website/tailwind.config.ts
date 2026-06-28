@@ -9,15 +9,24 @@ const config: Config = {
     extend: {
       colors: {
         tamamhealth: {
-          navy: '#1E3A8A',
-          teal: '#2563EB',
-          sage: '#1B9E77',
-          earth: '#D4A843',
-          gold: '#E4A84B',
-          green: '#1B9E77',
-          red: '#C44536',
-          cream: '#F8FAFC',
+          navy: 'var(--tb-blue-900)',
+          teal: 'var(--tb-blue-700)',
+          sage: 'var(--tb-text-sec)',
+          earth: 'var(--tb-gold-dark)',
+          gold: 'var(--tb-gold)',
+          green: 'var(--tb-green)',
+          red: 'var(--tb-red)',
+          cream: 'var(--tb-cream-50)',
         },
+      },
+      boxShadow: {
+        sm: 'none',
+        md: 'none',
+        lg: 'none',
+        xl: 'none',
+        '2xl': 'none',
+        inner: 'none',
+        none: 'none',
       },
       fontFamily: {
         sans: ['DM Sans', 'system-ui', 'sans-serif'],

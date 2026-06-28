@@ -3,7 +3,7 @@ import { type IconName } from '@/components/icons';
 import {
   Heart, Activity, Thermometer, Droplet, Wind, Weight, Ruler, AlertTriangle,
   type LucideIcon,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import {
   getVitalStatus,
   getBloodPressureStatus,
@@ -78,18 +78,14 @@ export function VitalCard({
         display: 'flex',
         alignItems: 'center',
         gap: 14,
-        boxShadow: severity === 'danger'
-          ? `0 0 0 1px ${tokens.ring} inset, 0 4px 12px rgba(196, 69, 54, 0.10)`
-          : severity === 'warning'
-          ? `0 0 0 1px ${tokens.ring} inset`
-          : '0 1px 2px rgba(0,0,0,0.03)',
+        boxShadow: 'none',
       }}
     >
       {/* Enlarged icon, left-aligned */}
       <div
         style={{
           width: 52, height: 52, borderRadius: 12, flexShrink: 0,
-          background: severity === 'normal' ? 'rgba(59, 130, 246, 0.12)' : tokens.badge,
+          background: severity === 'normal' ? 'var(--accent-light)' : tokens.badge,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
@@ -143,13 +139,13 @@ export function VitalCard({
               {hint}
             </span>
           ) : vitalKey !== 'none' ? (
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#15795C' }}>Normal</span>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-success-text)' }}>Normal</span>
           ) : null}
           {trend && (
             <span
               style={{
                 fontSize: 11, fontWeight: 700,
-                color: trend.direction === 'up' ? '#15795C' : trend.direction === 'down' ? '#C44536' : 'var(--text-muted)',
+                color: trend.direction === 'up' ? 'var(--color-success-text)' : trend.direction === 'down' ? 'var(--color-danger)' : 'var(--text-muted)',
                 fontVariantNumeric: 'tabular-nums',
               }}
             >

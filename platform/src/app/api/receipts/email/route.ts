@@ -32,7 +32,7 @@ const RECEIPT_EMAIL_ROLES: UserRole[] = [
  * connectivity facility deployment. If the provider call fails the
  * receipt is logged so it can be retried out-of-band.
  *
- * `from` defaults to FROM_EMAIL or `receipts@tamamhealth.org`.
+ * `from` defaults to FROM_EMAIL or `support.tamam@gmail.com`.
  */
 async function postHandler(req: NextRequest) {
   const auth = await getAuthPayload(req);
@@ -85,7 +85,7 @@ async function postHandler(req: NextRequest) {
     return NextResponse.json({ error: 'to is not a valid email address' }, { status: 400 });
   }
 
-  const from = process.env.FROM_EMAIL || 'receipts@tamamhealth.org';
+  const from = process.env.FROM_EMAIL || 'support.tamam@gmail.com';
   const provider = (process.env.EMAIL_PROVIDER || 'log').toLowerCase();
 
   try {

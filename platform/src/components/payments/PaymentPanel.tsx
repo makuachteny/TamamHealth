@@ -255,7 +255,7 @@ export default function PaymentPanel({
           {/* Success header with green gradient */}
           <div style={{
             padding: '28px 20px', textAlign: 'center',
-            background: 'linear-gradient(135deg, rgba(59, 130, 246,0.12), rgba(59, 130, 246,0.04))',
+            background: 'linear-gradient(135deg, rgba(33, 145, 208, 0.12), rgba(59, 130, 246,0.04))',
             borderBottom: '1px solid var(--border-medium)',
           }}>
             <div style={{
@@ -310,7 +310,7 @@ export default function PaymentPanel({
           {showEmailInput && !emailSent && (
             <div style={{ padding: '0 20px 12px', display: 'flex', gap: 8 }}>
               <input type="email" value={emailAddress} onChange={e => setEmailAddress(e.target.value)}
-                placeholder="patient@email.com"
+                placeholder="support.tamam@gmail.com"
                 style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 13, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
               />
               <button onClick={handleEmailReceipt} disabled={emailSending || !emailAddress} style={{
@@ -325,7 +325,7 @@ export default function PaymentPanel({
 
           {emailSent && (
             <div style={{ padding: '0 20px 12px' }}>
-              <div style={{ fontSize: 12, color: '#3b82f6', padding: '6px 12px', background: 'rgba(59, 130, 246,0.08)', borderRadius: 8, textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: 'var(--accent-primary)', padding: '6px 12px', background: 'rgba(33, 145, 208, 0.08)', borderRadius: 8, textAlign: 'center' }}>
                 {t('payments.receiptSentTo', { email: emailAddress })}
               </div>
             </div>
@@ -627,7 +627,7 @@ export default function PaymentPanel({
             background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover, #1e3a8a))',
             color: '#fff', fontSize: 14, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer',
             opacity: processing ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-            boxShadow: '0 4px 14px var(--accent-glow, rgba(59,130,246,0.3))',
+            boxShadow: '0 4px 14px var(--accent-glow, rgba(33,145,208,0.3))',
           }}>
             {processing ? <><Loader2 size={14} className="animate-spin" /> {t('payments.processing')}</> : t('payments.recordAmount', { amount: parseFloat(amount).toLocaleString(), currency })}
           </button>

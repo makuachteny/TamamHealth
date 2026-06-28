@@ -1,60 +1,175 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { DuoIcon } from "./DuoIcon";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Marketing — Navbar (Simplified)
    Logo left, nav links center, CTA button right
    No dropdowns — flat structure
-   Smooth scroll, shadow on scroll
    ═══════════════════════════════════════════════════════════════════ */
 
 // Fundraising entry points are locked off for now. Flip to true to re-enable.
 const SHOW_FUNDRAISING = false;
 
+const PRODUCTS_LINKS = [
+  { label: "Hospital Management System", href: "/products/hospital" },
+  { label: "Clinic Management System", href: "/products/clinic" },
+  { label: "Laboratory Information System", href: "/products/lab" },
+  { label: "Radiology Information System", href: "/products/radiology" },
+  { label: "Pharmacy Management System", href: "/products/pharmacy" },
+  { label: "Patient Experience Platform", href: "/patient-experience" },
+];
+
+const COMPANY_LINKS = [
+  { label: "Our Story", href: "/about" },
+  { label: "Our Team", href: "/about/team" },
+  { label: "Careers", href: "/about/careers" },
+  { label: "Contact", href: "/about/contact" },
+];
+
+const DISPLAY_PHONE = "(973) 566-4336";
+const PHONE_TEL = "tel:+19735664336";
+const CONTACT_FORM_HREF = "/about/contact";
+const PRICING_HREF = "/pricing";
+type NavScrollState = "top" | "hero" | "past";
+type NavTone = "home" | "platform" | "company" | "commerce" | "resource" | "clinical";
+
+function getNavTone(pathname: string): NavTone {
+  if (pathname === "/") return "home";
+  if (pathname === "/billing" || pathname === "/pricing" || pathname === "/donate") return "commerce";
+  if (pathname.startsWith("/about")) return "company";
+  if (pathname === "/download" || pathname.startsWith("/resources") || pathname.startsWith("/case-studies")) return "resource";
+  if (pathname.startsWith("/products") || pathname === "/ehr" || pathname === "/pharmacy-lab") return "clinical";
+  return "platform";
+}
+
 export default function MarketingNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [scrollState, setScrollState] = useState<NavScrollState>("top");
+  const [lightHero, setLightHero] = useState(false);
+  const pathname = usePathname();
+  const tone = getNavTone(pathname);
+  const navClass = scrollState === "past"
+    ? "mk-navbar--scrolled"
+    : lightHero
+      ? "mk-navbar--light-hero"
+      : "mk-navbar--hero-solid";
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 10);
+      const scrollY = window.scrollY;
+
+      const hero = document.querySelector<HTMLElement>(
+        [
+          ".mk-home-hero",
+          ".mk-mod-hero",
+          ".mk-product-hero",
+          ".mk-subpage-hero",
+          ".mk-case-hero",
+          ".mk-hero-split",
+          ".mk-hero-donate",
+          ".mk-hero-team",
+          ".mk-hero-billing",
+          ".mk-hero-telehealth",
+          ".mk-hero-download",
+          ".mk-hero-careers",
+          ".mk-hero-pricing",
+          ".mk-hero-contact",
+          ".mk-hero-case-index",
+          ".mk-hero-patient-experience",
+          ".mk-hero-api-docs",
+        ].join(", ")
+      );
+      const nav = document.querySelector<HTMLElement>(".mk-navbar");
+      const navHeight = nav?.getBoundingClientRect().height ?? 80;
+      const heroBottom = hero ? hero.offsetTop + hero.offsetHeight - navHeight : 0;
+      const nextLightHero = Boolean(
+        hero?.matches([
+          ".mk-home-hero",
+          ".mk-mod-hero--showcase",
+          ".mk-mod-hero--data",
+          ".mk-mod-hero--legal",
+          ".mk-hero-contact",
+          ".mk-hero-pricing",
+          ".mk-hero-case-index",
+          ".mk-hero-patient-experience",
+        ].join(", "))
+      );
+
+      setLightHero((current) => current === nextLightHero ? current : nextLightHero);
+
+      if (scrollY <= 10) {
+        setScrollState("top");
+      } else if (hero && scrollY < heroBottom) {
+        setScrollState("hero");
+      } else {
+        setScrollState("past");
+      }
     };
+
+    handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    window.addEventListener("resize", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [pathname]);
 
   return (
     <>
       {/* Main navbar */}
-      <nav className="mk-navbar" style={{
-        boxShadow: scrolled ? "0 4px 12px rgba(26,58,58,0.06)" : "none",
-        transition: "box-shadow 0.3s ease",
-      }}>
+      <nav className={`mk-navbar ${navClass} mk-navbar--tone-${tone}`}>
         <div className="mk-container mk-navbar-inner">
           {/* Logo */}
-          <Link href="/" className="mk-nav-logo" aria-label="Tamam Healthcare System — home" style={{ display: "flex", alignItems: "center" }}>
+          <Link href="/" className="mk-nav-logo" aria-label="Tamam Healthcare System — home">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/assets/tamamhealth-logo-name.svg"
+              src="/assets/logos/SVG/Tamam_Style_Guide-33.svg"
+              alt=""
+              className="mk-nav-logo-mark"
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/logos/SVG/Tamam_Style_Guide-31.svg"
               alt="Tamam Healthcare System"
-              height={40}
-              style={{ height: 40, width: "auto", display: "block" }}
+              className="mk-nav-logo-type"
             />
           </Link>
 
           {/* Desktop center nav links */}
           <div className="mk-nav-center desktop-only">
-            <Link href="/products" className="mk-nav-item">Product</Link>
-            <Link href="/pricing" className="mk-nav-item">Pricing</Link>
-            <Link href="/about" className="mk-nav-item">About</Link>
-            <Link href="/about/contact" className="mk-nav-item">Contact</Link>
+            <div className="mk-nav-item">
+              <Link href="/products" className="mk-nav-item-link">Products</Link>
+              <DuoIcon name="chevron-down" size={14} />
+              <div className="mk-nav-dropdown">
+                {PRODUCTS_LINKS.map((item) => (
+                  <Link key={item.href} href={item.href}>{item.label}</Link>
+                ))}
+              </div>
+            </div>
+            <Link href="/case-studies" className="mk-nav-item">Testimonials</Link>
+            <div className="mk-nav-item">
+              <Link href="/about" className="mk-nav-item-link">Company</Link>
+              <DuoIcon name="chevron-down" size={14} />
+              <div className="mk-nav-dropdown">
+                {COMPANY_LINKS.map((item) => (
+                  <Link key={item.href} href={item.href}>{item.label}</Link>
+                ))}
+              </div>
+            </div>
+            <Link href="/about/careers" className="mk-nav-item">Careers</Link>
           </div>
 
           {/* Desktop right CTA actions */}
-          <div className="mk-nav-actions desktop-only" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="mk-nav-actions desktop-only">
+            <a href={PHONE_TEL} className="mk-nav-phone">
+              <DuoIcon name="phone" size={17} strokeWidth={1.8} aria-hidden="true" />
+              {DISPLAY_PHONE}
+            </a>
             {SHOW_FUNDRAISING && (
               <>
                 <div style={{ width: 1, height: 20, background: "var(--tb-cream-300)" }} />
@@ -73,7 +188,6 @@ export default function MarketingNav() {
                     borderRadius: 8,
                     background: "var(--tb-tint-gold)",
                     border: "1px solid var(--tb-gold)",
-                    transition: "all 0.2s ease",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -81,13 +195,25 @@ export default function MarketingNav() {
                 </Link>
               </>
             )}
-            <Link href="/download" className="mk-btn mk-btn-green mk-btn-sm">
-              Open app
+            <Link href={PRICING_HREF} className="mk-btn mk-btn-sm mk-nav-pricing">
+              Get pricing
+            </Link>
+            <Link href={CONTACT_FORM_HREF} className="mk-btn mk-btn-green mk-btn-sm mk-nav-demo">
+              Get in touch
             </Link>
           </div>
 
           {/* Mobile hamburger */}
+          <div className="mk-mobile-top-actions" aria-label="Mobile quick actions">
+            <Link href={PRICING_HREF} className="mk-mobile-top-pricing">
+              Get pricing
+            </Link>
+            <Link href={CONTACT_FORM_HREF} className="mk-mobile-top-demo">
+              Get in touch
+            </Link>
+          </div>
           <button
+            type="button"
             className="mk-mobile-toggle"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Toggle menu"
@@ -96,52 +222,69 @@ export default function MarketingNav() {
           </button>
         </div>
 
+        <a href={PHONE_TEL} className="mk-mobile-sales-row">
+          <span>Call sales</span>
+          <DuoIcon name="phone" size={18} strokeWidth={1.8} aria-hidden="true" />
+          <span>{DISPLAY_PHONE}</span>
+        </a>
+
         {/* Mobile dropdown */}
         {mobileOpen && (
-          <div style={{
-            background: "#fff",
-            borderTop: "1px solid var(--tb-cream-300)",
-            padding: "16px var(--tb-pad)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            maxHeight: "70vh",
-            overflowY: "auto",
-          }}>
-            <Link href="/products" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-              Product
-            </Link>
-            <Link href="/pricing" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-              Pricing
-            </Link>
-            <Link href="/about" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-              About
-            </Link>
-            <Link href="/about/contact" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-              Contact
-            </Link>
-
-            <div style={{ height: 1, background: "var(--tb-cream-300)", margin: "8px 0" }} />
-
-            {SHOW_FUNDRAISING && (
-              <Link
-                href="/donate"
-                onClick={() => setMobileOpen(false)}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  fontSize: 15, fontWeight: 700, color: "var(--tb-gold-dark)",
-                  textDecoration: "none", padding: "12px 0",
-                  background: "var(--tb-tint-gold)", borderRadius: 10,
-                  border: "1px solid var(--tb-gold)", textAlign: "center",
-                }}
-              >
-                <DuoIcon name="heart" size={16} /> Fund Our Pilot
+          <div className="mk-mobile-menu">
+            <div className="mk-mobile-menu-inner">
+              <Link href="/products" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                Products
               </Link>
-            )}
+              <Link href="/case-studies" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                Testimonials
+              </Link>
+              <Link href="/about/careers" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                Careers
+              </Link>
+              <Link href="/about" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                About
+              </Link>
+              <Link href="/about/contact" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                Contact
+              </Link>
 
-            <Link href="/download" className="mk-btn mk-btn-green" onClick={() => setMobileOpen(false)}>
-              Open app
-            </Link>
+              <div className="mk-mobile-menu-divider" />
+              <a href={PHONE_TEL} className="mk-mobile-phone" onClick={() => setMobileOpen(false)}>
+                <DuoIcon name="phone" size={17} strokeWidth={1.8} aria-hidden="true" />
+                {DISPLAY_PHONE}
+              </a>
+
+              {SHOW_FUNDRAISING && (
+                <Link
+                  href="/donate"
+                  onClick={() => setMobileOpen(false)}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    fontSize: 15, fontWeight: 700, color: "var(--tb-gold-dark)",
+                    textDecoration: "none", padding: "12px 0",
+                    background: "var(--tb-tint-gold)", borderRadius: 10,
+                    border: "1px solid var(--tb-gold)", textAlign: "center",
+                  }}
+                >
+                  <DuoIcon name="heart" size={16} /> Fund Our Pilot
+                </Link>
+              )}
+
+              <Link
+                href={PRICING_HREF}
+                className="mk-btn mk-mobile-cta mk-mobile-pricing"
+                onClick={() => setMobileOpen(false)}
+              >
+                Get pricing
+              </Link>
+              <Link
+                href={CONTACT_FORM_HREF}
+                className="mk-btn mk-btn-green mk-mobile-cta"
+                onClick={() => setMobileOpen(false)}
+              >
+                Get in touch
+              </Link>
+            </div>
           </div>
         )}
       </nav>
@@ -155,7 +298,6 @@ export default function MarketingNav() {
           position: relative;
           color: var(--tb-text);
           text-decoration: none;
-          transition: color 0.2s ease;
         }
 
         .mk-nav-item:hover {
@@ -167,18 +309,30 @@ export default function MarketingNav() {
           background: transparent;
           border: none;
           cursor: pointer;
+          margin-left: auto;
           padding: 8px;
           color: var(--tb-text);
+          line-height: 0;
+        }
+
+        .mk-mobile-toggle:focus:not(:focus-visible) {
+          outline: none;
+        }
+
+        .mk-mobile-toggle:focus-visible {
+          outline: 2px solid currentColor;
+          outline-offset: 5px;
+          border-radius: 8px;
         }
 
         .mk-mobile-link {
-          font-size: 15px;
+          font-size: 18px;
           font-weight: 500;
           color: var(--tb-text);
           text-decoration: none;
-          padding: 10px 0;
-          display: block;
-          transition: color 0.2s ease;
+          min-height: 48px;
+          display: flex;
+          align-items: center;
         }
 
         .mk-mobile-link:hover {
@@ -190,7 +344,7 @@ export default function MarketingNav() {
           color: #fff !important;
         }
 
-        @media (max-width: 959.98px) {
+        @media (max-width: 1120px) {
           .desktop-only { display: none !important; }
           .mk-mobile-toggle { display: block !important; }
         }

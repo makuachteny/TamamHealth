@@ -20,7 +20,7 @@ export default function OrgSettingsPage() {
   const [lockTimeout, setLockTimeout] = useState<number>(1);
   const [savingTimeout, setSavingTimeout] = useState(false);
 
-  const brandColor = currentUser?.branding?.primaryColor || '#7C3AED';
+  const brandColor = currentUser?.branding?.primaryColor || 'var(--accent-primary)';
 
   useEffect(() => {
     if (!currentUser?.orgId) return;

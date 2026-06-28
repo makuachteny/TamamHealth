@@ -90,7 +90,7 @@ export default function MCHAnalyticsPage() {
             { label: t('mch.kpiHighRisk'), value: summary.highRiskCount, icon: AlertTriangle, color: '#F87171', bg: 'rgba(248,113,113,0.12)' },
           ].map((kpi) => (
             <div key={kpi.label} className="kpi">
-              <div className="kpi__icon" style={{ background: kpi.bg }}>
+              <div className="kpi__icon">
                 <kpi.icon style={{ color: kpi.color }} />
               </div>
               <div className="kpi__body">

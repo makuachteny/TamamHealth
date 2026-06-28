@@ -495,10 +495,10 @@ function FacilityProfile({ hospital, onClose, canManage }: {
 
       {/* Quick stats row */}
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Users style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.patientCount.toLocaleString()}</div><div className="kpi__label">{t('hospitals.statPatients')}</div></div></div>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Activity style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.todayVisits}</div><div className="kpi__label">{t('hospitals.statToday')}</div></div></div>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'rgba(168,85,247,0.08)' }}><BedDouble style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.totalBeds}</div><div className="kpi__label">{t('hospitals.statBeds')}</div></div></div>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'rgba(168,85,247,0.08)' }}><Stethoscope style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{totalStaff}</div><div className="kpi__label">{t('hospitals.statStaff')}</div></div></div>
+        <div className="kpi"><div className="icon-box-sm"><Users style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.patientCount.toLocaleString()}</div><div className="kpi__label">{t('hospitals.statPatients')}</div></div></div>
+        <div className="kpi"><div className="icon-box-sm"><Activity style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.todayVisits}</div><div className="kpi__label">{t('hospitals.statToday')}</div></div></div>
+        <div className="kpi"><div className="icon-box-sm"><BedDouble style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.totalBeds}</div><div className="kpi__label">{t('hospitals.statBeds')}</div></div></div>
+        <div className="kpi"><div className="icon-box-sm"><Stethoscope style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{totalStaff}</div><div className="kpi__label">{t('hospitals.statStaff')}</div></div></div>
       </div>
 
       <hr className="section-divider" />
@@ -543,7 +543,7 @@ function FacilityProfile({ hospital, onClose, canManage }: {
             ) : (
             <ResponsiveContainer width="100%" height={50}>
               <LineChart data={hospital.monthlyTrends} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
-                <Line type="monotone" dataKey="opdVisits" stroke="#3b82f6" strokeWidth={1.5} dot={false} />
+                <Line type="monotone" dataKey="opdVisits" stroke="#2191D0" strokeWidth={1.5} dot={false} />
                 <Line type="monotone" dataKey="reportingTimeliness" stroke="#1F9D6F" strokeWidth={1.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>

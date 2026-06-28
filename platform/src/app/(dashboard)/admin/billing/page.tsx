@@ -80,8 +80,8 @@ export default function AdminBillingPage() {
 
   // Summary stats
   const planRevenue: Record<string, { count: number; color: string }> = {
-    enterprise: { count: organizations.filter(o => o.subscriptionPlan === 'enterprise' && o.subscriptionStatus === 'active').length, color: '#7C3AED' },
-    professional: { count: organizations.filter(o => o.subscriptionPlan === 'professional' && o.subscriptionStatus === 'active').length, color: '#3b82f6' },
+    enterprise: { count: organizations.filter(o => o.subscriptionPlan === 'enterprise' && o.subscriptionStatus === 'active').length, color: 'var(--accent-primary)' },
+    professional: { count: organizations.filter(o => o.subscriptionPlan === 'professional' && o.subscriptionStatus === 'active').length, color: '#2191D0' },
     basic: { count: organizations.filter(o => o.subscriptionPlan === 'basic' && o.subscriptionStatus === 'active').length, color: '#6B7280' },
   };
 
@@ -194,8 +194,8 @@ export default function AdminBillingPage() {
                           </select>
                         ) : (
                           <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
-                            background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(59, 130, 246,0.12)' : 'rgba(107,114,128,0.12)',
-                            color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#3b82f6' : '#6B7280',
+                            background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(33, 145, 208, 0.12)' : 'rgba(107,114,128,0.12)',
+                            color: org.subscriptionPlan === 'enterprise' ? 'var(--accent-primary)' : org.subscriptionPlan === 'professional' ? '#2191D0' : '#6B7280',
                           }}>{org.subscriptionPlan}</span>
                         )}
                       </td>

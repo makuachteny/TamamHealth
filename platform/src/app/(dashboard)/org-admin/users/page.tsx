@@ -63,7 +63,7 @@ export default function OrgUsersPage() {
   const [handoff, setHandoff] = useState<{ username: string; password: string; kind: 'created' | 'reset' } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const brandColor = currentUser?.branding?.primaryColor || '#3b82f6';
+  const brandColor = currentUser?.branding?.primaryColor || '#2191D0';
 
   const loadData = useCallback(async () => {
     if (!currentUser?.orgId) return;
@@ -217,7 +217,7 @@ export default function OrgUsersPage() {
   const roleColor = (role: string) => {
     const map: Record<string, string> = {
       super_admin: 'var(--color-danger)',
-      org_admin: '#7C3AED',
+      org_admin: 'var(--accent-primary)',
       doctor: 'var(--accent-primary)',
       clinical_officer: '#8B5CF6',
       nurse: '#EC4899',
@@ -229,9 +229,9 @@ export default function OrgUsersPage() {
       medical_superintendent: '#1E40AF',
       hrio: '#0F766E',
       nutritionist: '#EA580C',
-      radiologist: '#7C3AED',
+      radiologist: 'var(--accent-primary)',
       hospital_manager: '#1E3A8A',
-      medical_biller: '#3b82f6',
+      medical_biller: '#2191D0',
     };
     return map[role] || '#6B7280';
   };

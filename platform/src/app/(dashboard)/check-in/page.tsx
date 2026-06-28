@@ -7,6 +7,7 @@ import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useToast } from '@/components/Toast';
 import { patientFullName } from '@/lib/patient-utils';
+import PatientAvatar from '@/components/patients/PatientAvatar';
 import { ClipboardCheck, Search, X, UserPlus } from '@/components/icons/lucide';
 import type { CheckInAcuity } from '@/lib/services/check-in-service';
 import type { PatientDoc } from '@/lib/db-types';
@@ -115,9 +116,7 @@ export default function CheckInPage() {
             </h3>
             {selected ? (
               <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                <div className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold text-white flex-shrink-0" style={{ background: 'var(--accent-primary)' }}>
-                  {patientFullName(selected).split(' ').map(s => s[0]).slice(0, 2).join('')}
-                </div>
+                <PatientAvatar patient={selected} size={36} />
                 <div className="flex-1 min-w-0">
                   <p className="text-[14px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(selected)}</p>
                   <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
@@ -134,9 +133,10 @@ export default function CheckInPage() {
                 {matches.length > 0 && (
                   <div className="mt-1 rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card)' }}>
                     {matches.map(p => (
-                      <button key={p._id} onClick={() => { setSelected(p); }} className="w-full text-left px-3 py-2 flex items-center justify-between hover:bg-[var(--table-row-hover)]" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                        <span className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>
-                        <span className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber}</span>
+                      <button key={p._id} onClick={() => { setSelected(p); }} className="w-full text-left px-3 py-2 flex items-center gap-2.5 hover:bg-[var(--table-row-hover)]" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                        <PatientAvatar patient={p} size={26} />
+                        <span className="flex-1 text-[13px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>
+                        <span className="text-[11px] font-mono flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber}</span>
                       </button>
                     ))}
                   </div>

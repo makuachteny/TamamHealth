@@ -12,7 +12,7 @@
 
 import { useMemo, useState } from 'react';
 import {
-  Plus, X, CheckCircle2, Activity, Search, Edit3,
+  Plus, X, CheckCircle2, Activity, Search, Edit3, Trash2,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useProblems } from '@/lib/hooks/useProblems';
@@ -205,10 +205,10 @@ function ProblemRow({
           onClick={() => onRemove(problem._id)}
           aria-label={t('action.remove')}
           title={t('action.remove')}
-          className="text-xs font-medium inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-red-50 transition"
+          className="p-1.5 rounded-lg transition-colors hover:bg-red-50"
           style={{ color: 'var(--tamamhealth-red)' }}
         >
-          <X className="w-3.5 h-3.5" /> {t('action.remove')}
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
       )}
     </li>
@@ -326,8 +326,8 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
       {/* Header */}
       <div className="card-elevated p-5 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className="icon-box-lg" style={{ background: 'rgba(124,58,237,0.12)' }}>
-            <Activity className="w-5 h-5" style={{ color: '#7C3AED' }} />
+          <div className="icon-box-lg">
+            <Activity className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
           </div>
           <div>
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{t('problemList.title')}</h2>
@@ -351,7 +351,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
             style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}
           >
             <div className="flex items-center gap-2">
-              <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+              <div className="icon-box-sm">
                 <Plus className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('problemList.newProblem')}</h3>
@@ -517,7 +517,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
             className="card-elevated p-5 text-center"
             style={{ borderStyle: 'dashed' }}
           >
-            <div className="icon-box-lg mx-auto" style={{ background: 'var(--overlay-subtle)' }}>
+            <div className="icon-box-lg mx-auto">
               <Activity className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
             </div>
             <p className="text-sm font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>

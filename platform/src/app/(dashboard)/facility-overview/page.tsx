@@ -28,8 +28,10 @@ import {
   ArrowRightLeft, AlertTriangle, Send, CheckCircle, Clock, Loader2, TrendingUp,
 } from '@/components/icons/lucide';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
+import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick } from '@/components/ChartCard';
 
 export default function FacilityOverviewPage() {
   return (
@@ -144,7 +146,7 @@ function FacilityOverview() {
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex-1 min-w-[240px]">
               <div className="flex items-center gap-2 mb-1.5">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <Send className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
                 </div>
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Ministry of Health Reporting</h3>
@@ -240,31 +242,72 @@ function FacilityOverview() {
         </div>
 
         {/* ═══ HEALTH VISITS TREND ═══ */}
-        <div className="card-elevated p-5 mt-4">
-          <SectionTitle icon={<TrendingUp className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />} title="Health Visits Trend" />
-          {trend.length > 0 ? (
-            <div className="mt-3" style={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trend} margin={{ top: 8, right: 16, left: -8, bottom: 0 }}>
+        <ChartCard
+          title="Health Visits Trend"
+          defaultType="area"
+          defaultPeriod="month"
+          className="mt-4"
+        >
+          {({ chartType }) => {
+            if (trend.length === 0) {
+              return <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No monthly trend data recorded for this facility yet.</p>;
+            }
+            const visitSeries = [
+              { key: 'OPD Visits', color: '#2191D0' },
+              { key: 'ANC Visits', color: '#ec4899' },
+              { key: 'Immunizations', color: '#22c55e' },
+            ];
+            const commonProps = { data: trend, margin: { top: 8, right: 16, left: -8, bottom: 0 } };
+            const legendProps = { iconType: 'circle' as const, iconSize: 8, wrapperStyle: { fontSize: '0.75rem', paddingTop: '4px' } };
+            if (chartType === 'bar') {
+              return (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart {...commonProps}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                    <XAxis dataKey="month" tick={axisTick} />
+                    <YAxis tick={axisTick} />
+                    <Tooltip {...chartTooltipStyle} />
+                    <Legend {...{ ...legendProps, iconType: 'square' as const }} />
+                    {visitSeries.map(s => <Bar key={s.key} dataKey={s.key} fill={s.color} radius={[3, 3, 0, 0]} />)}
+                  </BarChart>
+                </ResponsiveContainer>
+              );
+            }
+            if (chartType === 'line') {
+              return (
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart {...commonProps}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                    <XAxis dataKey="month" tick={axisTick} />
+                    <YAxis tick={axisTick} />
+                    <Tooltip {...chartTooltipStyle} />
+                    <Legend {...legendProps} />
+                    {visitSeries.map(s => <Line key={s.key} type="monotone" dataKey={s.key} stroke={s.color} strokeWidth={2} dot={{ r: 3 }} />)}
+                  </LineChart>
+                </ResponsiveContainer>
+              );
+            }
+            return (
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart {...commonProps}>
                   <defs>
-                    <linearGradient id="gOpd" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0} /></linearGradient>
+                    <linearGradient id="gOpd" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#2191D0" stopOpacity={0.4} /><stop offset="95%" stopColor="#2191D0" stopOpacity={0} /></linearGradient>
                     <linearGradient id="gAnc" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} /><stop offset="95%" stopColor="#ec4899" stopOpacity={0} /></linearGradient>
                     <linearGradient id="gImm" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} /><stop offset="95%" stopColor="#22c55e" stopOpacity={0} /></linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                  <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                  <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', borderRadius: 8, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="OPD Visits" stroke="#3b82f6" fill="url(#gOpd)" strokeWidth={2} />
+                  <XAxis dataKey="month" tick={axisTick} />
+                  <YAxis tick={axisTick} />
+                  <Tooltip {...chartTooltipStyle} />
+                  <Legend {...legendProps} />
+                  <Area type="monotone" dataKey="OPD Visits" stroke="#2191D0" fill="url(#gOpd)" strokeWidth={2} />
                   <Area type="monotone" dataKey="ANC Visits" stroke="#ec4899" fill="url(#gAnc)" strokeWidth={2} />
                   <Area type="monotone" dataKey="Immunizations" stroke="#22c55e" fill="url(#gImm)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>No monthly trend data recorded for this facility yet.</p>
-          )}
-        </div>
+            );
+          }}
+        </ChartCard>
 
       </main>
     </>
@@ -288,7 +331,7 @@ function StatCard({ icon: Icon, label, value, tint }: { icon: typeof Users; labe
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
     <div className="flex items-center gap-2 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-      <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>{icon}</div>
+      <div className="icon-box-sm">{icon}</div>
       <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
     </div>
   );

@@ -93,7 +93,7 @@ writeFileSync(join(stagingDirActual, 'INSTALL.txt'), `
 
   Prerequisites:
     - Node.js 18+ (https://nodejs.org)
-    - A license key from TamamHealth Health Technologies (hello@tamamhealth.org)
+    - A license key from TamamHealth Health Technologies (support.tamam@gmail.com)
 
   Installation:
 
@@ -119,7 +119,7 @@ writeFileSync(join(stagingDirActual, 'INSTALL.txt'), `
     5. Open http://localhost:3000 in your browser.
 
   Support:
-    Email: hello@tamamhealth.org
+    Email: support.tamam@gmail.com
 
 ================================================================================
 `, 'utf-8');

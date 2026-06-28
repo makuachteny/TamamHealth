@@ -36,7 +36,7 @@ interface PatientSBARProps {
 const LETTER_COLORS = {
   S: { bg: 'rgba(196,69,54,0.12)',  fg: 'var(--tamamhealth-red)' },
   B: { bg: 'rgba(228,168,75,0.18)', fg: 'var(--color-warning)' },
-  A: { bg: 'rgba(59, 130, 246,0.14)', fg: '#1E3A8A' },
+  A: { bg: 'rgba(33, 145, 208, 0.14)', fg: '#1E3A8A' },
   R: { bg: 'var(--accent-light)',   fg: 'var(--accent-primary)' },
 } as const;
 
@@ -137,7 +137,7 @@ export default function PatientSBAR({
       {/* Document header */}
       <div className="card-elevated p-5 flex items-start justify-between flex-wrap gap-3 no-print">
         <div className="flex items-start gap-3">
-          <div className="icon-box-lg" style={{ background: 'var(--accent-light)' }}>
+          <div className="icon-box-lg">
             <FileText className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
           </div>
           <div>

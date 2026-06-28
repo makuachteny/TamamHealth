@@ -8,6 +8,50 @@ import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { findByType } from './db-query';
 import { isProviderRole, isClinicalAuthorRole } from '../clinical-roles';
+import { maybeDecrypt, maybeEncrypt } from '../field-encryption';
+
+const ENCRYPTED_RECORD_FIELDS = [
+  'chiefComplaint',
+  'historyOfPresentIllness',
+  'familyHistory',
+  'treatmentPlan',
+] as const;
+
+function decryptRecord(doc: MedicalRecordDoc): MedicalRecordDoc {
+  const out = { ...doc };
+  for (const field of ENCRYPTED_RECORD_FIELDS) {
+    const value = out[field];
+    if (typeof value === 'string') out[field] = maybeDecrypt(value);
+  }
+  if (out.followUp?.reason) {
+    out.followUp = { ...out.followUp, reason: maybeDecrypt(out.followUp.reason) };
+  }
+  if (out.aiEvaluation?.clinicalNotes) {
+    out.aiEvaluation = { ...out.aiEvaluation, clinicalNotes: maybeDecrypt(out.aiEvaluation.clinicalNotes) };
+  }
+  if (out.addenda) {
+    out.addenda = out.addenda.map(a => ({ ...a, text: maybeDecrypt(a.text) }));
+  }
+  return out;
+}
+
+function encryptRecordFields<T extends Partial<MedicalRecordDoc>>(data: T): T {
+  const out = { ...data };
+  for (const field of ENCRYPTED_RECORD_FIELDS) {
+    const value = out[field];
+    if (typeof value === 'string' && value.length > 0) out[field] = maybeEncrypt(value);
+  }
+  if (out.followUp?.reason) {
+    out.followUp = { ...out.followUp, reason: maybeEncrypt(out.followUp.reason) };
+  }
+  if (out.aiEvaluation?.clinicalNotes) {
+    out.aiEvaluation = { ...out.aiEvaluation, clinicalNotes: maybeEncrypt(out.aiEvaluation.clinicalNotes) };
+  }
+  if (out.addenda) {
+    out.addenda = out.addenda.map(a => ({ ...a, text: maybeEncrypt(a.text) }));
+  }
+  return out;
+}
 
 /**
  * Thrown when a caller tries to mutate the clinical content of a record that
@@ -74,7 +118,7 @@ export async function getRecordsByPatient(patientId: string, scope?: DataScope):
     selector: { type: 'medical_record', patientId },
     limit: 10000,
   }) as { docs: MedicalRecordDoc[] };
-  let docs = (result.docs || []) as MedicalRecordDoc[];
+  let docs = ((result.docs || []) as MedicalRecordDoc[]).map(decryptRecord);
   if (scope) docs = filterByScope(docs, scope);
   // Sort by consultedAt (full datetime) when present so records with the
   // same visitDate still order correctly. Fall back to visitDate/createdAt.
@@ -96,25 +140,26 @@ export async function createMedicalRecord(
   }
   const db = medicalRecordsDB();
   const now = new Date().toISOString();
-  const doc: MedicalRecordDoc = {
+  const doc: MedicalRecordDoc = encryptRecordFields({
     _id: `rec-${uuidv4().slice(0, 12)}`,
     type: 'medical_record',
     ...data,
     createdAt: now,
     updatedAt: now,
-  } as MedicalRecordDoc;
+  } as MedicalRecordDoc);
   const resp = await db.put(doc);
   doc._rev = resp.rev;
-  await logAuditSafe('CREATE_MEDICAL_RECORD', undefined, undefined, `Record ${doc._id} for patient ${doc.patientId}`);
+  const plaintextDoc = decryptRecord(doc);
+  await logAuditSafe('CREATE_MEDICAL_RECORD', undefined, undefined, `Record ${plaintextDoc._id} for patient ${plaintextDoc.patientId}`);
   emitSyncEvent({
     resourceType: 'medical_record',
-    resourceId: doc._id,
+    resourceId: plaintextDoc._id,
     operation: 'create',
-    resourceVersion: doc._rev,
-    orgId: doc.orgId,
-    hospitalId: doc.hospitalId,
+    resourceVersion: plaintextDoc._rev,
+    orgId: plaintextDoc.orgId,
+    hospitalId: plaintextDoc.hospitalId,
   });
-  return doc;
+  return plaintextDoc;
 }
 
 export async function updateMedicalRecord(id: string, data: Partial<MedicalRecordDoc>): Promise<MedicalRecordDoc | null> {
@@ -132,25 +177,26 @@ export async function updateMedicalRecord(id: string, data: Partial<MedicalRecor
     throw new SignedRecordLockError(id);
   }
   try {
-    const updated = {
+    const updated = encryptRecordFields({
       ...existing,
       ...data,
       _id: existing._id,
       _rev: existing._rev,
       updatedAt: new Date().toISOString(),
-    };
+    });
     const resp = await db.put(updated);
     updated._rev = resp.rev;
-    await logAuditSafe('UPDATE_MEDICAL_RECORD', undefined, undefined, `Updated record ${id} for patient ${updated.patientId}`);
+    const plaintextUpdated = decryptRecord(updated);
+    await logAuditSafe('UPDATE_MEDICAL_RECORD', undefined, undefined, `Updated record ${id} for patient ${plaintextUpdated.patientId}`);
     emitSyncEvent({
       resourceType: 'medical_record',
-      resourceId: updated._id,
+      resourceId: plaintextUpdated._id,
       operation: 'update',
-      resourceVersion: updated._rev,
-      orgId: updated.orgId,
-      hospitalId: updated.hospitalId,
+      resourceVersion: plaintextUpdated._rev,
+      orgId: plaintextUpdated.orgId,
+      hospitalId: plaintextUpdated.hospitalId,
     });
-    return updated;
+    return plaintextUpdated;
   } catch {
     return null;
   }
@@ -198,21 +244,22 @@ export async function signMedicalRecord(
   };
   const resp = await db.put(signed);
   signed._rev = resp.rev;
+  const plaintextSigned = decryptRecord(signed);
   await logAuditSafe(
     opts.awaitingCosign ? 'SIGN_MEDICAL_RECORD_AWAITING_COSIGN' : 'SIGN_MEDICAL_RECORD',
     signer.userId,
     signer.userName,
-    `Signed record ${id} for patient ${signed.patientId}`,
+    `Signed record ${id} for patient ${plaintextSigned.patientId}`,
   );
   emitSyncEvent({
     resourceType: 'medical_record',
-    resourceId: signed._id,
+    resourceId: plaintextSigned._id,
     operation: 'update',
-    resourceVersion: signed._rev,
-    orgId: signed.orgId,
-    hospitalId: signed.hospitalId,
+    resourceVersion: plaintextSigned._rev,
+    orgId: plaintextSigned.orgId,
+    hospitalId: plaintextSigned.hospitalId,
   });
-  return signed;
+  return plaintextSigned;
 }
 
 /**
@@ -253,25 +300,26 @@ export async function addAddendum(
     authorRole: author.userRole,
     createdAt: now,
   };
-  const amended: MedicalRecordDoc = {
+  const amended: MedicalRecordDoc = encryptRecordFields({
     ...existing,
     addenda: [...(existing.addenda || []), addendum],
     documentStatus: 'amended',
     syncStatus: 'pending',
     updatedAt: now,
-  };
+  });
   const resp = await db.put(amended);
   amended._rev = resp.rev;
-  await logAuditSafe('ADDENDUM_MEDICAL_RECORD', author.userId, author.userName, `Addendum on record ${id} for patient ${amended.patientId}`);
+  const plaintextAmended = decryptRecord(amended);
+  await logAuditSafe('ADDENDUM_MEDICAL_RECORD', author.userId, author.userName, `Addendum on record ${id} for patient ${plaintextAmended.patientId}`);
   emitSyncEvent({
     resourceType: 'medical_record',
-    resourceId: amended._id,
+    resourceId: plaintextAmended._id,
     operation: 'update',
-    resourceVersion: amended._rev,
-    orgId: amended.orgId,
-    hospitalId: amended.hospitalId,
+    resourceVersion: plaintextAmended._rev,
+    orgId: plaintextAmended.orgId,
+    hospitalId: plaintextAmended.hospitalId,
   });
-  return amended;
+  return plaintextAmended;
 }
 
 /**
@@ -314,16 +362,17 @@ export async function cosignMedicalRecord(
   };
   const resp = await db.put(cosigned);
   cosigned._rev = resp.rev;
-  await logAuditSafe('COSIGN_MEDICAL_RECORD', cosigner.userId, cosigner.userName, `Co-signed record ${id} for patient ${cosigned.patientId}`);
+  const plaintextCosigned = decryptRecord(cosigned);
+  await logAuditSafe('COSIGN_MEDICAL_RECORD', cosigner.userId, cosigner.userName, `Co-signed record ${id} for patient ${plaintextCosigned.patientId}`);
   emitSyncEvent({
     resourceType: 'medical_record',
-    resourceId: cosigned._id,
+    resourceId: plaintextCosigned._id,
     operation: 'update',
-    resourceVersion: cosigned._rev,
-    orgId: cosigned.orgId,
-    hospitalId: cosigned.hospitalId,
+    resourceVersion: plaintextCosigned._rev,
+    orgId: plaintextCosigned.orgId,
+    hospitalId: plaintextCosigned.hospitalId,
   });
-  return cosigned;
+  return plaintextCosigned;
 }
 
 /**
@@ -340,7 +389,7 @@ export interface SigningInbox {
 
 export async function getSigningInbox(scope?: DataScope): Promise<SigningInbox> {
   const db = medicalRecordsDB();
-  let docs = await findByType<MedicalRecordDoc>(db, 'medical_record');
+  let docs = (await findByType<MedicalRecordDoc>(db, 'medical_record')).map(decryptRecord);
   if (scope) docs = filterByScope(docs, scope);
   // Nursing vitals observations are standalone snapshots, not consult notes
   // that require attestation — exclude them from the "to sign" queue. Prefer the
@@ -362,7 +411,7 @@ export async function getSigningInbox(scope?: DataScope): Promise<SigningInbox> 
 /** Fetch a single medical record by id, or null if not found. */
 export async function getMedicalRecordById(id: string): Promise<MedicalRecordDoc | null> {
   try {
-    return await medicalRecordsDB().get(id) as MedicalRecordDoc;
+    return decryptRecord(await medicalRecordsDB().get(id) as MedicalRecordDoc);
   } catch {
     return null;
   }

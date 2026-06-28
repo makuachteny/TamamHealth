@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import TopBar from '@/components/TopBar';
 import PatientName from '@/components/PatientName';
 import { useDeaths } from '@/lib/hooks/useDeaths';
@@ -13,11 +13,11 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { FilterBar } from '@/components/filters';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
-import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck, Filter } from '@/components/icons/lucide';
+import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck } from '@/components/icons/lucide';
 
 export default function DeathsPage() {
   const { t } = useTranslation();
-  const { deaths, stats, register } = useDeaths();
+  const { deaths, register } = useDeaths();
   const { hospitals } = useHospitals();
   const { patients } = usePatients();
   const { currentUser } = useApp();
@@ -29,16 +29,6 @@ export default function DeathsPage() {
   const anyColFilter = Object.values(colFilters).some(Boolean);
   const clearColFilters = () => setColFilters({ certificate: '', name: '', sex: '', age: '', cause: '', manner: '', facility: '', registered: '' });
   const ageBandOf = (age: number | null) => age == null ? null : age < 18 ? 'child' : age < 65 ? 'adult' : 'elderly';
-  const [openFilter, setOpenFilter] = useState<string | null>(null);
-  const filterRef = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!openFilter) return;
-    const onDown = (e: MouseEvent) => { if (filterRef.current && !filterRef.current.contains(e.target as Node)) setOpenFilter(null); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenFilter(null); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [openFilter]);
   const [showForm, setShowForm] = useState(false);
   const [expandedDeath, setExpandedDeath] = useState<string | null>(null);
   const [patientLookup, setPatientLookup] = useState('');
@@ -93,32 +83,16 @@ export default function DeathsPage() {
     return true;
   });
 
-  // Per-column filter controls + column config (funnel dropdown in each header).
-  type ColFilter = { field: keyof typeof colFilters; node: React.ReactNode };
-  const fieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', padding: '5px 9px', borderRadius: 8, fontSize: 11, width: '100%', minWidth: 0 } as const;
-  const textFilter = (key: keyof typeof colFilters, label: string): ColFilter => ({
-    field: key,
-    node: <input type="text" autoFocus value={colFilters[key]} onChange={(e) => setColFilter(key, e.target.value)} placeholder={label} className="normal-case font-normal tracking-normal w-full" style={fieldStyle} />,
-  });
-  const selectFilter = (key: keyof typeof colFilters, opts: { v: string; l: string }[]): ColFilter => ({
-    field: key,
-    node: (
-      <select value={colFilters[key]} onChange={(e) => setColFilter(key, e.target.value)} className="normal-case font-normal tracking-normal w-full" style={fieldStyle}>
-        <option value="">{t('patients.all')}</option>
-        {opts.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-      </select>
-    ),
-  });
-  const deathCols: { key: string; label: string; filter?: ColFilter }[] = [
-    { key: 'certificate', label: t('deaths.colCertificate'), filter: textFilter('certificate', t('deaths.colCertificate')) },
-    { key: 'deceased', label: t('deaths.colDeceased'), filter: textFilter('name', t('deaths.colDeceased')) },
-    { key: 'sex', label: t('nurse.colGender'), filter: selectFilter('sex', [{ v: 'Male', l: t('patient.male') }, { v: 'Female', l: t('patient.female') }]) },
-    { key: 'age', label: t('deaths.colAge'), filter: selectFilter('age', [{ v: 'child', l: t('nurse.ageChild') }, { v: 'adult', l: t('nurse.ageAdult') }, { v: 'elderly', l: t('nurse.ageElderly') }]) },
+  const deathCols = [
+    { key: 'certificate', label: t('deaths.colCertificate') },
+    { key: 'deceased', label: t('deaths.colDeceased') },
+    { key: 'sex', label: t('nurse.colGender') },
+    { key: 'age', label: t('deaths.colAge') },
     { key: 'dateOfDeath', label: t('deaths.colDateOfDeath') },
-    { key: 'cause', label: t('deaths.colCause'), filter: textFilter('cause', t('deaths.colCause')) },
-    { key: 'manner', label: t('deaths.colManner'), filter: textFilter('manner', t('deaths.colManner')) },
-    { key: 'facility', label: t('deaths.colFacility'), filter: textFilter('facility', t('deaths.colFacility')) },
-    { key: 'registered', label: t('deaths.colRegistered'), filter: selectFilter('registered', [{ v: 'yes', l: t('deaths.yes') }, { v: 'no', l: t('deaths.no') }]) },
+    { key: 'cause', label: t('deaths.colCause') },
+    { key: 'manner', label: t('deaths.colManner') },
+    { key: 'facility', label: t('deaths.colFacility') },
+    { key: 'registered', label: t('deaths.colRegistered') },
   ];
 
   const handleSubmit = async () => {
@@ -176,38 +150,40 @@ export default function DeathsPage() {
   return (
     <>
       <TopBar title={t('deaths.title')} actions={
-            <div className="flex gap-2">
-              {anyColFilter && (
-                <button onClick={clearColFilters} className="btn btn-secondary" title={t('nurse.clearAllFilters')} aria-label={t('nurse.clearAllFilters')}>
-                  <X className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('nurse.clearAllFilters')}</span>
-                </button>
-              )}
-              {canRecordVitalEvents && (
-                <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
-                  <Plus className="w-4 h-4" /> {t('deaths.registerDeath')}
-                </button>
-              )}
-            </div>
+            canRecordVitalEvents ? (
+              <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
+                <Plus className="w-4 h-4" /> {t('deaths.registerDeath')}
+              </button>
+            ) : undefined
           } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        {/* Registry stats (filtering now lives in the column headers) */}
+        {/* Single unified filter */}
         <FilterBar>
-          {stats && (
-            <div className="flex items-center gap-4 sm:gap-5 pr-1">
-              {[
-                { label: t('deaths.statTotalDeaths'), value: stats.total, color: 'var(--color-danger)' },
-                { label: t('deaths.statMaternalDeaths'), value: stats.maternalDeaths, color: 'var(--color-danger)' },
-                { label: t('deaths.statUnder5Deaths'), value: stats.under5Deaths, color: 'var(--color-warning)' },
-                { label: t('deaths.statWithIcd11'), value: `${stats.withICD11Code}/${stats.total}`, color: 'var(--accent-primary)' },
-                { label: t('deaths.statRegistered'), value: `${stats.registered}/${stats.total}`, color: 'var(--accent-primary)' },
-              ].map(s => (
-                <div key={s.label} className="text-center leading-tight">
-                  <div className="text-base font-bold" style={{ color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
+          <div className="relative flex-1" style={{ maxWidth: 360 }}>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder={t('deaths.searchPlaceholder') || 'Search by name, certificate, cause…'}
+              value={colFilters.name}
+              onChange={e => setColFilter('name', e.target.value)}
+              className="input-field"
+              style={{ paddingLeft: 36 }}
+            />
+          </div>
+          <select value={colFilters.sex} onChange={e => setColFilter('sex', e.target.value)} className="input-field" style={{ width: 'auto' }}>
+            <option value="">All Genders</option>
+            <option value="Male">{t('patient.male')}</option>
+            <option value="Female">{t('patient.female')}</option>
+          </select>
+          <select value={colFilters.registered} onChange={e => setColFilter('registered', e.target.value)} className="input-field" style={{ width: 'auto' }}>
+            <option value="">All Status</option>
+            <option value="yes">{t('deaths.yes')}</option>
+            <option value="no">{t('deaths.no')}</option>
+          </select>
+          {anyColFilter && (
+            <button onClick={clearColFilters} className="btn btn-secondary btn-sm" title={t('nurse.clearAllFilters')}>
+              <X className="w-4 h-4" />
+            </button>
           )}
         </FilterBar>
 
@@ -218,39 +194,7 @@ export default function DeathsPage() {
             <thead>
               <tr>
                 {deathCols.map(c => (
-                  <th key={c.key}>
-                    <div className="flex items-center gap-1.5">
-                      <span className="whitespace-nowrap">{c.label}</span>
-                      {c.filter && (
-                        <span ref={openFilter === c.key ? filterRef : null} className="relative inline-flex items-center">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === c.key ? null : c.key); }}
-                            className="inline-flex items-center justify-center w-4 h-4 rounded transition-colors hover:bg-[var(--overlay-subtle)]"
-                            aria-label={`${c.label} filter`}
-                          >
-                            <Filter className="w-3 h-3" style={{ color: colFilters[c.filter.field] ? 'var(--accent-primary)' : 'var(--text-muted)', fill: colFilters[c.filter.field] ? 'var(--accent-primary)' : 'transparent' }} />
-                          </button>
-                          {openFilter === c.key && (
-                            <div className="absolute top-full right-0 mt-2 normal-case rounded-xl overflow-hidden flex flex-col" style={{ zIndex: 50, width: 220, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}>
-                              <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
-                                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{c.label}</span>
-                                <button type="button" onClick={() => setOpenFilter(null)} className="p-0.5 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
-                                  <X className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-                                </button>
-                              </div>
-                              <div className="p-2 flex flex-col gap-1.5">
-                                {c.filter.node}
-                                {colFilters[c.filter.field] && (
-                                  <button type="button" onClick={() => setColFilter(c.filter!.field, '')} className="text-[11px] font-medium text-left px-1" style={{ color: 'var(--accent-primary)' }}>{t('nurse.filterClear')}</button>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </th>
+                  <th key={c.key}>{c.label}</th>
                 ))}
               </tr>
             </thead>

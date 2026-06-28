@@ -133,6 +133,8 @@ export async function sendConversationMessage(data: {
   hospitalId?: string;
   hospitalName?: string;
   orgId?: string;
+  attachments?: Array<{ name: string; mimeType: string; base64Data: string; sizeBytes: number; phiWarningAcknowledged?: boolean }>;
+  phiAcknowledged?: boolean;
 }): Promise<MessageDoc> {
   const now = new Date().toISOString();
   const msg = await createMessage({
@@ -154,6 +156,8 @@ export async function sendConversationMessage(data: {
     sentAt: now,
     readBy: [data.fromId],
     ...(data.replyToId ? { replyToId: data.replyToId } : {}),
+    ...(data.attachments?.length ? { attachments: data.attachments } : {}),
+    ...(data.phiAcknowledged ? { phiAcknowledged: true } : {}),
     orgId: data.orgId,
   });
 

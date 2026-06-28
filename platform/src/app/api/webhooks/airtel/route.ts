@@ -12,7 +12,11 @@ import crypto from 'crypto';
 function verifyAirtelSignature(rawBody: string, signature: string | null): boolean {
   const secret = process.env.AIRTEL_WEBHOOK_SECRET;
   if (!secret) {
-    console.warn('[Airtel Webhook] AIRTEL_WEBHOOK_SECRET not configured — skipping signature verification');
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Airtel Webhook] AIRTEL_WEBHOOK_SECRET not configured — refusing unsigned production webhook');
+      return false;
+    }
+    console.warn('[Airtel Webhook] AIRTEL_WEBHOOK_SECRET not configured — skipping signature verification in non-production');
     return true;
   }
   if (!signature) {
@@ -20,7 +24,12 @@ function verifyAirtelSignature(rawBody: string, signature: string | null): boole
     return false;
   }
   const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-  return computed === signature;
+  const a = Buffer.from(computed, 'utf8');
+  const b = Buffer.from(signature, 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(
+    a as unknown as Uint8Array,
+    b as unknown as Uint8Array,
+  );
 }
 
 interface AirtelTransaction {

@@ -32,7 +32,7 @@ Works on **Windows**, **macOS**, and **Linux**. No other dependencies required �
 
 ### Install the Platform (EHR Software)
 
-The platform is distributed as a downloadable archive. Contact **[hello@tamamhealth.org](mailto:hello@tamamhealth.org)** to obtain a license and download link.
+The platform is distributed as a downloadable archive. Contact **[support.tamam@gmail.com](mailto:support.tamam@gmail.com)** to obtain a license and download link.
 
 ```bash
 # 1. Extract the archive you received
@@ -103,12 +103,24 @@ LEVEL 5 — NATIONAL (Teaching Hospitals + MoH)
 ### Repository Structure
 
 ```text
-SafeguardJunub/
-├── platform/      EHR application (Next.js) — port 3000
-├── website/       Marketing site (Next.js) — port 3001
-├── docs/          Documentation, specs, research
+tamamhealth/
+├── platform/           EHR application (Next.js) — port 3000
+├── website/            Marketing site (Next.js) — port 3001
+├── mobile/             React Native companion app
+├── fingerprint-bridge/ Localhost USB-scanner bridge for the registration desk
+│                       (Node service on 127.0.0.1:7345; see its README)
+├── sync-worker/        CouchDB → PostgreSQL national-analytics sync worker
+├── country-node/       Country-level aggregation node
+├── regional-exchange/  Cross-facility / cross-border record exchange
+├── infra/              Deployment + infrastructure config
+├── docs/               Documentation, specs, research
 └── docker-compose.yml
 ```
+
+> The **fingerprint-bridge** runs on the same machine as the USB scanner (the
+> registration-desk PC), not on the server — the platform talks to it over
+> loopback HTTP and degrades gracefully when it's unavailable. See
+> [fingerprint-bridge/README.md](fingerprint-bridge/README.md).
 
 ### Technology Stack
 

@@ -28,7 +28,7 @@ const CATEGORIES: { id: AssetCategory; labelKey: string }[] = [
 const STATUS_TOKENS: Record<AssetStatus, { labelKey: string; color: string; bg: string }> = {
   operational:    { labelKey: 'equipment.statusOperational',     color: '#15795C', bg: 'rgba(27, 158, 119, 0.12)' },
   needs_service:  { labelKey: 'equipment.statusNeedsService',   color: '#B8741C', bg: 'rgba(228, 168, 75, 0.16)' },
-  under_repair:   { labelKey: 'equipment.statusUnderRepair',    color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)' },
+  under_repair:   { labelKey: 'equipment.statusUnderRepair',    color: '#2191D0', bg: 'rgba(33, 145, 208, 0.12)' },
   decommissioned: { labelKey: 'equipment.statusDecommissioned',  color: '#5A7370', bg: 'rgba(90, 115, 112, 0.14)' },
   lost_or_stolen: { labelKey: 'equipment.statusLostOrStolen',   color: '#C44536', bg: 'rgba(196, 69, 54, 0.14)' },
 };
@@ -161,10 +161,10 @@ export default function AssetsPage() {
         {summary && (
           <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch' }}>
             {[
-              { label: t('equipment.kpiTotal'), value: summary.total, accent: 'var(--accent-primary)', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
+              { label: t('equipment.kpiTotal'), value: summary.total, accent: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
               { label: t('equipment.kpiOperational'), value: summary.operational, accent: '#15795C', bg: 'rgba(27, 158, 119, 0.10)', border: 'rgba(27, 158, 119, 0.26)' },
               { label: t('equipment.kpiNeedsService'), value: summary.needsService, accent: '#B8741C', bg: 'rgba(228, 168, 75, 0.12)', border: 'rgba(228, 168, 75, 0.30)' },
-              { label: t('equipment.kpiUnderRepair'), value: summary.underRepair, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
+              { label: t('equipment.kpiUnderRepair'), value: summary.underRepair, accent: '#2191D0', bg: 'rgba(33, 145, 208, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
               { label: t('equipment.kpiServiceDueSoon'), value: summary.serviceDueSoon, accent: '#C44536', bg: 'rgba(196, 69, 54, 0.10)', border: 'rgba(196, 69, 54, 0.26)' },
             ].map(k => (
               <div key={k.label} style={{ padding: '14px 16px', borderRadius: 10, background: k.bg, border: `1px solid ${k.border}` }}>

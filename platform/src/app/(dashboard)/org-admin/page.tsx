@@ -46,7 +46,7 @@ function OrgAdminDashboard() {
   const [thisMonthConsultations, setThisMonthConsultations] = useState(0);
   const [thisMonthReferrals, setThisMonthReferrals] = useState(0);
 
-  const brandColor = currentUser?.branding?.primaryColor || '#7C3AED';
+  const brandColor = currentUser?.branding?.primaryColor || 'var(--accent-primary)';
 
   useEffect(() => {
     if (!currentUser?.orgId) return;
@@ -287,7 +287,7 @@ function OrgAdminDashboard() {
                 }}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <div className="icon-box-sm">
                     <Icon className="w-3.5 h-3.5" style={{ color: card.color }} />
                   </div>
                   <span className="kpi-card-title">{card.displayLabel}</span>
@@ -341,7 +341,7 @@ function OrgAdminDashboard() {
             <div className="p-4 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.referrals')}</span>
-                <TrendingUp className="w-4 h-4" style={{ color: '#7C3AED' }} />
+                <TrendingUp className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{thisMonthReferrals}</p>
               <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.thisMonth')}</p>
@@ -439,7 +439,7 @@ function OrgAdminDashboard() {
                 <span
                   className="text-xs font-medium px-2 py-0.5 rounded-full"
                   style={{
-                    background: org?.subscriptionStatus === 'active' ? 'rgba(59, 130, 246,0.12)' : 'rgba(245,158,11,0.12)',
+                    background: org?.subscriptionStatus === 'active' ? 'rgba(33, 145, 208, 0.12)' : 'rgba(245,158,11,0.12)',
                     color: org?.subscriptionStatus === 'active' ? 'var(--accent-primary)' : 'var(--color-warning)',
                   }}
                 >
@@ -610,7 +610,7 @@ function OrgAdminDashboard() {
                 <a
                   key={action.href}
                   href={action.href}
-                  className="flex items-center gap-3 p-4 rounded-lg transition-all hover:scale-[1.01]"
+                  className="flex items-center gap-3 p-4 rounded-lg transition-all"
                   style={{
                     background: 'var(--overlay-subtle)',
                     border: '1px solid var(--border-light)',

@@ -29,7 +29,7 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
   const { globalSearch, setGlobalSearch } = useApp();
   const [localSearch, setLocalSearch] = useState(globalSearch);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { patients } = usePatients();
@@ -89,8 +89,8 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
 
   return (
     <div className={split
-      ? 'mx-5 mt-5 flex-shrink-0 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:items-center'
-      : 'mx-5 mt-5 flex-shrink-0 flex items-center gap-3 flex-wrap'}>
+      ? 'mx-[10px] mt-[10px] flex-shrink-0 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:items-center'
+      : 'mx-[10px] mt-[10px] flex-shrink-0 flex items-center gap-3 flex-wrap'}>
       {/* In split mode this groups search + trailing into the left grid column;
           otherwise `contents` makes them plain flex children as before. */}
       <div className={split ? 'flex items-center gap-3 min-w-0' : 'contents'}>

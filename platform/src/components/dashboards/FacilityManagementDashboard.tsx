@@ -1,4 +1,7 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import TodaysAppointmentsCard from '@/components/dashboard/TodaysAppointmentsCard';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,17 +13,19 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useWards } from '@/lib/hooks/useWards';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, AreaChart, Area,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
 } from 'recharts';
+import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick, AreaGradients } from '@/components/ChartCard';
 import {
   Stethoscope, Users, HeartPulse, BedDouble, ChevronRight,
-  Edit3, Trash2, Eye, ChevronDown,
+  Edit3, Trash2, Eye, ChevronDown, BarChart3,
 } from '@/components/icons/lucide';
 import { formatMoney } from '@/lib/format-utils';
 import type { MessageDoc } from '@/lib/db-types';
 
 const TEAL = '#06B6D4';
-const PURPLE = '#7C3AED';
+const PURPLE = 'var(--accent-primary)';
 const CORAL = '#FB923C';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -149,7 +154,7 @@ export default function FacilityManagementDashboard() {
 
   const stat = (icon: React.ReactNode, label: React.ReactNode, value: number) => (
     <div className="flex items-center gap-3 py-2.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
-      <div className="icon-box-sm" style={{ background: 'var(--overlay-subtle)' }}>{icon}</div>
+      <div className="icon-box-sm">{icon}</div>
       <span className="text-sm flex-1" style={{ color: 'var(--text-secondary)' }}>{label}</span>
       <span className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{value}</span>
     </div>
@@ -160,6 +165,25 @@ export default function FacilityManagementDashboard() {
       <TopBar title="Dashboard" />
       <main className="page-container page-enter">
         <div className="flex flex-col gap-5">
+
+          <DashboardHero
+            stats={[
+              { label: 'Patients', value: patients.length },
+              { label: 'Doctors', value: doctors.length },
+              { label: 'Nurses', value: nurses.length },
+              { label: 'Available Beds', value: availableBeds },
+            ]}
+          />
+
+          <DashboardActionsRow
+            actions={[
+              { label: 'Patients', icon: Users, href: '/patients' },
+              { label: 'Doctors & Staff', icon: Stethoscope, href: '/hr', color: '#0D9488' },
+              { label: 'Bed Management', icon: BedDouble, href: '/wards', color: 'var(--accent-primary)' },
+              { label: 'Reports', icon: BarChart3, href: '/reports', color: '#F59E0B' },
+            ]}
+            secondaryCard={<TodaysAppointmentsCard />}
+          />
 
           {/* ═══ ROW 1 — Cash Flow · Stat cards · Weekly activity ═══ */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -204,7 +228,7 @@ export default function FacilityManagementDashboard() {
                 {stat(<Users className="w-4 h-4" style={{ color: PURPLE }} />, <>Total <b>Patients</b></>, patients.length)}
                 {stat(<HeartPulse className="w-4 h-4" style={{ color: CORAL }} />, <>Total <b>Nurses</b></>, nurses.length)}
                 <div className="flex items-center gap-3 pt-2.5">
-                  <div className="icon-box-sm" style={{ background: 'var(--overlay-subtle)' }}><BedDouble className="w-4 h-4" style={{ color: TEAL }} /></div>
+                  <div className="icon-box-sm"><BedDouble className="w-4 h-4" style={{ color: TEAL }} /></div>
                   <span className="text-sm flex-1" style={{ color: 'var(--text-secondary)' }}>Available <b>Beds</b></span>
                   <span className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{availableBeds}</span>
                 </div>
@@ -212,25 +236,61 @@ export default function FacilityManagementDashboard() {
             </div>
 
             {/* Weekly patient activity (titled "Reviews Score" to match the reference) */}
-            <div className="dash-card overflow-hidden">
-              <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Reviews Score</h3>
-                <span className="text-[11px] font-medium inline-flex items-center gap-1 px-2.5 py-1 rounded-lg" style={{ color: 'var(--text-secondary)', background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>This Month <ChevronDown className="w-3 h-3" /></span>
-              </div>
-              <div className="p-5" style={{ width: '100%', height: 232 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weekly} barGap={2} barCategoryGap="20%">
-                    <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} width={28} />
-                    <Tooltip cursor={{ fill: 'var(--overlay-subtle)' }} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
-                    <Bar dataKey="newPatients" name="New Patients" fill={PURPLE} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="appointments" name="Appointments" fill={TEAL} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="canceled" name="Canceled" fill={CORAL} radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+            <ChartCard
+              title="Reviews Score"
+              defaultType="bar"
+              defaultPeriod="week"
+            >
+              {({ chartType }) => {
+                const series = [
+                  { key: 'newPatients', name: 'New Patients', color: PURPLE },
+                  { key: 'appointments', name: 'Appointments', color: TEAL },
+                  { key: 'canceled', name: 'Canceled', color: CORAL },
+                ];
+                const commonProps = { data: weekly, barGap: 2, barCategoryGap: '20%' };
+                const legendProps = { wrapperStyle: { fontSize: 11 }, iconType: 'circle' as const };
+                if (chartType === 'area') {
+                  return (
+                    <ResponsiveContainer width="100%" height={232}>
+                      <AreaChart data={weekly} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
+                        <AreaGradients />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                        <XAxis dataKey="day" tickLine={false} axisLine={false} tick={axisTick} />
+                        <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} />
+                        <Tooltip {...chartTooltipStyle} />
+                        <Legend {...legendProps} />
+                        {series.map(s => <Area key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} fill={s.color} fillOpacity={0.12} strokeWidth={2} />)}
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  );
+                }
+                if (chartType === 'line') {
+                  return (
+                    <ResponsiveContainer width="100%" height={232}>
+                      <LineChart data={weekly} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                        <XAxis dataKey="day" tickLine={false} axisLine={false} tick={axisTick} />
+                        <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} />
+                        <Tooltip {...chartTooltipStyle} />
+                        <Legend {...legendProps} />
+                        {series.map(s => <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} strokeWidth={2} dot={{ r: 3 }} />)}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  );
+                }
+                return (
+                  <ResponsiveContainer width="100%" height={232}>
+                    <BarChart {...commonProps}>
+                      <XAxis dataKey="day" tickLine={false} axisLine={false} tick={axisTick} />
+                      <YAxis tickLine={false} axisLine={false} tick={axisTick} width={28} />
+                      <Tooltip cursor={{ fill: 'var(--overlay-subtle)' }} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                      <Legend {...legendProps} />
+                      {series.map(s => <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[3, 3, 0, 0]} />)}
+                    </BarChart>
+                  </ResponsiveContainer>
+                );
+              }}
+            </ChartCard>
           </div>
 
           {/* ═══ ROW 2 — Upcoming Appointments ═══ */}

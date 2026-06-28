@@ -4,49 +4,44 @@ import { useState } from 'react';
 import { useApp } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import type { DirectiveType } from '@/data/mock';
-import { ShieldCheck, Plus, X } from '@/components/icons/lucide';
+import { ShieldCheck, Plus, Edit3, Trash2, X } from '@/components/icons/lucide';
+import Modal from '@/components/Modal';
 
 const TYPE_LABELS: Record<DirectiveType, string> = {
-  informed_consent: 'Informed consent',
-  abn_noncovered: 'Non-covered service (ABN)',
-  privacy_consent: 'Privacy / communication consent',
-  advance_directive: 'Advance directive',
-  release_of_information: 'Release of information',
-  other: 'Other',
+  informed_consent:      'Informed consent',
+  abn_noncovered:        'Non-covered service (ABN)',
+  privacy_consent:       'Privacy / communication consent',
+  advance_directive:     'Advance directive',
+  release_of_information:'Release of information',
+  other:                 'Other',
 };
 
 const TYPE_OPTIONS = Object.keys(TYPE_LABELS) as DirectiveType[];
 
-/**
- * Directives / consent list for the patient chart (P2.1). Mirrors the
- * Centricity Directives window: add informed consent, ABN, privacy and advance
- * directives once; they persist on the chart instead of being re-collected each
- * visit. Removal requires a reason (entries are revoked, never hard-deleted).
- */
+const EMPTY_FORM = { type: 'informed_consent' as DirectiveType, description: '', startDate: '' };
+
 export default function DirectiveList({ patient, hideAddButton = false }: { patient: PatientDoc; hideAddButton?: boolean }) {
   const { currentUser } = useApp();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [editingEntry, setEditingEntry] = useState<{ id: string; type: DirectiveType; description: string; startDate?: string } | null>(null);
+  const [removingEntry, setRemovingEntry] = useState<{ id: string; type: DirectiveType; description: string } | null>(null);
   const [removalReason, setRemovalReason] = useState('');
-  const [form, setForm] = useState<{ type: DirectiveType; description: string; startDate: string }>(
-    { type: 'informed_consent', description: '', startDate: '' },
-  );
+  const [addForm, setAddForm] = useState(EMPTY_FORM);
+  const [editForm, setEditForm] = useState(EMPTY_FORM);
 
   const entries = patient.directives ?? [];
   const active = entries.filter((d) => d.status === 'active');
   const author = { recordedBy: currentUser?._id, recordedByName: currentUser?.name || currentUser?.username };
+  const typeLabel = (t: DirectiveType) => TYPE_LABELS[t] || t;
 
-  async function run(fn: () => Promise<unknown>) {
+  async function run(fn: () => Promise<unknown>, onDone?: () => void) {
     setBusy(true);
     setError(null);
     try {
       await fn();
-      setAdding(false);
-      setRemovingId(null);
-      setRemovalReason('');
-      setForm({ type: 'informed_consent', description: '', startDate: '' });
+      onDone?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Action failed');
     } finally {
@@ -54,86 +49,117 @@ export default function DirectiveList({ patient, hideAddButton = false }: { pati
     }
   }
 
-  async function doAdd() {
-    const svc = await import('@/lib/services/directive-service');
-    await svc.addDirective(patient._id, { ...form, ...author });
-  }
-  async function doRemove(id: string) {
-    const svc = await import('@/lib/services/directive-service');
-    await svc.removeDirective(patient._id, id, removalReason);
-  }
-
-  const typeLabel = (t: DirectiveType) => TYPE_LABELS[t] || t;
+  const inputCls = 'w-full p-2.5 rounded-md text-[13px]';
+  const inputStyle = { background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' };
+  const modalCard = { background: 'var(--bg-card)', border: '1px solid var(--border-light)' };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+    <div className="w-full flex flex-col h-full">
+      {/* Section header */}
+      <div style={{ background: 'var(--overlay-subtle)', borderBottom: '1px solid var(--border-light)', padding: '0 20px', height: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6 }}>
           <ShieldCheck className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} /> Directives &amp; consent
         </p>
-        {!adding && !hideAddButton && (
-          <button className="btn btn-xs btn-secondary" disabled={busy} onClick={() => setAdding(true)}>
-            <Plus className="w-3 h-3" /> Add
+        {!hideAddButton && (
+          <button className="p-1 rounded transition-colors hover:bg-blue-50" disabled={busy} title="Add directive" onClick={() => { setAdding(true); setAddForm(EMPTY_FORM); setError(null); }} style={{ color: 'var(--accent-primary)' }}>
+            <Plus className="w-3.5 h-3.5" />
           </button>
         )}
       </div>
 
-      {active.length === 0 && !adding && (
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No directives on file.</p>
-      )}
-
-      <ul className="space-y-1.5" style={{ maxHeight: 150, overflowY: 'auto', paddingRight: 4 }}>
-        {active.map((d) => (
-          <li key={d.id} className="rounded-lg p-2.5" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>{typeLabel(d.type)}</span>
-              <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{d.description}</span>
-              {d.startDate && <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>· from {d.startDate}</span>}
+      {/* Scrollable list */}
+      <div className="flex-1 overflow-y-auto px-5 py-3 scrollbar-none">
+        {active.length === 0 && (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No directives on file.</p>
+        )}
+        <ul>
+          {active.map((d) => (
+            <li key={d.id} className="flex items-center gap-2 py-2 min-w-0 overflow-hidden group">
+              <span className="text-[10px] font-semibold flex-shrink-0 whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>{typeLabel(d.type)}</span>
+              <span className="text-[12px] truncate" style={{ color: 'var(--text-primary)' }}>{d.description}</span>
+              {d.startDate && <span className="text-[10px] flex-shrink-0 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>· {d.startDate}</span>}
               <span className="flex-1" />
-              {removingId !== d.id && (
-                <button className="btn btn-xs btn-secondary" disabled={busy} onClick={() => setRemovingId(d.id)}>
-                  <X className="w-3 h-3" /> Revoke
+              <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button className="p-1 rounded transition-colors hover:bg-blue-50" disabled={busy} title="Edit" onClick={() => { setEditingEntry({ id: d.id, type: d.type, description: d.description, startDate: d.startDate }); setEditForm({ type: d.type, description: d.description, startDate: d.startDate ?? '' }); setError(null); }} style={{ color: 'var(--color-primary)' }}>
+                  <Edit3 className="w-3.5 h-3.5" />
                 </button>
-              )}
-            </div>
-            {removingId === d.id && (
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <input
-                  value={removalReason}
-                  onChange={(e) => setRemovalReason(e.target.value)}
-                  placeholder="Reason for revoking (required)"
-                  className="flex-1 min-w-[160px] p-1.5 rounded-md text-[12px]"
-                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
-                />
-                <button className="btn btn-xs btn-primary" disabled={busy || removalReason.trim().length === 0} onClick={() => run(() => doRemove(d.id))}>Confirm</button>
-                <button className="btn btn-xs btn-secondary" disabled={busy} onClick={() => { setRemovingId(null); setRemovalReason(''); }}>Cancel</button>
+                <button className="p-1 rounded transition-colors hover:bg-red-50" disabled={busy} title="Revoke" onClick={() => { setRemovingEntry({ id: d.id, type: d.type, description: d.description }); setRemovalReason(''); setError(null); }} style={{ color: 'var(--color-danger)' }}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
-            )}
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      </div>
 
+      {/* Add modal */}
       {adding && (
-        <div className="mt-2 rounded-lg p-3 space-y-2" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)' }}>
-          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as DirectiveType })}
-            className="w-full p-2 rounded-md text-[12px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
-            {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
-          </select>
-          <input
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="Description (e.g. Consent to treat signed)"
-            className="w-full p-2 rounded-md text-[13px]"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
-          />
-          <div className="flex items-center gap-2">
-            <button className="btn btn-sm btn-primary" disabled={busy || form.description.trim().length === 0} onClick={() => run(doAdd)}>Save directive</button>
-            <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setAdding(false)}>Cancel</button>
+        <Modal onClose={() => setAdding(false)} width={480} labelledBy="add-directive-title">
+          <div className="rounded-xl p-5 space-y-4" style={modalCard}>
+            <div className="flex items-center justify-between">
+              <h2 id="add-directive-title" className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>Add Directive / Consent</h2>
+              <button className="p-1 rounded hover:bg-red-50 transition-colors" onClick={() => setAdding(false)} style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Type</label>
+              <select value={addForm.type} onChange={(e) => setAddForm({ ...addForm, type: e.target.value as DirectiveType })} className="w-full p-2.5 rounded-md text-[12px]" style={inputStyle}>
+                {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
+              </select>
+            </div>
+            <input autoFocus value={addForm.description} onChange={(e) => setAddForm({ ...addForm, description: e.target.value })} placeholder="Description (e.g. Consent to treat signed)" className={inputCls} style={inputStyle} />
+            {error && <p className="text-[11px]" style={{ color: 'var(--color-danger)' }}>{error}</p>}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setAdding(false)}>Cancel</button>
+              <button className="btn btn-sm btn-primary" disabled={busy || addForm.description.trim().length === 0} onClick={() => run(async () => { const svc = await import('@/lib/services/directive-service'); await svc.addDirective(patient._id, { ...addForm, ...author }); }, () => setAdding(false))}>Save directive</button>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
 
-      {error && <p className="mt-2 text-[11px]" style={{ color: 'var(--color-danger)' }}>{error}</p>}
+      {/* Edit modal */}
+      {editingEntry && (
+        <Modal onClose={() => setEditingEntry(null)} width={480} labelledBy="edit-directive-title">
+          <div className="rounded-xl p-5 space-y-4" style={modalCard}>
+            <div className="flex items-center justify-between">
+              <h2 id="edit-directive-title" className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>Edit Directive</h2>
+              <button className="p-1 rounded hover:bg-red-50 transition-colors" onClick={() => setEditingEntry(null)} style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Type</label>
+              <select value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value as DirectiveType })} className="w-full p-2.5 rounded-md text-[12px]" style={inputStyle}>
+                {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
+              </select>
+            </div>
+            <input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className={inputCls} style={inputStyle} />
+            {error && <p className="text-[11px]" style={{ color: 'var(--color-danger)' }}>{error}</p>}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setEditingEntry(null)}>Cancel</button>
+              <button className="btn btn-sm btn-primary" disabled={busy || editForm.description.trim().length === 0} onClick={() => run(async () => { const svc = await import('@/lib/services/directive-service'); await svc.updateDirective(patient._id, editingEntry.id, editForm); }, () => setEditingEntry(null))}>Save changes</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Revoke confirmation modal */}
+      {removingEntry && (
+        <Modal onClose={() => setRemovingEntry(null)} width={440} labelledBy="revoke-directive-title">
+          <div className="rounded-xl p-5 space-y-4" style={modalCard}>
+            <div className="flex items-center justify-between">
+              <h2 id="revoke-directive-title" className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>Revoke Directive</h2>
+              <button className="p-1 rounded hover:bg-red-50 transition-colors" onClick={() => setRemovingEntry(null)} style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+              Revoke <strong>{typeLabel(removingEntry.type)}</strong>? A reason is required.
+            </p>
+            <input autoFocus value={removalReason} onChange={(e) => setRemovalReason(e.target.value)} placeholder="Reason for revoking" className={inputCls} style={inputStyle} />
+            {error && <p className="text-[11px]" style={{ color: 'var(--color-danger)' }}>{error}</p>}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setRemovingEntry(null)}>Cancel</button>
+              <button className="btn btn-sm" disabled={busy || removalReason.trim().length === 0} onClick={() => run(async () => { const svc = await import('@/lib/services/directive-service'); await svc.removeDirective(patient._id, removingEntry.id, removalReason); }, () => setRemovingEntry(null))} style={{ background: 'var(--color-danger)', color: '#fff', borderRadius: 8, padding: '6px 16px', fontSize: 13 }}>Confirm revocation</button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

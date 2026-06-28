@@ -43,7 +43,7 @@ export default function GetStartedCard() {
       >
         <button
           onClick={() => setCollapsed(false)}
-          className="flex items-center gap-1.5 rounded-full px-1.5 py-1 transition-transform hover:scale-105"
+          className="flex items-center gap-1.5 rounded-full px-1.5 py-1 transition-transform"
         >
           Get started
           <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px]">

@@ -59,7 +59,7 @@ export default function TermsPage() {
           <h2 style={{ marginTop: 24, fontSize: 18 }}>5. Contact</h2>
           <p>
             Questions about these terms should be directed to your facility administrator or
-            the platform operator at <a href="mailto:hello@tamamhealth.org" style={{ color: 'var(--accent-text)' }}>hello@tamamhealth.org</a>.
+            the platform operator at <a href="mailto:support.tamam@gmail.com" style={{ color: 'var(--accent-text)' }}>support.tamam@gmail.com</a>.
           </p>
 
           <p style={{ marginTop: 28, fontSize: 12.5, color: 'var(--text-muted)' }}>

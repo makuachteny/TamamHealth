@@ -35,7 +35,7 @@ function validSession(overrides: Partial<CreateSessionInput> = {}): CreateSessio
     patientId: 'pat-001',
     patientName: 'John Doe',
     patientPhone: '211912345678',
-    patientEmail: 'john@example.com',
+    patientEmail: 'support.tamam@gmail.com',
     providerId: 'prov-001',
     providerName: 'Dr. Smith',
     providerRole: 'doctor',

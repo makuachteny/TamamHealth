@@ -94,5 +94,23 @@ export function usePrescriptions() {
     return result;
   }, [loadPrescriptions]);
 
-  return { prescriptions, loading, error, create, dispense, administer, voidAdministration, advance, reload: loadPrescriptions };
+  const discontinue = useCallback(async (
+    id: string,
+    reason: string,
+    source: 'clinician' | 'patient_reported',
+    stoppedByName: string,
+  ) => {
+    const { updatePrescription } = await import('../services/prescription-service');
+    const result = await updatePrescription(id, {
+      status: 'discontinued',
+      stoppedAt: new Date().toISOString(),
+      stoppedReason: reason,
+      stoppedSource: source,
+      stoppedByName,
+    });
+    await loadPrescriptions();
+    return result;
+  }, [loadPrescriptions]);
+
+  return { prescriptions, loading, error, create, dispense, administer, voidAdministration, advance, discontinue, reload: loadPrescriptions };
 }

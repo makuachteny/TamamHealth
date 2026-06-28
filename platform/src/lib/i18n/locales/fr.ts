@@ -1386,6 +1386,7 @@ const fr: TranslationMap = {
   'mar.recordAdministration': 'Enregistrer l\'administration',
   'referrals.completing': 'Finalisation…',
   'patientNew.nokAddressPlaceholder': 'Adresse du proche parent',
+  'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'Programmé',
   'anc.view': 'Voir',
   'patientNew.payam': 'Payam (sous-comté)',

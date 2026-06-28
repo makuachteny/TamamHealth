@@ -204,7 +204,6 @@ export default function AlertsPage() {
         <div
           className="icon-box flex-shrink-0"
           style={{
-            background: '#fff',
             border: `1px solid ${styles.border}`,
             color: styles.color,
           }}

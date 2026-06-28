@@ -1,13 +1,15 @@
-"use client";
-
-import Link from "next/link";
 import Image from "next/image";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
-  FAQItem,
   CheckItem,
-  TestimonialSwoosh,
 } from "@/components/marketing/MarketingShared";
+import {
+  FeatureFAQSection,
+  FeatureRelatedProductsSection,
+  FeatureStatsBand,
+  FeatureTestimonialSection,
+} from "@/components/marketing/FeatureSections";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Telehealth Product Page
@@ -17,50 +19,21 @@ import {
 export default function TelehealthPage() {
   return (
     <>
-      {/* ── HERO SECTION ────────────────────────────────────────────── */}
-      <section className="mk-hero" id="demo">
-        <div className="mk-container">
-          <div className="mk-hero-flex">
-            {/* Left: Headline + Description */}
-            <div className="mk-hero-content">
-              <span className="mk-label">TELEHEALTH</span>
-              <h1 className="mk-h1">
-                Get expert care in 30 minutes, not 8 hours of travel — video that works on any network
-              </h1>
-              <p className="mk-body-lg">
-                Rural clinics lose 70% of patients who can&apos;t afford the journey to a specialist. TamamHealth Telehealth connects them in 30 minutes — with video that works on 2G networks and costs a fraction of the travel. Specialists diagnose and treat from anywhere. Power outages and poor connectivity are no barrier to care.
-              </p>
-              <div style={{ display: "flex", gap: 16, alignItems: "center", margin: "24px 0 32px" }}>
-                <div style={{ backgroundColor: "var(--tb-gold-light)", padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", color: "var(--tb-text)" }}>
-                  Works on 2G/3G Networks
-                </div>
-                <div style={{ backgroundColor: "var(--tb-gold-light)", padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", color: "var(--tb-text)" }}>
-                  4x More Specialist Access
-                </div>
-              </div>
-              <div style={{ marginTop: 32 }}>
-                <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
-                  See offline capability demo
-                </Link>
-              </div>
-            </div>
-
-            {/* Center: Hero Photo */}
-            <div className="mk-hero-photo">
-              <Reveal delay={0.15}>
-                <Image
-                  src="/assets/doctor-tablet-review.jpg"
-                  alt="Doctor reviewing patient data on tablet"
-                  width={260}
-                  height={380}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
-                  priority
-                />
-              </Reveal>
-            </div>
-          </div>
-        </div>
-      </section>
+      <MarketingHero
+        variant="mosaic"
+        eyebrow="TELEHEALTH"
+        title="Expert care in 30 minutes, not 8 hours of travel"
+        subtitle="TamamHealth Telehealth connects rural clinics to specialists with video that works on constrained networks and costs a fraction of patient travel."
+        primaryCta={{ label: "See offline capability demo", href: "/about/contact?intent=demo#contact-form" }}
+        stats={[
+          { value: "2G/3G", label: "network support" },
+          { value: "4x", label: "more specialist access" },
+        ]}
+        image="/assets/doctor-tablet-review.jpg"
+        imageAlt="Doctor reviewing patient data on tablet"
+        imagePriority
+        className="mk-hero-telehealth"
+      />
 
       {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
       <section className="mk-section mk-section-white" style={{ backgroundColor: "var(--tb-cream-100)" }}>
@@ -70,7 +43,7 @@ export default function TelehealthPage() {
               Telehealth in 3 steps
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 32 }}>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>1</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   Patient books appointment
@@ -79,7 +52,7 @@ export default function TelehealthPage() {
                   Via SMS, web portal, or clinic staff. Appointment syncs to specialist&apos;s calendar in Juba. Patient receives reminder SMS.
                 </p>
               </div>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>2</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   Secure HD video consult
@@ -88,7 +61,7 @@ export default function TelehealthPage() {
                   Works on 2G/3G; adjusts quality automatically. Share lab images, X-rays, ECGs in real-time. Record for follow-up.
                 </p>
               </div>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>3</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   Visit notes auto-sync to EHR
@@ -353,132 +326,71 @@ export default function TelehealthPage() {
       </section>
 
       {/* ── STATS SECTION ────────────────────────────────────────────── */}
-      <section className="mk-stat-band">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-stat-row">
-              <div className="mk-stat-badge">
-                <strong>95%</strong>
-                <span>Connection success rate</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>92%</strong>
-                <span>Patient satisfaction</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>4x</strong>
-                <span>Specialist access increase</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>500MB</strong>
-                <span>Per 60-min call on 3G</span>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureStatsBand
+        stats={[
+          { value: "95%", label: "Connection success rate" },
+          { value: "92%", label: "Patient satisfaction" },
+          { value: "4x", label: "Specialist access increase" },
+          { value: "500MB", label: "Per 60-min call on 3G" },
+        ]}
+      />
 
-      {/* ── TESTIMONIAL SECTION ─────────────────────────────────────── */}
-      <section className="mk-section mk-section-teal">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-testimonial-inner">
-              <div className="mk-testimonial-swoosh">
-                <TestimonialSwoosh />
-              </div>
+      <FeatureTestimonialSection
+        testimonial={{
+          quote: "Before TamamHealth Telehealth, patients either didn't see specialists or spent weeks traveling and a month's wages getting to Juba. Now we do 30-40 consultations per week across our health posts. The video quality on 3G is excellent, and specialists can review patient images in real-time. We've increased specialist access 4x, and patient outcomes have improved dramatically.",
+          name: "Dr. Amir Hassan",
+          role: "Regional Health Director, Eastern Equatoria State",
+        }}
+      />
 
-              <div className="mk-testimonial-quote">
-                <div className="mk-quote-mark">&ldquo;</div>
-                <blockquote>
-                  Before TamamHealth Telehealth, patients either didn&apos;t see specialists or spent weeks traveling and a month&apos;s wages getting to Juba. Now we do 30-40 consultations per week across our health posts. The video quality on 3G is excellent, and specialists can review patient images in real-time. We&apos;ve increased specialist access 4x, and patient outcomes have improved dramatically.
-                </blockquote>
-                <cite>
-                  <strong>Dr. Amir Hassan</strong>
-                  <span>Regional Health Director, Eastern Equatoria State</span>
-                </cite>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureFAQSection
+        faqs={[
+          {
+            question: "How does the video quality work on poor network connections?",
+            answer: "Our adaptive bitrate system starts at 1080p on fast connections and automatically scales down to 240p on 2G/3G networks. The video remains smooth and usable at all quality levels. We optimize frame rate and resolution in real-time based on available bandwidth.",
+          },
+          {
+            question: "Can video sessions be recorded for training?",
+            answer: "Yes. Recordings are optional and require explicit patient consent before any call begins. Recordings are encrypted and stored securely with automatic compliance audit trails. Providers can use recordings for quality assurance and staff training with proper authorization.",
+          },
+          {
+            question: "What happens if a patient doesn't show up to their appointment?",
+            answer: "No-show management is built in. Providers receive notifications when patients don't join at their appointment time. The system tracks no-show patterns and can send automated reminders via SMS or push notification to reduce missed appointments.",
+          },
+          {
+            question: "What if the internet drops during a call?",
+            answer: "The system gracefully handles disconnections. If a network drop occurs, the call is temporarily suspended and the connection is automatically re-established if the patient reconnects within 5 minutes. Voice-only fallback mode can continue the consultation without video.",
+          },
+          {
+            question: "Do mobile apps work offline?",
+            answer: "Our native iOS and Android apps support offline video recording. Providers can record video locally and it will automatically sync to the platform when connection returns. The app also caches patient information and appointment schedules for offline access.",
+          },
+        ]}
+      />
 
-      {/* ── FAQ SECTION ─────────────────────────────────────────────── */}
-      <section className="mk-faq-section">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2 mk-faq-title">Frequently asked questions</h2>
-
-            <div className="mk-faq-list">
-              <FAQItem
-                question="How does the video quality work on poor network connections?"
-                answer="Our adaptive bitrate system starts at 1080p on fast connections and automatically scales down to 240p on 2G/3G networks. The video remains smooth and usable at all quality levels. We optimize frame rate and resolution in real-time based on available bandwidth."
-              />
-              <FAQItem
-                question="Can video sessions be recorded for training?"
-                answer="Yes. Recordings are optional and require explicit patient consent before any call begins. Recordings are encrypted and stored securely with automatic compliance audit trails. Providers can use recordings for quality assurance and staff training with proper authorization."
-              />
-              <FAQItem
-                question="What happens if a patient doesn't show up to their appointment?"
-                answer="No-show management is built in. Providers receive notifications when patients don't join at their appointment time. The system tracks no-show patterns and can send automated reminders via SMS or push notification to reduce missed appointments."
-              />
-              <FAQItem
-                question="What if the internet drops during a call?"
-                answer="The system gracefully handles disconnections. If a network drop occurs, the call is temporarily suspended and the connection is automatically re-established if the patient reconnects within 5 minutes. Voice-only fallback mode can continue the consultation without video."
-              />
-              <FAQItem
-                question="Do mobile apps work offline?"
-                answer="Our native iOS and Android apps support offline video recording. Providers can record video locally and it will automatically sync to the platform when connection returns. The app also caches patient information and appointment schedules for offline access."
-              />
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── RELATED PRODUCTS ────────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 48 }}>
-              Empower telehealth with integrated care
-            </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 32 }}>
-              <div style={{ backgroundColor: "var(--tb-tint-blue)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  EHR Module
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Telehealth consultations auto-document to patient EHR. Complete specialist recommendations available to local clinician immediately.
-                </p>
-                <Link href="/ehr" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Learn more
-                </Link>
-              </div>
-              <div style={{ backgroundColor: "var(--tb-tint-gold)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  Pharmacy & Lab Module
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Share lab results and imaging with specialists during video calls. Order prescriptions from consultation recommendations instantly.
-                </p>
-                <Link href="/pharmacy-lab" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Learn more
-                </Link>
-              </div>
-              <div style={{ backgroundColor: "var(--tb-tint-green)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  Patient Experience
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Patients book appointments, receive reminders, and access consultation notes via secure portal. Multi-language support included.
-                </p>
-                <Link href="/patient-experience" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Learn more
-                </Link>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureRelatedProductsSection
+        heading="Empower telehealth with integrated care"
+        products={[
+          {
+            title: "EHR Module",
+            body: "Telehealth consultations auto-document to patient EHR. Complete specialist recommendations available to local clinician immediately.",
+            href: "/ehr",
+            tone: "blue",
+          },
+          {
+            title: "Pharmacy & Lab Module",
+            body: "Share lab results and imaging with specialists during video calls. Order prescriptions from consultation recommendations instantly.",
+            href: "/pharmacy-lab",
+            tone: "gold",
+          },
+          {
+            title: "Patient Experience",
+            body: "Patients book appointments, receive reminders, and access consultation notes via secure portal. Multi-language support included.",
+            href: "/patient-experience",
+            tone: "green",
+          },
+        ]}
+      />
 
     </>
   );

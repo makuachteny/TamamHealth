@@ -5,7 +5,7 @@ import TopBar from '@/components/TopBar';
 import Modal from '@/components/Modal';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
-import { Plus, Save, Search } from '@/components/icons/lucide';
+import { Plus, Save, Search, Trash2 } from '@/components/icons/lucide';
 import {
   getFeeSchedule, createFee, updateFee, deleteFee, type FeeInput,
 } from '@/lib/services/fee-schedule-service';
@@ -171,7 +171,7 @@ export default function ServicePricingPage() {
                     </td>
                     <td className="px-4 py-2.5 text-right whitespace-nowrap">
                       <button onClick={() => openEdit(fee)} className="text-[12px] font-semibold mr-3" style={{ color: 'var(--accent-text)' }}>Edit</button>
-                      <button onClick={() => setRemovingFee(fee)} className="text-[12px] font-semibold" style={{ color: 'var(--color-danger)' }}>Remove</button>
+                      <button onClick={() => setRemovingFee(fee)} aria-label="Remove fee" title="Remove fee" className="p-1.5 rounded-lg transition-colors hover:bg-red-50" style={{ color: 'var(--color-danger)' }}><Trash2 className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 ))}

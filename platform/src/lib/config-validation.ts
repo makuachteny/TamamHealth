@@ -76,5 +76,15 @@ export function validateProductionConfig(env: ConfigEnv): string[] {
     }
   }
 
+  // --- Payment webhooks ------------------------------------------------------
+  // Public money-movement callbacks must not run unsigned in production. The
+  // individual routes keep a non-production fallback for local gateway testing.
+  if (!env.AIRTEL_WEBHOOK_SECRET) {
+    errors.push('AIRTEL_WEBHOOK_SECRET is unset — Airtel webhooks would be unsigned in production.');
+  }
+  if (!env.MPESA_WEBHOOK_SECRET) {
+    errors.push('MPESA_WEBHOOK_SECRET is unset — M-Pesa webhooks would be unsigned in production.');
+  }
+
   return errors;
 }

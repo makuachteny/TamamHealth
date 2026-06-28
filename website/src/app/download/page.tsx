@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { Reveal, CheckItem, FAQItem } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
+import { ShieldCheck } from "@/components/marketing/icons";
 
 /* ═══════════════════════════════════════════════════════════════════
    Download & Set Up — how facilities get and install TamamHealth.
@@ -19,43 +20,26 @@ const ANDROID_APK_URL = "https://github.com/tamamhealth/tamamhealth/releases/lat
 export default function DownloadPage() {
   return (
     <>
-      {/* ── HERO ─────────────────────────────────────────────── */}
-      <section className="mk-hero-split">
-        <div className="mk-container">
-          <div className="mk-hero-split-grid">
-            <Reveal>
-              <div className="mk-hero-split-text">
-                <p className="mk-label">DOWNLOAD &amp; SET UP</p>
-                <h1 className="mk-h1">Get TamamHealth on any device.</h1>
-                <p>
-                  TamamHealth is offline-first — install it once and it keeps working
-                  through power cuts and connectivity gaps, syncing automatically when
-                  you&apos;re back online. No app store required.
-                </p>
-                <div className="mk-hero-split-actions">
-                  <a href={APP_URL} className="mk-btn mk-btn-green mk-btn-lg" target="_blank" rel="noopener noreferrer">
-                    Open the web app
-                  </a>
-                  <a href={ANDROID_APK_URL} className="mk-btn mk-btn-outline mk-btn-lg" target="_blank" rel="noopener noreferrer">
-                    Download for Android
-                  </a>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <span className="mk-hero-split-meta">Works 100% offline</span>
-                  <span className="mk-hero-split-meta">Phone, tablet &amp; desktop</span>
-                  <span className="mk-hero-split-meta">Data stays in-country</span>
-                </div>
-              </div>
-            </Reveal>
-            <Reveal delay={0.1}>
-              <div className="mk-hero-split-image">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/assets/dashboard-screenshot.png" alt="TamamHealth running on a device" loading="eager" />
-              </div>
-            </Reveal>
+      <MarketingHero
+        variant="console"
+        eyebrow="DOWNLOAD & SET UP"
+        title="Get TamamHealth on any device."
+        subtitle="TamamHealth is offline-first. Install it once and it keeps working through power cuts and connectivity gaps, syncing automatically when you're back online."
+        primaryCta={{ label: "Open the web app", href: APP_URL }}
+        secondaryCta={{ label: "Download for Android", href: ANDROID_APK_URL }}
+        stats={[
+          { value: "100%", label: "offline capable" },
+          { value: "Any", label: "phone, tablet, desktop" },
+          { value: "Local", label: "data can stay in-country" },
+        ]}
+        media={(
+          <div className="mk-dashboard-crop">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/assets/Dashboard.png" alt="TamamHealth running on a device" loading="eager" />
           </div>
-        </div>
-      </section>
+        )}
+        className="mk-hero-download"
+      />
 
       {/* ── THREE WAYS TO INSTALL ────────────────────────────── */}
       <section className="mk-section mk-section-cream">
@@ -70,7 +54,7 @@ export default function DownloadPage() {
           <div className="mk-grid-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
             {/* Web app / PWA */}
             <Reveal>
-              <div className="mk-card" style={{ background: "#fff", borderRadius: 16, padding: 28, border: "1px solid var(--tb-cream-300)", height: "100%" }}>
+              <div className="mk-card" style={{ background: "#FEFFF9", borderRadius: 16, padding: 28, border: "1px solid var(--tb-cream-300)", height: "100%" }}>
                 <p className="mk-label">RECOMMENDED</p>
                 <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Web app (phone, tablet, desktop)</h3>
                 <p style={{ marginBottom: 16 }}>Open the app in any modern browser, then add it to your home screen — it installs like a normal app and runs offline.</p>
@@ -84,7 +68,7 @@ export default function DownloadPage() {
 
             {/* Android APK */}
             <Reveal delay={0.05}>
-              <div className="mk-card" style={{ background: "#fff", borderRadius: 16, padding: 28, border: "1px solid var(--tb-cream-300)", height: "100%" }}>
+              <div className="mk-card" style={{ background: "#FEFFF9", borderRadius: 16, padding: 28, border: "1px solid var(--tb-cream-300)", height: "100%" }}>
                 <p className="mk-label">ANDROID</p>
                 <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Android app (.apk)</h3>
                 <p style={{ marginBottom: 16 }}>For phones without Play Store access. Download the signed APK and install it directly.</p>
@@ -101,7 +85,7 @@ export default function DownloadPage() {
 
             {/* Self-host */}
             <Reveal delay={0.1}>
-              <div className="mk-card" style={{ background: "#fff", borderRadius: 16, padding: 28, border: "1px solid var(--tb-cream-300)", height: "100%" }}>
+              <div className="mk-card" style={{ background: "#FEFFF9", borderRadius: 16, padding: 28, border: "1px solid var(--tb-cream-300)", height: "100%" }}>
                 <p className="mk-label">MINISTRIES &amp; IT TEAMS</p>
                 <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Run your own server</h3>
                 <p style={{ marginBottom: 16 }}>Host the national server in-country so all patient data stays within your borders. One command on an Ubuntu server.</p>
@@ -110,7 +94,7 @@ export default function DownloadPage() {
                   <li>Set your domain + secrets, run the deploy script (Docker + auto-TLS).</li>
                   <li>Facilities point their app at your server and sync to it.</li>
                 </ol>
-                <Link href="/about/contact" className="mk-btn mk-btn-outline mk-btn-sm" style={{ marginTop: 16 }}>
+                <Link href="/about/contact?intent=partnership#contact-form" className="mk-btn mk-btn-outline mk-btn-sm" style={{ marginTop: 16 }}>
                   Get the deployment guide
                 </Link>
               </div>
@@ -153,9 +137,9 @@ export default function DownloadPage() {
             </div>
           </Reveal>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20, maxWidth: 900, margin: "0 auto" }}>
-            <Reveal><div><h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}><DuoIcon name="shield-check" size={18} /> Any device</h3><p style={{ fontSize: 15 }}>Android 8+, iPhone/iPad, or any Windows/Mac/Linux computer with a modern browser (Chrome, Edge, Safari, Firefox).</p></div></Reveal>
-            <Reveal delay={0.05}><div><h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}><DuoIcon name="shield-check" size={18} /> No constant internet</h3><p style={{ fontSize: 15 }}>Works fully offline after install. You only need a connection occasionally to sync — even a brief mobile-data window is enough.</p></div></Reveal>
-            <Reveal delay={0.1}><div><h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}><DuoIcon name="shield-check" size={18} /> An account</h3><p style={{ fontSize: 15 }}>Provided by your facility admin or Ministry. Don&apos;t have one yet? Request a demo and we&apos;ll get you set up.</p></div></Reveal>
+            <Reveal><div><h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}><ShieldCheck size={18} strokeWidth={1.8} /> Any device</h3><p style={{ fontSize: 15 }}>Android 8+, iPhone/iPad, or any Windows/Mac/Linux computer with a modern browser (Chrome, Edge, Safari, Firefox).</p></div></Reveal>
+            <Reveal delay={0.05}><div><h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}><ShieldCheck size={18} strokeWidth={1.8} /> No constant internet</h3><p style={{ fontSize: 15 }}>Works fully offline after install. You only need a connection occasionally to sync — even a brief mobile-data window is enough.</p></div></Reveal>
+            <Reveal delay={0.1}><div><h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}><ShieldCheck size={18} strokeWidth={1.8} /> An account</h3><p style={{ fontSize: 15 }}>Provided by your facility admin or Ministry. Don&apos;t have one yet? Request a demo and we&apos;ll get you set up.</p></div></Reveal>
           </div>
         </div>
       </section>

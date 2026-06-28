@@ -25,27 +25,68 @@ export type CalEvent = { id: string; title: string; start: Date; end: Date; reso
 // day/week/month view switcher docked on the right (mirrors the same filter
 // that lives beside the search bar — both drive the calendar granularity).
 const rbcNavBtn: React.CSSProperties = {
-  background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)',
-  borderRadius: 8, width: 34, height: 34, display: 'flex', alignItems: 'center',
-  justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)',
+  background: 'transparent',
+  border: '1px solid var(--glass-border)',
+  borderRadius: 8,
+  width: 32,
+  height: 32,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  color: 'var(--text-secondary)',
+  transition: 'background 0.15s',
 };
 const CAL_VIEWS: ('day' | 'week' | 'month')[] = ['day', 'week', 'month'];
+
 function CalToolbar({ label, onNavigate, onView, view }: ToolbarProps<CalEvent, object>) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-      <button type="button" onClick={() => onNavigate('PREV')} aria-label="Previous" style={rbcNavBtn}><ChevronLeft size={18} /></button>
-      <button type="button" onClick={() => onNavigate('NEXT')} aria-label="Next" style={rbcNavBtn}><ChevronRight size={18} /></button>
-      <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{label}</h3>
-      {/* View switcher — right-aligned in the calendar header card. */}
-      <div style={{ marginLeft: 'auto', display: 'flex', height: 34, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-medium)' }}>
-        {CAL_VIEWS.map(v => (
-          <button key={v} type="button" onClick={() => onView(v as View)} style={{
-            display: 'flex', alignItems: 'center', padding: '0 14px', border: 'none', cursor: 'pointer',
-            fontSize: 13, fontWeight: 600, textTransform: 'capitalize',
-            background: view === v ? 'var(--accent-primary)' : 'var(--bg-card)',
-            color: view === v ? '#fff' : 'var(--text-secondary)',
-            transition: 'background 0.15s, color 0.15s',
-          }}>{v}</button>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+      {/* Today */}
+      <button
+        type="button"
+        onClick={() => onNavigate('TODAY')}
+        style={{
+          height: 32, padding: '0 14px', borderRadius: 8,
+          border: '1px solid var(--glass-border)',
+          background: 'var(--bg-card-solid)',
+          color: 'var(--text-secondary)',
+          fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          fontFamily: "'DM Sans', sans-serif",
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Today
+      </button>
+      {/* Prev / Next */}
+      <button type="button" onClick={() => onNavigate('PREV')} aria-label="Previous" style={rbcNavBtn}>
+        <ChevronLeft size={16} />
+      </button>
+      <button type="button" onClick={() => onNavigate('NEXT')} aria-label="Next" style={rbcNavBtn}>
+        <ChevronRight size={16} />
+      </button>
+      {/* Period label */}
+      <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>{label}</h3>
+      {/* View switcher */}
+      <div style={{ marginLeft: 'auto', display: 'flex', height: 32, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'var(--bg-card-solid)' }}>
+        {CAL_VIEWS.map((v, i) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onView(v as View)}
+            style={{
+              display: 'flex', alignItems: 'center', padding: '0 14px',
+              borderLeft: i === 0 ? 'none' : '1px solid var(--glass-border)',
+              cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              textTransform: 'capitalize',
+              fontFamily: "'DM Sans', sans-serif",
+              background: view === v ? 'var(--accent-primary)' : 'transparent',
+              color: view === v ? '#fff' : 'var(--text-secondary)',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+          >
+            {v}
+          </button>
         ))}
       </div>
     </div>
@@ -94,10 +135,20 @@ export default function AppointmentsCalendar({
       onSelectSlot={(slot: { start: Date }) => onSelectSlot(slot)}
       eventPropGetter={(e: { resource: AppointmentDoc }) => {
         const a = e.resource;
-        const color = a.appointmentType === 'walk_in'
-          ? '#7C3AED'
-          : (statusConfig[a.status]?.color || 'var(--accent-primary)');
-        return { style: { backgroundColor: color, borderColor: color, color: '#fff', borderRadius: 6, border: 'none', fontSize: 12, padding: '1px 6px' } };
+        const statusColor = statusConfig[a.status]?.color || 'var(--accent-primary)';
+        return {
+          style: {
+            backgroundColor: statusColor,
+            borderColor: statusColor,
+            color: '#fff',
+            borderRadius: 6,
+            border: 'none',
+            fontSize: 12,
+            fontFamily: "'DM Sans', sans-serif",
+            fontWeight: 600,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+          },
+        };
       }}
       dayPropGetter={(d: Date) => {
         const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

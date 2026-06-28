@@ -2,11 +2,16 @@
  * Tests for role-based permissions and route access control
  */
 import { getRoleConfig, isRouteAllowed, getDefaultDashboard, ROLE_PERMISSIONS } from '../lib/permissions';
+import { ROLE_ROUTE_TABLE } from '../lib/role-routes';
 import type { UserRole } from '../lib/db-types';
 
-const ALL_ROLES: UserRole[] = ['doctor', 'clinical_officer', 'nurse', 'lab_tech', 'pharmacist', 'front_desk', 'government'];
+const ALL_ROLES = Object.keys(ROLE_PERMISSIONS) as UserRole[];
 
 describe('permissions', () => {
+  test('covers every route-gated role', () => {
+    expect(new Set(Object.keys(ROLE_PERMISSIONS))).toEqual(new Set(Object.keys(ROLE_ROUTE_TABLE)));
+  });
+
   describe('getRoleConfig', () => {
     test.each(ALL_ROLES)('returns config for role: %s', (role) => {
       const config = getRoleConfig(role);

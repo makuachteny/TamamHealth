@@ -82,7 +82,7 @@ const buildPaymentMethods = (bankDetails?: string): PaymentMethodDef[] => [
   { id: 'mtn', label: 'MTN Mobile Money', desc: 'Pay via MTN MoMo', icon: Smartphone, color: '#FFCB05', instructions: 'Dial *165# > Pay Bill\nMerchant Code: TamamHealth\nReference: Your Invoice #' },
   { id: 'airtel', label: 'Airtel Money', desc: 'Pay via Airtel Money', icon: Smartphone, color: '#ED1C24', instructions: 'Dial *185# > Pay Bill\nBusiness Name: TamamHealth HEALTH\nReference: Your Invoice #' },
   { id: 'card', label: 'Visa / Mastercard', desc: 'Secure card payment via Flutterwave', icon: CreditCard, color: '#6366f1', instructions: 'Click "Pay Now" to be redirected to our secure payment gateway powered by Flutterwave.' },
-  { id: 'bank', label: 'Bank Transfer', desc: 'Direct bank deposit', icon: Building2, color: '#3b82f6', instructions: resolveBankInstructions(bankDetails) },
+  { id: 'bank', label: 'Bank Transfer', desc: 'Direct bank deposit', icon: Building2, color: '#2191D0', instructions: resolveBankInstructions(bankDetails) },
 ];
 
 export default function PatientPortalPage() {
@@ -257,7 +257,6 @@ export default function PatientPortalPage() {
                         {/* Icon */}
                         <div className="icon-box-sm" style={{
                           flexShrink: 0,
-                          background: isPaid ? 'var(--color-success-bg)' : 'var(--accent-light)',
                         }}>
                           {isPaid
                             ? <CheckCircle size={34} style={{ color: 'var(--color-success)' }} />
@@ -308,7 +307,7 @@ export default function PatientPortalPage() {
                             onClick={() => handlePayBill(bill)}
                             style={{
                               padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                              background: 'var(--accent-primary)', color: '#fff',
+                              background: '#2191D0', color: '#fff',
                               fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
                               transition: 'opacity 0.15s',
                             }}
@@ -380,7 +379,6 @@ export default function PatientPortalPage() {
                       <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div className="icon-box-sm" style={{
                           flexShrink: 0,
-                          background: `${m.color}14`,
                         }}>
                           <Icon size={14} style={{ color: m.color }} />
                         </div>
@@ -481,9 +479,7 @@ export default function PatientPortalPage() {
                       transition: 'all 0.15s',
                     }}
                   >
-                    <div className="icon-box-sm" style={{
-                      background: `${m.color}14`,
-                    }}>
+                    <div className="icon-box-sm">
                       <Icon size={16} style={{ color: m.color }} />
                     </div>
                     <div style={{ flex: 1 }}>
@@ -666,7 +662,7 @@ export default function PatientPortalPage() {
                 onClick={resetPayment}
                 style={{
                   padding: '12px 32px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                  background: 'var(--accent-primary)', color: '#fff',
+                  background: '#2191D0', color: '#fff',
                   fontSize: '0.875rem', fontWeight: 700,
                 }}
               >

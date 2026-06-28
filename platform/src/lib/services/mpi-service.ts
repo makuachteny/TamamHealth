@@ -1,14 +1,14 @@
 /**
- * Master Patient Index (MPI) matcher — stub for Phase 3 cross-facility /
- * cross-border patient resolution.
+ * Master Patient Index (MPI) matcher for local facility de-duplication and
+ * future cross-facility / cross-border patient resolution.
  *
  * Matching strategy (tiered, cheap-first):
  *   1. Deterministic — exact match on national ID, geocode ID, or
  *      hospitalNumber (same country only). These are high-confidence.
  *   2. Probabilistic — Jaro-Winkler similarity over firstName + surname
- *      + dateOfBirth + phone; returns a confidence score. A real MPI would
- *      use ML or Fellegi-Sunter; this stub gives the right shape + a
- *      usable baseline.
+ *      + dateOfBirth + phone; returns a confidence score. This baseline can
+ *      later be replaced with ML or Fellegi-Sunter scoring without changing
+ *      the API contract.
  *
  * The regional MPI (the spec's Regional Exchange component) would live on
  * the regional node and call this function per-country then combine. For

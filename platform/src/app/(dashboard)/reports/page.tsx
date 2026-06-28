@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import TopBar from '@/components/TopBar';
 import {
   FileText, Download, Users, Activity, Pill, BedDouble, TrendingUp,
@@ -14,6 +14,12 @@ import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useLabResults } from '@/lib/hooks/useLabResults';
+import { usePharmacyInventory } from '@/lib/hooks/usePharmacyInventory';
+import { usePayments, useLedger } from '@/lib/hooks/usePayments';
+import { useDataScope } from '@/lib/hooks/useDataScope';
+import type { BillingDoc } from '@/lib/db-types-billing';
+import { ESSENTIAL_MEDICINES } from '@/lib/services/supply-chain-service';
+import { classifyStockStatus } from '@/lib/services/pharmacy-inventory-service';
 
 /* ── CSV helper ────────────────────────────────────────────────── */
 const downloadCSV = (data: Record<string, unknown>[], filename: string) => {
@@ -98,8 +104,35 @@ export default function ReportsPage() {
   const { referrals, loading: referralsLoading } = useReferrals();
   const { alerts, loading: alertsLoading } = useSurveillance();
   const { results: labResults, loading: labLoading } = useLabResults();
+  const { items: inventoryItems, loading: inventoryLoading } = usePharmacyInventory();
+  const { payments, loading: paymentsLoading } = usePayments();
+  const { ledger, loading: ledgerLoading } = useLedger();
+  const scope = useDataScope();
+  const [bills, setBills] = useState<BillingDoc[]>([]);
+  const [billsLoading, setBillsLoading] = useState(true);
 
-  const dataLoading = patientsLoading || hospitalsLoading || referralsLoading || alertsLoading || labLoading;
+  const loadBills = useCallback(async () => {
+    if (!scope) {
+      setBills([]);
+      setBillsLoading(false);
+      return;
+    }
+    setBillsLoading(true);
+    try {
+      const { getAllBills } = await import('@/lib/services/billing-service');
+      setBills(await getAllBills(scope));
+    } catch (err) {
+      console.error('Failed to load report billing data', err);
+      setBills([]);
+    } finally {
+      setBillsLoading(false);
+    }
+  }, [scope]);
+
+  useEffect(() => { loadBills(); }, [loadBills]);
+
+  const dataLoading = patientsLoading || hospitalsLoading || referralsLoading || alertsLoading || labLoading
+    || inventoryLoading || paymentsLoading || ledgerLoading || billsLoading;
 
   // Today's ISO date (YYYY-MM-DD). Reports are regenerated on demand from
   // live data, so the most accurate "last generated" stamp we can show
@@ -338,36 +371,85 @@ export default function ReportsPage() {
 
         /* ─── Drug Consumption Report ─────────────────────── */
         case 'Drug Consumption Report': {
-          const byTest: Record<string, { total: number; completed: number; pending: number; abnormal: number; critical: number }> = {};
-          labResults.forEach(r => {
-            const t = r.testName || 'Unknown';
-            if (!byTest[t]) byTest[t] = { total: 0, completed: 0, pending: 0, abnormal: 0, critical: 0 };
-            byTest[t].total++;
-            if (r.status === 'completed') byTest[t].completed++;
-            else byTest[t].pending++;
-            if (r.abnormal) byTest[t].abnormal++;
-            if (r.critical) byTest[t].critical++;
+          const byMedication: Record<string, { dispensedToday: number; currentStock: number; reorderLevel: number; facilities: Set<string>; unit: string }> = {};
+          inventoryItems.forEach(item => {
+            const key = item.medicationName || 'Unknown';
+            if (!byMedication[key]) {
+              byMedication[key] = {
+                dispensedToday: 0,
+                currentStock: 0,
+                reorderLevel: 0,
+                facilities: new Set(),
+                unit: item.unit || '',
+              };
+            }
+            byMedication[key].dispensedToday += item.dispensedToday || 0;
+            byMedication[key].currentStock += item.stockLevel || 0;
+            byMedication[key].reorderLevel += item.reorderLevel || 0;
+            byMedication[key].facilities.add(item.hospitalName || item.hospitalId || 'Unknown');
           });
-          const rows = Object.entries(byTest)
-            .sort((a, b) => b[1].total - a[1].total)
-            .map(([test, d]) => ({
-              'Test Name': test,
-              'Total Orders': d.total,
-              Completed: d.completed,
-              Pending: d.pending,
-              'Abnormal Results': d.abnormal,
-              'Critical Results': d.critical,
+          const rows = Object.entries(byMedication)
+            .sort((a, b) => b[1].dispensedToday - a[1].dispensedToday)
+            .map(([medication, d]) => ({
+              Medication: medication,
+              'Dispensed Today': d.dispensedToday,
+              'Current Stock': d.currentStock,
+              'Reorder Level': d.reorderLevel,
+              Unit: d.unit,
+              Facilities: d.facilities.size,
             }));
-          return { rows, title: 'Lab Test Consumption Report' };
+          return { rows, title: 'Drug Consumption Report' };
         }
 
         /* ─── Stock Status Report ─────────────────────────── */
-        case 'Stock Status Report':
-          return { rows: [], title: 'Stock Status Report', placeholder: t('reports.placeholderStockStatus') };
+        case 'Stock Status Report': {
+          const rows = inventoryItems
+            .map(item => {
+              const status = item.stockLevel <= 0 ? 'stockout' : classifyStockStatus(item);
+              return {
+                Facility: item.hospitalName || item.hospitalId,
+                Medication: item.medicationName,
+                Category: item.category,
+                Status: status,
+                'Stock Level': item.stockLevel,
+                'Reorder Level': item.reorderLevel,
+                Unit: item.unit,
+                'Batch Number': item.batchNumber,
+                'Expiry Date': item.expiryDate,
+                'Dispensed Today': item.dispensedToday || 0,
+              };
+            })
+            .sort((a, b) => String(a.Status).localeCompare(String(b.Status)) || String(a.Medication).localeCompare(String(b.Medication)));
+          if (rows.length === 0) {
+            return { rows: [], title: 'Stock Status Report', placeholder: t('reports.placeholderStockStatus') };
+          }
+          return { rows, title: 'Stock Status Report' };
+        }
 
         /* ─── Essential Medicines Availability ────────────── */
-        case 'Essential Medicines Availability':
-          return { rows: [], title: 'Essential Medicines Availability', placeholder: t('reports.placeholderEssentialMedicines') };
+        case 'Essential Medicines Availability': {
+          const rows = ESSENTIAL_MEDICINES.map(medicine => {
+            const matches = inventoryItems.filter(item =>
+              item.medicationName.toLowerCase().includes(medicine.toLowerCase())
+            );
+            const totalStock = matches.reduce((sum, item) => sum + (item.stockLevel || 0), 0);
+            const facilitiesStocked = new Set(matches.filter(item => (item.stockLevel || 0) > 0).map(item => item.hospitalId)).size;
+            const lowestStatus = matches.reduce<string>((worst, item) => {
+              const status = item.stockLevel <= 0 ? 'stockout' : classifyStockStatus(item);
+              const rank: Record<string, number> = { adequate: 0, low: 1, critical: 2, expired: 3, stockout: 4, missing: 5 };
+              return rank[status] > rank[worst] ? status : worst;
+            }, matches.length ? 'adequate' : 'missing');
+            return {
+              Medicine: medicine,
+              Availability: totalStock > 0 ? 'Available' : 'Gap',
+              Status: lowestStatus,
+              'Total Stock': totalStock,
+              'Facilities Stocked': facilitiesStocked,
+              'SKUs Tracked': matches.length,
+            };
+          });
+          return { rows, title: 'Essential Medicines Availability' };
+        }
 
         /* ─── Bed Occupancy Report ────────────────────────── */
         case 'Bed Occupancy Report': {
@@ -425,8 +507,63 @@ export default function ReportsPage() {
         }
 
         /* ─── Revenue Report ──────────────────────────────── */
-        case 'Revenue Report':
-          return { rows: [], title: 'Revenue Report', placeholder: t('reports.placeholderRevenue') };
+        case 'Revenue Report': {
+          const byFacility: Record<string, {
+            charged: number;
+            collected: number;
+            outstanding: number;
+            waived: number;
+            bills: number;
+            payments: number;
+            currency: string;
+          }> = {};
+          const ensure = (facility: string, currency = 'SSP') => {
+            if (!byFacility[facility]) {
+              byFacility[facility] = { charged: 0, collected: 0, outstanding: 0, waived: 0, bills: 0, payments: 0, currency };
+            }
+            return byFacility[facility];
+          };
+          bills.forEach(bill => {
+            const row = ensure(bill.facilityName || bill.facilityId || 'Unknown', bill.currency);
+            row.charged += bill.totalAmount || 0;
+            row.outstanding += bill.balanceDue || 0;
+            row.waived += bill.status === 'waived' ? (bill.totalAmount || 0) : 0;
+            row.bills += 1;
+          });
+          payments
+            .filter(payment => payment.status === 'posted')
+            .forEach(payment => {
+              const relatedBill = payment.invoiceId ? bills.find(bill => bill._id === payment.invoiceId) : undefined;
+              const row = ensure(relatedBill?.facilityName || relatedBill?.facilityId || 'Unallocated payments', payment.currency);
+              row.collected += payment.amount || 0;
+              row.payments += 1;
+            });
+          if (payments.length === 0) {
+            ledger
+              .filter(entry => entry.entryType === 'payment' || entry.entryType === 'insurance_payment')
+              .forEach(entry => {
+                const row = ensure(entry.facilityId || 'Ledger collections', entry.currency);
+                row.collected += Math.abs(entry.amount || 0);
+              });
+          }
+          const rows = Object.entries(byFacility)
+            .sort((a, b) => b[1].charged - a[1].charged)
+            .map(([facility, d]) => ({
+              Facility: facility,
+              Currency: d.currency,
+              'Bills Issued': d.bills,
+              'Payments Posted': d.payments,
+              'Gross Charges': d.charged.toFixed(2),
+              'Collected': d.collected.toFixed(2),
+              'Outstanding': d.outstanding.toFixed(2),
+              'Waived': d.waived.toFixed(2),
+              'Collection Rate (%)': d.charged > 0 ? ((d.collected / d.charged) * 100).toFixed(1) : '0.0',
+            }));
+          if (rows.length === 0) {
+            return { rows: [], title: 'Revenue Report', placeholder: t('reports.placeholderRevenue') };
+          }
+          return { rows, title: 'Revenue Report' };
+        }
 
         /* ─── Donor Reporting Pack ────────────────────────── */
         case 'Donor Reporting Pack': {
@@ -451,7 +588,7 @@ export default function ReportsPage() {
           return { rows: [], title: reportName, placeholder: t('reports.placeholderNoGenerator') };
       }
     };
-  }, [patients, hospitals, referrals, alerts, labResults, t]);
+  }, [patients, hospitals, referrals, alerts, labResults, inventoryItems, bills, payments, ledger, t]);
 
   /* ── Render expanded report section ─────────────────────────── */
   const renderExpandedReport = (reportName: string) => {
@@ -528,7 +665,7 @@ export default function ReportsPage() {
                     style={{
                       borderBottom: '1px solid var(--overlay-light)',
                       background: isTotal
-                        ? 'rgba(59, 130, 246,0.06)'
+                        ? 'rgba(33, 145, 208, 0.06)'
                         : isSection
                           ? 'var(--overlay-light)'
                           : 'transparent',
@@ -572,13 +709,13 @@ export default function ReportsPage() {
         {/* ── Summary stats cards ─────────────────────────────── */}
         <div className="kpi-grid mb-6">
           {[
-            { id: 'totalPatients', label: t('patients.kpiTotalPatients'), value: totalPatients, icon: Users, color: 'var(--tamamhealth-blue)', bg: 'rgba(59, 130, 246,0.12)' },
+            { id: 'totalPatients', label: t('patients.kpiTotalPatients'), value: totalPatients, icon: Users, color: 'var(--tamamhealth-blue)', bg: 'rgba(33, 145, 208, 0.12)' },
             { id: 'totalReferrals', label: t('referrals.statTotal'), value: totalReferrals, icon: BedDouble, color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
             { id: 'labResults', label: t('reports.statLabResults'), value: totalLabResults, icon: FileText, color: '#1F9D6F', bg: 'rgba(31, 157, 111,0.12)' },
             { id: 'diseaseAlerts', label: t('reports.statDiseaseAlerts'), value: totalDiseaseAlerts, icon: Activity, color: '#E4A84B', bg: 'rgba(245,158,11,0.12)' },
           ].map(stat => (
             <div key={stat.id} className="kpi">
-              <div className="kpi__icon" style={{ background: stat.bg }}>
+              <div className="kpi__icon">
                 <stat.icon style={{ color: stat.color }} />
               </div>
               <div className="kpi__body">

@@ -417,7 +417,7 @@ export default function PaymentsPage() {
                       </div>
 
                       {/* Patient ID */}
-                      <div className="font-mono text-[12px] truncate" style={{ color: line.hospitalNumber ? '#3b82f6' : 'var(--text-muted)', fontWeight: 600 }}>
+                      <div className="font-mono text-[12px] truncate" style={{ color: line.hospitalNumber ? '#2191D0' : 'var(--text-muted)', fontWeight: 600 }}>
                         {line.hospitalNumber || '—'}
                       </div>
 
@@ -716,7 +716,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                 <h2 id="billing-detail-name" className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{line.patientName}</h2>
               </button>
               {line.hospitalNumber && (
-                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.10)', color: '#3b82f6', fontWeight: 600 }}>
+                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.10)', color: '#2191D0', fontWeight: 600 }}>
                   {line.hospitalNumber}
                 </span>
               )}
@@ -731,7 +731,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
         <div className="px-5 py-4" style={{
           background: owing
             ? 'linear-gradient(135deg, rgba(196, 69, 54, 0.08) 0%, rgba(228, 168, 75, 0.06) 100%)'
-            : 'linear-gradient(135deg, rgba(27, 158, 119, 0.08) 0%, rgba(59, 130, 246, 0.04) 100%)',
+            : 'linear-gradient(135deg, rgba(27, 158, 119, 0.08) 0%, rgba(33, 145, 208, 0.04) 100%)',
           borderBottom: '1px solid var(--border-light)',
         }}>
           <div className="flex items-end justify-between gap-3 flex-wrap">
@@ -773,7 +773,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                     {m.brand && <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{m.brand}</div>}
                   </div>
                   {m.isDefault && (
-                    <span className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.14)', color: '#15795C', border: '1px solid rgba(59, 130, 246, 0.30)' }}>
+                    <span className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.14)', color: '#15795C', border: '1px solid rgba(33, 145, 208, 0.30)' }}>
                       {t('payments.default')}
                     </span>
                   )}
@@ -891,9 +891,9 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                     </div>
                   </div>
                   <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
-                    background: c.status === 'paid' ? 'rgba(59, 130, 246, 0.14)' : c.status === 'denied' ? 'rgba(196, 69, 54, 0.14)' : 'rgba(228, 168, 75, 0.14)',
+                    background: c.status === 'paid' ? 'rgba(33, 145, 208, 0.14)' : c.status === 'denied' ? 'rgba(196, 69, 54, 0.14)' : 'rgba(228, 168, 75, 0.14)',
                     color: c.status === 'paid' ? '#15795C' : c.status === 'denied' ? '#8B2E24' : '#B8741C',
-                    border: c.status === 'paid' ? '1px solid rgba(59, 130, 246, 0.30)' : c.status === 'denied' ? '1px solid rgba(196, 69, 54, 0.30)' : '1px solid rgba(228, 168, 75, 0.30)',
+                    border: c.status === 'paid' ? '1px solid rgba(33, 145, 208, 0.30)' : c.status === 'denied' ? '1px solid rgba(196, 69, 54, 0.30)' : '1px solid rgba(228, 168, 75, 0.30)',
                   }}>
                     {c.status}
                   </span>
@@ -923,8 +923,8 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                         </div>
                       </div>
                       <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
-                        background: p.status === 'active' ? 'rgba(59, 130, 246, 0.14)' : p.status === 'completed' ? 'rgba(59, 130, 246, 0.14)' : 'rgba(228, 168, 75, 0.14)',
-                        color: p.status === 'active' ? '#15795C' : p.status === 'completed' ? '#3b82f6' : '#B8741C',
+                        background: p.status === 'active' ? 'rgba(33, 145, 208, 0.14)' : p.status === 'completed' ? 'rgba(33, 145, 208, 0.14)' : 'rgba(228, 168, 75, 0.14)',
+                        color: p.status === 'active' ? '#15795C' : p.status === 'completed' ? '#2191D0' : '#B8741C',
                       }}>
                         {p.status}
                       </span>

@@ -36,7 +36,7 @@ wrapper is a transparent passthrough.
 
 ### 2. Structured request log (always on)
 
-[`middleware.ts`](../../src/middleware.ts) writes one JSON line per request
+[`proxy.ts`](../../src/proxy.ts) writes one JSON line per request
 to stdout in production. This is the ground-truth audit trail; Sentry is a
 convenience layer on top of it. In dev only API + state-changing calls are
 logged, and the format is human-readable (`[REQ] METHOD path → status`).

@@ -6,8 +6,8 @@ import TextareaAutoResize from "@/components/TextareaAutoResize";
 import BootIntegrityGuard from "@/components/BootIntegrityGuard";
 
 export const metadata: Metadata = {
-  title: "TamamHealth — Digital Health Records for South Sudan",
-  description: "Offline-first hospital record system for South Sudan's public hospital network",
+  title: "TamamHealth — Every Patient Deserves to Be Remembered",
+  description: "Offline-first health records for South Sudan and Africa, built to keep patient stories connected from the bedside to the nation.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -27,7 +27,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#eff6ff" },
-    { media: "(prefers-color-scheme: dark)", color: "#1e3a8a" },
+    { media: "(prefers-color-scheme: dark)", color: "#015697" },
   ],
 };
 
@@ -39,8 +39,8 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light" suppressHydrationWarning>
       <head>
-        <link rel="icon" type="image/svg+xml" href="/assets/tamamhealth-icon.svg" />
-        <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.svg" />
+        <link rel="icon" type="image/svg+xml" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="antialiased">

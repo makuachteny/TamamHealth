@@ -1,4 +1,6 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import TodaysAppointmentsCard from '@/components/dashboard/TodaysAppointmentsCard';
 
 import { useState, useMemo, useCallback, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
@@ -78,7 +80,7 @@ interface CheckoutTarget {
 
 export default function FrontDeskDashboardPage() {
   const router = useRouter();
-  const { currentUser, globalSearch } = useApp();
+  const { currentUser } = useApp();
   const { canConsult } = usePermissions();
   const { patients } = usePatients();
   const { appointments, updateStatus: updateAppointmentStatus } = useAppointments();
@@ -91,6 +93,7 @@ export default function FrontDeskDashboardPage() {
 
   const [queueFilter, setQueueFilter] = useState<'all' | 'walk-in' | 'appointment' | 'referral'>('all');
   const [queueSort, setQueueSort] = useState<'priority' | 'name' | 'time' | 'status'>('priority');
+  const [queueSearch, setQueueSearch] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
@@ -242,7 +245,7 @@ export default function FrontDeskDashboardPage() {
   const filteredQueue = useMemo(() => {
     let items = queueFilter === 'all' ? queue : queue.filter(q => q.type === queueFilter);
 
-    const q = globalSearch.trim().toLowerCase();
+    const q = queueSearch.trim().toLowerCase();
     if (q) {
       items = items.filter(it =>
         it.patientName.toLowerCase().includes(q) ||
@@ -261,7 +264,7 @@ export default function FrontDeskDashboardPage() {
     }
 
     return items;
-  }, [queue, queueFilter, globalSearch, queueSort]);
+  }, [queue, queueFilter, queueSearch, queueSort]);
 
   // ── Selected patient previous visit info (from real records) ──
   const selectedPatient = useMemo(() =>
@@ -377,47 +380,49 @@ export default function FrontDeskDashboardPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <TopBar
-          title={t('frontDesk.receptionCenter')}
-          splitActions
-          searchTrailing={
-            // Queue filters live on the platform-wide search bar: the text search
-            // is the bar itself, this popover narrows/sorts the queue below.
-            <QueueFilters
-              filter={queueFilter}
-              setFilter={setQueueFilter}
-              sort={queueSort}
-              setSort={setQueueSort}
-              counts={{
-                all: queue.length,
-                'walk-in': queue.filter(q => q.type === 'walk-in').length,
-                appointment: queue.filter(q => q.type === 'appointment').length,
-                referral: queue.filter(q => q.type === 'referral').length,
-              }}
-            />
-          }
-          actions={
-            <>
-              <button onClick={() => router.push('/patients')} className="btn btn-secondary">
-                <QrCode className="w-4 h-4" color="var(--accent-primary)" />
-                <span className="hidden sm:inline">{t('frontDesk.findPatient')}</span>
-              </button>
-              <button onClick={() => router.push('/patients/new')} className="btn btn-primary">
-                <UserPlus className="w-4 h-4" color="#fff" />
-                <span className="hidden sm:inline">{t('frontDesk.registerNewPatient')}</span>
-              </button>
-            </>
-          } />
+      <TopBar title={t('frontDesk.receptionCenter')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+
+        <DashboardHero
+          className="mb-4"
+          stats={[
+            { label: "Today's Appts", value: todaysAppointments.length },
+            { label: 'In Queue', value: todaysTriages.length },
+            { label: 'Patients', value: patients.length },
+          ]}
+        />
 
         {/* PATIENT QUEUE TABLE — below the cards (order: 2) */}
         <div className="dash-card rounded-2xl overflow-hidden mb-4 flex flex-col" style={{ padding: '0', flex: 1, minHeight: 0, order: 2 }}>
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b flex-shrink-0 flex-wrap" style={{ borderColor: 'var(--border-light)' }}>
             <div className="flex items-center gap-2 flex-shrink-0">
               <ClipboardList className="w-4 h-4" style={{ color: ACCENT }} />
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('frontDesk.patientQueue')}</span>
             </div>
-            <button onClick={() => router.push('/patients')} className="text-xs font-medium flex items-center gap-1" style={{ color: ACCENT }}>{t('frontDesk.viewAll')} <ChevronRight className="w-3.5 h-3.5" /></button>
+            {/* In-list search + filters (matches the clinical-officer table). */}
+            <div className="flex items-center gap-2.5 flex-1 justify-end min-w-[200px]">
+              <input
+                type="search"
+                value={queueSearch}
+                onChange={(e) => setQueueSearch(e.target.value)}
+                placeholder="Search by name or patient ID…"
+                className="min-w-0 flex-1 max-w-xs"
+                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '8px 16px', fontSize: 13 }}
+              />
+              <QueueFilters
+                filter={queueFilter}
+                setFilter={setQueueFilter}
+                sort={queueSort}
+                setSort={setQueueSort}
+                counts={{
+                  all: queue.length,
+                  'walk-in': queue.filter(q => q.type === 'walk-in').length,
+                  appointment: queue.filter(q => q.type === 'appointment').length,
+                  referral: queue.filter(q => q.type === 'referral').length,
+                }}
+              />
+              <button onClick={() => router.push('/patients')} className="text-xs font-medium flex items-center gap-1 flex-shrink-0" style={{ color: ACCENT }}>{t('frontDesk.viewAll')} <ChevronRight className="w-3.5 h-3.5" /></button>
+            </div>
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             <table className="w-full" style={{ tableLayout: 'fixed', minWidth: 760 }}>
@@ -600,17 +605,18 @@ export default function FrontDeskDashboardPage() {
         </div>
 
         {/* CARDS GRID: Quick Actions + Today's Appointments — above the queue (order: 1) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3 flex-shrink-0 lg:items-start" style={{ order: 1 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-3 flex-shrink-0 lg:items-stretch" style={{ order: 1 }}>
 
           {/* Quick Actions — compact tile grid (clinician-dashboard style) */}
-          <div className="dash-card px-3 py-2.5 flex flex-col lg:self-start" style={{ order: 1 }}>
+          <div className="dash-card px-3 py-2.5 flex flex-col lg:col-span-2" style={{ order: 1 }}>
             <div className="flex items-center mb-2" style={{ height: 20 }}>
               <h3 className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('frontDesk.quickActions')}</h3>
             </div>
             <div className="grid grid-cols-2 gap-1.5 keep-cols">
               {[
                 { label: 'Check In Patient', icon: ClipboardCheck, href: '/check-in', color: 'var(--color-success)', bg: 'rgba(21,121,92,0.10)' },
-                { label: t('frontDesk.registerNewPatient'), icon: UserPlus, href: '/patients/new', color: 'var(--accent-primary)', bg: 'rgba(59,130,246,0.10)' },
+                { label: t('frontDesk.registerNewPatient'), icon: UserPlus, href: '/patients/new', color: 'var(--accent-primary)', bg: 'rgba(33,145,208,0.10)' },
+                { label: t('frontDesk.findPatient'), icon: QrCode, href: '/patients', color: '#0D9488', bg: 'rgba(13,148,136,0.10)' },
                 { label: t('frontDesk.viewReferrals'), icon: ArrowRightLeft, href: '/referrals', color: '#F59E0B', bg: 'rgba(245,158,11,0.10)' },
                 { label: t('nav.appointments'), icon: Calendar, href: '/appointments', color: '#2563EB', bg: 'rgba(37,99,235,0.10)' },
               ].map(action => (
@@ -626,38 +632,8 @@ export default function FrontDeskDashboardPage() {
             </div>
           </div>
 
-          {/* Today's Appointments — mirrors the Quick Actions card: a small label
-              header plus two rows that line up with the left tile column. */}
-          <div className="dash-card px-3 py-2.5 flex flex-col lg:self-start" style={{ order: 2 }}>
-            <div className="flex items-center justify-between mb-2" style={{ height: 20 }}>
-              <h3 className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('frontDesk.todaysAppointments')}</h3>
-              <button onClick={() => router.push('/appointments')} className="text-[11px] font-medium inline-flex items-center gap-0.5" style={{ color: ACCENT }}>{t('frontDesk.viewAll')} <ChevronRight className="w-3 h-3" /></button>
-            </div>
-            {todaysAppointments.length === 0 ? (
-              <p className="text-center text-[12px]" style={{ color: 'var(--text-muted)', minHeight: 82, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{t('frontDesk.noAppointmentsToday')}</p>
-            ) : (
-              <div className="flex flex-col gap-1.5 overflow-y-auto pr-0.5" style={{ height: 82 }}>
-                {todaysAppointments.map(appt => {
-                  const arrived = appt.status === 'checked_in' || appt.status === 'in_progress' || appt.status === 'completed';
-                  return (
-                  <div key={appt._id} onClick={() => setCheckInTarget(appt)} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all hover:bg-[var(--table-row-hover)]" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', minHeight: 38 }} title={t('frontDesk.checkInTitle')}>
-                    <span className="text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{appt.patientName}</span>
-                    <span className="flex items-center gap-2 flex-shrink-0">
-                      {arrived ? (
-                        <span className="text-[10px] font-semibold inline-flex items-center gap-1" style={{ color: 'var(--color-success)' }}>
-                          <CheckCircle className="w-3 h-3" />{t('frontDesk.checkedIn')}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-semibold" style={{ color: ACCENT }}>{t('frontDesk.checkIn')}</span>
-                      )}
-                      <span className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{appt.appointmentTime}</span>
-                    </span>
-                  </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <TodaysAppointmentsCard className="lg:col-span-1" />
+
         </div>
 
         {assignTarget && (

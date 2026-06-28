@@ -57,7 +57,7 @@ export default function FacilityAssessmentsPage() {
   if (loading) return <><TopBar title={t('facilityAssessments.topBarTitle')} /><main className="page-container flex items-center justify-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</p></main></>;
 
   const scoreColor = (score: number) => score >= 70 ? 'var(--accent-primary)' : score >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
-  const scoreBg = (score: number) => score >= 70 ? 'rgba(59, 130, 246,0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
+  const scoreBg = (score: number) => score >= 70 ? 'rgba(33, 145, 208, 0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
 
   const handleSubmit = async () => {
     if (!form.facilityId) {
@@ -231,7 +231,7 @@ export default function FacilityAssessmentsPage() {
                           ))}
                         </div>
                         {a.recommendations && (
-                          <div className="p-3 rounded-lg" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
+                          <div className="p-3 rounded-lg" style={{ background: 'rgba(33, 145, 208, 0.06)', border: '1px solid var(--accent-border)' }}>
                             <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{t('facilityAssessments.recommendations')}</p>
                             <p className="text-xs">{a.recommendations}</p>
                           </div>

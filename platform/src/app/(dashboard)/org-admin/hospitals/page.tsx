@@ -36,7 +36,7 @@ export default function OrgHospitalsPage() {
   const [formType, setFormType] = useState<string>('phcc');
   const [formBeds, setFormBeds] = useState('');
 
-  const brandColor = currentUser?.branding?.primaryColor || '#7C3AED';
+  const brandColor = currentUser?.branding?.primaryColor || 'var(--accent-primary)';
 
   const loadData = useCallback(async () => {
     if (!currentUser?.orgId) return;
@@ -132,7 +132,7 @@ export default function OrgHospitalsPage() {
   const facilityColor = (ft: string) => {
     const map: Record<string, string> = {
       national_referral: 'var(--color-danger)',
-      state_hospital: '#7C3AED',
+      state_hospital: 'var(--accent-primary)',
       county_hospital: 'var(--accent-primary)',
       phcc: 'var(--accent-primary)',
       phcu: '#06B6D4',

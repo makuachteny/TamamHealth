@@ -59,14 +59,14 @@ export async function register() {
       console.warn('  WARNING: No valid TamamHealth license key found.');
       console.warn('  Set TAMAMHEALTH_LICENSE_KEY in your .env.local file.');
       console.warn('  Run "npm run setup" to configure your license.');
-      console.warn('  Contact hello@tamamhealth.org to obtain a license.');
+      console.warn('  Contact support.tamam@gmail.com to obtain a license.');
       console.warn('  ============================================================');
       console.warn('');
     } else if (license.expired) {
       console.warn('');
       console.warn('  ============================================================');
       console.warn(`  WARNING: TamamHealth license expired on ${license.expiry.slice(0, 4)}-${license.expiry.slice(4, 6)}-${license.expiry.slice(6, 8)}.`);
-      console.warn('  Contact hello@tamamhealth.org to renew your license.');
+      console.warn('  Contact support.tamam@gmail.com to renew your license.');
       console.warn('  ============================================================');
       console.warn('');
     } else {

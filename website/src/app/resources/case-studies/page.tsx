@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
   TestimonialSwoosh,
@@ -98,33 +99,21 @@ export default function CaseStudiesPage() {
 
   return (
     <>
-      {/* ── HERO SECTION (side-by-side) ──────────────────────────────── */}
-      <section className="mk-hero-split">
-        <div className="mk-container">
-          <div className="mk-hero-split-grid">
-            <Reveal>
-              <div className="mk-hero-split-text">
-                <span className="mk-label">CASE STUDIES</span>
-                <h1 className="mk-h1">What digital health rollouts deliver</h1>
-                <p>
-                  Stories from comparable healthcare facilities across East Africa — proven strategies
-                  that drive efficiency, improve patient care, and strengthen facility finances.
-                </p>
-              </div>
-            </Reveal>
-            <Reveal delay={0.1}>
-              <div className="mk-hero-split-image">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/assets/community-health-worker.jpg"
-                  alt="Community health worker on outreach"
-                  loading="eager"
-                />
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
+      <MarketingHero
+        variant="split"
+        eyebrow="CASE STUDIES"
+        title="What digital health rollouts deliver"
+        subtitle="Stories from comparable healthcare facilities across East Africa: proven strategies that improve care, efficiency, and facility finances."
+        primaryCta={{ label: "Browse studies", href: "#facility-filter" }}
+        stats={[
+          { value: "4", label: "facilities studied" },
+          { value: "$150K+", label: "revenue recovered" },
+          { value: "45%", label: "average efficiency gain" },
+        ]}
+        image="/assets/community-health-worker.jpg"
+        imageAlt="Community health worker on outreach"
+        imagePriority
+      />
 
       {/* ── STATS BANNER ──────────────────────────────────────────────── */}
       <section className="mk-stat-band">
@@ -153,7 +142,7 @@ export default function CaseStudiesPage() {
       </section>
 
       {/* ── FACILITY TYPE FILTER ──────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
+      <section className="mk-section mk-section-white" id="facility-filter">
         <div className="mk-container">
           <Reveal>
             <div style={{ marginBottom: 48 }}>

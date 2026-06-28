@@ -1355,6 +1355,7 @@ const apd: TranslationMap = {
   'mar.recordAdministration': 'سجّل إعطاء الدوا',
   'referrals.completing': 'بكمّل...',
   'patientNew.nokAddressPlaceholder': 'عنوان أقرب قريب',
+  'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'مجدول',
   'anc.view': 'عرض',
   'patientNew.payam': 'البيام (المحلية الفرعية)',

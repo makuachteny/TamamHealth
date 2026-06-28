@@ -4,10 +4,10 @@
 
 /** Discrete 4-stop color: red(<40), amber(40-59), yellow(60-79), green(80+) */
 export function getPerformanceColor(value: number): string {
-  if (value < 40) return '#C44536';   // red
-  if (value < 60) return '#E4A84B';   // amber
-  if (value < 80) return '#EAB308';   // yellow
-  return '#1B9E77';                    // green
+  if (value < 40) return 'var(--color-danger)';   // red
+  if (value < 60) return 'var(--color-warning)';  // amber
+  if (value < 80) return 'var(--color-warning)';  // yellow
+  return 'var(--color-success)';                   // green
 }
 
 /** Smooth RGB gradient: red(0) → yellow(50) → green(100) */

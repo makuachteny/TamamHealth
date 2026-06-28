@@ -13,9 +13,10 @@ const WRITE_ROLES: UserRole[] = [
 ];
 async function patchHandler(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const auth = await getAuthPayload(request);
     if (!auth) return unauthorized();
     if (!hasRole(auth, WRITE_ROLES)) return forbidden();
@@ -28,7 +29,7 @@ async function patchHandler(
     // Check if this is a dispensing action
     if (body.status === 'dispensed') {
       const { dispensePrescription } = await import('@/lib/services/prescription-service');
-      const dispensed = await dispensePrescription(params.id, auth.name);
+      const dispensed = await dispensePrescription(id, auth.name);
       if (!dispensed) {
         return NextResponse.json({ error: 'Prescription not found' }, { status: 404 });
       }
@@ -40,7 +41,7 @@ async function patchHandler(
     delete body.type;
     delete body.createdAt;
     const { updatePrescription } = await import('@/lib/services/prescription-service');
-    const updated = await updatePrescription(params.id, body);
+    const updated = await updatePrescription(id, body);
     if (!updated) {
       return NextResponse.json({ error: 'Prescription not found' }, { status: 404 });
     }

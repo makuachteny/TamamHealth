@@ -1,13 +1,15 @@
-"use client";
-
-import Link from "next/link";
 import Image from "next/image";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
-  FAQItem,
   CheckItem,
-  TestimonialSwoosh,
 } from "@/components/marketing/MarketingShared";
+import {
+  FeatureFAQSection,
+  FeatureRelatedProductsSection,
+  FeatureStatsBand,
+  FeatureTestimonialSection,
+} from "@/components/marketing/FeatureSections";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Billing & Payments Product Page
@@ -17,50 +19,22 @@ import {
 export default function BillingPage() {
   return (
     <>
-      {/* ── HERO SECTION ────────────────────────────────────────────── */}
-      <section className="mk-hero" id="demo">
-        <div className="mk-container">
-          <div className="mk-hero-flex">
-            {/* Left: Headline + Description */}
-            <div className="mk-hero-content">
-              <span className="mk-label">BILLING & PAYMENTS</span>
-              <h1 className="mk-h1">
-                Get paid in days, not months — smart claims and M-Pesa collection for African healthcare
-              </h1>
-              <p className="mk-body-lg">
-                Clinics in South Sudan face 12-18% claim denials, manual M-Pesa reconciliation, and months waiting for reimbursement. TamamHealth&apos;s billing engine cuts denials to under 5%, automates mobile money collection, and accelerates cash flow — with zero error-prone paperwork.
-              </p>
-              <div style={{ display: "flex", gap: 16, alignItems: "center", margin: "24px 0 32px" }}>
-                <div style={{ backgroundColor: "var(--tb-gold-light)", padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", color: "var(--tb-text)" }}>
-                  65% Fewer Billing Errors
-                </div>
-                <div style={{ backgroundColor: "var(--tb-gold-light)", padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", color: "var(--tb-text)" }}>
-                  37% Higher Collections
-                </div>
-              </div>
-              <div style={{ marginTop: 32 }}>
-                <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
-                  Calculate your savings
-                </Link>
-              </div>
-            </div>
-
-            {/* Center: Hero Photo */}
-            <div className="mk-hero-photo">
-              <Reveal delay={0.15}>
-                <Image
-                  src="/assets/doctor-prescription.jpg"
-                  alt="Healthcare professional managing billing documentation"
-                  width={260}
-                  height={380}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
-                  priority
-                />
-              </Reveal>
-            </div>
-          </div>
-        </div>
-      </section>
+      <MarketingHero
+        variant="impact"
+        eyebrow="BILLING & PAYMENTS"
+        title="Get paid in days, not months."
+        subtitle="Smart claims and mobile money collection reduce denials, automate reconciliation, and give finance teams a clear view of every payment."
+        primaryCta={{ label: "Calculate your savings", href: "/about/contact?intent=pricing#contact-form" }}
+        stats={[
+          { value: "65%", label: "fewer billing errors" },
+          { value: "37%", label: "higher collections" },
+          { value: "<5%", label: "claim denial target" },
+        ]}
+        image="/assets/doctor-prescription.jpg"
+        imageAlt="Healthcare professional managing billing documentation"
+        imagePriority
+        className="mk-hero-billing"
+      />
 
       {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
       <section className="mk-section mk-section-white" style={{ backgroundColor: "var(--tb-cream-100)" }}>
@@ -70,7 +44,7 @@ export default function BillingPage() {
               How TamamHealth Billing transforms your revenue cycle
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 32 }}>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>1</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   Smart claims, zero errors
@@ -79,7 +53,7 @@ export default function BillingPage() {
                   AI catches billing errors before submission. Diagnosis-code mismatches, missing modifiers, and invalid combinations are fixed automatically — reducing denials from 12% to under 5%.
                 </p>
               </div>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>2</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   Payments instantly matched
@@ -88,7 +62,7 @@ export default function BillingPage() {
                   M-Pesa, MTN, and Airtel payments auto-reconcile to patient accounts. No more manual spreadsheet matching — payments are matched in real-time with full audit trails.
                 </p>
               </div>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>3</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   Denials become revenue
@@ -366,133 +340,71 @@ export default function BillingPage() {
         </div>
       </section>
 
-      {/* ── STATS SECTION ────────────────────────────────────────────── */}
-      <section className="mk-stat-band">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-stat-row">
-              <div className="mk-stat-badge">
-                <strong>45%</strong>
-                <span>Insurance payment increase</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>&lt;5%</strong>
-                <span>Clean claim denial rate</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>12 days</strong>
-                <span>Average Days Sales Outstanding</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>37%</strong>
-                <span>Unpaid bill reduction</span>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureStatsBand
+        stats={[
+          { value: "45%", label: "Insurance payment increase" },
+          { value: "<5%", label: "Clean claim denial rate" },
+          { value: "12 days", label: "Average Days Sales Outstanding" },
+          { value: "37%", label: "Unpaid bill reduction" },
+        ]}
+      />
 
-      {/* ── TESTIMONIAL SECTION ─────────────────────────────────────── */}
-      <section className="mk-section mk-section-teal">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-testimonial-inner">
-              <div className="mk-testimonial-swoosh">
-                <TestimonialSwoosh />
-              </div>
+      <FeatureTestimonialSection
+        testimonial={{
+          quote: "Before TamamHealth, we spent 3 days a month manually reconciling M-Pesa payments against patient bills. Now it's automatic. We've cut claim denials from 14% to 3%, collections went up 38%, and our Days Sales Outstanding dropped from 35 days to 12 days. The system basically paid for itself in the first month.",
+          name: "Sarah Malik",
+          role: "Finance Director, Kampala Medical Clinic",
+        }}
+      />
 
-              <div className="mk-testimonial-quote">
-                <div className="mk-quote-mark">&ldquo;</div>
-                <blockquote>
-                  Before TamamHealth, we spent 3 days a month manually reconciling M-Pesa payments against patient bills. Now it&apos;s automatic. We&apos;ve cut claim denials from 14% to 3%, collections went up 38%, and our Days Sales Outstanding dropped from 35 days to 12 days. The system basically paid for itself in the first month.
-                </blockquote>
-                <cite>
-                  <strong>Sarah Malik</strong>
-                  <span>Finance Director, Kampala Medical Clinic</span>
-                </cite>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureFAQSection
+        faqs={[
+          {
+            question: "Which mobile money providers do you support?",
+            answer: "We integrate with M-Pesa, MTN Mobile Money, Airtel Money, and direct bank transfers. Our API integrations support both East Africa and West Africa payment corridors, with plans to add additional providers based on market demand.",
+          },
+          {
+            question: "How does payment reconciliation work?",
+            answer: "Payments are automatically matched to claims and patient accounts via our encrypted API connections to payment providers. You get a unified dashboard showing what came in, which bills were paid, and any discrepancies requiring follow-up.",
+          },
+          {
+            question: "What are your mobile money fees?",
+            answer: "Fees vary by provider and transaction type. We negotiate wholesale rates directly with M-Pesa, MTN, and Airtel to pass on the best margins to you. Schedule a demo for a detailed fee schedule customized to your volume.",
+          },
+          {
+            question: "Can patients set up recurring payments?",
+            answer: "Yes. Our patient portal supports one-time and recurring payment plans with flexible scheduling. Patients can authorize recurring mobile money deductions for installment plans, and our system automates reminders and reconciliation.",
+          },
+          {
+            question: "How long does integration take?",
+            answer: "Our standard integration takes 2-4 weeks depending on your current billing infrastructure. We provide API documentation, sandbox testing, and a dedicated integration specialist to ensure a smooth launch.",
+          },
+        ]}
+      />
 
-      {/* ── FAQ SECTION ─────────────────────────────────────────────── */}
-      <section className="mk-faq-section">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2 mk-faq-title">Frequently asked questions</h2>
-
-            <div className="mk-faq-list">
-              <FAQItem
-                question="Which mobile money providers do you support?"
-                answer="We integrate with M-Pesa, MTN Mobile Money, Airtel Money, and direct bank transfers. Our API integrations support both East Africa and West Africa payment corridors, with plans to add additional providers based on market demand."
-              />
-              <FAQItem
-                question="How does payment reconciliation work?"
-                answer="Payments are automatically matched to claims and patient accounts via our encrypted API connections to payment providers. You get a unified dashboard showing what came in, which bills were paid, and any discrepancies requiring follow-up."
-              />
-              <FAQItem
-                question="What are your mobile money fees?"
-                answer="Fees vary by provider and transaction type. We negotiate wholesale rates directly with M-Pesa, MTN, and Airtel to pass on the best margins to you. Schedule a demo for a detailed fee schedule customized to your volume."
-              />
-              <FAQItem
-                question="Can patients set up recurring payments?"
-                answer="Yes. Our patient portal supports one-time and recurring payment plans with flexible scheduling. Patients can authorize recurring mobile money deductions for installment plans, and our system automates reminders and reconciliation."
-              />
-              <FAQItem
-                question="How long does integration take?"
-                answer="Our standard integration takes 2-4 weeks depending on your current billing infrastructure. We provide API documentation, sandbox testing, and a dedicated integration specialist to ensure a smooth launch."
-              />
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── RELATED PRODUCTS ────────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 48 }}>
-              Maximize revenue with integrated solutions
-            </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 32 }}>
-              <div style={{ backgroundColor: "var(--tb-tint-blue)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  EHR Module
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Accurate clinical coding starts with complete documentation. TamamHealth EHR feeds clean data to billing and reduces denials.
-                </p>
-                <Link href="/ehr" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Learn more
-                </Link>
-              </div>
-              <div style={{ backgroundColor: "var(--tb-tint-gold)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  Patient Experience
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Patient portal and automated billing reminders increase collection rates. Patients pay faster when given easy options.
-                </p>
-                <Link href="/patient-experience" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Learn more
-                </Link>
-              </div>
-              <div style={{ backgroundColor: "var(--tb-tint-green)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  Analytics & Reporting
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Real-time financial dashboards, denial trend analysis, and cash flow forecasting. See exactly where money is and why.
-                </p>
-                <Link href="/analytics" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Learn more
-                </Link>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureRelatedProductsSection
+        heading="Maximize revenue with integrated solutions"
+        products={[
+          {
+            title: "EHR Module",
+            body: "Accurate clinical coding starts with complete documentation. TamamHealth EHR feeds clean data to billing and reduces denials.",
+            href: "/ehr",
+            tone: "blue",
+          },
+          {
+            title: "Patient Experience",
+            body: "Patient portal and automated billing reminders increase collection rates. Patients pay faster when given easy options.",
+            href: "/patient-experience",
+            tone: "gold",
+          },
+          {
+            title: "Analytics & Reporting",
+            body: "Real-time financial dashboards, denial trend analysis, and cash flow forecasting. See exactly where money is and why.",
+            href: "/analytics",
+            tone: "green",
+          },
+        ]}
+      />
 
     </>
   );

@@ -1,11 +1,14 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import TopBar from '@/components/TopBar';
 import {
   Users, Calendar, Clock, CheckCircle2, AlertCircle, ChevronRight,
-  Plus, ArrowRight, Wallet, Activity,
+  Plus, ArrowRight, Wallet, Activity, BarChart3,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -96,6 +99,26 @@ export default function HRDashboardPage() {
     <>
       <TopBar title={t('hr.dashboardTitle')} />
       <main className="page-container page-enter">
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Staff', value: facilityUsers.length },
+            { label: 'Present Today', value: presentToday },
+            { label: 'On Leave', value: onLeaveToday.length },
+            { label: 'On Call', value: onCallToday },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={[
+            { label: 'Staff Directory', icon: Users, href: '/hr' },
+            { label: 'Schedules', icon: Calendar, href: '/hr?tab=schedule', color: 'var(--accent-primary)' },
+            { label: 'Payroll', icon: Wallet, href: '/payments', color: '#0D9488' },
+            { label: 'Reports', icon: BarChart3, href: '/reports', color: '#F59E0B' },
+          ]}
+          secondaryCard={<SpotlightCard title="Pending Leave" value={pendingLeave.length} caption={`${onLeaveToday.length} on leave today`} href="/hr?tab=leave" />}
+        />
         <div className="flex items-end justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
           <div>
             <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>{t('hr.dashboardTitle')}</h1>
@@ -116,11 +139,11 @@ export default function HRDashboardPage() {
         {/* KPI strip */}
         <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', alignItems: 'stretch' }}>
           {[
-            { id: 'activeStaff', label: t('hr.kpiActiveStaff'), value: facilityUsers.length, accent: 'var(--accent-primary)', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
+            { id: 'activeStaff', label: t('hr.kpiActiveStaff'), value: facilityUsers.length, accent: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
             { id: 'presentToday', label: t('hr.kpiPresentToday'), value: presentToday, accent: '#15795C', bg: 'rgba(27, 158, 119, 0.10)', border: 'rgba(27, 158, 119, 0.26)' },
-            { id: 'onLeaveToday', label: t('hr.kpiOnLeaveToday'), value: onLeaveToday.length, accent: onLeaveToday.length > 0 ? '#B8741C' : 'var(--accent-primary)', bg: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.12)' : 'rgba(59, 130, 246, 0.08)', border: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.30)' : 'rgba(59, 130, 246, 0.22)' },
-            { id: 'pendingDecisions', label: t('hr.kpiPendingDecisions'), value: pendingLeave.length, accent: pendingLeave.length > 0 ? '#C44536' : 'var(--accent-primary)', bg: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.10)' : 'rgba(59, 130, 246, 0.08)', border: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.28)' : 'rgba(59, 130, 246, 0.22)' },
-            { id: 'onCallToday', label: t('hr.kpiOnCallToday'), value: onCallToday, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
+            { id: 'onLeaveToday', label: t('hr.kpiOnLeaveToday'), value: onLeaveToday.length, accent: onLeaveToday.length > 0 ? '#B8741C' : 'var(--accent-primary)', bg: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.12)' : 'rgba(33, 145, 208, 0.08)', border: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.30)' : 'rgba(59, 130, 246, 0.22)' },
+            { id: 'pendingDecisions', label: t('hr.kpiPendingDecisions'), value: pendingLeave.length, accent: pendingLeave.length > 0 ? '#C44536' : 'var(--accent-primary)', bg: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.10)' : 'rgba(33, 145, 208, 0.08)', border: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.28)' : 'rgba(59, 130, 246, 0.22)' },
+            { id: 'onCallToday', label: t('hr.kpiOnCallToday'), value: onCallToday, accent: '#2191D0', bg: 'rgba(33, 145, 208, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
           ].map(k => (
             <div key={k.id} style={{ padding: '14px 16px', borderRadius: 10, background: k.bg, border: `1px solid ${k.border}`, position: 'relative' }}>
               {k.id === 'pendingDecisions' && pendingLeave.length > 0 && <span className="data-tile__alarm-pulse" aria-hidden="true" />}
@@ -179,7 +202,7 @@ export default function HRDashboardPage() {
                 <ShiftRow label={t('hr.shiftMorning')} count={morningStaff} accent="#15795C" />
                 <ShiftRow label={t('hr.shiftAfternoon')} count={schedules.filter(s => s.shiftType === 'afternoon').length} accent="#E4A84B" />
                 <ShiftRow label={t('hr.shiftNight')} count={nightStaff} accent="#1E3A8A" />
-                <ShiftRow label={t('hr.shiftOnCall')} count={onCallToday} accent="#3b82f6" />
+                <ShiftRow label={t('hr.shiftOnCall')} count={onCallToday} accent="#2191D0" />
               </div>
             </div>
 
@@ -200,7 +223,7 @@ export default function HRDashboardPage() {
                           <span className="capitalize">{l.leaveType}</span> · {l.startDate}
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.14)', color: '#3b82f6' }}>{l.days}d</span>
+                      <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.14)', color: '#2191D0' }}>{l.days}d</span>
                     </div>
                   ))}
                 </div>

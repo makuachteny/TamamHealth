@@ -1,4 +1,7 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useState, useMemo } from 'react';
 import TopBar from '@/components/TopBar';
@@ -10,11 +13,11 @@ import { useLabResults } from '@/lib/hooks/useLabResults';
 import {
   Scan, Upload, CheckCircle2, Clock, AlertTriangle,
   FileText, BarChart3, TrendingUp, Eye,
-  Image, Activity,
+  Image, Activity, Users, MessageSquare,
 } from '@/components/icons/lucide';
 import PatientName from '@/components/PatientName';
 
-const ACCENT = '#7C3AED';
+const ACCENT = 'var(--accent-primary)';
 
 const MODALITIES = ['X-Ray', 'Ultrasound', 'CT Scan', 'MRI', 'Fluoroscopy', 'Mammography'];
 
@@ -94,6 +97,27 @@ export default function RadiologyDashboard() {
       <TopBar title={t('radiology.title')} />
       <main className="page-container page-enter">
 
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Studies', value: stats.total },
+            { label: 'Pending', value: stats.pending },
+            { label: 'In Progress', value: stats.inProgress },
+            { label: 'Urgent', value: stats.urgent },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={[
+            { label: 'All Patients', icon: Users, href: '/patients' },
+            { label: 'Imaging Queue', icon: Scan, href: '/radiology', color: 'var(--accent-primary)' },
+            { label: 'Reports', icon: BarChart3, href: '/reports', color: '#0D9488' },
+            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#F59E0B' },
+          ]}
+          secondaryCard={<SpotlightCard title="Urgent Studies" value={stats.urgent} caption={`${stats.pending} pending · ${stats.inProgress} in progress`} />}
+        />
+
         {IS_DEMO && <DemoModeBanner />}
 
         {submitToast && (
@@ -109,7 +133,7 @@ export default function RadiologyDashboard() {
         {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
         <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-primary)' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
               <Scan className="w-5 h-5 text-white" />
             </div>
             <div>

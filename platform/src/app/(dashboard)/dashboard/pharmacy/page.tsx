@@ -1,4 +1,7 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -7,9 +10,9 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useMessagingDock } from '@/lib/messaging-dock-context';
 import {
   Pill, AlertTriangle, Package, Clock, ShieldCheck,
-  MessageSquare, Activity, Radio, Zap, Wifi, ChevronRight,
+  MessageSquare, Activity, Radio, ChevronRight,
   Search, ClipboardList, Send, CheckCircle2, XCircle,
-  AlertOctagon, X, Check, Plus, Filter,
+  AlertOctagon, X, Check, Plus, Filter, Users, BarChart3,
 } from '@/components/icons/lucide';
 
 const ACCENT = 'var(--accent-primary)';
@@ -325,7 +328,6 @@ export default function PharmacyDashboardPage() {
   const { openDock } = useMessagingDock();
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [eventCounter, setEventCounter] = useState(0);
-  const [dataRate, setDataRate] = useState(0);
 
   // State for prescription queue (mutable for dispense)
   const [prescriptionQueue, setPrescriptionQueue] = useState<PrescriptionItem[]>(INITIAL_PRESCRIPTION_QUEUE);
@@ -380,7 +382,6 @@ export default function PharmacyDashboardPage() {
         return [newEvent, ...prev.slice(0, 9).map(e => ({ ...e, isNew: false }))];
       });
       setEventCounter(c => c + 1);
-      setDataRate(14 + Math.floor(Math.random() * 10) - 5);
     }, 5000);
 
     return () => clearInterval(interval);
@@ -483,24 +484,37 @@ export default function PharmacyDashboardPage() {
       <TopBar title={t('pharmacy.operations')} hideSearch />
       <main className="page-container page-enter">
 
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Pending Rx', value: pendingRx },
+            { label: 'Dispensed Today', value: dispensedToday },
+            { label: 'Low Stock', value: lowStockCount },
+            { label: 'Awaiting Pickup', value: awaitingPickup },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={[
+            { label: 'All Patients', icon: Users, href: '/patients' },
+            { label: 'Controlled Substances', icon: ShieldCheck, href: '/controlled-substances', color: '#C44536' },
+            { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
+            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#0D9488' },
+          ]}
+          secondaryCard={<SpotlightCard title="Low Stock Items" value={lowStockCount} caption={`${criticalCount} critical · ${awaitingPickup} awaiting pickup`} />}
+        />
+
         {/* Command Center Header */}
         <div className="flex items-center justify-between" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
-              background: 'var(--accent-primary)',
-            }}>
-              <Pill className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center">
+              <Pill className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
                 {t('nav.pharmacy')}
               </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-[10px] text-right" style={{ color: 'var(--text-muted)' }}>
-              <div className="flex items-center gap-1"><Zap className="w-3 h-3" style={{ color: ACCENT }} /><span>{t('pharmacy.dispensingPerHr', { count: dataRate || 14 })}</span></div>
-              <div className="flex items-center gap-1"><Wifi className="w-3 h-3" style={{ color: 'var(--color-success)' }} /><span>{t('pharmacy.inventorySynced')}</span></div>
             </div>
           </div>
         </div>

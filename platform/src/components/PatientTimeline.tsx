@@ -1,6 +1,6 @@
 'use client';
 
-// Clean single-stroke (Tailwind-style) outline icons straight from lucide-react.
+// Clean single-stroke Tailwind Labs Heroicons via the local compatibility shim.
 import {
   Stethoscope,
   FlaskConical,
@@ -10,7 +10,7 @@ import {
   HeartPulse,
   FileText,
   Activity,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import type {
   MedicalRecordDoc, LabResultDoc, PrescriptionDoc, ImmunizationDoc,
   ReferralDoc, ANCVisitDoc, AppointmentDoc, TriageDoc,
@@ -52,7 +52,7 @@ interface TimelineEvent {
 const CATEGORY_CONFIG: Record<TimelineEvent['category'], { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string; labelKey: string }> = {
   triage:        { icon: Activity,       color: '#FB923C',               labelKey: 'timeline.categoryTriage' },
   consultation:  { icon: Stethoscope,    color: 'var(--accent-primary)', labelKey: 'timeline.categoryConsultation' },
-  lab:           { icon: FlaskConical,   color: '#7C3AED',               labelKey: 'timeline.categoryLab' },
+  lab:           { icon: FlaskConical,   color: 'var(--accent-primary)',               labelKey: 'timeline.categoryLab' },
   prescription:  { icon: Pill,           color: '#0D9488',               labelKey: 'timeline.categoryRx' },
   immunization:  { icon: Syringe,        color: '#059669',               labelKey: 'timeline.categoryVaccine' },
   referral:      { icon: ArrowRightLeft, color: '#F59E0B',               labelKey: 'timeline.categoryReferral' },

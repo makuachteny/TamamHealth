@@ -23,15 +23,15 @@ const scriptSrc = isProd
 const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || String(Date.now());
 
 const nextConfig = {
+  devIndicators: false,
   env: {
     NEXT_PUBLIC_BUILD_ID: BUILD_ID,
   },
   generateBuildId: () => BUILD_ID,
   experimental: {
-    instrumentationHook: true,
     // Tree-shake heavy barrel imports so pages only pull the components they
     // use — cuts dev compile time and production bundle size.
-    optimizePackageImports: ['recharts', 'date-fns', 'react-big-calendar', 'lucide-react'],
+    optimizePackageImports: ['recharts', 'date-fns', 'react-big-calendar', '@heroicons/react'],
   },
   webpack: (config, { isServer }) => {
     // Filter managed paths that don't contain a package.json to avoid noisy
@@ -73,7 +73,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob:",
-              `connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com${couchdbConnectSrc}`,
+              `connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com${couchdbConnectSrc}`,
               "worker-src 'self' blob:",
               "frame-ancestors 'none'",
               "base-uri 'self'",

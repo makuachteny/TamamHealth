@@ -1351,6 +1351,7 @@ const din: TranslationMap = {
   'mar.recordAdministration': 'Gɔ̈t gam de wël',
   'referrals.completing': 'Akɔ̈ŋ thök...',
   'patientNew.nokAddressPlaceholder': 'Tɛ̈ rëër de raan de baai',
+  'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'Acï tɔ̈u',
   'anc.view': 'Tïŋ',
   'patientNew.payam': 'Payam',

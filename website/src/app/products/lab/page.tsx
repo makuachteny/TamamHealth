@@ -18,8 +18,8 @@ export default function LabManagementPage() {
           title="From order to result — without the paperwork."
           subtitle="Receive orders from any clinician on the platform, run the bench workflow, capture results, and release them back to the requester. With turnaround-time tracking, instrument integration, and critical-value alerts."
           accentColor="var(--tb-gold-dark)"
-          primaryCta={{ label: "Request a demo", href: "/about/contact" }}
-          illustration={<ProductIllustration accent="var(--tb-gold-dark)" variant="lab" />}
+          primaryCta={{ label: "Request a demo", href: "/about/contact?intent=demo#contact-form" }}
+          illustration={<ProductIllustration accent="#2191D0" variant="lab" />}
         />
 
         <ProductModuleGrid

@@ -8,14 +8,15 @@ import MarketingFooter from "@/components/marketing/MarketingFooter";
 // public production hostname if no override is set (e.g. running the
 // production build locally without a `.env`).
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://tamamhealth.org").replace(/\/$/, "");
-const siteTitle = "TamamHealth — Digital Health Platform for South Sudan";
+const siteTitle = "TamamHealth — Every Patient Deserves to Be Remembered";
 const siteDescription =
-  "The complete hospital information system built for South Sudan. Offline-first EHR, billing, pharmacy, lab, telehealth — designed by doctors, built for real clinical workflows.";
+  "TamamHealth is building an offline-first health record system for South Sudan and Africa, helping health workers keep one patient memory from the bedside to the nation.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: siteTitle,
   description: siteDescription,
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -32,10 +33,10 @@ export const metadata: Metadata = {
     description: siteDescription,
     images: [
       {
-        url: "/assets/dashboard-screenshot.png",
+        url: "/assets/Dashboard.png",
         width: 1200,
         height: 630,
-        alt: "TamamHealth product dashboard",
+        alt: "TamamHealth offline-first health record platform",
       },
     ],
     locale: "en_US",
@@ -44,7 +45,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: siteTitle,
     description: siteDescription,
-    images: ["/assets/dashboard-screenshot.png"],
+    images: ["/assets/Dashboard.png"],
     creator: "@tamamhealth",
   },
   robots: {
@@ -59,7 +60,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#FAFAF8",
+  themeColor: "#FEFFF9",
 };
 
 export default function RootLayout({
@@ -70,8 +71,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" type="image/svg+xml" href="/assets/tamamhealth-icon.svg" />
-        <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.svg" />
+        <link rel="icon" type="image/svg+xml" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />
       </head>
       <body className="antialiased">
         <div className="mk-page">

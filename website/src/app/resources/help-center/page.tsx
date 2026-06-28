@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
   FAQItem,
 } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
+import { Rocket, FileText, CreditCard, Video, Settings, BarChart3, Search } from "@/components/marketing/icons";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Help Center Page
@@ -20,42 +21,42 @@ export default function HelpCenterPage() {
       title: "Getting Started",
       description: "Setup, initial configuration, first steps with TamamHealth",
       articleCount: 8,
-      icon: <DuoIcon name="rocket" size={56} />,
+      icon: <Rocket size={56} strokeWidth={1.8} />,
     },
     {
       id: 2,
       title: "EHR & Charting",
       description: "Patient charts, note templates, clinical workflows",
       articleCount: 12,
-      icon: <DuoIcon name="ehr" size={56} />,
+      icon: <FileText size={56} strokeWidth={1.8} />,
     },
     {
       id: 3,
       title: "Billing & Claims",
       description: "Claims submission, denials, payment processing",
       articleCount: 10,
-      icon: <DuoIcon name="billing" size={56} />,
+      icon: <CreditCard size={56} strokeWidth={1.8} />,
     },
     {
       id: 4,
       title: "Telehealth",
       description: "Video visits, virtual waiting rooms, troubleshooting",
       articleCount: 7,
-      icon: <DuoIcon name="video" size={56} />,
+      icon: <Video size={56} strokeWidth={1.8} />,
     },
     {
       id: 5,
       title: "Admin & Settings",
       description: "Users, permissions, system configuration",
       articleCount: 9,
-      icon: <DuoIcon name="settings" size={56} />,
+      icon: <Settings size={56} strokeWidth={1.8} />,
     },
     {
       id: 6,
       title: "Data & Reporting",
       description: "DHIS2 exports, analytics, dashboards",
       articleCount: 8,
-      icon: <DuoIcon name="analytics" size={56} />,
+      icon: <BarChart3 size={56} strokeWidth={1.8} />,
     },
   ];
 
@@ -72,56 +73,25 @@ export default function HelpCenterPage() {
 
   return (
     <>
-      {/* ── HERO SECTION ─────────────────────────────────────────────── */}
-      <section className="mk-hero-split">
-        <div className="mk-container">
-          <div className="mk-hero-split-grid">
-            <Reveal>
-              <div className="mk-hero-split-text">
-                <span className="mk-label">HELP CENTER</span>
-                <h1 className="mk-h1">How can we help?</h1>
-                <p>
-                  Search the knowledge base, browse troubleshooting articles, or
-                  reach out directly — our support team responds within 4 business hours.
-                </p>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  background: "#fff",
-                  border: "2px solid var(--tb-blue-100)",
-                  borderRadius: 12,
-                  padding: "14px 20px",
-                  maxWidth: 520,
-                  boxShadow: "0 4px 16px rgba(15, 76, 129, 0.08)",
-                  marginTop: 8,
-                }}>
-                  <DuoIcon name="search" size={18} />
-                  <input
-                    type="text"
-                    placeholder="Search articles, topics, troubleshooting..."
-                    style={{
-                      flex: 1, border: "none", outline: "none",
-                      fontSize: 15, fontFamily: "inherit", background: "transparent",
-                      color: "var(--tb-text-pri)",
-                    }}
-                  />
-                </div>
-              </div>
-            </Reveal>
-            <Reveal delay={0.1}>
-              <div className="mk-hero-split-image">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/assets/doctor-tablet-smiling.jpg"
-                  alt="Support team helping a clinician"
-                  loading="eager"
-                />
-              </div>
-            </Reveal>
-          </div>
+      <MarketingHero
+        variant="portal"
+        eyebrow="HELP CENTER"
+        title="How can we help?"
+        subtitle="Search the knowledge base, browse troubleshooting articles, or reach out directly. Our support team responds within 4 business hours."
+        primaryCta={{ label: "Browse topics", href: "#browse-topics" }}
+        image="/assets/doctor-tablet-smiling.jpg"
+        imageAlt="Support team helping a clinician"
+        imagePriority
+      >
+        <div className="mk-help-search">
+          <Search size={18} strokeWidth={1.8} />
+          <input
+            type="text"
+            placeholder="Search articles, topics, troubleshooting..."
+            aria-label="Search help articles"
+          />
         </div>
-      </section>
+      </MarketingHero>
 
       {/* ── SUPPORT CHANNELS BANNER ───────────────────────────────────── */}
       <section className="mk-stat-band">
@@ -135,7 +105,7 @@ export default function HelpCenterPage() {
               </div>
               <div className="mk-stat-badge">
                 <div style={{ fontSize: 12, fontWeight: 700, color: "var(--tb-text-pri)", marginBottom: 4 }}>Email</div>
-                <strong style={{ color: "var(--tb-blue-700)", fontSize: 16 }}>support@tamamhealth.org</strong>
+                <strong style={{ color: "var(--tb-blue-700)", fontSize: 16 }}>support.tamam@gmail.com</strong>
                 <span style={{ fontSize: 12, color: "var(--tb-text-sec)", marginTop: 4, display: "block" }}>2-hour response</span>
               </div>
               <div className="mk-stat-badge">
@@ -149,7 +119,7 @@ export default function HelpCenterPage() {
       </section>
 
       {/* ── CATEGORIES SECTION ────────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
+      <section className="mk-section mk-section-white" id="browse-topics">
         <div className="mk-container">
           <Reveal>
             <h2 className="mk-h2" style={{ marginBottom: 40, textAlign: "center" }}>Browse by topic</h2>
@@ -160,7 +130,7 @@ export default function HelpCenterPage() {
             }}>
               {categories.map((category, index) => (
                 <Reveal key={category.id} delay={index * 0.05}>
-                  <Link href="/about/contact" style={{ textDecoration: "none" }}>
+                  <Link href="/about/contact#contact-form" style={{ textDecoration: "none" }}>
                     <div className="mk-product-card" style={{
                       background: "var(--tb-white)",
                       border: "1px solid var(--tb-cream-300)",
@@ -301,10 +271,10 @@ export default function HelpCenterPage() {
                 <span className="mk-btn mk-btn-green" style={{ cursor: "default" }}>
                   +1 (973) 566-4336
                 </span>
-                <a href="mailto:support@tamamhealth.org" className="mk-btn mk-btn-outline">
+                <a href="mailto:support.tamam@gmail.com" className="mk-btn mk-btn-outline">
                   Email Us
                 </a>
-                <a href="mailto:support@tamamhealth.org" className="mk-btn mk-btn-outline">
+                <a href="mailto:support.tamam@gmail.com" className="mk-btn mk-btn-outline">
                   Live Chat
                 </a>
               </div>

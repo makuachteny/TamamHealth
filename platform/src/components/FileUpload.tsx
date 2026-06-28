@@ -94,7 +94,7 @@ export default function FileUpload({ attachments, onAdd, onRemove, uploaderName,
         className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all"
         style={{
           borderColor: dragOver ? 'var(--tamamhealth-blue)' : 'var(--border-light)',
-          background: dragOver ? 'rgba(59, 130, 246,0.08)' : 'var(--overlay-subtle)',
+          background: dragOver ? 'rgba(33, 145, 208, 0.08)' : 'var(--overlay-subtle)',
         }}
       >
         <Upload className="w-8 h-8 mx-auto mb-2" style={{ color: dragOver ? 'var(--tamamhealth-blue)' : 'var(--text-muted)' }} />
@@ -145,7 +145,7 @@ export default function FileUpload({ attachments, onAdd, onRemove, uploaderName,
                   />
                 </div>
               ) : (
-                <div className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(229,46,66,0.12)' }}>
+                <div className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0">
                   <FileText className="w-5 h-5" style={{ color: 'var(--color-danger)' }} />
                 </div>
               )}

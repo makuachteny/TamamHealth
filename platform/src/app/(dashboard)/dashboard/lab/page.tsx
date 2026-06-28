@@ -1,4 +1,7 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -9,7 +12,7 @@ import {
   FlaskConical, Clock, CheckCircle2, AlertTriangle, Activity,
   Radio, Microscope, Droplets, FileText,
   MessageSquare, ChevronRight, Beaker, Thermometer, Loader2,
-  X, Save, Table, List, BarChart3, Timer, BellOff,
+  X, Save, Table, List, BarChart3, Timer, BellOff, Users,
 } from '@/components/icons/lucide';
 import PatientName from '@/components/PatientName';
 
@@ -450,6 +453,27 @@ export default function LabDashboardPage() {
       <TopBar title="Laboratory" hideSearch />
       <main className="page-container page-enter">
 
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Pending', value: kpis.pending },
+            { label: 'In Progress', value: kpis.inProgress },
+            { label: 'Completed Today', value: kpis.completedToday },
+            { label: 'Critical', value: kpis.critical },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={[
+            { label: 'All Patients', icon: Users, href: '/patients' },
+            { label: 'Blood Bank', icon: Droplets, href: '/blood-bank', color: '#C44536' },
+            { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
+            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#0D9488' },
+          ]}
+          secondaryCard={<SpotlightCard title="Critical Results" value={kpis.critical} caption={`${kpis.abnormal} abnormal · ${kpis.unacknowledgedCritical} unacknowledged`} />}
+        />
+
         {/* --- Feature 2: Critical Result Alert Banner --- */}
         {unackAlerts.length > 0 && (
           <div className="mb-4 space-y-2">
@@ -489,10 +513,8 @@ export default function LabDashboardPage() {
         {/* --- Command Center Header --- */}
         <div className="flex items-center justify-between" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
-              background: 'var(--accent-primary)',
-            }}>
-              <FlaskConical className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center">
+              <FlaskConical className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
@@ -927,7 +949,7 @@ export default function LabDashboardPage() {
 
                       {/* Reference Range Display */}
                       {currentRefRange && (
-                        <div className="p-3 rounded-xl" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
+                        <div className="p-3 rounded-xl" style={{ background: 'rgba(33, 145, 208, 0.06)', border: '1px solid var(--accent-border)' }}>
                           <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: ACCENT }}>{t('lab.referenceRange')}</p>
                           <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
                             {currentRefRange.referenceStr}
@@ -1051,7 +1073,7 @@ export default function LabDashboardPage() {
                   {batchTestType && (() => {
                     const ref = getRefRange(batchTestType);
                     return ref ? (
-                      <div className="p-2.5 rounded-xl" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
+                      <div className="p-2.5 rounded-xl" style={{ background: 'rgba(33, 145, 208, 0.06)', border: '1px solid var(--accent-border)' }}>
                         <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: ACCENT }}>
                           {t('lab.reference')}: {ref.referenceStr}
                           {ref.criticalLow !== undefined && ` | ${t('lab.criticalLabel')}: <${ref.criticalLow}`}

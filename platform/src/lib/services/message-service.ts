@@ -5,6 +5,27 @@ import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
+import { maybeDecrypt, maybeEncrypt } from '../field-encryption';
+
+const ENCRYPTED_MESSAGE_FIELDS = ['subject', 'body'] as const;
+
+function decryptMessage(doc: MessageDoc): MessageDoc {
+  const out = { ...doc };
+  for (const field of ENCRYPTED_MESSAGE_FIELDS) {
+    const value = out[field];
+    if (typeof value === 'string') out[field] = maybeDecrypt(value);
+  }
+  return out;
+}
+
+function encryptMessageFields<T extends Partial<MessageDoc>>(data: T): T {
+  const out = { ...data };
+  for (const field of ENCRYPTED_MESSAGE_FIELDS) {
+    const value = out[field];
+    if (typeof value === 'string' && value.length > 0) out[field] = maybeEncrypt(value);
+  }
+  return out;
+}
 
 export async function getAllMessages(scope?: DataScope): Promise<MessageDoc[]> {
   const db = messagesDB();
@@ -12,6 +33,7 @@ export async function getAllMessages(scope?: DataScope): Promise<MessageDoc[]> {
   const all = result.rows
     .map(r => r.doc as MessageDoc)
     .filter(d => d && d.type === 'message')
+    .map(decryptMessage)
     .sort((a, b) => new Date(b.sentAt || '').getTime() - new Date(a.sentAt || '').getTime());
   return scope ? filterByScope(all, scope) : all;
 }
@@ -60,16 +82,16 @@ export async function updateMessage(id: string, data: Partial<MessageDoc>): Prom
   const db = messagesDB();
   try {
     const existing = await db.get(id) as MessageDoc;
-    const updated = {
+    const updated = encryptMessageFields({
       ...existing,
       ...data,
       _id: existing._id,
       _rev: existing._rev,
       updatedAt: new Date().toISOString(),
-    };
+    });
     const resp = await db.put(updated);
     updated._rev = resp.rev;
-    return updated;
+    return decryptMessage(updated);
   } catch {
     return null;
   }
@@ -90,34 +112,35 @@ export async function createMessage(data: Omit<MessageDoc, '_id' | '_rev' | 'typ
   const db = messagesDB();
   const now = new Date().toISOString();
   const id = `msg-${uuidv4().slice(0, 8)}`;
-  const doc: MessageDoc = {
+  const doc: MessageDoc = encryptMessageFields({
     _id: id,
     type: 'message',
     ...data,
     status: 'sent',
     createdAt: now,
     updatedAt: now,
-  };
+  });
   const resp = await db.put(doc);
   doc._rev = resp.rev;
+  const plaintextDoc = decryptMessage(doc);
   // Audit trail: every message write is patient-related communication, so
   // it belongs in the audit log alongside other PHI-touching mutations.
   // Previously createMessage wrote silently — the admin audit-log page
   // showed Rx and lab activity but nothing for patient↔staff chats.
   await logAuditSafe(
-    'CREATE_MESSAGE', undefined, doc.fromDoctorName,
-    `Message ${doc._id}: ${doc.direction || 'staff_to_patient'} — ${doc.subject || '(no subject)'}`
+    'CREATE_MESSAGE', undefined, plaintextDoc.fromDoctorName,
+    `Message ${plaintextDoc._id}: ${plaintextDoc.direction || 'staff_to_patient'} — ${plaintextDoc.subject || '(no subject)'}`
   );
   // Sync event so the Postgres `messages` analytics table receives the row.
   // The /api/sync route already has a field mapper for it (DB_TABLE_MAP +
   // FIELD_MAPPERS.messages), so the missing piece was just emitting the event.
   emitSyncEvent({
     resourceType: 'message',
-    resourceId: doc._id,
+    resourceId: plaintextDoc._id,
     operation: 'create',
-    resourceVersion: doc._rev,
-    hospitalId: doc.fromHospitalId || doc.recipientHospitalId,
-    orgId: doc.orgId,
+    resourceVersion: plaintextDoc._rev,
+    hospitalId: plaintextDoc.fromHospitalId || plaintextDoc.recipientHospitalId,
+    orgId: plaintextDoc.orgId,
   });
-  return doc;
+  return plaintextDoc;
 }

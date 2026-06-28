@@ -7,13 +7,14 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import {
-  BarChart3, PieChart as PieChartIcon, TrendingUp, Users, HeartPulse, Building2
+  PieChart as PieChartIcon, TrendingUp, Users, HeartPulse, Building2
 } from '@/components/icons/lucide';
 import EmptyState from '@/components/EmptyState';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend
+  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, CartesianGrid, Legend
 } from 'recharts';
+import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick, AreaGradients } from '@/components/ChartCard';
 
 interface OrgDataPoint {
   name: string;
@@ -73,8 +74,8 @@ export default function AdminAnalyticsPage() {
   // Plan distribution data for pie chart
   const planDistribution = [
     { name: t('analytics.planBasic'), value: organizations.filter(o => o.subscriptionPlan === 'basic').length, color: '#6B7280' },
-    { name: t('analytics.planProfessional'), value: organizations.filter(o => o.subscriptionPlan === 'professional').length, color: '#3b82f6' },
-    { name: t('analytics.planEnterprise'), value: organizations.filter(o => o.subscriptionPlan === 'enterprise').length, color: '#7C3AED' },
+    { name: t('analytics.planProfessional'), value: organizations.filter(o => o.subscriptionPlan === 'professional').length, color: '#2191D0' },
+    { name: t('analytics.planEnterprise'), value: organizations.filter(o => o.subscriptionPlan === 'enterprise').length, color: 'var(--accent-primary)' },
   ].filter(d => d.value > 0);
 
   // Status distribution for pie chart
@@ -110,14 +111,6 @@ export default function AdminAnalyticsPage() {
   const totalPatientsAll = orgData.reduce((s, d) => s + d.patients, 0);
   const totalUsersAll = orgData.reduce((s, d) => s + d.users, 0);
 
-  // Custom tooltip style
-  const tooltipStyle = {
-    backgroundColor: 'var(--bg-card)',
-    border: '1px solid var(--border-light)',
-    borderRadius: '4px',
-    fontSize: '12px',
-  };
-
   return (
     <>
       <TopBar title={t('analytics.title')} />
@@ -127,13 +120,13 @@ export default function AdminAnalyticsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {[
             { label: t('analytics.totalOrganizations'), value: organizations.length, icon: Building2, color: 'var(--color-danger)' },
-            { label: t('analytics.totalUsers'), value: totalUsersAll, icon: Users, color: '#3b82f6' },
+            { label: t('analytics.totalUsers'), value: totalUsersAll, icon: Users, color: '#2191D0' },
             { label: t('patients.kpiTotalPatients'), value: totalPatientsAll, icon: HeartPulse, color: 'var(--color-success)' },
             { label: t('analytics.avgPatientsPerOrg'), value: organizations.length > 0 ? Math.round(totalPatientsAll / organizations.length) : 0, icon: TrendingUp, color: 'var(--color-warning)' },
           ].map(stat => (
             <div key={stat.label} className="dash-card" style={{ padding: '14px 16px' }}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <stat.icon className="w-3.5 h-3.5" style={{ color: stat.color }} />
                 </div>
                 <span className="kpi-card-title">{stat.label}</span>
@@ -147,32 +140,59 @@ export default function AdminAnalyticsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
           {/* Patients per Org Bar Chart */}
-          <div className="lg:col-span-2 dash-card overflow-hidden">
-            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <BarChart3 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.patientsPerOrganization')}</h3>
-            </div>
-            <div className="p-4">
-            {dataLoading || orgsLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('analytics.loadingChartData')}</p>
-              </div>
-            ) : orgData.length === 0 ? (
-              <div className="flex items-center justify-center h-64">
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.noData')}</p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={orgData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                  <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="patients" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-            </div>
-          </div>
+          <ChartCard
+            title={t('analytics.patientsPerOrganization')}
+            defaultType="bar"
+            defaultPeriod="month"
+            className="lg:col-span-2"
+          >
+            {({ chartType }) => {
+              if (dataLoading || orgsLoading) {
+                return <div className="flex items-center justify-center h-64"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('analytics.loadingChartData')}</p></div>;
+              }
+              if (orgData.length === 0) {
+                return <div className="flex items-center justify-center h-64"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.noData')}</p></div>;
+              }
+              const commonProps = { data: orgData, margin: { top: 5, right: 10, left: 0, bottom: 5 } };
+              if (chartType === 'area') {
+                return (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart {...commonProps}>
+                      <AreaGradients />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                      <XAxis dataKey="name" tick={axisTick} />
+                      <YAxis tick={axisTick} />
+                      <Tooltip {...chartTooltipStyle} />
+                      <Area type="monotone" dataKey="patients" stroke="#2191D0" fill="url(#grad1)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                );
+              }
+              if (chartType === 'line') {
+                return (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart {...commonProps}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                      <XAxis dataKey="name" tick={axisTick} />
+                      <YAxis tick={axisTick} />
+                      <Tooltip {...chartTooltipStyle} />
+                      <Line type="monotone" dataKey="patients" stroke="#2191D0" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                );
+              }
+              return (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart {...commonProps}>
+                    <XAxis dataKey="name" tick={axisTick} />
+                    <YAxis tick={axisTick} />
+                    <Tooltip {...chartTooltipStyle} />
+                    <Bar dataKey="patients" fill="#2191D0" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              );
+            }}
+          </ChartCard>
 
           {/* Pie Charts */}
           <div className="grid grid-cols-1 gap-4">
@@ -250,60 +270,122 @@ export default function AdminAnalyticsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
           {/* Growth Over Time */}
-          <div className="dash-card overflow-hidden">
-            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <TrendingUp className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.growthTrendSimulated')}</h3>
-            </div>
-            <div className="p-4">
-            {growthData.length === 0 || growthData.every(d => !d.users && !d.patients && !d.organizations) ? (
-              <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <EmptyState icon={TrendingUp} title="No data yet" message="No growth data to display for this period." />
-              </div>
-            ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={growthData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Line type="monotone" dataKey="users" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name={t('analytics.legendUsers')} />
-                <Line type="monotone" dataKey="patients" stroke="#059669" strokeWidth={2} dot={{ r: 3 }} name={t('analytics.legendPatients')} />
-                <Line type="monotone" dataKey="organizations" stroke="#7C3AED" strokeWidth={2} dot={{ r: 3 }} name={t('analytics.legendOrganizations')} />
-              </LineChart>
-            </ResponsiveContainer>
-            )}
-            </div>
-          </div>
+          <ChartCard
+            title={t('analytics.growthTrendSimulated')}
+            defaultType="line"
+            defaultPeriod="month"
+          >
+            {({ chartType }) => {
+              if (growthData.length === 0 || growthData.every(d => !d.users && !d.patients && !d.organizations)) {
+                return (
+                  <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <EmptyState icon={TrendingUp} title="No data yet" message="No growth data to display for this period." />
+                  </div>
+                );
+              }
+              const commonProps = { data: growthData, margin: { top: 5, right: 10, left: 0, bottom: 5 } };
+              const lines = [
+                { key: 'users', color: '#2191D0', name: t('analytics.legendUsers') },
+                { key: 'patients', color: '#059669', name: t('analytics.legendPatients') },
+                { key: 'organizations', color: '#7C3AED', name: t('analytics.legendOrganizations') },
+              ];
+              if (chartType === 'area') {
+                return (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <AreaChart {...commonProps}>
+                      <AreaGradients />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                      <XAxis dataKey="month" tick={axisTick} />
+                      <YAxis tick={axisTick} />
+                      <Tooltip {...chartTooltipStyle} />
+                      <Legend wrapperStyle={{ fontSize: '11px' }} />
+                      {lines.map(l => <Area key={l.key} type="monotone" dataKey={l.key} stroke={l.color} fill={l.color} fillOpacity={0.12} strokeWidth={2} name={l.name} />)}
+                    </AreaChart>
+                  </ResponsiveContainer>
+                );
+              }
+              if (chartType === 'bar') {
+                return (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart {...commonProps}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                      <XAxis dataKey="month" tick={axisTick} />
+                      <YAxis tick={axisTick} />
+                      <Tooltip {...chartTooltipStyle} />
+                      <Legend wrapperStyle={{ fontSize: '11px' }} />
+                      {lines.map(l => <Bar key={l.key} dataKey={l.key} fill={l.color} radius={[3, 3, 0, 0]} name={l.name} />)}
+                    </BarChart>
+                  </ResponsiveContainer>
+                );
+              }
+              return (
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart {...commonProps}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                    <XAxis dataKey="month" tick={axisTick} />
+                    <YAxis tick={axisTick} />
+                    <Tooltip {...chartTooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    {lines.map(l => <Line key={l.key} type="monotone" dataKey={l.key} stroke={l.color} strokeWidth={2} dot={{ r: 3 }} name={l.name} />)}
+                  </LineChart>
+                </ResponsiveContainer>
+              );
+            }}
+          </ChartCard>
 
           {/* Users per Org Bar Chart */}
-          <div className="dash-card overflow-hidden">
-            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('analytics.usersPerOrganization')}</h3>
-            </div>
-            <div className="p-4">
-            {dataLoading || orgsLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</p>
-              </div>
-            ) : orgData.length === 0 ? (
-              <div className="flex items-center justify-center h-64">
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.noData')}</p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={orgData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                  <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="users" fill="#D97706" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-            </div>
-          </div>
+          <ChartCard
+            title={t('analytics.usersPerOrganization')}
+            defaultType="bar"
+            defaultPeriod="month"
+          >
+            {({ chartType }) => {
+              if (dataLoading || orgsLoading) {
+                return <div className="flex items-center justify-center h-64"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</p></div>;
+              }
+              if (orgData.length === 0) {
+                return <div className="flex items-center justify-center h-64"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.noData')}</p></div>;
+              }
+              const commonProps = { data: orgData, margin: { top: 5, right: 10, left: 0, bottom: 5 } };
+              if (chartType === 'area') {
+                return (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <AreaChart {...commonProps}>
+                      <AreaGradients color1="#D97706" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                      <XAxis dataKey="name" tick={axisTick} />
+                      <YAxis tick={axisTick} />
+                      <Tooltip {...chartTooltipStyle} />
+                      <Area type="monotone" dataKey="users" stroke="#D97706" fill="url(#grad1)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                );
+              }
+              if (chartType === 'line') {
+                return (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart {...commonProps}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                      <XAxis dataKey="name" tick={axisTick} />
+                      <YAxis tick={axisTick} />
+                      <Tooltip {...chartTooltipStyle} />
+                      <Line type="monotone" dataKey="users" stroke="#D97706" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                );
+              }
+              return (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart {...commonProps}>
+                    <XAxis dataKey="name" tick={axisTick} />
+                    <YAxis tick={axisTick} />
+                    <Tooltip {...chartTooltipStyle} />
+                    <Bar dataKey="users" fill="#D97706" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              );
+            }}
+          </ChartCard>
         </div>
 
         {/* Per-Org Data Table */}
@@ -337,11 +419,11 @@ export default function AdminAnalyticsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm font-bold" style={{ color: 'var(--color-success)' }}>{data?.patients ?? '...'}</td>
-                    <td className="px-4 py-3 text-sm font-bold" style={{ color: '#3b82f6' }}>{data?.users ?? '...'}</td>
+                    <td className="px-4 py-3 text-sm font-bold" style={{ color: '#2191D0' }}>{data?.users ?? '...'}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
-                        background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(59, 130, 246,0.12)' : 'rgba(107,114,128,0.12)',
-                        color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#3b82f6' : '#6B7280',
+                        background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(33, 145, 208, 0.12)' : 'rgba(107,114,128,0.12)',
+                        color: org.subscriptionPlan === 'enterprise' ? 'var(--accent-primary)' : org.subscriptionPlan === 'professional' ? '#2191D0' : '#6B7280',
                       }}>{org.subscriptionPlan}</span>
                     </td>
                     <td className="px-4 py-3">

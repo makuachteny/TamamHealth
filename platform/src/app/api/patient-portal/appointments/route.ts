@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { verifyPatientToken } from '@/lib/patient-portal-auth';
 import { appointmentsDB } from '@/lib/db';
 import { logAuditSafe } from '@/lib/services/audit-service';
+import { emitSyncEvent } from '@/lib/services/sync-event-service';
 import type { AppointmentDoc, AppointmentStatus } from '@/lib/db-types';
 
 export async function GET(req: NextRequest) {
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
       priority: (typeof body.priority === 'string' ? body.priority : 'routine') as AppointmentDoc['priority'],
       department: typeof body.department === 'string' ? body.department : 'General',
       reason: typeof body.reason === 'string' ? body.reason : '',
-      status: 'requested' as unknown as AppointmentStatus,
+      status: 'requested' as AppointmentStatus,
       reminderSent: false,
       isRecurring: false,
       bookedBy: auth.sub,
@@ -74,6 +75,15 @@ export async function POST(req: NextRequest) {
       'PATIENT_REQUEST_APPOINTMENT', auth.sub, auth.name,
       `Patient ${auth.sub} requested appointment ${doc._id} on ${doc.appointmentDate || '(no date)'}`
     );
+    emitSyncEvent({
+      resourceType: 'appointment',
+      resourceId: doc._id,
+      operation: 'create',
+      resourceVersion: doc._rev,
+      userId: auth.sub,
+      username: auth.name,
+      hospitalId: doc.facilityId,
+    });
 
     return NextResponse.json({ ok: true, id: doc._id, appointment: doc }, { status: 201 });
   } catch (err) {

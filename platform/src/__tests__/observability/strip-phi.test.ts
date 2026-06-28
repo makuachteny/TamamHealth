@@ -36,7 +36,7 @@ describe('stripPHI', () => {
       request: {
         data: {
           username: 'alice',
-          email: 'alice@example.com',
+          email: 'support.tamam@gmail.com',
           phone: '+211912345678',
           dob: '1980-01-01',
           password: 'hunter2',

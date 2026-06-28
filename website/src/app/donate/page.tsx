@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { Reveal, FAQItem, CheckItem, StatCounter } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
+import { FileText, Users, Tablet, Hospital, Heart, BarChart3, HeartPulse } from "@/components/marketing/icons";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth — Fund Our Pilot / Donation Page
@@ -21,7 +22,7 @@ const impactTiers = [
     description: "Covers the cost of migrating one week of paper records to TamamHealth for a rural clinic, preserving critical patient histories.",
     color: "var(--tb-tint-blue)",
     iconColor: "var(--tb-blue-700)",
-    icon: <DuoIcon name="ehr" size={56} />,
+    icon: <FileText size={56} strokeWidth={1.8} />,
   },
   {
     amount: "$250",
@@ -29,7 +30,7 @@ const impactTiers = [
     description: "Funds a complete training program for one healthcare worker to master digital records, from charting to telehealth.",
     color: "var(--tb-tint-green)",
     iconColor: "var(--tb-green)",
-    icon: <DuoIcon name="users" size={56} />,
+    icon: <Users size={56} strokeWidth={1.8} />,
   },
   {
     amount: "$2,500",
@@ -37,7 +38,7 @@ const impactTiers = [
     description: "Provides tablets, solar chargers, protective cases, and local server hardware for one clinic to go fully digital.",
     color: "var(--tb-tint-gold)",
     iconColor: "var(--tb-gold-dark)",
-    icon: <DuoIcon name="tablet" size={56} />,
+    icon: <Tablet size={56} strokeWidth={1.8} />,
   },
   {
     amount: "$10,000",
@@ -45,7 +46,7 @@ const impactTiers = [
     description: "Covers 6 months of full operations for one pilot clinic — hardware, training, connectivity, support, and impact measurement.",
     color: "var(--tb-tint-green)",
     iconColor: "var(--tb-green)",
-    icon: <DuoIcon name="hospital" size={56} />,
+    icon: <Hospital size={56} strokeWidth={1.8} />,
   },
 ];
 
@@ -54,71 +55,23 @@ const presetAmounts = [25, 50, 100, 250, 500, 1000, 2500, 5000];
 export default function DonatePage() {
   return (
     <>
-      {/* ── HERO ─────────────────────────────────────────────────── */}
-      <section className="mk-hero">
-        <div className="mk-container">
-          <div className="mk-hero-flex">
-            {/* Left: Headline + Description */}
-            <div className="mk-hero-content">
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                background: "var(--tb-tint-gold)", border: "1px solid var(--tb-gold)",
-                borderRadius: 24, padding: "6px 16px", marginBottom: 20,
-              }}>
-                <DuoIcon name="heart" size={16} />
-                <span style={{ color: "var(--tb-gold-dark)", fontSize: 13, fontWeight: 700, letterSpacing: "0.05em" }}>FUNDRAISING CAMPAIGN</span>
-              </div>
-
-              <h1 className="mk-h1" style={{ fontWeight: 700 }}>
-                Help us bring digital health records to South Sudan
-              </h1>
-              <p className="mk-body-lg">
-                We&apos;re raising <strong>$100,000</strong> to launch TamamHealth in 10 clinics across Juba and greater South Sudan. Every dollar goes directly to equipment, training, and keeping the platform running for healthcare workers who need it most.
-              </p>
-
-              <div style={{ display: "flex", gap: 12, alignItems: "center", margin: "24px 0 0", flexWrap: "wrap" }}>
-                <div style={{ backgroundColor: "var(--tb-gold-light)", padding: "8px 16px", borderRadius: 8, fontSize: 14, fontWeight: 600, color: "var(--tb-text)" }}>
-                  Goal: $100,000
-                </div>
-                <div style={{ backgroundColor: "var(--tb-gold-light)", padding: "8px 16px", borderRadius: 8, fontSize: 14, fontWeight: 600, color: "var(--tb-text)" }}>
-                  10 Clinics in South Sudan
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 16, marginTop: 32, flexWrap: "wrap" }}>
-                <a
-                  href={GOFUNDME_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mk-btn mk-btn-gold mk-btn-lg"
-                  style={{ gap: 8 }}
-                >
-                  <DuoIcon name="heart" size={18} />
-                  Donate on GoFundMe
-                </a>
-                <a href="#impact" className="mk-btn mk-btn-outline mk-btn-lg">
-                  See your impact
-                </a>
-              </div>
-            </div>
-
-            {/* Right: Hero Photo */}
-            <div className="mk-hide-tablet" style={{ flex: "0 0 320px", borderRadius: 16, overflow: "hidden" }}>
-              <Reveal delay={0.15}>
-                <div style={{ position: "relative", height: 420 }}>
-                  <Image
-                    src="/assets/village-community.jpg"
-                    alt="South Sudanese community members"
-                    fill
-                    style={{ objectFit: "cover", objectPosition: "top center" }}
-                    priority
-                  />
-                </div>
-              </Reveal>
-            </div>
-          </div>
-        </div>
-      </section>
+      <MarketingHero
+        variant="impact"
+        eyebrow="FUNDRAISING CAMPAIGN"
+        title="Help us bring digital health records to South Sudan"
+        subtitle="We're raising $100,000 to launch TamamHealth in 10 clinics across Juba and greater South Sudan. Every dollar goes directly to equipment, training, and platform operations."
+        primaryCta={{ label: "Donate on GoFundMe", href: GOFUNDME_URL }}
+        secondaryCta={{ label: "See your impact", href: "#impact" }}
+        stats={[
+          { value: "$100K", label: "pilot goal" },
+          { value: "10", label: "clinics in South Sudan" },
+          { value: "100%", label: "pilot-focused funding" },
+        ]}
+        image="/assets/village-community.jpg"
+        imageAlt="South Sudanese community members"
+        imagePriority
+        className="mk-hero-donate"
+      />
 
       {/* ── DIVIDER ─────────────────────────────────────────────── */}
       <div className="mk-divider"></div>
@@ -185,7 +138,7 @@ export default function DonatePage() {
             {impactTiers.map((tier, i) => (
               <Reveal key={tier.title} delay={i * 0.08}>
                 <div style={{
-                  background: "#fff", borderRadius: 16, padding: "32px 28px",
+                  background: "#FEFFF9", borderRadius: 16, padding: "32px 28px",
                   border: "1px solid var(--tb-cream-300)", height: "100%",
                   display: "flex", flexDirection: "column", gap: 16,
                   boxShadow: "0 4px 16px rgba(26,58,58,0.04)",
@@ -248,30 +201,30 @@ export default function DonatePage() {
                 step: "PHASE 1", title: "Equipment & Infrastructure", cost: "$30,000", timeline: "Month 1–2",
                 items: ["Tablets and protective cases for 10 clinics", "Solar chargers and backup batteries", "Local server hardware and networking", "Secure data storage setup"],
                 bg: "var(--tb-tint-blue)", color: "var(--tb-blue-700)",
-                icon: <DuoIcon name="tablet" size={56} />,
+                icon: <Tablet size={56} strokeWidth={1.8} />,
               },
               {
                 step: "PHASE 2", title: "Training & Onboarding", cost: "$25,000", timeline: "Month 2–4",
                 items: ["5-day intensive training per clinic", "40+ healthcare workers certified", "Paper-to-digital record migration", "On-site mentorship program"],
                 bg: "var(--tb-tint-green)", color: "var(--tb-green)",
-                icon: <DuoIcon name="users" size={56} />,
+                icon: <Users size={56} strokeWidth={1.8} />,
               },
               {
                 step: "PHASE 3", title: "Operations & Support", cost: "$30,000", timeline: "Month 3–10",
                 items: ["On-site technical support teams", "Connectivity and data costs", "Ongoing maintenance and updates", "Community health worker integration"],
                 bg: "var(--tb-tint-gold)", color: "var(--tb-gold-dark)",
-                icon: <DuoIcon name="heart-pulse" size={56} />,
+                icon: <HeartPulse size={56} strokeWidth={1.8} />,
               },
               {
                 step: "PHASE 4", title: "Measurement & Scale", cost: "$15,000", timeline: "Month 8–12",
                 items: ["Impact measurement and data analysis", "DHIS2 national reporting integration", "Documentation for scale to 50+ clinics", "Sustainability planning"],
                 bg: "var(--tb-tint-green)", color: "var(--tb-green)",
-                icon: <DuoIcon name="analytics" size={56} />,
+                icon: <BarChart3 size={56} strokeWidth={1.8} />,
               },
             ].map((phase, i) => (
               <Reveal key={phase.step} delay={i * 0.08}>
                 <div style={{
-                  background: "#fff", padding: 32, borderRadius: 16,
+                  background: "#FEFFF9", padding: 32, borderRadius: 16,
                   border: "1px solid var(--tb-cream-300)",
                   boxShadow: "0 4px 16px rgba(26,58,58,0.04)",
                   height: "100%", display: "flex", flexDirection: "column",
@@ -329,7 +282,7 @@ export default function DonatePage() {
                 <span className="mk-label" style={{ color: "var(--tb-gold-dark)" }}>THE TEAM</span>
                 <h2 className="mk-h2">Built by people who lived it</h2>
                 <p className="mk-body" style={{ lineHeight: 1.8 }}>
-                  TamamHealth was born in Kakuma Refugee Camp, where our founder Teny Makuach watched patients die not from lack of medicine — but lack of information. Now studying at Tufts University, Teny and co-founders Toye Adebayo and Ekow Williams are building the digital health platform Africa deserves.
+                  TamamHealth started with Teny Makuach&apos;s firsthand experience of how broken paper records can fail patients. Today, the work is carried by a growing team across product, engineering, research, partnerships, and implementation, building the digital health platform South Sudan deserves.
                 </p>
 
                 <ul className="mk-check-list" style={{ marginTop: 24 }}>
@@ -394,7 +347,7 @@ export default function DonatePage() {
               />
               <FAQItem
                 question="Can I donate in other ways?"
-                answer="Yes! We also accept donations of hardware (tablets, laptops), technical expertise, and partnerships. Contact us at hello@tamamhealth.org to discuss other ways to contribute."
+                answer="Yes! We also accept donations of hardware (tablets, laptops), technical expertise, and partnerships. Contact us at support.tamam@gmail.com to discuss other ways to contribute."
               />
             </div>
           </Reveal>
@@ -418,10 +371,10 @@ export default function DonatePage() {
                   className="mk-btn mk-btn-gold mk-btn-lg"
                   style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
                 >
-                  <DuoIcon name="heart" size={18} />
+                  <Heart size={18} strokeWidth={1.8} />
                   Donate on GoFundMe
                 </a>
-                <Link href="/about/contact" className="mk-btn mk-btn-outline-white mk-btn-lg">
+                <Link href="/about/contact#contact-form" className="mk-btn mk-btn-outline-white mk-btn-lg">
                   Contact Us
                 </Link>
               </div>
@@ -446,7 +399,7 @@ function DonationAmountPicker() {
   return (
     <div style={{
       maxWidth: 640, margin: "48px auto 0",
-      background: "#fff", borderRadius: 16, padding: "36px 32px",
+      background: "#FEFFF9", borderRadius: 16, padding: "36px 32px",
       border: "1px solid var(--tb-cream-300)",
       boxShadow: "0 4px 16px rgba(26,58,58,0.04)",
     }}>
@@ -524,7 +477,7 @@ function DonationAmountPicker() {
           boxSizing: "border-box",
         }}
       >
-        <DuoIcon name="heart" size={16} />
+        <Heart size={16} strokeWidth={1.8} />
         {activeAmount ? `Donate $${activeAmount.toLocaleString()} on GoFundMe` : "Select an amount to donate"}
       </a>
 

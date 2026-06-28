@@ -10,7 +10,7 @@ import {
   AlertTriangle, RefreshCw,
   Video, Stethoscope, Syringe, HeartPulse, FlaskConical,
   Building2, X, UserPlus, ClipboardList,
-  Filter, ExternalLink,
+  Filter, ExternalLink, ChevronLeft, ChevronRight,
 } from '@/components/icons/lucide';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -35,17 +35,17 @@ const AppointmentsCalendar = dynamic(() => import('./_AppointmentsCalendar'), {
 
 /* ─── Config ─── */
 const appointmentTypes: { value: AppointmentType; label: string; icon: typeof Calendar; color: string; bg: string }[] = [
-  { value: 'general', label: 'General Consultation', icon: Stethoscope, color: '#1E3A8A', bg: 'rgba(13,148,136,0.12)' },
-  { value: 'follow_up', label: 'Follow-Up', icon: RefreshCw, color: '#6366F1', bg: 'rgba(99,102,241,0.12)' },
-  { value: 'specialist', label: 'Specialist', icon: User, color: '#6366F1', bg: 'rgba(99,102,241,0.12)' },
-  { value: 'anc', label: 'Antenatal Care', icon: HeartPulse, color: '#EC4899', bg: 'rgba(236,72,153,0.12)' },
-  { value: 'immunization', label: 'Immunization', icon: Syringe, color: '#059669', bg: 'rgba(5,150,105,0.12)' },
-  { value: 'lab', label: 'Laboratory', icon: FlaskConical, color: '#6366F1', bg: 'rgba(99,102,241,0.12)' },
-  { value: 'telehealth', label: 'Telehealth', icon: Video, color: '#6366F1', bg: 'rgba(99,102,241,0.12)' },
-  { value: 'surgical', label: 'Surgical', icon: Stethoscope, color: '#1E3A8A', bg: 'rgba(13,148,136,0.12)' },
-  { value: 'dental', label: 'Dental', icon: Stethoscope, color: '#1E3A8A', bg: 'rgba(13,148,136,0.12)' },
-  { value: 'mental_health', label: 'Mental Health', icon: HeartPulse, color: '#EC4899', bg: 'rgba(236,72,153,0.12)' },
-  { value: 'walk_in', label: 'Walk-In', icon: UserPlus, color: '#7C3AED', bg: 'rgba(124,58,237,0.12)' },
+  { value: 'general',      label: 'General Consultation', icon: Stethoscope,   color: '#2191D0', bg: 'rgba(33,145,208,0.10)' },
+  { value: 'follow_up',    label: 'Follow-Up',            icon: RefreshCw,     color: '#015697', bg: 'rgba(1,86,151,0.10)' },
+  { value: 'specialist',   label: 'Specialist',           icon: User,          color: '#0369A1', bg: 'rgba(3,105,161,0.10)' },
+  { value: 'anc',          label: 'Antenatal Care',       icon: HeartPulse,    color: '#047857', bg: 'rgba(4,120,87,0.10)' },
+  { value: 'immunization', label: 'Immunization',         icon: Syringe,       color: '#059669', bg: 'rgba(5,150,105,0.10)' },
+  { value: 'lab',          label: 'Laboratory',           icon: FlaskConical,  color: '#0891B2', bg: 'rgba(8,145,178,0.10)' },
+  { value: 'telehealth',   label: 'Telehealth',           icon: Video,         color: '#0E7490', bg: 'rgba(14,116,144,0.10)' },
+  { value: 'surgical',     label: 'Surgical',             icon: Stethoscope,   color: '#DC2626', bg: 'rgba(220,38,38,0.10)' },
+  { value: 'dental',       label: 'Dental',               icon: Stethoscope,   color: '#1D4ED8', bg: 'rgba(29,78,216,0.10)' },
+  { value: 'mental_health',label: 'Mental Health',        icon: HeartPulse,    color: '#D97706', bg: 'rgba(217,119,6,0.10)' },
+  { value: 'walk_in',      label: 'Walk-In',              icon: UserPlus,      color: '#2191D0', bg: 'rgba(33,145,208,0.10)' },
 ];
 
 // Fallback list when the facility hasn't set its departments in Facility Settings.
@@ -56,13 +56,14 @@ const FALLBACK_DEPARTMENTS = [
 ];
 
 const statusConfig: Record<AppointmentStatus, { color: string; bg: string; label: string }> = {
-  scheduled: { color: 'var(--accent-primary)', bg: 'var(--accent-light)', label: 'Scheduled' },
-  confirmed: { color: 'var(--accent-primary)', bg: 'rgba(124,58,237,0.08)', label: 'Confirmed' },
-  checked_in: { color: 'var(--color-warning)', bg: 'rgba(217,119,6,0.08)', label: 'Checked In' },
-  in_progress: { color: 'var(--color-success)', bg: 'rgba(5,150,105,0.08)', label: 'In Progress' },
-  completed: { color: 'var(--color-success)', bg: 'rgba(31, 157, 111,0.08)', label: 'Completed' },
-  cancelled: { color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.08)', label: 'Cancelled' },
-  no_show: { color: '#6B7280', bg: 'rgba(107,114,128,0.08)', label: 'No Show' },
+  requested:   { color: '#7C3AED', bg: 'rgba(124,58,237,0.10)', label: 'Requested' },
+  scheduled:   { color: '#2191D0', bg: 'rgba(33,145,208,0.10)',  label: 'Scheduled' },
+  confirmed:   { color: '#015697', bg: 'rgba(1,86,151,0.10)',    label: 'Confirmed' },
+  checked_in:  { color: '#D97706', bg: 'rgba(217,119,6,0.10)',   label: 'Checked In' },
+  in_progress: { color: '#059669', bg: 'rgba(5,150,105,0.10)',   label: 'In Progress' },
+  completed:   { color: '#047857', bg: 'rgba(4,120,87,0.10)',    label: 'Completed' },
+  cancelled:   { color: '#DC2626', bg: 'rgba(220,38,38,0.10)',   label: 'Cancelled' },
+  no_show:     { color: '#64748B', bg: 'rgba(100,116,139,0.10)', label: 'No Show' },
 };
 
 const priorityConfig: Record<AppointmentPriority, { color: string; label: string }> = {
@@ -96,6 +97,7 @@ export default function AppointmentsPage() {
     walk_in: 'appointments.typeWalkIn',
   };
   const statusLabelKey: Record<AppointmentStatus, string> = {
+    requested: 'appointments.statusRequested',
     scheduled: 'appointments.statusScheduled', confirmed: 'appointments.statusConfirmed',
     checked_in: 'appointments.statusCheckedIn', in_progress: 'appointments.statusInProgress',
     completed: 'appointments.statusCompleted', cancelled: 'appointments.statusCancelled',
@@ -108,6 +110,10 @@ export default function AppointmentsPage() {
 
   const router = useRouter();
   const [calView, setCalView] = useState<'month' | 'week' | 'day'>('month');
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [listSearch, setListSearch] = useState('');
+  const [listStatus, setListStatus] = useState('all');
+  const [listSort, setListSort] = useState<'date_asc' | 'date_desc' | 'name' | 'priority'>('date_asc');
   // Appointment opened in the click-to-view detail popup.
   const [eventApt, setEventApt] = useState<typeof appointments[0] | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -136,6 +142,21 @@ export default function AppointmentsPage() {
       window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
     }
   }, []);
+
+  // Keyboard ← → to step through appointments while the detail modal is open.
+  useEffect(() => {
+    if (!eventApt) return;
+    const sorted = [...appointments].sort((a, b) =>
+      `${a.appointmentDate}${a.appointmentTime}`.localeCompare(`${b.appointmentDate}${b.appointmentTime}`)
+    );
+    const idx = sorted.findIndex(a => a._id === eventApt._id);
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' && idx > 0) setEventApt(sorted[idx - 1]);
+      if (e.key === 'ArrowRight' && idx < sorted.length - 1) setEventApt(sorted[idx + 1]);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [eventApt, appointments]);
 
   // Date the react-big-calendar view is centered on (Google-Calendar-style nav).
   // Defaults to "today" in Africa/Juba so the initial focus matches the facility
@@ -323,31 +344,68 @@ export default function AppointmentsPage() {
     catch { showToast(t('appointments.toastFailedCancel'), 'error'); }
   };
 
+  // List view — filtered + sorted appointments
+  const listAppointments = useMemo(() => {
+    const q = listSearch.toLowerCase();
+    let result = appointments.filter(a => {
+      const matchSearch = !q || a.patientName.toLowerCase().includes(q) || a.reason.toLowerCase().includes(q);
+      const matchStatus = listStatus === 'all' || a.status === listStatus;
+      return matchSearch && matchStatus;
+    });
+    if (listSort === 'date_asc') result = result.sort((a, b) => `${a.appointmentDate}${a.appointmentTime}`.localeCompare(`${b.appointmentDate}${b.appointmentTime}`));
+    else if (listSort === 'date_desc') result = result.sort((a, b) => `${b.appointmentDate}${b.appointmentTime}`.localeCompare(`${a.appointmentDate}${a.appointmentTime}`));
+    else if (listSort === 'name') result = result.sort((a, b) => a.patientName.localeCompare(b.patientName));
+    else if (listSort === 'priority') {
+      const order: Record<string, number> = { emergency: 0, urgent: 1, routine: 2 };
+      result = result.sort((a, b) => (order[a.priority] ?? 2) - (order[b.priority] ?? 2));
+    }
+    return result;
+  }, [appointments, listSearch, listStatus, listSort]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <TopBar
           searchTrailing={
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* Calendar granularity filter — mirrors the switcher on the calendar. */}
-              <select
-                value={calView}
-                onChange={(e) => setCalView(e.target.value as 'month' | 'week' | 'day')}
-                aria-label={t('appointments.viewCalendar')}
-                className="text-[13px] font-medium cursor-pointer"
-                style={{ height: 36, padding: '0 10px', borderRadius: 'var(--input-radius)', border: '1px solid var(--border-medium)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)' }}
-              >
-                <option value="day">Day</option>
-                <option value="week">Week</option>
-                <option value="month">Month</option>
-              </select>
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`btn btn-secondary btn-filter${(selectedDate || filterStatus !== 'all') ? ' is-active' : ''}`}
-                aria-pressed={showFilters}
-                style={{ gap: 6 }}
-              >
-                <Filter size={14} /> {t('appointments.filters')}
-              </button>
+              {/* Calendar / List view toggle */}
+              <div style={{ display: 'flex', borderRadius: 10, border: '1px solid var(--border-medium)', overflow: 'hidden', height: 36 }}>
+                <button
+                  onClick={() => setViewMode('calendar')}
+                  style={{ padding: '0 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === 'calendar' ? 'var(--accent-primary)' : 'var(--bg-card-solid)', color: viewMode === 'calendar' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}
+                >
+                  <Calendar size={13} /> Calendar
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  style={{ padding: '0 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', borderLeft: '1px solid var(--border-medium)', background: viewMode === 'list' ? 'var(--accent-primary)' : 'var(--bg-card-solid)', color: viewMode === 'list' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}
+                >
+                  <Filter size={13} /> List
+                </button>
+              </div>
+              {/* Calendar granularity — only when in calendar mode */}
+              {viewMode === 'calendar' && (
+                <select
+                  value={calView}
+                  onChange={(e) => setCalView(e.target.value as 'month' | 'week' | 'day')}
+                  aria-label={t('appointments.viewCalendar')}
+                  className="text-[13px] font-medium cursor-pointer"
+                  style={{ height: 36, padding: '0 10px', borderRadius: 'var(--input-radius)', border: '1px solid var(--border-medium)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)' }}
+                >
+                  <option value="day">Day</option>
+                  <option value="week">Week</option>
+                  <option value="month">Month</option>
+                </select>
+              )}
+              {viewMode === 'calendar' && (
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`btn btn-secondary btn-filter${(selectedDate || filterStatus !== 'all') ? ' is-active' : ''}`}
+                  aria-pressed={showFilters}
+                  style={{ gap: 6 }}
+                >
+                  <Filter size={14} /> {t('appointments.filters')}
+                </button>
+              )}
             </div>
           }
           actions={
@@ -396,8 +454,115 @@ export default function AppointmentsPage() {
           </FilterBar>
         )}
 
+        {/* ═══ LIST VIEW ═══ */}
+        {viewMode === 'list' && (
+          <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+            {/* Toolbar — matches "Patients assigned to you" design */}
+            <div className="flex items-center gap-3 px-4 py-3 flex-wrap flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <input
+                type="search"
+                value={listSearch}
+                onChange={e => setListSearch(e.target.value)}
+                placeholder="Search by name or reason…"
+                className="flex-1 min-w-[200px]"
+                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 18px', fontSize: 13 }}
+              />
+              <select
+                value={listStatus}
+                onChange={e => setListStatus(e.target.value)}
+                className="w-full sm:w-44"
+                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 16px', fontSize: 13 }}
+                aria-label="Filter by status"
+              >
+                <option value="all">All Status</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="no_show">No Show</option>
+              </select>
+              <select
+                value={listSort}
+                onChange={e => setListSort(e.target.value as typeof listSort)}
+                className="w-full sm:w-44"
+                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 16px', fontSize: 13 }}
+                aria-label="Sort"
+              >
+                <option value="date_asc">Date (earliest first)</option>
+                <option value="date_desc">Date (latest first)</option>
+                <option value="name">Name (A–Z)</option>
+                <option value="priority">Priority (urgent first)</option>
+              </select>
+            </div>
+
+            {/* Table */}
+            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+              <table className="data-table" style={{ minWidth: 760 }}>
+                <thead>
+                  <tr>
+                    {['Patient', 'Reason', 'Date & Time', 'Type', 'Priority', 'Status', 'Actions'].map(h => (
+                      <th key={h} className="text-left px-4 py-2.5" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {listAppointments.length === 0 ? (
+                    <tr><td colSpan={7} className="px-4 py-12 text-center" style={{ color: 'var(--text-muted)', fontSize: 13 }}>No appointments match your search.</td></tr>
+                  ) : listAppointments.map(apt => {
+                    const sc = statusConfig[apt.status];
+                    const pc = priorityConfig[apt.priority];
+                    const typeInfo = appointmentTypes.find(ti => ti.value === apt.appointmentType);
+                    return (
+                      <tr
+                        key={apt._id}
+                        className="cursor-pointer hover:bg-[var(--table-row-hover)]"
+                        onClick={() => setEventApt(apt)}
+                        style={{ borderBottom: '1px solid var(--border-light)' }}
+                      >
+                        <td className="px-4 py-3">
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{apt.patientName}</div>
+                          {apt.providerName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{apt.providerName}</div>}
+                        </td>
+                        <td className="px-4 py-3" style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 220 }}>
+                          <div className="truncate">{apt.reason || '—'}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'monospace' }}>{apt.appointmentDate}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{apt.appointmentTime} · {apt.duration}min</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {typeInfo ? (
+                            <span style={{ fontSize: 11, fontWeight: 600, color: typeInfo.color, background: typeInfo.bg, borderRadius: 6, padding: '2px 8px' }}>{typeInfo.label}</span>
+                          ) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span style={{ fontSize: 11, fontWeight: 700, color: pc.color, background: `${pc.color}15`, borderRadius: 6, padding: '2px 8px' }}>{t(priorityLabelKey[apt.priority])}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span style={{ fontSize: 11, fontWeight: 700, color: sc.color, background: sc.bg, borderRadius: 6, padding: '2px 8px' }}>{t(statusLabelKey[apt.status])}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                            {apt.status === 'scheduled' && (
+                              <button onClick={() => handleStatusChange(apt._id, 'confirmed')} className="btn btn-sm btn-secondary" style={{ fontSize: 11 }}>Confirm</button>
+                            )}
+                            {apt.status === 'confirmed' && (
+                              <button onClick={() => handleStatusChange(apt._id, 'completed')} className="btn btn-sm btn-primary" style={{ fontSize: 11 }}>Complete</button>
+                            )}
+                            <button onClick={() => { setEditingApt(apt._id); loadEditForm(apt); }} className="btn btn-sm btn-secondary" style={{ fontSize: 11 }}>Edit</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* ═══ Calendar (react-big-calendar) — the only appointments view ═══ */}
-        <div className="card-elevated" style={{ padding: 16, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', marginBottom: -8 }}>
+        {viewMode === 'calendar' && <div className="card-elevated" style={{ padding: 16, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', marginBottom: -8 }}>
           <div className="rbc-tamam" style={{ flex: 1, minHeight: 560 }}>
             <AppointmentsCalendar
               events={calendarEvents}
@@ -419,7 +584,7 @@ export default function AppointmentsPage() {
               }}
             />
           </div>
-        </div>
+        </div>}
 
 
 
@@ -490,49 +655,96 @@ export default function AppointmentsPage() {
         {/* Provider availability ("Schedule") — opened from the action bar */}
         {showAvailability && <AvailabilityModal onClose={() => setShowAvailability(false)} />}
 
-        {/* Appointment detail — opens when an event on the calendar is clicked */}
-        {eventApt && (
-          <Modal onClose={() => setEventApt(null)} title={eventApt.patientName} size="md">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: statusConfig[eventApt.status].color, background: statusConfig[eventApt.status].bg }}>
-                {t(statusLabelKey[eventApt.status])}
-              </span>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: priorityConfig[eventApt.priority].color, background: `${priorityConfig[eventApt.priority].color}14` }}>
-                {t(priorityLabelKey[eventApt.priority])}
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 18 }}>
-              <Detail label="Date" value={new Date(eventApt.appointmentDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} icon={<Calendar size={14} />} />
-              <Detail label="Time" value={`${eventApt.appointmentTime} · ${eventApt.duration}m`} icon={<Clock size={14} />} />
-              <Detail label="Type" value={appointmentTypes.find(x => x.value === eventApt.appointmentType)?.label || eventApt.appointmentType} icon={<ClipboardList size={14} />} />
-              <Detail label="Provider" value={eventApt.providerName} icon={<Stethoscope size={14} />} />
-              <Detail label="Department" value={eventApt.department} icon={<Building2 size={14} />} />
-            </div>
-            {eventApt.reason && (
-              <div style={{ marginBottom: 18 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Reason</div>
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{eventApt.reason}</div>
+        {/* Appointment detail — opens when an event on the calendar is clicked.
+            Sorted list enables prev/next navigation without closing the modal. */}
+        {eventApt && (() => {
+          const sorted = [...appointments].sort((a, b) =>
+            `${a.appointmentDate}${a.appointmentTime}`.localeCompare(`${b.appointmentDate}${b.appointmentTime}`)
+          );
+          const idx = sorted.findIndex(a => a._id === eventApt._id);
+          const hasPrev = idx > 0;
+          const hasNext = idx < sorted.length - 1;
+          return (
+            <Modal
+              onClose={() => setEventApt(null)}
+              title={eventApt.patientName}
+              size="md"
+              nav={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>
+                    {idx + 1} / {sorted.length}
+                  </span>
+                  <button
+                    onClick={() => setEventApt(sorted[idx - 1])}
+                    disabled={!hasPrev}
+                    aria-label="Previous appointment"
+                    style={{
+                      width: 30, height: 30, borderRadius: 8, border: '1px solid var(--glass-border)',
+                      background: hasPrev ? 'var(--bg-card-solid)' : 'transparent',
+                      color: hasPrev ? 'var(--text-secondary)' : 'var(--text-muted)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: hasPrev ? 'pointer' : 'default', opacity: hasPrev ? 1 : 0.35,
+                    }}
+                  >
+                    <ChevronLeft size={15} />
+                  </button>
+                  <button
+                    onClick={() => setEventApt(sorted[idx + 1])}
+                    disabled={!hasNext}
+                    aria-label="Next appointment"
+                    style={{
+                      width: 30, height: 30, borderRadius: 8, border: '1px solid var(--glass-border)',
+                      background: hasNext ? 'var(--bg-card-solid)' : 'transparent',
+                      color: hasNext ? 'var(--text-secondary)' : 'var(--text-muted)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: hasNext ? 'pointer' : 'default', opacity: hasNext ? 1 : 0.35,
+                    }}
+                  >
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+              }
+            >
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: statusConfig[eventApt.status].color, background: statusConfig[eventApt.status].bg }}>
+                  {t(statusLabelKey[eventApt.status])}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: priorityConfig[eventApt.priority].color, background: `${priorityConfig[eventApt.priority].color}14` }}>
+                  {t(priorityLabelKey[eventApt.priority])}
+                </span>
               </div>
-            )}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <button onClick={() => { const id = eventApt.patientId; setEventApt(null); router.push(`/patients/${id}`); }} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
-                <User size={14} /> Open patient record
-              </button>
-              <button onClick={() => { loadEditForm(eventApt); setEditingApt(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('action.edit')}</button>
-              <button onClick={() => { setRescheduleId(eventApt._id); setRescheduleDate(eventApt.appointmentDate); setRescheduleTime(eventApt.appointmentTime); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('appointments.actionReschedule')}</button>
-              {/* Undo a confirm / check-in / start, or reopen a terminal appointment. */}
-              {PRIOR_STATUS[eventApt.status] && (
-                <button onClick={() => { const id = eventApt._id; const to = PRIOR_STATUS[eventApt.status]!; setEventApt(null); handleStatusChange(id, to); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 18 }}>
+                <Detail label="Date" value={new Date(eventApt.appointmentDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} icon={<Calendar size={14} />} />
+                <Detail label="Time" value={`${eventApt.appointmentTime} · ${eventApt.duration}m`} icon={<Clock size={14} />} />
+                <Detail label="Type" value={appointmentTypes.find(x => x.value === eventApt.appointmentType)?.label || eventApt.appointmentType} icon={<ClipboardList size={14} />} />
+                <Detail label="Provider" value={eventApt.providerName} icon={<Stethoscope size={14} />} />
+                <Detail label="Department" value={eventApt.department} icon={<Building2 size={14} />} />
+              </div>
+              {eventApt.reason && (
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Reason</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{eventApt.reason}</div>
+                </div>
               )}
-              {(eventApt.status === 'completed' || eventApt.status === 'cancelled' || eventApt.status === 'no_show') && (
-                <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'scheduled'); }} className="btn btn-secondary btn-sm">{t('action.reopen')}</button>
-              )}
-              {eventApt.status !== 'cancelled' && eventApt.status !== 'completed' && (
-                <button onClick={() => { setCancelId(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm" style={{ color: 'var(--color-danger)' }}>{t('appointments.actionCancel')}</button>
-              )}
-            </div>
-          </Modal>
-        )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <button onClick={() => { const id = eventApt.patientId; setEventApt(null); router.push(`/patients/${id}`); }} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
+                  <User size={14} /> Open patient record
+                </button>
+                <button onClick={() => { loadEditForm(eventApt); setEditingApt(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('action.edit')}</button>
+                <button onClick={() => { setRescheduleId(eventApt._id); setRescheduleDate(eventApt.appointmentDate); setRescheduleTime(eventApt.appointmentTime); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('appointments.actionReschedule')}</button>
+                {PRIOR_STATUS[eventApt.status] && (
+                  <button onClick={() => { const id = eventApt._id; const to = PRIOR_STATUS[eventApt.status]!; setEventApt(null); handleStatusChange(id, to); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
+                )}
+                {(eventApt.status === 'completed' || eventApt.status === 'cancelled' || eventApt.status === 'no_show') && (
+                  <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'scheduled'); }} className="btn btn-secondary btn-sm">{t('action.reopen')}</button>
+                )}
+                {eventApt.status !== 'cancelled' && eventApt.status !== 'completed' && (
+                  <button onClick={() => { setCancelId(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm" style={{ color: 'var(--color-danger)' }}>{t('appointments.actionCancel')}</button>
+                )}
+              </div>
+            </Modal>
+          );
+        })()}
 
         {/* Reschedule */}
         {rescheduleId && (
@@ -591,7 +803,7 @@ export default function AppointmentsPage() {
                           <div className="stat-value" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{apt.appointmentTime}</div>
                           <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{apt.duration}m</div>
                         </div>
-                        <div className="icon-box-sm" style={{ background: typeInfo?.bg || sc.bg, flexShrink: 0 }}>
+                        <div className="icon-box-sm" style={{ flexShrink: 0 }}>
                           {typeInfo ? <typeInfo.icon size={14} style={{ color: typeInfo.color }} /> : <Calendar size={14} style={{ color: '#6366F1' }} />}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -619,7 +831,7 @@ export default function AppointmentsPage() {
                         {/* Action buttons */}
                         <div style={{ display: 'flex', gap: 4 }}>
                           {apt.status === 'scheduled' && (
-                            <button onClick={() => { handleStatusChange(apt._id, 'confirmed'); }} title={t('appointments.actionApprove')} style={miniBtn('#7C3AED')}>
+                            <button onClick={() => { handleStatusChange(apt._id, 'confirmed'); }} title={t('appointments.actionApprove')} style={miniBtn('var(--accent-primary)')}>
                               <CheckCircle2 size={12} />
                             </button>
                           )}
@@ -692,9 +904,9 @@ export default function AppointmentsPage() {
 
 /* ─── Reusable Components ─── */
 
-function Modal({ children, onClose, title, titleColor, icon, size = 'md' }: {
+function Modal({ children, onClose, title, titleColor, icon, size = 'md', nav }: {
   children: React.ReactNode; onClose: () => void; title: string; titleColor?: string;
-  icon?: React.ReactNode; size?: 'sm' | 'md' | 'lg';
+  icon?: React.ReactNode; size?: 'sm' | 'md' | 'lg'; nav?: React.ReactNode;
 }) {
   const sizeClass = size === 'sm' ? 'modal-panel--sm' : size === 'lg' ? 'modal-panel--lg' : 'modal-panel--md';
   const width = size === 'sm' ? 440 : size === 'lg' ? 820 : 600;
@@ -702,15 +914,18 @@ function Modal({ children, onClose, title, titleColor, icon, size = 'md' }: {
     <PortalModal onClose={onClose} width={width}>
       <div className={`modal-panel ${sizeClass}`} style={{ maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
             {icon}
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: titleColor || 'var(--text-primary)' }}>{title}</h2>
+            <h2 className="truncate" style={{ fontSize: 18, fontWeight: 700, color: titleColor || 'var(--text-primary)' }}>{title}</h2>
           </div>
-          <button onClick={onClose} style={{
-            background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer',
-            width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--text-muted)', transition: 'background 0.15s',
-          }}><X size={16} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {nav}
+            <button onClick={onClose} style={{
+              background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer',
+              width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--text-muted)', transition: 'background 0.15s',
+            }}><X size={16} /></button>
+          </div>
         </div>
         {children}
       </div>

@@ -3,22 +3,19 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import { Check, ArrowLeft, ArrowRight } from '@/components/icons/lucide';
+import { Check, ArrowLeft, ArrowRight, Trash2 } from '@/components/icons/lucide';
 import FingerprintCapture, { type CapturedFingerprint } from '@/components/FingerprintCapture';
-import { statesAndCounties, states, tribes, languages, bloodTypes } from '@/data/mock';
+import { statesAndCounties, states, tribes, languages } from '@/data/mock';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { enrollFingerprint } from '@/lib/services/fingerprint-service';
 import { isValidPhone, isValidNationalId, normalizePhone, normalizeNationalId } from '@/lib/field-formats';
-import type { AllergyEntry } from '@/data/mock';
-
-type AllergyRow = { substance: string; criticality: NonNullable<AllergyEntry['criticality']>; reaction: string };
 
 export default function NewPatientPage() {
   const { t } = useTranslation();
-  const steps = [t('patientNew.stepDemographics'), t('patientNew.stepContactLocation'), t('patientNew.stepNextOfKin'), t('patientNew.stepMedicalInfo'), t('patientNew.stepReview')];
+  const steps = [t('patientNew.stepDemographics'), t('patientNew.stepContactLocation'), t('patientNew.stepNextOfKin'), 'Payment Coverage', t('patientNew.stepReview')];
   const router = useRouter();
   const { create: createPatient } = usePatients();
   const { currentUser } = useApp();
@@ -31,21 +28,22 @@ export default function NewPatientPage() {
     state: '', county: '', payam: '', boma: '', bomaCode: '', householdNumber: '', address: '',
     nationalId: '',
     nokName: '', nokRelationship: '', nokPhone: '', nokAddress: '',
-    bloodType: 'Unknown', allergies: '' as string, chronicConditions: '' as string,
+    payorCoverageType: 'out-of-pocket' as 'out-of-pocket' | 'program' | 'exemption' | 'ngo',
+    payorProgram: '', payorNgo: '', payorExemptionReason: '',
   });
+
+  type AdditionalNok = { name: string; relationship: string; phone: string; address: string };
+  const [additionalNok, setAdditionalNok] = useState<AdditionalNok[]>([]);
+  const addNokEntry = () => setAdditionalNok(rs => rs.length < 3 ? [...rs, { name: '', relationship: '', phone: '', address: '' }] : rs);
+  const updateNokEntry = (i: number, patch: Partial<AdditionalNok>) => setAdditionalNok(rs => rs.map((r, j) => j === i ? { ...r, ...patch } : r));
+  const removeNokEntry = (i: number) => setAdditionalNok(rs => rs.filter((_, j) => j !== i));
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   // Fingerprint templates captured during registration (consent-gated inside
   // the component). Persisted AFTER the patient doc exists, in handleSubmit.
   const [fingerprints, setFingerprints] = useState<CapturedFingerprint[]>([]);
-  // Structured allergies captured at registration (substance + criticality +
-  // reaction). Persisted as first-class structuredAllergies on the new patient
-  // so the allergy is graded from the patient registry onward (P0.3).
-  const [allergyRows, setAllergyRows] = useState<AllergyRow[]>([]);
-  const addAllergyRow = () => setAllergyRows(rs => [...rs, { substance: '', criticality: 'unknown', reaction: '' }]);
-  const updateAllergyRow = (i: number, patch: Partial<AllergyRow>) => setAllergyRows(rs => rs.map((r, j) => j === i ? { ...r, ...patch } : r));
-  const removeAllergyRow = (i: number) => setAllergyRows(rs => rs.filter((_, j) => j !== i));
+  const [patientPhotoUrl, setPatientPhotoUrl] = useState<string | null>(null);
 
   const update = (field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -70,6 +68,7 @@ export default function NewPatientPage() {
         const age = parseInt(form.estimatedAge, 10);
         if (isNaN(age) || age < 0 || age > 150) errs.estimatedAge = t('patientNew.errAgeRange');
       }
+      if (!form.primaryLanguage) errs.primaryLanguage = 'Primary language is required';
     } else if (s === 1) {
       if (!form.state) errs.state = t('patientNew.errStateRequired');
       if (form.state && !form.county) errs.county = t('patientNew.errCountyRequired');
@@ -148,29 +147,24 @@ export default function NewPatientPage() {
         nokRelationship: form.nokRelationship,
         nokPhone: normNokPhone,
         nokAddress: form.nokAddress,
-        bloodType: form.bloodType,
-        ...(() => {
-          // Merge free-text allergies (quick entry, unknown criticality) with
-          // the structured rows (graded). Structured rows win on substance match.
-          const nowIsoStr = new Date().toISOString();
-          const recordedByName = currentUser?.name || currentUser?.username;
-          const freeText = form.allergies ? form.allergies.split(',').map(a => a.trim()).filter(Boolean) : [];
-          const structured: AllergyEntry[] = [
-            ...allergyRows.filter(r => r.substance.trim()).map((r, i) => ({
-              id: `alg-reg-${i}`, substance: r.substance.trim(), criticality: r.criticality,
-              reaction: r.reaction.trim() || undefined, status: 'active' as const, recordedByName, recordedAt: nowIsoStr,
-            })),
-            ...freeText
-              .filter(s => !allergyRows.some(r => r.substance.trim().toLowerCase() === s.toLowerCase()))
-              .map((s, i) => ({ id: `alg-regf-${i}`, substance: s, criticality: 'unknown' as const, status: 'active' as const, recordedByName, recordedAt: nowIsoStr })),
-          ];
-          const names = structured.map(a => a.substance);
-          return {
-            allergies: names.length > 0 ? names : ['None known'],
-            ...(structured.length > 0 ? { structuredAllergies: structured } : {}),
-          };
-        })(),
-        chronicConditions: form.chronicConditions ? form.chronicConditions.split(',').map(c => c.trim()).filter(c => c.length > 0) : ['None'],
+        ...(additionalNok.filter(n => n.name.trim()).length > 0 ? {
+          additionalNextOfKin: additionalNok.filter(n => n.name.trim()).map(n => ({
+            name: n.name.trim(),
+            relationship: n.relationship,
+            phone: n.phone,
+            address: n.address || undefined,
+          })),
+        } : {}),
+        payorInfo: {
+          coverageType: form.payorCoverageType,
+          ...(form.payorProgram ? { programEnrollment: form.payorProgram } : {}),
+          ...(form.payorNgo ? { ngoName: form.payorNgo } : {}),
+          ...(form.payorExemptionReason ? { exemptionReason: form.payorExemptionReason } : {}),
+        },
+        bloodType: 'Unknown',
+        allergies: ['None known'],
+        chronicConditions: ['None'],
+        ...(patientPhotoUrl ? { photoUrl: patientPhotoUrl } : {}),
         registrationHospital: currentUser?.hospitalId || '',
         registrationDate: today,
         registeredAt: nowIso,
@@ -304,11 +298,12 @@ export default function NewPatientPage() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="pt-language">{t('patientNew.primaryLanguage')}</label>
-                    <select id="pt-language" value={form.primaryLanguage} onChange={e => update('primaryLanguage', e.target.value)}>
+                    <label htmlFor="pt-language">{t('patientNew.primaryLanguage')} *</label>
+                    <select id="pt-language" value={form.primaryLanguage} onChange={e => update('primaryLanguage', e.target.value)} aria-required="true" aria-invalid={!!errors.primaryLanguage} style={errors.primaryLanguage ? { borderColor: 'var(--color-danger)' } : {}}>
                       <option value="">{t('patientNew.selectLanguage')}</option>
                       {languages.map(l => <option key={l} value={l}>{l}</option>)}
                     </select>
+                    {errors.primaryLanguage && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.primaryLanguage}</p>}
                   </div>
                 </div>
               </div>
@@ -400,100 +395,223 @@ export default function NewPatientPage() {
               </div>
             )}
 
-            {/* Step 2: Next of Kin */}
+            {/* Step 2: Next of Kin (multiple contacts supported) */}
             {step === 2 && (
-              <div className="space-y-5">
-                <h3 className="text-base font-semibold mb-4">{t('patientNew.nextOfKinHeading')}</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label>{t('patientNew.fullName')}</label>
-                    <input type="text" value={form.nokName} onChange={e => update('nokName', e.target.value)} placeholder={t('patientNew.nokNamePlaceholder')} />
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold">{t('patientNew.nextOfKinHeading')}</h3>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Primary contact required · up to 4 contacts total</span>
+                </div>
+                <p className="text-xs -mt-4" style={{ color: 'var(--text-muted)' }}>
+                  Multiple contacts improve follow-up. Patients may not have reliable phone access, and multiple family members may be involved in care decisions.
+                </p>
+
+                {/* Primary NOK */}
+                <div className="p-4 rounded-xl space-y-4" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>Primary</span>
                   </div>
-                  <div>
-                    <label>{t('patientNew.relationship')}</label>
-                    <select value={form.nokRelationship} onChange={e => update('nokRelationship', e.target.value)}>
-                      <option value="">{t('patientNew.selectRelationship')}</option>
-                      {[
-                        { value: 'Spouse', label: t('patientNew.relSpouse') },
-                        { value: 'Parent', label: t('patientNew.relParent') },
-                        { value: 'Child', label: t('patientNew.relChild') },
-                        { value: 'Sibling', label: t('patientNew.relSibling') },
-                        { value: 'Uncle', label: t('patientNew.relUncle') },
-                        { value: 'Aunt', label: t('patientNew.relAunt') },
-                        { value: 'Cousin', label: t('patientNew.relCousin') },
-                        { value: 'Friend', label: t('patientNew.relFriend') },
-                        { value: 'Other', label: t('patientNew.relOther') },
-                      ].map(r => (
-                        <option key={r.value} value={r.value}>{r.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label>{t('patientNew.nokPhone')}</label>
-                    <input type="tel" value={form.nokPhone} onChange={e => update('nokPhone', e.target.value)} placeholder={t('patientNew.phonePlaceholder')} aria-invalid={!!errors.nokPhone} style={errors.nokPhone ? { borderColor: 'var(--color-danger)' } : {}} />
-                    {errors.nokPhone && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.nokPhone}</p>}
-                  </div>
-                  <div>
-                    <label>{t('patientNew.nokAddress')}</label>
-                    <input type="text" value={form.nokAddress} onChange={e => update('nokAddress', e.target.value)} placeholder={t('patientNew.nokAddressPlaceholder')} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label>{t('patientNew.fullName')} *</label>
+                      <input type="text" value={form.nokName} onChange={e => update('nokName', e.target.value)} placeholder={t('patientNew.nokNamePlaceholder')} aria-invalid={!!errors.nokName} style={errors.nokName ? { borderColor: 'var(--color-danger)' } : {}} />
+                      {errors.nokName && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.nokName}</p>}
+                    </div>
+                    <div>
+                      <label>{t('patientNew.relationship')} *</label>
+                      <select value={form.nokRelationship} onChange={e => update('nokRelationship', e.target.value)} aria-invalid={!!errors.nokRelationship} style={errors.nokRelationship ? { borderColor: 'var(--color-danger)' } : {}}>
+                        <option value="">{t('patientNew.selectRelationship')}</option>
+                        {['Spouse', 'Parent', 'Child', 'Sibling', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Other'].map(r => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label>{t('patientNew.nokPhone')} *</label>
+                      <input type="tel" value={form.nokPhone} onChange={e => update('nokPhone', e.target.value)} placeholder={t('patientNew.phonePlaceholder')} aria-invalid={!!errors.nokPhone} style={errors.nokPhone ? { borderColor: 'var(--color-danger)' } : {}} />
+                      {errors.nokPhone && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors.nokPhone}</p>}
+                    </div>
+                    <div>
+                      <label>{t('patientNew.nokAddress')}</label>
+                      <input type="text" value={form.nokAddress} onChange={e => update('nokAddress', e.target.value)} placeholder={t('patientNew.nokAddressPlaceholder')} />
+                    </div>
                   </div>
                 </div>
+
+                {/* Additional NOK entries */}
+                {additionalNok.map((nok, i) => (
+                  <div key={i} className="p-4 rounded-xl space-y-4" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-light)', color: 'var(--text-muted)' }}>Contact {i + 2}</span>
+                      <button type="button" onClick={() => removeNokEntry(i)} aria-label="Remove contact" title="Remove contact" className="p-1.5 rounded-lg transition-colors hover:bg-red-50" style={{ color: 'var(--color-danger)' }}><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label>Full Name</label>
+                        <input type="text" value={nok.name} onChange={e => updateNokEntry(i, { name: e.target.value })} placeholder="Full name" />
+                      </div>
+                      <div>
+                        <label>Relationship</label>
+                        <select value={nok.relationship} onChange={e => updateNokEntry(i, { relationship: e.target.value })}>
+                          <option value="">Select relationship</option>
+                          {['Spouse', 'Parent', 'Child', 'Sibling', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Other'].map(r => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label>Phone</label>
+                        <input type="tel" value={nok.phone} onChange={e => updateNokEntry(i, { phone: e.target.value })} placeholder="Phone number" />
+                      </div>
+                      <div>
+                        <label>Address / Location</label>
+                        <input type="text" value={nok.address} onChange={e => updateNokEntry(i, { address: e.target.value })} placeholder="Village, boma, or address" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {additionalNok.length < 3 && (
+                  <button type="button" onClick={addNokEntry} className="btn btn-secondary btn-sm">
+                    + Add another contact
+                  </button>
+                )}
+
+                {/* Patient photo capture */}
+                <div className="card-elevated p-4">
+                  <h4 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Patient Photo <span className="font-normal text-xs" style={{ color: 'var(--text-muted)' }}>(optional)</span></h4>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-shrink-0" style={{ width: 72, height: 72, borderRadius: 12, overflow: 'hidden', border: '2px dashed var(--border-light)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {patientPhotoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={patientPhotoUrl} alt="Patient" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: 'var(--text-muted)', opacity: 0.4 }}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="btn btn-secondary btn-sm cursor-pointer">
+                        {patientPhotoUrl ? 'Change photo' : 'Upload photo'}
+                        <input
+                          type="file"
+                          className="sr-only"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = ev => {
+                              const result = ev.target?.result as string;
+                              if (result) setPatientPhotoUrl(result);
+                            };
+                            reader.readAsDataURL(file);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                      {patientPhotoUrl && (
+                        <button type="button" onClick={() => setPatientPhotoUrl(null)} className="btn btn-sm text-xs" style={{ color: 'var(--text-muted)', background: 'transparent' }}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] flex-1" style={{ color: 'var(--text-muted)' }}>
+                      Use a clear front-facing photo. JPG, PNG or WebP, max 5 MB.
+                    </p>
+                  </div>
+                </div>
+
+                <FingerprintCapture value={fingerprints} onChange={setFingerprints} />
               </div>
             )}
 
-            {/* Step 3: Medical Info */}
+            {/* Step 3: Payment Coverage */}
             {step === 3 && (
               <div className="space-y-5">
-                <h3 className="text-base font-semibold mb-4">{t('patientNew.medicalInfoHeading')}</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <label>{t('patientNew.bloodType')}</label>
-                    <select value={form.bloodType} onChange={e => update('bloodType', e.target.value)}>
-                      {bloodTypes.map(b => <option key={b} value={b}>{b}</option>)}
-                    </select>
-                  </div>
-                </div>
                 <div>
-                  <label>{t('patientNew.knownAllergies')}</label>
-                  <textarea value={form.allergies} onChange={e => update('allergies', e.target.value)} rows={2} placeholder={t('patientNew.allergiesPlaceholder')} />
-                  {/* Optional graded entry for known severe/important allergies. */}
-                  <div className="mt-2 space-y-2">
-                    {allergyRows.map((r, i) => (
-                      <div key={i} className="flex items-center gap-2 flex-wrap">
-                        <input value={r.substance} onChange={e => updateAllergyRow(i, { substance: e.target.value })} placeholder="Substance"
-                          className="flex-1 min-w-[120px] p-2 rounded-md text-[13px]" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
-                        <select value={r.criticality} onChange={e => updateAllergyRow(i, { criticality: e.target.value as AllergyRow['criticality'] })}
-                          className="p-2 rounded-md text-[12px]" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
-                          <option value="unknown">Unknown</option>
-                          <option value="mild">Mild</option>
-                          <option value="moderate">Moderate</option>
-                          <option value="severe">Severe</option>
-                        </select>
-                        <input value={r.reaction} onChange={e => updateAllergyRow(i, { reaction: e.target.value })} placeholder="Reaction (optional)"
-                          className="flex-1 min-w-[120px] p-2 rounded-md text-[13px]" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
-                        <button type="button" onClick={() => removeAllergyRow(i)} className="text-xs px-2 py-1" style={{ color: 'var(--text-muted)' }}>Remove</button>
-                      </div>
-                    ))}
-                    <button type="button" onClick={addAllergyRow} className="btn btn-secondary btn-sm">+ Add graded allergy</button>
-                  </div>
-                </div>
-                <div>
-                  <label>{t('patientNew.chronicConditions')}</label>
-                  <textarea value={form.chronicConditions} onChange={e => update('chronicConditions', e.target.value)} rows={2} placeholder={t('patientNew.chronicConditionsPlaceholder')} />
-                </div>
-                <div className="p-4 rounded-lg" style={{ background: 'rgba(252,211,77,0.10)', border: '1px solid rgba(252,211,77,0.2)' }}>
-                  <p className="text-xs font-medium" style={{ color: 'var(--color-warning)' }}>
-                    {t('patientNew.medicalWarning')}
+                  <h3 className="text-base font-semibold mb-1">Payment Coverage</h3>
+                  <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+                    Capture how this patient&apos;s care will be covered. This information is used at checkout and billing.
                   </p>
                 </div>
-                <FingerprintCapture value={fingerprints} onChange={setFingerprints} />
+
+                <div>
+                  <label>Coverage Type *</label>
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    {([
+                      { value: 'out-of-pocket', label: 'Out of Pocket', desc: 'Patient pays directly' },
+                      { value: 'program', label: 'Program Enrolled', desc: 'Government or NGO program' },
+                      { value: 'exemption', label: 'Exemption', desc: 'Fee waiver or exemption status' },
+                      { value: 'ngo', label: 'NGO Covered', desc: 'NGO covers services' },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => update('payorCoverageType', opt.value)}
+                        className="flex flex-col items-start p-4 rounded-xl text-left transition-all"
+                        style={{
+                          border: `2px solid ${form.payorCoverageType === opt.value ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+                          background: form.payorCoverageType === opt.value ? 'var(--accent-light)' : 'var(--overlay-subtle)',
+                        }}
+                      >
+                        <span className="text-sm font-semibold" style={{ color: form.payorCoverageType === opt.value ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{opt.label}</span>
+                        <span className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {form.payorCoverageType === 'program' && (
+                  <div>
+                    <label>Program Name</label>
+                    <input type="text" value={form.payorProgram} onChange={e => update('payorProgram', e.target.value)} placeholder="e.g. UNICEF Health Program, MoH Free Care" />
+                  </div>
+                )}
+                {form.payorCoverageType === 'ngo' && (
+                  <div>
+                    <label>NGO Name</label>
+                    <input type="text" value={form.payorNgo} onChange={e => update('payorNgo', e.target.value)} placeholder="e.g. MSF, IRC, GOAL" />
+                  </div>
+                )}
+                {form.payorCoverageType === 'exemption' && (
+                  <div>
+                    <label>Exemption Reason</label>
+                    <select value={form.payorExemptionReason} onChange={e => update('payorExemptionReason', e.target.value)}>
+                      <option value="">Select reason</option>
+                      <option value="Child under 5">Child under 5</option>
+                      <option value="Pregnant woman">Pregnant woman</option>
+                      <option value="Indigent / unable to pay">Indigent / unable to pay</option>
+                      <option value="Emergency care">Emergency care</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    {form.payorExemptionReason === 'Other' && (
+                      <input type="text" className="mt-2" value={form.payorExemptionReason === 'Other' ? '' : form.payorExemptionReason} onChange={e => update('payorExemptionReason', e.target.value)} placeholder="Specify reason" />
+                    )}
+                  </div>
+                )}
+
+                <div className="p-4 rounded-lg" style={{ background: 'rgba(33,145,208,0.06)', border: '1px solid rgba(33,145,208,0.15)' }}>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    Medical history, allergies, and chronic conditions are collected later during triage and clinical consultation — not at registration.
+                  </p>
+                </div>
               </div>
             )}
 
             {/* Step 4: Review */}
             {step === 4 && (
               <div className="space-y-4">
-                <h3 className="text-base font-semibold mb-4">{t('patientNew.reviewHeading')}</h3>
+                <div className="flex items-center gap-4 mb-4">
+                  <div style={{ width: 60, height: 60, borderRadius: 12, overflow: 'hidden', flexShrink: 0, border: '1px solid var(--border-light)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {patientPhotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={patientPhotoUrl} alt="Patient" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: 'var(--text-muted)', opacity: 0.4 }}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+                    )}
+                  </div>
+                  <h3 className="text-base font-semibold">{t('patientNew.reviewHeading')}</h3>
+                </div>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewDemographics')}</h4>
@@ -515,11 +633,15 @@ export default function NewPatientPage() {
                     </div>
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewMedical')}</h4>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Payment Coverage</h4>
                     <div className="space-y-1.5">
-                      <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewBloodType')}</span> {form.bloodType}</p>
-                      <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewAllergies')}</span> {form.allergies || t('patientNew.noneSpecified')}</p>
-                      <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewConditions')}</span> {form.chronicConditions || t('patientNew.noneSpecified')}</p>
+                      <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Coverage:</span> {form.payorCoverageType}</p>
+                      {form.payorProgram && <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Program:</span> {form.payorProgram}</p>}
+                      {form.payorNgo && <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>NGO:</span> {form.payorNgo}</p>}
+                      {form.payorExemptionReason && <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Exemption:</span> {form.payorExemptionReason}</p>}
+                      {additionalNok.length > 0 && (
+                        <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Additional contacts:</span> {additionalNok.length}</p>
+                      )}
                     </div>
                   </div>
                 </div>

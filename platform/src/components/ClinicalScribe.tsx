@@ -260,7 +260,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
         {activeTab === 'fields' && scribe.extraction && (
           <div className="p-3 space-y-2">
             <FieldSection
-              icon={Clipboard} label={t('scribe.sectionChiefComplaint')} color="#3b82f6"
+              icon={Clipboard} label={t('scribe.sectionChiefComplaint')} color="var(--accent-primary)"
               expanded={expandedSections.has('complaint')}
               onToggle={() => toggleSection('complaint')}
               empty={!scribe.extraction.chiefComplaint}
@@ -336,7 +336,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
                     )}
                     <span className="text-xs font-medium flex-1" style={{ color: 'var(--text-primary)' }}>{dx.name}</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{
-                      background: dx.certainty === 'confirmed' ? 'rgba(59, 130, 246,0.12)' : 'rgba(252,211,77,0.12)',
+                      background: dx.certainty === 'confirmed' ? 'rgba(33, 145, 208, 0.12)' : 'rgba(252,211,77,0.12)',
                       color: dx.certainty === 'confirmed' ? 'var(--accent-primary)' : 'var(--color-warning)',
                     }}>{dx.certainty}</span>
                   </div>
@@ -400,7 +400,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             </FieldSection>
 
             <FieldSection
-              icon={FileText} label={t('scribe.sectionTreatmentPlan')} color="#3b82f6"
+              icon={FileText} label={t('scribe.sectionTreatmentPlan')} color="var(--accent-primary)"
               expanded={expandedSections.has('plan')}
               onToggle={() => toggleSection('plan')}
               empty={scribe.extraction.treatmentPlan.length === 0}

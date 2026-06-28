@@ -8,8 +8,9 @@ export async function GET(req: NextRequest) {
   try {
     const paymentMod = await import('@/lib/services/payment-service');
     const ledgerMod = await import('@/lib/services/ledger-service');
+    const billingMod = await import('@/lib/services/billing-service');
 
-    const [payments, charges, plans, claims, policies, summary, balance, ledger] = await Promise.all([
+    const [payments, charges, plans, claims, policies, summary, balance, ledger, bills] = await Promise.all([
       paymentMod.getPaymentsByPatient(auth.sub),
       paymentMod.getChargesByPatient(auth.sub),
       paymentMod.getPaymentPlansByPatient(auth.sub),
@@ -18,9 +19,10 @@ export async function GET(req: NextRequest) {
       paymentMod.getPatientFinancialSummary(auth.sub),
       ledgerMod.getPatientBalance(auth.sub),
       ledgerMod.getPatientLedger(auth.sub, 30),
+      billingMod.getBillsByPatient(auth.sub),
     ]);
 
-    return NextResponse.json({ payments, charges, plans, claims, policies, summary, balance, ledger });
+    return NextResponse.json({ payments, charges, plans, claims, policies, summary, balance, ledger, bills });
   } catch (err) {
     console.error('[patient-portal/billing]', err);
     return NextResponse.json({ error: 'Failed to fetch billing data' }, { status: 500 });

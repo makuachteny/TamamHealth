@@ -1,12 +1,12 @@
 // Edge-safe single source of truth for role -> route allow-list.
 //
-// IMPORTANT: This module is imported by `src/middleware.ts`, which runs on
+// IMPORTANT: This module is imported by `src/proxy.ts`, which runs on
 // the Next.js Edge runtime. It MUST NOT import anything that pulls in
-// lucide-react, node:fs, or any non-Edge-safe module. Only type-only imports
+// icon libraries, node:fs, or any non-Edge-safe module. Only type-only imports
 // from sibling files are permitted (types are erased at compile time).
 //
 // The richer `ROLE_PERMISSIONS` map in `./permissions.ts` derives its
-// `allowedRoutes` from this table so the page-route gating in middleware and
+// `allowedRoutes` from this table so the page-route gating in proxy and
 // server/client `isRouteAllowed` checks share one list. Nav items, icons,
 // labels, and colours stay in `permissions.ts` because they pull in icon
 // components that are not Edge-safe.

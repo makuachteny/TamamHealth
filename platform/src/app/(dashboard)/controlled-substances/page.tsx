@@ -156,7 +156,7 @@ export default function ControlledSubstancesPage() {
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <div className="dash-card flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <div className="px-5 py-3 border-b flex items-center gap-3" style={{ borderColor: 'var(--border-light)' }}>
-            <span className="icon-box-sm" style={{ background: 'rgba(196, 69, 54, 0.12)' }}>
+            <span className="icon-box-sm">
               <Pill className="w-4 h-4" style={{ color: '#C44536' }} />
             </span>
             <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Movement log</h3>

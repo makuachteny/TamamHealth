@@ -53,7 +53,8 @@ export default function ReferralsPage() {
   const { showToast } = useToast();
   const { hospitals } = useHospitals();
   const { patients } = usePatients();
-  const { currentUser, globalSearch } = useApp();
+  const { currentUser } = useApp();
+  const [localSearch, setLocalSearch] = useState('');
   const { canManageReferrals } = usePermissions();
   const { departments: facilityDepartments } = useSettings();
   const departments = facilityDepartments.length ? facilityDepartments : FALLBACK_DEPARTMENTS;
@@ -140,7 +141,7 @@ export default function ReferralsPage() {
   }, [expandedReferral]);
 
   // Search filtering (+ status filter)
-  const combinedSearch = `${globalSearch}`.toLowerCase().trim();
+  const combinedSearch = localSearch.toLowerCase().trim();
   const filteredReferrals = activeReferrals.filter(r => {
     const f = colFilters;
     if (combinedSearch) {
@@ -328,7 +329,7 @@ export default function ReferralsPage() {
         {refAttachments && refAttachments.length > 0 && (
           <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2 mb-3">
-              <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+              <div className="icon-box-sm">
                 <Paperclip className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.referralAttachments', { count: refAttachments.length })}</span>
@@ -357,7 +358,7 @@ export default function ReferralsPage() {
         {/* Patient Demographics */}
         <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
           <div className="flex items-center gap-2 mb-3">
-            <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+            <div className="icon-box-sm">
               <User className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
             </div>
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.patientDemographics')}</span>
@@ -406,7 +407,7 @@ export default function ReferralsPage() {
         {pkg.medicalRecords.length > 0 && (
           <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2 mb-3">
-              <div className="icon-box-sm" style={{ background: 'rgba(92,184,168,0.12)' }}>
+              <div className="icon-box-sm">
                 <Stethoscope className="w-4 h-4" style={{ color: '#2563EB' }} />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.medicalRecords', { count: pkg.medicalRecords.length })}</span>
@@ -485,7 +486,7 @@ export default function ReferralsPage() {
         {pkg.labResults.length > 0 && (
           <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2 mb-3">
-              <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+              <div className="icon-box-sm">
                 <FlaskConical className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.labResults', { count: pkg.labResults.length })}</span>
@@ -533,7 +534,7 @@ export default function ReferralsPage() {
         {pkg.attachments.length > 0 && (
           <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2 mb-3">
-              <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+              <div className="icon-box-sm">
                 <ImageIcon className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.patientAttachments', { count: pkg.attachments.length })}</span>
@@ -558,8 +559,8 @@ export default function ReferralsPage() {
         <hr className="section-divider" />
 
         {/* Package Metadata */}
-        <div className="flex items-center gap-3 p-3 rounded-lg text-xs" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
-          <div className="icon-box-sm flex-shrink-0" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+        <div className="flex items-center gap-3 p-3 rounded-lg text-xs" style={{ background: 'rgba(33, 145, 208, 0.06)', border: '1px solid var(--accent-border)' }}>
+          <div className="icon-box-sm flex-shrink-0">
             <Package className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
           </div>
           <span style={{ color: 'var(--text-muted)' }}>
@@ -578,9 +579,57 @@ export default function ReferralsPage() {
 
   return (
     <>
-      <TopBar
-            title={t('nav.referrals')}
-            searchTrailing={
+      <TopBar title={t('nav.referrals')} hideSearch />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+
+        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          {/* ── Card toolbar ── */}
+          <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            {/* Tabs as big titles + stats on right */}
+            <div className="flex items-end justify-between gap-3 mb-3">
+              <div className="flex items-end gap-6">
+                <button
+                  onClick={() => setActiveTab('incoming')}
+                  className="transition-colors focus:outline-none"
+                  style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'incoming' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                >
+                  {t('referrals.incoming')}
+                  {newIncomingCount > 0 && (
+                    <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: 'var(--color-danger)', color: '#fff', verticalAlign: 'middle' }}>
+                      {newIncomingCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('outgoing')}
+                  className="transition-colors focus:outline-none"
+                  style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'outgoing' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                >
+                  {t('referrals.outgoing')}
+                </button>
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0 pb-0.5">
+                <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#2191D0' }} />
+                  Incoming ({incomingReferrals.length})
+                </span>
+                <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#D97706' }} />
+                  Outgoing ({outgoingReferrals.length})
+                </span>
+              </div>
+            </div>
+            {/* Search + filter row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <input
+                  type="text"
+                  value={localSearch}
+                  onChange={e => setLocalSearch(e.target.value)}
+                  placeholder="Search by patient, hospital, or department…"
+                  style={{ padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
+                />
+              </div>
               <ReferralFilters
                 filters={colFilters}
                 setFilter={setColFilter}
@@ -594,22 +643,18 @@ export default function ReferralsPage() {
                   { v: 'cancelled', l: getStatusLabel('cancelled') },
                 ]}
               />
-            }
-            actions={
-              canManageReferrals && (
+              {canManageReferrals && (
                 <button
                   onClick={() => setShowNewReferral(!showNewReferral)}
-                  className="btn btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 999, background: showNewReferral ? 'var(--bg-card-solid)' : '#2191D0', color: showNewReferral ? 'var(--text-secondary)' : '#fff', border: showNewReferral ? '1px solid var(--border-light)' : 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                 >
-                  {showNewReferral ? (
-                    <><X className="w-4 h-4" /> {t('action.cancel')}</>
-                  ) : (
-                    <><Plus className="w-4 h-4" /> {t('referrals.newReferral')}</>
-                  )}
+                  {showNewReferral ? <><X className="w-4 h-4" /> {t('action.cancel')}</> : <><Plus className="w-4 h-4" /> {t('referrals.newReferral')}</>}
                 </button>
-              )
-            } />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+              )}
+            </div>
+          </div>
+          {/* Scrollable body */}
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
 
           {/* New Referral Form */}
           {showNewReferral && (
@@ -800,62 +845,9 @@ export default function ReferralsPage() {
             </div>
           )}
 
-          {/* Tabs */}
-          <div className="flex items-center gap-0 mb-4 border-b" style={{ borderColor: 'var(--border-light)' }}>
-            <button
-              onClick={() => setActiveTab('incoming')}
-              className={`px-5 py-3 text-sm font-medium transition-colors relative ${activeTab === 'incoming' ? 'tab-active' : ''}`}
-              style={{ color: activeTab === 'incoming' ? 'var(--tamamhealth-blue)' : 'var(--text-muted)' }}
-            >
-              <span className="flex items-center gap-2">
-                {t('referrals.incoming')}
-                <span
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{
-                    background: activeTab === 'incoming' ? 'rgba(59, 130, 246,0.12)' : 'rgba(100,116,139,0.12)',
-                    color: activeTab === 'incoming' ? 'var(--tamamhealth-blue)' : 'var(--text-muted)',
-                  }}
-                >
-                  {incomingReferrals.length}
-                </span>
-                {newIncomingCount > 0 && (
-                  <span
-                    className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{
-                      background: 'var(--color-danger)',
-                      color: '#fff',
-                      animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                    }}
-                  >
-                    <Bell className="w-3 h-3" />
-                    {t('referrals.newCount', { count: newIncomingCount })}
-                  </span>
-                )}
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('outgoing')}
-              className={`px-5 py-3 text-sm font-medium transition-colors relative ${activeTab === 'outgoing' ? 'tab-active' : ''}`}
-              style={{ color: activeTab === 'outgoing' ? 'var(--tamamhealth-blue)' : 'var(--text-muted)' }}
-            >
-              <span className="flex items-center gap-2">
-                {t('referrals.outgoing')}
-                <span
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{
-                    background: activeTab === 'outgoing' ? 'rgba(59, 130, 246,0.12)' : 'rgba(100,116,139,0.12)',
-                    color: activeTab === 'outgoing' ? 'var(--tamamhealth-blue)' : 'var(--text-muted)',
-                  }}
-                >
-                  {outgoingReferrals.length}
-                </span>
-              </span>
-            </button>
-          </div>
-
-          {/* Referrals table — search + structured filters live on the top bar */}
-          <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+          {/* Referrals table */}
+          <div className="overflow-hidden">
+            <div style={{ overflowX: 'auto' }}>
             {filteredReferrals.length === 0 ? (
               <div className="p-8">
                 <EmptyState
@@ -1002,7 +994,7 @@ export default function ReferralsPage() {
                               <p className="text-sm whitespace-pre-wrap">{ref.notes || t('referrals.none')}</p>
                             </div>
                             <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                              <div className="icon-box-sm" style={{ background: 'rgba(239,68,68,0.12)' }}>
+                              <div className="icon-box-sm">
                                 <AlertTriangle className="w-3.5 h-3.5" style={{ color: '#EF4444' }} />
                               </div>
                               {t('referrals.noDataPackage')}
@@ -1206,6 +1198,8 @@ export default function ReferralsPage() {
               </div>
             </div>
           )}
+          </div>{/* end scrollable body */}
+        </div>{/* end dash-card */}
       </main>
     </>
   );

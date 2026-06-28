@@ -1311,6 +1311,7 @@ const pt: TranslationMap = {
   'mar.recordAdministration': 'Registar administração',
   'referrals.completing': 'A concluir...',
   'patientNew.nokAddressPlaceholder': 'Morada do familiar próximo',
+  'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'Agendada',
   'anc.view': 'Ver',
   'patientNew.payam': 'Payam (Subcondado)',

@@ -1,34 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientIp } from '@/lib/request-utils';
+import { createIpRateLimiter } from '@/lib/rate-limit';
+import { escapeHtml, isValidEmail, sendMarketingEmail, type EmailMessage } from '@/lib/email';
 
-// Rate limit: 3 subscribes / hour / IP
-const rateLimit: Record<string, { count: number; windowStart: number }> = {};
-const RATE_WINDOW_MS = 60 * 60 * 1000;
-const RATE_MAX = 3;
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimit[ip];
-  if (!entry || now - entry.windowStart > RATE_WINDOW_MS) {
-    rateLimit[ip] = { count: 1, windowStart: now };
-    return false;
-  }
-  entry.count++;
-  return entry.count > RATE_MAX;
-}
-
-function isValidEmail(value: string): boolean {
-  return /\S+@\S+\.\S+/.test(value) && value.length <= 320 && !/[\r\n]/.test(value);
-}
-
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+const isRateLimited = createIpRateLimiter(60 * 60 * 1000, 3);
 
 /**
  * Returns `true` if the email was sent, `false` if no email provider is
@@ -37,56 +12,8 @@ function escapeHtml(input: string): string {
  * still throw so the caller decides whether to surface a 500.
  */
 async function sendEmail(to: string, subject: string, text: string, html?: string): Promise<boolean> {
-  if (process.env.RESEND_API_KEY) {
-    const fromEmail = process.env.DEMO_FROM_EMAIL || 'noreply@tamamhealth.org';
-    const fromName = process.env.DEMO_FROM_NAME || 'TamamHealth Health';
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: `${fromName} <${fromEmail}>`,
-        to,
-        subject,
-        text,
-        html,
-      }),
-    });
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(`Resend error ${res.status}: ${detail}`);
-    }
-    return true;
-  }
-  if (process.env.SENDGRID_API_KEY) {
-    const fromEmail = process.env.DEMO_FROM_EMAIL || 'noreply@tamamhealth.org';
-    const fromName = process.env.DEMO_FROM_NAME || 'TamamHealth Health';
-    const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        personalizations: [{ to: [{ email: to }] }],
-        from: { email: fromEmail, name: fromName },
-        subject,
-        content: [
-          { type: 'text/plain', value: text },
-          ...(html ? [{ type: 'text/html', value: html }] : []),
-        ],
-      }),
-    });
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(`SendGrid error ${res.status}: ${detail}`);
-    }
-    return true;
-  }
-  console.warn('[newsletter] No email provider configured (RESEND_API_KEY / SENDGRID_API_KEY); skipping email to', to);
-  return false;
+  const msg: EmailMessage = { to, subject, text, html };
+  return sendMarketingEmail('newsletter', msg, 'TamamHealth');
 }
 
 export async function POST(req: NextRequest) {
@@ -127,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     // Send welcome email to subscriber
     const welcomeText = [
-      'Welcome to the TamamHealth Health newsletter!',
+      'Welcome to the TamamHealth newsletter!',
       '',
       "You'll receive updates about our platform, healthcare technology insights, and news from our team.",
       '',
@@ -135,11 +62,11 @@ export async function POST(req: NextRequest) {
       'The TamamHealth Team',
     ].join('\n');
     const welcomeHtml = `
-      <h2 style="color: #3B82F6;">Welcome to TamamHealth Health!</h2>
+      <h2 style="color: #3B82F6;">Welcome to TamamHealth!</h2>
       <p>Thanks for subscribing to our newsletter. You'll receive updates about our platform, healthcare technology insights, and news from our team.</p>
       <p>Best regards,<br/>The TamamHealth Team</p>
     `;
-    await sendEmail(email, 'Welcome to the TamamHealth Health Newsletter', welcomeText, welcomeHtml);
+    await sendEmail(email, 'Welcome to the TamamHealth Newsletter', welcomeText, welcomeHtml);
 
     return NextResponse.json({ ok: true });
   } catch (err) {

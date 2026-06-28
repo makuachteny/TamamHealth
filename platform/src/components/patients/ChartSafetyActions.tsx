@@ -33,18 +33,10 @@ type Which = 'allergy' | 'directive' | 'alert' | null;
 
 const inputStyle = { background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' } as const;
 
-// Match the patient-header action buttons (Order Lab / Prescribe / Refer).
 const triggerClass = 'inline-flex items-center gap-2 px-3.5 rounded-lg text-sm font-semibold transition-colors';
 const triggerStyle = { height: 40, background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' } as const;
 
-/**
- * Grouped chart-safety actions (P1.x). Surfaces the three "add to chart"
- * affordances — allergy, directive/consent and care alert — as a single row of
- * buttons. Each opens its add form in a popup ({@link Modal}) so the chart
- * stays uncluttered. Writes reuse the existing per-domain services, so the
- * patient lists/banners refresh reactively exactly as the inline forms did.
- */
-export default function ChartSafetyActions({ patient }: { patient: PatientDoc }) {
+export default function ChartSafetyActions({ patient, iconOnly }: { patient: PatientDoc; iconOnly?: boolean }) {
   const { currentUser } = useApp();
   const [open, setOpen] = useState<Which>(null);
   const [busy, setBusy] = useState(false);
@@ -98,8 +90,23 @@ export default function ChartSafetyActions({ patient }: { patient: PatientDoc })
 
   const titleId = 'chart-safety-action-title';
 
+  const iconBtnStyle = { width: 36, height: 36, flexShrink: 0, background: 'transparent', border: 'none', color: 'var(--text-secondary)' } as const;
+
   return (
     <>
+      {iconOnly ? (
+        <>
+          <button onClick={() => setOpen('allergy')} title="Add allergy" aria-label="Add allergy" className="flex items-center justify-center rounded-lg transition-colors hover:opacity-80" style={iconBtnStyle}>
+            <AlertTriangle className="w-4 h-4" />
+          </button>
+          <button onClick={() => setOpen('directive')} title="Add directive" aria-label="Add directive" className="flex items-center justify-center rounded-lg transition-colors hover:opacity-80" style={iconBtnStyle}>
+            <ShieldCheck className="w-4 h-4" />
+          </button>
+          <button onClick={() => setOpen('alert')} title="Add care alert" aria-label="Add care alert" className="flex items-center justify-center rounded-lg transition-colors hover:opacity-80" style={iconBtnStyle}>
+            <Bell className="w-4 h-4" />
+          </button>
+        </>
+      ) : (
       <div className="inline-flex items-center gap-2 flex-wrap">
         <button onClick={() => setOpen('allergy')} className={triggerClass} style={triggerStyle}>
           <AlertTriangle className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} /> Add allergy
@@ -111,6 +118,7 @@ export default function ChartSafetyActions({ patient }: { patient: PatientDoc })
           <Bell className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} /> Add alert
         </button>
       </div>
+      )}
 
       {open && (
         <Modal onClose={busy ? () => {} : close} width={460} labelledBy={titleId}>

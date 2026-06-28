@@ -13,7 +13,11 @@ import crypto from 'crypto';
 function verifyMpesaSignature(rawBody: string, signature: string | null): boolean {
   const secret = process.env.MPESA_WEBHOOK_SECRET;
   if (!secret) {
-    console.warn('[M-Pesa Webhook] MPESA_WEBHOOK_SECRET not configured — skipping signature verification');
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[M-Pesa Webhook] MPESA_WEBHOOK_SECRET not configured — refusing unsigned production webhook');
+      return false;
+    }
+    console.warn('[M-Pesa Webhook] MPESA_WEBHOOK_SECRET not configured — skipping signature verification in non-production');
     return true;
   }
   if (!signature) {
@@ -21,7 +25,12 @@ function verifyMpesaSignature(rawBody: string, signature: string | null): boolea
     return false;
   }
   const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-  return computed === signature;
+  const a = Buffer.from(computed, 'utf8');
+  const b = Buffer.from(signature, 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(
+    a as unknown as Uint8Array,
+    b as unknown as Uint8Array,
+  );
 }
 
 interface CallbackMetadataItem {

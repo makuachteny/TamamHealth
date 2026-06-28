@@ -13,9 +13,10 @@ const WRITE_ROLES: UserRole[] = [
 ];
 async function patchHandler(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const auth = await getAuthPayload(request);
     if (!auth) return unauthorized();
     if (!hasRole(auth, WRITE_ROLES)) return forbidden();
@@ -33,7 +34,7 @@ async function patchHandler(
     const { sanitizePayload } = await import('@/lib/validation');
     const sanitized = sanitizePayload(body);
     const { updateLabResult } = await import('@/lib/services/lab-service');
-    const updated = await updateLabResult(params.id, sanitized);
+    const updated = await updateLabResult(id, sanitized);
     if (!updated) {
       return NextResponse.json({ error: 'Lab result not found' }, { status: 404 });
     }

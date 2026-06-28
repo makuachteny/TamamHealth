@@ -401,10 +401,10 @@ export default function PharmacyPage() {
           <div className="flex gap-0 border-b mb-4 overflow-x-auto" style={{ borderColor: 'var(--border-light)' }}>
             {([
               { key: 'queue', label: `${t('pharmacy.prescriptionQueue')} (${pendingRx})` },
+              { key: 'overview', label: t('pharmacy.inventoryOverview') },
               { key: 'inventory', label: `${t('pharmacy.inventory')} (${inventory.length})${lowStock > 0 ? ` · ${lowStock} ${t('pharmacy.kpiLowStockItems')}` : ''}` },
               { key: 'reorder', label: `${t('pharmacy.reorderNeeded')} (${reorderList.length})` },
               { key: 'expiry', label: `${t('pharmacy.expiryTracker')}${expiredCount > 0 ? ` · ${expiredCount} ${t('pharmacy.kpiExpired')}` : ''}` },
-              { key: 'overview', label: t('pharmacy.inventoryOverview') },
               { key: 'patients', label: t('pharmacy.patientMedHistory') },
             ] as const).map(tab => (
               <button key={tab.key} onClick={() => setActiveTab(tab.key)}
@@ -418,7 +418,7 @@ export default function PharmacyPage() {
           {activeTab === 'queue' && (
             <div className="card-elevated overflow-hidden">
               <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-                <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.10)' }}>
+                <div className="icon-box-sm">
                   <Pill className="w-4 h-4" style={{ color: '#3B82F6' }} />
                 </div>
                 <span className="text-sm font-semibold">{t('pharmacy.prescriptionQueue')}</span>
@@ -455,7 +455,7 @@ export default function PharmacyPage() {
                       <td><PatientName patientId={rx.patientId} name={rx.patientName} nameClassName="text-sm font-medium" /></td>
                       <td className="text-sm">
                         <div className="flex items-center gap-2">
-                          <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.08)' }}>
+                          <div className="icon-box-sm">
                             <Pill className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
                           </div>
                           {rx.medication}
@@ -500,7 +500,7 @@ export default function PharmacyPage() {
             <>
               <div className="card-elevated overflow-hidden">
                 <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-                  <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.10)' }}>
+                  <div className="icon-box-sm">
                     <Pill className="w-4 h-4" style={{ color: '#3B82F6' }} />
                   </div>
                   <span className="text-sm font-semibold">{t('pharmacy.medicationInventory')}</span>
@@ -535,7 +535,7 @@ export default function PharmacyPage() {
                       <tr key={item._id}>
                         <td className="font-medium text-sm">
                           <div className="flex items-center gap-2">
-                            <div className="icon-box-sm" style={{ background: item.status === 'expired' ? 'rgba(229,46,66,0.10)' : item.status === 'critical' ? 'rgba(229,46,66,0.10)' : item.status === 'low' ? 'rgba(245,158,11,0.10)' : 'rgba(59, 130, 246,0.08)' }}>
+                            <div className="icon-box-sm">
                               {item.status === 'expired' || item.status === 'critical'
                                 ? <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
                                 : <Pill className="w-3.5 h-3.5" style={{ color: item.status === 'low' ? '#F59E0B' : '#3B82F6' }} />
@@ -600,7 +600,7 @@ export default function PharmacyPage() {
               )}
               <div className="card-elevated overflow-hidden">
                 <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-                  <div className="icon-box-sm" style={{ background: 'rgba(249,115,22,0.10)' }}>
+                  <div className="icon-box-sm">
                     <ShoppingCart className="w-4 h-4" style={{ color: '#F97316' }} />
                   </div>
                   <span className="text-sm font-semibold">{t('pharmacy.reorderNeeded')}</span>
@@ -626,7 +626,7 @@ export default function PharmacyPage() {
                       <tr key={item._id}>
                         <td className="font-medium text-sm">
                           <div className="flex items-center gap-2">
-                            <div className="icon-box-sm" style={{ background: item.status === 'critical' ? 'rgba(229,46,66,0.10)' : 'rgba(245,158,11,0.10)' }}>
+                            <div className="icon-box-sm">
                               {item.status === 'critical'
                                 ? <AlertOctagon className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
                                 : <AlertTriangle className="w-3.5 h-3.5" style={{ color: '#F59E0B' }} />}
@@ -657,7 +657,7 @@ export default function PharmacyPage() {
             <>
               <div className="card-elevated overflow-hidden">
                 <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-                  <div className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.10)' }}>
+                  <div className="icon-box-sm">
                     <Calendar className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
                   </div>
                   <span className="text-sm font-semibold">{t('pharmacy.expiryTracker')}</span>
@@ -688,7 +688,7 @@ export default function PharmacyPage() {
                         <tr key={item._id}>
                           <td className="font-medium text-sm">
                             <div className="flex items-center gap-2">
-                              <div className="icon-box-sm" style={{ background: expired ? 'rgba(229,46,66,0.10)' : soon ? 'rgba(245,158,11,0.10)' : 'rgba(59,130,246,0.08)' }}>
+                              <div className="icon-box-sm">
                                 <Calendar className="w-3.5 h-3.5" style={{ color: expired ? 'var(--color-danger)' : soon ? '#F59E0B' : '#3B82F6' }} />
                               </div>
                               {item.medicationName}
@@ -716,7 +716,7 @@ export default function PharmacyPage() {
           {activeTab === 'overview' && (
             <div className="card-elevated overflow-hidden">
               <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-                <div className="icon-box-sm" style={{ background: 'rgba(59,130,246,0.10)' }}>
+                <div className="icon-box-sm">
                   <Package className="w-4 h-4" style={{ color: '#3B82F6' }} />
                 </div>
                 <span className="text-sm font-semibold">{t('pharmacy.inventoryOverview')}</span>
@@ -794,7 +794,7 @@ export default function PharmacyPage() {
                         <tr key={rx._id}>
                           <td className="font-medium text-sm">
                             <div className="flex items-center gap-2">
-                              <div className="icon-box-sm" style={{ background: 'rgba(59,130,246,0.08)' }}>
+                              <div className="icon-box-sm">
                                 <Pill className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
                               </div>
                               {rx.medication}
@@ -818,7 +818,7 @@ export default function PharmacyPage() {
               ) : (
                 <div className="card-elevated overflow-hidden">
                   <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-                    <div className="icon-box-sm" style={{ background: 'rgba(168,85,247,0.10)' }}>
+                    <div className="icon-box-sm">
                       <User className="w-4 h-4" style={{ color: '#A855F7' }} />
                     </div>
                     <span className="text-sm font-semibold">{t('pharmacy.patientMedHistory')}</span>
@@ -863,7 +863,7 @@ export default function PharmacyPage() {
               <div className="modal-content card-elevated p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.10)' }}>
+                    <div className="icon-box-sm">
                       <Pill className="w-4 h-4" style={{ color: '#3B82F6' }} />
                     </div>
                     <h3 className="text-base font-semibold">{t('pharmacy.receiveStock')}</h3>

@@ -1440,6 +1440,7 @@ const ar: TranslationMap = {
   'mar.recordAdministration': 'تسجيل الإعطاء',
   'referrals.completing': 'جارٍ الإكمال...',
   'patientNew.nokAddressPlaceholder': 'عنوان أقرب الأقارب',
+  'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'مجدول',
   'anc.view': 'عرض',
   'patientNew.payam': 'البايام (المحلية الفرعية)',

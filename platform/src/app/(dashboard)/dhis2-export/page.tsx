@@ -156,7 +156,7 @@ export default function DHIS2ExportPage() {
           style={{
             background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
             color: syncing ? 'var(--text-muted)' : '#fff',
-            boxShadow: syncing ? 'none' : '0 4px 12px rgba(59, 130, 246,0.3)',
+            boxShadow: syncing ? 'none' : '0 4px 12px rgba(33, 145, 208, 0.3)',
           }}
         >
           <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
@@ -349,7 +349,7 @@ export default function DHIS2ExportPage() {
               className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all"
               style={{
                 background: 'linear-gradient(135deg, #3b82f6, #1E40AF)',
-                boxShadow: '0 4px 12px rgba(59, 130, 246,0.3)',
+                boxShadow: '0 4px 12px rgba(33, 145, 208, 0.3)',
               }}
             >
               <Upload className="w-4 h-4" />
@@ -450,7 +450,7 @@ export default function DHIS2ExportPage() {
             </div>
 
             {exportResult && (
-              <div className="card-elevated p-4" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
+              <div className="card-elevated p-4" style={{ background: 'rgba(33, 145, 208, 0.06)', border: '1px solid var(--accent-border)' }}>
                 <div className="flex items-center gap-2 mb-1">
                   <CheckCircle className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                   <span className="font-semibold text-sm" style={{ color: 'var(--accent-primary)' }}>{t('dhis2.exportSuccessful')}</span>

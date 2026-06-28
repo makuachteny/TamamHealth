@@ -21,19 +21,20 @@ const WRITE_ROLES: UserRole[] = [
 ];
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const auth = await getAuthPayload(request);
     if (!auth) return unauthorized();
     if (!hasRole(auth, READ_ROLES)) return forbidden();
     const { getPatientById } = await import('@/lib/services/patient-service');
-    const patient = await getPatientById(params.id);
+    const patient = await getPatientById(id);
     if (!patient) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
     }
-    // Data scope check: non-admin users can only see patients in their org
-    if (auth.role !== 'super_admin' && auth.role !== 'government' && auth.orgId && patient.orgId && patient.orgId !== auth.orgId) {
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+    if (filterByScope([patient], buildScopeFromAuth(auth)).length === 0) {
       return forbidden('Access denied to this patient record');
     }
     return NextResponse.json({ patient });
@@ -44,9 +45,10 @@ export async function GET(
 }
 async function patchHandler(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const auth = await getAuthPayload(request);
     if (!auth) return unauthorized();
     if (!hasRole(auth, WRITE_ROLES)) return forbidden();
@@ -64,14 +66,13 @@ async function patchHandler(
     const { sanitizePayload } = await import('@/lib/validation');
     const sanitized = sanitizePayload(body);
     const { updatePatient, getPatientById } = await import('@/lib/services/patient-service');
-    // Org-scope guard (mirrors the GET handler above): a user may only edit a
-    // patient in their own org (super_admin excepted) — no cross-tenant writes.
-    const existing = await getPatientById(params.id);
+    const existing = await getPatientById(id);
     if (!existing) return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-    if (auth.role !== 'super_admin' && auth.orgId && existing.orgId && existing.orgId !== auth.orgId) {
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+    if (filterByScope([existing], buildScopeFromAuth(auth)).length === 0) {
       return forbidden('Access denied to this patient record');
     }
-    const updated = await updatePatient(params.id, sanitized);
+    const updated = await updatePatient(id, sanitized);
     if (!updated) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
     }

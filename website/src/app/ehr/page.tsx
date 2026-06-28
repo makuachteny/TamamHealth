@@ -1,13 +1,16 @@
-"use client";
-
-import Link from "next/link";
 import Image from "next/image";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
-  FAQItem,
   CheckItem,
 } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
+import {
+  FeatureFAQSection,
+  FeatureRelatedProductsSection,
+  FeatureStatsBand,
+  FeatureTestimonialSection,
+} from "@/components/marketing/FeatureSections";
+import { FileText, HeartPulse, BarChart3 } from "@/components/marketing/icons";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth EHR Product Page
@@ -17,41 +20,21 @@ import { DuoIcon } from "@/components/marketing/DuoIcon";
 export default function EHRPage() {
   return (
     <>
-      {/* ── HERO SECTION — split, image right ────────────────────── */}
-      <section className="mk-hero-split">
-        <div className="mk-container">
-          <div className="mk-hero-split-grid">
-            <Reveal>
-              <div className="mk-hero-split-text">
-                <p className="mk-label">EHR SOFTWARE</p>
-                <h1 className="mk-h1">Digital patient records that work offline.</h1>
-                <p>
-                  Clinicians across Africa face power outages, connectivity gaps, and paper records scattered across filing cabinets.
-                  TamamHealth solves this with offline charting, instant lab orders, electronic prescriptions, and built-in telehealth.
-                </p>
-                <div className="mk-hero-split-actions">
-                  <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">Request a demo</Link>
-                  <Link href="#how-it-works" className="mk-btn mk-btn-outline mk-btn-lg">See how it works</Link>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <span className="mk-hero-split-meta">75% faster documentation</span>
-                  <span className="mk-hero-split-meta">Works offline in all regions</span>
-                </div>
-              </div>
-            </Reveal>
-            <Reveal delay={0.1}>
-              <div className="mk-hero-split-image">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/assets/doctor-tablet-review.jpg"
-                  alt="Clinician reviewing patient records on a tablet"
-                  loading="eager"
-                />
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
+      <MarketingHero
+        variant="product"
+        eyebrow="EHR SOFTWARE"
+        title="Digital patient records that work offline."
+        subtitle="Clinicians across Africa face power outages, connectivity gaps, and paper records scattered across filing cabinets. TamamHealth solves this with offline charting, instant lab orders, electronic prescriptions, and built-in telehealth."
+        primaryCta={{ label: "Request a demo", href: "/about/contact?intent=demo#contact-form" }}
+        secondaryCta={{ label: "See how it works", href: "#how-it-works" }}
+        stats={[
+          { value: "75%", label: "faster documentation" },
+          { value: "Offline", label: "records in all regions" },
+        ]}
+        image="/assets/doctor-tablet-review.jpg"
+        imageAlt="Clinician reviewing patient records on a tablet"
+        imagePriority
+      />
 
       {/* ── HOW IT WORKS: 3-STEP WORKFLOW (directly under hero) ───── */}
       <section id="how-it-works" className="mk-section mk-section-cream">
@@ -61,9 +44,9 @@ export default function EHRPage() {
               <h2 className="mk-h2">How TamamHealth EHR works</h2>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 32 }}>
-              <div style={{ background: "#fff", padding: 36, borderRadius: 16, border: "1px solid var(--tb-cream-300)", boxShadow: "0 4px 16px rgba(26,58,58,0.04)" }}>
+              <div style={{ background: "#FEFFF9", padding: 36, borderRadius: 16, border: "1px solid var(--tb-cream-300)", boxShadow: "0 4px 16px rgba(26,58,58,0.04)" }}>
                 <div style={{ width: 56, height: 56, borderRadius: 14, background: "var(--tb-tint-blue)", color: "var(--tb-blue-700)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
-                  <DuoIcon name="ehr" size={56} />
+                  <FileText size={56} strokeWidth={1.8} />
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 8, letterSpacing: "0.05em" }}>STEP 1</div>
                 <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: "var(--tb-text)" }}>
@@ -73,9 +56,9 @@ export default function EHRPage() {
                   Write patient notes, orders, and prescriptions on any device — even when connectivity drops. Your data stays safe locally and syncs automatically when networks return. No internet required.
                 </p>
               </div>
-              <div style={{ background: "#fff", padding: 36, borderRadius: 16, border: "1px solid var(--tb-cream-300)", boxShadow: "0 4px 16px rgba(26,58,58,0.04)" }}>
+              <div style={{ background: "#FEFFF9", padding: 36, borderRadius: 16, border: "1px solid var(--tb-cream-300)", boxShadow: "0 4px 16px rgba(26,58,58,0.04)" }}>
                 <div style={{ width: 56, height: 56, borderRadius: 14, background: "var(--tb-tint-green)", color: "var(--tb-green)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
-                  <DuoIcon name="heart-pulse" size={56} />
+                  <HeartPulse size={56} strokeWidth={1.8} />
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--tb-green-dark)", marginBottom: 8, letterSpacing: "0.05em" }}>STEP 2</div>
                 <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: "var(--tb-text)" }}>
@@ -85,9 +68,9 @@ export default function EHRPage() {
                   Lab tests, imaging, and pharmacy orders transmit to partners via secure connections. Results come back in real-time with alerts for critical findings — no manual transcription needed.
                 </p>
               </div>
-              <div style={{ background: "#fff", padding: 36, borderRadius: 16, border: "1px solid var(--tb-cream-300)", boxShadow: "0 4px 16px rgba(26,58,58,0.04)" }}>
+              <div style={{ background: "#FEFFF9", padding: 36, borderRadius: 16, border: "1px solid var(--tb-cream-300)", boxShadow: "0 4px 16px rgba(26,58,58,0.04)" }}>
                 <div style={{ width: 56, height: 56, borderRadius: 14, background: "var(--tb-tint-gold)", color: "var(--tb-gold-dark)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
-                  <DuoIcon name="analytics" size={56} />
+                  <BarChart3 size={56} strokeWidth={1.8} />
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--tb-gold-dark)", marginBottom: 8, letterSpacing: "0.05em" }}>STEP 3</div>
                 <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: "var(--tb-text)" }}>
@@ -376,31 +359,14 @@ export default function EHRPage() {
       {/* ── DIVIDER ─────────────────────────────────────────────────── */}
       <div className="mk-divider"></div>
 
-      {/* ── CAPABILITIES SECTION ────────────────────────────────────────────── */}
-      <section className="mk-stat-band">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-stat-row">
-              <div className="mk-stat-badge">
-                <strong style={{ fontWeight: 700, fontSize: "1.25rem" }}>100%</strong>
-                <span style={{ fontWeight: 500 }}>Offline-capable</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong style={{ fontWeight: 700, fontSize: "1.25rem" }}>Offline-first</strong>
-                <span style={{ fontWeight: 500 }}>Built for unreliable power</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong style={{ fontWeight: 700, fontSize: "1.25rem" }}>Fast</strong>
-                <span style={{ fontWeight: 500 }}>Designed for speed</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong style={{ fontWeight: 700, fontSize: "1.25rem" }}>Open</strong>
-                <span style={{ fontWeight: 500 }}>DHIS2 & HL7 FHIR compatible</span>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureStatsBand
+        stats={[
+          { value: "100%", label: "Offline-capable" },
+          { value: "Offline-first", label: "Built for unreliable power" },
+          { value: "Fast", label: "Designed for speed" },
+          { value: "Open", label: "DHIS2 & HL7 FHIR compatible" },
+        ]}
+      />
 
       {/* ── CAPABILITY CALLOUT ─────────────────────────────────────── */}
       <section className="mk-section mk-section-cream">
@@ -414,104 +380,66 @@ export default function EHRPage() {
         </div>
       </section>
 
-      {/* ── TESTIMONIAL ──────────────────────────────────────────────── */}
-      <section className="mk-section mk-section-cream">
-        <div className="mk-container">
-          <Reveal>
-            <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
-              <div style={{ fontSize: 48, color: "var(--tb-gold)", marginBottom: 24, fontFamily: "var(--tb-serif)" }}>&ldquo;</div>
-              <blockquote style={{ fontSize: 20, lineHeight: 1.8, color: "var(--tb-text)", fontStyle: "normal", margin: "0 0 32px" }}>
-                We went from four filing cabinets of paper records to a fully digital clinic in 12 days. The offline capability was the deciding factor — our electricity cuts out three to four times a day, and TamamHealth never skips a beat. Our clinicians document faster, our lab results come back same-day, and we finally have data we can trust for DHIS2 reporting.
-              </blockquote>
-              <cite style={{ fontStyle: "normal" }}>
-                <strong style={{ display: "block", fontSize: 16, fontWeight: 700, color: "var(--tb-text)" }}>Dr. Sarah Achol</strong>
-                <span style={{ fontSize: 14, color: "var(--tb-text-sec)" }}>Medical Director, Juba Teaching Hospital</span>
-              </cite>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureTestimonialSection
+        testimonial={{
+          quote: "We went from four filing cabinets of paper records to a fully digital clinic in 12 days. The offline capability was the deciding factor - our electricity cuts out three to four times a day, and TamamHealth never skips a beat. Our clinicians document faster, our lab results come back same-day, and we finally have data we can trust for DHIS2 reporting.",
+          name: "Dr. Sarah Achol",
+          role: "Medical Director, Juba Teaching Hospital",
+          variant: "cream",
+        }}
+      />
 
-      {/* ── FAQ SECTION ─────────────────────────────────────────────── */}
-      <section className="mk-faq-section">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2 mk-faq-title">Frequently asked questions</h2>
-
-            <div className="mk-faq-list">
-              <FAQItem
-                question="How does TamamHealth handle data security?"
-                answer="TamamHealth is built with data security best practices — encryption at rest, role-based access control, and audit logging. All patient data is protected and compliance-ready for your region."
-              />
-              <FAQItem
-                question="Can I integrate with other healthcare systems?"
-                answer="Yes. We support HL7, FHIR, and direct protocol integrations with custom API connections to lab systems, pharmacies, and billing providers. Our team assists with implementation."
-              />
-              <FAQItem
-                question="What kind of training and support do you provide?"
-                answer="We provide comprehensive onboarding with staff training, workflow consultation, and data migration. You get a dedicated support team, extensive documentation, and regular webinar training throughout your subscription."
-              />
-              <FAQItem
-                question="How much does TamamHealth EHR cost?"
-                answer="Pricing depends on your practice size, specialty, and modules. We offer flexible per-provider, per-patient, or flat-rate models. Schedule a demo for a customized quote."
-              />
-              <FAQItem
-                question="Can I access patient records on mobile devices?"
-                answer="Yes. Our native iOS and Android apps include full charting, offline access, and push notifications with encrypted mobile communications."
-              />
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureFAQSection
+        faqs={[
+          {
+            question: "How does TamamHealth handle data security?",
+            answer: "TamamHealth is built with data security best practices — encryption at rest, role-based access control, and audit logging. All patient data is protected and compliance-ready for your region.",
+          },
+          {
+            question: "Can I integrate with other healthcare systems?",
+            answer: "Yes. We support HL7, FHIR, and direct protocol integrations with custom API connections to lab systems, pharmacies, and billing providers. Our team assists with implementation.",
+          },
+          {
+            question: "What kind of training and support do you provide?",
+            answer: "We provide comprehensive onboarding with staff training, workflow consultation, and data migration. You get a dedicated support team, extensive documentation, and regular webinar training throughout your subscription.",
+          },
+          {
+            question: "How much does TamamHealth EHR cost?",
+            answer: "Pricing depends on your practice size, specialty, and modules. We offer flexible per-provider, per-patient, or flat-rate models. Schedule a demo for a customized quote.",
+          },
+          {
+            question: "Can I access patient records on mobile devices?",
+            answer: "Yes. Our native iOS and Android apps include full charting, offline access, and push notifications with encrypted mobile communications.",
+          },
+        ]}
+      />
 
       {/* ── DIVIDER ─────────────────────────────────────────────────── */}
       <div className="mk-divider"></div>
 
-      {/* ── RELATED PRODUCTS ────────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 48 }}>
-              Unlock more power with TamamHealth&apos;s integrated suite
-            </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 32 }}>
-              <div style={{ backgroundColor: "var(--tb-tint-gold)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  Pharmacy & Lab Module
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Integrated e-prescribing, drug interaction checking, and lab ordering that connects directly to your clinical workflow. Manage inventory, track prescription fulfillment, and coordinate with partner pharmacies — all from one dashboard.
-                </p>
-                <Link href="/about/contact" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Coming soon — contact us to learn more
-                </Link>
-              </div>
-              <div style={{ backgroundColor: "var(--tb-tint-blue)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  Telehealth Module
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Bring specialist expertise to remote clinics with video optimized for low bandwidth connectivity.
-                </p>
-                <Link href="/about/contact" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Coming soon — contact us to learn more
-                </Link>
-              </div>
-              <div style={{ backgroundColor: "var(--tb-tint-green)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  Analytics & Reporting
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Real-time population health dashboards, automated DHIS2 reporting, and clinical outcome tracking. Identify disease trends, monitor facility performance, and generate ministry-ready reports without manual data entry.
-                </p>
-                <Link href="/about/contact" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Coming soon — contact us to learn more
-                </Link>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureRelatedProductsSection
+        heading="Unlock more power with TamamHealth's integrated suite"
+        products={[
+          {
+            title: "Pharmacy & Lab Module",
+            body: "Integrated e-prescribing, drug interaction checking, and lab ordering that connects directly to your clinical workflow. Manage inventory, track prescription fulfillment, and coordinate with partner pharmacies - all from one dashboard.",
+            href: "/pharmacy-lab",
+            tone: "gold",
+          },
+          {
+            title: "Telehealth Module",
+            body: "Bring specialist expertise to remote clinics with video optimized for low bandwidth connectivity.",
+            href: "/telehealth",
+            tone: "blue",
+          },
+          {
+            title: "Analytics & Reporting",
+            body: "Real-time population health dashboards, automated DHIS2 reporting, and clinical outcome tracking. Identify disease trends, monitor facility performance, and generate ministry-ready reports without manual data entry.",
+            href: "/analytics",
+            tone: "green",
+          },
+        ]}
+      />
 
     </>
   );

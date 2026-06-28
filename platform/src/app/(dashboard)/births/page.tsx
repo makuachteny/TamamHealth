@@ -14,7 +14,7 @@ import {
 } from '@/components/icons/lucide';
 
 export default function BirthsPage() {
-  const { births, stats, loading, register } = useBirths();
+  const { births, loading, register } = useBirths();
   const { hospitals } = useHospitals();
   const { currentUser, globalSearch } = useApp();
   const { canRecordVitalEvents } = usePermissions();
@@ -87,23 +87,6 @@ export default function BirthsPage() {
             )
           } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        {/* Registry stats surfaced inline above the table. */}
-        {stats && (
-            <div className="flex items-center justify-end gap-4 sm:gap-5 pr-1 mb-3">
-              {[
-                { label: 'Total Registered', value: stats.total, color: '#EC4899' },
-                { label: 'This Month', value: stats.thisMonth, color: '#3B82F6' },
-                { label: 'Male / Female', value: <><span style={{ color: 'var(--accent-primary)' }}>{stats.byGender.male}</span><span style={{ color: 'var(--text-muted)' }}> / </span><span style={{ color: 'var(--color-danger)' }}>{stats.byGender.female}</span></>, color: '#059669' },
-                { label: 'Caesarean Rate', value: `${stats.total ? Math.round(stats.byDeliveryType.caesarean / stats.total * 100) : 0}%`, color: '#DC2626' },
-              ].map(s => (
-                <div key={s.label} className="text-center leading-tight">
-                  <div className="text-base font-bold" style={{ color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
         {/* Table */}
         <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
@@ -129,7 +112,7 @@ export default function BirthsPage() {
                   <tr key={b._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setExpandedBirth(expandedBirth === b._id ? null : b._id)}>
                     <td className="font-mono text-xs">{b.certificateNumber}</td>
                     <td className="font-medium text-sm">{b.childFirstName} {b.childSurname}</td>
-                    <td><span className="badge text-[10px]" style={{ background: b.childGender === 'Male' ? 'rgba(59, 130, 246,0.12)' : 'rgba(229,46,66,0.12)', color: b.childGender === 'Male' ? 'var(--accent-primary)' : 'var(--color-danger)' }}>{b.childGender}</span></td>
+                    <td><span className="badge text-[10px]" style={{ background: b.childGender === 'Male' ? 'rgba(33, 145, 208, 0.12)' : 'rgba(229,46,66,0.12)', color: b.childGender === 'Male' ? 'var(--accent-primary)' : 'var(--color-danger)' }}>{b.childGender}</span></td>
                     <td className="text-xs font-mono">{b.dateOfBirth}</td>
                     <td className="text-sm">{b.birthWeight}g</td>
                     <td className="text-xs capitalize">{b.deliveryType}</td>

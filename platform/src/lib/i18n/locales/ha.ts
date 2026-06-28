@@ -1311,6 +1311,7 @@ const ha: TranslationMap = {
   'mar.recordAdministration': 'Yi rikodin bayarwa',
   'referrals.completing': 'Ana kammalawa...',
   'patientNew.nokAddressPlaceholder': 'Adireshin dangi na kusa',
+  'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'An tsara',
   'anc.view': 'Duba',
   'patientNew.payam': 'Payam (Karamar hukuma)',

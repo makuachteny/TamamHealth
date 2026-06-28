@@ -1322,6 +1322,7 @@ const am: TranslationMap = {
   'mar.recordAdministration': 'አሰጣጥ መዝግብ',
   'referrals.completing': 'በማጠናቀቅ ላይ...',
   'patientNew.nokAddressPlaceholder': 'የቅርብ ዘመድ አድራሻ',
+  'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'የተያዘ',
   'anc.view': 'ይመልከቱ',
   'patientNew.payam': 'ፓያም (ንዑስ ካውንቲ)',

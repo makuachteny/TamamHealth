@@ -2,6 +2,16 @@
 // TamamHealth - Mock Data for South Sudan Hospitals
 // ============================================
 
+// Patient-chart clinical list types now live in lib/types; re-exported here so
+// existing `from '@/data/mock'` imports keep working.
+import type {
+  AllergyEntry, DirectiveEntry, CareAlertEntry, ScreeningEntry,
+} from '@/lib/types/patient-clinical';
+export type {
+  AllergyEntry, DirectiveType, DirectiveEntry,
+  CareAlertCategory, CareAlertEntry, ScreeningEntry,
+} from '@/lib/types/patient-clinical';
+
 export interface Hospital {
   id: string;
   name: string;
@@ -1624,88 +1634,8 @@ const zandeFirstNames = ['Bazungula', 'Ezibon', 'Khamis', 'Samson', 'Zakaria', '
 const bariFirstNames = ['Ladu', 'Wani', 'Tombe', 'Lemi', 'Soro', 'Loro', 'Keji', 'Lado', 'Modi', 'TamamHealth', 'Bakhita', 'Hellen', 'Janet', 'Monica', 'Stella', 'Viola', 'Lucy', 'Tabitha', 'Cecilia', 'Patricia'];
 const familyNames = ['Deng', 'Garang', 'Mabior', 'Kuol', 'Bol', 'Atem', 'Kiir', 'Machar', 'Wani', 'TamamHealth', 'Lado', 'Laku', 'Gore', 'Tombura', 'Gbudue', 'Akot', 'Ajith', 'Mayom', 'Nyuon', 'Gatdet', 'Koang', 'Jok', 'Ring', 'Aguer', 'Achien', 'Makuei', 'Thiik', 'Ayuel', 'Malual', 'Madhol', 'Arou', 'Ngor', 'Biel', 'Ruot', 'Gai', 'Puok', 'Duoth'];
 
-/**
- * Structured allergy / adverse-reaction record (P0.3). Replaces the meaning of
- * the legacy `Patient.allergies: string[]`, which is now kept only as a
- * denormalised list of active substance names so existing read sites (chart
- * banner, SBAR, MAR, referrals) keep working unchanged. `structuredAllergies`
- * is the source of truth for reaction, criticality and status.
- */
-export interface AllergyEntry {
-  /** Stable id for keys + removal (uuid). */
-  id: string;
-  substance: string;
-  classification?: 'drug' | 'food' | 'environmental' | 'biologic' | 'other';
-  /** Clinical criticality — drives prescribing-time escalation. */
-  criticality?: 'mild' | 'moderate' | 'severe' | 'unknown';
-  /** Free-text description of the reaction (e.g. "anaphylaxis", "rash"). */
-  reaction?: string;
-  /** YYYY-MM-DD when the reaction was first noted, if known. */
-  onsetDate?: string;
-  status: 'active' | 'inactive' | 'resolved' | 'entered_in_error';
-  /** Required when status moves away from active — preserves the audit trail. */
-  removalReason?: string;
-  recordedBy?: string;
-  recordedByName?: string;
-  recordedAt: string;
-}
-
-/**
- * Patient directive / consent record (P2.1). Holds informed consent, ABN /
- * non-covered-service acknowledgement, privacy preferences and advance
- * directives ON the patient chart so they aren't re-collected every visit
- * (mirrors the Centricity "Directives" chart window). Stored on the patient
- * document like {@link AllergyEntry}.
- */
-export type DirectiveType =
-  | 'informed_consent'
-  | 'abn_noncovered'
-  | 'privacy_consent'
-  | 'advance_directive'
-  | 'release_of_information'
-  | 'other';
-
-export interface DirectiveEntry {
-  id: string;
-  type: DirectiveType;
-  /** Human-readable description (free text or a picked predefined option). */
-  description: string;
-  /** YYYY-MM-DD the directive takes effect. */
-  startDate?: string;
-  status: 'active' | 'inactive' | 'expired' | 'revoked';
-  /** Required when the directive is removed/revoked — preserves the audit trail. */
-  removalReason?: string;
-  recordedBy?: string;
-  recordedByName?: string;
-  recordedAt: string;
-}
-
-/**
- * Care alert (P1.2) — chart-permanent patient-safety information that should be
- * visible on every visit (e.g. "High fall risk", "Difficult IV access", "Do not
- * use right arm for BP"). Mirrors the Centricity "care alert" (the sticky note
- * with a red plus that stays attached to the chart). Stored on the patient
- * document like {@link AllergyEntry} / {@link DirectiveEntry}.
- */
-export type CareAlertCategory =
-  | 'clinical_risk'
-  | 'safety'
-  | 'infection_control'
-  | 'administrative'
-  | 'other';
-
-export interface CareAlertEntry {
-  id: string;
-  category: CareAlertCategory;
-  message: string;
-  priority: 'high' | 'normal';
-  status: 'active' | 'resolved';
-  /** Required when resolving — preserves the audit trail. */
-  resolutionReason?: string;
-  recordedBy?: string;
-  recordedByName?: string;
-  recordedAt: string;
-}
+// AllergyEntry, DirectiveType/Entry, CareAlertCategory/Entry and ScreeningEntry
+// moved to lib/types/patient-clinical.ts (imported + re-exported at the top).
 
 export interface Patient {
   id: string;
@@ -1750,11 +1680,22 @@ export interface Patient {
   directives?: DirectiveEntry[];
   /** Chart-permanent care alerts / safety flags (P1.2). */
   careAlerts?: CareAlertEntry[];
+  /** Preventive-care / health-maintenance screenings due on the chart. */
+  screenings?: ScreeningEntry[];
   chronicConditions: string[];
   nokName: string;
   nokRelationship: string;
   nokPhone: string;
   nokAddress?: string;
+  /** Additional next-of-kin contacts beyond the primary (up to 3 additional). */
+  additionalNextOfKin?: Array<{ name: string; relationship: string; phone: string; address?: string }>;
+  /** Payment coverage collected at registration. */
+  payorInfo?: {
+    coverageType: 'out-of-pocket' | 'program' | 'exemption' | 'ngo';
+    programEnrollment?: string;
+    ngoName?: string;
+    exemptionReason?: string;
+  };
   registrationHospital: string;
   registrationDate: string;
   /** ISO 8601 timestamp (date + time) captured when patient is first registered. */
@@ -1781,6 +1722,11 @@ export interface Patient {
   /** Optional handoff note from the nurse to the doctor. */
   assignmentNote?: string;
   isActive: boolean;
+  /** Set when patient death is recorded within the platform. */
+  deceasedAt?: string;
+  deathCause?: string;
+  deathPlace?: string;
+  deathInformant?: string;
   photoUrl?: string;
   // Follow-up tracking (expert-recommended)
   followUpStatus?: 'recovered' | 'died' | 'referred' | 'under_treatment' | 'lost_to_followup';
@@ -2089,6 +2035,8 @@ export interface VitalSigns {
   /** Glasgow Coma Scale, 3–15. */
   gcs?: number;
   recordedAt: string;
+  recordedBy?: string;
+  recordedByRole?: string;
 }
 
 export interface Diagnosis {
@@ -2194,6 +2142,11 @@ export interface MedicalRecord {
   socialHistory?: SocialHistory;
   drugHistory?: DrugHistory;
   vitalSigns: VitalSigns;
+  triageVitals?: {
+    temperature?: string; systolic?: string; diastolic?: string; pulse?: string;
+    respiratoryRate?: string; oxygenSaturation?: string; weight?: string;
+    muac?: string; bloodGlucose?: string; capturedAt?: string; capturedBy?: string;
+  };
   diagnoses: Diagnosis[];
   prescriptions: Prescription[];
   labResults: LabResult[];

@@ -72,6 +72,9 @@ export default function AdminUsersPage() {
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterOrg, setFilterOrg] = useState<string>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [changeRoleUser, setChangeRoleUser] = useState<UserDoc | null>(null);
+  const [newRole, setNewRole] = useState<UserRole>('nurse');
+  const [changingRole, setChangingRole] = useState(false);
 
   // Access control
   useEffect(() => {
@@ -105,6 +108,21 @@ export default function AdminUsersPage() {
       return matchSearch && matchRole && matchOrg;
     });
   }, [users, search, filterRole, filterOrg]);
+
+  const handleChangeRole = async () => {
+    if (!changeRoleUser || !currentUser) return;
+    setChangingRole(true);
+    try {
+      const { updateUser } = await import('@/lib/services/user-service');
+      await updateUser(changeRoleUser._id, { role: newRole } as Partial<UserDoc>, currentUser._id, currentUser.username);
+      setUsers(prev => prev.map(u => u._id === changeRoleUser._id ? { ...u, role: newRole } : u));
+      setChangeRoleUser(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setChangingRole(false);
+    }
+  };
 
   const handleToggleActive = async (userId: string, currentlyActive: boolean) => {
     if (!currentUser) return;
@@ -156,11 +174,11 @@ export default function AdminUsersPage() {
             { label: t('adminUsers.statTotalUsers'), value: users.length, icon: Users, color: 'var(--accent-primary)' },
             { label: t('adminUsers.statActiveUsers'), value: users.filter(u => u.isActive).length, icon: UserCheck, color: 'var(--color-success)' },
             { label: t('adminUsers.statInactiveUsers'), value: users.filter(u => !u.isActive).length, icon: UserX, color: 'var(--color-danger)' },
-            { label: t('adminUsers.statAdminUsers'), value: users.filter(u => u.role === 'super_admin' || u.role === 'org_admin').length, icon: Shield, color: '#7C3AED' },
+            { label: t('adminUsers.statAdminUsers'), value: users.filter(u => u.role === 'super_admin' || u.role === 'org_admin').length, icon: Shield, color: 'var(--accent-primary)' },
           ].map(stat => (
             <div key={stat.label} className="dash-card" style={{ padding: '14px 16px' }}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <stat.icon className="w-3.5 h-3.5" style={{ color: stat.color }} />
                 </div>
                 <span className="kpi-card-title">{stat.label}</span>
@@ -261,6 +279,12 @@ export default function AdminUsersPage() {
                         <RowActionsMenu
                           actions={[
                             {
+                              key: 'change-role',
+                              label: 'Change Role',
+                              icon: <Shield className="w-4 h-4" />,
+                              onClick: () => { setChangeRoleUser(u); setNewRole(u.role); },
+                            },
+                            {
                               key: 'toggle',
                               label: u.isActive ? t('adminUsers.deactivate') : t('adminUsers.activate'),
                               tone: u.isActive ? 'danger' : 'success',
@@ -314,6 +338,37 @@ export default function AdminUsersPage() {
           </div>
         </div>
       </main>
+
+      {/* Change Role Modal */}
+      {changeRoleUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="rounded-2xl shadow-2xl w-full max-w-sm" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-light)' }}>
+              <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Change Role — {changeRoleUser.name}</h2>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Current: {ROLE_LABELS[changeRoleUser.role] || changeRoleUser.role}</p>
+            </div>
+            <div className="px-5 py-4">
+              <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>New Role</label>
+              <select
+                value={newRole}
+                onChange={e => setNewRole(e.target.value as UserRole)}
+                className="w-full px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+              >
+                {(Object.keys(ROLE_LABELS) as UserRole[]).filter(r => r !== 'super_admin').map(r => (
+                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                ))}
+              </select>
+            </div>
+            <div className="px-5 py-3 border-t flex justify-end gap-2" style={{ borderColor: 'var(--border-light)' }}>
+              <button onClick={() => setChangeRoleUser(null)} className="btn btn-secondary" disabled={changingRole}>Cancel</button>
+              <button onClick={handleChangeRole} className="btn btn-primary" disabled={changingRole || newRole === changeRoleUser.role}>
+                {changingRole ? 'Saving…' : 'Save Role'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

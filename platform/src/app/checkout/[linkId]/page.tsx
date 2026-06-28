@@ -35,7 +35,7 @@ const PAYMENT_METHODS: { key: UiMethod; name: string; icon: typeof Phone; desc: 
   { key: 'airtel', name: 'Airtel Money', icon: Phone, desc: 'Pay via Airtel Money', color: '#E53935' },
   { key: 'card', name: 'Card Payment', icon: CreditCard, desc: 'Pay with a debit or credit card', color: '#5C6BC0' },
   { key: 'bank', name: 'Bank Transfer', icon: Banknote, desc: 'Pay via bank transfer', color: '#00897B' },
-  { key: 'cash', name: 'Cash at Facility', icon: Wallet, desc: 'Pay in cash at the facility desk', color: '#3b82f6' },
+  { key: 'cash', name: 'Cash at Facility', icon: Wallet, desc: 'Pay in cash at the facility desk', color: '#2191D0' },
 ];
 
 const isMobileMoney = (m: UiMethod | null) => m === 'mpesa' || m === 'mtn' || m === 'airtel';

@@ -212,7 +212,7 @@ export default function TelehealthPage() {
               { label: t('referral.completed'), value: stats.completedTotal, icon: CheckCircle2, color: 'var(--color-success)' },
               { label: t('telehealth.statAvgDuration'), value: `${stats.avgDuration}m`, icon: Clock, color: 'var(--color-warning)' },
               { label: t('telehealth.statAvgRating'), value: stats.avgRating > 0 ? `${stats.avgRating}/5` : '—', icon: Star, color: 'var(--color-warning)' },
-              { label: t('telehealth.statBookings'), value: telehealthAppointments.length, icon: UserPlus, color: '#7C3AED' },
+              { label: t('telehealth.statBookings'), value: telehealthAppointments.length, icon: UserPlus, color: 'var(--accent-primary)' },
             ].map((c, i) => (
               <div key={i} className="card-elevated" style={{ padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -433,7 +433,7 @@ export default function TelehealthPage() {
                             <Btn c="#D97706" onClick={() => update(session._id, { connectionDrops: session.connectionDrops + 1 })}><WifiOff size={13} /> {t('telehealth.btnDrop')}</Btn>
                           </>}
                           {(session.status === 'in_session' || session.status === 'completed') && (
-                            <Btn c="#3b82f6" onClick={() => { setNotesId(session._id); setNotesText(session.clinicalNotes || ''); setNotesDx(session.diagnosis || ''); setNotesIcd(session.icd10Code || ''); }}><FileText size={13} /> {t('nurse.notes')}</Btn>
+                            <Btn c="#2191D0" onClick={() => { setNotesId(session._id); setNotesText(session.clinicalNotes || ''); setNotesDx(session.diagnosis || ''); setNotesIcd(session.icd10Code || ''); }}><FileText size={13} /> {t('nurse.notes')}</Btn>
                           )}
                           {session.status === 'completed' && !session.patientRating && <Btn c="#F59E0B" onClick={() => setRatingId(session._id)}><Star size={13} /> {t('telehealth.btnRate')}</Btn>}
                           {session.status === 'completed' && session.paymentStatus === 'pending' && <Btn c="#1F9D6F" onClick={() => update(session._id, { paymentStatus: 'paid' })}><DollarSign size={13} /> {t('telehealth.payment_paid')}</Btn>}

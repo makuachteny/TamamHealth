@@ -15,6 +15,10 @@ import {
   ShieldAlert, Paperclip,
   Mic, Wallet,
 } from '@/components/icons/lucide';
+import { useFavorites } from '@/lib/hooks/useFavorites';
+import { FavoritesBar, FavoriteStar } from '@/components/consultation/FavoritesBar';
+import SymptomTemplateForm from '@/components/consultation/SymptomTemplateForm';
+import { SYMPTOM_TEMPLATES, getSymptomTemplate, compileSymptomNote, type SymptomAnswers } from '@/lib/clinical/symptom-templates';
 import { medications } from '@/data/mock';
 import type { Attachment } from '@/data/mock';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
@@ -35,7 +39,6 @@ import type { SuperbillPreview } from '@/lib/services/superbill-service';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { patientAgeLabel, patientFullName } from '@/lib/patient-utils';
 import { formatMoney } from '@/lib/format-utils';
-import PatientName from '@/components/PatientName';
 import { Icon as DuotoneInfoIcon } from '@/components/icons';
 import { useToast } from '@/components/Toast';
 import { ROS_SYSTEMS, CHRONIC_CONDITIONS, SMOKING_OPTIONS, ALCOHOL_OPTIONS, SES_OPTIONS } from '@/lib/clinical-history';
@@ -309,6 +312,25 @@ export default function ConsultationPage() {
   const [diagSearch, setDiagSearch] = useState('');
   const [diagnoses, setDiagnoses] = useState<DiagnosisEntry[]>([]);
   const [showDiagDropdown, setShowDiagDropdown] = useState(false);
+
+  // Per-clinician favorites — one-tap diagnosis & medicine picks.
+  const favDx = useFavorites(currentUser?._id, 'diagnosis');
+  const favRx = useFavorites(currentUser?._id, 'medication');
+
+  // Symptom screening template (branching questions) used in the Symptoms step.
+  const [symptomTemplateId, setSymptomTemplateId] = useState<string | null>(null);
+  const [symptomAnswers, setSymptomAnswers] = useState<SymptomAnswers>({});
+  const setSymptomAnswer = (id: string, value: string) => setSymptomAnswers(prev => ({ ...prev, [id]: value }));
+  const insertSymptomTemplate = () => {
+    const tmpl = symptomTemplateId ? getSymptomTemplate(symptomTemplateId) : undefined;
+    if (!tmpl) return;
+    const note = compileSymptomNote(tmpl, symptomAnswers);
+    if (!note) { showToast('Answer at least one question first', 'error'); return; }
+    setHistory(h => ({ ...h, hpi: h.hpi.trim() ? `${h.hpi.trim()}\n\n${note}` : note }));
+    setSymptomTemplateId(null);
+    setSymptomAnswers({});
+    showToast('Screening added to the history', 'success');
+  };
 
   // Prescriptions
   const [prescriptions, setPrescriptions] = useState<PrescriptionEntry[]>([]);
@@ -1745,62 +1767,6 @@ export default function ConsultationPage() {
             </div>
           )}
 
-          {/* Doctor Queue — Triaged patients waiting to be seen */}
-          {!selectedPatient && (() => {
-            const today = new Date().toISOString().slice(0, 10);
-            const pendingTriages = triages
-              .filter(t => (t.triagedAt || '').startsWith(today) && (t.status === 'pending') && !t.handoffTo)
-              .sort((a, b) => {
-                const pOrder: Record<string, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
-                return (pOrder[a.priority] ?? 3) - (pOrder[b.priority] ?? 3);
-              });
-            if (pendingTriages.length === 0) return null;
-            return (
-              <div className="card-elevated p-4 mb-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
-                    <AlertTriangle className="w-4 h-4" style={{ color: '#EF4444' }} />
-                  </div>
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('consultation.patientsWaiting', { count: pendingTriages.length })}</span>
-                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('consultation.sortedByTriagePriority')}</span>
-                </div>
-                <div className="space-y-1.5">
-                  {pendingTriages.slice(0, 6).map(triage => {
-                    const PRIO: Record<string, { color: string; bg: string }> = {
-                      RED: { color: '#EF4444', bg: 'rgba(239,68,68,0.12)' },
-                      YELLOW: { color: '#E4A84B', bg: 'rgba(228,168,75,0.16)' },
-                      GREEN: { color: '#1F9D6F', bg: 'rgba(31,157,111,0.12)' },
-                    };
-                    const prio = PRIO[triage.priority] || PRIO.GREEN;
-                    return (
-                      <button
-                        key={triage._id}
-                        onClick={() => { setSelectedPatient(triage.patientId); setPatientSearch(''); }}
-                        className="group w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-all hover:bg-[var(--accent-light)]"
-                        style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', borderLeft: `3px solid ${prio.color}` }}
-                      >
-                        <span
-                          className="flex-shrink-0 inline-flex items-center justify-center text-[10px] font-bold rounded-md px-2 py-1 uppercase tracking-wide"
-                          style={{ background: prio.bg, color: prio.color, minWidth: 56 }}
-                        >
-                          {triage.priority}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <PatientName name={triage.patientName} size={36} />
-                          <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                            {triage.chiefComplaint || t('consultation.etatAssessment')} · {triage.hospitalNumber} · {t('consultation.triagedAt', { time: new Date(triage.triagedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })}
-                          </p>
-                        </div>
-                        <span className="text-[10px] font-semibold flex-shrink-0 px-2 py-1 rounded-md text-white" style={{ background: 'var(--accent-primary)' }}>
-                          {t('consultation.startConsultation')}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
 
           {/* Patient Selector — elevated above the following cards so the patient
               search dropdown (which overflows the card) is never hidden behind
@@ -1985,6 +1951,44 @@ export default function ConsultationPage() {
                   ) : (
                     <p className="text-[11px]" style={{ color: 'var(--color-warning)' }}>Maximum of 3 complaints reached.</p>
                   )}
+
+                  {/* Symptom screening templates — branching question sets that
+                      compile into the history (pick a visit type, tap answers). */}
+                  <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border-light)' }}>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <ClipboardList className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Symptom screen (optional)</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {SYMPTOM_TEMPLATES.map(tmpl => {
+                        const active = symptomTemplateId === tmpl.id;
+                        return (
+                          <button
+                            key={tmpl.id}
+                            type="button"
+                            onClick={() => { setSymptomTemplateId(active ? null : tmpl.id); setSymptomAnswers({}); }}
+                            className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors"
+                            style={{ background: active ? 'var(--accent-primary)' : 'var(--overlay-subtle)', color: active ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                          >
+                            {tmpl.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {symptomTemplateId && getSymptomTemplate(symptomTemplateId) && (
+                      <>
+                        <SymptomTemplateForm
+                          template={getSymptomTemplate(symptomTemplateId)!}
+                          answers={symptomAnswers}
+                          onAnswer={setSymptomAnswer}
+                        />
+                        <div className="flex items-center gap-2 mt-2">
+                          <button type="button" onClick={insertSymptomTemplate} className="btn btn-sm btn-primary">Add to history</button>
+                          <button type="button" onClick={() => { setSymptomTemplateId(null); setSymptomAnswers({}); }} className="btn btn-sm btn-secondary">Cancel</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -2277,6 +2281,12 @@ export default function ConsultationPage() {
               <SectionHeader index={4} />
               {openSections[4] && (
                 <div className="p-5">
+                  {/* Favorite diagnoses — one-tap add */}
+                  <FavoritesBar
+                    favorites={favDx.favorites}
+                    label="Favorite diagnoses"
+                    onPick={(fav) => { addDiagnosis(fav.code, fav.label); favDx.bumpUse('diagnosis', fav.code); }}
+                  />
                   {/* ICD-10 Search */}
                   <div className="relative mb-4">
                     <label>{t('consultation.searchIcdLabel')}</label>
@@ -2344,6 +2354,10 @@ export default function ConsultationPage() {
                             <option value="moderate">{t('consultation.diagModerate')}</option>
                             <option value="severe">{t('consultation.diagSevere')}</option>
                           </select>
+                          <FavoriteStar
+                            active={favDx.isFav(d.code)}
+                            onToggle={() => favDx.toggle({ kind: 'diagnosis', code: d.code, label: d.name, userName: currentUser?.name, orgId: currentUser?.orgId, hospitalId: currentUser?.hospitalId })}
+                          />
                           <button onClick={() => removeDiagnosis(i)} className="p-1 rounded transition-colors flex-shrink-0" style={{ background: 'transparent' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(229,46,66,0.15)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                             <X className="w-4 h-4" style={{ color: 'var(--tamamhealth-red)' }} />
                           </button>
@@ -2400,6 +2414,12 @@ export default function ConsultationPage() {
                       </div>
                     </div>
                   )}
+                  {/* Favorite medicines — one-tap add */}
+                  <FavoritesBar
+                    favorites={favRx.favorites}
+                    label="Favorite medicines"
+                    onPick={(fav) => { addPrescription(fav.label); favRx.bumpUse('medication', fav.code); }}
+                  />
                   {/* Medication Search */}
                   <div className="relative mb-4">
                     <label>{t('consultation.searchMedicationLabel')}</label>
@@ -2447,9 +2467,15 @@ export default function ConsultationPage() {
                                 </span>
                               )}
                             </div>
-                            <button onClick={() => removePrescription(i)} className="p-1 rounded transition-colors" style={{ background: 'transparent' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(229,46,66,0.15)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                              <X className="w-4 h-4" style={{ color: 'var(--tamamhealth-red)' }} />
-                            </button>
+                            <div className="flex items-center">
+                              <FavoriteStar
+                                active={favRx.isFav(rx.medication)}
+                                onToggle={() => favRx.toggle({ kind: 'medication', code: rx.medication, label: rx.medication, meta: { dosage: rx.dose, frequency: rx.frequency }, userName: currentUser?.name, orgId: currentUser?.orgId, hospitalId: currentUser?.hospitalId })}
+                              />
+                              <button onClick={() => removePrescription(i)} className="p-1 rounded transition-colors" style={{ background: 'transparent' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(229,46,66,0.15)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                <X className="w-4 h-4" style={{ color: 'var(--tamamhealth-red)' }} />
+                              </button>
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div>

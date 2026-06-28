@@ -1449,6 +1449,7 @@ const sw: TranslationMap = {
   'mar.recordAdministration': 'Rekodi utoaji',
   'referrals.completing': 'Inakamilisha...',
   'patientNew.nokAddressPlaceholder': 'Anwani ya ndugu wa karibu',
+  'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'Imepangwa',
   'anc.view': 'Tazama',
   'patientNew.payam': 'Payam (Wilaya ndogo)',

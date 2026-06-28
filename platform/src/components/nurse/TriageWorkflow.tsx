@@ -569,7 +569,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
           {/* Editing-an-existing-record banner — makes it clear the next save
               corrects a saved triage rather than creating a new one. */}
           {editingTriageId && (
-            <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(59,130,246,0.25))' }}>
+            <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-border, rgba(33,145,208,0.25))' }}>
               <span className="text-[11px] font-semibold" style={{ color: ACCENT }}>{t('action.edit')}</span>
               <button
                 onClick={() => {

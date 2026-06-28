@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
   CheckItem,
 } from "@/components/marketing/MarketingShared";
-import { Icon } from "@iconify/react";
+import { Code2, Database, Laptop } from "@/components/marketing/icons";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth API Documentation Page
@@ -57,49 +58,38 @@ export default function APIDocs() {
     {
       language: "Python",
       package: "pip install tamamhealth-sdk",
-      icon: <Icon icon="logos:python" width={40} height={40} />,
+      icon: <Code2 size={40} strokeWidth={1.8} />,
     },
     {
       language: "JavaScript",
       package: "npm install tamamhealth-sdk",
-      icon: <Icon icon="logos:javascript" width={40} height={40} />,
+      icon: <Laptop size={40} strokeWidth={1.8} />,
     },
     {
       language: "Java",
       package: "gradle add com.tamamhealth:sdk",
-      icon: <Icon icon="logos:java" width={40} height={40} />,
+      icon: <Database size={40} strokeWidth={1.8} />,
     },
   ];
 
   return (
     <>
-      {/* ── HERO SECTION (side-by-side) ──────────────────────────────── */}
-      <section className="mk-hero-split">
-        <div className="mk-container">
-          <div className="mk-hero-split-grid">
-            <Reveal>
-              <div className="mk-hero-split-text">
-                <span className="mk-label">DEVELOPER DOCS</span>
-                <h1 className="mk-h1">TamamHealth API Documentation</h1>
-                <p>
-                  Build integrations with our FHIR-compliant REST APIs for healthcare data
-                  exchange and system integration across South Sudan.
-                </p>
-              </div>
-            </Reveal>
-            <Reveal delay={0.1}>
-              <div className="mk-hero-split-image">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/assets/african-nurse.jpg"
-                  alt="Health worker using TamamHealth on a phone"
-                  loading="eager"
-                />
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
+      <MarketingHero
+        variant="console"
+        eyebrow="DEVELOPER DOCS"
+        title="TamamHealth API Documentation"
+        subtitle="Build integrations with FHIR-compliant REST APIs for healthcare data exchange and system integration across South Sudan."
+        primaryCta={{ label: "View quick start", href: "#quick-start" }}
+        stats={[
+          { value: "FHIR R4", label: "compatible model" },
+          { value: "OAuth 2.0", label: "authentication" },
+          { value: "6", label: "API modules" },
+        ]}
+        image="/assets/african-nurse.jpg"
+        imageAlt="Health worker using TamamHealth on a phone"
+        imagePriority
+        className="mk-hero-api-docs"
+      />
 
       {/* ── STATS BANNER ──────────────────────────────────────────────── */}
       <section className="mk-stat-band">
@@ -128,7 +118,7 @@ export default function APIDocs() {
       </section>
 
       {/* ── QUICK START SECTION ───────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
+      <section className="mk-section mk-section-white" id="quick-start">
         <div className="mk-container">
           <Reveal>
             <h2 className="mk-h2" style={{ marginBottom: 40 }}>Quick Start</h2>
@@ -160,7 +150,7 @@ export default function APIDocs() {
                   <p style={{ fontSize: 14, color: "var(--tb-text-sec)", lineHeight: 1.6, marginBottom: 16 }}>
                     Log into your TamamHealth dashboard and navigate to Settings to generate your API key and client secret.
                   </p>
-                  <Link href="/about/contact" style={{ fontSize: 14, color: "var(--tb-green)", fontWeight: 600, textDecoration: "none" }}>
+                  <Link href="/about/contact?intent=partnership#contact-form" style={{ fontSize: 14, color: "var(--tb-green)", fontWeight: 600, textDecoration: "none" }}>
                     Create credentials →
                   </Link>
                 </div>
@@ -189,7 +179,7 @@ export default function APIDocs() {
                   <p style={{ fontSize: 14, color: "var(--tb-text-sec)", lineHeight: 1.6, marginBottom: 16 }}>
                     Exchange your credentials for an OAuth 2.0 access token. Include the token in all API requests.
                   </p>
-                  <Link href="/about/contact" style={{ fontSize: 14, color: "var(--tb-green)", fontWeight: 600, textDecoration: "none" }}>
+                  <Link href="/about/contact?intent=partnership#contact-form" style={{ fontSize: 14, color: "var(--tb-green)", fontWeight: 600, textDecoration: "none" }}>
                     View auth guide →
                   </Link>
                 </div>
@@ -218,7 +208,7 @@ export default function APIDocs() {
                   <p style={{ fontSize: 14, color: "var(--tb-text-sec)", lineHeight: 1.6, marginBottom: 16 }}>
                     Start making requests to endpoints. Use the code samples below or dive into full documentation.
                   </p>
-                  <Link href="/about/contact" style={{ fontSize: 14, color: "var(--tb-green)", fontWeight: 600, textDecoration: "none" }}>
+                  <Link href="/about/contact?intent=partnership#contact-form" style={{ fontSize: 14, color: "var(--tb-green)", fontWeight: 600, textDecoration: "none" }}>
                     View examples →
                   </Link>
                 </div>
@@ -304,13 +294,12 @@ export default function APIDocs() {
                   </ul>
                 </div>
               </div>
-              <div className="mk-split-image">
+              <div className="mk-split-image mk-dashboard-crop">
                 <Image
-                  src="/assets/dashboard-screenshot.png"
+                  src="/assets/Dashboard.png"
                   alt="API documentation dashboard"
                   width={600}
                   height={400}
-                  style={{ width: "100%", height: "auto", borderRadius: 8 }}
                 />
               </div>
             </div>
@@ -330,7 +319,7 @@ export default function APIDocs() {
             }}>
               {endpointCategories.map((category, index) => (
                 <Reveal key={category.id} delay={index * 0.05}>
-                  <Link href="/about/contact" style={{ textDecoration: "none" }}>
+                  <Link href="/about/contact?intent=partnership#contact-form" style={{ textDecoration: "none" }}>
                     <div className="mk-product-card" style={{
                       background: "var(--tb-white)",
                       border: "1px solid var(--tb-cream-300)",
@@ -390,7 +379,7 @@ export default function APIDocs() {
                     margin: 0,
                     fontFamily: "monospace",
                     fontSize: 13,
-                    color: "#00ff00",
+                    color: "var(--tb-blue-100)",
                     lineHeight: 1.6,
                   }}>
 {`curl -X GET https://api.tamamhealth.org/v1/patients \\
@@ -465,7 +454,7 @@ export default function APIDocs() {
                     }}>
                       {sdk.package}
                     </div>
-                    <Link href="/about/contact" style={{ color: "var(--tb-green)", fontWeight: 600, fontSize: 14, textDecoration: "none" }}>
+                    <Link href="/about/contact?intent=partnership#contact-form" style={{ color: "var(--tb-green)", fontWeight: 600, fontSize: 14, textDecoration: "none" }}>
                       View docs →
                     </Link>
                   </div>

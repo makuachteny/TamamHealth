@@ -1311,6 +1311,7 @@ const so: TranslationMap = {
   'mar.recordAdministration': 'Diiwaangeli bixinta',
   'referrals.completing': 'Dhammaynaya...',
   'patientNew.nokAddressPlaceholder': 'Cinwaanka qaraabada',
+  'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'La qorsheeyey',
   'anc.view': 'Eeg',
   'patientNew.payam': 'Payam (Degmo-hoose)',

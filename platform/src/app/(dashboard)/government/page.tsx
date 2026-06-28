@@ -979,7 +979,7 @@ export default function GovernmentDashboardPage() {
     return (
       <div className="p-3 grid grid-cols-2 gap-2">
         <CircularGauge value={avgReporting} label={t('government.metricReporting')} color="#2563EB" size={96} strokeWidth={5} />
-        <CircularGauge value={avgReadiness} label={t('government.metricReadiness')} color="#3b82f6" size={96} strokeWidth={5} />
+        <CircularGauge value={avgReadiness} label={t('government.metricReadiness')} color="#2191D0" size={96} strokeWidth={5} />
         <CircularGauge value={avgImmCoverage} label={t('government.metricEpiCoverage')} color="#A855F7" size={96} strokeWidth={5} />
         <CircularGauge value={functionalPct} label={t('government.metricFunctional')} color="#FCD34D" size={96} strokeWidth={5} />
       </div>
@@ -1051,7 +1051,7 @@ export default function GovernmentDashboardPage() {
           {[
             { label: t('government.kpiHospitals'), value: totalHospitals.toString(), icon: Building2, color: '#2563EB', bg: 'rgba(37,99,235,0.10)', href: '/hospitals' },
             { label: t('government.kpiPatients'), value: totalPatients.toLocaleString(), icon: Users, color: '#0E7490', bg: 'rgba(14,116,144,0.10)', href: '/hospitals' },
-            { label: t('government.kpiBeds'), value: totalBeds.toLocaleString(), icon: BedDouble, color: '#7C3AED', bg: 'rgba(124,58,237,0.10)', href: '/hospitals' },
+            { label: t('government.kpiBeds'), value: totalBeds.toLocaleString(), icon: BedDouble, color: 'var(--accent-primary)', bg: 'rgba(124,58,237,0.10)', href: '/hospitals' },
             { label: t('government.kpiStaff'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: '#0891B2', bg: 'rgba(8,145,178,0.10)', href: '/hospitals' },
             { label: t('government.kpiOnline'), value: onlineHospitals.toString(), icon: Wifi, color: '#15803D', bg: 'rgba(21,128,61,0.10)', href: '/hospitals' },
             { label: t('government.kpiOffline'), value: offlineHospitals.toString(), icon: WifiOff, color: '#64748B', bg: 'rgba(100,116,139,0.12)', href: '/hospitals' },
@@ -1061,7 +1061,7 @@ export default function GovernmentDashboardPage() {
             <button
               key={stat.label}
               onClick={() => stat.href && router.push(stat.href)}
-              className="flex items-center gap-2.5 p-3 rounded-xl text-left transition-transform active:scale-[0.98] hover:-translate-y-0.5"
+              className="flex items-center gap-2.5 p-3 rounded-xl text-left transition-transform"
               style={{ background: stat.bg, border: `1px solid ${stat.color}22` }}
             >
               <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent' }}>

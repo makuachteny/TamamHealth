@@ -40,9 +40,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex items-center justify-center min-h-screen gradient-mesh-bg">
         <div className="flex flex-col items-center gap-4 relative z-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/tamamhealth-logo.svg" alt="TamamHealth" className="w-14 h-14" style={{
-            filter: 'drop-shadow(0 4px 12px rgba(10, 61, 107, 0.3))',
-          }} />
+          <img src="/assets/tamamhealth-logo.svg" alt="TamamHealth" className="w-14 h-14" />
           <div className="flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--accent-primary)' }} />
             <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Loading TamamHealth...</p>
@@ -58,9 +56,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return <ForcePasswordChange userName={currentUser.name} onLogout={logout} />;
   }
 
-  // Content starts flush against the sidebar's right edge. The sidebar now fills
-  // the browser's left edge (no outer margin), so this equals its raw width.
-  const sidebarMargin = sidebarCollapsed ? '80px' : '220px';
+  // Sidebar floats with 10px left margin. Content starts 10px beyond the sidebar's right edge.
+  const sidebarMargin = sidebarCollapsed ? '100px' : '240px';
 
   return (
     <SettingsProvider>

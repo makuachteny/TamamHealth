@@ -1321,6 +1321,7 @@ const nus: TranslationMap = {
   'mar.recordAdministration': 'Gɔ̈t gam wal',
   'referrals.completing': 'Thuk...',
   'patientNew.nokAddressPlaceholder': 'Tedun mär thiɛk',
+  'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'Cuŋ',
   'anc.view': 'Nɛn',
   'patientNew.payam': 'Payam',

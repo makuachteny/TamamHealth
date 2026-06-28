@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tabs, useRouter } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, type ColorValue } from 'react-native';
 import { Icon } from '@/components/icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/lib/auth';
@@ -70,10 +70,10 @@ function HeaderWithSync() {
   );
 }
 
-function TabIcon({ name, color, focused }: { name: string; color: string; focused: boolean }) {
+function TabIcon({ name, color, focused }: { name: string; color: ColorValue; focused: boolean }) {
   return (
     <View style={[styles.tabIconWrap, focused && styles.tabIconActive]}>
-      <Icon name={name as any} size={21} color={color} />
+      <Icon name={name as any} size={21} color={String(color)} />
     </View>
   );
 }

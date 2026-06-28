@@ -1,7 +1,7 @@
 /**
- * Tests for middleware route configuration consistency.
+ * Tests for proxy route configuration consistency.
  *
- * The Edge middleware (`src/middleware.ts`) gates pages using the allow-list in
+ * The Edge proxy (`src/proxy.ts`) gates pages using the allow-list in
  * `lib/role-routes.ts` (`ROLE_ROUTE_TABLE`). The richer `ROLE_PERMISSIONS` map
  * in `lib/permissions.ts` derives its `allowedRoutes` from the same table. These
  * tests assert the two stay consistent for EVERY role — including new roles —
@@ -19,7 +19,7 @@ function allowedByTable(role: UserRole, path: string): boolean {
   );
 }
 
-describe('middleware-routes sync with permissions', () => {
+describe('proxy routes sync with permissions', () => {
   test('every role in permissions has a route-table entry', () => {
     for (const role of ALL_ROLES) {
       expect(ROLE_PERMISSIONS[role]).toBeDefined();
@@ -41,7 +41,7 @@ describe('middleware-routes sync with permissions', () => {
     }
   });
 
-  test.each(ALL_ROLES)('all nav-item hrefs are reachable through the middleware for role: %s', (role) => {
+  test.each(ALL_ROLES)('all nav-item hrefs are reachable through the proxy for role: %s', (role) => {
     for (const item of ROLE_PERMISSIONS[role].navItems) {
       expect(allowedByTable(role, item.href)).toBe(true);
     }

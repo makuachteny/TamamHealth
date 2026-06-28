@@ -1,0 +1,143 @@
+'use client';
+
+/**
+ * Patient reminders — queue a message to reach the patient on a future date
+ * (e.g. "Come fasted in 3 weeks for path tests"). The HealthBridge scheduled-SMS
+ * idea, built honestly as a queue staff work from: there is no SMS gateway, so
+ * reminders are marked sent manually (a real gateway can dispatch queued rows).
+ */
+import { useState } from 'react';
+import { useApp } from '@/lib/context';
+import type { PatientDoc, ReminderChannel } from '@/lib/db-types';
+import { usePatientReminders } from '@/lib/hooks/usePatientReminders';
+import { patientFullName } from '@/lib/patient-utils';
+import { Bell, Plus, Check, X, Clock } from '@/components/icons/lucide';
+
+const CHANNELS: { v: ReminderChannel; label: string }[] = [
+  { v: 'sms', label: 'SMS' },
+  { v: 'whatsapp', label: 'WhatsApp' },
+  { v: 'call', label: 'Call' },
+  { v: 'in_person', label: 'In person' },
+];
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export default function RemindersPanel({ patient }: { patient: PatientDoc }) {
+  const { currentUser } = useApp();
+  const { reminders, queued, queue, markSent, cancel } = usePatientReminders(patient._id);
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState<{ message: string; sendDate: string; channel: ReminderChannel }>(
+    { message: '', sendDate: todayISO(), channel: 'sms' },
+  );
+
+  const today = todayISO();
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await queue({
+        patientId: patient._id,
+        patientName: patientFullName(patient),
+        message: form.message.trim(),
+        sendDate: form.sendDate,
+        channel: form.channel,
+        createdById: currentUser?._id,
+        createdByName: currentUser?.name || currentUser?.username,
+        hospitalId: currentUser?.hospitalId,
+        orgId: currentUser?.orgId,
+      });
+      setForm({ message: '', sendDate: todayISO(), channel: 'sms' });
+      setAdding(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not queue reminder');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card-elevated p-3.5">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Bell className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+          <h3 className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Reminders</h3>
+          {queued.length > 0 && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>{queued.length} queued</span>
+          )}
+        </div>
+        {!adding && (
+          <button className="btn btn-xs btn-secondary" onClick={() => setAdding(true)}>
+            <Plus className="w-3 h-3" /> Add
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="space-y-2 mb-3">
+          <textarea
+            value={form.message}
+            onChange={e => setForm({ ...form, message: e.target.value })}
+            rows={2}
+            placeholder="e.g. Come fasted in 3 weeks for your path tests"
+            className="w-full p-2 rounded-md text-[12px]"
+            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', resize: 'vertical' }}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              Send date
+              <input type="date" value={form.sendDate} min={today} onChange={e => setForm({ ...form, sendDate: e.target.value })}
+                className="w-full p-2 rounded-md text-[12px] mt-0.5" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }} />
+            </label>
+            <label className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              Channel
+              <select value={form.channel} onChange={e => setForm({ ...form, channel: e.target.value as ReminderChannel })}
+                className="w-full p-2 rounded-md text-[12px] mt-0.5" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
+                {CHANNELS.map(c => <option key={c.v} value={c.v}>{c.label}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="btn btn-sm btn-primary" disabled={busy || form.message.trim().length === 0} onClick={submit}>Queue reminder</button>
+            <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => { setAdding(false); setError(null); }}>Cancel</button>
+          </div>
+          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>No SMS gateway is connected — this queues a reminder for staff to send and mark done.</p>
+        </div>
+      )}
+
+      {reminders.length === 0 ? (
+        <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>No reminders.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {reminders.map(r => {
+            const overdue = r.status === 'queued' && r.sendDate < today;
+            const muted = r.status !== 'queued';
+            return (
+              <div key={r._id} className="flex items-start gap-2 p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', opacity: muted ? 0.6 : 1 }}>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px]" style={{ color: 'var(--text-primary)' }}>{r.message}</div>
+                  <div className="inline-flex items-center gap-1 text-[11px]" style={{ color: overdue ? 'var(--color-danger)' : 'var(--text-muted)' }}>
+                    {overdue && <Clock className="w-3 h-3" />}
+                    <span>{CHANNELS.find(c => c.v === r.channel)?.label} · {r.status === 'queued' ? `send ${r.sendDate}` : r.status}</span>
+                  </div>
+                </div>
+                {r.status === 'queued' && (
+                  <>
+                    <button className="btn btn-xs btn-primary flex-shrink-0" onClick={() => markSent(r._id)} title="Mark sent"><Check className="w-3 h-3" /> Sent</button>
+                    <button className="p-1 rounded flex-shrink-0" onClick={() => cancel(r._id)} title="Cancel" style={{ color: 'var(--text-muted)' }}><X className="w-3.5 h-3.5" /></button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {error && <p className="text-[11px] mt-1" style={{ color: 'var(--color-danger)' }}>{error}</p>}
+    </div>
+  );
+}

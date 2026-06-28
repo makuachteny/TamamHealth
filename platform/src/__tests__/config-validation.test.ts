@@ -8,6 +8,8 @@ function validEnv(overrides: Record<string, string | undefined> = {}) {
   return {
     JWT_SECRET: 'x'.repeat(48),
     TAMAMHEALTH_LICENSE_SECRET: 'y'.repeat(48),
+    AIRTEL_WEBHOOK_SECRET: 'airtel-webhook-secret',
+    MPESA_WEBHOOK_SECRET: 'mpesa-webhook-secret',
     ...overrides,
   };
 }
@@ -67,6 +69,18 @@ describe('validateProductionConfig', () => {
     expect(errs).toEqual(expect.arrayContaining([
       expect.stringContaining('NEXT_PUBLIC_COUCHDB_URL is unset'),
       expect.stringContaining('COUCHDB_WEBHOOK_SECRET is unset'),
+    ]));
+  });
+
+  // --- Payment webhooks ---
+  test('flags unsigned Airtel and M-Pesa webhooks', () => {
+    const errs = validateProductionConfig(validEnv({
+      AIRTEL_WEBHOOK_SECRET: undefined,
+      MPESA_WEBHOOK_SECRET: undefined,
+    }));
+    expect(errs).toEqual(expect.arrayContaining([
+      expect.stringContaining('AIRTEL_WEBHOOK_SECRET is unset'),
+      expect.stringContaining('MPESA_WEBHOOK_SECRET is unset'),
     ]));
   });
 });

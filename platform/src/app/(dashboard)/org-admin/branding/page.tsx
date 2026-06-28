@@ -21,13 +21,13 @@ export default function OrgBrandingPage() {
 
   // Form state
   const [orgName, setOrgName] = useState('');
-  const [primaryColor, setPrimaryColor] = useState('#7C3AED');
+  const [primaryColor, setPrimaryColor] = useState('var(--accent-primary)');
   const [secondaryColor, setSecondaryColor] = useState('#0F47AF');
   const [accentColor, setAccentColor] = useState('var(--accent-primary)');
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
   const [bankDetails, setBankDetails] = useState('');
 
-  const brandColor = primaryColor || '#7C3AED';
+  const brandColor = primaryColor || 'var(--accent-primary)';
 
   useEffect(() => {
     if (!currentUser?.orgId) return;
@@ -38,7 +38,7 @@ export default function OrgBrandingPage() {
         if (o) {
           setOrg(o);
           setOrgName(o.name);
-          setPrimaryColor(o.primaryColor || '#7C3AED');
+          setPrimaryColor(o.primaryColor || 'var(--accent-primary)');
           setSecondaryColor(o.secondaryColor || '#0F47AF');
           setAccentColor(o.accentColor || 'var(--accent-primary)');
           setLogoUrl(o.logoUrl);
@@ -121,7 +121,7 @@ export default function OrgBrandingPage() {
   const handleReset = () => {
     if (!org) return;
     setOrgName(org.name);
-    setPrimaryColor(org.primaryColor || '#7C3AED');
+    setPrimaryColor(org.primaryColor || 'var(--accent-primary)');
     setSecondaryColor(org.secondaryColor || '#0F47AF');
     setAccentColor(org.accentColor || 'var(--accent-primary)');
     setLogoUrl(org.logoUrl);

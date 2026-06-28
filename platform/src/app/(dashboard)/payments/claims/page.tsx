@@ -32,7 +32,7 @@ const PAYER_COLORS: Record<PayerType, string> = {
   nhis: 'var(--color-success)',
   cbhi: '#0891B2',
   donor: 'var(--color-warning)',
-  government: '#7C3AED',
+  government: 'var(--accent-primary)',
   private: '#EA580C',
   employer: '#0F766E',
 };

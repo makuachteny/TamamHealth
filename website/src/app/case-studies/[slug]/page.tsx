@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { Reveal } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
 import { CASE_STUDIES, getCaseStudy } from "@/data/case-studies";
 
 interface Params { params: Promise<{ slug: string }> }
@@ -30,74 +30,21 @@ export default async function CaseStudyDetail({ params }: Params) {
 
   return (
     <>
-      
       <main className="mk-main">
-        {/* Image banner */}
-        <section
-          style={{
-            position: "relative",
-            height: "min(380px, 40vh)",
-            marginTop: -1,
-            overflow: "hidden",
-            background: study.bg,
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={study.image}
-            alt={study.imageAlt}
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 30%" }}
-          />
-          <div style={{
-            position: "absolute", inset: 0,
-            background: `linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.5) 100%)`,
-          }} />
-        </section>
-
-        {/* Hero */}
-        <section
-          className="mk-case-hero"
-          style={{
-            background: study.bg,
-            borderBottom: `2px solid ${study.accent}`,
-          }}
-        >
-          <div className="mk-container">
-            <Reveal>
-              <Link
-                href="/case-studies"
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  fontSize: 13, fontWeight: 600, color: study.accent, textDecoration: "none",
-                  marginBottom: 18,
-                }}
-              >
-                <DuoIcon name="arrow-right" size={14} style={{ transform: "rotate(180deg)" }} />
-                All case studies
-              </Link>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16, alignItems: "center" }}>
-                <span style={{
-                  fontSize: 10.5, fontWeight: 800, letterSpacing: 0.7, textTransform: "uppercase",
-                  color: "var(--tb-gold-dark)", background: "var(--tb-tint-gold)",
-                  border: "1px solid var(--tb-gold)",
-                  padding: "3px 10px", borderRadius: 999,
-                }}>
-                  Projected scenario
-                </span>
-              </div>
-              <h1 className="mk-h1" style={{ marginBottom: 18, maxWidth: 880 }}>{study.title}</h1>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 14, color: "var(--tb-text-sec)" }}>
-                <span><strong style={{ color: "var(--tb-text-pri)" }}>{study.client}</strong></span>
-                <span>·</span>
-                <span>{study.facilityType}</span>
-                <span>·</span>
-                <span>{study.location}, {study.state}</span>
-                <span>·</span>
-                <span>Live since {study.goLiveDate}</span>
-              </div>
-            </Reveal>
-          </div>
-        </section>
+        <MarketingHero
+          variant="photo"
+          eyebrow="PROJECTED SCENARIO"
+          title={study.title}
+          subtitle={`${study.client} · ${study.facilityType} · ${study.location}, ${study.state} · Live since ${study.goLiveDate}`}
+          primaryCta={{ label: "All case studies", href: "/case-studies" }}
+          stats={study.metrics.slice(0, 3).map((metric) => ({
+            value: metric.value,
+            label: metric.label,
+          }))}
+          image={study.image}
+          imageAlt={study.imageAlt}
+          imagePriority
+        />
 
         {/* Metrics strip */}
         <section style={{ paddingTop: 32, paddingBottom: 0 }}>

@@ -37,7 +37,7 @@ type OrgFormData = {
 
 const emptyForm: OrgFormData = {
   name: '', slug: '', orgType: 'public', contactEmail: '', country: 'South Sudan',
-  primaryColor: '#3b82f6', secondaryColor: '#1e3a8a', accentColor: '#3b82f6',
+  primaryColor: '#2191D0', secondaryColor: '#015697', accentColor: '#2191D0',
   subscriptionPlan: 'professional', subscriptionStatus: 'trial',
   maxUsers: 50, maxHospitals: 10,
   epidemicIntelligence: true, mchAnalytics: true, dhis2Export: false,
@@ -277,8 +277,8 @@ export default function AdminOrganizationsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
-                        background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(59, 130, 246,0.12)' : 'rgba(107,114,128,0.12)',
-                        color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#3b82f6' : '#6B7280',
+                        background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(33, 145, 208, 0.12)' : 'rgba(107,114,128,0.12)',
+                        color: org.subscriptionPlan === 'enterprise' ? 'var(--accent-primary)' : org.subscriptionPlan === 'professional' ? '#2191D0' : '#6B7280',
                       }}>{org.subscriptionPlan}</span>
                     </td>
                     <td className="px-4 py-3">
@@ -359,7 +359,7 @@ export default function AdminOrganizationsPage() {
                   <div>
                     <label style={labelStyle}>{t('orgAdmin.labelContactEmail')}</label>
                     <input type="email" value={form.contactEmail} onChange={e => setForm(p => ({ ...p, contactEmail: e.target.value }))}
-                      placeholder="admin@example.org" style={inputStyle} />
+                      placeholder="support.tamam@gmail.com" style={inputStyle} />
                   </div>
                   <div>
                     <label style={labelStyle}>{t('orgAdmin.labelCountry')}</label>

@@ -1034,7 +1034,7 @@ function PerformanceTab({ scope, hospitalId }: { scope: DataScope | undefined; h
   if (error) return <ErrorBlock message={error} />;
 
   const cards: { label: string; value: number | string; icon: typeof Calendar; tint: string }[] = [
-    { label: t('hospitals.kpiVisitsToday'),       value: kpis.visitsToday,                  icon: Calendar,    tint: '#3b82f6' },
+    { label: t('hospitals.kpiVisitsToday'),       value: kpis.visitsToday,                  icon: Calendar,    tint: '#2191D0' },
     { label: t('hospitals.kpiActiveAdmissions'),  value: kpis.activeAdmissions,             icon: BedDouble,   tint: '#A78BFA' },
     { label: t('hospitals.kpiDischargesToday'),   value: kpis.dischargesToday,              icon: CheckCircle, tint: '#1F9D6F' },
     { label: t('hospitals.kpiTransfersToday'),    value: kpis.transfersToday,               icon: ArrowLeft,   tint: '#3B82F6' },
@@ -1047,7 +1047,7 @@ function PerformanceTab({ scope, hospitalId }: { scope: DataScope | undefined; h
     <div className="kpi-grid">
       {cards.map(c => (
         <div key={c.label} className="kpi">
-          <div className="icon-box-sm" style={{ background: `${c.tint}18` }}>
+          <div className="icon-box-sm">
             <c.icon style={{ color: c.tint }} />
           </div>
           <div className="kpi__body">

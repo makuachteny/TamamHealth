@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import {
   User, Calendar, FileText, FlaskConical, Syringe,
@@ -26,6 +26,60 @@ type Tab = 'overview' | 'appointments' | 'records' | 'lab' | 'prescriptions' | '
 // but exposing their hospital numbers + phone numbers in the login UI is
 // strictly a dev/sales aid.
 const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
+const PATIENT_PORTAL_SESSION_KEY = 'tamamhealth-patient-portal-session';
+
+type PatientPortalSession = {
+  token: string;
+  patient: PatientDoc;
+};
+
+function readPatientPortalSession(): PatientPortalSession | null {
+  if (typeof window === 'undefined') return null;
+  const raw = window.sessionStorage.getItem(PATIENT_PORTAL_SESSION_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as PatientPortalSession;
+    if (!parsed.token || !parsed.patient?._id) return null;
+    return parsed;
+  } catch {
+    window.sessionStorage.removeItem(PATIENT_PORTAL_SESSION_KEY);
+    return null;
+  }
+}
+
+function writePatientPortalSession(session: PatientPortalSession): void {
+  window.sessionStorage.setItem(PATIENT_PORTAL_SESSION_KEY, JSON.stringify(session));
+}
+
+function clearPatientPortalSession(): void {
+  window.sessionStorage.removeItem(PATIENT_PORTAL_SESSION_KEY);
+}
+
+async function patientPortalFetch<T>(
+  path: string,
+  token: string,
+  init: RequestInit = {}
+): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  if (init.body != null && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const response = await fetch(path, { ...init, headers });
+  if (!response.ok) {
+    if (response.status === 401) clearPatientPortalSession();
+    let message = 'Request failed';
+    try {
+      const body = await response.json() as { error?: string };
+      message = body.error || message;
+    } catch {
+      // keep generic message
+    }
+    throw new Error(message);
+  }
+  return response.json() as Promise<T>;
+}
 
 /* ═════════════════════════════════════════
    PATIENT LOGIN SCREEN
@@ -46,6 +100,10 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
   useEffect(() => {
     (async () => {
       try {
+        if (!IS_DEMO) {
+          setDbReady(true);
+          return;
+        }
         const { isSeeded } = await import('@/lib/db');
         const seeded = await isSeeded();
         if (!seeded) {
@@ -59,20 +117,18 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         // PouchDB (phones are generated per-seed, so static entries drift).
         // Skipped entirely outside demo mode — production must not surface
         // sample patient phone numbers on the login screen.
-        if (IS_DEMO) {
-          try {
-            const { getAllPatients } = await import('@/lib/services/patient-service');
-            const all = await getAllPatients();
-            setDemoPatients(
-              all.slice(0, 3).map((p) => ({
-                id: p._id,
-                hospitalNumber: p.hospitalNumber || '',
-                phone: p.phone || '',
-                name: `${p.firstName} ${p.surname}`,
-              }))
-            );
-          } catch { /* demo panel is best-effort */ }
-        }
+        try {
+          const { getAllPatients } = await import('@/lib/services/patient-service');
+          const all = await getAllPatients();
+          setDemoPatients(
+            all.slice(0, 3).map((p) => ({
+              id: p._id,
+              hospitalNumber: p.hospitalNumber || '',
+              phone: p.phone || '',
+              name: `${p.firstName} ${p.surname}`,
+            }))
+          );
+        } catch { /* demo panel is best-effort */ }
       } catch { setDbReady(false); }
     })();
   }, []);
@@ -82,86 +138,64 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
     if (!dbReady) { setError(t('patientPortal.dbLoading')); return; }
     setError(''); setLoading(true);
     try {
-      const { getAllPatients } = await import('@/lib/services/patient-service');
-      const patients = await getAllPatients();
-      let found: PatientDoc | undefined;
+      let payload: Record<string, string>;
 
       if (mode === 'login') {
-        // Match by hospital number + full phone. We require an exact phone
-        // match (after whitespace strip) because the old `endsWith(last 6)`
-        // fallback meant that anyone with the right hospital ID and any
-        // number ending in the patient's last 6 digits could log in.
-        const hnum = hospitalNumber.trim().toUpperCase();
-        // Normalize to digits only on both sides so that "+211-912-345-678",
-        // "+211 912 345 678", and "211912345678" all compare equal.
-        const ph = phoneNumber.replace(/\D/g, '');
-        found = patients.find(p => {
-          const pPhone = (p.phone || '').replace(/\D/g, '');
-          return (p.hospitalNumber?.toUpperCase() === hnum || p.geocodeId?.toUpperCase() === hnum) &&
-            pPhone === ph &&
-            pPhone.length > 0;
-        });
+        payload = {
+          hospitalNumber: hospitalNumber.trim(),
+          phone: phoneNumber.trim(),
+        };
       } else {
-        // Lookup by name + DOB — now require DOB (was optional), otherwise
-        // two fields (first + last name) was too weak to gate real records.
-        const fn = firstName.trim().toLowerCase();
-        const sn = surname.trim().toLowerCase();
         if (!dateOfBirth) {
           setError(t('patientPortal.dobRequired'));
           setLoading(false);
           return;
         }
-        found = patients.find(p =>
-          p.firstName.toLowerCase() === fn &&
-          p.surname.toLowerCase() === sn &&
-          p.dateOfBirth === dateOfBirth
-        );
+        payload = {
+          firstName: firstName.trim(),
+          surname: surname.trim(),
+          dateOfBirth: dateOfBirth.trim(),
+          phone: phoneNumber.trim(),
+        };
       }
 
-      // Audit trail every portal lookup (success OR failure) so that a
-      // clinician/admin can review who searched for whom — critical given
-      // this form is on a public, unauthenticated route.
-      try {
-        const { logAudit } = await import('@/lib/services/audit-service');
-        await logAudit(
-          found ? 'PATIENT_PORTAL_LOGIN' : 'PATIENT_PORTAL_LOOKUP_FAIL',
-          undefined,
-          'patient-portal',
-          mode === 'login'
-            ? `hospital_number=${hospitalNumber.trim().slice(0, 20)} ${found ? `→ ${found._id}` : '(no match)'}`
-            : `name=${firstName.trim().slice(0, 40)} ${surname.trim().slice(0, 40)} ${found ? `→ ${found._id}` : '(no match)'}`,
-          !!found
-        );
-      } catch { /* audit best-effort */ }
-
-      if (found) {
-        localStorage.setItem('tamamhealth-patient-id', found._id);
-        localStorage.setItem('tamamhealth-patient-name', `${found.firstName} ${found.surname}`);
-        onLogin(found);
-      } else {
+      const response = await fetch('/api/patient-portal/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
         setError(mode === 'login'
           ? t('patientPortal.noMatchHospitalId')
           : t('patientPortal.noMatchName')
         );
+        return;
       }
+      const data = await response.json() as { token?: string; patient?: PatientDoc & { id?: string } };
+      const patientDoc = data.patient
+        ? { ...data.patient, _id: data.patient._id || data.patient.id } as PatientDoc
+        : null;
+      if (!data.token || !patientDoc?._id) throw new Error('Invalid patient session');
+      writePatientPortalSession({ token: data.token, patient: patientDoc });
+      onLogin(patientDoc);
     } catch (err) {
       setError(t('patientPortal.unableToConnect'));
       console.error(err);
     } finally { setLoading(false); }
   };
 
-  const BLUE = '#3b82f6';
+  const BLUE = '#2191D0';
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '12px 14px', fontSize: 15,
     border: '1px solid var(--border-medium)', borderRadius: 4,
     background: 'var(--bg-card-solid)', color: 'var(--text-primary)',
     outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
-    fontFamily: "'Untitled Sans', Arial, sans-serif",
+    fontFamily: "'DM Sans', Arial, sans-serif",
   };
   const labelStyle: React.CSSProperties = {
     display: 'block', fontSize: 13, fontWeight: 600,
     color: 'var(--text-secondary)', marginBottom: 6,
-    fontFamily: "'Untitled Sans', Arial, sans-serif",
+    fontFamily: "'DM Sans', Arial, sans-serif",
   };
 
   return (
@@ -182,12 +216,12 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
               </p>
             </div>
             <div className="pp-form-card">
-            <h2 className="text-[15px] font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: "'Untitled Sans', Arial, sans-serif", letterSpacing: '-0.01em' }}>{t('patientPortal.signInTitle')}</h2>
-            <p className="text-[13px] mb-6" style={{ color: 'var(--text-muted)', fontFamily: "'Untitled Sans', Arial, sans-serif" }}>{t('patientPortal.signInSubtitle')}</p>
+            <h2 className="text-[15px] font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: "'DM Sans', Arial, sans-serif", letterSpacing: '-0.01em' }}>{t('patientPortal.signInTitle')}</h2>
+            <p className="text-[13px] mb-6" style={{ color: 'var(--text-muted)', fontFamily: "'DM Sans', Arial, sans-serif" }}>{t('patientPortal.signInSubtitle')}</p>
 
             {!dbReady && (
               <div className="mb-4 p-3 rounded-lg text-center" style={{
-                background: 'rgba(59, 130, 246,0.08)', border: '1px solid rgba(59, 130, 246,0.15)',
+                background: 'rgba(33, 145, 208, 0.08)', border: '1px solid rgba(59, 130, 246,0.15)',
               }}>
                 <p className="text-xs" style={{ color: BLUE }}>
                   <svg className="animate-spin w-3 h-3 inline mr-1.5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
@@ -263,7 +297,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
               <button type="submit" disabled={loading || !dbReady}
                 className="w-full flex items-center justify-center gap-2 text-[15px] font-semibold text-white transition-all duration-200 mt-3"
                 style={{
-                  fontFamily: "'Untitled Sans', Arial, sans-serif",
+                  fontFamily: "'DM Sans', Arial, sans-serif",
                   background: BLUE, padding: '14px 20px', borderRadius: 4,
                   border: 'none', cursor: loading ? 'wait' : 'pointer',
                   opacity: loading || !dbReady ? 0.6 : 1,
@@ -370,7 +404,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           padding: 5px 12px;
           border: 1px solid var(--accent-primary, #3b82f6);
           border-radius: 999px;
-          background: var(--accent-light, rgba(59, 130, 246,0.08));
+          background: var(--accent-light, rgba(33, 145, 208, 0.08));
           margin-bottom: 18px;
         }
 
@@ -400,7 +434,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         }
         .pp-logo-img { width: 42px; height: 42px; }
         .pp-heading {
-          font-family: 'Untitled Sans', Arial, sans-serif;
+          font-family: 'DM Sans', Arial, sans-serif;
           font-size: clamp(28px, 3.2vw, 36px);
           font-weight: 700;
           letter-spacing: -0.02em;
@@ -507,7 +541,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           padding: 48px 0;
         }
         .pp-image-title {
-          font-family: 'Untitled Sans', Arial, sans-serif;
+          font-family: 'DM Sans', Arial, sans-serif;
           font-size: clamp(32px, 3.6vw, 48px);
           font-weight: 700;
           line-height: 1.08;
@@ -558,27 +592,15 @@ export default function PatientPortalPage() {
 
   // Check for existing session
   useEffect(() => {
-    const savedId = localStorage.getItem('tamamhealth-patient-id');
-    if (savedId) {
-      (async () => {
-        try {
-          const { getAllPatients } = await import('@/lib/services/patient-service');
-          const patients = await getAllPatients();
-          const found = patients.find(p => p._id === savedId);
-          if (found) setPatient(found);
-        } catch { /* ignore */ }
-        finally { setChecking(false); }
-      })();
-    } else {
-      setChecking(false);
-    }
+    const session = readPatientPortalSession();
+    if (session) setPatient(session.patient);
+    setChecking(false);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('tamamhealth-patient-id');
-    localStorage.removeItem('tamamhealth-patient-name');
+  const handleLogout = useCallback(() => {
+    clearPatientPortalSession();
     setPatient(null);
-  };
+  }, []);
 
   if (checking) {
     return (
@@ -608,33 +630,33 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
   const [immunizations, setImmunizations] = useState<ImmunizationDoc[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showBooking, setShowBooking] = useState(false);
+  const [sessionToken, setSessionToken] = useState('');
 
   // Load patient-specific data
   useEffect(() => {
+    const session = readPatientPortalSession();
+    if (!session) {
+      onLogout();
+      return;
+    }
+    setSessionToken(session.token);
     (async () => {
       try {
-        const [aptMod, labMod, recMod, rxMod, immMod] = await Promise.all([
-          import('@/lib/services/appointment-service'),
-          import('@/lib/services/lab-service'),
-          import('@/lib/services/medical-record-service'),
-          import('@/lib/services/prescription-service'),
-          import('@/lib/services/immunization-service'),
-        ]);
         const [apts, labs, recs, rxs, imms] = await Promise.all([
-          aptMod.getAppointmentsByPatient(patient._id),
-          labMod.getLabResultsByPatient(patient._id),
-          recMod.getRecordsByPatient(patient._id),
-          rxMod.getPrescriptionsByPatient(patient._id),
-          immMod.getByPatient(patient._id),
+          patientPortalFetch<{ appointments: AppointmentDoc[] }>('/api/patient-portal/appointments', session.token),
+          patientPortalFetch<{ results: LabResultDoc[] }>('/api/patient-portal/labs', session.token),
+          patientPortalFetch<{ records: MedicalRecordDoc[] }>('/api/patient-portal/records', session.token),
+          patientPortalFetch<{ prescriptions: PrescriptionDoc[] }>('/api/patient-portal/prescriptions', session.token),
+          patientPortalFetch<{ immunizations: ImmunizationDoc[] }>('/api/patient-portal/immunizations', session.token),
         ]);
-        setAppointments(apts);
-        setLabResults(labs);
-        setRecords(recs);
-        setPrescriptions(rxs);
-        setImmunizations(imms);
+        setAppointments(apts.appointments);
+        setLabResults(labs.results);
+        setRecords(recs.records);
+        setPrescriptions(rxs.prescriptions);
+        setImmunizations(imms.immunizations);
       } catch (err) { console.error('Failed to load patient data:', err); }
     })();
-  }, [patient._id]);
+  }, [onLogout, patient._id]);
 
   const upcomingApts = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -682,8 +704,12 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
     let cancelled = false;
     (async () => {
       try {
-        const { getMessagesByPatient } = await import('@/lib/services/message-service');
-        const docs = await getMessagesByPatient(patient._id);
+        const session = readPatientPortalSession();
+        if (!session) return;
+        const { messages: docs } = await patientPortalFetch<{ messages: Array<{ _id?: string; body: string; fromDoctorId?: string; sentAt?: string; createdAt?: string }> }>(
+          '/api/patient-portal/messages',
+          session.token
+        );
         if (cancelled) return;
         const formatted: ChatMsg[] = docs
           .slice() // getMessagesByPatient returns newest-first; flip so newest is at the bottom
@@ -704,7 +730,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
       }
     })();
     return () => { cancelled = true; };
-  }, [patient._id]);
+  }, []);
 
   const handleSendChat = async () => {
     const trimmed = chatInput.trim();
@@ -721,40 +747,30 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
     setChatInput('');
 
     try {
-      const { createMessage } = await import('@/lib/services/message-service');
-      // Persist into the patient's local PouchDB. In synced deployments this
-      // replicates to CouchDB and shows up on the staff side; in offline /
-      // local-only deployments it still survives reloads on this device.
-      // We mark the author as `patient` so staff dashboards can distinguish
-      // patient-originated messages from clinician replies.
-      // The Patient interface only formally declares `registrationHospital`
-      // (the hospital id), but seed/runtime docs frequently also carry a
-      // `registrationHospitalName`. Read it defensively via index access so
-      // we do the right thing regardless.
+      const session = readPatientPortalSession();
+      if (!session) throw new Error('Missing patient session');
       const registrationHospitalName =
         (patient as { registrationHospitalName?: string }).registrationHospitalName
         || patient.registrationHospital
         || '';
-      const saved = await createMessage({
-        // Direction is the canonical sender→recipient marker; recipientType
-        // is kept for staff-inbox filter compatibility.
-        direction: 'patient_to_staff',
-        recipientType: 'staff',
-        patientId: patient._id,
-        patientName: `${patient.firstName} ${patient.surname}`,
-        patientPhone: patient.phone || '',
-        recipientDepartment: chatDepartment,
-        recipientHospitalId: patient.registrationHospital || '',
-        recipientHospitalName: registrationHospitalName,
-        fromDoctorId: 'patient',
-        fromDoctorName: `${patient.firstName} ${patient.surname}`,
-        fromHospitalId: patient.registrationHospital || '',
-        fromHospitalName: registrationHospitalName,
-        subject: `Patient message — ${chatDepartment}`,
-        body: trimmed,
-        channel: 'app',
-        sentAt: now.toISOString(),
-      });
+      const { message: saved } = await patientPortalFetch<{ message: { _id: string; body: string } }>(
+        '/api/patient-portal/messages',
+        session.token,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            patientPhone: patient.phone || '',
+            recipientDepartment: chatDepartment,
+            recipientHospitalId: patient.registrationHospital || '',
+            recipientHospitalName: registrationHospitalName,
+            fromHospitalId: patient.registrationHospital || '',
+            fromHospitalName: registrationHospitalName,
+            subject: `Patient message — ${chatDepartment}`,
+            body: trimmed,
+            sentAt: now.toISOString(),
+          }),
+        }
+      );
       // Replace the optimistic entry with the persisted one (using the real id).
       setChatMessages(prev => prev.map(m => m.id === tempId
         ? { id: saved._id, text: saved.body, from: 'patient', time }
@@ -980,7 +996,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                 style={{
                   padding: '10px 14px', borderRadius: 8, border: 'none',
                   cursor: chatSending || !chatInput.trim() ? 'not-allowed' : 'pointer',
-                  background: 'var(--accent-primary)', color: '#fff',
+                  background: '#2191D0', color: '#fff',
                   display: 'flex', alignItems: 'center',
                   opacity: chatSending || !chatInput.trim() ? 0.6 : 1,
                 }}
@@ -1052,7 +1068,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             {[
               { icon: Calendar, label: t('patientPortal.nextAppointment'), value: upcomingApts.length > 0 ? upcomingApts[0].appointmentDate : t('patientPortal.noneScheduled'), color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
               { icon: FlaskConical, label: t('patientPortal.pendingLabs'), value: t('patientPortal.pendingCount', { count: pendingLabs }), color: pendingLabs > 0 ? 'var(--color-warning)' : 'var(--color-success)', bg: pendingLabs > 0 ? 'rgba(217,119,6,0.08)' : 'rgba(31, 157, 111,0.08)' },
-              { icon: Pill, label: t('patientPortal.activeMeds'), value: t('patientPortal.activeCount', { count: activeMeds }), color: '#7C3AED', bg: 'rgba(124,58,237,0.08)' },
+              { icon: Pill, label: t('patientPortal.activeMeds'), value: t('patientPortal.activeCount', { count: activeMeds }), color: 'var(--accent-primary)', bg: 'rgba(124,58,237,0.08)' },
               { icon: CheckCircle2, label: t('patientPortal.completedVisits'), value: t('patientPortal.visitCount', { count: completedApts }), color: 'var(--color-success)', bg: 'rgba(31, 157, 111,0.08)' },
             ].map((stat, i) => (
               <div key={i} className="card-elevated" style={{ padding: '14px 14px', borderTop: `3px solid ${stat.color}` }}>
@@ -1096,7 +1112,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                             <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{apt.reason || apt.appointmentType}</p>
                             <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('patientPortal.drPrefix')} {apt.providerName} &middot; {apt.department}</p>
                           </div>
-                          {i === 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: 'var(--accent-primary)', color: '#fff', textTransform: 'uppercase', flexShrink: 0 }}>{t('patientPortal.next')}</span>}
+                          {i === 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#2191D0', color: '#fff', textTransform: 'uppercase', flexShrink: 0 }}>{t('patientPortal.next')}</span>}
                         </div>
                       </div>
                     ))}
@@ -1110,7 +1126,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 0' }}>
                     <Calendar size={44} style={{ color: 'var(--text-muted)', opacity: 0.3, marginBottom: 8 }} />
                     <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>{t('patientPortal.noUpcomingAppointments')}</p>
-                    <button onClick={() => setShowBooking(true)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button onClick={() => setShowBooking(true)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#2191D0', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Plus size={12} />{t('patientPortal.bookAppointment')}
                     </button>
                   </div>
@@ -1538,7 +1554,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
       )}
 
       {/* ═══ Billing & Payments ═══ */}
-      {activeTab === 'billing' && <BillingTab patient={patient} />}
+      {activeTab === 'billing' && <BillingTab patient={patient} sessionToken={sessionToken} />}
 
       {/* ═══ Immunizations ═══ */}
       {activeTab === 'immunizations' && (
@@ -1657,7 +1673,7 @@ function InsuranceTab({}: { patient: PatientDoc }) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.insuranceInformation')}</h2>
-        <button onClick={() => setShowAddForm(!showAddForm)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 14px', borderRadius: 8, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button onClick={() => setShowAddForm(!showAddForm)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 14px', borderRadius: 8, background: '#2191D0', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
           <Plus size={13} /> {t('patientPortal.addInsurance')}
         </button>
       </div>
@@ -1798,7 +1814,7 @@ function FormsTab() {
                 {form.date && <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('patientPortal.completedDate', { date: form.date })}</p>}
               </div>
               {form.status !== 'completed' ? (
-                <button style={{ fontSize: 11, fontWeight: 600, padding: '6px 12px', borderRadius: 6, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                <button style={{ fontSize: 11, fontWeight: 600, padding: '6px 12px', borderRadius: 6, background: '#2191D0', color: '#fff', border: 'none', cursor: 'pointer' }}>
                   {form.status === 'pending' ? t('patientPortal.complete') : t('patientPortal.fillOut')}
                 </button>
               ) : (
@@ -1938,7 +1954,7 @@ function StatementsTab() {
                   <Download size={12} /> {t('patientPortal.downloadPdf')}
                 </button>
                 {balance > 0 && (
-                  <button style={{ fontSize: 11, fontWeight: 600, padding: '6px 14px', borderRadius: 6, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                  <button style={{ fontSize: 11, fontWeight: 600, padding: '6px 14px', borderRadius: 6, background: '#2191D0', color: '#fff', border: 'none', cursor: 'pointer' }}>
                     {t('patientPortal.payNow')}
                   </button>
                 )}
@@ -2075,7 +2091,7 @@ function ProfileTab({ patient }: { patient: PatientDoc }) {
 // and the "Pay" flow returned a fake `TBN-…` reference without persisting
 // anything, which was dishonest UX (the patient thought they had paid).
 type BillItem = {
-  id: string;          // The PouchDB _id of the BillingDoc — used to call recordPayment.
+  id: string;          // The BillingDoc _id sent to the patient-portal payment API.
   invoiceNumber: string;
   date: string;
   description: string;
@@ -2088,7 +2104,7 @@ type BillItem = {
 
 type UiPaymentMethod = 'mpesa' | 'mtn' | 'airtel' | 'card' | 'bank';
 
-function BillingTab({ patient }: { patient: PatientDoc }) {
+function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionToken: string }) {
   const { t } = useTranslation();
   const [step, setStep] = useState<'bills' | 'method' | 'confirm' | 'success'>('bills');
   const [selectedBills, setSelectedBills] = useState<string[]>([]);
@@ -2159,8 +2175,19 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
     setLoadError(null);
     (async () => {
       try {
-        const { getBillsByPatient } = await import('@/lib/services/billing-service');
-        const docs = await getBillsByPatient(patient._id);
+        const session = readPatientPortalSession();
+        if (!session) throw new Error('Missing patient session');
+        const { bills: docs } = await patientPortalFetch<{ bills: Array<{
+          _id: string;
+          invoiceNumber?: string;
+          encounterDate?: string;
+          createdAt?: string;
+          facilityName?: string;
+          items?: Array<{ description: string; category: string }>;
+          totalAmount: number;
+          amountPaid: number;
+          status: string;
+        }> }>('/api/patient-portal/billing', session.token);
         if (cancelled) return;
         const mapped: BillItem[] = docs
           .map(d => ({
@@ -2213,30 +2240,25 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
   ];
 
   // Map the UI-level payment buttons onto the canonical PaymentMethod values
-  // accepted by `recordPayment` in @/lib/services/billing-service.
+  // accepted by the patient-portal payment API.
   const toCanonicalMethod = (m: UiPaymentMethod): 'mobile_money' | 'bank_transfer' | 'cash' => {
     if (m === 'mpesa' || m === 'mtn' || m === 'airtel') return 'mobile_money';
     if (m === 'card' || m === 'bank') return 'bank_transfer';
     return 'cash';
   };
 
-  // Persist the payment by calling recordPayment for every selected bill.
-  // Returns a real reference number from the saved PaymentRecord — no more
-  // `TBN-…` fabrication. Updates local state so the UI reflects the new
-  // amountPaid + status without needing a page refresh.
+  // Submit a patient-entered payment for every selected bill. The server stores
+  // these as pending finance review; this screen only reflects the submitted
+  // intent, then refreshes billing from the server when possible.
   const submitPayment = async () => {
     if (!payMethod || paying) return;
     setPaying(true);
     setPayError(null);
 
     try {
-      const { recordPayment } = await import('@/lib/services/billing-service');
       const canonicalMethod = toCanonicalMethod(payMethod);
       const referenceBase = `TBN-${Date.now().toString(36).toUpperCase()}`;
-      // We attach the patient as the "receivedBy" for an audit trail since
-      // this is a self-service payment initiated from the portal.
-      const receivedBy = patient._id;
-      const receivedByName = `${patient.firstName} ${patient.surname} (self-service)`;
+      if (!sessionToken) throw new Error('Missing patient session');
 
       const updates: Array<{ id: string; amount: number; ok: boolean }> = [];
       for (const billId of selectedBills) {
@@ -2244,18 +2266,30 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
         if (!bill) continue;
         const remaining = bill.amount - bill.paid;
         if (remaining <= 0) continue;
-        const result = await recordPayment(
-          billId,
-          remaining,
-          canonicalMethod,
-          receivedBy,
-          receivedByName,
-          referenceBase,
-          payMethod === 'mpesa' || payMethod === 'mtn' || payMethod === 'airtel'
-            ? `Patient portal — ${payMethod} from ${payPhone}`
-            : `Patient portal — ${payMethod}`,
-        );
-        updates.push({ id: billId, amount: remaining, ok: result !== null });
+        try {
+          await patientPortalFetch<{ ok: boolean; id: string }>(
+            '/api/patient-portal/payments',
+            sessionToken,
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                invoiceId: billId,
+                amount: remaining,
+                method: canonicalMethod,
+                reference: referenceBase,
+                mobileMoneyPhone: payMethod === 'mpesa' || payMethod === 'mtn' || payMethod === 'airtel'
+                  ? payPhone
+                  : undefined,
+                notes: payMethod === 'mpesa' || payMethod === 'mtn' || payMethod === 'airtel'
+                  ? `Patient portal — ${payMethod} from ${payPhone}`
+                  : `Patient portal — ${payMethod}`,
+              }),
+            }
+          );
+          updates.push({ id: billId, amount: remaining, ok: true });
+        } catch {
+          updates.push({ id: billId, amount: remaining, ok: false });
+        }
       }
 
       const failed = updates.filter(u => !u.ok);
@@ -2270,8 +2304,17 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
       // Refresh the in-memory bills list from the source of truth so the UI
       // reflects the new amountPaid / balanceDue / status.
       try {
-        const { getBillsByPatient } = await import('@/lib/services/billing-service');
-        const docs = await getBillsByPatient(patient._id);
+        const { bills: docs } = await patientPortalFetch<{ bills: Array<{
+          _id: string;
+          invoiceNumber?: string;
+          encounterDate?: string;
+          createdAt?: string;
+          facilityName?: string;
+          items?: Array<{ description: string; category: string }>;
+          totalAmount: number;
+          amountPaid: number;
+          status: string;
+        }> }>('/api/patient-portal/billing', sessionToken);
         setBills(docs
           .map(d => ({
             id: d._id,
@@ -2360,7 +2403,7 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
               </div>
             )}
           </div>
-          <button onClick={() => { setStep('bills'); setSelectedBills([]); setPayMethod(null); setLastPayment(null); }} style={{ fontSize: 13, fontWeight: 600, padding: '10px 24px', borderRadius: 8, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>{t('patientPortal.done')}</button>
+          <button onClick={() => { setStep('bills'); setSelectedBills([]); setPayMethod(null); setLastPayment(null); }} style={{ fontSize: 13, fontWeight: 600, padding: '10px 24px', borderRadius: 8, background: '#2191D0', color: '#fff', border: 'none', cursor: 'pointer' }}>{t('patientPortal.done')}</button>
         </div>
       </div>
     );
@@ -2618,7 +2661,7 @@ function BillingTab({ patient }: { patient: PatientDoc }) {
                   <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>{t('portal.amountToPay')}</p>
                   <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--accent-primary)' }}>{selectedTotal.toLocaleString()} <span style={{ fontSize: 12 }}>SSP</span></p>
                 </div>
-                <button onClick={() => setStep('method')} style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: 'var(--accent-primary)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                <button onClick={() => setStep('method')} style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: '#2191D0', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                   {t('patientPortal.proceedToPay')}
                 </button>
               </>
@@ -2680,7 +2723,7 @@ function SH({ icon: Icon, title }: { icon: typeof User; title: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
       <Icon size={14} style={{ color: 'var(--accent-primary)' }} />
-      <span style={{ fontFamily: "'Untitled Sans', Arial, sans-serif", fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</span>
+      <span style={{ fontFamily: "'DM Sans', Arial, sans-serif", fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</span>
     </div>
   );
 }
@@ -2723,12 +2766,12 @@ function Empty({ icon: Icon, text, action, onAction }: { icon: typeof User; text
    ═══════════════════════════════════════════════════════════════ */
 const patientPortalCSS = `
 .pp-title {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 32px; font-weight: 700; color: var(--text-primary);
   letter-spacing: -0.02em; margin-bottom: 8px; line-height: 1.2;
 }
 .pp-subtitle {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 16px; color: var(--text-secondary); line-height: 1.6;
   max-width: 380px; margin: 0 auto;
 }
@@ -2742,7 +2785,7 @@ const patientPortalCSS = `
   background: var(--bg-secondary);
 }
 .pp-toggle__btn {
-  flex: 1; padding: 14px 0; font-family: 'Untitled Sans', Arial, sans-serif;
+  flex: 1; padding: 14px 0; font-family: 'DM Sans', Arial, sans-serif;
   font-size: 14px; font-weight: 700; border: none; cursor: pointer;
   background: transparent; color: var(--text-secondary); transition: all 0.2s ease;
   border-radius: 7px; margin: 2px;
@@ -2753,14 +2796,14 @@ const patientPortalCSS = `
 }
 .pp-field { margin-bottom: 20px; }
 .pp-label {
-  display: block; font-family: 'Untitled Sans', Arial, sans-serif;
+  display: block; font-family: 'DM Sans', Arial, sans-serif;
   font-size: 14px; font-weight: 600; color: var(--text-primary);
   margin-bottom: 8px; letter-spacing: 0;
   text-transform: none;
 }
 .pp-input {
   width: 100%; padding: 14px 16px; border-radius: 8px;
-  border: 1px solid var(--border-medium); font-family: 'Untitled Sans', Arial, sans-serif;
+  border: 1px solid var(--border-medium); font-family: 'DM Sans', Arial, sans-serif;
   font-size: 16px; color: var(--text-primary); background: var(--bg-card-solid);
   transition: border-color 0.2s, box-shadow 0.2s; outline: none;
 }
@@ -2769,7 +2812,7 @@ const patientPortalCSS = `
 .pp-btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
   gap: 10px; padding: 16px 28px; border-radius: 8px;
-  font-family: 'Untitled Sans', Arial, sans-serif; font-size: 16px;
+  font-family: 'DM Sans', Arial, sans-serif; font-size: 16px;
   font-weight: 700; cursor: pointer; border: none;
   background: var(--accent-primary); color: #fff; transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(0,119,215,0.2);

@@ -137,7 +137,7 @@ export default function EpidemicIntelligencePage() {
             { label: t('epidemic.kpiEwarsAlerts'), value: ewarsAlerts.length, icon: Radio, color: 'var(--color-warning)', bg: 'rgba(251,191,36,0.12)' },
           ].map((kpi) => (
             <div key={kpi.label} className="kpi">
-              <div className="kpi__icon" style={{ background: kpi.bg }}>
+              <div className="kpi__icon">
                 <kpi.icon style={{ color: kpi.color }} />
               </div>
               <div className="kpi__body">

@@ -33,12 +33,12 @@ const STATUS_TOKENS: Record<LeaveRequestDoc['status'], { label: string; color: s
   approved:  { label: 'Approved',  color: '#15795C', bg: 'rgba(27, 158, 119, 0.12)' },
   rejected:  { label: 'Rejected',  color: '#C44536', bg: 'rgba(196, 69, 54, 0.14)' },
   cancelled: { label: 'Cancelled', color: '#5A7370', bg: 'rgba(90, 115, 112, 0.14)' },
-  taken:     { label: 'Taken',     color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.14)' },
+  taken:     { label: 'Taken',     color: '#2191D0', bg: 'rgba(33, 145, 208, 0.14)' },
 };
 
 const PAYROLL_STATUS_TOKENS: Record<PayrollEntryDoc['status'], { label: string; color: string; bg: string }> = {
   draft:    { label: 'Draft',    color: '#5A7370', bg: 'rgba(90, 115, 112, 0.14)' },
-  approved: { label: 'Approved', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.14)' },
+  approved: { label: 'Approved', color: '#2191D0', bg: 'rgba(33, 145, 208, 0.14)' },
   paid:     { label: 'Paid',     color: '#15795C', bg: 'rgba(27, 158, 119, 0.14)' },
   reversed: { label: 'Reversed', color: '#C44536', bg: 'rgba(196, 69, 54, 0.14)' },
 };
@@ -314,9 +314,9 @@ export default function HRPage() {
         {leaveSummary && (
           <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch' }}>
             {[
-              { label: t('hr.kpiActiveStaff'), value: facilityUsers.length, accent: 'var(--accent-primary)', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
+              { label: t('hr.kpiActiveStaff'), value: facilityUsers.length, accent: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
               { label: t('hr.kpiPendingLeave'), value: leaveSummary.pending, accent: '#B8741C', bg: 'rgba(228, 168, 75, 0.12)', border: 'rgba(228, 168, 75, 0.30)' },
-              { label: t('hr.kpiApprovedUpcoming'), value: leaveSummary.upcoming, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
+              { label: t('hr.kpiApprovedUpcoming'), value: leaveSummary.upcoming, accent: '#2191D0', bg: 'rgba(33, 145, 208, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
               { label: t('hr.kpiDaysOffThisMonth'), value: leaveSummary.daysApprovedThisMonth, accent: '#15795C', bg: 'rgba(27, 158, 119, 0.10)', border: 'rgba(27, 158, 119, 0.26)' },
             ].map(k => (
               <div key={k.label} style={{ padding: '14px 16px', borderRadius: 10, background: k.bg, border: `1px solid ${k.border}` }}>
@@ -506,7 +506,7 @@ export default function HRPage() {
                 {SHIFT_TYPES.map(shift => {
                   const list = schedules.filter(s => s.shiftType === shift);
                   if (list.length === 0) return null;
-                  const shiftColor = shift === 'morning' ? '#15795C' : shift === 'afternoon' ? '#E4A84B' : shift === 'night' ? '#1E3A8A' : '#3b82f6';
+                  const shiftColor = shift === 'morning' ? '#15795C' : shift === 'afternoon' ? '#E4A84B' : shift === 'night' ? '#1E3A8A' : '#2191D0';
                   return (
                     <div key={shift}>
                       <div className="px-5 py-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: shiftColor, background: 'var(--overlay-subtle)', borderTop: '1px solid var(--border-light)', borderBottom: '1px solid var(--border-light)' }}>
@@ -523,7 +523,7 @@ export default function HRPage() {
                               <span className="capitalize">{s.role.replace(/_/g, ' ')}</span>
                               {s.department && ` · ${s.department}`}
                               {' · '}{s.startTime}–{s.endTime}
-                              {s.isOnCall && <span className="ml-2 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(59, 130, 246, 0.16)', color: '#3b82f6' }}>{t('hr.onCall')}</span>}
+                              {s.isOnCall && <span className="ml-2 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(59, 130, 246, 0.16)', color: '#2191D0' }}>{t('hr.onCall')}</span>}
                             </div>
                           </div>
                           <RowActionsMenu
@@ -550,7 +550,7 @@ export default function HRPage() {
               {payrollSummary && (
                 <div className="flex gap-2 flex-wrap ml-auto">
                   <Pill label={t('hr.pillEntries')} value={String(payrollSummary.total)} />
-                  <Pill label={t('hr.pillGross')} value={formatMoney(payrollSummary.totalGross)} accent="#3b82f6" />
+                  <Pill label={t('hr.pillGross')} value={formatMoney(payrollSummary.totalGross)} accent="#2191D0" />
                   <Pill label={t('hr.pillDeductions')} value={formatMoney(payrollSummary.totalDeductions)} accent="#B8741C" />
                   <Pill label={t('hr.pillNet')} value={formatMoney(payrollSummary.totalNet)} accent="#15795C" />
                   <Pill label={t('hr.pillPaid')} value={`${payrollSummary.paid}/${payrollSummary.total}`} accent="#15795C" />
@@ -590,7 +590,7 @@ export default function HRPage() {
                             <div className="text-[11px] capitalize" style={{ color: 'var(--text-muted)' }}>{e.role.replace(/_/g, ' ')}</div>
                           </td>
                           <td className="text-xs text-right font-mono" style={{ color: 'var(--text-primary)' }}>{formatMoney(e.baseSalary, { currency: e.currency })}</td>
-                          <td className="text-xs text-right font-mono" style={{ color: '#3b82f6' }}>+{formatMoney(e.allowances, { currency: e.currency })}</td>
+                          <td className="text-xs text-right font-mono" style={{ color: '#2191D0' }}>+{formatMoney(e.allowances, { currency: e.currency })}</td>
                           <td className="text-xs text-right font-mono" style={{ color: '#B8741C' }}>-{formatMoney(e.deductions, { currency: e.currency })}</td>
                           <td className="text-sm text-right font-mono font-bold" style={{ color: '#15795C' }}>{formatMoney(e.netPay, { currency: e.currency })}</td>
                           <td>

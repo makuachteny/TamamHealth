@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, ReactNode } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import {
@@ -10,7 +10,7 @@ import {
   Pill, FlaskConical, FileText, Network, Layers, Code2,
   Server, Cpu, MonitorSmartphone, Languages,
   GitBranch,
-} from "lucide-react";
+} from "@/components/icons/lucide";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth — Main Landing Page
@@ -18,53 +18,12 @@ import {
    IBM Plex Sans, generous whitespace, section cards with real imagery
    ═══════════════════════════════════════════════════════════════════ */
 
-function useInView(threshold = 0.12) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { setInView(true); obs.unobserve(el); } },
-      { threshold }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [threshold]);
-  return { ref, inView };
+function Reveal({ children }: { children: ReactNode; delay?: number }) {
+  return <div>{children}</div>;
 }
 
-function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
-  const { ref, inView } = useInView(0.08);
-  return (
-    <div
-      ref={ref}
-      style={{
-        opacity: inView ? 1 : 0,
-        transform: inView ? "translateY(0)" : "translateY(32px)",
-        transition: `opacity 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}s, transform 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}s`,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function Counter({ end, suffix = "", prefix = "", duration = 2200 }: { end: number; suffix?: string; prefix?: string; duration?: number }) {
-  const [val, setVal] = useState(0);
-  const { ref, inView } = useInView(0.3);
-  useEffect(() => {
-    if (!inView) return;
-    let start = 0;
-    const step = end / (duration / 16);
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= end) { setVal(end); clearInterval(timer); }
-      else setVal(Math.floor(start));
-    }, 16);
-    return () => clearInterval(timer);
-  }, [inView, end, duration]);
-  return <span ref={ref}>{prefix}{val.toLocaleString()}{suffix}</span>;
+function Counter({ end, suffix = "", prefix = "" }: { end: number; suffix?: string; prefix?: string; duration?: number }) {
+  return <span>{prefix}{end.toLocaleString()}{suffix}</span>;
 }
 
 // ─── DATA ───────────────────────────────────────────────────────
@@ -80,7 +39,7 @@ const FEATURE_CATEGORIES = [
   {
     title: "product.feature.configurableTitle",
     icon: Stethoscope,
-    color: "#3b82f6",
+    color: "#2191D0",
     desc: "product.feature.configurableDesc",
     highlights: ["product.feature.configurableH1", "product.feature.configurableH2", "product.feature.configurableH3", "product.feature.configurableH4"],
   },
@@ -101,7 +60,7 @@ const FEATURE_CATEGORIES = [
   {
     title: "product.feature.interopTitle",
     icon: Network,
-    color: "#3b82f6",
+    color: "#2191D0",
     desc: "product.feature.interopDesc",
     highlights: ["product.feature.interopH1", "product.feature.interopH2", "product.feature.interopH3", "product.feature.interopH4"],
   },
@@ -122,7 +81,7 @@ const FEATURE_CATEGORIES = [
   {
     title: "product.feature.reportingTitle",
     icon: BarChart3,
-    color: "#3b82f6",
+    color: "#2191D0",
     desc: "product.feature.reportingDesc",
     highlights: ["product.feature.reportingH1", "product.feature.reportingH2", "product.feature.reportingH3", "product.feature.reportingH4"],
   },
@@ -143,7 +102,7 @@ const SHOWCASE_SECTIONS = [
     cta: "product.showcase.featuresCta",
     ctaId: "features",
     visual: "features",
-    color: "#3b82f6",
+    color: "#2191D0",
   },
   {
     eyebrow: "product.showcase.roadmapEyebrow",
@@ -170,7 +129,7 @@ const SHOWCASE_SECTIONS = [
     cta: "product.showcase.deployCta",
     ctaHref: "/login",
     visual: "download",
-    color: "#3b82f6",
+    color: "#2191D0",
   },
 ];
 
@@ -222,8 +181,8 @@ export default function ProductPage() {
   const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
-  const [activeTour, setActiveTour] = useState(0);
   const [expandedFeature, setExpandedFeature] = useState<number | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -232,62 +191,116 @@ export default function ProductPage() {
   }, []);
 
   const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById(id)?.scrollIntoView({ behavior: "auto", block: "start" });
     setMobileNav(false);
+    setOpenDropdown(null);
   };
+
+  const PRODUCTS_ITEMS = [
+    { label: "Features", action: () => scrollTo("features") },
+    { label: "Technology", action: () => scrollTo("technology") },
+    { label: "Interoperability", action: () => scrollTo("interoperability") },
+    { label: "Roadmap", action: () => scrollTo("roadmap") },
+  ];
+
+  const COMPANY_ITEMS = [
+    { label: "About Us", href: "/product" },
+    { label: "Careers", href: "/product" },
+    { label: "Contact", action: () => scrollTo("tour") },
+  ];
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: productCSS }} />
 
       {/* ════════ HEADER ════════ */}
-      <header className={`p-header ${scrolled ? "p-header--scrolled" : ""}`}>
+      <header className={`p-header ${scrolled ? "p-header--scrolled" : ""}`} onClick={() => setOpenDropdown(null)}>
         <div className="p-container p-header__inner">
           <Link href="/" className="p-logo">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/tamamhealth-icon.svg" alt="TamamHealth" className="p-logo__icon" />
-            <span className="p-logo__text">TamamHealth</span>
+            <img src="/assets/logos/SVG/Tamam_Style_Guide-21.svg" alt="TamamHealth" style={{ height: 28, width: 'auto' }} />
           </Link>
 
-          <nav className="p-nav">
-            {[
-              { id: "product", label: t("product.nav.product"), href: "/product", active: true },
-              { id: "features", label: t("product.nav.features"), action: () => scrollTo("features") },
-              { id: "technology", label: t("product.nav.technology"), action: () => scrollTo("technology") },
-              { id: "roadmap", label: t("product.nav.roadmap"), action: () => scrollTo("roadmap") },
-            ].map((item) => (
-              item.href ? (
-                <Link key={item.id} href={item.href} className={`p-nav__link ${item.active ? "p-nav__link--active" : ""}`}>{item.label}</Link>
-              ) : (
-                <button key={item.id} className="p-nav__link" onClick={item.action}>{item.label}</button>
-              )
-            ))}
+          <nav className="p-nav" onClick={(e) => e.stopPropagation()}>
+            {/* HOME */}
+            <Link href="/product" className="p-nav__link p-nav__link--active">Home</Link>
+
+            {/* PRODUCTS ▼ */}
+            <div className="p-nav__dropdown-wrap" style={{ position: 'relative' }}>
+              <button
+                className="p-nav__link p-nav__link--has-arrow"
+                onClick={() => setOpenDropdown(openDropdown === 'products' ? null : 'products')}
+              >
+                Products <ChevronDown size={13} style={{ marginLeft: 3, opacity: 0.7 }} />
+              </button>
+              {openDropdown === 'products' && (
+                <div className="p-nav__dropdown">
+                  {PRODUCTS_ITEMS.map(item => (
+                    <button key={item.label} className="p-nav__dropdown-item" onClick={item.action}>{item.label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* TESTIMONIALS */}
+            <button className="p-nav__link" onClick={() => scrollTo("tour")}>Testimonials</button>
+
+            {/* COMPANY ▼ */}
+            <div className="p-nav__dropdown-wrap" style={{ position: 'relative' }}>
+              <button
+                className="p-nav__link p-nav__link--has-arrow"
+                onClick={() => setOpenDropdown(openDropdown === 'company' ? null : 'company')}
+              >
+                Company <ChevronDown size={13} style={{ marginLeft: 3, opacity: 0.7 }} />
+              </button>
+              {openDropdown === 'company' && (
+                <div className="p-nav__dropdown">
+                  {COMPANY_ITEMS.map(item => (
+                    item.href
+                      ? <Link key={item.label} href={item.href} className="p-nav__dropdown-item" onClick={() => setOpenDropdown(null)}>{item.label}</Link>
+                      : <button key={item.label} className="p-nav__dropdown-item" onClick={item.action}>{item.label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* PRICING */}
+            <button className="p-nav__link" onClick={() => scrollTo("releases")}>Pricing</button>
+
+            {/* CAREERS */}
+            <Link href="/product" className="p-nav__link">Careers</Link>
+
+            {/* CONTACT */}
+            <button className="p-nav__link" onClick={() => scrollTo("tour")}>Contact</button>
           </nav>
 
           <div className="p-header__actions">
-            <Link href="/patient-portal" className="p-btn p-btn--ghost">{t("product.nav.patientSignIn")}</Link>
-            <Link href="/login" className="p-btn p-btn--ghost">{t("landing.cta.staffSignIn")}</Link>
-            <Link href="/login" className="p-btn p-btn--primary">
-              {t("product.nav.tryDemo")} <ArrowRight size={14} />
+            <a href="tel:+15550001234" className="p-nav__phone">
+              +1 (555) 000-1234
+            </a>
+            <Link href="/login" className="p-btn p-btn--demo">
+              Request Demo
             </Link>
           </div>
 
           <button className="p-mobile-toggle" onClick={() => setMobileNav(!mobileNav)}>
-            {mobileNav ? <X size={56} /> : <Menu size={56} />}
+            {mobileNav ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
 
         {mobileNav && (
           <div className="p-mobile-nav">
-            <button className="p-mobile-nav__link" onClick={() => scrollTo("features")}>{t("product.nav.features")}</button>
-            <button className="p-mobile-nav__link" onClick={() => scrollTo("technology")}>{t("product.nav.technology")}</button>
-            <button className="p-mobile-nav__link" onClick={() => scrollTo("interoperability")}>{t("product.nav.interoperability")}</button>
-            <button className="p-mobile-nav__link" onClick={() => scrollTo("roadmap")}>{t("product.nav.roadmap")}</button>
+            <Link href="/product" className="p-mobile-nav__link">Home</Link>
+            <button className="p-mobile-nav__link" onClick={() => scrollTo("features")}>Products</button>
+            <button className="p-mobile-nav__link" onClick={() => scrollTo("tour")}>Testimonials</button>
+            <button className="p-mobile-nav__link" onClick={() => scrollTo("technology")}>Company</button>
+            <button className="p-mobile-nav__link" onClick={() => scrollTo("releases")}>Pricing</button>
+            <Link href="/product" className="p-mobile-nav__link">Careers</Link>
+            <button className="p-mobile-nav__link" onClick={() => scrollTo("tour")}>Contact</button>
             <div className="p-mobile-nav__actions">
-              <Link href="/patient-portal" className="p-btn p-btn--outline" style={{ width: "100%" }}>{t("product.nav.patientSignIn")}</Link>
-              <Link href="/login" className="p-btn p-btn--outline" style={{ width: "100%" }}>{t("landing.cta.staffSignIn")}</Link>
-              <Link href="/login" className="p-btn p-btn--primary" style={{ width: "100%" }}>
-                {t("product.nav.tryDemo")} <ArrowRight size={14} />
+              <a href="tel:+15550001234" className="p-btn p-btn--outline" style={{ width: "100%", textAlign: 'center' }}>+1 (555) 000-1234</a>
+              <Link href="/login" className="p-btn p-btn--demo" style={{ width: "100%", textAlign: 'center' }}>
+                Request Demo
               </Link>
             </div>
           </div>
@@ -296,44 +309,100 @@ export default function ProductPage() {
 
       <main className="p-main">
 
-        {/* ════════ HERO ════════ */}
-        <section className="p-hero">
-          <div className="p-hero__bg" />
+        {/* ════════ HERO — split layout ════════ */}
+        <section className="p-hero" id="home">
           <div className="p-container">
-            <Reveal delay={0.05}>
-              <h1 className="p-hero__title">
-                {t("product.hero.titleLine1")}<br />
-                <span className="p-hero__title--accent">{t("product.hero.titleAccent")}</span>
-              </h1>
-            </Reveal>
-            <Reveal delay={0.1}>
-              <p className="p-hero__subtitle">
-                {t("product.hero.subtitle")}
-              </p>
-            </Reveal>
-            <Reveal delay={0.15}>
-              <div className="p-hero__ctas">
-                <Link href="/login" className="p-btn p-btn--primary p-btn--lg">
-                  {t("product.hero.tryDemo")} <ArrowRight size={16} />
-                </Link>
-                <button className="p-btn p-btn--outline p-btn--lg" onClick={() => scrollTo("features")}>
-                  {t("product.hero.exploreFeatures")}
-                </button>
-              </div>
-            </Reveal>
-            <Reveal delay={0.22}>
-              <div className="p-hero__stats">
-                {HERO_STATS.map((s, i) => (
-                  <div key={i} className="p-hero__stat">
-                    <div className="p-hero__stat-value">
-                      <Counter end={s.value} suffix={s.suffix} />
+            <div className="p-hero__split">
+
+              {/* Left: hero image */}
+              <Reveal delay={0.05}>
+                <div className="p-hero__img-col">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/assets/doctor-tablet-smiling.jpg"
+                    alt="Doctor using TamamHealth on a tablet"
+                    className="p-hero__photo"
+                  />
+                </div>
+              </Reveal>
+
+              {/* Right: content */}
+              <div className="p-hero__content-col">
+                <Reveal delay={0.08}>
+                  <span className="p-eyebrow" style={{ marginBottom: 20 }}>
+                    Electronic Health Records · Built for Africa
+                  </span>
+                  <h1 className="p-hero__title">
+                    Digital health platform<br />
+                    <span className="p-hero__title--accent">for Africa&apos;s frontline clinics</span>
+                  </h1>
+                </Reveal>
+
+                <Reveal delay={0.13}>
+                  <p className="p-hero__green-sub">
+                    We empower hospitals and clinics to deliver better patient care — offline-first,
+                    multilingual, and purpose-built for South Sudan&apos;s healthcare realities.
+                  </p>
+                </Reveal>
+
+                {/* Stat row */}
+                <Reveal delay={0.18}>
+                  <div className="p-hero__stat-row">
+                    <div className="p-hero__stat-item">
+                      <span className="p-hero__stat-num"><Counter end={90} suffix="+" /></span>
+                      <span className="p-hero__stat-label">Clinical features<br />built and shipped</span>
                     </div>
-                    <div className="p-hero__stat-label">{t(s.label)}</div>
-                    {s.sub && <div className="p-hero__stat-sub">{t(s.sub)}</div>}
+                    <div className="p-hero__stat-divider" />
+                    <div className="p-hero__stat-item">
+                      <span className="p-hero__stat-num"><Counter end={11} suffix=".4M+" /></span>
+                      <span className="p-hero__stat-label">People in our<br />service regions</span>
+                    </div>
                   </div>
-                ))}
+                </Reveal>
+
+                <Reveal delay={0.23}>
+                  <Link href="/login" className="p-btn p-btn--demo p-btn--hero-cta">
+                    Request Demo &raquo;
+                  </Link>
+                </Reveal>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ════════ RECOGNITION / IMPACT ════════ */}
+        <section className="p-recognition" id="recognition">
+          <div className="p-container">
+            <Reveal>
+              <h2 className="p-recognition__headline">
+                TamamHealth: End-to-End Clinical Workflow<br />in One Integrated Platform
+              </h2>
             </Reveal>
+            <div className="p-recognition__split">
+              <Reveal delay={0.05}>
+                <div className="p-recognition__content">
+                  <p>
+                    TamamHealth is the first purpose-built EHR system designed for hospitals and
+                    clinics operating in South Sudan&apos;s complex environment — supporting every
+                    role from reception and triage to clinical consultation, pharmacy, lab, and billing.
+                  </p>
+                  <p style={{ marginTop: 16 }}>
+                    Built offline-first with multilingual support across <strong>15+ languages</strong>,
+                    the platform keeps care running even without internet — with automatic sync
+                    when connectivity returns.
+                  </p>
+                  <Link href="/login" className="p-btn p-btn--demo" style={{ marginTop: 28 }}>
+                    Read more &raquo;
+                  </Link>
+                </div>
+              </Reveal>
+              <Reveal delay={0.1}>
+                <div className="p-recognition__image-wrap">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/assets/doctor-nurse-consultation.jpg" alt="Clinical team using TamamHealth" className="p-recognition__photo" />
+                </div>
+              </Reveal>
+            </div>
           </div>
         </section>
 
@@ -380,7 +449,7 @@ export default function ProductPage() {
               {TECH_STACK.map((techItem, i) => (
                 <Reveal key={i} delay={i * 0.06}>
                   <div className="p-tech__card">
-                    <div className="p-tech__card-icon"><techItem.icon size={34} /></div>
+                    <div className="p-tech__card-icon"><techItem.icon size={22} /></div>
                     <h3 className="p-tech__card-name">{techItem.name}</h3>
                     <p className="p-tech__card-desc">{t(techItem.desc)}</p>
                   </div>
@@ -445,7 +514,7 @@ export default function ProductPage() {
                 <Reveal key={i} delay={i * 0.06}>
                   <div className="p-interop__card">
                     <div className="p-interop__card-icon-wrap">
-                      <item.icon size={44} />
+                      <item.icon size={20} />
                     </div>
                     <div>
                       <div className="p-interop__card-badge">{item.name}</div>
@@ -495,11 +564,11 @@ export default function ProductPage() {
                   >
                     <div className="p-features__card-header">
                       <div className="p-features__card-icon" style={{ background: f.color + "0D", color: f.color }}>
-                        <f.icon size={56} />
+                        <f.icon size={20} />
                       </div>
                       <h3 className="p-features__card-title">{t(f.title)}</h3>
                       <ChevronDown
-                        size={44}
+                        size={16}
                         className="p-features__card-chevron"
                         style={{ transform: expandedFeature === i ? "rotate(180deg)" : "rotate(0)" }}
                       />
@@ -608,9 +677,9 @@ export default function ProductPage() {
             <div className="p-tour__grid">
               {TOUR_FEATURES.map((f, i) => (
                 <Reveal key={i} delay={i * 0.05}>
-                  <div className="p-tour__card" onMouseEnter={() => setActiveTour(i)}>
-                    <div className={`p-tour__card-icon ${activeTour === i ? "p-tour__card-icon--active" : ""}`}>
-                      <f.icon size={44} />
+                  <div className="p-tour__card">
+                    <div className="p-tour__card-icon">
+                      <f.icon size={22} />
                     </div>
                     <h4 className="p-tour__card-label">{t(f.label)}</h4>
                     <p className="p-tour__card-desc">{t(f.desc)}</p>
@@ -658,8 +727,7 @@ export default function ProductPage() {
             <div className="p-footer__brand">
               <div className="p-logo" style={{ marginBottom: 16 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/assets/tamamhealth-icon.svg" alt="TamamHealth" className="p-logo__icon" />
-                <span className="p-logo__text" style={{ color: "#fff" }}>TamamHealth</span>
+                <img src="/assets/logos/SVG/Tamam_Style_Guide-21.svg" alt="TamamHealth" style={{ height: 24, width: 'auto', filter: 'brightness(0) invert(1)' }} />
               </div>
               <p className="p-footer__tagline">{t("product.footer.tagline")}</p>
             </div>
@@ -680,7 +748,7 @@ export default function ProductPage() {
               <h4>{t("product.footer.aboutHeading")}</h4>
               <Link href="/">{t("product.footer.ourStory")}</Link>
               <Link href="/login">{t("landing.cta.staffSignIn")}</Link>
-              <div className="p-footer__contact"><Mail size={14} /> info@tamamhealth.org</div>
+              <div className="p-footer__contact"><Mail size={14} /> support.tamam@gmail.com</div>
               <div className="p-footer__contact"><MapPin size={14} /> Juba, South Sudan</div>
             </div>
           </div>
@@ -706,7 +774,7 @@ function ShowcaseVisual({ type }: { type: string }) {
     return (
       <div className="p-showcase__visual-wrap">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/dashboard-screenshot.png" alt={t("product.visual.featuresAlt")} className="p-showcase__photo" />
+        <img src="/assets/Dashboard.png" alt={t("product.visual.featuresAlt")} className="p-showcase__photo" />
         <div className="p-showcase__photo-caption">
           <span>{t("product.visual.featuresLabel")}</span> — {t("product.visual.featuresCaption")}
         </div>
@@ -781,22 +849,22 @@ const productCSS = `
   --p-radius-lg: 14px;
   --p-radius-xl: 20px;
 
-  --p-shadow-xs: 0 1px 2px rgba(15,23,42,0.04);
-  --p-shadow-sm: 0 2px 8px -2px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.04);
-  --p-shadow-md: 0 8px 24px -8px rgba(15,23,42,0.1), 0 2px 6px rgba(15,23,42,0.04);
-  --p-shadow-lg: 0 20px 48px -16px rgba(15,23,42,0.14), 0 4px 12px rgba(15,23,42,0.05);
-  --p-shadow-xl: 0 32px 72px -24px rgba(15,23,42,0.18), 0 8px 20px rgba(15,23,42,0.06);
+  --p-shadow-xs: none;
+  --p-shadow-sm: none;
+  --p-shadow-md: none;
+  --p-shadow-lg: none;
+  --p-shadow-xl: none;
 
   --p-font-display: 'IBM Plex Sans', sans-serif;
   --p-font-body: 'IBM Plex Sans', sans-serif;
   --p-font-accent: 'IBM Plex Sans', sans-serif;
   --p-font-mono: 'IBM Plex Mono', monospace;
 
-  --p-section-pad: clamp(80px, 10vh, 120px);
+  --p-section-pad: clamp(56px, 7vh, 88px);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+html { scroll-behavior: auto; -webkit-text-size-adjust: 100%; }
 body {
   font-family: var(--p-font-body);
   color: var(--p-text);
@@ -809,7 +877,7 @@ body {
 a { color: inherit; text-decoration: none; }
 
 /* ── Container ── */
-.p-container { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+.p-container { max-width: 1320px; margin: 0 auto; padding: 0 48px; }
 @media (max-width: 640px) { .p-container { padding: 0 20px; } }
 
 /* ── Section Headers ── */
@@ -840,21 +908,16 @@ a { color: inherit; text-decoration: none; }
   border-radius: 10px;
   border: 1.5px solid transparent;
   cursor: pointer; text-decoration: none;
-  transition: transform 0.2s cubic-bezier(0.16,1,0.3,1),
-              box-shadow 0.2s cubic-bezier(0.16,1,0.3,1),
-              background 0.2s ease,
+  transition: background 0.2s ease,
               border-color 0.2s ease,
               color 0.2s ease;
   line-height: 1.2; white-space: nowrap;
 }
 .p-btn--primary {
   background: var(--p-blue); color: #fff; border-color: var(--p-blue);
-  box-shadow: 0 4px 12px -4px rgba(0,119,215,0.45);
 }
 .p-btn--primary:hover {
   background: var(--p-blue-hover); border-color: var(--p-blue-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px -6px rgba(0,119,215,0.55);
 }
 .p-btn--outline {
   background: transparent; color: var(--p-text);
@@ -871,7 +934,7 @@ a { color: inherit; text-decoration: none; }
   background: #fff; color: var(--p-blue); padding: 16px 30px; font-size: 15px;
   border-color: #fff; border-radius: 12px;
 }
-.p-btn--cta:hover { background: var(--p-blue-pale); transform: translateY(-1px); }
+.p-btn--cta:hover { background: var(--p-blue-pale); }
 .p-btn--cta-outline {
   background: transparent; color: #fff; padding: 16px 30px; font-size: 15px;
   border: 1.5px solid rgba(255,255,255,0.45); border-radius: 12px;
@@ -884,11 +947,9 @@ a { color: inherit; text-decoration: none; }
   padding: 18px 0;
   background: #ffffff;
   border-bottom: 1px solid var(--p-border-light);
-  transition: padding 0.25s ease, box-shadow 0.25s ease;
 }
 .p-header--scrolled {
   padding: 12px 0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 8px rgba(0,0,0,0.02);
 }
 .p-header__inner { display: flex; align-items: center; gap: 20px; }
 .p-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
@@ -897,23 +958,50 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--p-font-display); font-size: 1.2rem; font-weight: 700;
   letter-spacing: 0.06em; color: var(--p-text);
 }
-.p-nav { display: flex; gap: 2px; margin-left: 24px; }
+.p-nav { display: flex; gap: 0; margin-left: 16px; align-items: center; }
 .p-nav__link {
-  background: none; border: none; font-family: var(--p-font-accent); font-size: 14px;
-  font-weight: 500; color: var(--p-text-secondary); padding: 10px 16px;
-  cursor: pointer; transition: color 0.2s ease, background 0.2s ease;
-  text-decoration: none; border-radius: 8px;
+  background: none; border: none; font-family: var(--p-font-accent); font-size: 13.5px;
+  font-weight: 500; color: var(--p-text); padding: 8px 12px;
+  cursor: pointer;
+  text-decoration: none; border-radius: 8px; letter-spacing: 0;
+  text-transform: none;
+  display: inline-flex; align-items: center; white-space: nowrap;
 }
-.p-nav__link:hover { color: var(--p-text); background: var(--p-bg-cool); }
-.p-nav__link--active { color: var(--p-blue); font-weight: 600; }
+.p-nav__link--active { color: var(--p-text); font-weight: 600; }
+.p-nav__link--has-arrow { gap: 2px; }
+.p-nav__dropdown-wrap { position: relative; }
+.p-nav__dropdown {
+  position: absolute; top: calc(100% + 6px); left: 0;
+  background: #fff; border: 1px solid var(--p-border-light);
+  border-radius: 12px;
+  min-width: 180px; padding: 6px; z-index: 200;
+}
+.p-nav__dropdown-item {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  font-family: var(--p-font-body); font-size: 14px; font-weight: 500;
+  color: var(--p-text); padding: 10px 14px; border-radius: 8px;
+  cursor: pointer; text-decoration: none;
+}
+.p-nav__phone {
+  font-family: var(--p-font-body); font-size: 13px; font-weight: 600;
+  color: var(--p-text); text-decoration: none; padding: 0 8px;
+  white-space: nowrap;
+}
+.p-btn--demo {
+  background: #22c55e; color: #fff; border: none; border-radius: 999px;
+  font-family: var(--p-font-accent); font-size: 13px; font-weight: 600;
+  padding: 10px 22px; cursor: pointer; text-decoration: none;
+  letter-spacing: 0; text-transform: none; transition: background 0.2s;
+  white-space: nowrap;
+}
+.p-btn--demo:hover { background: #16a34a; }
 .p-header__actions {
-  display: flex; gap: 8px; margin-left: auto; align-items: center;
+  display: flex; gap: 10px; margin-left: auto; align-items: center; flex-shrink: 0;
 }
 .p-mobile-toggle {
   display: none; background: none; border: none; cursor: pointer;
   padding: 8px; color: var(--p-text); margin-left: auto; border-radius: 8px;
 }
-.p-mobile-toggle:hover { background: var(--p-bg-cool); }
 .p-mobile-nav {
   display: flex; flex-direction: column; gap: 2px; padding: 20px 24px 24px;
   background: #fff; border-top: 1px solid var(--p-border-light);
@@ -923,105 +1011,101 @@ a { color: inherit; text-decoration: none; }
   font-weight: 600; color: var(--p-text); padding: 14px 0; cursor: pointer;
   text-align: left; border-bottom: 1px solid var(--p-border-light); text-decoration: none; display: block;
 }
-.p-mobile-nav__link:hover { color: var(--p-blue); }
 .p-mobile-nav__link--active { color: var(--p-blue); }
 .p-mobile-nav__actions {
   display: flex; flex-direction: column; gap: 8px; margin-top: 16px;
 }
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .p-nav, .p-header__actions { display: none; }
   .p-mobile-toggle { display: block; }
 }
 
 /* ── Hero ── */
+/* ── Hero — split layout ── */
 .p-hero {
-  position: relative; padding: 140px 0 96px; text-align: center;
-  overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, var(--p-blue-pale) 100%);
+  padding: 100px 0 72px;
+  background: #fff;
 }
-.p-hero__bg {
-  position: absolute; inset: 0; z-index: 0;
-  background:
-    radial-gradient(ellipse 60% 40% at 20% 10%, rgba(0,119,215,0.08) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 35% at 85% 20%, rgba(10,95,194,0.06) 0%, transparent 70%),
-    radial-gradient(ellipse 80% 50% at 50% 100%, rgba(0,119,215,0.05) 0%, transparent 70%);
-  pointer-events: none;
+.p-hero__split {
+  display: grid; grid-template-columns: 1fr 1.1fr; gap: 72px; align-items: center;
 }
-.p-hero .p-container { position: relative; z-index: 1; }
-.p-hero__tag {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 12px; font-weight: 700;
-  padding: 7px 14px; border-radius: 100px;
-  background: #fff; color: var(--p-blue);
-  border: 1px solid var(--p-blue-light);
-  box-shadow: 0 1px 3px rgba(0,119,215,0.08);
-  margin-bottom: 24px;
-  text-transform: uppercase; letter-spacing: 0.08em;
+.p-hero__img-col { position: relative; }
+.p-hero__photo {
+  width: 100%; height: 560px; object-fit: cover; object-position: center top;
+  border-radius: 10px;
 }
+.p-hero__content-col { display: flex; flex-direction: column; align-items: flex-start; }
 .p-hero__title {
-  font-family: var(--p-font-display); font-size: clamp(36px, 5.5vw, 64px);
-  font-weight: 700; line-height: 1.08; color: var(--p-text);
-  letter-spacing: -0.025em; margin-bottom: 22px;
+  font-family: var(--p-font-display); font-size: clamp(30px, 3.8vw, 52px);
+  font-weight: 700; line-height: 1.1; color: #111827;
+  letter-spacing: -0.025em; margin-bottom: 20px; margin-top: 12px;
 }
-.p-hero__title--accent {
-  background: linear-gradient(135deg, var(--p-blue) 0%, var(--p-blue-mid) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text; color: transparent;
+.p-hero__title--accent { color: var(--p-blue); -webkit-text-fill-color: initial; background: none; }
+.p-hero__green-sub {
+  font-size: clamp(15px, 1.2vw, 17px); line-height: 1.7;
+  color: #16a34a; font-weight: 500;
+  margin-bottom: 32px; max-width: 480px;
 }
-.p-hero__subtitle {
-  font-size: clamp(16px, 1.4vw, 19px); line-height: 1.65;
-  color: var(--p-text-secondary);
-  max-width: 620px; margin: 0 auto 36px;
+.p-hero__stat-row {
+  display: flex; align-items: center; gap: 0;
+  margin-bottom: 36px;
+  background: #fff; border: 1px solid #e5e7eb;
+  border-radius: 14px; overflow: hidden;
 }
-.p-hero__ctas {
-  display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
-  margin-bottom: 64px;
+.p-hero__stat-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 24px;
 }
-.p-hero__stats {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
-  max-width: 920px; margin: 0 auto;
-  background: #ffffff;
-  border-radius: var(--p-radius-lg);
-  border: 1px solid var(--p-border-light);
-  box-shadow: var(--p-shadow-md);
-  overflow: hidden;
-}
-.p-hero__stat {
-  padding: 32px 20px; text-align: center;
-  border-right: 1px solid var(--p-border-light);
-  transition: background 0.2s ease;
-}
-.p-hero__stat:last-child { border-right: none; }
-.p-hero__stat:hover { background: var(--p-blue-pale); }
-.p-hero__stat-value {
-  font-family: var(--p-font-display); font-size: clamp(1.875rem, 3vw, 2.5rem);
-  font-weight: 700; color: var(--p-blue); line-height: 1; margin-bottom: 8px;
-  letter-spacing: -0.02em;
+.p-hero__stat-divider { width: 1px; height: 56px; background: #e5e7eb; flex-shrink: 0; }
+.p-hero__stat-num {
+  font-family: var(--p-font-display); font-size: clamp(28px, 2.5vw, 36px);
+  font-weight: 700; color: #111827; line-height: 1; white-space: nowrap;
 }
 .p-hero__stat-label {
-  font-size: 11px; font-weight: 700; color: var(--p-text);
-  text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: 12px; font-weight: 500; color: #6b7280; line-height: 1.4;
 }
-.p-hero__stat-sub {
-  font-size: 11px; color: var(--p-text-muted);
-  margin-top: 4px; line-height: 1.4;
+.p-btn--hero-cta {
+  font-size: 15px; padding: 14px 32px; border-radius: 999px;
 }
-@media (max-width: 720px) {
-  .p-hero { padding: 120px 0 64px; }
-  .p-hero__stats { grid-template-columns: repeat(2, 1fr); }
-  .p-hero__stat:nth-child(2) { border-right: none; }
-  .p-hero__stat:nth-child(1), .p-hero__stat:nth-child(2) { border-bottom: 1px solid var(--p-border-light); }
+@media (max-width: 900px) {
+  .p-hero__split { grid-template-columns: 1fr; gap: 40px; }
+  .p-hero__photo { height: 320px; object-position: center 20%; }
+  .p-hero { padding: 100px 0 60px; }
 }
-@media (max-width: 480px) {
-  .p-hero__ctas { flex-direction: column; align-items: stretch; max-width: 320px; margin-left: auto; margin-right: auto; margin-bottom: 48px; }
-  .p-hero__ctas .p-btn { width: 100%; }
+
+/* ── Recognition / Impact ── */
+.p-recognition {
+  padding: 80px 0;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+}
+.p-recognition__headline {
+  font-family: var(--p-font-display); font-size: clamp(22px, 3vw, 36px);
+  font-weight: 700; line-height: 1.2; color: #111827;
+  text-align: center; margin-bottom: 56px;
+}
+.p-recognition__split {
+  display: grid; grid-template-columns: 1fr 1.1fr; gap: 80px; align-items: center;
+}
+.p-recognition__content {
+  font-size: 16px; line-height: 1.75; color: #374151;
+}
+.p-recognition__content strong { color: #111827; }
+.p-recognition__image-wrap { position: relative; }
+.p-recognition__photo {
+  width: 100%; height: 420px; object-fit: cover; object-position: center;
+  border-radius: 10px;
+}
+@media (max-width: 900px) {
+  .p-recognition__split { grid-template-columns: 1fr; gap: 32px; }
+  .p-recognition__photo { height: 260px; }
 }
 
 /* ── Showcase Cards ── */
 .p-showcase { padding: var(--p-section-pad) 0; }
 .p-showcase__card {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center;
-  padding: 48px 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center;
+  padding: 56px 0;
 }
 .p-showcase__card + .p-showcase__card { border-top: 1px solid var(--p-border-light); }
 .p-showcase__card--reverse .p-showcase__content { order: 2; }
@@ -1049,25 +1133,18 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--p-font-body); font-size: 14px; font-weight: 700;
   background: var(--p-blue-pale); border: 1.5px solid var(--p-blue-light);
   padding: 11px 20px; border-radius: 10px;
-  cursor: pointer; transition: all 0.2s ease;
+  cursor: pointer; transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 .p-showcase__cta:hover {
-  gap: 12px; border-color: var(--p-blue);
+  border-color: var(--p-blue);
   background: #fff;
-  box-shadow: 0 4px 12px -4px rgba(0,119,215,0.2);
 }
 
 /* Showcase Mock UI */
 .p-showcase__mock {
   border-radius: var(--p-radius-lg); overflow: hidden;
   border: 1px solid var(--p-border);
-  box-shadow: var(--p-shadow-md);
   background: var(--p-bg);
-  transition: transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s;
-}
-.p-showcase__card:hover .p-showcase__mock {
-  transform: translateY(-4px);
-  box-shadow: var(--p-shadow-lg);
 }
 .p-showcase__mock-header {
   display: flex; align-items: center; gap: 12px;
@@ -1101,17 +1178,11 @@ a { color: inherit; text-decoration: none; }
 /* Showcase Photo Visuals */
 .p-showcase__visual-wrap {
   border-radius: var(--p-radius-lg); overflow: hidden;
-  box-shadow: var(--p-shadow-md); position: relative;
-  transition: transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s;
-}
-.p-showcase__card:hover .p-showcase__visual-wrap {
-  transform: translateY(-4px); box-shadow: var(--p-shadow-lg);
+  position: relative;
 }
 .p-showcase__photo {
-  width: 100%; height: 300px; object-fit: cover; display: block;
-  transition: transform 0.6s cubic-bezier(0.16,1,0.3,1);
+  width: 100%; height: 380px; object-fit: cover; display: block;
 }
-.p-showcase__visual-wrap:hover .p-showcase__photo { transform: scale(1.03); }
 .p-showcase__photo-caption {
   position: absolute; bottom: 0; left: 0; right: 0;
   padding: 20px; color: #fff;
@@ -1132,16 +1203,13 @@ a { color: inherit; text-decoration: none; }
 /* ── Technology ── */
 .p-tech { padding: var(--p-section-pad) 0; background: var(--p-bg-warm); }
 .p-tech__grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
   margin-bottom: 56px;
 }
 .p-tech__card {
-  background: #fff; border-radius: var(--p-radius-lg); padding: 28px;
+  background: #fff; border-radius: var(--p-radius-lg); padding: 32px;
   border: 1px solid var(--p-border-light);
-  box-shadow: var(--p-shadow-xs);
-  transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s cubic-bezier(0.16,1,0.3,1), border-color 0.2s ease;
 }
-.p-tech__card:hover { border-color: rgba(0,119,215,0.3); box-shadow: var(--p-shadow-md); transform: translateY(-3px); }
 .p-tech__card-icon {
   width: 44px; height: 44px; border-radius: 12px;
   background: var(--p-blue-light); color: var(--p-blue);
@@ -1157,7 +1225,6 @@ a { color: inherit; text-decoration: none; }
 .p-tech__arch {
   border-radius: var(--p-radius-lg); overflow: hidden;
   border: 1px solid var(--p-border); background: var(--p-bg);
-  box-shadow: var(--p-shadow-sm);
 }
 .p-tech__arch-header {
   display: flex; align-items: center; gap: 12px;
@@ -1194,16 +1261,14 @@ a { color: inherit; text-decoration: none; }
 /* ── Interoperability ── */
 .p-interop { padding: var(--p-section-pad) 0; background: var(--p-bg); }
 .p-interop__grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
   margin-bottom: 48px;
 }
 .p-interop__card {
   display: flex; gap: 18px; align-items: flex-start;
-  background: var(--p-bg-warm); border-radius: var(--p-radius-lg); padding: 26px;
+  background: var(--p-bg-warm); border-radius: var(--p-radius-lg); padding: 28px;
   border: 1px solid var(--p-border-light);
-  transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s cubic-bezier(0.16,1,0.3,1), border-color 0.2s ease;
 }
-.p-interop__card:hover { border-color: rgba(0,119,215,0.3); box-shadow: var(--p-shadow-md); transform: translateY(-3px); background: #fff; }
 .p-interop__card-icon-wrap {
   width: 40px; height: 40px; border-radius: 10px;
   background: var(--p-blue-light); color: var(--p-blue);
@@ -1237,17 +1302,14 @@ a { color: inherit; text-decoration: none; }
 /* ── Features Deep Dive ── */
 .p-features { padding: var(--p-section-pad) 0; background: var(--p-bg-section); }
 .p-features__grid {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;
   align-items: start;
 }
 .p-features__card {
-  background: #fff; border-radius: var(--p-radius-lg); padding: 28px;
+  background: #fff; border-radius: var(--p-radius-lg); padding: 32px;
   border: 1px solid var(--p-border-light); cursor: pointer;
-  box-shadow: var(--p-shadow-xs);
-  transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s cubic-bezier(0.16,1,0.3,1), border-color 0.2s ease;
 }
-.p-features__card:hover { border-color: rgba(0,119,215,0.3); box-shadow: var(--p-shadow-md); transform: translateY(-3px); }
-.p-features__card--expanded { border-color: var(--p-blue); box-shadow: var(--p-shadow-md); }
+.p-features__card--expanded { border-color: var(--p-blue); }
 .p-features__card-header {
   display: flex; align-items: center; gap: 14px; margin-bottom: 12px;
 }
@@ -1259,9 +1321,7 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--p-font-body); font-size: 15px; font-weight: 700;
   color: var(--p-text); flex: 1;
 }
-.p-features__card-chevron {
-  color: var(--p-text-muted); transition: transform 0.3s ease; flex-shrink: 0;
-}
+.p-features__card-chevron { color: var(--p-text-muted); flex-shrink: 0; }
 .p-features__card-desc {
   font-size: 14px; line-height: 1.7; color: var(--p-text-secondary);
 }
@@ -1269,7 +1329,6 @@ a { color: inherit; text-decoration: none; }
   list-style: none; margin-top: 16px; padding-top: 16px;
   border-top: 1px solid var(--p-border-light);
   display: grid; gap: 8px;
-  animation: pFadeIn 0.3s ease;
 }
 .p-features__card-list li {
   display: flex; align-items: center; gap: 8px;
@@ -1337,10 +1396,8 @@ a { color: inherit; text-decoration: none; }
   padding: 10px 12px; border-radius: var(--p-radius);
   font-size: 14px; font-weight: 500; color: var(--p-text);
   border-bottom: 1px solid var(--p-border-light);
-  transition: background 0.15s;
 }
 .p-roadmap__item:last-child { border-bottom: none; }
-.p-roadmap__item:hover { background: var(--p-bg-cool); }
 .p-roadmap__item-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .p-roadmap__item-dot--done { background: #10B944; }
 .p-roadmap__item-dot--now { background: var(--p-blue); }
@@ -1350,22 +1407,19 @@ a { color: inherit; text-decoration: none; }
 /* ── Tour ── */
 .p-tour { padding: var(--p-section-pad) 0; background: var(--p-bg); }
 .p-tour__grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
   margin-bottom: 56px;
 }
 .p-tour__card {
-  text-align: center; padding: 32px 20px; border-radius: var(--p-radius-lg);
+  text-align: center; padding: 36px 24px; border-radius: var(--p-radius-lg);
   border: 1px solid var(--p-border-light); background: var(--p-bg);
-  transition: all 0.25s; cursor: pointer;
 }
-.p-tour__card:hover { border-color: var(--p-blue); box-shadow: var(--p-shadow-md); transform: translateY(-3px); }
 .p-tour__card-icon {
   width: 52px; height: 52px; border-radius: 14px;
   background: var(--p-bg-cool); color: var(--p-text-muted);
   display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 14px; transition: all 0.3s;
+  margin: 0 auto 14px;
 }
-.p-tour__card-icon--active { background: var(--p-blue); color: #fff; }
 .p-tour__card-label { font-size: 14px; font-weight: 700; margin-bottom: 4px; color: var(--p-text); }
 .p-tour__card-desc { font-size: 12px; color: var(--p-text-muted); }
 @media (max-width: 700px) { .p-tour__grid { grid-template-columns: repeat(2, 1fr); } }
@@ -1375,7 +1429,6 @@ a { color: inherit; text-decoration: none; }
   text-align: center; padding: 56px 32px; border-radius: var(--p-radius-xl);
   background: linear-gradient(135deg, var(--p-blue-pale) 0%, var(--p-blue-light) 100%);
   border: 1px solid var(--p-blue-light);
-  box-shadow: var(--p-shadow-sm);
 }
 .p-tour__cta h3 {
   font-family: var(--p-font-display); font-size: 26px; font-weight: 700;
@@ -1389,13 +1442,10 @@ a { color: inherit; text-decoration: none; }
   text-align: center; padding: 88px 48px; border-radius: var(--p-radius-xl);
   background: linear-gradient(135deg, var(--p-blue) 0%, var(--p-blue-mid) 100%);
   position: relative; overflow: hidden;
-  box-shadow: 0 30px 80px -30px rgba(0,119,215,0.45);
 }
 .p-final-cta__inner::before {
   content: ''; position: absolute; inset: 0;
-  background:
-    radial-gradient(circle 400px at 15% 20%, rgba(255,255,255,0.12) 0%, transparent 50%),
-    radial-gradient(circle 500px at 85% 80%, rgba(255,255,255,0.08) 0%, transparent 50%);
+  background: transparent;
   pointer-events: none;
 }
 .p-final-cta__inner > * { position: relative; z-index: 1; }
@@ -1414,7 +1464,7 @@ a { color: inherit; text-decoration: none; }
   background: #211F1D; padding: 64px 0 32px; color: rgba(255,255,255,0.5);
 }
 .p-footer__grid {
-  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px;
+  display: grid; grid-template-columns: 1.8fr 1fr 1fr 1fr; gap: 64px;
   margin-bottom: 48px;
 }
 .p-footer__brand { max-width: 300px; }
@@ -1427,9 +1477,7 @@ a { color: inherit; text-decoration: none; }
   display: block; font-size: 14px; color: rgba(255,255,255,0.4);
   padding: 4px 0; text-decoration: none; background: none; border: none;
   font-family: var(--p-font-body); cursor: pointer; text-align: left;
-  transition: color 0.15s;
 }
-.p-footer__col a:hover, .p-footer__col button:hover { color: rgba(255,255,255,0.9); }
 .p-footer__contact {
   display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0;
 }
@@ -1448,9 +1496,4 @@ a { color: inherit; text-decoration: none; }
 }
 @media (max-width: 500px) { .p-footer__grid { grid-template-columns: 1fr; } }
 
-/* ── Animations ── */
-@keyframes pFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 `;

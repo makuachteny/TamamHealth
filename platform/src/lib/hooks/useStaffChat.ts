@@ -87,8 +87,13 @@ export function useStaffChat() {
     [conversations, activeId],
   );
 
-  const send = useCallback(async (body: string, replyToId?: string) => {
-    if (!me || !activeConversation || !body.trim()) return;
+  const send = useCallback(async (
+    body: string,
+    replyToId?: string,
+    attachments?: Array<{ name: string; mimeType: string; base64Data: string; sizeBytes: number; phiWarningAcknowledged?: boolean }>,
+    phiAcknowledged?: boolean,
+  ) => {
+    if (!me || !activeConversation || (!body.trim() && !attachments?.length)) return;
     const { sendConversationMessage } = await import('../services/conversation-service');
     await sendConversationMessage({
       conversationId: activeConversation._id,
@@ -97,6 +102,8 @@ export function useStaffChat() {
       fromName: me.name,
       body: body.trim(),
       ...(replyToId ? { replyToId } : {}),
+      ...(attachments?.length ? { attachments } : {}),
+      ...(phiAcknowledged ? { phiAcknowledged } : {}),
       ...ctx,
     });
     await loadMessages(activeConversation._id);

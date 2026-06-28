@@ -384,6 +384,7 @@ const en: TranslationMap = {
   'appointments.statusConfirmed': 'Confirmed',
   'appointments.statusInProgress': 'In Progress',
   'appointments.statusNoShow': 'No Show',
+  'appointments.statusRequested': 'Requested',
   'appointments.statusScheduled': 'Scheduled',
   'appointments.subtitle': 'Schedule, approve, and manage patient appointments',
   'appointments.title': 'Appointments',

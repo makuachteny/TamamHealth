@@ -273,7 +273,14 @@ export interface PrescriptionDoc extends BaseDoc {
   prescribedBy: string;
   /** Coarse status kept for backward compatibility + queue filters. Derived
    *  from the granular `orderStatus` below. */
-  status: 'pending' | 'dispensed';
+  status: 'pending' | 'dispensed' | 'discontinued';
+  /** Discontinuation — set when a clinician or patient reports stopping the medication. */
+  stoppedAt?: string;
+  stoppedReason?: string;
+  stoppedBy?: string;
+  stoppedByName?: string;
+  /** Source of the stop: 'clinician' | 'patient_reported' */
+  stoppedSource?: 'clinician' | 'patient_reported';
   /** Granular pharmacy dispensing lifecycle (Stage 8): prescribed →
    *  received_in_pharmacy_queue → under_review → cleared_for_dispensing →
    *  dispensed → counseled → complete, plus stockout/held/recalled branches.
@@ -306,6 +313,13 @@ export interface PrescriptionDoc extends BaseDoc {
    * administration.
    */
   administrations?: MedicationAdministration[];
+  /**
+   * Problem this medication is pinned to (problem-oriented charting). When set,
+   * the chart summary groups the medicine under the linked problem — e.g. a
+   * chronic inhaler pinned to "Asthma". Denormalised label kept for display.
+   */
+  linkedProblemId?: string;
+  linkedProblemLabel?: string;
 }
 
 /** One medication line inside an order set / clinical protocol. */
@@ -565,6 +579,16 @@ export interface MessageDoc extends BaseDoc {
   deleted?: boolean;
   /** Set when the author edits a message within the edit window. */
   editedAt?: string;
+  /** File/image attachments (PDF, JPG, PNG — base64 encoded for offline-first sync). */
+  attachments?: Array<{
+    name: string;
+    mimeType: string;
+    base64Data: string;
+    sizeBytes: number;
+    phiWarningAcknowledged?: boolean;
+  }>;
+  /** PHI acknowledgement — true when sender confirmed content may contain patient data. */
+  phiAcknowledged?: boolean;
   /**
    * SMS gateway delivery status, stamped after the provider call resolves.
    * Absent when the message was app-only or when the gateway hasn't yet
@@ -659,6 +683,146 @@ export interface PhoneNoteDoc extends BaseDoc {
   recordedByName?: string;
   hospitalId?: string;
   hospitalName?: string;
+  orgId?: string;
+}
+
+/** Which clinical picker a favorite belongs to. */
+export type FavoriteKind = 'diagnosis' | 'medication' | 'procedure';
+
+/**
+ * A per-clinician "favorite" — a one-tap shortcut to a diagnosis, medicine or
+ * procedure the provider reaches for often. Stored one doc per (user, kind,
+ * code) so toggling is idempotent and the picker can show stars instantly.
+ * Personal/operational data: synced org-scoped so a clinician's favorites
+ * follow them to any workstation, but never flows to national analytics.
+ */
+export interface ClinicalFavoriteDoc extends BaseDoc {
+  type: 'clinical_favorite';
+  /** Owning clinician. */
+  userId: string;
+  kind: FavoriteKind;
+  /** Canonical code (ICD-10 / drug code / procedure code) — the identity key. */
+  code: string;
+  /** Human label shown in the picker. */
+  label: string;
+  /** Optional default dosing/instructions carried for medication favorites. */
+  meta?: {
+    dosage?: string;
+    frequency?: string;
+    durationDays?: number;
+    price?: number;
+    category?: string;
+  };
+  /** Usage counter — lets the UI sort favorites by how often they're used. */
+  useCount?: number;
+  hospitalId?: string;
+  orgId?: string;
+}
+
+/**
+ * A clinician-saved consultation template — a named bundle of diagnoses,
+ * medicines, labs and plan text captured from a real visit and re-applied in
+ * one click (HealthBridge "save this as a template … bronchitis adult"). Unlike
+ * order sets (admin-curated reference protocols), these are personal and owned
+ * by the clinician who saved them. Shapes mirror OrderSetDoc so the same merge
+ * applies both. Synced org-scoped, excluded from national analytics.
+ */
+export interface ConsultationTemplateDoc extends BaseDoc {
+  type: 'consultation_template';
+  userId: string;
+  name: string;
+  diagnoses?: { code?: string; label: string }[];
+  labs?: string[];
+  medications?: OrderSetMedication[];
+  planText?: string;
+  useCount?: number;
+  hospitalId?: string;
+  orgId?: string;
+}
+
+/** Category a scanned/uploaded chart document is filed under. */
+export type PatientDocumentCategory =
+  | 'radiology' | 'lab_report' | 'referral_letter' | 'discharge_summary'
+  | 'consent' | 'advance_directive' | 'legal_document' | 'treatment_agreement'
+  | 'insurance' | 'id_document' | 'prescription' | 'scanned_record'
+  | 'external_medical_record' | 'other';
+
+/**
+ * A scanned or uploaded document filed on the patient chart — radiology films,
+ * a referral letter, an ID, a previous paper record, etc. The HealthBridge
+ * "drop a PDF/photo, categorise it, filter on the timeline" capability. Stored
+ * in its own database (not on the patient doc) so large base64 payloads don't
+ * bloat patient reads. Facility-operational PHI; excluded from national
+ * analytics.
+ */
+export interface PatientDocumentDoc extends BaseDoc {
+  type: 'patient_document';
+  patientId: string;
+  title: string;
+  category: PatientDocumentCategory;
+  /** File payload + metadata (name, mimeType, base64Data, sizeBytes). */
+  fileName: string;
+  mimeType: string;
+  base64Data: string;
+  sizeBytes: number;
+  note?: string;
+  uploadedById?: string;
+  uploadedByName?: string;
+  hospitalId?: string;
+  orgId?: string;
+}
+
+export type ReminderChannel = 'sms' | 'whatsapp' | 'call' | 'in_person';
+export type ReminderStatus = 'queued' | 'sent' | 'cancelled';
+
+/**
+ * A patient reminder queued to go out on a future date — e.g. "Come fasted in 3
+ * weeks for your path tests." The HealthBridge "SMS the patient, queued and sent
+ * a few days before" idea. NOTE: this app has no SMS gateway wired in, so this
+ * is an honest reminder QUEUE that staff work from (and mark sent), not a claim
+ * of automated delivery; a real gateway can later consume `status === 'queued'`
+ * rows whose sendDate has arrived. Facility-operational; excluded from national
+ * analytics.
+ */
+export interface PatientReminderDoc extends BaseDoc {
+  type: 'patient_reminder';
+  patientId: string;
+  patientName?: string;
+  message: string;
+  /** Date the reminder should go out (yyyy-mm-dd). */
+  sendDate: string;
+  channel: ReminderChannel;
+  status: ReminderStatus;
+  createdById?: string;
+  createdByName?: string;
+  sentAt?: string;
+  hospitalId?: string;
+  orgId?: string;
+}
+
+export type ClinicianTaskStatus = 'open' | 'completed';
+
+/**
+ * A clinician's personal to-do — the HealthBridge "tasks" / sticky-note
+ * replacement: "phone John", "contact Dr Smith", with an optional reminder date
+ * and patient link. Completed tasks are retained (not deleted) so the done list
+ * stays visible. Owned by one user; synced org-scoped, excluded from national
+ * analytics.
+ */
+export interface ClinicianTaskDoc extends BaseDoc {
+  type: 'clinician_task';
+  userId: string;
+  title: string;
+  description?: string;
+  /** ISO date (yyyy-mm-dd) the task should resurface / is due. */
+  dueDate?: string;
+  status: ClinicianTaskStatus;
+  priority?: 'normal' | 'high';
+  /** Optional patient this task is about. */
+  patientId?: string;
+  patientName?: string;
+  completedAt?: string;
+  hospitalId?: string;
   orgId?: string;
 }
 
@@ -1259,7 +1423,7 @@ export interface BloodBankDoc extends BaseDoc {
 }
 
 // ===== Appointment Booking (Payam Level & Above) =====
-export type AppointmentStatus = 'scheduled' | 'confirmed' | 'checked_in' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
+export type AppointmentStatus = 'requested' | 'scheduled' | 'confirmed' | 'checked_in' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
 export type AppointmentType = 'general' | 'follow_up' | 'specialist' | 'anc' | 'immunization' | 'lab' | 'telehealth' | 'surgical' | 'dental' | 'mental_health' | 'walk_in';
 export type AppointmentPriority = 'routine' | 'urgent' | 'emergency';
 

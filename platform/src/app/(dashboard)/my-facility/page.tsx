@@ -285,7 +285,7 @@ export default function MyFacilityPage() {
 
           {/* Staffing */}
           <div className={sectionClass}>
-            {sectionTitle(<Users className="w-3.5 h-3.5" style={{ color: '#3b82f6' }} />, t('myFacility.staffing'), 'rgba(59, 130, 246,0.12)')}
+            {sectionTitle(<Users className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />, t('myFacility.staffing'), 'rgba(33, 145, 208, 0.12)')}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {numberInput(t('dashboard.doctors'), doctors, setDoctors)}
               {numberInput(t('dataEntry.nurses'), nurses, setNurses)}

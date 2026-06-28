@@ -705,7 +705,7 @@ export default function BillingTab({
           <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <CreditCard className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                 </div>
                 <h3 className="text-base font-semibold">{t('billing.addPaymentMethod') || 'Add payment method'}</h3>
@@ -785,7 +785,7 @@ export default function BillingTab({
           <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <RotateCcw className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                 </div>
                 <h3 className="text-base font-semibold">{t('billing.issueRefund') || 'Issue refund'}</h3>
@@ -848,7 +848,7 @@ export default function BillingTab({
           <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <RefreshCw className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                 </div>
                 <h3 className="text-base font-semibold">{t('billing.adjustmentWriteOff') || 'Adjustment / write-off'}</h3>

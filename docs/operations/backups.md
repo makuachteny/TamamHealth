@@ -50,17 +50,17 @@ Key-Length: 4096
 Subkey-Type: RSA
 Subkey-Length: 4096
 Name-Real: TamamHealth Backup
-Name-Email: backup@tamamhealth.org
+Name-Email: support.tamam@gmail.com
 Expire-Date: 2y
 Passphrase: <strong, generated, stored in 1Password>
 %commit
 EOF
 
 # Export public key (for the production host)
-gpg --armor --export backup@tamamhealth.org > backup-pubkey.gpg
+gpg --armor --export support.tamam@gmail.com > backup-pubkey.gpg
 
 # Export private key (for 1Password vault + offline backup)
-gpg --armor --export-secret-keys backup@tamamhealth.org > backup-privkey.asc
+gpg --armor --export-secret-keys support.tamam@gmail.com > backup-privkey.asc
 ```
 
 Store:

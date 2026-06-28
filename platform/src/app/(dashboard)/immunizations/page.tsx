@@ -56,7 +56,8 @@ export default function ImmunizationsPage() {
   useBodyScrollLock(showModal || !!editDose);
   const [expandedChild, setExpandedChild] = useState<string | null>(null);
   const [patientLookup, setPatientLookup] = useState('');
-  const [activeTab, setActiveTab] = useState<'records' | 'defaulters'>('records');
+  const [activeTab, setActiveTab] = useState<'records' | 'by_vaccine' | 'defaulters'>('records');
+  const [vaccineExpanded, setVaccineExpanded] = useState<Record<string, boolean>>({});
   const [defaulters, setDefaulters] = useState<ImmunizationDefaulter[]>([]);
   const [defaulterStats, setDefaulterStats] = useState<{ totalDefaulters: number; uniqueChildren: number; critical: number; high: number; medium: number; byVaccine: Record<string, number> } | null>(null);
   const [defaulterFilter, setDefaulterFilter] = useState<'all' | 'critical' | 'high' | 'medium'>('all');
@@ -233,14 +234,21 @@ export default function ImmunizationsPage() {
       } />
       <main className="page-container page-enter">
         {/* Tab switcher */}
-        <div className="flex gap-0 border-b mb-5" style={{ borderColor: 'var(--border-light)' }}>
+        <div className="flex gap-0 border-b mb-5 overflow-x-auto" style={{ borderColor: 'var(--border-light)' }}>
           <button onClick={() => setActiveTab('records')}
-            className={`px-4 py-3 text-sm font-medium ${activeTab === 'records' ? 'tab-active' : ''}`}
+            className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${activeTab === 'records' ? 'tab-active' : ''}`}
             style={{ color: activeTab === 'records' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
             {t('immun.tabRecords', { count: stats?.totalChildren || 0 })}
           </button>
+          {canViewCoverage && (
+            <button onClick={() => setActiveTab('by_vaccine')}
+              className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${activeTab === 'by_vaccine' ? 'tab-active' : ''}`}
+              style={{ color: activeTab === 'by_vaccine' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+              By Vaccine
+            </button>
+          )}
           <button onClick={() => setActiveTab('defaulters')}
-            className={`px-4 py-3 text-sm font-medium flex items-center gap-2 ${activeTab === 'defaulters' ? 'tab-active' : ''}`}
+            className={`px-4 py-3 text-sm font-medium flex items-center gap-2 whitespace-nowrap ${activeTab === 'defaulters' ? 'tab-active' : ''}`}
             style={{ color: activeTab === 'defaulters' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
             {t('immun.tabDefaulters', { count: defaulterStats?.uniqueChildren || 0 })}
             {defaulterStats && defaulterStats.critical > 0 && (
@@ -251,11 +259,128 @@ export default function ImmunizationsPage() {
           </button>
         </div>
 
+        {/* By Vaccine — population-level outreach view */}
+        {activeTab === 'by_vaccine' && canViewCoverage && (
+          <div className="space-y-4">
+            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+              Population-level vaccine coverage. Use this view to identify children needing doses and plan outreach.
+            </p>
+            {VACCINES.map(vaccine => {
+              const given = immunizations.filter(i => i.vaccine === vaccine && i.status === 'completed');
+              const overdueItems = defaulters.filter(d => d.vaccine === vaccine);
+              const expanded = !!vaccineExpanded[vaccine];
+              const total = given.length;
+              const overdueCount = overdueItems.length;
+              return (
+                <div key={vaccine} className="card-elevated overflow-hidden">
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3 text-left"
+                    onClick={() => setVaccineExpanded(s => ({ ...s, [vaccine]: !s[vaccine] }))}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="icon-box-sm">
+                        <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
+                      </span>
+                      <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{vaccine}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(5,150,105,0.1)', color: '#059669' }}>
+                        {total} completed
+                      </span>
+                      {overdueCount > 0 && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(229,46,66,0.1)', color: 'var(--color-danger)' }}>
+                          {overdueCount} overdue
+                        </span>
+                      )}
+                    </div>
+                    {expanded ? <ChevronUp className="w-4 h-4" style={{ color: 'var(--text-muted)' }} /> : <ChevronDown className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}
+                  </button>
+
+                  {expanded && (
+                    <div style={{ borderTop: '1px solid var(--border-light)' }}>
+                      {/* Completed */}
+                      {given.length > 0 && (
+                        <div className="px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: '#059669' }}>
+                            Completed ({given.length})
+                          </p>
+                          <div className="space-y-1.5">
+                            {given.slice(0, 20).map(i => {
+                              const scheduledOnTime = !i.nextDueDate || new Date(i.dateGiven) <= new Date(i.nextDueDate);
+                              return (
+                                <div key={i._id} className="flex items-center justify-between text-xs py-1 px-2 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                                    {i.patientName || 'Unknown'}
+                                  </span>
+                                  <div className="flex items-center gap-3">
+                                    <span style={{ color: 'var(--text-secondary)' }}>
+                                      {new Date(i.dateGiven).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{
+                                      background: scheduledOnTime ? 'rgba(5,150,105,0.1)' : 'rgba(245,158,11,0.1)',
+                                      color: scheduledOnTime ? '#059669' : '#B8741C',
+                                    }}>
+                                      {scheduledOnTime ? 'On schedule' : 'Late'}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {given.length > 20 && (
+                              <p className="text-[11px] text-center pt-1" style={{ color: 'var(--text-muted)' }}>+{given.length - 20} more</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Overdue */}
+                      {overdueItems.length > 0 && (
+                        <div className="px-4 py-3" style={{ borderTop: given.length > 0 ? '1px solid var(--border-light)' : undefined }}>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-danger)' }}>
+                            Overdue ({overdueItems.length})
+                          </p>
+                          <div className="space-y-1.5">
+                            {overdueItems.slice(0, 20).map(d => {
+                              const overdueDays = Math.floor((Date.now() - new Date(d.dueDate).getTime()) / 86400000);
+                              const overdueMo = Math.floor(overdueDays / 30);
+                              const overdueLabel = overdueMo >= 1 ? `Overdue by ${overdueMo}mo` : `Overdue by ${overdueDays}d`;
+                              return (
+                                <div key={`${d.patientId}-${d.vaccine}-${d.doseNumber}`} className="flex items-center justify-between text-xs py-1 px-2 rounded-lg" style={{ background: 'rgba(229,46,66,0.05)', border: '1px solid rgba(229,46,66,0.15)' }}>
+                                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                                    {d.patientName || 'Unknown'}
+                                  </span>
+                                  <div className="flex items-center gap-3">
+                                    <span style={{ color: 'var(--text-muted)' }}>Due: {new Date(d.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>
+                                      {overdueLabel}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {overdueItems.length > 20 && (
+                              <p className="text-[11px] text-center pt-1" style={{ color: 'var(--text-muted)' }}>+{overdueItems.length - 20} more</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {given.length === 0 && overdueItems.length === 0 && (
+                        <div className="px-4 py-6 text-center">
+                          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No records for {vaccine} yet.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Coverage by Antigen */}
         {activeTab === 'records' && canViewCoverage && coverage && (
           <div className="card-elevated p-5 mb-6">
             <h3 className="font-semibold text-sm mb-0 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <span className="icon-box-sm" style={{ background: 'rgba(5,150,105,0.12)' }}>
+              <span className="icon-box-sm">
                 <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
               </span>
               {t('immun.coverageByAntigen')}
@@ -290,7 +415,7 @@ export default function ImmunizationsPage() {
           <div className="card-elevated p-5 mb-6">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <span className="icon-box-sm" style={{ background: 'rgba(5,150,105,0.12)' }}>
+                <span className="icon-box-sm">
                   <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
                 </span>
                 <h3 className="font-semibold text-sm">{t('immun.coverageByAgeCohort')}</h3>
@@ -340,7 +465,7 @@ export default function ImmunizationsPage() {
             <div className="card-elevated overflow-hidden">
               <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
                 <div className="flex items-center gap-2">
-                  <span className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.12)' }}>
+                  <span className="icon-box-sm">
                     <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
                   </span>
                   <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -401,7 +526,7 @@ export default function ImmunizationsPage() {
         {activeTab === 'records' && (
         <div className="card-elevated overflow-hidden">
           <div className="p-4 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-            <span className="icon-box-sm" style={{ background: 'rgba(5,150,105,0.12)' }}>
+            <span className="icon-box-sm">
               <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
             </span>
             <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>

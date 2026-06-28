@@ -7,7 +7,7 @@ import type { PaymentDoc, PaymentStatus, PaymentMethodType } from '@/lib/db-type
 /**
  * Public checkout helper for the pay-by-link flow.
  *
- * This route is intentionally UNAUTHENTICATED (see middleware.ts) — a patient
+ * This route is intentionally UNAUTHENTICATED (see proxy.ts) — a patient
  * or payer opens a link we handed them, so there is no staff session. To avoid
  * leaking PHI it exposes only what a payer needs to pay:
  *

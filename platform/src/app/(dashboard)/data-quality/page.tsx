@@ -13,7 +13,7 @@ export default function DataQualityPage() {
   if (loading || !data) return <><TopBar title={t('dataQuality.topBarTitle')} /><main className="page-container flex items-center justify-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('dataQuality.loading')}</p></main></>;
 
   const scoreColor = (score: number) => score >= 70 ? 'var(--accent-primary)' : score >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
-  const scoreBg = (score: number) => score >= 70 ? 'rgba(59, 130, 246,0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
+  const scoreBg = (score: number) => score >= 70 ? 'rgba(33, 145, 208, 0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
 
   return (
     <>
@@ -68,7 +68,7 @@ export default function DataQualityPage() {
                 </p>
                 <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('dataQuality.facilitiesWithTrainedStaff', { trained: data.facilitiesWithTrainedStaff, total: data.totalFacilities })}</p>
               </div>
-              <div className="p-3 rounded-lg" style={{ background: data.dhis2Adoption >= 50 ? 'rgba(59, 130, 246,0.08)' : 'rgba(229,46,66,0.08)' }}>
+              <div className="p-3 rounded-lg" style={{ background: data.dhis2Adoption >= 50 ? 'rgba(33, 145, 208, 0.08)' : 'rgba(229,46,66,0.08)' }}>
                 <div className="flex items-center gap-2 mb-1">
                   <Wifi className="w-3.5 h-3.5" style={{ color: scoreColor(data.dhis2Adoption) }} />
                   <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('dataQuality.electronicReporting')}</p>

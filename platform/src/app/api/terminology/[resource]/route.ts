@@ -79,13 +79,14 @@ const VALUE_SETS = {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { resource: string } }
+  { params }: { params: Promise<{ resource: string }> }
 ) {
   try {
+    const { resource } = await params;
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
 
-    if (params.resource === 'CodeSystem') {
+    if (resource === 'CodeSystem') {
       if (!id) {
         return NextResponse.json({
           resourceType: 'Bundle',
@@ -99,7 +100,7 @@ export async function GET(
       return NextResponse.json(cs, { headers: { 'Content-Type': 'application/fhir+json' } });
     }
 
-    if (params.resource === 'ValueSet') {
+    if (resource === 'ValueSet') {
       if (!id) {
         return NextResponse.json({
           resourceType: 'Bundle',
@@ -113,7 +114,7 @@ export async function GET(
       return NextResponse.json(vs, { headers: { 'Content-Type': 'application/fhir+json' } });
     }
 
-    return NextResponse.json({ error: `Unsupported resource type: ${params.resource}` }, { status: 400 });
+    return NextResponse.json({ error: `Unsupported resource type: ${resource}` }, { status: 400 });
   } catch (err) {
     logApiError('[API /terminology/:resource GET]', err);
     return serverError();

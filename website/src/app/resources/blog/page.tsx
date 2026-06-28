@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
+import { NewsletterSignup } from "@/components/marketing/NewsletterSignup";
 import {
   Reveal,
 } from "@/components/marketing/MarketingShared";
@@ -55,7 +57,7 @@ export default function BlogPage() {
       excerpt: "Ministry of Health reporting used to consume days of manual data work. See how DHIS2 automation cuts monthly reporting time from 3 days to 3 minutes—with zero data entry errors.",
       category: "Policy",
       date: "February 20, 2025",
-      image: "dashboard-screenshot.png",
+      image: "Dashboard.png",
       imageAlt: "Data analytics dashboard with charts",
       readTime: 9,
       featured: false,
@@ -88,7 +90,7 @@ export default function BlogPage() {
       excerpt: "Manual paper records contribute to missed diagnoses and lost patient histories. See how digital-first clinics are reducing medical errors while improving care quality and staff efficiency.",
       category: "Case Studies",
       date: "March 22, 2025",
-      image: "dashboard-screenshot.png",
+      image: "Dashboard.png",
       imageAlt: "Digital health transformation with analytics dashboard",
       readTime: 12,
       featured: true,
@@ -133,37 +135,20 @@ export default function BlogPage() {
 
   return (
     <>
-      {/* ── HERO SECTION (side-by-side) ──────────────────────────────── */}
-      <section className="mk-hero-split">
-        <div className="mk-container">
-          <div className="mk-hero-split-grid">
-            <Reveal>
-              <div className="mk-hero-split-text">
-                <span className="mk-label">INSIGHTS & RESOURCES</span>
-                <h1 className="mk-h1">Insights for modern healthcare in South Sudan</h1>
-                <p>
-                  Articles on digital health transformation, EHR best practices, and healthcare
-                  innovation — building the knowledge to accelerate your facility&apos;s digital journey.
-                </p>
-              </div>
-            </Reveal>
-            <Reveal delay={0.1}>
-              <div className="mk-hero-split-image">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/assets/doctor-writing-notes.jpg"
-                  alt="Clinician writing notes"
-                  loading="eager"
-                />
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
+      <MarketingHero
+        variant="photo"
+        eyebrow="INSIGHTS & RESOURCES"
+        title="Insights for modern healthcare in South Sudan"
+        subtitle="Articles on digital health transformation, EHR best practices, and healthcare innovation for facilities moving from paper to reliable digital workflows."
+        primaryCta={{ label: "Read featured article", href: "#featured-article" }}
+        image="/assets/doctor-writing-notes.jpg"
+        imageAlt="Clinician writing notes"
+        imagePriority
+      />
 
       {/* ── FEATURED ARTICLE SECTION (mk-split) ───────────────────────── */}
       {featuredPost && (
-        <section className="mk-section mk-section-white">
+        <section className="mk-section mk-section-white" id="featured-article">
           <div className="mk-container">
             <Reveal>
               <h2 className="mk-h2" style={{ marginBottom: 40 }}>Featured Article</h2>
@@ -184,7 +169,7 @@ export default function BlogPage() {
                       {featuredPost.readTime} min read
                     </span>
                   </div>
-                  <Link href="/about/contact" className="mk-btn mk-btn-green">
+                  <Link href="/about/contact#contact-form" className="mk-btn mk-btn-green">
                     Read article
                   </Link>
                 </div>
@@ -270,17 +255,9 @@ export default function BlogPage() {
                       flexDirection: "column",
                       height: "100%",
                       overflow: "hidden",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                      boxShadow: "none",
+                      transition: "none",
                       cursor: "pointer",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-4px)";
-                      e.currentTarget.style.boxShadow = "0 8px 16px rgba(0,0,0,0.12)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
                     }}
                   >
                     {/* Image with 240px height, rounded top corners */}
@@ -384,19 +361,13 @@ export default function BlogPage() {
                           {post.date}
                         </span>
                         <Link
-                          href="/about/contact"
+                          href="/about/contact#contact-form"
                           style={{
                             fontSize: 14,
                             color: "var(--tb-green)",
                             fontWeight: 600,
                             textDecoration: "none",
-                            transition: "transform 0.2s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = "translateX(4px)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = "translateX(0)";
+                            transition: "none",
                           }}
                         >
                           Read →
@@ -431,23 +402,7 @@ export default function BlogPage() {
               >
                 Get the latest healthcare insights, EHR best practices, and digital transformation tips delivered to your inbox.
               </p>
-              <div style={{ display: "flex", gap: 12 }}>
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  style={{
-                    flex: 1,
-                    padding: "12px 16px",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                    borderRadius: 6,
-                    fontSize: 14,
-                    fontFamily: "inherit",
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    color: "var(--tb-text-pri)",
-                  }}
-                />
-                <button className="mk-btn mk-btn-green">Subscribe</button>
-              </div>
+              <NewsletterSignup />
             </div>
           </Reveal>
         </div>

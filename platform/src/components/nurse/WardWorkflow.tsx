@@ -375,7 +375,7 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
             {/* Success State */}
             {vitalsSaved ? (
               <div className="p-8 text-center">
-                <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: 'rgba(74,222,128,0.15)' }}>
+                <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center">
                   <Check className="w-7 h-7" style={{ color: 'var(--color-success)' }} />
                 </div>
                 <p className="text-sm font-semibold" style={{ color: 'var(--color-success)' }}>{t('nurse.vitalsSavedSuccess')}</p>

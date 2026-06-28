@@ -12,7 +12,7 @@ const DEFAULT_CONFIG: Omit<PlatformConfigDoc, '_id' | '_rev' | 'createdAt' | 'up
     trialDays: 30,
     maxOrganizations: 100,
   },
-  defaultPrimaryColor: '#3b82f6',
+  defaultPrimaryColor: '#2191D0',
   defaultSecondaryColor: '#1E40AF',
 };
 

@@ -7,43 +7,64 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Users, FlaskConical, ArrowRightLeft, Building2, TrendingUp,
-  Activity,
 } from '@/components/icons/lucide';
 import type { HospitalDoc, PatientDoc, LabResultDoc, ReferralDoc, UserRole } from '@/lib/db-types';
 import type { DataScope } from '@/lib/services/data-scope';
 
 // Dynamically import Recharts to avoid SSR issues
 import dynamic from 'next/dynamic';
+import ChartCard from '@/components/ChartCard';
+import type { ChartType } from '@/components/ChartCard';
 
-const RechartsBarChart = dynamic(
+const RechartsOrgChart = dynamic(
   () => import('recharts').then(mod => {
-    const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } = mod;
+    const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line, AreaChart, Area } = mod;
 
-    function ChartComponent({ data, brandColor }: { data: { name: string; patients: number }[]; brandColor: string }) {
+    function ChartComponent({ data, brandColor, chartType }: { data: { name: string; patients: number }[]; brandColor: string; chartType: ChartType }) {
       const barColors = [brandColor, 'var(--accent-primary)', 'var(--color-success)', 'var(--color-warning)', '#EC4899', '#06B6D4', '#8B5CF6', '#3B82F6'];
+      const commonProps = { data, margin: { top: 5, right: 20, left: 0, bottom: 60 } };
+      const xProps = { dataKey: 'name', tick: { fontSize: 10, fill: '#888' }, angle: -35, textAnchor: 'end' as const, height: 80, interval: 0 };
+      const tooltipProps = { contentStyle: { background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 12 }, labelStyle: { color: 'var(--text-primary)', fontWeight: 600 } };
 
+      if (chartType === 'area') {
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart {...commonProps}>
+              <defs>
+                <linearGradient id="orgGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={brandColor} stopOpacity={0.18} />
+                  <stop offset="95%" stopColor={brandColor} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
+              <XAxis {...xProps} />
+              <YAxis tick={{ fontSize: 11, fill: '#888' }} />
+              <Tooltip {...tooltipProps} />
+              <Area type="monotone" dataKey="patients" stroke={brandColor} fill="url(#orgGrad)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        );
+      }
+      if (chartType === 'line') {
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart {...commonProps}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
+              <XAxis {...xProps} />
+              <YAxis tick={{ fontSize: 11, fill: '#888' }} />
+              <Tooltip {...tooltipProps} />
+              <Line type="monotone" dataKey="patients" stroke={brandColor} strokeWidth={2} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        );
+      }
       return (
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 60 }}>
+          <BarChart {...commonProps}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
-            <XAxis
-              dataKey="name"
-              tick={{ fontSize: 10, fill: '#888' }}
-              angle={-35}
-              textAnchor="end"
-              height={80}
-              interval={0}
-            />
+            <XAxis {...xProps} />
             <YAxis tick={{ fontSize: 11, fill: '#888' }} />
-            <Tooltip
-              contentStyle={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-light)',
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              labelStyle={{ color: 'var(--text-primary)', fontWeight: 600 }}
-            />
+            <Tooltip {...tooltipProps} />
             <Bar dataKey="patients" radius={[4, 4, 0, 0]} maxBarSize={40}>
               {data.map((_entry, index) => (
                 <Cell key={`cell-${index}`} fill={barColors[index % barColors.length]} />
@@ -68,7 +89,7 @@ export default function OrgAnalyticsPage() {
   const [referrals, setReferrals] = useState<ReferralDoc[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const brandColor = currentUser?.branding?.primaryColor || '#7C3AED';
+  const brandColor = currentUser?.branding?.primaryColor || 'var(--accent-primary)';
 
   useEffect(() => {
     if (!currentUser?.orgId) return;
@@ -189,7 +210,7 @@ export default function OrgAnalyticsPage() {
                 style={{ padding: '14px 16px' }}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <div className="icon-box-sm">
                     <Icon className="w-3.5 h-3.5" style={{ color: card.color }} />
                   </div>
                   <span className="kpi-card-title">{card.label}</span>
@@ -210,23 +231,22 @@ export default function OrgAnalyticsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Patients Per Hospital Chart */}
-          <div className="lg:col-span-2 dash-card overflow-hidden">
-            <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                {t('orgAnalytics.patientsPerHospital')}
-              </h3>
-            </div>
-            <div className="p-4">
-            {patientsPerHospital.length > 0 ? (
-              <RechartsBarChart data={patientsPerHospital} brandColor={brandColor} />
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                {t('orgAnalytics.noHospitalData')}
-              </div>
+          <ChartCard
+            title={t('orgAnalytics.patientsPerHospital')}
+            defaultType="bar"
+            defaultPeriod="month"
+            className="lg:col-span-2"
+          >
+            {({ chartType }) => (
+              patientsPerHospital.length > 0 ? (
+                <RechartsOrgChart data={patientsPerHospital} brandColor={brandColor} chartType={chartType} />
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {t('orgAnalytics.noHospitalData')}
+                </div>
+              )
             )}
-            </div>
-          </div>
+          </ChartCard>
 
           {/* Right Column */}
           <div className="flex flex-col gap-4">
@@ -240,7 +260,7 @@ export default function OrgAnalyticsPage() {
               </div>
               <div className="p-4">
               <div className="space-y-3">
-                <ProgressRow label={t('orgAnalytics.statusCompleted')} count={labCompleted} total={labTotal} color="#3b82f6" />
+                <ProgressRow label={t('orgAnalytics.statusCompleted')} count={labCompleted} total={labTotal} color="#2191D0" />
                 <ProgressRow label={t('orgAnalytics.statusInProgress')} count={labInProgress} total={labTotal} color="#F59E0B" />
                 <ProgressRow label={t('orgAnalytics.statusPending')} count={labPending} total={labTotal} color="#E52E42" />
               </div>
