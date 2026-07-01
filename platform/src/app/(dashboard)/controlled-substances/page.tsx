@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { Pill, Plus, X, UserCheck } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
@@ -13,6 +12,9 @@ import {
   type RecordMovementInput,
 } from '@/lib/services/controlled-substance-service';
 import type { ControlledSubstanceLogDoc } from '@/lib/db-types';
+import Badge, { type BadgeTone } from '@/components/Badge';
+import EmptyState from '@/components/EmptyState';
+import { formatDateTime } from '@/lib/format-utils';
 
 const SCHEDULES: ControlledSubstanceLogDoc['schedule'][] = ['I', 'II', 'III', 'IV', 'V'];
 const MOVEMENTS: ControlledSubstanceLogDoc['movement'][] = ['intake', 'dispense', 'waste', 'reconciliation', 'transfer'];
@@ -25,16 +27,14 @@ const MOVEMENT_LABELS: Record<ControlledSubstanceLogDoc['movement'], string> = {
   transfer: 'Transfer',
 };
 
-/** Color per movement type for the small status pill. */
-function movementColor(m: ControlledSubstanceLogDoc['movement']): string {
-  switch (m) {
-    case 'intake': return '#15795C';
-    case 'dispense': return '#3b82f6';
-    case 'waste': return '#C44536';
-    case 'transfer': return '#B8741C';
-    default: return 'var(--accent-primary)';
-  }
-}
+/** Semantic Badge tone per movement type for the small status pill. */
+const MOVEMENT_TONE: Record<ControlledSubstanceLogDoc['movement'], BadgeTone> = {
+  intake: 'success',
+  dispense: 'info',
+  waste: 'danger',
+  reconciliation: 'accent',
+  transfer: 'warning',
+};
 
 /** Turn a free-typed witness name into a stable id so it differs from the operator. */
 function slugify(name: string): string {
@@ -148,22 +148,15 @@ export default function ControlledSubstancesPage() {
 
   return (
     <>
-      <TopBar title="Controlled Substances" />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <PageHeader
-          icon={Pill}
-          title="Controlled Substance Register"
-          subtitle="Two-signature audit log of every Schedule I–V drug movement, for regulatory compliance."
-          actions={
+      <TopBar title="Controlled Substances" actions={
             <button onClick={openModal} className="btn btn-primary">
               <Plus className="w-4 h-4" /> Record movement
             </button>
-          }
-        />
-
+          } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <div className="dash-card flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <div className="px-5 py-3 border-b flex items-center gap-3" style={{ borderColor: 'var(--border-light)' }}>
-            <span className="icon-box-sm" style={{ background: 'rgba(196, 69, 54, 0.12)' }}>
+            <span className="icon-box-sm">
               <Pill className="w-4 h-4" style={{ color: '#C44536' }} />
             </span>
             <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Movement log</h3>
@@ -176,18 +169,14 @@ export default function ControlledSubstancesPage() {
           {loading ? (
             <div className="p-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading log…</div>
           ) : movements.length === 0 ? (
-            <div className="p-10 text-center">
-              <span className="icon-box-sm mx-auto mb-3" style={{ background: 'rgba(196, 69, 54, 0.12)', display: 'inline-flex' }}>
-                <Pill className="w-4 h-4" style={{ color: '#C44536' }} />
-              </span>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>No movements recorded yet</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                Record the first controlled-substance movement to start the audit trail.
-              </p>
-            </div>
+            <EmptyState
+              icon={Pill}
+              title="No movements recorded yet"
+              message="Record the first controlled-substance movement to start the audit trail."
+            />
           ) : (
             <div className="overflow-x-auto">
-              <table className="data-table">
+              <table className="data-table" style={{ minWidth: 960 }}>
                 <thead>
                   <tr>
                     <th>Medication</th>
@@ -201,31 +190,24 @@ export default function ControlledSubstancesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {movements.map(m => {
-                    const color = movementColor(m.movement);
-                    return (
-                      <tr key={m._id}>
-                        <td className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>{m.medicationName}</td>
-                        <td>
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}>
-                            Sch {m.schedule}
-                          </span>
-                        </td>
-                        <td>
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{ background: `${color}1A`, color, border: `1px solid ${color}40` }}>
-                            {MOVEMENT_LABELS[m.movement]}
-                          </span>
-                        </td>
-                        <td className="text-sm" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{m.quantity} {m.unit}</td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{m.operatorName}</td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{m.witnessName}</td>
-                        <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{m.reason || '—'}</td>
-                        <td className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-                          {m.createdAt ? new Date(m.createdAt).toLocaleString() : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {movements.map(m => (
+                    <tr key={m._id}>
+                      <td className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>{m.medicationName}</td>
+                      <td>
+                        <Badge tone="neutral" uppercase>Sch {m.schedule}</Badge>
+                      </td>
+                      <td>
+                        <Badge tone={MOVEMENT_TONE[m.movement]} uppercase>{MOVEMENT_LABELS[m.movement]}</Badge>
+                      </td>
+                      <td className="text-sm" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{m.quantity} {m.unit}</td>
+                      <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{m.operatorName}</td>
+                      <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{m.witnessName}</td>
+                      <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{m.reason || '—'}</td>
+                      <td className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                        {formatDateTime(m.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -314,6 +296,16 @@ export default function ControlledSubstancesPage() {
               <hr className="section-divider" />
               <div className="flex gap-2 mt-2">
                 <button onClick={() => setOpen(false)} className="btn btn-secondary flex-1" disabled={saving}>Cancel</button>
+                {/* Correct a mis-typed draft before it is committed. The committed
+                    log itself is append-only for regulatory compliance and is
+                    never editable or deletable from here. */}
+                <button
+                  onClick={() => setForm({ ...blankForm, operatorName: currentUser?.name || '' })}
+                  className="btn btn-secondary flex-1"
+                  disabled={saving}
+                >
+                  Clear
+                </button>
                 <button onClick={handleSubmit} className="btn btn-primary flex-1" disabled={saving}>
                   {saving ? 'Recording…' : 'Record movement'}
                 </button>

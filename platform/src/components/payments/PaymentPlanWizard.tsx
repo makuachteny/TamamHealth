@@ -5,6 +5,7 @@ import Modal from '@/components/Modal';
 import { X, CheckCircle2, ArrowRight, Loader2 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { formatMoney } from '@/lib/format-utils';
 
 interface PaymentPlanWizardProps {
   patientId: string;
@@ -97,7 +98,7 @@ export default function PaymentPlanWizard({
         {/* Balance */}
         <div style={{ padding: '16px 20px', background: 'var(--bg-secondary)', textAlign: 'center' }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('payments.totalBalance')}</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)' }}>{balance.toLocaleString()} {currency}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(balance, { currency })}</div>
         </div>
 
         <div style={{ padding: 20 }}>
@@ -134,7 +135,7 @@ export default function PaymentPlanWizard({
               <div style={{ padding: 16, borderRadius: 12, background: 'var(--bg-secondary)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('payments.monthlyPayment')}</span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)' }}>{monthlyAmount.toLocaleString()} {currency}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)' }}>{formatMoney(monthlyAmount, { currency })}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('payments.term')}</span>

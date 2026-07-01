@@ -20,10 +20,10 @@ This single mechanism stops the textbook CSRF attack (an `<img>` or
 [`/api/auth/login`](../../src/app/api/auth/login/route.ts) and
 [`/api/auth/logout`](../../src/app/api/auth/logout/route.ts).
 
-### 2. Origin / Host header check (middleware layer 1)
+### 2. Origin / Host header check (proxy layer 1)
 
 For every state-changing request to `/api/*`,
-[`middleware.ts`](../../src/middleware.ts) requires:
+[`proxy.ts`](../../src/proxy.ts) requires:
 
 - An `Origin` header is present (mandatory in production).
 - `URL(origin).host === request.headers.get('host')`.
@@ -32,7 +32,7 @@ This catches the residual cases where SameSite is bypassed — most commonly,
 buggy or older browsers, exotic deployment misconfigurations, or a downstream
 proxy that strips cookie attributes.
 
-### 3. HMAC-bound double-submit token (middleware layer 2)
+### 3. HMAC-bound double-submit token (proxy layer 2)
 
 Implemented in [`lib/csrf.ts`](../../src/lib/csrf.ts).
 
@@ -45,7 +45,7 @@ browser-side fetch wrapper [`lib/api-fetch.ts`](../../src/lib/api-fetch.ts)
 can read it and echo it back in the `X-CSRF-Token` header on every
 state-changing request.
 
-The middleware enforces, for any non-exempt POST/PUT/PATCH/DELETE under
+The proxy enforces, for any non-exempt POST/PUT/PATCH/DELETE under
 `/api/*`:
 
 - both the cookie *and* the header are present;
@@ -73,7 +73,7 @@ Some `/api/*` paths are intentionally exempt from layer 3:
 | `/api/fhir/metadata` | Public CapabilityStatement. |
 | `/api/country/metadata`, `/api/terminology/*` | Public reference data, no PHI. |
 
-The exempt list lives in [`middleware.ts`](../../src/middleware.ts) — touch
+The exempt list lives in [`proxy.ts`](../../src/proxy.ts) — touch
 both there and the unit tests when adding to it.
 
 ## What this does *not* defend against

@@ -1,28 +1,38 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Modal from '@/components/Modal';
 import { useRouter } from 'next/navigation';
+import {
+  LineChart, Line, AreaChart, Area, BarChart, Bar,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
+} from 'recharts';
 import { useApp } from '@/lib/context';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import {
   Users, AlertTriangle,
-  ChevronRight, Stethoscope,
-  Syringe, HeartPulse, Baby, FlaskConical,
+  ChevronRight, ChevronLeft, Stethoscope,
+  Syringe, HeartPulse, FlaskConical,
   FileText, Pill,
   SendHorizontal,
-  X, ClipboardList, TestTube, Clock,
-  CheckCircle2, Search, Globe, ExternalLink, RefreshCw,
-  LayoutDashboard,
+  X, ClipboardList, TestTube,
+  CheckCircle2, ArrowUpRight,
+  ArrowRightLeft, Calendar, BedDouble,
 } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useResumableEncounters } from '@/lib/hooks/useResumableEncounters';
+import { useSigningInbox } from '@/lib/hooks/useSigningInbox';
+import { usePhoneNotesInbox } from '@/lib/hooks/usePhoneNotesInbox';
 import { useTriage } from '@/lib/hooks/useTriage';
+import { useReferrals } from '@/lib/hooks/useReferrals';
+import { useAppointments } from '@/lib/hooks/useAppointments';
+import { useWards } from '@/lib/hooks/useWards';
 import { formatCompactDateTime } from '@/lib/format-utils';
+import { patientFullName, patientAge } from '@/lib/patient-utils';
 import { getDefaultDashboard } from '@/lib/permissions';
 import SuperintendentDashboard from '@/components/dashboards/SuperintendentDashboard';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import PatientAvatar from '@/components/patients/PatientAvatar';
 
 const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', 'Lab', 'Pharmacy', 'ICU'];
 
@@ -252,6 +262,24 @@ export default function DashboardPage() {
   const { patients } = usePatients();
   // Consultations this clinician paused while waiting on lab/imaging results.
   const { encounters: resumableEncounters } = useResumableEncounters();
+  // Documents awaiting signature / co-signature — the Chart Desktop "to sign" inbox.
+  const { unsignedDrafts, awaitingCosign, heldAssessments } = useSigningInbox();
+  // Open patient phone notes routed to me — callbacks worklist.
+  const { notes: phoneNotesInbox } = usePhoneNotesInbox();
+  // Referrals — used for the "My Referrals" greeting-hero stat.
+  const { referrals } = useReferrals();
+  // Appointments — drives the "Next Appointment" card.
+  const { appointments, updateStatus: updateApptStatus } = useAppointments();
+  const { wards } = useWards();
+  const canCosign = currentUser?.role === 'doctor' || currentUser?.role === 'medical_superintendent' || currentUser?.role === 'clinician';
+  // Resolve a patient display name for the signing inbox from the loaded roster.
+  const signingPatientName = useCallback(
+    (patientId: string): string => {
+      const p = patients.find((pt) => pt._id === patientId);
+      return p ? patientFullName(p) : patientId;
+    },
+    [patients],
+  );
   const { triages } = useTriage();
   // Today's triage priority per patient, so the worklist can lead with acuity.
   const triagePriorityByPatient = useMemo(() => {
@@ -266,22 +294,45 @@ export default function DashboardPage() {
     return map;
   }, [triages]);
 
-  // Facility Sync — the data elements/documents this facility pushes to the
-  // national HMIS, each with its current sync status. The "syncing" item shows
-  // an animated spinner while it's in flight.
-  const SYNC_ELEMENTS: { name: string; status: 'synced' | 'syncing' | 'pending' }[] = [
-    { name: 'OPD Attendance', status: 'synced' },
-    { name: 'Malaria Cases', status: 'synced' },
-    { name: 'ANC Visits', status: 'synced' },
-    { name: 'Immunizations', status: 'synced' },
-    { name: 'Births', status: 'synced' },
-    { name: 'Deaths', status: 'synced' },
-    { name: 'Lab Results', status: 'synced' },
-    { name: 'Referrals', status: 'synced' },
-    { name: 'Inpatient Admissions', status: 'syncing' },
-    { name: 'Drug Stock Levels', status: 'pending' },
-  ];
-  const syncedCount = SYNC_ELEMENTS.filter(e => e.status === 'synced').length;
+  // Reviews Score chart controls
+  const [reviewsChartType, setReviewsChartType] = useState<'line' | 'area' | 'bar'>('bar');
+  const [reviewsPeriod, setReviewsPeriod] = useState<'week' | 'month' | 'quarter'>('week');
+
+  const REVIEWS_DATA: Record<string, { label: string; data: { label: string; inpatient: number; outpatient: number }[] }> = {
+    week: {
+      label: 'This Week',
+      data: [
+        { label: 'Mon', inpatient: 76, outpatient: 82 },
+        { label: 'Tue', inpatient: 80, outpatient: 78 },
+        { label: 'Wed', inpatient: 72, outpatient: 86 },
+        { label: 'Thu', inpatient: 84, outpatient: 80 },
+        { label: 'Fri', inpatient: 78, outpatient: 88 },
+        { label: 'Sat', inpatient: 82, outpatient: 84 },
+        { label: 'Sun', inpatient: 86, outpatient: 90 },
+      ],
+    },
+    month: {
+      label: 'This Month',
+      data: [
+        { label: 'Wk 1', inpatient: 74, outpatient: 80 },
+        { label: 'Wk 2', inpatient: 80, outpatient: 84 },
+        { label: 'Wk 3', inpatient: 78, outpatient: 88 },
+        { label: 'Wk 4', inpatient: 84, outpatient: 86 },
+      ],
+    },
+    quarter: {
+      label: 'This Quarter',
+      data: [
+        { label: 'Jan', inpatient: 72, outpatient: 78 },
+        { label: 'Feb', inpatient: 76, outpatient: 82 },
+        { label: 'Mar', inpatient: 80, outpatient: 86 },
+        { label: 'Apr', inpatient: 78, outpatient: 84 },
+        { label: 'May', inpatient: 82, outpatient: 88 },
+        { label: 'Jun', inpatient: 86, outpatient: 90 },
+      ],
+    },
+  };
+  const reviewsData = REVIEWS_DATA[reviewsPeriod].data;
 
   // Patients a nurse has assigned to this clinician for care.
   const myAssigned = useMemo(
@@ -295,6 +346,27 @@ export default function DashboardPage() {
   const [assignedSearch, setAssignedSearch] = useState('');
   const [assignedDivision, setAssignedDivision] = useState('all');
   const [assignedSort, setAssignedSort] = useState<'acuity' | 'recent' | 'name' | 'age'>('acuity');
+  // Acuity filter value (the setter's UI control was removed; value still
+  // feeds the worklist filter and defaults to showing all acuities).
+  const [assignedAcuity] = useState<'all' | 'RED' | 'YELLOW' | 'GREEN'>('all');
+  // Which tab of the worklist card is showing: the assigned-patients table or
+  // the documents-to-sign inbox (both share one card).
+  const [worklistTab, setWorklistTab] = useState<'patients' | 'documents'>('patients');
+  // Index into the clinician's upcoming-appointments carousel. Declared with the
+  // other hooks (above any early return) so hook order is always stable.
+  const [apptIndex, setApptIndex] = useState(0);
+  const apptCarouselRef = useRef<HTMLDivElement>(null);
+  const apptScrolling = useRef(false);
+  useEffect(() => {
+    const el = apptCarouselRef.current;
+    if (!el) return;
+    apptScrolling.current = true;
+    el.scrollTo({ left: apptIndex * el.clientWidth, behavior: 'smooth' });
+    const timer = setTimeout(() => { apptScrolling.current = false; }, 400);
+    return () => clearTimeout(timer);
+  }, [apptIndex]);
+  const [docsSearch, setDocsSearch] = useState('');
+  const [docsFilter, setDocsFilter] = useState<'all' | 'outcome' | 'cosign' | 'draft'>('all');
 
   // Disease trend explorer
 
@@ -313,6 +385,25 @@ export default function DashboardPage() {
   const [labPatientId, setLabPatientId] = useState('');
   const [selectedLabTests, setSelectedLabTests] = useState<Set<string>>(new Set());
   const [labOrderSuccess, setLabOrderSuccess] = useState(false);
+
+  // Quick-action popup modals
+  const [newPatientOpen, setNewPatientOpen] = useState(false);
+  const [newPatientForm, setNewPatientForm] = useState({ firstName: '', lastName: '', dob: '', gender: 'female', phone: '' });
+
+  const [newReferralOpen, setNewReferralOpen] = useState(false);
+  const [referralForm, setReferralForm] = useState({ patientId: '', toFacility: '', reason: '' });
+  const [referralDone, setReferralDone] = useState(false);
+
+  const [bookApptOpen, setBookApptOpen] = useState(false);
+  const [apptForm, setApptForm] = useState({ patientId: '', date: '', time: '', type: 'OPD' });
+  const [apptDone, setApptDone] = useState(false);
+
+  const [ancOpen, setAncOpen] = useState(false);
+  const [ancPatientId, setAncPatientId] = useState('');
+
+  const [wardAdmitOpen, setWardAdmitOpen] = useState(false);
+  const [admitForm2, setAdmitForm2] = useState({ patientId: '', wardId: '', diagnosis: '' });
+  const [admitDone, setAdmitDone] = useState(false);
 
   // `/dashboard` is shared. Doctors/clinical officers get the clinical view
   // below; the medical superintendent gets the admin-oriented view rendered
@@ -427,8 +518,12 @@ export default function DashboardPage() {
   // and left blank in production rather than inventing a clinical team.
   const assignedRows = myAssigned.map((p, i) => ({
     _id: p._id,
-    name: `${p.firstName} ${p.surname}`,
-    age: p.estimatedAge || (p.dateOfBirth ? new Date().getFullYear() - new Date(p.dateOfBirth).getFullYear() : 25 + i * 3),
+    firstName: p.firstName,
+    surname: p.surname,
+    photoUrl: p.photoUrl,
+    payorInfo: p.payorInfo,
+    name: patientFullName(p),
+    age: patientAge(p) ?? (25 + i * 3),
     gender: p.gender?.[0] || (IS_DEMO ? (i % 2 === 0 ? 'M' : 'F') : ''),
     id: p.hospitalNumber,
     admittedAt: p.assignedAt || p.registeredAt || p.registrationDate,
@@ -452,7 +547,8 @@ export default function DashboardPage() {
       const haystack = `${r.name} ${r.id} ${r.ward} ${r.division} ${r.nurse} ${r.doctor} ${r.gender}`.toLowerCase();
       const matchesSearch = !q || q.split(/\s+/).every(term => haystack.includes(term));
       const matchesDivision = assignedDivision === 'all' || r.division === assignedDivision;
-      return matchesSearch && matchesDivision;
+      const matchesAcuity = assignedAcuity === 'all' || r.triagePriority === assignedAcuity;
+      return matchesSearch && matchesDivision && matchesAcuity;
     })
     .sort((a, b) => {
       if (assignedSort === 'name') return a.name.localeCompare(b.name);
@@ -467,58 +563,311 @@ export default function DashboardPage() {
       return (b.admittedAt ?? '').localeCompare(a.admittedAt ?? ''); // recent
     });
 
+  // Total documents awaiting the clinician's signature — drives the
+  // "Documents to sign" tab count + empty state.
+  const signCount = unsignedDrafts.length + awaitingCosign.length + heldAssessments.length;
+
+  // ─── Greeting hero values ───
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? 'Good Morning' : now.getHours() < 17 ? 'Good Afternoon' : 'Good Evening';
+  const heroDate = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  const myReferralsCount = (referrals || []).filter(r => r.createdBy === currentUser._id).length;
+  const heroStats = [
+    { label: 'My Patients', value: assignedRows.length },
+    { label: 'My Referrals', value: myReferralsCount },
+    { label: 'Documents', value: signCount },
+  ];
+
+  // ─── Facility sync summary (drives the ring + pending list) ───
+
+  // ─── Next appointment for this clinician ───
+  const apptKey = (a: { appointmentDate: string; appointmentTime?: string }) => `${a.appointmentDate}T${a.appointmentTime || '00:00'}`;
+  const myUpcomingAppts = (appointments || [])
+    .filter(a => a.providerId === currentUser._id && a.status !== 'cancelled' && a.status !== 'completed' && a.status !== 'no_show')
+    .sort((x, y) => apptKey(x).localeCompare(apptKey(y)));
+
+  // ─── Quick actions — all open popup modals ───
+  const quickActions = [
+    { label: t('dashboard.newPatient'), icon: Users, action: () => setNewPatientOpen(true) },
+    { label: t('action.newConsultation'), icon: FileText, action: () => setSoapModalOpen(true) },
+    { label: t('dashboard.quickPrescribe'), icon: Pill, action: () => setPrescribeModalOpen(true) },
+    { label: t('dashboard.quickLabOrder'), icon: FlaskConical, action: () => setLabModalOpen(true) },
+    { label: 'New Referral', icon: ArrowRightLeft, action: () => { setReferralDone(false); setReferralForm({ patientId: '', toFacility: '', reason: '' }); setNewReferralOpen(true); } },
+    { label: 'Book Appointment', icon: Calendar, action: () => { setApptDone(false); setApptForm({ patientId: '', date: '', time: '', type: 'OPD' }); setBookApptOpen(true); } },
+    { label: 'ANC Visit', icon: HeartPulse, action: () => { setAncPatientId(''); setAncOpen(true); } },
+    { label: 'Ward Admission', icon: BedDouble, action: () => { setAdmitDone(false); setAdmitForm2({ patientId: '', wardId: '', diagnosis: '' }); setWardAdmitOpen(true); } },
+  ];
 
   return (
     <>
-      <TopBar title={t('nav.dashboard')} />
+      {/* Clinical officers don't get the platform-wide search bar on their dashboard. */}
+      <TopBar title={t('nav.dashboard')} hideSearch={currentUser.role === 'clinical_officer'} />
       <main className="page-container page-enter">
 
         {/* Clinical alerts moved to a dedicated /alerts page. */}
 
         <div className="flex flex-col gap-5 h-full min-h-0">
-        {/* ═══ PAGE HEADER (Patient Registry-style) — order:0 so it sits at the
-            top and pushes Quick Actions + Sync down to align with the sidebar
-            navigation. ═══ */}
-        <div style={{ order: 0 }} className="flex-shrink-0">
-          <PageHeader
-            icon={LayoutDashboard}
-            title={t('nav.dashboard')}
-            subtitle={currentUser?.hospitalName || 'Clinical overview'}
-          />
-        </div>
+        {/* ═══ ROW 1 — Greeting hero + Facility Sync ═══ */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 flex-shrink-0" style={{ order: 0 }}>
+          {/* Greeting hero — brand gradient banner. Greeting on top, day-at-a-
+              glance stats anchored to the bottom-left (matches the design). */}
+          <div className="hero-banner md:col-span-2 lg:col-span-2 flex flex-col justify-between" style={{ minHeight: 224, height: 224 }}>
+            {/* Decorative Union dots */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              aria-hidden
+              src="/assets/union.png"
+              alt=""
+              style={{
+                position: 'absolute',
+                width: 420,
+                height: 420,
+                top: -80,
+                right: -60,
+                zIndex: 0,
+                pointerEvents: 'none',
+                objectFit: 'contain',
+                filter: 'brightness(0) invert(1)',
+                opacity: 0.18,
+                transform: 'rotate(10deg)',
+              }}
+            />
+            <div className="relative z-[1] min-w-0">
+              <h2 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 24, lineHeight: 1, letterSpacing: 0 }}>
+                {greeting}{currentUser.name ? ` ${currentUser.name}` : ''}
+              </h2>
+              <div className="flex items-center gap-2.5 mt-2.5 flex-wrap">
+                <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: 14, lineHeight: 1, letterSpacing: 0, color: 'rgba(255,255,255,0.9)' }}>
+                  {heroDate}
+                </span>
+                {currentUser.hospitalName && (
+                  <span
+                    className="inline-flex items-center gap-2"
+                    style={{ height: 26, padding: '0 12px 0 3px', background: 'transparent', border: '0.5px solid #FEFFF9', borderRadius: 9999, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 12, color: '#fff' }}
+                  >
+                    <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#90F489', flexShrink: 0, display: 'block' }} />
+                    {currentUser.hospitalName}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="relative z-[1] flex items-end gap-8 sm:gap-12 mt-6">
+              {heroStats.map(s => (
+                <div key={s.label} className="text-left">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                    {s.label}
+                  </div>
+                  <div className="mt-2 tabular-nums" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 48, lineHeight: 1, letterSpacing: -0.5 }}>
+                    {s.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
+          {/* Reviews Score */}
+          <div className="dash-card p-4 md:col-span-2 lg:col-span-1 flex flex-col" style={{ minHeight: 224, height: 224 }}>
+            {/* Header row */}
+            <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
+              <h3 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15, lineHeight: 1, color: 'var(--text-primary)', flexShrink: 0 }}>Patient Satisfaction</h3>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {/* Chart type picker */}
+                {(['line', 'area', 'bar'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setReviewsChartType(t)}
+                    style={{
+                      fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                      background: reviewsChartType === t ? 'var(--accent-primary)' : 'var(--overlay-subtle)',
+                      color: reviewsChartType === t ? '#fff' : 'var(--text-muted)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {t[0].toUpperCase() + t.slice(1)}
+                  </button>
+                ))}
+                {/* Period picker */}
+                <select
+                  value={reviewsPeriod}
+                  onChange={e => setReviewsPeriod(e.target.value as 'week' | 'month' | 'quarter')}
+                  style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', borderRadius: 6, padding: '2px 6px', cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                  <option value="quarter">This Quarter</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Chart */}
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                {reviewsChartType === 'bar' ? (
+                  <BarChart data={reviewsData} margin={{ top: 2, right: 4, left: -26, bottom: 0 }} barCategoryGap="28%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'DM Sans' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
+                    <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'DM Sans', paddingTop: 2 }} />
+                    <Bar dataKey="inpatient" name="Inpatient" fill="#2191D0" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="outpatient" name="Outpatient" fill="#FF7F00" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                ) : reviewsChartType === 'area' ? (
+                  <AreaChart data={reviewsData} margin={{ top: 2, right: 4, left: -26, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradIn" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#2191D0" stopOpacity={0.18} />
+                        <stop offset="95%" stopColor="#2191D0" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradOut" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#FF7F00" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#FF7F00" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'DM Sans' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
+                    <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'DM Sans', paddingTop: 2 }} />
+                    <Area type="monotone" dataKey="inpatient" name="Inpatient" stroke="#2191D0" strokeWidth={2} fill="url(#gradIn)" dot={false} activeDot={{ r: 4 }} />
+                    <Area type="monotone" dataKey="outpatient" name="Outpatient" stroke="#FF7F00" strokeWidth={2} fill="url(#gradOut)" dot={false} activeDot={{ r: 4 }} />
+                  </AreaChart>
+                ) : (
+                  <LineChart data={reviewsData} margin={{ top: 2, right: 4, left: -26, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'DM Sans' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
+                    <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'DM Sans', paddingTop: 2 }} />
+                    <Line type="monotone" dataKey="inpatient" name="Inpatient" stroke="#2191D0" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                    <Line type="monotone" dataKey="outpatient" name="Outpatient" stroke="#FF7F00" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                  </LineChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
         {/* ═══ PATIENTS ASSIGNED TO YOU TABLE ═══ */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ order: 4, flex: 1, minHeight: 0 }}>
-          <div className="p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            {/* Row 1 — title + details */}
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Patients assigned to you <span className="text-[11px] font-normal" style={{ color: 'var(--text-muted)' }}>({displayedAssigned.length}{displayedAssigned.length !== assignedRows.length ? ` / ${assignedRows.length}` : ''})</span></h3>
-              <button onClick={() => router.push('/patients')} className="text-[12px] font-medium flex items-center gap-0.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }}>
-                {t('dashboard.details')} <ChevronRight className="w-3 h-3" />
-              </button>
-            </div>
-            {/* Row 2 — search + filters (matches the patient registry) */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-                <input
-                  type="search"
-                  value={assignedSearch}
-                  onChange={(e) => setAssignedSearch(e.target.value)}
-                  placeholder="Search by name or patient ID…"
-                  className="pl-9 search-icon-input w-full"
-                  style={{ background: 'var(--overlay-subtle)' }}
-                />
+          <div className="p-4 pb-3">
+            {/* Row 1 — tab switcher (assigned patients / documents to sign) + context action */}
+            <div className="flex items-end justify-between gap-3 mb-3">
+              <div className="flex items-end gap-6" role="tablist">
+                <button
+                  role="tab"
+                  aria-selected={worklistTab === 'patients'}
+                  onClick={() => setWorklistTab('patients')}
+                  className="transition-colors focus:outline-none"
+                  style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 500,
+                    fontSize: 24,
+                    lineHeight: '100%',
+                    letterSpacing: 0,
+                    color: worklistTab === 'patients' ? '#000000' : 'rgba(0,0,0,0.30)',
+                    background: 'none',
+                    border: 'none',
+                    outline: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Patients assigned to you
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={worklistTab === 'documents'}
+                  onClick={() => setWorklistTab('documents')}
+                  className="transition-colors focus:outline-none"
+                  style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 500,
+                    fontSize: 24,
+                    lineHeight: '100%',
+                    letterSpacing: 0,
+                    color: worklistTab === 'documents' ? '#000000' : 'rgba(0,0,0,0.30)',
+                    background: 'none',
+                    border: 'none',
+                    outline: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Documents to sign
+                  {signCount > 0 && (
+                    <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: 'var(--color-warning)', color: '#fff', verticalAlign: 'middle' }}>
+                      {signCount}
+                    </span>
+                  )}
+                </button>
               </div>
+              <div className="flex items-center gap-3 flex-shrink-0 pb-0.5">
+                {worklistTab === 'patients' ? (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'var(--color-danger)' }} /> Critical ({assignedRows.filter(r => r.triagePriority === 'RED').length})</span>
+                    <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'var(--color-warning)' }} /> Watch ({assignedRows.filter(r => r.triagePriority === 'YELLOW').length})</span>
+                    <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'var(--color-success)' }} /> Stable ({assignedRows.filter(r => r.triagePriority === 'GREEN').length})</span>
+                    <button onClick={() => router.push('/patients')} className="text-[12px] font-medium flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
+                      {t('dashboard.details')} <ChevronRight className="w-3 h-3" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'var(--text-muted)' }} /> Drafts ({unsignedDrafts.length})</span>
+                    <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#6366F1' }} /> Co-sign ({awaitingCosign.length})</span>
+                    <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'var(--color-warning)' }} /> Outcome ({heldAssessments.length})</span>
+                    <button onClick={() => router.push('/encounters')} className="text-[12px] font-medium flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
+                      Details <ChevronRight className="w-3 h-3" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            {/* Row 2 — search + filters */}
+            {worklistTab === 'documents' && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <input
+                type="search"
+                value={docsSearch}
+                onChange={(e) => setDocsSearch(e.target.value)}
+                placeholder="Search by patient name…"
+                className="flex-1 min-w-[200px]"
+                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 18px', fontSize: 13 }}
+              />
+              <select
+                value={docsFilter}
+                onChange={(e) => setDocsFilter(e.target.value as typeof docsFilter)}
+                className="w-full sm:w-48"
+                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 16px', fontSize: 13 }}
+                aria-label="Filter by document type"
+              >
+                <option value="all">All Types</option>
+                <option value="draft">Unsigned drafts</option>
+                <option value="cosign">Needs co-signature</option>
+                <option value="outcome">Outcome measures</option>
+              </select>
+            </div>
+            )}
+            {worklistTab === 'patients' && (
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Pill-shaped search + filters (matches the design). */}
+              <input
+                type="search"
+                value={assignedSearch}
+                onChange={(e) => setAssignedSearch(e.target.value)}
+                placeholder="Search by name or patient ID…"
+                className="flex-1 min-w-[200px]"
+                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 18px', fontSize: 13 }}
+              />
               {assignedDivisions.length > 0 && (
                 <select
                   value={assignedDivision}
                   onChange={(e) => setAssignedDivision(e.target.value)}
                   className="w-full sm:w-44"
-                  style={{ background: 'var(--overlay-subtle)' }}
+                  style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 16px', fontSize: 13 }}
                   aria-label="Filter by division"
                 >
-                  <option value="all">All divisions</option>
+                  <option value="all">All Divisions</option>
                   {assignedDivisions.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               )}
@@ -526,7 +875,7 @@ export default function DashboardPage() {
                 value={assignedSort}
                 onChange={(e) => setAssignedSort(e.target.value as 'acuity' | 'recent' | 'name' | 'age')}
                 className="w-full sm:w-44"
-                style={{ background: 'var(--overlay-subtle)' }}
+                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 16px', fontSize: 13 }}
                 aria-label="Sort"
               >
                 <option value="acuity">Acuity (urgent first)</option>
@@ -535,13 +884,15 @@ export default function DashboardPage() {
                 <option value="age">Age (high→low)</option>
               </select>
             </div>
+            )}
           </div>
+          {worklistTab === 'patients' ? (
           <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 840 }}>
               <thead>
                 <tr>
-                  {[t('patient.name'), t('dashboard.patientId'), t('dashboard.admitted'), t('dashboard.wardRoomNo'), t('dashboard.assignedDoctor'), t('dashboard.assignedNurse'), t('dashboard.division')].map(h => (
-                    <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>
+                  {[t('patient.name'), t('nurse.colAge'), t('nurse.colGender'), t('dashboard.patientId'), t('dashboard.admitted'), t('dashboard.wardRoomNo'), t('dashboard.assignedDoctor'), t('dashboard.assignedNurse'), t('dashboard.division')].map(h => (
+                    <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>
                       {h}
                     </th>
                   ))}
@@ -550,14 +901,14 @@ export default function DashboardPage() {
               <tbody>
                 {assignedRows.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                    <td colSpan={9} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
                       No patients are assigned to you right now.
                     </td>
                   </tr>
                 )}
                 {assignedRows.length > 0 && displayedAssigned.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                    <td colSpan={9} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
                       No assigned patients match your search or filter.
                     </td>
                   </tr>
@@ -575,29 +926,24 @@ export default function DashboardPage() {
                   >
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                          style={{ background: p.gender === 'F' ? 'linear-gradient(135deg, #D96E59 0%, #C44536 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)', letterSpacing: 0.3 }}
-                          aria-hidden
-                        >
-                          {p.name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{p.name}</span>
-                          <span className="text-[10px] ml-1.5" style={{ color: 'var(--text-muted)' }}>{p.age} Y, {p.gender}</span>
-                          {p.triagePriority && (
-                            <span className="text-[8px] font-bold uppercase tracking-wider ml-1.5 px-1.5 py-0.5 rounded align-middle" style={{
-                              background: p.triagePriority === 'RED' ? 'rgba(229,46,66,0.12)' : p.triagePriority === 'YELLOW' ? 'rgba(217,119,6,0.12)' : 'rgba(21,121,92,0.12)',
-                              color: p.triagePriority === 'RED' ? 'var(--color-danger)' : p.triagePriority === 'YELLOW' ? 'var(--color-warning)' : 'var(--color-success)',
-                            }}>{p.triagePriority}</span>
-                          )}
-                        </span>
+                        <PatientAvatar
+                          patient={p}
+                          size={28}
+                          color={
+                            p.triagePriority === 'RED' ? '#DC2626' :
+                            p.triagePriority === 'YELLOW' ? '#D97706' :
+                            p.triagePriority === 'GREEN' ? '#059669' :
+                            undefined
+                          }
+                        />
+                        <span className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</span>
                       </div>
                     </td>
+                    <td className="px-4 py-2.5 text-[12px] tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.age != null ? `${p.age}y` : '—'}</td>
+                    <td className="px-4 py-2.5 text-[12px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.gender || '—'}</td>
                     <td className="px-4 py-2.5 text-[12px] font-mono" style={{ color: 'var(--text-secondary)' }}>{p.id}</td>
                     <td className="px-4 py-2.5 text-[11px] font-mono" style={{ color: 'var(--text-secondary)' }}>
                       <span className="inline-flex items-center gap-1">
-                        <Clock className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />
                         {formatCompactDateTime(p.admittedAt)}
                       </span>
                     </td>
@@ -618,79 +964,243 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
+          ) : (
+          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+            <table className="w-full" style={{ minWidth: 600 }}>
+              <thead>
+                <tr>
+                  {['Patient', 'Document', 'Detail', 'Date', 'Action'].map(h => (
+                    <th key={h} className="text-left px-4 py-2.5 text-[11px] font-semibold" style={{ color: 'var(--text-muted)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {signCount === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                      No outstanding clinical tasks.
+                    </td>
+                  </tr>
+                )}
+                {heldAssessments.filter(a => (docsFilter === 'all' || docsFilter === 'outcome') && (!docsSearch || signingPatientName(a.patientId).toLowerCase().includes(docsSearch.toLowerCase()))).length > 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-1.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <span className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>Outcome measures</span>
+                    </td>
+                  </tr>
+                )}
+                {heldAssessments.filter(a => (docsFilter === 'all' || docsFilter === 'outcome') && (!docsSearch || signingPatientName(a.patientId).toLowerCase().includes(docsSearch.toLowerCase()))).map((a) => (
+                  <tr
+                    key={a._id}
+                    className="cursor-pointer hover:bg-[var(--table-row-hover)]"
+                    onClick={() => router.push(`/patients/${a.patientId}`)}
+                    style={{ borderBottom: '1px solid var(--border-light)' }}
+                  >
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <PatientAvatar patient={(() => { const p = signingPatientName(a.patientId).trim().split(/\s+/); return { firstName: p[0], surname: p[p.length - 1] }; })()} size={28} />
+                        <span className="text-[12px] font-medium min-w-0" style={{ color: 'var(--text-primary)' }}>{signingPatientName(a.patientId)}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-[12px]" style={{ color: '#B45309' }}>Outcome measure</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+                      {a.instrumentName} · score {a.totalScore}{a.interpretation ? ` · ${a.interpretation}` : ''}
+                    </td>
+                    <td className="px-4 py-2.5 text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>—</td>
+                    <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => router.push(`/patients/${a.patientId}`)} className="btn btn-sm btn-secondary">Review</button>
+                    </td>
+                  </tr>
+                ))}
+                {awaitingCosign.filter(r => (docsFilter === 'all' || docsFilter === 'cosign') && (!docsSearch || signingPatientName(r.patientId).toLowerCase().includes(docsSearch.toLowerCase()))).length > 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-1.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <span className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>Co-signatures</span>
+                    </td>
+                  </tr>
+                )}
+                {awaitingCosign.filter(r => (docsFilter === 'all' || docsFilter === 'cosign') && (!docsSearch || signingPatientName(r.patientId).toLowerCase().includes(docsSearch.toLowerCase()))).map((r) => (
+                  <tr
+                    key={r._id}
+                    className="cursor-pointer hover:bg-[var(--table-row-hover)]"
+                    onClick={() => router.push(`/patients/${r.patientId}`)}
+                    style={{ borderBottom: '1px solid var(--border-light)' }}
+                  >
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <PatientAvatar patient={(() => { const p = signingPatientName(r.patientId).trim().split(/\s+/); return { firstName: p[0], surname: p[p.length - 1] }; })()} size={28} />
+                        <span className="text-[12px] font-medium min-w-0" style={{ color: 'var(--text-primary)' }}>{signingPatientName(r.patientId)}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-[12px]" style={{ color: '#B45309' }}>
+                        {canCosign ? 'Needs co-sign' : 'Awaiting co-sign'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+                      {r.chiefComplaint} · signed by {r.signedByName || 'trainee'}
+                    </td>
+                    <td className="px-4 py-2.5 text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>—</td>
+                    <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => router.push(`/patients/${r.patientId}`)} className="btn btn-sm btn-secondary">Review</button>
+                    </td>
+                  </tr>
+                ))}
+                {unsignedDrafts
+                  .filter(r => (docsFilter === 'all' || docsFilter === 'draft') && (!docsSearch || signingPatientName(r.patientId).toLowerCase().includes(docsSearch.toLowerCase())))
+                  .map((r) => (
+                  <tr
+                    key={r._id}
+                    className="cursor-pointer hover:bg-[var(--table-row-hover)]"
+                    onClick={() => router.push(`/patients/${r.patientId}`)}
+                    style={{ borderBottom: '1px solid var(--border-light)' }}
+                  >
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <PatientAvatar patient={(() => { const p = signingPatientName(r.patientId).trim().split(/\s+/); return { firstName: p[0], surname: p[p.length - 1] }; })()} size={28} />
+                        <span className="text-[12px] font-medium min-w-0 truncate" style={{ color: 'var(--text-primary)' }}>{signingPatientName(r.patientId)}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Unsigned draft</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{r.chiefComplaint}</td>
+                    <td className="px-4 py-2.5 text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{formatCompactDateTime(r.consultedAt || r.visitDate || r.createdAt)}</td>
+                    <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => router.push(`/patients/${r.patientId}`)} className="btn btn-sm btn-secondary">Sign</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
         </div>
 
-        {/* ═══ TOP ROW — Quick Actions + Facility Sync ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 flex-shrink-0" style={{ order: 1 }}>
+        {/* ═══ ROW 2 — Quick Actions (2×2) + Next Appointment ═══ */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 flex-shrink-0" style={{ order: 1 }}>
           {/* Quick Actions */}
-          <div className="dash-card p-3 lg:col-span-2">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('dashboard.quickActions')}</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {[
-                { label: t('dashboard.newPatient'), icon: Users, action: () => router.push('/patients/new'), color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.10)' },
-                { label: t('action.newConsultation'), icon: ClipboardList, action: () => setSoapModalOpen(true), color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.10)' },
-                { label: t('dashboard.quickPrescribe'), icon: Pill, action: () => setPrescribeModalOpen(true), color: '#1E3A8A', bg: 'rgba(13,148,136,0.10)' },
-                { label: t('dashboard.quickLabOrder'), icon: TestTube, action: () => setLabModalOpen(true), color: '#7C3AED', bg: 'rgba(124,58,237,0.10)' },
-                { label: t('dashboard.immunization'), icon: Syringe, action: () => router.push('/immunizations'), color: '#059669', bg: 'rgba(5,150,105,0.10)' },
-                { label: t('dashboard.ancVisit'), icon: HeartPulse, action: () => router.push('/anc'), color: '#EC4899', bg: 'rgba(236,72,153,0.10)' },
-                { label: t('dashboard.birthReg'), icon: Baby, action: () => router.push('/births'), color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.10)' },
-                { label: t('nav.referrals'), icon: SendHorizontal, action: () => router.push('/referrals'), color: '#F59E0B', bg: 'rgba(245,158,11,0.10)' },
-              ].map(action => (
-                <button
-                  key={action.label}
-                  onClick={action.action}
-                  className="flex flex-col items-center justify-center text-center gap-1.5 p-2.5 rounded-xl transition-all hover:shadow-sm hover:-translate-y-0.5"
-                  style={{ background: action.bg, border: '1px solid var(--border-light)' }}
-                >
-                  <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg-card-solid)' }}>
-                    <action.icon className="w-4 h-4" style={{ color: action.color }} />
-                  </span>
-                  <span className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
-                </button>
-              ))}
+          <div className="md:col-span-2 lg:col-span-2 flex flex-col">
+            <div className="dash-card p-4 flex flex-col gap-4 flex-1">
+              <h2 className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dashboard.quickActions')}</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                {quickActions.map(a => (
+                  <button
+                    key={a.label}
+                    onClick={a.action}
+                    className="flex items-center gap-3 text-left transition-all hover:border-[var(--accent-primary)] hover:bg-[var(--accent-light)]"
+                    style={{
+                      height: 56,
+                      borderRadius: 18,
+                      border: '1px solid #202F394D',
+                      background: 'var(--bg-card)',
+                      padding: '0 14px',
+                      width: '100%',
+                    }}
+                  >
+                    <span className="flex items-center justify-center rounded-xl flex-shrink-0" style={{ width: 34, height: 34 }}>
+                      <a.icon className="w-[17px] h-[17px]" style={{ color: '#2191D0' }} />
+                    </span>
+                    <span className="text-xs font-semibold leading-tight" style={{ color: '#2191D0' }}>{a.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Facility Sync (national HMIS / DHIS2 connection) */}
-          <div className="dash-card p-3 lg:col-span-1 flex flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                <Globe className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /> Facility Sync
-              </h3>
-              <button onClick={() => router.push('/dhis2-export')} className="text-[11px] font-semibold inline-flex items-center gap-0.5" style={{ color: 'var(--accent-primary)' }}>
-                Open <ExternalLink className="w-3 h-3" />
-              </button>
-            </div>
-            {/* Summary line */}
-            <div className="flex items-center justify-between pb-2 mb-1 border-b" style={{ borderColor: 'var(--border-light)' }}>
-              <span className="text-xs font-semibold inline-flex items-center gap-1.5" style={{ color: 'var(--color-success)' }}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-success)' }} /> Connected
+          {/* Upcoming Appointments */}
+          <div className="hero-banner md:col-span-2 lg:col-span-1 flex flex-col" style={{ minHeight: 224, height: 224, padding: 0, overflow: 'hidden' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img aria-hidden src="/assets/union.png" alt="" style={{ position: 'absolute', width: 280, height: 280, top: -40, right: -40, zIndex: 0, pointerEvents: 'none', objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.13, transform: 'rotate(10deg)' }} />
+
+            {/* Fixed header */}
+            <div className="relative z-[1] flex items-center justify-between flex-shrink-0" style={{ padding: '14px 16px 0' }}>
+              <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, color: '#fff', lineHeight: 1, letterSpacing: 0 }}>
+                Upcoming Appointments
+                {myUpcomingAppts.length > 1 && (
+                  <span style={{ marginLeft: 6, fontSize: 13, opacity: 0.6 }}>{apptIndex + 1}/{myUpcomingAppts.length}</span>
+                )}
               </span>
-              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{syncedCount}/{SYNC_ELEMENTS.length} synced · 08:00</span>
-            </div>
-            {/* Per-document sync status — scrolls within the card so the panel
-                stays exactly as tall as the Quick Actions card beside it. */}
-            <div className="relative flex-1 min-h-0">
-              <div className="overflow-y-auto pr-1 lg:absolute lg:inset-0">
-                {SYNC_ELEMENTS.map(el => {
-                  const cfg = el.status === 'synced'
-                    ? { color: 'var(--color-success)', label: 'Synced' }
-                    : el.status === 'syncing'
-                    ? { color: 'var(--accent-primary)', label: 'Syncing' }
-                    : { color: 'var(--color-warning)', label: 'Pending' };
-                  return (
-                    <div key={el.name} className="flex items-center justify-between py-1">
-                      <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{el.name}</span>
-                      <span className="text-[10px] font-semibold inline-flex items-center gap-1 flex-shrink-0" style={{ color: cfg.color }}>
-                        {el.status === 'synced' && <CheckCircle2 className="w-3 h-3" />}
-                        {el.status === 'syncing' && <RefreshCw className="w-3 h-3 animate-spin" />}
-                        {el.status === 'pending' && <Clock className="w-3 h-3" />}
-                        {cfg.label}
-                      </span>
-                    </div>
-                  );
-                })}
+              <div className="flex items-center gap-1">
+                {myUpcomingAppts.length > 1 && (<>
+                  <button
+                    disabled={apptIndex === 0}
+                    onClick={() => setApptIndex(apptIndex - 1)}
+                    className="flex items-center justify-center transition-opacity"
+                    style={{ background: 'none', border: 'none', padding: 4, opacity: apptIndex === 0 ? 0.4 : 1 }}
+                    aria-label="Previous appointment"
+                  >
+                    <ChevronLeft className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.88)' }} />
+                  </button>
+                  <button
+                    disabled={apptIndex === myUpcomingAppts.length - 1}
+                    onClick={() => setApptIndex(apptIndex + 1)}
+                    className="flex items-center justify-center transition-opacity"
+                    style={{ background: 'none', border: 'none', padding: 4, opacity: apptIndex === myUpcomingAppts.length - 1 ? 0.4 : 1 }}
+                    aria-label="Next appointment"
+                  >
+                    <ChevronRight className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.88)' }} />
+                  </button>
+                </>)}
+                <button
+                  onClick={() => router.push('/appointments')}
+                  className="flex items-center justify-center transition-opacity hover:opacity-100"
+                  style={{ background: 'none', border: 'none', padding: 4, opacity: 1, marginLeft: 2 }}
+                  aria-label="View all appointments"
+                >
+                  <ArrowUpRight className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.88)' }} />
+                </button>
               </div>
+            </div>
+
+            {/* Scroll track — full-width cards, scroll hidden */}
+            <div
+              ref={apptCarouselRef}
+              className="flex flex-1 min-h-0 scrollbar-none"
+              style={{ overflowX: 'auto', scrollSnapType: 'x mandatory', scrollBehavior: 'smooth', pointerEvents: 'none' }}
+              onScroll={(e) => {
+                if (apptScrolling.current) return;
+                const el = e.currentTarget;
+                setApptIndex(Math.round(el.scrollLeft / el.clientWidth));
+              }}
+            >
+              {myUpcomingAppts.length > 0 ? myUpcomingAppts.map((appt) => {
+                const when = new Date(apptKey(appt)).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                return (
+                  <div key={appt._id} className="flex-shrink-0 flex flex-col relative"
+                    style={{ width: '100%', scrollSnapAlign: 'start', padding: '10px 16px 16px', zIndex: 1, pointerEvents: 'auto' }}>
+                    {/* Patient info — vertically centered */}
+                    <div className="flex-1 flex flex-col justify-center">
+                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, color: '#fff', lineHeight: 1, letterSpacing: 0 }}>{appt.patientName}</div>
+                      <div className="mt-1.5" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 400, fontSize: 13, color: 'rgba(255,255,255,0.72)' }}>{when}</div>
+                    </div>
+                    {/* Actions */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => updateApptStatus(appt._id, 'checked_in')}
+                        className="transition-opacity hover:opacity-90"
+                        style={{ background: '#fff', color: 'var(--text-primary)', fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 12, padding: '7px 18px', borderRadius: 999 }}
+                      >
+                        Check In
+                      </button>
+                      <button
+                        onClick={() => router.push(`/patients/${appt.patientId}`)}
+                        style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)', fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 12 }}
+                      >
+                        Open Patient Record
+                      </button>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="flex-shrink-0 flex items-center relative z-[1]" style={{ width: '100%', padding: '12px 16px 16px' }}>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 400, fontSize: 14, color: 'rgba(255,255,255,0.72)' }}>No upcoming appointments scheduled.</div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -700,16 +1210,14 @@ export default function DashboardPage() {
           <div className="dash-card overflow-hidden flex-shrink-0" style={{ order: 2 }}>
             <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
               <h3 className="font-semibold text-sm inline-flex items-center gap-2">
-                <TestTube className="w-4 h-4" style={{ color: '#7C3AED' }} />
+                <TestTube className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                 Awaiting results
                 <span className="text-[11px] font-normal" style={{ color: 'var(--text-muted)' }}>({resumableEncounters.length})</span>
               </h3>
               <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Visits paused while labs are processed</span>
             </div>
             <div style={{ maxHeight: 222, overflowY: 'auto' }}>
-              {resumableEncounters.map((e, i) => {
-                const initials = (e.patientName || '').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
-                const avatarBg = ['#7C3AED', '#1E3A8A', '#B8741C', '#15795C', '#C44536'][i % 5];
+              {resumableEncounters.map((e) => {
                 const ready = e.allResultsBack;
                 return (
                   <div
@@ -717,7 +1225,6 @@ export default function DashboardPage() {
                     className="flex items-center gap-3 px-5 py-3"
                     style={{ borderBottom: '1px solid var(--border-light)' }}
                   >
-                    <div className="w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ background: avatarBg }}>{initials}</div>
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{e.patientName}</div>
                       <div className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>
@@ -741,6 +1248,36 @@ export default function DashboardPage() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Documents to sign now lives as a tab inside the worklist card above. */}
+
+        {/* ═══ PATIENT CALLBACKS — open phone notes routed to me ═══ */}
+        {phoneNotesInbox.length > 0 && (
+          <div className="dash-card overflow-hidden flex-shrink-0" style={{ order: 2 }}>
+            <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
+              <h3 className="font-semibold text-sm inline-flex items-center gap-2">
+                <SendHorizontal className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                Patient callbacks
+                <span className="text-[11px] font-normal" style={{ color: 'var(--text-muted)' }}>({phoneNotesInbox.length})</span>
+              </h3>
+              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Phone notes awaiting your response</span>
+            </div>
+            <div style={{ maxHeight: 264, overflowY: 'auto' }}>
+              {phoneNotesInbox.map((n) => (
+                <div key={n._id} className="flex items-center gap-3 px-5 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{n.patientName || n.patientId}</div>
+                    <div className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>{n.subject} · from {n.callerName || 'caller'}</div>
+                  </div>
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded flex-shrink-0" style={{ background: 'rgba(217,119,6,0.12)', color: '#B45309' }}>Open</span>
+                  <button onClick={() => router.push(`/patients/${n.patientId}`)} className="btn btn-sm btn-secondary flex-shrink-0">
+                    Respond
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -875,7 +1412,7 @@ export default function DashboardPage() {
                     <button
                       key={preset.id}
                       onClick={() => handleApplyPreset(preset)}
-                      className="p-2.5 rounded-xl text-left transition-all hover:scale-[1.01]"
+                      className="p-2.5 rounded-xl text-left transition-all"
                       style={{ background: `${preset.color}08`, border: `1px solid ${preset.color}20` }}
                     >
                       <div className="flex items-center gap-2 mb-1">
@@ -992,7 +1529,7 @@ export default function DashboardPage() {
                         onClick={() => handleToggleLabTest(test.id)}
                         className="flex items-center gap-3 p-2.5 rounded-xl text-left transition-all"
                         style={{
-                          background: isSelected ? 'rgba(59, 130, 246,0.08)' : 'var(--bg-secondary)',
+                          background: isSelected ? 'rgba(33, 145, 208, 0.08)' : 'var(--bg-secondary)',
                           border: isSelected ? '2px solid #3b82f6' : '1px solid var(--border-light)',
                         }}
                       >
@@ -1009,7 +1546,7 @@ export default function DashboardPage() {
                           <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{test.name}</p>
                           <div className="flex items-center gap-2">
                             <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{test.specimen}</span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(59, 130, 246,0.06)', color: 'var(--accent-primary)' }}>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(33, 145, 208, 0.06)', color: 'var(--accent-primary)' }}>
                               {test.category}
                             </span>
                           </div>
@@ -1022,7 +1559,7 @@ export default function DashboardPage() {
 
               {/* Selected summary */}
               {selectedLabTests.size > 0 && (
-                <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(59, 130, 246,0.04)', border: '1px solid rgba(59, 130, 246,0.12)' }}>
+                <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(59, 130, 246,0.04)', border: '1px solid rgba(33, 145, 208, 0.12)' }}>
                   <p className="text-[11px] font-medium mb-1" style={{ color: 'var(--accent-primary)' }}>
                     {t('dashboard.testsSelected', { count: selectedLabTests.size })}
                   </p>
@@ -1053,6 +1590,208 @@ export default function DashboardPage() {
                 </button>
               </div>
             </>
+          )}
+        </ModalOverlay>
+
+        {/* ── New Patient ── */}
+        <ModalOverlay open={newPatientOpen} onClose={() => setNewPatientOpen(false)} title="New Patient">
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>First Name</label>
+                <input className="input-field" value={newPatientForm.firstName} onChange={e => setNewPatientForm(f => ({ ...f, firstName: e.target.value }))} placeholder="e.g. Amara" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Last Name</label>
+                <input className="input-field" value={newPatientForm.lastName} onChange={e => setNewPatientForm(f => ({ ...f, lastName: e.target.value }))} placeholder="e.g. Deng" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Date of Birth</label>
+                <input className="input-field" type="date" value={newPatientForm.dob} onChange={e => setNewPatientForm(f => ({ ...f, dob: e.target.value }))} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Gender</label>
+                <select className="input-field" value={newPatientForm.gender} onChange={e => setNewPatientForm(f => ({ ...f, gender: e.target.value }))}>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Phone (optional)</label>
+              <input className="input-field" value={newPatientForm.phone} onChange={e => setNewPatientForm(f => ({ ...f, phone: e.target.value }))} placeholder="+211..." />
+            </div>
+            <div className="flex gap-2 justify-end mt-1">
+              <button className="btn btn-secondary btn-sm" onClick={() => setNewPatientOpen(false)}>Cancel</button>
+              <button
+                className="btn btn-primary btn-sm"
+                disabled={!newPatientForm.firstName || !newPatientForm.lastName}
+                onClick={() => { setNewPatientOpen(false); router.push(`/patients/new?first=${encodeURIComponent(newPatientForm.firstName)}&last=${encodeURIComponent(newPatientForm.lastName)}&dob=${newPatientForm.dob}&gender=${newPatientForm.gender}&phone=${encodeURIComponent(newPatientForm.phone)}`); }}
+              >
+                Continue to Full Registration →
+              </button>
+            </div>
+          </div>
+        </ModalOverlay>
+
+        {/* ── New Referral ── */}
+        <ModalOverlay open={newReferralOpen} onClose={() => setNewReferralOpen(false)} title="New Referral">
+          {referralDone ? (
+            <div className="flex flex-col items-center gap-3 py-6">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6" style={{ color: '#059669' }} />
+              </div>
+              <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Referral submitted</p>
+              <button className="btn btn-primary btn-sm" onClick={() => setNewReferralOpen(false)}>Done</button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Patient</label>
+                <select className="input-field" value={referralForm.patientId} onChange={e => setReferralForm(f => ({ ...f, patientId: e.target.value }))}>
+                  <option value="">Select patient…</option>
+                  {patients.slice(0, 50).map(p => <option key={p._id} value={p._id}>{patientFullName(p)}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Referring To (Facility)</label>
+                <input className="input-field" value={referralForm.toFacility} onChange={e => setReferralForm(f => ({ ...f, toFacility: e.target.value }))} placeholder="e.g. Juba Teaching Hospital" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Reason for Referral</label>
+                <textarea className="input-field" rows={3} value={referralForm.reason} onChange={e => setReferralForm(f => ({ ...f, reason: e.target.value }))} placeholder="Clinical summary and reason…" />
+              </div>
+              <div className="flex gap-2 justify-end mt-1">
+                <button className="btn btn-secondary btn-sm" onClick={() => setNewReferralOpen(false)}>Cancel</button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  disabled={!referralForm.patientId || !referralForm.toFacility}
+                  onClick={() => { setNewReferralOpen(false); router.push(`/referrals?patient=${referralForm.patientId}&to=${encodeURIComponent(referralForm.toFacility)}&reason=${encodeURIComponent(referralForm.reason)}`); }}
+                >
+                  Open Full Form →
+                </button>
+              </div>
+            </div>
+          )}
+        </ModalOverlay>
+
+        {/* ── Book Appointment ── */}
+        <ModalOverlay open={bookApptOpen} onClose={() => setBookApptOpen(false)} title="Book Appointment">
+          {apptDone ? (
+            <div className="flex flex-col items-center gap-3 py-6">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6" style={{ color: '#059669' }} />
+              </div>
+              <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Appointment booked</p>
+              <button className="btn btn-primary btn-sm" onClick={() => setBookApptOpen(false)}>Done</button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Patient</label>
+                <select className="input-field" value={apptForm.patientId} onChange={e => setApptForm(f => ({ ...f, patientId: e.target.value }))}>
+                  <option value="">Select patient…</option>
+                  {patients.slice(0, 50).map(p => <option key={p._id} value={p._id}>{patientFullName(p)}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Date</label>
+                  <input className="input-field" type="date" value={apptForm.date} onChange={e => setApptForm(f => ({ ...f, date: e.target.value }))} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Time</label>
+                  <input className="input-field" type="time" value={apptForm.time} onChange={e => setApptForm(f => ({ ...f, time: e.target.value }))} />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Type</label>
+                <select className="input-field" value={apptForm.type} onChange={e => setApptForm(f => ({ ...f, type: e.target.value }))}>
+                  {['OPD', 'ANC', 'Follow-up', 'Specialist', 'Procedure', 'Vaccination'].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2 justify-end mt-1">
+                <button className="btn btn-secondary btn-sm" onClick={() => setBookApptOpen(false)}>Cancel</button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  disabled={!apptForm.patientId || !apptForm.date || !apptForm.time}
+                  onClick={() => { setBookApptOpen(false); router.push(`/appointments?patient=${apptForm.patientId}&date=${apptForm.date}&time=${apptForm.time}&type=${encodeURIComponent(apptForm.type)}`); }}
+                >
+                  Open Full Form →
+                </button>
+              </div>
+            </div>
+          )}
+        </ModalOverlay>
+
+        {/* ── ANC Visit ── */}
+        <ModalOverlay open={ancOpen} onClose={() => setAncOpen(false)} title="ANC Visit">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Select Patient</label>
+              <select className="input-field" value={ancPatientId} onChange={e => setAncPatientId(e.target.value)}>
+                <option value="">Select patient…</option>
+                {patients.filter(p => p.gender === 'Female').slice(0, 50).map(p => <option key={p._id} value={p._id}>{patientFullName(p)}</option>)}
+              </select>
+            </div>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>You&apos;ll be taken to the full ANC visit form for this patient.</p>
+            <div className="flex gap-2 justify-end mt-1">
+              <button className="btn btn-secondary btn-sm" onClick={() => setAncOpen(false)}>Cancel</button>
+              <button
+                className="btn btn-primary btn-sm"
+                disabled={!ancPatientId}
+                onClick={() => { setAncOpen(false); router.push(`/anc?patient=${ancPatientId}`); }}
+              >
+                Open ANC Form →
+              </button>
+            </div>
+          </div>
+        </ModalOverlay>
+
+        {/* ── Ward Admission ── */}
+        <ModalOverlay open={wardAdmitOpen} onClose={() => setWardAdmitOpen(false)} title="Ward Admission">
+          {admitDone ? (
+            <div className="flex flex-col items-center gap-3 py-6">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6" style={{ color: '#059669' }} />
+              </div>
+              <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Patient admitted</p>
+              <button className="btn btn-primary btn-sm" onClick={() => setWardAdmitOpen(false)}>Done</button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Patient</label>
+                <select className="input-field" value={admitForm2.patientId} onChange={e => setAdmitForm2(f => ({ ...f, patientId: e.target.value }))}>
+                  <option value="">Select patient…</option>
+                  {patients.slice(0, 50).map(p => <option key={p._id} value={p._id}>{patientFullName(p)} — {patientAge(p)}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Ward</label>
+                <select className="input-field" value={admitForm2.wardId} onChange={e => setAdmitForm2(f => ({ ...f, wardId: e.target.value }))}>
+                  <option value="">Select ward…</option>
+                  {wards.filter(w => w.availableBeds > 0).map(w => <option key={w._id} value={w._id}>{w.name} ({w.availableBeds} beds free)</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Admitting Diagnosis</label>
+                <input className="input-field" value={admitForm2.diagnosis} onChange={e => setAdmitForm2(f => ({ ...f, diagnosis: e.target.value }))} placeholder="e.g. Severe malaria" />
+              </div>
+              <div className="flex gap-2 justify-end mt-1">
+                <button className="btn btn-secondary btn-sm" onClick={() => setWardAdmitOpen(false)}>Cancel</button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  disabled={!admitForm2.patientId || !admitForm2.wardId || !admitForm2.diagnosis}
+                  onClick={() => { setWardAdmitOpen(false); router.push(`/wards?patient=${admitForm2.patientId}&ward=${admitForm2.wardId}&diagnosis=${encodeURIComponent(admitForm2.diagnosis)}`); }}
+                >
+                  Open Full Form →
+                </button>
+              </div>
+            </div>
           )}
         </ModalOverlay>
 

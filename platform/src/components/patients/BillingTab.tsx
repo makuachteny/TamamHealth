@@ -3,17 +3,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Wallet, CreditCard, CalendarClock,
-  Shield, FileText, Clock,
-  Receipt, AlertTriangle, CheckCircle, Printer, BarChart3,
+  Shield, FileText,
+  Receipt, Printer, BarChart3,
   Plus, Trash2, RotateCcw, RefreshCw, X,
 } from '@/components/icons/lucide';
 import { BalanceBanner, InsuranceSnapshot, PaymentHistoryTimeline, PaymentPanel, PaymentPlanWizard } from '@/components/payments';
-import DataTile from '@/components/DataTile';
 import Modal from '@/components/Modal';
 import { getMethodConfig } from '@/lib/payment-method-config';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
+import { formatMoney } from '@/lib/format-utils';
 import type { PatientDoc } from '@/lib/db-types';
 import type {
   PaymentDoc, ChargeDoc, PaymentPlanDoc, ClaimDoc, InsurancePolicyDoc,
@@ -50,8 +50,6 @@ interface FinancialOverview {
   claims: ClaimDoc[];
   policies: InsurancePolicyDoc[];
 }
-
-const fmt = (n: number) => `SSP ${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 export default function BillingTab({
   patient, patientBalance, showPaymentPanel, showPlanWizard,
@@ -315,18 +313,6 @@ export default function BillingTab({
         onPayClick={() => setShowPaymentPanel(true)}
       />
 
-      {/* ─── Financial Summary KPIs ─── */}
-      <div className="grid grid-cols-2 gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', alignItems: 'stretch' }}>
-        <DataTile label={t('billing.totalBilled')} value={fmt(d.totalCharged)} />
-        <DataTile label={t('billing.totalPaid')} value={fmt(d.totalPaid)} tone={d.totalPaid > 0 ? 'ok' : 'default'} />
-        <DataTile label={t('billing.insurancePaid')} value={fmt(d.insurancePaid)} />
-        <DataTile
-          label={t('billing.kpiOutstanding')}
-          value={d.outstanding > 0 ? fmt(d.outstanding) : t('billing.paidInFull')}
-          tone={d.outstanding > 0 ? 'danger' : 'ok'}
-        />
-      </div>
-
       {/* ─── Quick Actions ─── */}
       <div className="flex gap-3 flex-wrap">
         <button
@@ -371,9 +357,9 @@ export default function BillingTab({
       </div>
 
       {/* ─── Two-Column: Insurance + Charges ─── */}
-      <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', alignItems: 'stretch' }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
         {/* Insurance Coverage */}
-        <div className="card-elevated p-5">
+        <div className="card-elevated p-4 h-full">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <Shield size={16} style={{ color: 'var(--accent-primary)' }} />
@@ -389,7 +375,7 @@ export default function BillingTab({
         </div>
 
         {/* Recent Charges */}
-        <div className="card-elevated p-5">
+        <div className="card-elevated p-4 h-full">
           <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
             <Receipt size={16} style={{ color: 'var(--accent-primary)' }} />
             {t('billing.recentCharges')}
@@ -401,7 +387,7 @@ export default function BillingTab({
           </h3>
           {d.charges.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 text-center" style={{ color: 'var(--text-muted)' }}>
-              <Receipt size={44} style={{ opacity: 0.3, marginBottom: 8 }} />
+              <Receipt size={28} style={{ opacity: 0.3, marginBottom: 8 }} />
               <div className="text-xs">{t('billing.noChargesRecorded')}</div>
             </div>
           ) : (
@@ -415,7 +401,7 @@ export default function BillingTab({
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0 ml-3">
-                    <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{fmt(charge.billedAmount)}</div>
+                    <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatMoney(charge.billedAmount)}</div>
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{
                       background: charge.status === 'approved' ? 'var(--color-success-bg)' : charge.status === 'pending' ? 'var(--color-warning-bg)' : 'var(--overlay-subtle)',
                       color: charge.status === 'approved' ? 'var(--color-success)' : charge.status === 'pending' ? 'var(--color-warning)' : 'var(--text-muted)',
@@ -434,6 +420,81 @@ export default function BillingTab({
               )}
             </div>
           )}
+        </div>
+
+        {/* Saved Payment Methods */}
+        <div className="card-elevated p-4 h-full">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <CreditCard size={16} style={{ color: 'var(--accent-primary)' }} />
+              {t('billing.savedPaymentMethods') || 'Saved payment methods'}
+              {methods.length > 0 && (
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
+                  {methods.length}
+                </span>
+              )}
+            </h3>
+            <button
+              onClick={() => setShowAddMethod(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
+            >
+              <Plus size={14} /> {t('billing.addMethod') || 'Add method'}
+            </button>
+          </div>
+          {methodsLoading ? (
+            <div className="text-xs py-4 text-center" style={{ color: 'var(--text-muted)' }}>{t('common.loading') || 'Loading…'}</div>
+          ) : methods.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center" style={{ color: 'var(--text-muted)' }}>
+              <CreditCard size={28} style={{ opacity: 0.3, marginBottom: 8 }} />
+              <div className="text-xs">{t('billing.noSavedMethods') || 'No saved payment methods'}</div>
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {methods.map(m => {
+                const detail = m.cardLast4 ? `•••• ${m.cardLast4}`
+                  : m.bankAccountLast4 ? `${m.bankName ?? ''} •••• ${m.bankAccountLast4}`.trim()
+                  : m.phoneNumber ?? '';
+                return (
+                  <div key={m._id} className="flex items-center gap-3 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" style={{ background: 'transparent' }}>
+                      <CreditCard size={14} style={{ color: 'var(--accent-primary)' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                        {m.label || METHOD_LABELS[m.methodType]}
+                        {m.isDefault && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
+                            {t('billing.default') || 'Default'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        {METHOD_LABELS[m.methodType]}{detail ? ` · ${detail}` : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteMethod(m._id)}
+                      aria-label={t('billing.removeMethod') || 'Remove method'}
+                      className="p-1.5 rounded-lg flex-shrink-0 transition-colors"
+                      style={{ background: 'var(--overlay-subtle)', color: 'var(--color-danger)' }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Full Ledger History */}
+        <div className="card-elevated p-4 h-full">
+          <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
+            <BarChart3 size={16} style={{ color: 'var(--accent-primary)' }} />
+            {t('billing.transactionLedger')}
+          </h3>
+          <PaymentHistoryTimeline patientId={patient._id} limit={30} />
         </div>
       </div>
 
@@ -458,7 +519,7 @@ export default function BillingTab({
                         {t('billing.monthPlan', { count: plan.termMonths })}
                       </div>
                       <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                        {t('billing.planMonthlyStarted', { amount: fmt(plan.monthlyAmount), date: new Date(plan.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) })}
+                        {t('billing.planMonthlyStarted', { amount: formatMoney(plan.monthlyAmount), date: new Date(plan.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) })}
                       </div>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{
@@ -473,7 +534,7 @@ export default function BillingTab({
                   <div className="mb-2">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                        {t('billing.paidOfTotal', { paid: fmt(plan.paidToDate), total: fmt(plan.totalBalance) })}
+                        {t('billing.paidOfTotal', { paid: formatMoney(plan.paidToDate), total: formatMoney(plan.totalBalance) })}
                       </span>
                       <span className="text-[11px] font-bold" style={{ color: 'var(--color-success)' }}>
                         {Math.round(progress)}%
@@ -490,7 +551,7 @@ export default function BillingTab({
                       <div
                         key={i}
                         className="w-2.5 h-2.5 rounded-full"
-                        title={`#${inst.number}: ${inst.status} — ${fmt(inst.amount)}`}
+                        title={`#${inst.number}: ${inst.status} — ${formatMoney(inst.amount)}`}
                         style={{
                           background:
                             inst.status === 'paid' ? 'var(--color-success)' :
@@ -505,11 +566,10 @@ export default function BillingTab({
                   {/* Next due */}
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                      <Clock size={11} />
                       {t('billing.nextDue', { date: plan.nextDueDate ? new Date(plan.nextDueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—' })}
                     </div>
                     <div className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                      {t('billing.remaining', { amount: fmt(plan.remainingBalance) })}
+                      {t('billing.remaining', { amount: formatMoney(plan.remainingBalance) })}
                     </div>
                   </div>
                 </div>
@@ -532,16 +592,6 @@ export default function BillingTab({
           <div className="space-y-0">
             {d.claims.map(claim => (
               <div key={claim._id} className="flex items-center gap-3 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <div className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" style={{
-                  background:
-                    claim.status === 'paid' ? 'var(--color-success-bg)' :
-                    claim.status === 'denied' ? 'var(--color-danger-bg)' :
-                    'var(--color-warning-bg)',
-                }}>
-                  {claim.status === 'paid' ? <CheckCircle size={14} style={{ color: 'var(--color-success)' }} /> :
-                   claim.status === 'denied' ? <AlertTriangle size={14} style={{ color: 'var(--color-danger)' }} /> :
-                   <Clock size={14} style={{ color: 'var(--color-warning)' }} />}
-                </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                     {claim.payerName}
@@ -551,7 +601,7 @@ export default function BillingTab({
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{fmt(claim.totalBilled)}</div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatMoney(claim.totalBilled)}</div>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{
                     background:
                       claim.status === 'paid' ? 'var(--color-success-bg)' :
@@ -589,7 +639,7 @@ export default function BillingTab({
               const MethodIcon = mc.icon;
               return (
                 <div key={pmt._id} className="flex items-center gap-3 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                  <div className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" style={{ background: `${mc.color}15` }}>
+                  <div className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" style={{ background: 'transparent' }}>
                     <MethodIcon size={14} style={{ color: mc.color }} />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -599,7 +649,7 @@ export default function BillingTab({
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>{fmt(pmt.amount)}</div>
+                    <div className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>{formatMoney(pmt.amount)}</div>
                     <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{pmt.processedByName}</div>
                   </div>
                 </div>
@@ -609,86 +659,11 @@ export default function BillingTab({
         </div>
       )}
 
-      {/* ─── Saved Payment Methods ─── */}
-      <div className="card-elevated p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-            <CreditCard size={16} style={{ color: 'var(--accent-primary)' }} />
-            {t('billing.savedPaymentMethods') || 'Saved payment methods'}
-            {methods.length > 0 && (
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
-                {methods.length}
-              </span>
-            )}
-          </h3>
-          <button
-            onClick={() => setShowAddMethod(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-            style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
-          >
-            <Plus size={14} /> {t('billing.addMethod') || 'Add method'}
-          </button>
-        </div>
-        {methodsLoading ? (
-          <div className="text-xs py-4 text-center" style={{ color: 'var(--text-muted)' }}>{t('common.loading') || 'Loading…'}</div>
-        ) : methods.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-6 text-center" style={{ color: 'var(--text-muted)' }}>
-            <CreditCard size={44} style={{ opacity: 0.3, marginBottom: 8 }} />
-            <div className="text-xs">{t('billing.noSavedMethods') || 'No saved payment methods'}</div>
-          </div>
-        ) : (
-          <div className="space-y-0">
-            {methods.map(m => {
-              const detail = m.cardLast4 ? `•••• ${m.cardLast4}`
-                : m.bankAccountLast4 ? `${m.bankName ?? ''} •••• ${m.bankAccountLast4}`.trim()
-                : m.phoneNumber ?? '';
-              return (
-                <div key={m._id} className="flex items-center gap-3 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                  <div className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" style={{ background: 'var(--accent-light)' }}>
-                    <CreditCard size={14} style={{ color: 'var(--accent-primary)' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                      {m.label || METHOD_LABELS[m.methodType]}
-                      {m.isDefault && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-                          {t('billing.default') || 'Default'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                      {METHOD_LABELS[m.methodType]}{detail ? ` · ${detail}` : ''}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteMethod(m._id)}
-                    aria-label={t('billing.removeMethod') || 'Remove method'}
-                    className="p-1.5 rounded-lg flex-shrink-0 transition-colors"
-                    style={{ background: 'var(--overlay-subtle)', color: 'var(--color-danger)' }}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ─── Full Ledger History ─── */}
-      <div className="card-elevated p-5">
-        <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
-          <BarChart3 size={16} style={{ color: 'var(--accent-primary)' }} />
-          {t('billing.transactionLedger')}
-        </h3>
-        <PaymentHistoryTimeline patientId={patient._id} limit={30} />
-      </div>
-
       {/* ─── Empty State (no billing data at all) ─── */}
       {d.totalCharged === 0 && d.payments.length === 0 && d.policies.length === 0 && (
         <div className="card-elevated p-8 text-center">
           <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center justify-center w-14 h-14 rounded-2xl" style={{ background: 'var(--overlay-subtle)' }}>
+            <div className="flex items-center justify-center w-14 h-14 rounded-2xl" style={{ background: 'transparent' }}>
               <Wallet size={56} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
             </div>
             <div>
@@ -730,7 +705,7 @@ export default function BillingTab({
           <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <CreditCard className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                 </div>
                 <h3 className="text-base font-semibold">{t('billing.addPaymentMethod') || 'Add payment method'}</h3>
@@ -810,7 +785,7 @@ export default function BillingTab({
           <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <RotateCcw className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                 </div>
                 <h3 className="text-base font-semibold">{t('billing.issueRefund') || 'Issue refund'}</h3>
@@ -830,7 +805,7 @@ export default function BillingTab({
                   <select value={refundPaymentId} onChange={e => handleRefundPaymentChange(e.target.value)}>
                     {refundablePayments.map(p => (
                       <option key={p._id} value={p._id}>
-                        {fmt(p.amount)} · {getMethodConfig(p.method).label} · {new Date(p.processedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {formatMoney(p.amount)} · {getMethodConfig(p.method).label} · {new Date(p.processedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </option>
                     ))}
                   </select>
@@ -846,7 +821,7 @@ export default function BillingTab({
                   />
                   {selectedRefundPayment && (
                     <div className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                      {t('billing.maxRefund', { amount: fmt(selectedRefundPayment.amount) }) || `Max ${fmt(selectedRefundPayment.amount)}`}
+                      {t('billing.maxRefund', { amount: formatMoney(selectedRefundPayment.amount) }) || `Max ${formatMoney(selectedRefundPayment.amount)}`}
                     </div>
                   )}
                 </div>
@@ -873,7 +848,7 @@ export default function BillingTab({
           <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <RefreshCw className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                 </div>
                 <h3 className="text-base font-semibold">{t('billing.adjustmentWriteOff') || 'Adjustment / write-off'}</h3>

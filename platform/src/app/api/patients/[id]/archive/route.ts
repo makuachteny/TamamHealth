@@ -21,9 +21,10 @@ const ARCHIVE_ROLES: UserRole[] = [
 
 async function postHandler(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const auth = await getAuthPayload(request);
     if (!auth) return unauthorized();
     if (!hasRole(auth, ARCHIVE_ROLES)) return forbidden();
@@ -47,19 +48,20 @@ async function postHandler(
       '@/lib/services/patient-service'
     );
 
-    const existing = await getPatientById(params.id);
+    const existing = await getPatientById(id);
     if (!existing) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
     }
 
-    if (auth.role !== 'super_admin' && auth.orgId && existing.orgId && existing.orgId !== auth.orgId) {
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+    if (filterByScope([existing], buildScopeFromAuth(auth)).length === 0) {
       return forbidden('Access denied to this patient record');
     }
 
     const actor = auth.name || auth.username;
     const updated = action === 'archive'
-      ? await archivePatient(params.id, actor)
-      : await unarchivePatient(params.id, actor);
+      ? await archivePatient(id, actor)
+      : await unarchivePatient(id, actor);
 
     if (!updated) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 });

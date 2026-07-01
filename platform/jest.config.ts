@@ -15,7 +15,7 @@ const config: Config = {
 };
 
 export default async () => {
-  const jestConfig = await createJestConfig(config)();
+  const jestConfig = await createJestConfig(config as unknown as Parameters<typeof createJestConfig>[0])();
   jestConfig.transformIgnorePatterns = [
     '/node_modules/(?!(jose|uuid|pouchdb-adapter-memory)/).*\\.js$',
   ];

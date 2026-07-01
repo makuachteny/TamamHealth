@@ -1,13 +1,15 @@
-"use client";
-
-import Link from "next/link";
 import Image from "next/image";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
-  FAQItem,
   CheckItem,
-  TestimonialSwoosh,
 } from "@/components/marketing/MarketingShared";
+import {
+  FeatureFAQSection,
+  FeatureRelatedProductsSection,
+  FeatureStatsBand,
+  FeatureTestimonialSection,
+} from "@/components/marketing/FeatureSections";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Patient Experience Product Page
@@ -17,50 +19,21 @@ import {
 export default function PatientExperiencePage() {
   return (
     <>
-      {/* ── HERO SECTION ────────────────────────────────────────────── */}
-      <section className="mk-hero" id="demo">
-        <div className="mk-container">
-          <div className="mk-hero-flex">
-            {/* Left: Headline + Description */}
-            <div className="mk-hero-content">
-              <span className="mk-label">PATIENT ENGAGEMENT</span>
-              <h1 className="mk-h1">
-                Stop losing patients at the front desk — digital scheduling, fast check-in, and SMS reminders that work offline
-              </h1>
-              <p className="mk-body-lg">
-                South Sudan&apos;s clinics lose patients because booking requires a phone call, check-in takes 30 minutes of paperwork, and 40% of patients don&apos;t show up. TamamHealth Patient Experience enables SMS booking, cuts registration to under 5 minutes, and reduces no-shows with automated reminders — all in 4 local languages.
-              </p>
-              <div style={{ display: "flex", gap: 16, alignItems: "center", margin: "24px 0 32px" }}>
-                <div style={{ backgroundColor: "var(--tb-gold-light)", padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", color: "var(--tb-text)" }}>
-                  80% Faster Check-in
-                </div>
-                <div style={{ backgroundColor: "var(--tb-gold-light)", padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", color: "var(--tb-text)" }}>
-                  38% Fewer No-Shows
-                </div>
-              </div>
-              <div style={{ marginTop: 32 }}>
-                <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
-                  Try the patient portal
-                </Link>
-              </div>
-            </div>
-
-            {/* Center: Hero Photo */}
-            <div className="mk-hero-photo">
-              <Reveal delay={0.15}>
-                <Image
-                  src="/assets/community-health-worker.jpg"
-                  alt="Healthcare worker engaging with patients"
-                  width={260}
-                  height={380}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
-                  priority
-                />
-              </Reveal>
-            </div>
-          </div>
-        </div>
-      </section>
+      <MarketingHero
+        variant="showcase"
+        eyebrow="PATIENT ENGAGEMENT"
+        title="Digital scheduling, fast check-in, and SMS reminders that work offline"
+        subtitle="TamamHealth Patient Experience enables SMS booking, cuts registration to under 5 minutes, and reduces no-shows with automated reminders in local languages."
+        primaryCta={{ label: "Try the patient portal", href: "/about/contact?intent=demo#contact-form" }}
+        stats={[
+          { value: "80%", label: "faster check-in" },
+          { value: "38%", label: "fewer no-shows" },
+        ]}
+        image="/assets/community-health-worker.jpg"
+        imageAlt="Healthcare worker engaging with patients"
+        imagePriority
+        className="mk-hero-patient-experience"
+      />
 
       {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
       <section className="mk-section mk-section-white" style={{ backgroundColor: "var(--tb-cream-100)" }}>
@@ -70,7 +43,7 @@ export default function PatientExperiencePage() {
               Seamless patient journey from booking to care
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 32 }}>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>1</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   Patient books anytime, anywhere
@@ -79,7 +52,7 @@ export default function PatientExperiencePage() {
                   Via SMS, web, or phone. Available 24/7. Calendar syncs in real-time with provider schedules. Confirmation and reminder SMS.
                 </p>
               </div>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>2</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   Fast check-in on arrival
@@ -88,7 +61,7 @@ export default function PatientExperiencePage() {
                   Digital intake on tablet or kiosk. Adaptive forms ask only relevant questions. Auto-populate to EHR. Registration: 5 minutes instead of 30.
                 </p>
               </div>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>3</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   Care team focused on patients
@@ -353,132 +326,71 @@ export default function PatientExperiencePage() {
       </section>
 
       {/* ── STATS SECTION ────────────────────────────────────────────── */}
-      <section className="mk-stat-band">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-stat-row">
-              <div className="mk-stat-badge">
-                <strong>38%</strong>
-                <span>No-show reduction</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>&lt;5 min</strong>
-                <span>Registration time</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>65%</strong>
-                <span>Portal adoption</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>4</strong>
-                <span>Languages supported</span>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureStatsBand
+        stats={[
+          { value: "38%", label: "No-show reduction" },
+          { value: "<5 min", label: "Registration time" },
+          { value: "65%", label: "Portal adoption" },
+          { value: "4", label: "Languages supported" },
+        ]}
+      />
 
-      {/* ── TESTIMONIAL SECTION ─────────────────────────────────────── */}
-      <section className="mk-section mk-section-teal">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-testimonial-inner">
-              <div className="mk-testimonial-swoosh">
-                <TestimonialSwoosh />
-              </div>
+      <FeatureTestimonialSection
+        testimonial={{
+          quote: "TamamHealth changed our clinic from chaotic to smooth. Patients book via SMS without calling. Our receptionist used to spend 6 hours a day entering forms; now it takes 30 minutes. No-shows dropped 38%. Patients love checking their results on the portal instead of calling us. Our team is happier because they're doing healthcare work, not paperwork. It's the best investment we made.",
+          name: "Dr. Amira Hassan",
+          role: "Chief of Patient Services, Kosti Health Clinic",
+        }}
+      />
 
-              <div className="mk-testimonial-quote">
-                <div className="mk-quote-mark">&ldquo;</div>
-                <blockquote>
-                  TamamHealth changed our clinic from chaotic to smooth. Patients book via SMS without calling. Our receptionist used to spend 6 hours a day entering forms; now it takes 30 minutes. No-shows dropped 38%. Patients love checking their results on the portal instead of calling us. Our team is happier because they&apos;re doing healthcare work, not paperwork. It&apos;s the best investment we made.
-                </blockquote>
-                <cite>
-                  <strong>Dr. Amira Hassan</strong>
-                  <span>Chief of Patient Services, Kosti Health Clinic</span>
-                </cite>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureFAQSection
+        faqs={[
+          {
+            question: "How do adaptive intake forms work?",
+            answer: "Our intake system uses conditional logic to show or hide questions based on patient responses. This dramatically reduces form length and completion time. Answers are automatically validated and populated into the EHR, eliminating manual data entry and errors.",
+          },
+          {
+            question: "What languages are supported?",
+            answer: "TamamHealth Patient Experience currently supports English, Arabic, Nuer, and Dinka. We're actively expanding language support based on community feedback. All interfaces, SMS reminders, and patient materials are fully localized.",
+          },
+          {
+            question: "How reliable is SMS reminder delivery?",
+            answer: "We partner with leading telecommunications providers in South Sudan to ensure 99% SMS delivery reliability. Failed messages automatically escalate to email or voice reminders. You can track delivery status for each patient in your dashboard.",
+          },
+          {
+            question: "Is the patient portal HIPAA compliant and secure?",
+            answer: "Yes. Our patient portal uses 256-bit encryption, two-factor authentication options, role-based access controls, and comprehensive audit logging. All data is encrypted in transit and at rest. We're fully HIPAA compliant with regular security audits.",
+          },
+          {
+            question: "How does the Patient Experience module integrate with TamamHealth EHR?",
+            answer: "Integration is seamless. Digital intake data flows directly into the EHR, appointment bookings sync with provider calendars, portal messages appear in patient charts, and lab results automatically populate the portal. One unified system, zero manual data entry.",
+          },
+        ]}
+      />
 
-      {/* ── FAQ SECTION ─────────────────────────────────────────────── */}
-      <section className="mk-faq-section">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2 mk-faq-title">Frequently asked questions</h2>
-
-            <div className="mk-faq-list">
-              <FAQItem
-                question="How do adaptive intake forms work?"
-                answer="Our intake system uses conditional logic to show or hide questions based on patient responses. This dramatically reduces form length and completion time. Answers are automatically validated and populated into the EHR, eliminating manual data entry and errors."
-              />
-              <FAQItem
-                question="What languages are supported?"
-                answer="TamamHealth Patient Experience currently supports English, Arabic, Nuer, and Dinka. We're actively expanding language support based on community feedback. All interfaces, SMS reminders, and patient materials are fully localized."
-              />
-              <FAQItem
-                question="How reliable is SMS reminder delivery?"
-                answer="We partner with leading telecommunications providers in South Sudan to ensure 99% SMS delivery reliability. Failed messages automatically escalate to email or voice reminders. You can track delivery status for each patient in your dashboard."
-              />
-              <FAQItem
-                question="Is the patient portal HIPAA compliant and secure?"
-                answer="Yes. Our patient portal uses 256-bit encryption, two-factor authentication options, role-based access controls, and comprehensive audit logging. All data is encrypted in transit and at rest. We're fully HIPAA compliant with regular security audits."
-              />
-              <FAQItem
-                question="How does the Patient Experience module integrate with TamamHealth EHR?"
-                answer="Integration is seamless. Digital intake data flows directly into the EHR, appointment bookings sync with provider calendars, portal messages appear in patient charts, and lab results automatically populate the portal. One unified system, zero manual data entry."
-              />
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── RELATED PRODUCTS ────────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 48 }}>
-              Complete patient experience with TamamHealth modules
-            </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 32 }}>
-              <div style={{ backgroundColor: "var(--tb-tint-blue)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  EHR Module
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Patient portal integrates with EHR. Patients see visit notes, medications, and test results. Providers document faster without paper.
-                </p>
-                <Link href="/ehr" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Learn more
-                </Link>
-              </div>
-              <div style={{ backgroundColor: "var(--tb-tint-gold)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  Billing & Payments
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Patient portal shows bills and payment history. Automated reminders reduce collection follow-up. Patients pay via M-Pesa.
-                </p>
-                <Link href="/billing" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Learn more
-                </Link>
-              </div>
-              <div style={{ backgroundColor: "var(--tb-tint-green)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  Telehealth Module
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Patients book telehealth appointments from patient portal. Reminders sent via SMS. Consultation notes appear in portal after visit.
-                </p>
-                <Link href="/telehealth" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Learn more
-                </Link>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureRelatedProductsSection
+        heading="Complete patient experience with TamamHealth modules"
+        products={[
+          {
+            title: "EHR Module",
+            body: "Patient portal integrates with EHR. Patients see visit notes, medications, and test results. Providers document faster without paper.",
+            href: "/ehr",
+            tone: "blue",
+          },
+          {
+            title: "Billing & Payments",
+            body: "Patient portal shows bills and payment history. Automated reminders reduce collection follow-up. Patients pay via M-Pesa.",
+            href: "/billing",
+            tone: "gold",
+          },
+          {
+            title: "Telehealth Module",
+            body: "Patients book telehealth appointments from patient portal. Reminders sent via SMS. Consultation notes appear in portal after visit.",
+            href: "/telehealth",
+            tone: "green",
+          },
+        ]}
+      />
 
     </>
   );

@@ -12,7 +12,7 @@
 
 import { useMemo, useState } from 'react';
 import {
-  Plus, X, AlertTriangle, CheckCircle2, Activity, Search,
+  Plus, X, CheckCircle2, Activity, Search, Edit3, Trash2,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useProblems } from '@/lib/hooks/useProblems';
@@ -34,25 +34,108 @@ const STATUS_TINT: Record<ProblemStatus, { bg: string; color: string; ring: stri
 };
 
 function ProblemRow({
-  problem, onResolve, onReactivate,
+  problem, onResolve, onReactivate, onEdit, onRemove,
 }: {
   problem: ProblemDoc;
   onResolve?: (id: string) => void;
   onReactivate?: (id: string) => void;
+  onEdit?: (id: string, patch: Partial<ProblemDoc>) => Promise<void>;
+  onRemove?: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const tint = STATUS_TINT[problem.status];
+
+  // Inline edit affordance — lets a clinician correct a problem they added
+  // (status / onset / notes) without re-creating it. Reversible: Cancel
+  // discards the draft and restores the read-only row.
+  const [editing, setEditing] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<ProblemStatus>(problem.status);
+  const [draftOnset, setDraftOnset] = useState(problem.onsetDate || '');
+  const [draftNotes, setDraftNotes] = useState(problem.notes || '');
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = () => {
+    setDraftStatus(problem.status);
+    setDraftOnset(problem.onsetDate || '');
+    setDraftNotes(problem.notes || '');
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!onEdit) return;
+    setSaving(true);
+    try {
+      await onEdit(problem._id, {
+        status: draftStatus,
+        onsetDate: draftOnset || undefined,
+        notes: draftNotes.trim() || undefined,
+      });
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <li className="card-elevated p-3" style={{ borderColor: tint.ring }}>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{problem.name}</span>
+          {problem.icd11Code && (
+            <span className="text-[10.5px] font-medium" style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+              ICD-11 · {problem.icd11Code}
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] font-bold uppercase mb-1.5" style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}>{t('problemList.status')}</label>
+            <div className="grid grid-cols-3 gap-1 keep-cols">
+              {(['active', 'chronic', 'inactive'] as const).map(s => {
+                const st = STATUS_TINT[s];
+                const on = draftStatus === s;
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setDraftStatus(s)}
+                    className="px-2 py-2 text-xs font-bold uppercase rounded transition-all"
+                    style={{
+                      background: on ? st.bg : 'transparent',
+                      color: on ? st.color : 'var(--text-secondary)',
+                      border: `1px solid ${on ? st.color : 'var(--border-light)'}`,
+                      letterSpacing: '0.06em',
+                    }}
+                  >
+                    {t(`problemList.status_${s}`)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase mb-1.5" style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}>{t('problemList.onsetDate')}</label>
+            <input type="date" value={draftOnset} onChange={(e) => setDraftOnset(e.target.value)} className="w-full" />
+          </div>
+        </div>
+        <div className="mt-3">
+          <label className="block text-[10px] font-bold uppercase mb-1.5" style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}>{t('problemList.notes')}</label>
+          <textarea value={draftNotes} onChange={(e) => setDraftNotes(e.target.value)} rows={2} className="w-full" placeholder={t('problemList.notesPlaceholder')} />
+        </div>
+        <div className="flex items-center justify-end gap-2 mt-3">
+          <button onClick={() => setEditing(false)} className="btn btn-secondary">{t('action.cancel')}</button>
+          <button onClick={saveEdit} disabled={saving} className="btn btn-primary">
+            {saving ? t('problemList.saving') : t('action.saveChanges')}
+          </button>
+        </div>
+      </li>
+    );
+  }
+
   return (
     <li
       className="card-elevated p-3 flex items-start gap-3"
       style={{ borderColor: tint.ring }}
     >
-      <div
-        className="icon-box shrink-0"
-        style={{ background: tint.bg, color: tint.color }}
-      >
-        <AlertTriangle className="w-4 h-4" />
-      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -89,6 +172,16 @@ function ProblemRow({
           </div>
         )}
       </div>
+      {onEdit && (
+        <button
+          onClick={startEdit}
+          aria-label={t('action.edit')}
+          className="text-xs font-medium inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 transition"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <Edit3 size={14} /> {t('action.edit')}
+        </button>
+      )}
       {onResolve && (
         <button
           onClick={() => onResolve(problem._id)}
@@ -107,6 +200,17 @@ function ProblemRow({
           {t('problemList.reactivate')}
         </button>
       )}
+      {onRemove && (
+        <button
+          onClick={() => onRemove(problem._id)}
+          aria-label={t('action.remove')}
+          title={t('action.remove')}
+          className="p-1.5 rounded-lg transition-colors hover:bg-red-50"
+          style={{ color: 'var(--tamamhealth-red)' }}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
     </li>
   );
 }
@@ -114,7 +218,7 @@ function ProblemRow({
 export default function ProblemList({ patientId, patientName }: ProblemListProps) {
   const { t } = useTranslation();
   const { currentUser } = useApp();
-  const { active, resolved, problems, create, setStatus, loading } = useProblems(patientId);
+  const { active, resolved, problems, create, setStatus, update, remove, loading } = useProblems(patientId);
   const { showToast } = useToast();
 
   const [adding, setAdding] = useState(false);
@@ -193,13 +297,37 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
     }
   };
 
+  // Edit an existing problem (status / onset / notes) in place via the
+  // existing updateProblem service — corrections without re-creating the row.
+  const handleEdit = async (id: string, patch: Partial<ProblemDoc>) => {
+    try {
+      await update(id, patch);
+      showToast(t('action.saveChanges'), 'success');
+    } catch {
+      showToast(t('problemList.toastUpdateFailed'), 'error');
+      throw new Error('update failed');
+    }
+  };
+
+  // Remove a problem added in error. Destructive, so it is gated behind a
+  // confirm dialog — distinct from "resolve", which keeps the row for history.
+  const handleRemove = async (id: string) => {
+    if (!window.confirm(t('action.remove') + '?')) return;
+    try {
+      await remove(id);
+      showToast(t('action.remove'), 'success');
+    } catch {
+      showToast(t('problemList.toastUpdateFailed'), 'error');
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="card-elevated p-5 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className="icon-box-lg" style={{ background: 'rgba(124,58,237,0.12)' }}>
-            <Activity className="w-5 h-5" style={{ color: '#7C3AED' }} />
+          <div className="icon-box-lg">
+            <Activity className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
           </div>
           <div>
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{t('problemList.title')}</h2>
@@ -223,7 +351,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
             style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}
           >
             <div className="flex items-center gap-2">
-              <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+              <div className="icon-box-sm">
                 <Plus className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('problemList.newProblem')}</h3>
@@ -308,7 +436,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
                 <label className="block text-xs font-bold uppercase mb-1.5" style={{
                   color: 'var(--text-muted)', letterSpacing: '0.06em',
                 }}>{t('problemList.status')}</label>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-3 gap-1 keep-cols">
                   {(['active', 'chronic', 'inactive'] as const).map(s => {
                     const tint = STATUS_TINT[s];
                     const on = status === s;
@@ -389,7 +517,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
             className="card-elevated p-5 text-center"
             style={{ borderStyle: 'dashed' }}
           >
-            <div className="icon-box-lg mx-auto" style={{ background: 'var(--overlay-subtle)' }}>
+            <div className="icon-box-lg mx-auto">
               <Activity className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
             </div>
             <p className="text-sm font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>
@@ -402,7 +530,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
         ) : (
           <ul className="space-y-2">
             {active.map(p => (
-              <ProblemRow key={p._id} problem={p} onResolve={handleResolve} />
+              <ProblemRow key={p._id} problem={p} onResolve={handleResolve} onEdit={handleEdit} onRemove={handleRemove} />
             ))}
           </ul>
         )}
@@ -422,7 +550,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
           </div>
           <ul className="space-y-2">
             {resolved.map(p => (
-              <ProblemRow key={p._id} problem={p} onReactivate={handleReactivate} />
+              <ProblemRow key={p._id} problem={p} onReactivate={handleReactivate} onRemove={handleRemove} />
             ))}
           </ul>
         </section>

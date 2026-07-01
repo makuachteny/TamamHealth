@@ -17,9 +17,9 @@ export default function RadiologyManagementPage() {
           eyebrow="RADIOLOGY INFORMATION SYSTEM"
           title="Schedule. Acquire. Report. Send."
           subtitle="A modality-first imaging workflow that keeps your radiographers and reporting radiologists in sync — even when the radiologist is reading remotely from Juba."
-          accentColor="#1B7FA8"
-          primaryCta={{ label: "Request a demo", href: "/about/contact" }}
-          illustration={<ProductIllustration accent="#1B7FA8" variant="imaging" />}
+          accentColor="#2191D0"
+          primaryCta={{ label: "Request a demo", href: "/about/contact?intent=demo#contact-form" }}
+          illustration={<ProductIllustration accent="#2191D0" variant="imaging" />}
         />
 
         <ProductModuleGrid
@@ -40,7 +40,7 @@ export default function RadiologyManagementPage() {
         <ProductBenefits
           eyebrow="BUILT FOR REMOTE READING"
           heading="Right for radiology in low-bandwidth settings"
-          accentColor="#1B7FA8"
+          accentColor="#2191D0"
           benefits={[
             { title: "Lossless thumbnails first", description: "The radiologist sees a tiny thumbnail in seconds and a full-resolution download is on the way. No more waiting for a 100MB CT to render before knowing if it's the right study." },
             { title: "Reads anywhere with internet", description: "Reporting radiologist in Juba, modality in Bor — the report comes back to the requesting clinician at the source facility." },

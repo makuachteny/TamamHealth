@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react';
 import { Menu, X, User, Moon, Sun, LogOut } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 
+const PATIENT_PORTAL_SESSION_KEY = 'tamamhealth-patient-portal-session';
+
 export default function PatientPortalLayout({ children }: { children: React.ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -13,7 +15,7 @@ export default function PatientPortalLayout({ children }: { children: React.Reac
   const { theme, toggleTheme } = useApp();
 
   useEffect(() => {
-    const check = () => setIsLoggedIn(!!localStorage.getItem('tamamhealth-patient-id'));
+    const check = () => setIsLoggedIn(!!sessionStorage.getItem(PATIENT_PORTAL_SESSION_KEY));
     // Initial read from localStorage on mount.
     check();
     // The browser fires `storage` events when ANOTHER tab mutates localStorage,
@@ -25,8 +27,7 @@ export default function PatientPortalLayout({ children }: { children: React.Reac
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('tamamhealth-patient-id');
-    localStorage.removeItem('tamamhealth-patient-name');
+    sessionStorage.removeItem(PATIENT_PORTAL_SESSION_KEY);
     setIsLoggedIn(false);
     router.push('/patient-portal');
     router.refresh();

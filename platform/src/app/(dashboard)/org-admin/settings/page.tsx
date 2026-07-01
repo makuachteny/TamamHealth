@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import {
-  Settings, Mail, CreditCard, Building2,
+  Mail, CreditCard, Building2,
   CheckCircle, XCircle, Zap, Lock, Info, Shield, Timer,
 } from '@/components/icons/lucide';
 import type { OrganizationDoc } from '@/lib/db-types';
@@ -21,7 +20,7 @@ export default function OrgSettingsPage() {
   const [lockTimeout, setLockTimeout] = useState<number>(1);
   const [savingTimeout, setSavingTimeout] = useState(false);
 
-  const brandColor = currentUser?.branding?.primaryColor || '#7C3AED';
+  const brandColor = currentUser?.branding?.primaryColor || 'var(--accent-primary)';
 
   useEffect(() => {
     if (!currentUser?.orgId) return;
@@ -77,12 +76,6 @@ export default function OrgSettingsPage() {
       <TopBar title="Organization Settings" />
 
       <div className="page-container page-enter">
-        <PageHeader
-          icon={Settings}
-          title={t('orgSettings.title')}
-          subtitle={t('orgSettings.subtitle')}
-        />
-
         {/* Read-only notice */}
         <div className="mb-6 p-3 rounded-lg flex items-center gap-2" style={{ background: `${brandColor}08`, border: `1px solid ${brandColor}20` }}>
           <Lock className="w-4 h-4 flex-shrink-0" style={{ color: brandColor }} />

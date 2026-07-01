@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { verifyPatientToken } from '@/lib/patient-portal-auth';
 import { paymentsDB } from '@/lib/db';
 import { logAuditSafe } from '@/lib/services/audit-service';
+import { emitSyncEvent } from '@/lib/services/sync-event-service';
 import type { PaymentDoc, PaymentStatus, PaymentMethodType } from '@/lib/db-types-payments';
 
 export async function POST(req: NextRequest) {
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  // TODO(finance): patient-submitted payments land in 'pending' and MUST be
+  // Finance control: patient-submitted payments land in 'pending' and MUST be
   // reviewed/approved before being posted to the ledger. Do not auto-allocate.
   try {
     const db = paymentsDB();
@@ -56,6 +57,15 @@ export async function POST(req: NextRequest) {
       'PATIENT_SUBMIT_PAYMENT', auth.sub, auth.name,
       `Patient ${auth.sub} submitted payment ${doc._id} for ${doc.amount} ${doc.currency} (pending finance approval)`
     );
+    emitSyncEvent({
+      resourceType: 'payment',
+      resourceId: doc._id,
+      operation: 'create',
+      resourceVersion: doc._rev,
+      userId: auth.sub,
+      username: auth.name,
+      hospitalId: doc.facilityId,
+    });
 
     return NextResponse.json({ ok: true, id: doc._id }, { status: 201 });
   } catch (err) {

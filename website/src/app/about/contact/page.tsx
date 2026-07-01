@@ -1,17 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
   FAQItem,
 } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
+import { Check, Mail, Smartphone, MapPin } from "@/components/marketing/icons";
 
 type Intent =
   | ""
   | "demo"
+  | "pricing"
   | "pilot"
   | "partnership"
   | "careers"
@@ -21,12 +23,36 @@ type Intent =
 const INTENT_OPTIONS: { id: Intent; label: string }[] = [
   { id: "", label: "Select a reason…" },
   { id: "demo", label: "Book a demo" },
+  { id: "pricing", label: "Request pricing" },
   { id: "pilot", label: "Pilot at my facility" },
   { id: "partnership", label: "Partnership or integration" },
   { id: "careers", label: "Join the team" },
   { id: "media", label: "Press or media" },
   { id: "other", label: "Something else" },
 ];
+
+function parseIntent(value: string | null): Intent {
+  return INTENT_OPTIONS.some((option) => option.id === value) ? (value as Intent) : "";
+}
+
+function defaultSubjectForIntent(intent: Intent) {
+  switch (intent) {
+    case "demo":
+      return "Demo request";
+    case "pricing":
+      return "Pricing request";
+    case "pilot":
+      return "Pilot request";
+    case "partnership":
+      return "Partnership inquiry";
+    case "careers":
+      return "Careers inquiry";
+    case "media":
+      return "Media inquiry";
+    default:
+      return "";
+  }
+}
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -44,18 +70,43 @@ export default function ContactPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "intent" && !prev.subject ? { subject: defaultSubjectForIntent(value as Intent) } : {}),
+    }));
   };
+
+  useEffect(() => {
+    const requestedIntent = parseIntent(new URLSearchParams(window.location.search).get("intent"));
+    if (!requestedIntent) return;
+    setFormData((prev) => ({
+      ...prev,
+      intent: requestedIntent,
+      subject: prev.subject || defaultSubjectForIntent(requestedIntent),
+    }));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError("");
     setSubmitting(true);
     try {
-      const res = await fetch("/api/contact", {
+      const isAppointment = formData.intent === "demo";
+      const res = await fetch(isAppointment ? "/api/appointments" : "/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(
+          isAppointment
+            ? {
+                name: formData.name,
+                email: formData.email,
+                facility: formData.facility,
+                source: "contact-page-demo",
+                message: formData.message || formData.subject || "Demo request from contact page.",
+              }
+            : formData,
+        ),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Something went wrong" }));
@@ -73,38 +124,18 @@ export default function ContactPage() {
 
   return (
     <>
-      {/* ── HERO ─────────────────────────────────────────────────────── */}
-      <section className="mk-hero-photo-bg">
-        <Image
-          src="/assets/community-health-worker.jpg"
-          alt="Community health worker at an African clinic"
-          fill
-          className="mk-hero-bg-img"
-          priority
-        />
-        <div className="mk-container" style={{ textAlign: "center", maxWidth: 720, margin: "0 auto", position: "relative", zIndex: 1 }}>
-          <Reveal>
-            <span className="mk-label" style={{ color: "var(--tb-gold)" }}>GET IN TOUCH</span>
-            <h1 className="mk-h1" style={{ color: "#fff", marginTop: 12 }}>
-              Let&apos;s talk.
-            </h1>
-            <p className="mk-body-lg" style={{ color: "var(--tb-text-inv-m)", marginTop: 16, maxWidth: 560, margin: "16px auto 0" }}>
-              Whether you run a clinic, lead a health system, or want to build with us — we read every message, and we&apos;ll write back within one business day.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, marginTop: 28 }}>
-              <a href="#contact-form" className="mk-btn mk-btn-green mk-btn-lg">
-                Send us a message
-              </a>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 16px", borderRadius: 999, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.22)", backdropFilter: "blur(4px)" }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--tb-green)", boxShadow: "0 0 0 4px rgba(45,155,106,0.25)" }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", letterSpacing: "0.02em" }}>
-                  Typical response: under 4 business hours
-                </span>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <MarketingHero
+        variant="showcase"
+        eyebrow="GET IN TOUCH"
+        title="Let's talk."
+        subtitle="Whether you run a clinic, lead a health system, work in public health, or care about South Sudan's future, we want to hear from you."
+        primaryCta={{ label: "Send us a message", href: "#contact-form" }}
+        stats={[{ value: "Pilot", label: "facility conversations" }, { value: "Partner", label: "health system alliances" }]}
+        image="/assets/community-health-worker.jpg"
+        imageAlt="Community health worker at an African clinic"
+        imagePriority
+        className="mk-hero-contact"
+      />
 
       {/* ── REACH US DIRECTLY ─────────────────────────────────────────── */}
       <section className="mk-section mk-section-cream">
@@ -114,7 +145,7 @@ export default function ContactPage() {
               <span className="mk-label" style={{ color: "var(--tb-blue-700)" }}>REACH US DIRECTLY</span>
               <h2 className="mk-h2" style={{ marginTop: 10 }}>Pick the channel that works for you</h2>
               <p className="mk-body" style={{ color: "var(--tb-text-sec)", marginTop: 14 }}>
-                Email is fastest. For strategic conversations, talk to a founder.
+                Share what you are building, what you are seeing, or how you want to help.
               </p>
             </div>
           </Reveal>
@@ -131,23 +162,23 @@ export default function ContactPage() {
                 icon="email"
                 tone="blue"
                 label="Email"
-                primary="hello@tamamhealth.org"
-                secondary="Fastest way to reach the team"
-                href="mailto:hello@tamamhealth.org"
+                primary="support.tamam@gmail.com"
+                secondary="For pilot partners, advisors, and mission allies"
+                href="mailto:support.tamam@gmail.com"
               />
               <ChannelCard
                 icon="phone"
                 tone="green"
-                label="Phone"
-                primary="+1 (973) 566-4336"
-                secondary="Mon–Fri, 8 AM – 6 PM EAT"
+                label="Mission"
+                primary="Pilot partnerships"
+                secondary="Facilities, NGOs, clinicians, and public-health leaders"
               />
               <ChannelCard
                 icon="location"
                 tone="gold"
-                label="Offices"
-                primary="Boston & Juba"
-                secondary="Medford, MA · South Sudan"
+                label="Community"
+                primary="South Sudanese everywhere"
+                secondary="Diaspora, builders, donors, and advocates"
               />
             </div>
           </Reveal>
@@ -178,7 +209,7 @@ export default function ContactPage() {
                 }}>
                   <Image
                     src="/assets/founder-teny.jpg"
-                    alt="Teny Makuach, CEO of TamamHealth"
+                    alt="Teny Makuach, founder of TamamHealth"
                     fill
                     sizes="56px"
                     style={{ objectFit: "cover" }}
@@ -189,18 +220,18 @@ export default function ContactPage() {
                     Talk to a founder
                   </p>
                   <p style={{ fontSize: 14, lineHeight: 1.5, margin: "0 0 6px", color: "rgba(255,255,255,0.9)" }}>
-                    Strategic partnerships or funding — reach our CEO Teny Makuach directly.
+                    Pilot partnerships, product feedback, or mission support — write to the team directly.
                   </p>
-                  <a href="mailto:teny@tamamhealth.org" style={{ fontSize: 13, fontWeight: 700, color: "var(--tb-gold)", textDecoration: "none", borderBottom: "1px dashed var(--tb-gold)" }}>
-                    teny@tamamhealth.org →
+                  <a href="mailto:support.tamam@gmail.com" style={{ fontSize: 13, fontWeight: 700, color: "var(--tb-gold)", textDecoration: "none", borderBottom: "1px dashed var(--tb-gold)" }}>
+                    support.tamam@gmail.com →
                   </a>
                 </div>
               </div>
 
               {/* Partnerships / Careers split */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <SideEmail label="Partnerships" email="partnerships@tamamhealth.org" tone="blue" />
-                <SideEmail label="Careers" email="careers@tamamhealth.org" tone="green" />
+                <SideEmail label="Partnerships" email="support.tamam@gmail.com" tone="blue" />
+                <SideEmail label="Careers" email="support.tamam@gmail.com" tone="green" />
               </div>
             </div>
           </Reveal>
@@ -235,11 +266,11 @@ export default function ContactPage() {
                   textAlign: "center",
                 }}>
                   <div style={{ display: "inline-flex", width: 72, height: 72, borderRadius: "50%", background: "var(--tb-green)", color: "#fff", alignItems: "center", justifyContent: "center", marginBottom: 18 }}>
-                    <DuoIcon name="check" size={36} />
+                    <Check size={36} strokeWidth={1.8} />
                   </div>
                   <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--tb-green-dark)", margin: "0 0 8px" }}>Message received.</h3>
                   <p style={{ fontSize: 15, color: "var(--tb-text-sec)", margin: 0, lineHeight: 1.6 }}>
-                    We&apos;ll reply to your email within 4 business hours. Look for a confirmation in your inbox.
+                    Thank you for reaching out. We&apos;ll review your message and follow up where there is a clear fit for the mission.
                   </p>
                 </div>
               ) : (
@@ -255,7 +286,7 @@ export default function ContactPage() {
 
                   <div className="mk-form-row-3">
                     <FormField label="Full name" name="name" type="text" placeholder="Your name" value={formData.name} onChange={handleChange} required />
-                    <FormField label="Email" name="email" type="email" placeholder="you@clinic.com" value={formData.email} onChange={handleChange} required />
+                    <FormField label="Email" name="email" type="email" placeholder="you@example.com" value={formData.email} onChange={handleChange} required />
                     <FormField label="Facility" name="facility" type="text" placeholder="Clinic or hospital" value={formData.facility} onChange={handleChange} />
                   </div>
 
@@ -346,7 +377,7 @@ export default function ContactPage() {
             <div className="mk-faq-list">
               <FAQItem
                 question="How quickly do you reply?"
-                answer="Within 4 business hours, Monday through Friday. Demo requests and urgent pilot inquiries jump the queue."
+                answer="We are a small team, so response times vary. Pilot partnerships, health-worker feedback, and mission-aligned introductions are the highest priority."
               />
               <FAQItem
                 question="Can I see TamamHealth in action first?"
@@ -354,11 +385,11 @@ export default function ContactPage() {
               />
               <FAQItem
                 question="Where is TamamHealth based?"
-                answer="Founded at Tufts University in Medford, MA. Engineering is split between the US and Juba, South Sudan — so we&apos;re close to both the codebase and the clinicians we serve."
+                answer="TamamHealth was founded at Tufts University and is being built with South Sudan at the center of the mission."
               />
               <FAQItem
                 question="I represent a partner org or NGO — who do I reach?"
-                answer="Email partnerships@tamamhealth.org with a short note on your organization and the health systems you serve. We&apos;ll route it to the right lead."
+                answer="Email support.tamam@gmail.com with a short note about your organization, the health system you serve, and where you think TamamHealth can help."
               />
             </div>
           </Reveal>
@@ -405,7 +436,7 @@ const inputStyle: React.CSSProperties = {
   fontSize: 15,
   fontFamily: "var(--tb-sans)",
   color: "var(--tb-text)",
-  background: "#fff",
+  background: "#FEFFF9",
   outline: "none",
   transition: "border-color 0.15s",
 };
@@ -432,6 +463,12 @@ function FormField({ label, name, type, placeholder, value, onChange, required =
   );
 }
 
+const CHANNEL_ICON_MAP = {
+  email: Mail,
+  phone: Smartphone,
+  location: MapPin,
+} as const;
+
 function ChannelCard({ icon, tone, label, primary, secondary, href }: {
   icon: "email" | "phone" | "location";
   tone: "blue" | "green" | "gold";
@@ -446,15 +483,15 @@ function ChannelCard({ icon, tone, label, primary, secondary, href }: {
     gold: { bg: "var(--tb-tint-gold)", fg: "var(--tb-gold-dark)", primaryColor: "var(--tb-text-pri)" },
   }[tone];
 
+  const IconComp = CHANNEL_ICON_MAP[icon];
   const inner = (
     <>
       <div style={{
         width: 48, height: 48, borderRadius: 12,
-        background: toneMap.bg, color: toneMap.fg,
         display: "flex", alignItems: "center", justifyContent: "center",
         marginBottom: 18,
       }}>
-        <DuoIcon name={icon} size={22} />
+        <IconComp size={22} strokeWidth={1.8} />
       </div>
       <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--tb-text-muted)", margin: "0 0 6px" }}>
         {label}
@@ -467,7 +504,7 @@ function ChannelCard({ icon, tone, label, primary, secondary, href }: {
   );
 
   const cardStyle: React.CSSProperties = {
-    background: "#fff",
+    background: "#FEFFF9",
     borderRadius: 16,
     padding: "24px 26px",
     border: "1px solid var(--tb-cream-300)",
@@ -491,7 +528,7 @@ function SideEmail({ label, email, tone }: { label: string; email: string; tone:
     <a href={`mailto:${email}`} style={{
       display: "block",
       padding: "18px 20px",
-      background: "#fff",
+      background: "#FEFFF9",
       borderRadius: 14,
       border: "1px solid var(--tb-cream-300)",
       textDecoration: "none",

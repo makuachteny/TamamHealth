@@ -161,6 +161,8 @@ export const auditLogDB = () => getDB('tamamhealth_audit_log');
 export const messagesDB = () => getDB('tamamhealth_messages');
 export const conversationsDB = () => getDB('tamamhealth_conversations');
 export const patientNotesDB = () => getDB('tamamhealth_patient_notes');
+export const phoneNotesDB = () => getDB('tamamhealth_phone_notes');
+export const assessmentsDB = () => getDB('tamamhealth_assessments');
 export const birthsDB = () => getDB('tamamhealth_births');
 export const deathsDB = () => getDB('tamamhealth_deaths');
 export const facilityAssessmentsDB = () => getDB('tamamhealth_facility_assessments');
@@ -186,10 +188,31 @@ export const leaveRequestsDB = () => getDB('tamamhealth_leave_requests');
 export const payrollEntriesDB = () => getDB('tamamhealth_payroll_entries');
 export const controlledSubstanceLogDB = () => getDB('tamamhealth_controlled_substance_log');
 export const problemsDB = () => getDB('tamamhealth_problems');
+// Order sets / clinical protocols (reference data) — reusable bundles of
+// labs + medications keyed to a presenting condition (WHO/IMCI/ETAT/STG).
+export const orderSetsDB = () => getDB('tamamhealth_order_sets');
+// Nurse shift handoff records (SBAR + tasks), retrievable & acknowledgeable by
+// the oncoming shift.
+export const handoffsDB = () => getDB('tamamhealth_handoffs');
 // In-progress / paused clinical encounters (consultation workflow state machine).
 export const encountersDB = () => getDB('tamamhealth_encounters');
 // Fingerprint minutiae templates (no raw images) — see db-types-biometrics.ts
 export const biometricTemplatesDB = () => getDB('tamamhealth_biometric_templates');
+
+// Per-clinician clinical favorites (one-tap diagnosis/medicine/procedure picks).
+export const clinicalFavoritesDB = () => getDB('tamamhealth_clinical_favorites');
+
+// Clinician-saved consultation templates (reusable diagnosis+medicine bundles).
+export const consultationTemplatesDB = () => getDB('tamamhealth_consultation_templates');
+
+// Per-clinician personal tasks / to-dos with reminders.
+export const clinicianTasksDB = () => getDB('tamamhealth_clinician_tasks');
+
+// Scanned / uploaded chart documents (radiology, referral letters, IDs, etc.).
+export const patientDocumentsDB = () => getDB('tamamhealth_patient_documents');
+
+// Queued patient reminders (e.g. "come fasted in 3 weeks") worked by staff.
+export const patientRemindersDB = () => getDB('tamamhealth_patient_reminders');
 
 // Sync + conflict databases (Phase 1 closeout)
 export const syncEventsDB = () => getDB('tamamhealth_sync_events');
@@ -214,7 +237,21 @@ export const ledgerDB = () => getDB('tamamhealth_ledger');
 // dataset (sample patients + the complete user roster).
 // Bumped to 37: added today-dated reception walk-ins + appointments so the
 // front-desk queue is populated on seed day.
-export const SEED_VERSION = 37;
+// Bumped to 38: every seeded user now carries department + specialty + a
+// canonical phone + presence, so the staff directory / HR / messaging / provider
+// pickers are populated for all roles. (Demo re-seed only — never bump against a
+// live production DB.)
+// Bumped to 39: generated per-patient billing (charges, saved payment method,
+// ledger entries, a payment for most, insurance for some) for every demo patient
+// beyond the original five, so any patient's Billing tab shows populated cards.
+// Bumped to 40: seeded order sets / clinical protocols (WHO/IMCI/ETAT/STG
+// bundles) so the consultation "Apply protocol" picker is populated on seed.
+// Bumped to 41: shared sample structured allergies + directives attached to
+// every demo patient so the chart-summary Allergies & Directives windows are
+// populated and scrollable.
+// Bumped to 42: per-patient sample problem list + current medications for every
+// patient (all rosters) so all four chart-summary windows are populated.
+export const SEED_VERSION = 43;
 
 export async function isSeeded(): Promise<boolean> {
   try {
@@ -266,11 +303,15 @@ export async function resetAllDatabases(): Promise<void> {
     'tamamhealth_saved_payment_methods', 'tamamhealth_payment_plans', 'tamamhealth_invoices', 'tamamhealth_ledger',
     'tamamhealth_sync_events', 'tamamhealth_conflict_queue',
     'tamamhealth_problems', 'tamamhealth_encounters', 'tamamhealth_biometric_templates',
+    'tamamhealth_handoffs', 'tamamhealth_order_sets', 'tamamhealth_phone_notes', 'tamamhealth_assessments',
     // Operational DBs that were created + synced but previously missed here,
     // leaving stale data behind on reset/re-seed.
     'tamamhealth_availability', 'tamamhealth_announcements',
     'tamamhealth_emergency_plans', 'tamamhealth_assets',
     'tamamhealth_leave_requests', 'tamamhealth_payroll_entries',
+    'tamamhealth_clinical_favorites', 'tamamhealth_consultation_templates',
+    'tamamhealth_clinician_tasks', 'tamamhealth_patient_documents',
+    'tamamhealth_patient_reminders',
     // NOTE: 'tamamhealth_controlled_substance_log' is deliberately NOT reset
     // here — it is an append-only regulatory audit trail and resetAllDatabases()
     // runs on production seed-version bumps (see seedProduction).

@@ -36,7 +36,16 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
   'tamamhealth_conversations',         // internal staff chat — facility-operational PHI, not national analytics
   'tamamhealth_patient_notes',         // internal clinical notes — facility-operational PHI, not national analytics
   'tamamhealth_encounters',            // in-progress consultation workflow state — facility-operational, not national analytics
+  'tamamhealth_handoffs',              // nurse shift handoffs (SBAR) — facility-operational PHI, not national analytics
   'tamamhealth_biometric_templates',   // biometric identifiers — in-org identification only, never national
+  'tamamhealth_order_sets',            // clinical protocol templates — org-scoped reference data, not national analytics
+  'tamamhealth_phone_notes',           // patient call notes / callbacks — facility-operational PHI, not national analytics
+  'tamamhealth_assessments',           // scored intake/outcome-measure forms — facility-operational PHI, not national analytics
+  'tamamhealth_clinical_favorites',    // per-clinician picker shortcuts — personal/operational preference data, not national analytics
+  'tamamhealth_consultation_templates', // clinician-saved consultation bundles — personal/operational templates, not national analytics
+  'tamamhealth_clinician_tasks',       // per-clinician personal to-dos — personal/operational data, not national analytics
+  'tamamhealth_patient_documents',     // scanned chart documents (films, letters, IDs) — facility-operational PHI blobs, not national analytics
+  'tamamhealth_patient_reminders',     // queued patient reminders — facility-operational, not national analytics
 ]);
 
 // Local-only databases that never participate in sync at all.

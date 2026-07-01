@@ -1,13 +1,15 @@
-"use client";
-
-import Link from "next/link";
 import Image from "next/image";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
-  FAQItem,
   CheckItem,
-  TestimonialSwoosh,
 } from "@/components/marketing/MarketingShared";
+import {
+  FeatureFAQSection,
+  FeatureRelatedProductsSection,
+  FeatureStatsBand,
+  FeatureTestimonialSection,
+} from "@/components/marketing/FeatureSections";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Analytics & Reporting Product Page
@@ -17,50 +19,21 @@ import {
 export default function AnalyticsPage() {
   return (
     <>
-      {/* ── HERO SECTION ────────────────────────────────────────────── */}
-      <section className="mk-hero" id="demo">
-        <div className="mk-container">
-          <div className="mk-hero-flex">
-            {/* Left: Headline + Description */}
-            <div className="mk-hero-content">
-              <span className="mk-label">ANALYTICS & REPORTING</span>
-              <h1 className="mk-h1">
-                Transform data into action — MOH reporting, clinical insights, and real-time dashboards
-              </h1>
-              <p className="mk-body-lg">
-                Health systems in South Sudan spend days manually compiling DHIS2 reports, have no visibility into quality metrics, and can&apos;t track financial performance. TamamHealth Analytics automatically exports to DHIS2, delivers real-time clinical dashboards, and identifies patterns that improve patient outcomes — all with zero manual data work.
-              </p>
-              <div style={{ display: "flex", gap: 16, alignItems: "center", margin: "24px 0 32px" }}>
-                <div style={{ backgroundColor: "var(--tb-gold-light)", padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", color: "var(--tb-text)" }}>
-                  90% Faster MOH Reporting
-                </div>
-                <div style={{ backgroundColor: "var(--tb-gold-light)", padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", color: "var(--tb-text)" }}>
-                  DHIS2 Compliant
-                </div>
-              </div>
-              <div style={{ marginTop: 32 }}>
-                <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
-                  See DHIS2 dashboard demo
-                </Link>
-              </div>
-            </div>
-
-            {/* Center: Hero Photo */}
-            <div className="mk-hero-photo">
-              <Reveal delay={0.15}>
-                <Image
-                  src="/assets/african-nurse.jpg"
-                  alt="Healthcare professional reviewing analytics data"
-                  width={260}
-                  height={380}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
-                  priority
-                />
-              </Reveal>
-            </div>
-          </div>
-        </div>
-      </section>
+      <MarketingHero
+        variant="data"
+        eyebrow="ANALYTICS & REPORTING"
+        title="Transform health data into action."
+        subtitle="Automated DHIS2 exports, real-time clinical dashboards, and facility insights replace days of manual reporting with decisions backed by live data."
+        primaryCta={{ label: "See DHIS2 dashboard demo", href: "/about/contact?intent=demo#contact-form" }}
+        stats={[
+          { value: "90%", label: "faster MOH reporting" },
+          { value: "DHIS2", label: "compliant exports" },
+          { value: "Live", label: "facility dashboards" },
+        ]}
+        image="/assets/health-data.jpg"
+        imageAlt="Healthcare data and analytics visual"
+        imagePriority
+      />
 
       {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
       <section className="mk-section mk-section-white" style={{ backgroundColor: "var(--tb-cream-100)" }}>
@@ -70,7 +43,7 @@ export default function AnalyticsPage() {
               Analytics that empowers better health decisions
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 32 }}>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>1</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   Data flows automatically
@@ -79,7 +52,7 @@ export default function AnalyticsPage() {
                   Patient data from EHR, billing, pharmacy, and labs automatically feeds analytics engine. No manual data entry. Updated daily.
                 </p>
               </div>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>2</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   MOH gets reports automatically
@@ -88,7 +61,7 @@ export default function AnalyticsPage() {
                   TamamHealth automatically exports aggregate data to DHIS2 daily. MOH gets compliance reports without your team lifting a finger.
                 </p>
               </div>
-              <div style={{ background: "#fff", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
+              <div style={{ background: "#FEFFF9", padding: 32, borderRadius: 12, border: "1px solid var(--tb-cream-300)" }}>
                 <div style={{ fontSize: 48, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 12 }}>3</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
                   You see actionable insights
@@ -182,13 +155,12 @@ export default function AnalyticsPage() {
                   <CheckItem>Comprehensive audit trail for regulatory requirements</CheckItem>
                 </ul>
               </div>
-              <div className="mk-split-image">
+              <div className="mk-split-image mk-dashboard-crop">
                 <Image
-                  src="/assets/dashboard-screenshot.png"
+                  src="/assets/Dashboard.png"
                   alt="DHIS2 integration dashboard showing automated data exports"
                   width={600}
                   height={400}
-                  style={{ width: "100%", height: "auto" }}
                   priority
                 />
               </div>
@@ -352,133 +324,72 @@ export default function AnalyticsPage() {
         </div>
       </section>
 
-      {/* ── STATS SECTION ────────────────────────────────────────────── */}
-      <section className="mk-stat-band">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-stat-row">
-              <div className="mk-stat-badge">
-                <strong>90%</strong>
-                <span>Reporting time reduction</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>80+</strong>
-                <span>Countries using DHIS2</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>45%</strong>
-                <span>Data quality improvement</span>
-              </div>
-              <div className="mk-stat-badge">
-                <strong>15 days</strong>
-                <span>DSO improvement</span>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureStatsBand
+        stats={[
+          { value: "90%", label: "Reporting time reduction" },
+          { value: "80+", label: "Countries using DHIS2" },
+          { value: "45%", label: "Data quality improvement" },
+          { value: "15 days", label: "DSO improvement" },
+        ]}
+      />
 
-      {/* ── TESTIMONIAL SECTION ─────────────────────────────────────── */}
-      <section className="mk-section mk-section-teal">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-testimonial-inner">
-              <div className="mk-testimonial-swoosh">
-                <TestimonialSwoosh />
-              </div>
+      <FeatureTestimonialSection
+        testimonial={{
+          quote: "Three months ago, my team spent 3 days every month compiling DHIS2 data and Excel spreadsheets, and we still got errors. Now TamamHealth exports automatically each day. We've freed up 120 staff hours per year. More importantly, we now see real-time dashboards showing readmission rates, medication errors, and quality issues. We're making better decisions, catching problems faster, and reporting accurate data to the Ministry for the first time.",
+          name: "Dr. Amara Okonkwo",
+          role: "Director of Health Information Systems, Central Region Health Authority",
+        }}
+      />
 
-              <div className="mk-testimonial-quote">
-                <div className="mk-quote-mark">&ldquo;</div>
-                <blockquote>
-                  Three months ago, my team spent 3 days every month compiling DHIS2 data and Excel spreadsheets, and we still got errors. Now TamamHealth exports automatically each day. We&apos;ve freed up 120 staff hours per year. More importantly, we now see real-time dashboards showing readmission rates, medication errors, and quality issues. We&apos;re making better decisions, catching problems faster, and reporting accurate data to the Ministry for the first time.
-                </blockquote>
-                <cite>
-                  <strong>Dr. Amara Okonkwo</strong>
-                  <span>Director of Health Information Systems, Central Region Health Authority</span>
-                </cite>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureFAQSection
+        faqs={[
+          {
+            question: "How does the DHIS2 integration work?",
+            answer: "TamamHealth automatically extracts aggregate data from patient records and exports it daily to your national DHIS2 instance. The integration follows MOH standards and indicators, ensuring compliance with all reporting requirements. No manual data entry needed.",
+          },
+          {
+            question: "Can I create custom metrics and KPIs specific to my organization?",
+            answer: "Yes. Our drag-and-drop report builder allows you to create unlimited custom metrics and KPIs. You can combine data from multiple sources, set up scheduled delivery via email or SMS, and export to Excel, PDF, PowerPoint, or other formats.",
+          },
+          {
+            question: "How accurate are the predictive risk scores?",
+            answer: "Our predictive models are trained on clinical data and validated against real-world outcomes. Accuracy typically ranges from 78-85% depending on data quality and the specific prediction. We continuously refine the models as you input more data.",
+          },
+          {
+            question: "What happens if there are data quality issues?",
+            answer: "Our automated validation rules continuously monitor data completeness and quality. The system identifies issues at the source, flags them for correction, and provides training recommendations to staff. You get a comprehensive data quality dashboard showing completeness rates by field and facility.",
+          },
+          {
+            question: "Can I export reports in different formats?",
+            answer: "Yes. All reports can be exported to Excel, PDF, PowerPoint, and other common formats. You can schedule automated exports and delivery via email or SMS to stakeholders. This makes it easy to integrate with your existing workflows.",
+          },
+        ]}
+      />
 
-      {/* ── FAQ SECTION ─────────────────────────────────────────────── */}
-      <section className="mk-faq-section">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2 mk-faq-title">Frequently asked questions</h2>
-
-            <div className="mk-faq-list">
-              <FAQItem
-                question="How does the DHIS2 integration work?"
-                answer="TamamHealth automatically extracts aggregate data from patient records and exports it daily to your national DHIS2 instance. The integration follows MOH standards and indicators, ensuring compliance with all reporting requirements. No manual data entry needed."
-              />
-              <FAQItem
-                question="Can I create custom metrics and KPIs specific to my organization?"
-                answer="Yes. Our drag-and-drop report builder allows you to create unlimited custom metrics and KPIs. You can combine data from multiple sources, set up scheduled delivery via email or SMS, and export to Excel, PDF, PowerPoint, or other formats."
-              />
-              <FAQItem
-                question="How accurate are the predictive risk scores?"
-                answer="Our predictive models are trained on clinical data and validated against real-world outcomes. Accuracy typically ranges from 78-85% depending on data quality and the specific prediction. We continuously refine the models as you input more data."
-              />
-              <FAQItem
-                question="What happens if there are data quality issues?"
-                answer="Our automated validation rules continuously monitor data completeness and quality. The system identifies issues at the source, flags them for correction, and provides training recommendations to staff. You get a comprehensive data quality dashboard showing completeness rates by field and facility."
-              />
-              <FAQItem
-                question="Can I export reports in different formats?"
-                answer="Yes. All reports can be exported to Excel, PDF, PowerPoint, and other common formats. You can schedule automated exports and delivery via email or SMS to stakeholders. This makes it easy to integrate with your existing workflows."
-              />
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── RELATED PRODUCTS ────────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 48 }}>
-              Analytics works best with clean data sources
-            </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 32 }}>
-              <div style={{ backgroundColor: "var(--tb-tint-blue)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  EHR Module
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Complete patient data in EHR feeds analytics. Quality metrics, readmission rates, and mortality tracking all depend on accurate clinical documentation.
-                </p>
-                <Link href="/ehr" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Learn more
-                </Link>
-              </div>
-              <div style={{ backgroundColor: "var(--tb-tint-gold)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  Billing & Payments
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Financial metrics, denial rates, and revenue analysis depend on complete billing data. See your cash flow and payer performance in real-time.
-                </p>
-                <Link href="/billing" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  Learn more
-                </Link>
-              </div>
-              <div style={{ backgroundColor: "var(--tb-tint-green)", padding: 32, borderRadius: 12 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "var(--tb-text)" }}>
-                  All TamamHealth Modules
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", marginBottom: 20, lineHeight: 1.6 }}>
-                  Every TamamHealth module — EHR, Pharmacy, Telehealth, Patient Experience — feeds clean data to Analytics. The more modules you use, the better your insights.
-                </p>
-                <Link href="/ehr" className="mk-btn mk-btn-outline-green mk-btn-sm">
-                  View all modules
-                </Link>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <FeatureRelatedProductsSection
+        heading="Analytics works best with clean data sources"
+        products={[
+          {
+            title: "EHR Module",
+            body: "Complete patient data in EHR feeds analytics. Quality metrics, readmission rates, and mortality tracking all depend on accurate clinical documentation.",
+            href: "/ehr",
+            tone: "blue",
+          },
+          {
+            title: "Billing & Payments",
+            body: "Financial metrics, denial rates, and revenue analysis depend on complete billing data. See your cash flow and payer performance in real-time.",
+            href: "/billing",
+            tone: "gold",
+          },
+          {
+            title: "All TamamHealth Modules",
+            body: "Every TamamHealth module - EHR, Pharmacy, Telehealth, Patient Experience - feeds clean data to Analytics. The more modules you use, the better your insights.",
+            href: "/products#products-grid",
+            cta: "View all modules",
+            tone: "green",
+          },
+        ]}
+      />
 
     </>
   );

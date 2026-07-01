@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -10,7 +11,7 @@
    error on every page. Body/headings fall back to Arial (the intended look)
    while this is commented out. To re-enable, paste the full Webflow CDN URL.
 @font-face {
-    font-family: 'Untitled Sans';
+    font-family: 'DM Sans';
     src: url(https://cdn.prod.website-files.com/<FULL_HASH>/<FULL_HASH>_UntitledSansWeb-Light.woff2) format("woff2");
     font-weight: 300;
     font-style: normal;
@@ -27,245 +28,256 @@
   --section-spacing: 80px;
   --section-spacing-medium: 56px;
   --section-spacing-small: 40px;
-  --btn-radius: 12px;
-  --card-radius: 22px;
-  --input-radius: 12px;
-  --sidebar-width: 256px;
+  --btn-radius: 10px;
+  --card-radius: 16px;
+  --input-radius: 10px;
+  --sidebar-width: 220px;
   --sidebar-collapsed: 72px;
+
+  /* ============ Design tokens — literal color values live here only ============ */
+  --color-white: #FFFFFF;
+  --color-cream-25: #FEFFF9;
+  --color-cream-50: #F7FFF0;
+  --color-cream-75: #F4FFF0;
+  --color-cream-100: #EDFDE5;
+  --color-slate-50: #FCFDFE;
+  --color-slate-200: #E2E8F0;
+  --color-slate-300: #CBD5E1;
+  --color-slate-500: #64748B;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-900: #0F172A;
+  --color-slate-950: #0A1A33;
+  --color-brand-300: #7ECEF5;
+  --color-brand-400: #369FDA;
+  --color-brand-500: #2191D0;
+  --color-brand-700: #015697;
+  --color-success-500: #1B9E77;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-800: #15795C;
+  --color-warning-400: #E4A84B;
+  --color-warning-600: #D97706;
+  --color-warning-700: #B8741C;
+  --color-warning-800: #8A5A0E;
+  --color-danger-500: #C44536;
+  --color-danger-600: #DC2626;
+  --color-danger-700: #B91C1C;
+  --color-danger-800: #8B2E24;
+  --color-purple-500: #8B5CF6;
+  --color-blue-400: #60A5FA;
+  --color-dark-surface: #11244D;
+  --color-dark-surface-hover: #1A3160;
+  --color-dark-border: #1E3A6B;
+  --color-dark-border-strong: #2C4A82;
+  --color-dark-overlay: #0F2046;
+
+  /* Brand hero gradient — Tamam brand blues app-wide. */
+  --gradient-hero: linear-gradient(94.25deg, var(--color-brand-400) 7.28%, var(--color-brand-500) 25.22%, var(--color-brand-700) 84.92%);
+  --hero-base: var(--color-brand-700);
 }
 
 /* ============ LIGHT THEME — Blue & White Palette ============ */
 :root {
-  /* Solid backgrounds — clean neutral white */
-  --bg-gradient: #FFFFFF;
+  /* ── App canvas ── */
+  --bg-app:        var(--color-cream-25);
+  --bg-primary:    var(--color-cream-25);
+  --bg-secondary:  var(--color-cream-50);
+  --bg-card:       rgba(254, 255, 249, 0.82);   /* translucent for glass surfaces */
+  --bg-card-solid: var(--color-cream-25);        /* opaque — sticky headers, inputs */
+  --bg-card-hover: var(--color-cream-75);
+  --bg-input:      var(--color-cream-25);
+  --bg-sidebar:    rgba(254, 255, 249, 0.90);
+  --overlay-subtle: rgba(254, 255, 249, 0.55);
+  --overlay-light:  rgba(247, 255, 240, 0.75);
+  --overlay-medium: rgba(237, 253, 229, 0.88);
+  --overlay-backdrop: rgba(15, 23, 42, 0.56);
 
-  /* App canvas — soft lavender→blue gradient sitting behind white cards.
-     Keeps the page airy and clean while cards/sidebar/topbar stay solid white. */
-  --bg-app:
-    radial-gradient(1200px 700px at 80% -12%, rgba(129, 140, 248, 0.13), transparent 58%),
-    radial-gradient(1100px 680px at 102% 106%, rgba(59, 130, 246, 0.13), transparent 56%),
-    linear-gradient(150deg, #ECEFFB 0%, #F2F5FD 36%, #FAFBFE 62%, #E9F0FC 100%);
+  /* ── Brand blues ── */
+  --accent-primary:  var(--color-brand-500);
+  --accent-hover:    var(--color-brand-700);
+  --accent-text:     var(--color-brand-700);
+  --accent-light:    rgba(33, 145, 208, 0.10);
+  --accent-border:   rgba(33, 145, 208, 0.30);
+  --accent-glow:     transparent;
+  --accent-gradient: var(--gradient-hero);
 
-  /* Core palette — clear whitish page, white cards lifted by borders/shadow */
-  --bg-primary: #FFFFFF;
-  --bg-secondary: #F8FAFC;
-  --bg-sidebar: #FFFFFF;
-  --bg-card: #FFFFFF;
-  --bg-card-solid: #FFFFFF;
-  --bg-card-hover: #F1F5F9;
-  --bg-input: #FFFFFF;
-  --bg-tinted: #eff6ff;
+  /* ── Text (WCAG AA on #FEFFF9) ── */
+  --text-primary:   var(--color-slate-900);
+  --text-secondary: var(--color-slate-700);
+  --text-muted:     var(--color-slate-500);
+  --link-color:     var(--color-brand-700);
+  --icon-color:     var(--color-slate-500);
 
-  /* Tamam Healthcare System brand colors (blue primary; amber/red kept semantic) */
-  --tamamhealth-primary-deep: #1e3a8a;  /* deep brand blue (blue-900) */
-  --tamamhealth-primary: #3b82f6;       /* primary brand blue (blue-600) */
-  /* Brand blue alias used across the app (icons, links, accents). Tracks the
-     active accent so it stays on-theme in both light and dark modes. */
-  --tamamhealth-blue: var(--accent-primary);
-  --tamamhealth-amber: #E4A84B;
-  --tamamhealth-accent: #3b82f6;
-  --tamamhealth-accent-text: #1e3a8a;
-  --tamamhealth-red: #C44536;
-  --tamamhealth-red-text: #C24435;
+  /* ── Borders ── */
+  --border-light:  var(--color-slate-200);
+  --border-medium: var(--color-slate-300);
+  --border-accent: var(--color-brand-500);
 
-  /* Accent — Brand Blue (Tailwind blue-600) */
-  --accent-primary: #3b82f6;            /* fills, icons, button bgs */
-  --accent-hover: #2563eb;
-  --accent-text: #1e3a8a;               /* AA-passing deep blue for text/links on light bg */
-  --accent-light: rgba(59, 130, 246, 0.12);
-  --accent-border: rgba(59, 130, 246, 0.30);
-  --accent-glow: rgba(59, 130, 246, 0.20);
+  /* ── Sharp glassmorphism ── near-opaque frosted surfaces with crisp borders
+     and a minimal blur. High opacity stops content behind from bleeding through
+     (no refracting/misaligning blend); no saturate() so colours stay true. */
+  --glass-bg:        rgba(254, 255, 249, 0.94);
+  --glass-bg-strong: rgba(254, 255, 249, 0.98);
+  --glass-border:    rgba(203, 213, 225, 0.80);
+  --glass-blur:      blur(8px);
+  --glass-highlight: none;
+  --panel-shadow:    none;
 
-  /* Icon default — neutral slate so icons don't take on the accent tint */
-  --icon-color: #64748B;
-
-  /* Text — cool slate charcoal.
-     Contrast ratios on white: primary 16:1 · secondary 9.4:1 · muted 5.7:1 */
-  --text-primary: #0F172A;
-  --text-secondary: #334155;
-  --text-muted: #64748B;
-  --link-color: #1e3a8a;                /* uses accent-text so links pass AA on white */
-
-  /* Borders — cool slate for clear card definition. */
-  --border-light: #E2E8F0;
-  --border-medium: #CBD5E1;
-  --border-accent: #3b82f6;
-  --border-panel: #E2E8F0;
-
-  /* Subtle backgrounds for zebra striping and hover states */
-  --overlay-subtle: #FCFDFE;
-  --overlay-light: #F8FAFC;
-  --overlay-medium: #F1F5F9;
-
-  /* Topbar */
-  --topbar-bg: #FFFFFF;
-  --topbar-border: #E2E8F0;
-
-  /* Sidebar */
-  --sidebar-bg: #FFFFFF;
-
-  /* Card shadow — green-tinted for brand cohesion */
-  --card-shadow: 0 1px 3px rgba(30, 58, 138, 0.06), 0 4px 12px rgba(30, 58, 138, 0.05);
-  --card-shadow-lg: 0 8px 24px rgba(30, 58, 138, 0.10);
-  --card-shadow-xl: 0 16px 48px rgba(30, 58, 138, 0.12);
-  --card-hover-border: #bfdbfe;
-
-  /* ── Glassmorphism (frosted surfaces over the gradient app background) ── */
-  --glass-bg: rgba(255, 255, 255, 0.70);
-  --glass-bg-strong: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.75);
-  /* Blur radius kept modest — blur is the expensive part of backdrop-filter and
-     this app targets low-end hardware, so 10px reads as glass without the cost. */
-  --glass-blur: blur(10px) saturate(130%);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  --panel-shadow: 0 1px 3px rgba(30, 58, 138, 0.06), 0 4px 12px rgba(30, 58, 138, 0.05);
+  /* ── Shadows ── */
+  --card-shadow:       none;
+  --card-shadow-lg:    none;
+  --card-shadow-xl:    none;
+  --card-hover-border: var(--border-medium);
 
   /* Toggle */
-  --toggle-track: #CBD5E1;
+  --toggle-track: var(--color-slate-300);
 
   /* Scrollbar */
-  --scrollbar-thumb: rgba(30, 58, 138, 0.14);
-  --scrollbar-thumb-hover: rgba(30, 58, 138, 0.24);
+  --scrollbar-thumb: rgba(33, 145, 208, 0.18);
+  --scrollbar-thumb-hover: rgba(33, 145, 208, 0.32);
 
   /* Table */
-  --table-header-bg: #F8FAFC;
-  --table-row-border: #E2E8F0;
-  --table-row-hover: #FCFDFE;
+  --table-header-bg: var(--color-cream-50);
+  --table-row-border: var(--color-slate-200);
+  --table-row-hover: var(--color-slate-50);
 
-  /* Nav */
-  --nav-text: #475569;
-  --nav-text-hover: #0F172A;
-  --nav-hover-bg: #eff6ff;
-  --nav-active-bg: #3b82f6;
-  --nav-active-text: #FFFFFF;
+  /* Nav — dark text on light sidebar */
+  --nav-text: var(--color-slate-600);
+  --nav-text-hover: var(--color-white);
+  --nav-hover-bg: var(--color-brand-500);
+  --nav-active-bg: var(--color-brand-500);
+  --nav-active-text: var(--color-white);
 
   /* Button secondary */
-  --btn-secondary-bg: #FFFFFF;
-  --btn-secondary-hover-bg: #F8FAFC;
-  --btn-secondary-hover-border: #CBD5E1;
+  --btn-secondary-bg: var(--color-cream-25);
+  --btn-secondary-hover-bg: var(--color-cream-75);
+  --btn-secondary-hover-border: var(--color-slate-300);
 
   /* Status — colorblind-safe (Okabe-Ito derived) */
-  --status-online: #1B9E77;
-  --status-offline: #94A3B8;
-  --status-syncing: #E4A84B;
-  --status-error: #C44536;
+  --status-online: var(--color-success-500);
+  --status-offline: var(--text-muted);
+  --status-syncing: var(--color-warning-400);
+  --status-error: var(--color-danger-500);
 
-  /* Semantic status — success stays green (universal medical meaning) */
-  --color-success: #1F9D6F;
-  --color-success-text: #177755;
-  --color-success-bg: rgba(31, 157, 111, 0.10);
-  --color-warning: #8F6823;
-  --color-warning-bg: rgba(228, 168, 75, 0.12);
-  --color-danger: #C44536;
-  --color-danger-text: #C24435;
-  --color-danger-bg: rgba(196, 69, 54, 0.08);
-  --color-info: #3b82f6;                /* fills/icons */
-  --color-info-text: #1e3a8a;           /* AA-passing variant for text */
-  --color-info-bg: rgba(59, 130, 246, 0.12);
+  /* Semantic status — WCAG AA compliant, standard clinical palette */
+  --color-success: var(--color-success-600);
+  --color-success-text: var(--color-success-700);
+  --color-success-bg: rgba(5, 150, 105, 0.09);
+  --color-warning: var(--color-warning-600);
+  --color-warning-bg: rgba(217, 119, 6, 0.10);
+  --color-danger: var(--color-danger-600);
+  --color-danger-text: var(--color-danger-700);
+  --color-danger-bg: rgba(220, 38, 38, 0.08);
+  --color-info: var(--color-brand-500);                /* fills/icons */
+  --color-info-text: var(--color-brand-700);           /* AA-passing variant for text */
+  --color-info-bg: rgba(33, 145, 208, 0.12);
 
   /* Chart colors — brand-aligned series */
-  --color-chart-1: #3b82f6;
-  --color-chart-2: #60A5FA;
-  --color-chart-3: #E4A84B;
-  --color-chart-4: #C44536;
-  --color-chart-5: #1e3a8a;
-  --color-chart-6: #64748B;
+  --color-chart-1: var(--color-brand-500);
+  --color-chart-2: var(--color-blue-400);
+  --color-chart-3: var(--color-warning-400);
+  --color-chart-4: var(--color-danger-500);
+  --color-chart-5: var(--color-brand-700);
+  --color-chart-6: var(--color-slate-500);
 
   /* SVG map colors */
-  --map-bg: rgba(59, 130, 246, 0.06);
+  --map-bg: rgba(33, 145, 208, 0.06);
   --map-stroke: rgba(0, 0, 0, 0.05);
   --map-lines: rgba(0, 0, 0, 0.03);
-  --map-nile: rgba(59, 130, 246, 0.18);
+  --map-nile: rgba(33, 145, 208, 0.18);
   --map-label: rgba(0, 0, 0, 0.2);
-  --map-tooltip-bg: rgba(255, 255, 255, 0.95);
-  --map-tooltip-stroke: rgba(30, 58, 138, 0.06);
-  --map-tooltip-text: #0F172A;
-  --map-tooltip-sub: #64748B;
-  --map-dot-stroke: #FFFFFF;
+  --map-tooltip-bg: rgba(254, 255, 249, 0.96);
+  --map-tooltip-stroke: rgba(1, 86, 151, 0.06);
+  --map-tooltip-text: var(--color-slate-900);
+  --map-tooltip-sub: var(--color-slate-500);
+  --map-dot-stroke: var(--color-cream-25);
 }
 
 /* ============ DARK THEME ============ */
 [data-theme="dark"] {
   /* Deep navy dark background */
-  --bg-gradient: #0a1a33;
+  --bg-gradient: var(--color-slate-950);
 
   /* App canvas stays solid navy in dark mode (gradient is a light-theme accent). */
-  --bg-app: #0a1a33;
+  --bg-app: var(--color-slate-950);
 
-  --bg-primary: #0a1a33;
+  --bg-primary: var(--color-slate-950);
   --bg-secondary: #06122a;
-  --bg-sidebar: #11244d;
-  --bg-card: #11244d;
-  --bg-card-solid: #11244d;
-  --bg-card-hover: #1a3160;
-  --bg-input: #11244d;
+  --bg-sidebar: var(--color-dark-surface);
+  --bg-card: var(--color-dark-surface);
+  --bg-card-solid: var(--color-dark-surface);
+  --bg-card-hover: var(--color-dark-surface-hover);
+  --bg-input: var(--color-dark-surface);
   --bg-tinted: #13264f;
 
-  /* Brighter blue accent so it pops against the deep navy background. */
-  --accent-primary: #3b82f6;
-  --accent-hover: #60a5fa;
-  --accent-text: #93c5fd;               /* bright blue reads as text on dark */
-  --accent-light: rgba(59, 130, 246, 0.18);
-  --accent-border: rgba(59, 130, 246, 0.34);
-  --accent-glow: rgba(59, 130, 246, 0.22);
+  /* Brand blue accent — brightened for dark backgrounds */
+  --accent-primary: var(--color-brand-400);
+  --accent-hover: var(--color-brand-500);
+  --accent-text: var(--color-brand-300);
+  --accent-light: rgba(54, 159, 218, 0.18);
+  --accent-border: rgba(54, 159, 218, 0.34);
+  --accent-glow: transparent;
+  --accent-gradient: var(--gradient-hero);
 
   --icon-color: #93a9d6;
-  --link-color: #60a5fa;
+  --link-color: var(--color-brand-400);
 
   --text-primary: #F1F5F9;
   --text-secondary: #CBD5E1;
   --text-muted: #94A3B8;
 
-  --border-light: #1e3a6b;
-  --border-medium: #2c4a82;
-  --border-accent: #3b82f6;
-  --border-panel: #1e3a6b;
+  --border-light: var(--color-dark-border);
+  --border-medium: var(--color-dark-border-strong);
+  --border-accent: var(--color-brand-500);
+  --border-panel: var(--color-dark-border);
 
-  --overlay-subtle: #0f2046;
-  --overlay-light: #11244d;
-  --overlay-medium: #1a3160;
+  --overlay-subtle: var(--color-dark-overlay);
+  --overlay-light: var(--color-dark-surface);
+  --overlay-medium: var(--color-dark-surface-hover);
+  --overlay-backdrop: rgba(0, 0, 0, 0.56);
 
-  --topbar-bg: #11244d;
-  --topbar-border: #1e3a6b;
+  --topbar-bg: var(--color-dark-surface);
+  --topbar-border: var(--color-dark-border);
 
-  --sidebar-bg: #11244d;
+  --sidebar-bg: var(--color-dark-surface);
 
-  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --card-shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.5);
-  --card-shadow-xl: 0 4px 16px rgba(0, 0, 0, 0.6);
-  --card-hover-border: #2c4a82;
+  --card-shadow: none;
+  --card-shadow-lg: none;
+  --card-shadow-xl: none;
+  --card-hover-border: var(--color-dark-border-strong);
 
-  /* ── Glassmorphism (dark) ── */
-  --glass-bg: rgba(17, 36, 77, 0.62);
-  --glass-bg-strong: rgba(17, 36, 77, 0.84);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-blur: blur(10px) saturate(130%);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  /* ── Sharp glassmorphism (dark) ── near-opaque, crisp border, minimal blur. */
+  --glass-bg:        rgba(17, 36, 77, 0.92);
+  --glass-bg-strong: rgba(17, 36, 77, 0.97);
+  --glass-border:    rgba(255, 255, 255, 0.14);
+  --glass-blur:      blur(8px);
+  --glass-highlight: none;
+  --panel-shadow:    none;
 
-  --toggle-track: #2c4a82;
+  --toggle-track: var(--color-dark-border-strong);
 
-  --scrollbar-thumb: #1e3a6b;
-  --scrollbar-thumb-hover: #2c4a82;
+  --scrollbar-thumb: var(--color-dark-border);
+  --scrollbar-thumb-hover: var(--color-dark-border-strong);
 
-  --table-header-bg: #0f2046;
-  --table-row-border: #1e3a6b;
-  --table-row-hover: #11244d;
+  --table-header-bg: var(--color-dark-overlay);
+  --table-row-border: var(--color-dark-border);
+  --table-row-hover: var(--color-dark-surface);
 
   --nav-text: #93a9d6;
   --nav-text-hover: #e6edf9;
-  --nav-hover-bg: #11244d;
+  --nav-hover-bg: var(--color-dark-surface);
   --nav-active-bg: #0a1838;
-  --nav-active-text: #FFFFFF;
+  --nav-active-text: var(--color-white);
 
-  --btn-secondary-bg: #11244d;
-  --btn-secondary-hover-bg: #1a3160;
-  --btn-secondary-hover-border: #2c4a82;
+  --btn-secondary-bg: var(--color-dark-surface);
+  --btn-secondary-hover-bg: var(--color-dark-surface-hover);
+  --btn-secondary-hover-border: var(--color-dark-border-strong);
 
   --map-bg: rgba(59, 130, 246, 0.06);
   --map-stroke: rgba(255, 255, 255, 0.06);
   --map-lines: rgba(255, 255, 255, 0.05);
-  --map-nile: rgba(59, 130, 246, 0.20);
+  --map-nile: rgba(33, 145, 208, 0.20);
   --map-label: rgba(255, 255, 255, 0.3);
   --map-tooltip-bg: rgba(8, 18, 40, 0.95);
   --map-tooltip-stroke: rgba(255, 255, 255, 0.1);
@@ -273,22 +285,22 @@
   --map-tooltip-sub: #94A3B8;
   --map-dot-stroke: #0a1a33;
 
-  /* Success keeps its green — universal medical meaning. */
-  --color-success: #3ECF8E;
-  --color-success-text: #3ECF8E;
-  --color-success-bg: rgba(62, 207, 142, 0.12);
-  --color-warning: #E4A84B;
-  --color-warning-bg: rgba(228, 168, 75, 0.12);
+  /* Dark mode — lighter tints for readability on dark backgrounds. */
+  --color-success: #34D399;
+  --color-success-text: #6EE7B7;
+  --color-success-bg: rgba(5, 150, 105, 0.18);
+  --color-warning: #FBBF24;
+  --color-warning-bg: rgba(217, 119, 6, 0.18);
   --color-danger: #F87171;
-  --color-danger-text: #F87171;
-  --color-danger-bg: rgba(248, 113, 113, 0.10);
-  --color-info: #3b82f6;
-  --color-info-text: #93c5fd;
+  --color-danger-text: #FCA5A5;
+  --color-danger-bg: rgba(220, 38, 38, 0.18);
+  --color-info: var(--color-brand-500);
+  --color-info-text: var(--color-brand-300);
   --color-info-bg: rgba(59, 130, 246, 0.16);
 
-  --color-chart-1: #3b82f6;
+  --color-chart-1: var(--color-brand-500);
   --color-chart-2: #7fd9a8;
-  --color-chart-3: #E4A84B;
+  --color-chart-3: var(--color-warning-400);
   --color-chart-4: #F87171;
   --color-chart-5: #a78bfa;
   --color-chart-6: #f472b6;
@@ -296,18 +308,34 @@
 
 * { box-sizing: border-box; }
 
+/* ============ No-glow platform baseline ============
+   Keep surfaces flat across the app. This intentionally suppresses Tailwind
+   shadow utilities and inline boxShadow/textShadow styles without removing
+   borders, spacing, or semantic color. */
+*, *::before, *::after {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
 html {
   font-size: 15px;
   scroll-behavior: smooth;
+  /* Kill the rubber-band/overscroll bounce so scrolling up never reveals the
+     bare document background behind the app shell. */
+  overscroll-behavior: none;
 }
 
 body {
-  font-family: 'Untitled Sans', Arial, sans-serif;
-  background: var(--bg-primary);
+  font-family: 'DM Sans', Arial, sans-serif;
+  /* Match the app's gradient backdrop (not flat white). Even if any overscroll
+     does occur, what shows through is the same surface as the app, never a
+     white band at the top. */
+  background: var(--bg-app, var(--bg-primary));
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  overscroll-behavior: none;
   font-size: 15px;
   line-height: 1.55;
   font-weight: 450;
@@ -346,10 +374,19 @@ a, button, input, select, textarea, .card, .card-elevated, .btn, .nav-item, .bad
   }
 }
 
-::-webkit-scrollbar { width: 7px; height: 7px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+/* Hide all scrollbars globally — use .show-scrollbar to opt back in */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }
+
+/* Patients list table — explicit opt-in scrollbar */
+.show-scrollbar { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+.show-scrollbar::-webkit-scrollbar { display: block; width: 7px; height: 7px; }
+.show-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.show-scrollbar::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 10px; }
+.show-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
 
 /* Brand-tinted text selection */
 ::selection { background: var(--accent-light); color: var(--accent-text); }
@@ -362,18 +399,25 @@ button, a, .nav-item, .kpi, .card-elevated, [role="button"] { transition-timing-
 svg.lucide:not([style*="color"]) {
   color: var(--icon-color);
 }
-/* Active nav items keep their white override */
+/* Active nav items: white icon on solid blue pill */
 .nav-item-active svg.lucide {
-  color: var(--nav-active-text) !important;
+  color: var(--color-white) !important;
 }
 /* White icons inside primary-colored buttons/elements */
 .btn-primary svg.lucide,
 .pp-btn-primary svg.lucide {
-  color: #ffffff !important;
+  color: var(--color-white) !important;
+}
+/* Icons on any white-text surface (FABs, custom colored buttons, banners)
+   inherit white. The Icon component always sets an inline semantic color, so
+   without this an icon whose semantic color matches its colored background
+   (e.g. the blue message icon on a blue FAB) renders invisible. */
+.text-white svg.lucide {
+  color: var(--color-white) !important;
 }
 
 /* ============ Typography ============ */
-.font-display { font-family: 'Untitled Sans', Arial, sans-serif; }
+.font-display { font-family: 'DM Sans', Arial, sans-serif; }
 .font-mono { font-family: 'JetBrains Mono', 'Menlo', 'Consolas', monospace; }
 
 .animate-fadeInUp { animation: fadeInUp 0.4s ease-out both; }
@@ -381,7 +425,7 @@ svg.lucide:not([style*="color"]) {
 /* ============ Heading scale (explicit sizes — was relying on browser
    defaults, which made hierarchy drift between pages) ============ */
 h1 {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 1.875rem;        /* ~28px at 15px base */
   letter-spacing: -0.025em;
   font-weight: 800;
@@ -391,7 +435,7 @@ h1 {
 }
 
 h2 {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 1.4375rem;       /* ~21.5px */
   letter-spacing: -0.02em;
   font-weight: 700;
@@ -401,7 +445,7 @@ h2 {
 }
 
 h3 {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 1.1875rem;       /* ~17.8px */
   letter-spacing: -0.015em;
   font-weight: 700;
@@ -411,7 +455,7 @@ h3 {
 }
 
 h4 {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 1.0625rem;       /* ~16px */
   letter-spacing: -0.01em;
   font-weight: 700;
@@ -421,7 +465,7 @@ h4 {
 }
 
 h5 {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 0.9375rem;       /* ~14px */
   letter-spacing: 0;
   font-weight: 700;
@@ -465,14 +509,38 @@ a.link-accent:hover {
   border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
   box-shadow: var(--card-shadow), var(--glass-highlight);
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .card-elevated:hover {
   border-color: var(--card-hover-border);
   box-shadow: var(--card-shadow-lg), var(--glass-highlight);
-  transform: translateY(-2px);
 }
+
+/* ============ Hero banner ============ */
+/* Brand-gradient feature banner (dashboard greeting, next-appointment, etc.).
+   Soft decorative bubbles sit behind the content via ::after. */
+.hero-banner {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  padding: 22px 26px;
+  background-color: var(--hero-base);
+  background-image: var(--gradient-hero);
+  box-shadow: none;
+  color: var(--color-white);
+}
+/* Hero sits on a saturated gradient — force all text/headings white so the
+   global h1/h2/h3 color rules don't repaint them dark. */
+.hero-banner,
+.hero-banner h1,
+.hero-banner h2,
+.hero-banner h3,
+.hero-banner h4 {
+  color: var(--color-white);
+}
+/* A subtler/secondary hero (e.g. the next-appointment tile). */
+.hero-banner--compact { padding: 18px 20px; }
 
 .card-glass {
   background: var(--glass-bg);
@@ -506,28 +574,29 @@ a.link-accent:hover {
   font-weight: 700;
   letter-spacing: 0.01em;
   transition: all 0.2s ease;
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
 }
 
-.badge-online { background: rgba(27, 158, 119, 0.12); color: #157E5F; border: 1px solid rgba(27, 158, 119, 0.25); }
-.badge-offline { background: rgba(138, 158, 154, 0.15); color: #5A7370; border: 1px solid rgba(138, 158, 154, 0.2); }
-.badge-syncing { background: rgba(228, 168, 75, 0.12); color: #8F6823; border: 1px solid rgba(228, 168, 75, 0.2); }
-.badge-emergency { background: rgba(196, 69, 54, 0.12); color: #C24435; border: 1px solid rgba(196, 69, 54, 0.2); }
-.badge-warning { background: rgba(228, 168, 75, 0.12); color: #8F6823; border: 1px solid rgba(228, 168, 75, 0.2); }
-.badge-watch { background: rgba(59, 130, 246, 0.12); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); }
-.badge-normal { background: rgba(27, 158, 119, 0.12); color: #157E5F; border: 1px solid rgba(27, 158, 119, 0.2); }
+.badge-online { background: var(--color-success-bg); color: var(--color-success-text); border: 1px solid color-mix(in srgb, var(--color-success) 25%, transparent); }
+.badge-offline { background: color-mix(in srgb, var(--text-muted) 15%, transparent); color: var(--text-muted); border: 1px solid color-mix(in srgb, var(--text-muted) 20%, transparent); }
+.badge-syncing { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid color-mix(in srgb, var(--color-warning) 20%, transparent); }
+.badge-emergency { background: var(--color-danger-bg); color: var(--color-danger); border: 1px solid color-mix(in srgb, var(--color-danger) 20%, transparent); }
+.badge-warning { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid color-mix(in srgb, var(--color-warning) 20%, transparent); }
+.badge-watch { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid color-mix(in srgb, var(--color-warning) 25%, transparent); }
+.badge-normal { background: var(--color-success-bg); color: var(--color-success-text); border: 1px solid color-mix(in srgb, var(--color-success) 20%, transparent); }
 
-.urgency-routine { background: rgba(27, 158, 119, 0.12); color: #157E5F; border: 1px solid rgba(27, 158, 119, 0.2); }
-.urgency-urgent { background: rgba(228, 168, 75, 0.12); color: #8F6823; border: 1px solid rgba(228, 168, 75, 0.2); }
-.urgency-emergency { background: rgba(196, 69, 54, 0.12); color: #C24435; border: 1px solid rgba(196, 69, 54, 0.2); }
+.urgency-routine { background: var(--color-success-bg); color: var(--color-success-text); border: 1px solid color-mix(in srgb, var(--color-success) 20%, transparent); }
+.urgency-urgent { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid color-mix(in srgb, var(--color-warning) 20%, transparent); }
+.urgency-emergency { background: var(--color-danger-bg); color: var(--color-danger); border: 1px solid color-mix(in srgb, var(--color-danger) 20%, transparent); }
 
-.ref-sent { background: rgba(27, 158, 119, 0.12); color: #157E5F; border: 1px solid rgba(27, 158, 119, 0.2); }
-.ref-received { background: rgba(228, 168, 75, 0.12); color: #8F6823; border: 1px solid rgba(228, 168, 75, 0.2); }
-.ref-seen { background: rgba(139, 92, 246, 0.12); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.2); }
-.ref-completed { background: rgba(27, 158, 119, 0.12); color: #157E5F; border: 1px solid rgba(27, 158, 119, 0.2); }
-.ref-cancelled { background: rgba(138, 158, 154, 0.12); color: #8A9E9A; border: 1px solid rgba(138, 158, 154, 0.2); }
+.ref-sent { background: var(--color-success-bg); color: var(--color-success-text); border: 1px solid color-mix(in srgb, var(--color-success) 20%, transparent); }
+.ref-received { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid color-mix(in srgb, var(--color-warning) 20%, transparent); }
+.ref-seen { background: color-mix(in srgb, var(--color-purple-500) 12%, transparent); color: var(--color-purple-500); border: 1px solid color-mix(in srgb, var(--color-purple-500) 20%, transparent); }
+.ref-completed { background: var(--color-success-bg); color: var(--color-success-text); border: 1px solid color-mix(in srgb, var(--color-success) 20%, transparent); }
+.ref-cancelled { background: color-mix(in srgb, var(--text-muted) 12%, transparent); color: var(--text-muted); border: 1px solid color-mix(in srgb, var(--text-muted) 20%, transparent); }
 
 /* ============ Inputs — clean solid ============ */
+input:not([type]),
 input[type="text"],
 input[type="email"],
 input[type="tel"],
@@ -537,7 +606,7 @@ input[type="search"],
 input[type="password"],
 select,
 textarea {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 0.85rem;
   font-weight: 450;
   border: 1px solid var(--border-medium);
@@ -564,7 +633,7 @@ select:hover:not(:focus):not(:disabled) {
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 4px var(--accent-glow);
+  box-shadow: none;
   background: var(--bg-card-solid);
 }
 
@@ -593,7 +662,7 @@ label {
   margin-bottom: 6px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
 }
 
 /* Body paragraph rhythm — kicks in when components don't override */
@@ -620,7 +689,7 @@ small,
   border-radius: var(--btn-radius);
   font-size: 0.82rem;
   font-weight: 650;
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   cursor: pointer;
   transition: all 0.2s ease;
   border: none;
@@ -633,40 +702,56 @@ small,
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, var(--accent-primary), var(--accent-hover));
-  color: white;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.20), 0 6px 16px rgba(59, 130, 246, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  background: var(--accent-primary);
+  color: var(--color-white);
+  border: none;
+  box-shadow: none;
 }
 .btn-primary:hover {
-  background: linear-gradient(180deg, var(--accent-hover), var(--accent-hover));
-  box-shadow: 0 3px 6px rgba(59, 130, 246, 0.24), 0 12px 28px rgba(59, 130, 246, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  transform: translateY(-1px);
+  background: var(--accent-hover);
+  box-shadow: none;
 }
 
 .btn-secondary {
   background: var(--bg-card-solid);
   color: var(--text-secondary);
   border: 1px solid var(--border-medium);
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.04);
+  box-shadow: none;
 }
 .btn-secondary:hover {
   background: var(--overlay-subtle);
   border-color: var(--card-hover-border);
   color: var(--text-primary);
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.08);
+  box-shadow: none;
 }
 
 .btn-danger {
-  background: rgba(196, 69, 54, 0.12);
-  color: #C24435;
-  border: 1px solid rgba(196, 69, 54, 0.2);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 20%, transparent);
 }
 .btn-danger:hover {
-  background: rgba(196, 69, 54, 0.2);
+  background: color-mix(in srgb, var(--color-danger) 20%, transparent);
 }
 
-.btn-sm { padding: 7px 16px; font-size: 0.78rem; border-radius: 12px; }
-.btn-lg { padding: 14px 32px; font-size: 0.95rem; border-radius: 16px; }
+/* Filter toggle — turns clearly accent-colored when its dropdown is open
+   (aria-expanded/aria-pressed="true") or when filters are applied (.is-active).
+   Add `btn-filter` to any "Filters" button to get this behavior consistently. */
+.btn-filter[aria-expanded="true"],
+.btn-filter[aria-pressed="true"],
+.btn-filter.is-active {
+  background: var(--accent-light) !important;
+  border-color: var(--accent-primary) !important;
+  color: var(--accent-primary) !important;
+}
+.btn-filter[aria-expanded="true"] svg,
+.btn-filter[aria-pressed="true"] svg,
+.btn-filter.is-active svg {
+  color: var(--accent-primary) !important;
+}
+
+.btn-sm { padding: 7px 16px; font-size: 0.78rem; border-radius: 6px; }
+.btn-lg { padding: 14px 32px; font-size: 0.95rem; border-radius: 10px; }
 
 /* ============ Focus visible — keyboard accessibility ============ */
 :focus-visible {
@@ -687,19 +772,20 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 /* ============ Data Tables — clean solid ============ */
 .data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .data-table thead th {
-  background: var(--table-header-bg);
+  /* Clinical-officer table header: muted uppercase 10px, semibold, flat. */
+  background: var(--bg-card-solid);
   padding: 10px 16px;
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: 0.625rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: var(--text-muted);
   text-align: left;
-  border-bottom: 1px solid var(--table-row-border);
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  border-bottom: 1px solid var(--border-light);
+  font-family: 'DM Sans', Arial, sans-serif;
 }
-.data-table thead th:first-child { border-radius: 12px 0 0 0; }
-.data-table thead th:last-child { border-radius: 0 12px 0 0; }
+.data-table thead th:first-child { border-radius: 4px 0 0 0; }
+.data-table thead th:last-child { border-radius: 0 4px 0 0; }
 .data-table tbody td {
   padding: 12px 16px;
   font-size: 0.82rem;
@@ -708,14 +794,63 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   color: var(--text-primary);
 }
 .data-table tbody tr { transition: background 0.15s ease; }
-.data-table tbody tr:nth-child(even) { background: var(--overlay-subtle); }
+/* Clean CO-style rows: bottom borders + hover only (no zebra striping). */
 .data-table tbody tr:hover { background: var(--table-row-hover); }
 .data-table tbody tr:last-child td { border-bottom: none; }
 
 /* Light mode: stronger separators for readability */
 [data-theme="light"] .data-table tbody td { border-bottom: 1px solid var(--border-light); }
-[data-theme="light"] .data-table thead th { border-bottom: 2px solid var(--border-medium); }
-[data-theme="light"] .data-table tbody tr:nth-child(even) { background: var(--overlay-subtle); }
+[data-theme="light"] .data-table thead th { border-bottom: 1px solid var(--border-light); }
+
+/* ============ Referrals Table — polished list styling ============ */
+/* Header sticks to the top of its scroll container so columns stay labelled
+   while the list scrolls; rows get a roomier rhythm and a clearer hover/active
+   accent than the shared data-table base. */
+/* Fixed layout so the <colgroup> widths hold and columns line up across rows. */
+.referral-table { table-layout: fixed; }
+.referral-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-card-solid);
+  border-bottom: 1px solid var(--border-medium);
+  white-space: nowrap;
+}
+.referral-table tbody td { padding: 13px 16px; vertical-align: top; }
+.referral-table tbody tr { position: relative; }
+.referral-table tbody tr:nth-child(even) { background: transparent; }
+.referral-table tbody tr:hover { background: var(--table-row-hover); }
+/* Left rail on hover for a tactile "this row" cue. */
+.referral-table tbody tr > td:first-child { box-shadow: inset 3px 0 0 transparent; transition: box-shadow 0.15s ease; }
+.referral-table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 var(--accent-primary); }
+/* Actions column hugs the right edge. */
+.referral-table .ref-actions-col { text-align: right; }
+.referral-table tbody td:last-child { text-align: right; }
+
+/* ============ Appointments Table — compact list view ============ */
+/* Tighter, denser rows than the base data-table, with a sticky header and a
+   clear hover/active row cue. Fixed layout so the <colgroup> widths hold. */
+.appt-table { table-layout: fixed; }
+.appt-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-card-solid);
+  border-bottom: 1px solid var(--border-medium);
+  padding: 8px 14px;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+.appt-table tbody td { padding: 9px 14px; vertical-align: middle; }
+.appt-table tbody tr:nth-child(even) { background: transparent; }
+.appt-table tbody tr:hover { background: var(--table-row-hover); }
+
+/* ============ Global: strip all borders from table header rows ============ */
+/* Covers both CSS-class rules and inline borderBottom styles (! overrides inline) */
+thead th {
+  border-top: none !important;
+  border-bottom: none !important;
+}
 
 /* ============ Patient Table — fixed column widths ============ */
 .patient-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -743,39 +878,45 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 0.86rem;
+  gap: 11px;
+  padding: 0 13px;
+  height: 40px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--nav-text);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   text-decoration: none;
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   white-space: nowrap;
   overflow: hidden;
 }
 .nav-item:hover {
   color: var(--nav-text-hover);
   background: var(--nav-hover-bg);
-  transform: translateX(2px);
 }
 .nav-item-active {
-  color: var(--nav-active-text) !important;
+  color: var(--color-white) !important;
   background: var(--nav-active-bg) !important;
   font-weight: 700;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.30);
+  font-size: 15px;
+  border-radius: 12px;
   border-left: none;
-  padding-left: 14px;
+  box-shadow: none;
 }
-.nav-item-active:hover { transform: none; }
+.nav-item-active:hover {
+  opacity: 0.92;
+  color: var(--color-white) !important;
+  background: var(--nav-active-bg) !important;
+}
 
 /* ============ Step Indicator ============ */
 .step-dot {
-  width: 36px; height: 36px;
+  width: 28px; height: 28px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.8rem; font-weight: 600;
+  font-size: 0.72rem; font-weight: 600;
   border: 2px solid var(--border-medium);
   color: var(--text-muted);
   background: var(--bg-card-solid);
@@ -783,14 +924,14 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 }
 .step-dot-active {
   border-color: var(--accent-primary);
-  background: var(--accent-primary);
-  color: white;
-  box-shadow: 0 2px 8px rgba(30, 58, 138, 0.3);
+  background: var(--accent-gradient);
+  color: var(--color-white);
+  box-shadow: none;
 }
 .step-dot-completed {
   border-color: var(--accent-primary);
   background: var(--accent-primary);
-  color: white;
+  color: var(--color-white);
 }
 .step-line { width: 48px; height: 2px; background: var(--border-medium); border-radius: 1px; }
 .step-line-active { background: var(--accent-primary); }
@@ -798,7 +939,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 
 /* ============ Stat cards ============ */
 .stat-value {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.025em;
   font-weight: 700;
@@ -823,7 +964,6 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 .kpi:hover {
   border-color: var(--card-hover-border);
   box-shadow: var(--card-shadow-lg);
-  transform: translateY(-1px);
 }
 .kpi__icon {
   width: 28px;
@@ -845,7 +985,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   white-space: nowrap;
 }
 .kpi__value {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 1rem;
   font-weight: 700;
   line-height: 1.1;
@@ -884,7 +1024,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   padding-bottom: 10px;
 }
 .kpi-card-title {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 13px;
   font-weight: 700;
   color: var(--text-primary);
@@ -931,7 +1071,8 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   .grid-cols-3 { grid-template-columns: repeat(2, 1fr) !important; }
   .col-span-2 { grid-column: span 2; }
 
-  /* Dashboard content: remove left margin on tablet (sidebar is a drawer) */
+  /* Dashboard content: remove left margin below lg — the sidebar is an
+     off-canvas drawer (opened from the TopBar hamburger), not a persistent rail. */
   .dashboard-content-area { margin-left: 0 !important; }
 }
 
@@ -964,6 +1105,17 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
   .btn-lg { padding: 10px 16px; font-size: 0.85rem; }
 }
 
+/* -- Opt-out: compact fixed grids keep their columns on mobile --
+   The blanket .grid-cols-N collapse above is right for page-content grids
+   (KPI cards, form sections) but wrong for tight UI controls — PIN/keypads,
+   segmented toggles, ABCC/AVPU pads, small numeric input grids. Add the
+   `keep-cols` class to those: the cells shrink instead of stacking into a
+   tall single column. Two-class specificity beats the single-class collapse
+   rules even though both use !important. */
+.keep-cols.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.keep-cols.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.keep-cols.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+
 /* -- Global: ensure modals/overlays respect viewport -- */
 [style*="maxWidth"] {
   max-width: min(var(--modal-max, 100%), calc(100vw - 32px)) !important;
@@ -987,7 +1139,7 @@ html, body { overflow-x: hidden; max-width: 100vw; }
 /* -- Responsive card padding -- */
 @media (max-width: 639px) {
   .card, .card-elevated, .card-glass, .glass-section {
-    border-radius: 16px;
+    border-radius: 10px;
   }
   .glass-section-body {
     padding: 12px;
@@ -1048,7 +1200,7 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   background: linear-gradient(90deg, var(--overlay-subtle) 25%, var(--overlay-light) 50%, var(--overlay-subtle) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: 12px;
+  border-radius: 4px;
 }
 
 /* ============ Focus visible ============ */
@@ -1084,7 +1236,7 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   z-index: 9999;
   padding: 12px 24px;
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--color-white);
   font-size: 0.875rem;
   font-weight: 600;
   border-radius: 0 0 var(--card-radius) var(--card-radius);
@@ -1094,7 +1246,7 @@ html, body { overflow-x: hidden; max-width: 100vw; }
 
 .skip-link:focus {
   top: 0;
-  outline: 2px solid #fff;
+  outline: 2px solid var(--color-white);
   outline-offset: 2px;
 }
 
@@ -1118,9 +1270,20 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   }
 }
 
+/* ── Static, sharp UI ──────────────────────────────────────────────────────
+   Decorative motion is disabled by design (no page/modal entrance fades, no
+   pulses or shimmer) so the interface reads as crisp and still. Loading
+   spinners (`animate-spin`) are deliberately preserved so progress stays
+   legible. */
+*:not(.animate-spin),
+*:not(.animate-spin)::before,
+*:not(.animate-spin)::after {
+  animation: none !important;
+}
+
 /* ============ Selection ============ */
 ::selection {
-  background: rgba(59, 130, 246, 0.24);
+  background: var(--accent-light);
   color: var(--text-primary);
 }
 
@@ -1133,19 +1296,19 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(15, 31, 29, 0.70);
+  background: var(--overlay-backdrop);
   animation: modalFadeIn 0.2s ease-out;
 }
 
 .modal-content {
   position: relative;
   width: 100%;
-  border-radius: 16px;
+  border-radius: var(--card-radius);
   background: var(--glass-bg-strong);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
-  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.18), var(--glass-highlight);
+  box-shadow: none;
   animation: modalSlideUp 0.25s ease-out;
   overflow: hidden;
   max-height: 90vh;
@@ -1203,9 +1366,9 @@ svg circle {
 
 /* ============ Leaflet Map Overrides ============ */
 .leaflet-container {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   z-index: 1;
-  border-radius: 16px;
+  border-radius: var(--card-radius);
 }
 
 .facility-marker {
@@ -1216,7 +1379,7 @@ svg circle {
 .facility-popup .leaflet-popup-content-wrapper {
   background: var(--bg-card-solid);
   color: var(--text-primary);
-  border-radius: 16px;
+  border-radius: var(--btn-radius);
   box-shadow: var(--card-shadow-lg);
   border: 1px solid var(--border-medium);
   padding: 0;
@@ -1224,7 +1387,7 @@ svg circle {
 
 .facility-popup .leaflet-popup-content {
   margin: 10px 14px;
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
 }
 
 .facility-popup .leaflet-popup-tip {
@@ -1238,10 +1401,10 @@ svg circle {
   background: var(--bg-card) !important;
   color: var(--text-secondary) !important;
   border: 1px solid var(--border-panel) !important;
-  border-radius: 8px !important;
+  border-radius: 4px !important;
   padding: 3px 8px !important;
   font-size: 10px !important;
-  font-family: 'Untitled Sans', Arial, sans-serif !important;
+  font-family: 'DM Sans', Arial, sans-serif !important;
   font-weight: 500 !important;
   box-shadow: var(--card-shadow) !important;
 }
@@ -1254,7 +1417,7 @@ svg circle {
   background: var(--bg-card) !important;
   color: var(--text-secondary) !important;
   border-color: var(--border-panel) !important;
-  border-radius: 10px !important;
+  border-radius: var(--btn-radius) !important;
 }
 
 .leaflet-control-zoom a:hover {
@@ -1264,7 +1427,7 @@ svg circle {
 .leaflet-control-attribution {
   background: var(--overlay-subtle) !important;
   font-size: 9px !important;
-  border-radius: 6px !important;
+  border-radius: 3px !important;
 }
 
 [data-theme="dark"] .leaflet-control-attribution {
@@ -1279,6 +1442,18 @@ svg circle {
 /* ============ Hide scrollbar ============ */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ============ Sidebar scrollbar ============ */
+/* Static gray track (border-right on track, always visible) + blue thumb that
+   slides over it. border-right: 4px transparent + background-clip: padding-box
+   constrains the blue fill to the left 6px, letting the track line show through. */
+.sidebar-scrollbar { scrollbar-width: none; overflow-y: auto; }
+.sidebar-scrollbar::-webkit-scrollbar { display: none; }
+/* keep these rules inert so existing markup doesn't error */
+.sidebar-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scrollbar::-webkit-scrollbar-thumb { background: transparent; }
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover { background: transparent;
+}
 
 /* ============ Layout System ============ */
 .site-row {
@@ -1350,18 +1525,22 @@ svg circle {
 /* All dashboard pages should use: <main className="page-container"> */
 .page-container {
   flex: 1;
-  padding: 16px;
-  /* Top padding tuned so the page header's icon + title line up with the
-     sidebar role card (the "Medical Receptionist" card). The rail reserves
-     logo height above the role card; this matches it in the content column so
-     every dashboard page aligns the same way. Tuned to baseline-align the page
-     title with the role card's text (not just the box tops). */
-  padding-top: 20px;
+  padding: 10px;
+  padding-top: 10px;
+  padding-bottom: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  /* Reserve the scrollbar gutter at all times so the content width never
+     changes between a short page (no scrollbar) and a tall one (scrollbar
+     present). Without this, switching tabs makes the whole layout — including
+     the header — shift sideways as the scrollbar appears/disappears. */
+  scrollbar-gutter: stable;
+  /* Contain scroll so reaching the top of the page doesn't chain into a
+     document-level bounce that exposes white above the header. */
+  overscroll-behavior: contain;
 }
 @media (min-width: 640px) {
-  .page-container { padding: 20px; padding-top: 20px; }
+  .page-container { padding: 14px; padding-top: 14px; padding-bottom: 0; }
 }
 
 /* Compact density (Settings → Workspace → Spacing): tighten the central page
@@ -1400,7 +1579,7 @@ svg circle {
 .page-header__icon {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1408,10 +1587,10 @@ svg circle {
   border: 1px solid var(--accent-border);
   color: var(--accent-primary);
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(30, 58, 138, 0.04);
+  box-shadow: 0 1px 2px rgba(1, 86, 151, 0.04);
 }
 .page-header__title {
-  font-family: 'Untitled Sans', Arial, sans-serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 1.5rem;
   font-weight: 800;
   color: var(--text-primary);
@@ -1487,7 +1666,7 @@ svg circle {
 .dash-stat__icon {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1545,7 +1724,7 @@ svg circle {
 .data-tile {
   background: var(--bg-tinted, #F2F5F3);
   border: 1px solid var(--border-light);
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -1570,41 +1749,39 @@ svg circle {
 
 /* Severity variants — applied wherever a data point becomes alarming. */
 .data-tile--ok {
-  background: rgba(27, 158, 119, 0.06);
-  border-color: rgba(27, 158, 119, 0.22);
+  background: var(--color-success-bg);
+  border-color: color-mix(in srgb, var(--color-success) 22%, transparent);
 }
-.data-tile--ok .data-tile__hint { color: #15795C; }
+.data-tile--ok .data-tile__hint { color: var(--color-success-text); }
 
 .data-tile--warning {
-  background: rgba(228, 168, 75, 0.10);
-  border-color: rgba(228, 168, 75, 0.36);
-  box-shadow: 0 0 0 1px rgba(228, 168, 75, 0.22) inset;
+  background: var(--color-warning-bg);
+  border-color: color-mix(in srgb, var(--color-warning) 36%, transparent);
+  box-shadow: none;
 }
 .data-tile--warning .data-tile__label,
-.data-tile--warning .data-tile__hint { color: #B8741C; }
-.data-tile--warning .data-tile__value { color: #8A5A0E; }
+.data-tile--warning .data-tile__hint { color: var(--color-warning-700); }
+.data-tile--warning .data-tile__value { color: var(--color-warning-800); }
 
 .data-tile--danger {
-  background: rgba(196, 69, 54, 0.10);
-  border-color: rgba(196, 69, 54, 0.38);
-  box-shadow: 0 0 0 1px rgba(196, 69, 54, 0.28) inset, 0 4px 16px rgba(196, 69, 54, 0.08);
+  background: var(--color-danger-bg);
+  border-color: color-mix(in srgb, var(--color-danger) 38%, transparent);
+  box-shadow: none;
 }
 .data-tile--danger .data-tile__label,
-.data-tile--danger .data-tile__hint { color: #C44536; }
-.data-tile--danger .data-tile__value { color: #8B2E24; }
+.data-tile--danger .data-tile__hint { color: var(--color-danger); }
+.data-tile--danger .data-tile__value { color: var(--color-danger-800); }
 
 /* Pulse indicator used on the corner of a danger tile to draw the eye */
 .data-tile__alarm-pulse {
   position: absolute; top: 10px; right: 10px;
   width: 8px; height: 8px; border-radius: 50%;
-  background: #C44536;
-  box-shadow: 0 0 0 0 rgba(196, 69, 54, 0.6);
-  animation: dataTilePulse 1.8s infinite;
+  background: var(--color-danger);
+  box-shadow: none;
+  animation: none;
 }
 @keyframes dataTilePulse {
-  0%   { box-shadow: 0 0 0 0 rgba(196, 69, 54, 0.55); }
-  70%  { box-shadow: 0 0 0 10px rgba(196, 69, 54, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(196, 69, 54, 0); }
+  0%, 100% { box-shadow: none; }
 }
 
 /* Data row — side-by-side icon + label/value rows used in billing, patient
@@ -1620,19 +1797,19 @@ svg circle {
 }
 .data-row:last-child { border-bottom: none; }
 .data-row__icon {
-  width: 32px; height: 32px; border-radius: 9px;
+  width: 32px; height: 32px; border-radius: 4px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
-  background: rgba(59, 130, 246, 0.10);
+  background: var(--accent-light);
   color: var(--accent-primary);
 }
 .data-row__label { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-muted); }
 .data-row__value { font-size: 12.5px; font-weight: 600; color: var(--text-primary); }
 
-.data-row--warning { background: rgba(228, 168, 75, 0.06); }
-.data-row--warning .data-row__icon { background: rgba(228, 168, 75, 0.16); color: #B8741C; }
-.data-row--danger { background: rgba(196, 69, 54, 0.06); }
-.data-row--danger .data-row__icon { background: rgba(196, 69, 54, 0.16); color: #C44536; }
+.data-row--warning { background: var(--color-warning-bg); }
+.data-row--warning .data-row__icon { background: var(--color-warning-bg); color: var(--color-warning-700); }
+.data-row--danger { background: var(--color-danger-bg); }
+.data-row--danger .data-row__icon { background: var(--color-danger-bg); color: var(--color-danger); }
 
 /* Horizontal divider line — use between card sections */
 .section-divider {
@@ -1652,37 +1829,54 @@ svg circle {
 /* ============ Icon Container — matches mobile icon chips ============
    Subtle inset highlight + soft shadow gives tinted chips depth without
    competing with the icon itself. */
+/* Icon "boxes" — the colored square behind icons has been removed platform-wide.
+   These now just reserve a centered, fixed-size slot so icons stay aligned in
+   lists/cards; no background or shadow. The `background: transparent !important`
+   override neutralizes the per-instance inline tints (e.g. var(--accent-light))
+   that components still pass, so the square is gone everywhere in one place. */
+.icon-box,
+.icon-box-sm,
+.icon-box-lg,
+.kpi__icon {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Remove colored backgrounds from any element wrapping only an SVG icon */
+div:has(> svg:only-child),
+span:has(> svg:only-child) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 .icon-box {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.20);
 }
 
 .icon-box-sm {
   width: 28px;
   height: 28px;
-  border-radius: 7px;
+  border-radius: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
 .icon-box-lg {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
 /* ============ Data Row — icon + label + value layout ============ */
@@ -1715,7 +1909,7 @@ svg circle {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay-backdrop, rgba(0, 0, 0, 0.5));
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -1726,13 +1920,13 @@ svg circle {
   background: var(--glass-bg-strong);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
-  border-radius: 12px;
+  border-radius: var(--card-radius);
   border: 1px solid var(--glass-border);
   width: 100%;
   max-height: 90vh;
   overflow: auto;
   padding: 24px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.1), var(--glass-highlight);
+  box-shadow: none;
   animation: modalSlideUp 0.2s ease-out;
 }
 @keyframes modalSlideUp {
@@ -1796,6 +1990,9 @@ svg circle {
 .sync-dot-pulse {
   animation: sync-dot-pulse-kf 1.5s ease-in-out infinite;
 }
+.sync-dot-pending {
+  animation: sync-dot-pulse-kf 1.2s ease-in-out infinite;
+}
 
 /* Connectivity banner slide-down enter (220ms ease-out) and slide-up
    exit (180ms ease-in). Uses transform + opacity, no colour change. */
@@ -1840,7 +2037,7 @@ svg circle {
     display: none !important;
   }
   body {
-    background: white !important;
+    background: var(--color-white) !important;
     color: black !important;
   }
   .print-container {
@@ -1881,8 +2078,8 @@ svg circle {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: var(--color-white);
+  box-shadow: none;
   transition: transform 0.2s ease;
   pointer-events: none;
 }
@@ -1906,8 +2103,7 @@ svg circle {
 [data-theme="dark"] textarea { background: var(--bg-input); color: var(--text-primary); border-color: var(--border-medium); }
 [data-theme="dark"] input::placeholder,
 [data-theme="dark"] textarea::placeholder { color: var(--text-muted); }
-[data-theme="dark"] .data-table thead th { background: var(--table-header-bg); color: var(--text-muted); }
-[data-theme="dark"] .data-table tbody tr:nth-child(even) { background: var(--overlay-subtle); }
+[data-theme="dark"] .data-table thead th { background: var(--bg-card-solid); color: var(--text-muted); }
 [data-theme="dark"] .data-table tbody td { border-bottom-color: var(--table-row-border); }
 [data-theme="dark"] label { color: var(--text-secondary); }
 [data-theme="dark"] .btn-secondary { background: var(--btn-secondary-bg); color: var(--text-secondary); border-color: var(--border-medium); }
@@ -1924,80 +2120,221 @@ svg circle {
 }
 
 /* ============ react-big-calendar — Google-Calendar-style theming ============ */
-.rbc-tamam .rbc-toolbar { margin-bottom: 14px; gap: 6px; flex-wrap: wrap; }
-.rbc-tamam .rbc-toolbar button {
-  color: var(--text-secondary);
-  border: 1px solid var(--border-medium);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-weight: 600;
+
+/* Base */
+.rbc-tamam .rbc-calendar {
+  height: 100%;
+  font-family: 'DM Sans', sans-serif;
+  background: transparent;
 }
-.rbc-tamam .rbc-toolbar button:hover { background: var(--accent-light); color: var(--accent-text); }
-.rbc-tamam .rbc-toolbar button.rbc-active,
-.rbc-tamam .rbc-toolbar button.rbc-active:hover,
-.rbc-tamam .rbc-toolbar button.rbc-active:focus {
-  background: var(--accent-primary);
-  color: #fff;
-  border-color: var(--accent-primary);
-}
-.rbc-tamam .rbc-toolbar-label { font-weight: 700; font-size: 16px; color: var(--text-primary); }
-.rbc-tamam .rbc-header {
-  padding: 8px 4px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border-light);
-}
+
+/* ── Month + Time views: outer container ── */
 .rbc-tamam .rbc-month-view,
-.rbc-tamam .rbc-time-view { border: 1px solid var(--border-light); border-radius: 12px; overflow: hidden; }
-.rbc-tamam .rbc-today { background: var(--accent-light); }
-.rbc-tamam .rbc-off-range-bg { background: var(--overlay-subtle); }
-.rbc-tamam .rbc-event,
-.rbc-tamam .rbc-day-slot .rbc-event { box-shadow: none; }
-.rbc-tamam .rbc-event:focus { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
-.rbc-tamam .rbc-current-time-indicator { background: var(--color-danger, #C44536); height: 2px; }
-.rbc-tamam .rbc-show-more { color: var(--accent-text); font-weight: 600; }
+.rbc-tamam .rbc-time-view {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  background: var(--glass-bg-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
 
-/* Time-grid (day / week) — Google-Calendar-style hour rows + readable events.
-   Taller hour rows give short (30-min) appointments room to show their label,
-   and overflow clipping stops event text from spilling over the grid. */
-.rbc-tamam .rbc-time-view .rbc-timeslot-group { min-height: 64px; }
-.rbc-tamam .rbc-time-view .rbc-time-gutter .rbc-timeslot-group { font-size: 12px; }
+/* ── Day name headers (week / day view) ── */
+.rbc-tamam .rbc-header {
+  padding: 10px 6px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--glass-border);
+  border-left: none;
+  background: transparent;
+  text-align: center;
+}
+.rbc-tamam .rbc-header + .rbc-header {
+  border-left: 1px solid var(--glass-border);
+}
+/* Today column header: accent color */
+.rbc-tamam .rbc-header.rbc-today {
+  color: var(--accent-primary);
+  font-weight: 700;
+  background: var(--accent-light);
+}
+/* Date number link inside header */
+.rbc-tamam .rbc-header a,
+.rbc-tamam .rbc-header span {
+  display: inline-block;
+  min-width: 26px;
+  line-height: 26px;
+  border-radius: 50%;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-decoration: none;
+  margin-top: 4px;
+}
+.rbc-tamam .rbc-header.rbc-today a,
+.rbc-tamam .rbc-header.rbc-today span {
+  background: var(--accent-primary);
+  color: var(--color-white);
+}
 
-/* Keep the time-gutter and the header gutter the same width so the vertical
-   divider between the hour labels and the day columns lines up top-to-bottom
-   (react-big-calendar measures these independently and they drift otherwise). */
+/* ── Month view ── */
+.rbc-tamam .rbc-month-view { overflow-y: auto; }
+.rbc-tamam .rbc-month-row {
+  min-height: 108px;
+  border-top: 1px solid var(--glass-border);
+}
+.rbc-tamam .rbc-month-row:first-child { border-top: none; }
+.rbc-tamam .rbc-day-bg + .rbc-day-bg { border-left: 1px solid var(--glass-border); }
+
+/* Month view date number cell */
+.rbc-tamam .rbc-date-cell {
+  padding: 4px 8px 0;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.rbc-tamam .rbc-date-cell.rbc-now {
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+.rbc-tamam .rbc-date-cell.rbc-now a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  color: var(--color-white);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.rbc-tamam .rbc-date-cell a { color: inherit; text-decoration: none; }
+
+/* Off-range days */
+.rbc-tamam .rbc-off-range-bg { background: color-mix(in srgb, var(--bg-card-solid) 40%, transparent); }
+.rbc-tamam .rbc-off-range .rbc-date-cell { opacity: 0.35; }
+
+/* Today highlight */
+.rbc-tamam .rbc-today { background: var(--accent-light) !important; }
+
+/* ── Time grid (week / day) ── */
+/* Gutter sizing — must match header-gutter to keep vertical divider aligned */
 .rbc-tamam .rbc-time-gutter,
 .rbc-tamam .rbc-time-header-gutter {
-  width: 64px !important;
-  min-width: 64px !important;
-  max-width: 64px !important;
+  width: 60px !important;
+  min-width: 60px !important;
+  max-width: 60px !important;
   flex: none !important;
+  background: transparent;
 }
 .rbc-tamam .rbc-time-gutter .rbc-timeslot-group,
 .rbc-tamam .rbc-time-gutter .rbc-time-slot { border-left: none; }
-/* Right-align the hour labels against the divider for a clean gutter edge. */
-.rbc-tamam .rbc-time-gutter .rbc-label { padding: 0 8px 0 6px; }
-.rbc-tamam .rbc-time-header-gutter { border-bottom: 1px solid var(--border-light); }
+.rbc-tamam .rbc-time-header-gutter { border-bottom: 1px solid var(--glass-border); }
+
+/* Hour labels */
+.rbc-tamam .rbc-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 0 8px 0 4px;
+  text-align: right;
+}
+
+/* Time slot rows */
+.rbc-tamam .rbc-time-view .rbc-timeslot-group { min-height: 56px; }
+.rbc-tamam .rbc-time-view .rbc-time-gutter .rbc-timeslot-group { font-size: 10px; }
+.rbc-tamam .rbc-timeslot-group { border-bottom: 1px solid var(--glass-border); }
+.rbc-tamam .rbc-time-slot { border-top: none; }
+/* Half-hour: dashed lighter line */
+.rbc-tamam .rbc-timeslot-group .rbc-time-slot:last-child {
+  border-top: 1px dashed rgba(203,213,225,0.40);
+}
+.rbc-tamam .rbc-time-content { border-top: 1px solid var(--glass-border); }
+.rbc-tamam .rbc-day-slot + .rbc-day-slot { border-left: 1px solid var(--glass-border); }
+.rbc-tamam .rbc-time-header-content + .rbc-time-header-content { border-left: 1px solid var(--glass-border); }
+
+/* ── Events: week / day slots ── */
 .rbc-tamam .rbc-day-slot .rbc-event {
-  padding: 2px 6px;
-  border-radius: 6px;
+  padding: 3px 7px 3px 9px;
+  border-radius: 6px !important;
+  border: none !important;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
+  box-shadow: none;
 }
-.rbc-tamam .rbc-day-slot .rbc-event-label {
-  font-size: 10px;
-  font-weight: 600;
-  opacity: 0.92;
-  flex-shrink: 0;
-}
+.rbc-tamam .rbc-day-slot .rbc-event-label { display: none; }
 .rbc-tamam .rbc-day-slot .rbc-event-content {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: pre-wrap;
+  font-family: 'DM Sans', sans-serif;
 }
+
+/* ── Events: month view (compact pill) ── */
+.rbc-tamam .rbc-row-segment .rbc-event {
+  border-radius: 4px !important;
+  border: none !important;
+  padding: 1px 6px;
+  margin: 1px 3px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  box-shadow: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rbc-tamam .rbc-event { outline: none; }
+.rbc-tamam .rbc-event:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
+.rbc-tamam .rbc-event.rbc-selected { box-shadow: none; outline: 2px solid var(--accent-primary); outline-offset: 1px; }
+
+/* "Show N more" link */
+.rbc-tamam .rbc-show-more {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: transparent;
+  padding-left: 4px;
+}
+
+/* ── Current-time indicator — red dot + line ── */
+.rbc-tamam .rbc-current-time-indicator {
+  background: var(--color-danger);
+  height: 2px;
+  z-index: 3;
+}
+.rbc-tamam .rbc-current-time-indicator::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-danger);
+}
+
+/* Slot selection (click-drag to create) */
+.rbc-tamam .rbc-slot-selection {
+  background: var(--accent-light);
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  color: var(--accent-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* All-day area */
+.rbc-tamam .rbc-allday-cell { border-bottom: 1px solid var(--glass-border); }
+.rbc-tamam .rbc-row-bg + .rbc-row-bg { border-top: 1px solid var(--glass-border); }

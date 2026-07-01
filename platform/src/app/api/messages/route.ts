@@ -27,16 +27,16 @@ export async function GET(request: NextRequest) {
     if (!auth) return unauthorized();
     if (!hasRole(auth, READ_ROLES)) return forbidden();
     const { getAllMessages, getMessagesByPatient, getMessagesByDoctor } = await import('@/lib/services/message-service');
-    const { buildScopeFromAuth } = await import('@/lib/services/data-scope');
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
     const scope = buildScopeFromAuth(auth);
     const url = new URL(request.url);
     const patientId = url.searchParams.get('patientId');
     const doctorId = url.searchParams.get('doctorId');
     let messages;
     if (patientId) {
-      messages = await getMessagesByPatient(patientId);
+      messages = filterByScope(await getMessagesByPatient(patientId), scope);
     } else if (doctorId) {
-      messages = await getMessagesByDoctor(doctorId);
+      messages = filterByScope(await getMessagesByDoctor(doctorId), scope);
     } else {
       messages = await getAllMessages(scope);
     }
@@ -63,6 +63,16 @@ async function postHandler(request: NextRequest) {
     // Update message status
     if (action === 'update-status' && body.messageId) {
       const { updateMessage } = await import('@/lib/services/message-service');
+      const { messagesDB } = await import('@/lib/db');
+      const { filterByScope, buildScopeFromAuth } = await import('@/lib/services/data-scope');
+      try {
+        const existing = await messagesDB().get(body.messageId as string);
+        if (filterByScope([existing as unknown as Record<string, unknown>], buildScopeFromAuth(auth)).length === 0) {
+          return forbidden('Access denied to this message');
+        }
+      } catch {
+        return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+      }
       const updated = await updateMessage(body.messageId as string, {
         status: body.status as Parameters<typeof updateMessage>[1]['status'],
       });
@@ -72,6 +82,16 @@ async function postHandler(request: NextRequest) {
     // Delete message
     if (action === 'delete' && body.messageId) {
       const { deleteMessage } = await import('@/lib/services/message-service');
+      const { messagesDB } = await import('@/lib/db');
+      const { filterByScope, buildScopeFromAuth } = await import('@/lib/services/data-scope');
+      try {
+        const existing = await messagesDB().get(body.messageId as string);
+        if (filterByScope([existing as unknown as Record<string, unknown>], buildScopeFromAuth(auth)).length === 0) {
+          return forbidden('Access denied to this message');
+        }
+      } catch {
+        return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+      }
       const deleted = await deleteMessage(body.messageId as string);
       if (!deleted) return NextResponse.json({ error: 'Message not found' }, { status: 404 });
       return NextResponse.json({ deleted: true });
@@ -82,6 +102,15 @@ async function postHandler(request: NextRequest) {
         { error: 'patientId and content are required' },
         { status: 400 }
       );
+    }
+    if (body.patientId && body.recipientType !== 'staff') {
+      const { getPatientById } = await import('@/lib/services/patient-service');
+      const { filterByScope, buildScopeFromAuth } = await import('@/lib/services/data-scope');
+      const patient = await getPatientById(body.patientId as string);
+      if (!patient) return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+      if (filterByScope([patient], buildScopeFromAuth(auth)).length === 0) {
+        return forbidden('Access denied to this patient record');
+      }
     }
     const { createMessage, updateMessage } = await import('@/lib/services/message-service');
     const channel = (body.channel as 'app' | 'sms' | 'both') || 'app';

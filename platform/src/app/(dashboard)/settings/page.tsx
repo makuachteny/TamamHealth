@@ -10,18 +10,18 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { SUPPORTED_LOCALES } from '@/lib/i18n';
 import { hasLockPin, setLockPin, clearLockPin } from '@/lib/hooks/useAutoLock';
 import { getUserPrefs, setUserPrefs, DEFAULT_USER_PREFS, type UserPrefs } from '@/lib/user-prefs';
-import { getRoleConfig } from '@/lib/permissions';
 import { useToast } from '@/components/Toast';
 import { statesAndCounties } from '@/data/mock';
 import type { UserRole } from '@/lib/db-types';
 import FilterBar from '@/components/filters/FilterBar';
-import SearchInput from '@/components/filters/SearchInput';
 import FilterSelect from '@/components/filters/FilterSelect';
 import {
-  Users, Building2, Plus, Search, Edit3, KeyRound, UserX, UserCheck,
-  X, Eye, EyeOff, RefreshCw, Check, Bell, LayoutDashboard,
+  Users, Building2, Plus, Edit3, KeyRound, UserX, UserCheck,
+  X, Eye, EyeOff, RefreshCw, Check, Bell, LayoutDashboard, Trash2,
   Settings as SettingsIcon, Globe, Moon, Sun, Lock, Save, User as UserIcon,
 } from '@/components/icons/lucide';
+import RowActionsMenu from '@/components/RowActionsMenu';
+import { FacilitySettingsView } from '@/components/settings/FacilitySettingsView';
 
 const ROLES: { value: UserRole; label: string }[] = [
   { value: 'doctor', label: 'Doctor' },
@@ -61,11 +61,36 @@ export default function SettingsPage() {
   const { currentUser, theme, toggleTheme, isOnline, syncPaused, toggleOnline, syncNow, lastSync } = useApp();
   const { users, loading: usersLoading, create: createUser, update: updateUser, resetPassword, deactivate } = useUsers();
   const { hospitals, loading: hospitalsLoading, create: createHospital, reload: reloadHospitals } = useHospitals();
-  const { canManageUsers } = usePermissions();
+  const { canManageUsers, canAccess } = usePermissions();
   const { locale, setLocale } = useTranslation();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'preferences' | 'users' | 'hospitals'>('preferences');
+  const [activeTab, setActiveTab] = useState<'preferences' | 'facility' | 'users' | 'hospitals' | 'sync'>('preferences');
+
+  // ── Facility Sync ──
+  const SYNC_ELEMENTS: { name: string; status: 'synced' | 'syncing' | 'pending' | 'error'; error?: string }[] = [
+    { name: 'OPD Attendance', status: 'synced' },
+    { name: 'Malaria Cases', status: 'synced' },
+    { name: 'ANC Visits', status: 'synced' },
+    { name: 'Immunizations', status: 'synced' },
+    { name: 'Births', status: 'synced' },
+    { name: 'Deaths', status: 'synced' },
+    { name: 'Lab Results', status: 'synced' },
+    { name: 'Referrals', status: 'synced' },
+    { name: 'Inpatient Admissions', status: 'pending' },
+    { name: 'Drug Stock Levels', status: 'error', error: 'Connection timeout — DHIS2 server unreachable' },
+  ];
+  const [syncRunning, setSyncRunning] = useState(false);
+  const [syncDone, setSyncDone] = useState(false);
+  const syncedCount = SYNC_ELEMENTS.filter(e => e.status === 'synced').length;
+  const pendingItems = SYNC_ELEMENTS.filter(e => e.status === 'pending');
+  const errorItems = SYNC_ELEMENTS.filter(e => e.status === 'error');
+
+  const handleRunSync = () => {
+    setSyncRunning(true);
+    setSyncDone(false);
+    setTimeout(() => { setSyncRunning(false); setSyncDone(true); }, 3000);
+  };
 
   // ── My account / preferences ──
   const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
@@ -114,18 +139,6 @@ export default function SettingsPage() {
   const [prefs, setPrefsState] = useState<UserPrefs>(DEFAULT_USER_PREFS);
   useEffect(() => { setPrefsState(getUserPrefs()); }, []);
   const updatePref = (patch: Partial<UserPrefs>) => setPrefsState(setUserPrefs(patch));
-
-  // Start-page options come from the role's own nav items (so every option is a
-  // page the user can actually open), plus a "default" sentinel.
-  const startPageOptions = useMemo(() => {
-    const cfg = currentUser ? getRoleConfig(currentUser.role) : null;
-    const opts: { href: string; label: string }[] = [{ href: '', label: 'Default (role dashboard)' }];
-    const seen = new Set<string>();
-    for (const it of cfg?.navItems ?? []) {
-      if (!seen.has(it.href)) { seen.add(it.href); opts.push({ href: it.href, label: it.label }); }
-    }
-    return opts;
-  }, [currentUser?.role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggleNotifications = async () => {
     if (!prefs.messageNotifications) {
@@ -357,11 +370,11 @@ export default function SettingsPage() {
   // ─── Styles ─────────────────────────────────────────────
   const card: React.CSSProperties = {
     background: 'var(--card-bg)', border: '1px solid var(--border-light)',
-    borderRadius: '16px', overflow: 'hidden',
+    borderRadius: '6px', overflow: 'hidden',
   };
   const inputStyle: React.CSSProperties = {
     background: 'var(--input-bg)', border: '1px solid var(--border-light)',
-    borderRadius: '10px', padding: '10px 14px', color: 'var(--text-primary)',
+    borderRadius: '4px', padding: '10px 14px', color: 'var(--text-primary)',
     fontSize: '14px', width: '100%', outline: 'none',
   };
   const selectStyle: React.CSSProperties = {
@@ -371,13 +384,13 @@ export default function SettingsPage() {
   };
   const btnPrimary: React.CSSProperties = {
     background: 'var(--accent-primary)', color: 'white',
-    border: 'none', borderRadius: '10px', padding: '10px 20px',
+    border: 'none', borderRadius: '4px', padding: '10px 20px',
     fontSize: '14px', fontWeight: 600, cursor: 'pointer',
     display: 'flex', alignItems: 'center', gap: '8px',
   };
   const btnSecondary: React.CSSProperties = {
     background: 'var(--input-bg)', color: 'var(--text-primary)',
-    border: '1px solid var(--border-light)', borderRadius: '10px', padding: '10px 20px',
+    border: '1px solid var(--border-light)', borderRadius: '4px', padding: '10px 20px',
     fontSize: '14px', fontWeight: 500, cursor: 'pointer',
   };
   const labelStyle: React.CSSProperties = {
@@ -390,23 +403,30 @@ export default function SettingsPage() {
   };
   const modalStyle: React.CSSProperties = {
     background: 'var(--card-bg)', border: '1px solid var(--border-light)',
-    borderRadius: '20px', width: '100%', maxWidth: '600px', maxHeight: '90vh',
+    borderRadius: '6px', width: '100%', maxWidth: '600px', maxHeight: '90vh',
     overflow: 'auto', padding: '28px',
   };
 
   return (
     <>
-      <TopBar title="Settings" />
+      <TopBar
+        title="Settings"
+        titleIcon={<SettingsIcon className="w-4 h-4 flex-shrink-0" color="var(--accent-primary)" />}
+      />
       <main className="page-container space-y-6 page-enter">
 
         {/* Tab bar */}
         <div className="flex gap-2" style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '0' }}>
           {[
             { key: 'preferences' as const, label: 'Preferences', icon: SettingsIcon },
+            ...(canAccess('/facility-settings') ? [
+              { key: 'facility' as const, label: 'Facility Settings', icon: Building2 },
+            ] : []),
             ...(canManageUsers ? [
               { key: 'users' as const, label: 'User Management', icon: Users },
               { key: 'hospitals' as const, label: 'Hospital Management', icon: Building2 },
             ] : []),
+            { key: 'sync' as const, label: 'Facility Sync', icon: RefreshCw },
           ].map(tab => (
             <button
               key={tab.key}
@@ -428,13 +448,16 @@ export default function SettingsPage() {
           ))}
         </div>
 
+        {/* ═══════════════ FACILITY SETTINGS TAB ═══════════════ */}
+        {activeTab === 'facility' && <FacilitySettingsView embedded />}
+
         {/* ═══════════════ PREFERENCES TAB (all users) ═══════════════ */}
         {activeTab === 'preferences' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {/* Appearance */}
             <div className="dash-card">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Sun className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <div className="icon-box-sm"><Sun className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
                 <h3 className="font-semibold text-sm">Appearance</h3>
               </div>
               <div className="p-5">
@@ -466,7 +489,7 @@ export default function SettingsPage() {
             {/* Language */}
             <div className="dash-card">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Globe className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <div className="icon-box-sm"><Globe className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
                 <h3 className="font-semibold text-sm">Language</h3>
               </div>
               <div className="p-5">
@@ -488,7 +511,7 @@ export default function SettingsPage() {
             {/* My profile */}
             <div className="dash-card">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><UserIcon className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <div className="icon-box-sm"><UserIcon className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
                 <h3 className="font-semibold text-sm">My profile</h3>
               </div>
               <div className="p-5 space-y-3">
@@ -513,7 +536,7 @@ export default function SettingsPage() {
             {/* Security — change my password */}
             <div className="dash-card">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Lock className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <div className="icon-box-sm"><Lock className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
                 <h3 className="font-semibold text-sm">Security</h3>
               </div>
               <div className="p-5 space-y-3">
@@ -553,7 +576,7 @@ export default function SettingsPage() {
             {/* Screen lock — per-device unlock PIN for shared workstations */}
             <div className="dash-card">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Lock className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <div className="icon-box-sm"><Lock className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
                 <h3 className="font-semibold text-sm">Screen lock</h3>
               </div>
               <div className="p-5 space-y-3">
@@ -578,7 +601,7 @@ export default function SettingsPage() {
                     <Lock className="w-4 h-4" /> {pinSaving ? 'Saving…' : pinIsSet ? 'Update PIN' : 'Set PIN'}
                   </button>
                   {pinIsSet && (
-                    <button onClick={handleClearPin} className="btn btn-secondary btn-sm">Remove PIN</button>
+                    <button onClick={handleClearPin} aria-label="Remove PIN" title="Remove PIN" className="p-2 rounded-lg transition-colors hover:bg-red-50" style={{ color: 'var(--color-danger)' }}><Trash2 className="w-4 h-4" /></button>
                   )}
                 </div>
               </div>
@@ -587,7 +610,7 @@ export default function SettingsPage() {
             {/* Sync & connectivity */}
             <div className="dash-card">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <div className="icon-box-sm"><RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
                 <h3 className="font-semibold text-sm">Sync &amp; data</h3>
               </div>
               <div className="p-5 space-y-3">
@@ -614,44 +637,62 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Workspace — start page + density */}
+            {/* Workspace — density */}
             <div className="dash-card">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><LayoutDashboard className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <div className="icon-box-sm"><LayoutDashboard className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
                 <h3 className="font-semibold text-sm">Workspace</h3>
               </div>
               <div className="p-5 space-y-4">
                 <div>
-                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Start page after login</label>
-                  <select
-                    value={prefs.startPage}
-                    onChange={e => updatePref({ startPage: e.target.value })}
-                    className="w-full" style={{ background: 'var(--overlay-subtle)' }}
-                    aria-label="Start page after login"
-                  >
-                    {startPageOptions.map(o => (
-                      <option key={o.href || 'default'} value={o.href}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Spacing</p>
-                  <div className="flex gap-2">
+                  <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>Spacing — click to preview and apply</p>
+                  {/* Side-by-side visual previews */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
                     {([
-                      { v: 'comfortable' as const, label: 'Comfortable' },
-                      { v: 'compact' as const, label: 'Compact' },
+                      {
+                        v: 'comfortable' as const,
+                        label: 'Comfortable',
+                        desc: 'More whitespace, easier to read at a glance',
+                        rows: [14, 14, 14],
+                        gap: 10,
+                      },
+                      {
+                        v: 'compact' as const,
+                        label: 'Compact',
+                        desc: 'Tighter rows, more data on screen',
+                        rows: [10, 10, 10, 10],
+                        gap: 6,
+                      },
                     ]).map(opt => {
                       const active = prefs.density === opt.v;
                       return (
                         <button
                           key={opt.v}
                           onClick={() => updatePref({ density: opt.v })}
-                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                          style={active
-                            ? { background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }
-                            : { background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                          className="flex flex-col text-left rounded-xl overflow-hidden transition-all"
+                          style={{
+                            border: `2px solid ${active ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+                            background: active ? 'var(--accent-light)' : 'var(--overlay-subtle)',
+                          }}
                         >
-                          {opt.label}{active && <Check className="w-3.5 h-3.5" />}
+                          {/* Miniature table preview */}
+                          <div className="p-3 space-y-0" style={{ background: 'var(--bg-card-solid)', gap: opt.gap, display: 'flex', flexDirection: 'column' }}>
+                            <div className="rounded h-2 w-full opacity-30" style={{ background: 'var(--text-muted)', marginBottom: 4 }} />
+                            {opt.rows.map((h, i) => (
+                              <div key={i} className="flex items-center gap-2" style={{ height: h }}>
+                                <div className="rounded-full flex-shrink-0" style={{ width: h * 0.85, height: h * 0.85, background: 'var(--accent-primary)', opacity: 0.25 }} />
+                                <div className="flex-1 rounded" style={{ height: 6, background: 'var(--text-muted)', opacity: 0.2 }} />
+                                <div className="rounded flex-shrink-0" style={{ width: 28, height: 6, background: 'var(--text-muted)', opacity: 0.15 }} />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="px-3 py-2 flex items-center justify-between gap-2">
+                            <div>
+                              <p className="text-xs font-semibold" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{opt.label}</p>
+                              <p className="text-[10px] leading-tight mt-0.5" style={{ color: 'var(--text-muted)' }}>{opt.desc}</p>
+                            </div>
+                            {active && <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
+                          </div>
                         </button>
                       );
                     })}
@@ -663,7 +704,7 @@ export default function SettingsPage() {
             {/* Notifications */}
             <div className="dash-card">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Bell className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
+                <div className="icon-box-sm"><Bell className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
                 <h3 className="font-semibold text-sm">Notifications</h3>
               </div>
               <div className="p-5 space-y-3">
@@ -694,14 +735,6 @@ export default function SettingsPage() {
           <div className="space-y-4">
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1" style={{ minWidth: '200px', maxWidth: '360px' }}>
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                <input
-                  type="text" placeholder="Search users..."
-                  value={search} onChange={e => setSearch(e.target.value)}
-                  style={{ ...inputStyle, paddingLeft: '36px' }}
-                />
-              </div>
               <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={selectStyle}>
                 <option value="all">All Roles</option>
                 {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -719,7 +752,7 @@ export default function SettingsPage() {
             {/* Users table */}
             <div style={card}>
               <div style={{ overflowX: 'auto' }}>
-                <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 840 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                       {['Name', 'Username', 'Role', 'Hospital', 'Status', 'Created', 'Actions'].map(h => (
@@ -763,21 +796,14 @@ export default function SettingsPage() {
                           {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => openEditUser(u._id)} title="Edit"
-                              className="p-1.5 rounded-lg hover:bg-[rgba(0,119,215,0.1)] transition-colors" style={{ color: 'var(--text-muted)' }}>
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => { setResetUserId(u._id); setNewPassword(generatePassword()); setShowNewPassword(true); }} title="Reset Password"
-                              className="p-1.5 rounded-lg hover:bg-[rgba(252,211,77,0.15)] transition-colors" style={{ color: 'var(--text-muted)' }}>
-                              <KeyRound className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleToggleActive(u._id, u.isActive)} title={u.isActive ? 'Deactivate' : 'Activate'}
-                              className="p-1.5 rounded-lg transition-colors" style={{
-                                color: u.isActive ? 'var(--color-danger)' : 'var(--accent-primary)',
-                              }}>
-                              {u.isActive ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
-                            </button>
+                          <div className="flex items-center">
+                            <RowActionsMenu
+                              actions={[
+                                { key: 'edit', label: 'Edit', icon: <Edit3 className="w-4 h-4" />, onClick: () => openEditUser(u._id) },
+                                { key: 'reset', label: 'Reset Password', icon: <KeyRound className="w-4 h-4" />, onClick: () => { setResetUserId(u._id); setNewPassword(generatePassword()); setShowNewPassword(true); } },
+                                { key: 'toggle', label: u.isActive ? 'Deactivate' : 'Activate', tone: u.isActive ? 'danger' : 'default', icon: u.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />, onClick: () => handleToggleActive(u._id, u.isActive) },
+                              ]}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -794,12 +820,6 @@ export default function SettingsPage() {
           <div className="space-y-4">
             {/* Toolbar */}
             <FilterBar>
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="Search hospitals..."
-                aria-label="Search hospitals"
-              />
               <FilterSelect
                 value={filterFacilityType}
                 onChange={setFilterFacilityType}
@@ -818,7 +838,7 @@ export default function SettingsPage() {
             {/* Hospitals table */}
             <div style={card}>
               <div style={{ overflowX: 'auto' }}>
-                <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 720 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                       {['Name', 'State', 'Type', 'Beds', 'Staff', 'Status'].map(h => (
@@ -871,6 +891,91 @@ export default function SettingsPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════ FACILITY SYNC TAB ═══════════════ */}
+        {activeTab === 'sync' && (
+          <div className="max-w-2xl space-y-5">
+            {/* Header card */}
+            <div className="card-elevated p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>Facility Sync</h2>
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Push facility data to the national HMIS (DHIS2). Last synced: {new Date().toLocaleString()}.
+                  </p>
+                </div>
+                <button
+                  onClick={handleRunSync}
+                  disabled={syncRunning}
+                  className="flex items-center gap-2 btn btn-primary flex-shrink-0"
+                  style={{ opacity: syncRunning ? 0.7 : 1 }}
+                >
+                  <RefreshCw className={`w-4 h-4 ${syncRunning ? 'animate-spin' : ''}`} />
+                  {syncRunning ? 'Syncing…' : 'Sync Now'}
+                </button>
+              </div>
+
+              {/* Status message */}
+              {syncDone && (
+                <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: 'rgba(5,150,105,0.08)', border: '1px solid rgba(5,150,105,0.2)' }}>
+                  <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#059669' }} />
+                  <span style={{ fontSize: 13, color: '#059669', fontWeight: 500 }}>
+                    {errorItems.length === 0
+                      ? `Fully synced — all ${SYNC_ELEMENTS.length} data sets are up to date.`
+                      : `Sync completed with ${errorItems.length} error${errorItems.length > 1 ? 's' : ''}.`}
+                  </span>
+                </div>
+              )}
+              {syncRunning && (
+                <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(33,145,208,0.07)', border: '1px solid rgba(33,145,208,0.2)' }}>
+                  <RefreshCw className="w-4 h-4 animate-spin flex-shrink-0" style={{ color: 'var(--tamamhealth-blue)' }} />
+                  <span style={{ fontSize: 13, color: 'var(--tamamhealth-blue)', fontWeight: 500 }}>Syncing data to DHIS2…</span>
+                </div>
+              )}
+            </div>
+
+            {/* Progress overview */}
+            <div className="card-elevated p-5 space-y-1">
+              <div className="flex items-center justify-between mb-3">
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {syncedCount} / {SYNC_ELEMENTS.length} data sets synced
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {pendingItems.length > 0 && `${pendingItems.length} pending`}
+                  {pendingItems.length > 0 && errorItems.length > 0 && ' · '}
+                  {errorItems.length > 0 && <span style={{ color: 'var(--color-danger)' }}>{errorItems.length} error{errorItems.length > 1 ? 's' : ''}</span>}
+                </span>
+              </div>
+              {/* Progress bar */}
+              <div style={{ height: 6, borderRadius: 3, background: 'var(--border-light)', overflow: 'hidden', marginBottom: 16 }}>
+                <div style={{ height: '100%', width: `${(syncedCount / SYNC_ELEMENTS.length) * 100}%`, background: errorItems.length > 0 ? '#F59E0B' : '#059669', borderRadius: 3, transition: 'width 0.6s ease' }} />
+              </div>
+
+              {SYNC_ELEMENTS.map(el => {
+                const statusColors: Record<string, { bg: string; fg: string; label: string }> = {
+                  synced:  { bg: 'rgba(5,150,105,0.1)',  fg: '#059669',  label: 'Synced' },
+                  syncing: { bg: 'rgba(33,145,208,0.1)', fg: '#2191D0',  label: 'Syncing' },
+                  pending: { bg: 'rgba(245,158,11,0.1)', fg: '#D97706',  label: 'Pending' },
+                  error:   { bg: 'rgba(196,69,54,0.1)',  fg: '#C44536',  label: 'Error' },
+                };
+                const s = statusColors[el.status];
+                return (
+                  <div key={el.name} className="flex items-start justify-between py-2.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    <div className="min-w-0">
+                      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{el.name}</span>
+                      {el.error && (
+                        <p style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 2 }}>{el.error}</p>
+                      )}
+                    </div>
+                    <span className="flex-shrink-0 ml-3 text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{ background: s.bg, color: s.fg }}>
+                      {s.label}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1109,7 +1214,7 @@ export default function SettingsPage() {
               {/* Infrastructure */}
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--accent-primary)' }}>Infrastructure</h4>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 keep-cols">
                   {[
                     { key: 'hasElectricity', label: 'Has Electricity' },
                     { key: 'hasGenerator', label: 'Has Generator' },

@@ -1,4 +1,7 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -128,12 +131,19 @@ export default function DataEntryDashboard() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Save to local storage for now (would save to PouchDB in production)
-      const key = `tamamhealth-census-${currentUser?.hospitalId || 'unknown'}`;
-      const existing = JSON.parse(localStorage.getItem(key) || '[]');
-      const updated = [census, ...existing.filter((r: CensusData) => r.date !== census.date)].slice(0, 30);
-      localStorage.setItem(key, JSON.stringify(updated));
-      setSavedReports(updated);
+      const { saveFacilityCensus, getFacilityCensusByFacility } = await import('@/lib/services/facility-census-service');
+      const facilityId = currentUser?.hospitalId || 'unknown';
+      await saveFacilityCensus({
+        facilityId,
+        facilityName: myHospital?.name,
+        orgId: currentUser?.orgId,
+        date: census.date,
+        census: census as unknown as Record<string, unknown>,
+        submittedBy: currentUser?._id,
+        submittedByName: currentUser?.name,
+      });
+      const updated = await getFacilityCensusByFacility(facilityId);
+      setSavedReports(updated.map(r => r.census as unknown as CensusData).slice(0, 30));
       showToast(t('dataEntry.toastSaved'), 'success');
       setShowForm(false);
     } catch {
@@ -149,11 +159,19 @@ export default function DataEntryDashboard() {
   // skipped re-runs once the hospital loaded and triggered the React
   // "cannot update during render" warning.)
   useEffect(() => {
-    try {
-      const key = `tamamhealth-census-${currentUser?.hospitalId || 'unknown'}`;
-      const existing = JSON.parse(localStorage.getItem(key) || '[]');
-      setSavedReports(existing);
-    } catch { /* ignore */ }
+    let cancelled = false;
+    async function loadSavedReports() {
+      try {
+        const { getFacilityCensusByFacility } = await import('@/lib/services/facility-census-service');
+        const facilityId = currentUser?.hospitalId || 'unknown';
+        const existing = await getFacilityCensusByFacility(facilityId);
+        if (!cancelled) setSavedReports(existing.map(r => r.census as unknown as CensusData).slice(0, 30));
+      } catch {
+        if (!cancelled) setSavedReports([]);
+      }
+    }
+    loadSavedReports();
+    return () => { cancelled = true; };
   }, [currentUser?.hospitalId]);
 
   useEffect(() => {
@@ -237,10 +255,31 @@ export default function DataEntryDashboard() {
       <TopBar title={t('dataEntry.title')} />
       <main className="page-container page-enter">
 
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Beds', value: myHospital?.totalBeds ?? 0 },
+            { label: 'Doctors', value: myHospital?.doctors ?? 0 },
+            { label: 'Nurses', value: myHospital?.nurses ?? 0 },
+            { label: 'Profile', value: `${facilityStats?.pct ?? 0}%` },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={[
+            { label: 'My Facility', icon: Building2, href: '/my-facility' },
+            { label: 'All Patients', icon: Users, href: '/patients', color: '#0D9488' },
+            { label: 'Data Quality', icon: ClipboardCheck, href: '/data-quality', color: 'var(--accent-primary)' },
+            { label: 'Reports', icon: BarChart3, href: '/reports', color: '#F59E0B' },
+          ]}
+          secondaryCard={<SpotlightCard title="Profile Completeness" value={`${facilityStats?.pct ?? 0}%`} caption="facility profile filled" href="/my-facility" />}
+        />
+
         {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
         <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-primary)' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
               <ClipboardCheck className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -256,7 +295,7 @@ export default function DataEntryDashboard() {
         {myHospital && (
           <div className="dash-card mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-lg flex items-center justify-center" style={{ background: `${ACCENT}15` }}>
+              <div className="w-11 h-11 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                 <Building2 className="w-5 h-5" style={{ color: ACCENT }} />
               </div>
               <div className="flex-1">
@@ -291,7 +330,7 @@ export default function DataEntryDashboard() {
           ].map(k => (
             <div key={k.label} className="dash-card" style={{ padding: '14px 16px' }}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <k.icon className="w-3.5 h-3.5" style={{ color: k.color }} />
                 </div>
                 <span className="kpi-card-title">{k.label}</span>
@@ -316,10 +355,10 @@ export default function DataEntryDashboard() {
               { label: t('dataEntry.deaths'), icon: Skull, color: 'var(--accent-primary)', action: () => router.push('/deaths') },
             ].map(a => (
               <button key={a.label} onClick={a.action}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg transition-all active:scale-95"
+                className="flex flex-col items-center gap-2 p-3 rounded-lg transition-all"
                 style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}
               >
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${a.color}12` }}>
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                   <a.icon className="w-4 h-4" style={{ color: a.color }} />
                 </div>
                 <span className="text-[10px] font-semibold text-center" style={{ color: 'var(--text-primary)' }}>{a.label}</span>
@@ -372,7 +411,7 @@ export default function DataEntryDashboard() {
                   { label: t('dataEntry.generalBeds'), occupied: latest.occupiedBeds, total: latest.totalBeds, color: 'var(--accent-primary)' },
                   { label: t('dashboard.bedIcu'), occupied: latest.icuOccupied, total: latest.icuBeds, color: 'var(--color-danger)' },
                   { label: t('dashboard.bedMaternity'), occupied: latest.maternityOccupied, total: latest.maternityBeds, color: '#EC4899' },
-                  { label: t('dashboard.bedPediatric'), occupied: latest.pediatricOccupied, total: latest.pediatricBeds, color: '#3b82f6' },
+                  { label: t('dashboard.bedPediatric'), occupied: latest.pediatricOccupied, total: latest.pediatricBeds, color: '#2191D0' },
                 ].map(bed => {
                   const pct = bed.total > 0 ? Math.round((bed.occupied / bed.total) * 100) : 0;
                   return (
@@ -427,7 +466,6 @@ export default function DataEntryDashboard() {
                 ].map(eq => (
                   <div key={eq.label} className="flex items-center justify-between py-1" style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <div className="flex items-center gap-2">
-                      <eq.icon className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
                       <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{eq.label}</span>
                     </div>
                     <span className="text-sm font-bold" style={{ color: eq.value > 0 ? 'var(--text-primary)' : 'var(--color-danger)' }}>{eq.value}</span>
@@ -488,7 +526,6 @@ export default function DataEntryDashboard() {
               {savedReports.slice(0, 7).map((r, i) => (
                 <div key={i} className="flex items-center justify-between p-2.5 rounded-md" style={{ border: '1px solid var(--border-light)' }}>
                   <div className="flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5" style={{ color: ACCENT }} />
                     <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{r.date}</span>
                   </div>
                   <div className="flex items-center gap-4 text-[10px]" style={{ color: 'var(--text-muted)' }}>
@@ -545,7 +582,7 @@ export default function DataEntryDashboard() {
                 </div>
 
                 {/* 2. Bed Occupancy */}
-                {sectionHeader(BedDouble, t('dashboard.bedOccupancy'), '#7C3AED')}
+                {sectionHeader(BedDouble, t('dashboard.bedOccupancy'), 'var(--accent-primary)')}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {numField(t('dataEntry.totalBeds'), 'totalBeds', BedDouble)}
                   {numField(t('dataEntry.occupied'), 'occupiedBeds')}
@@ -598,7 +635,7 @@ export default function DataEntryDashboard() {
                 {textField(t('dataEntry.stockOutItems'), 'stockOutItems', t('dataEntry.stockOutItemsPlaceholder'))}
 
                 {/* 6. Infection Control */}
-                {sectionHeader(ShieldCheck, t('dataEntry.infectionControl'), '#3b82f6')}
+                {sectionHeader(ShieldCheck, t('dataEntry.infectionControl'), '#2191D0')}
                 <div className="grid grid-cols-2 gap-3">
                   {numField(t('dataEntry.handwashStations'), 'handwashStations')}
                   {numField(t('dataEntry.functionalStations'), 'handwashFunctional')}

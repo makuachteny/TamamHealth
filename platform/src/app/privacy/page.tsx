@@ -58,7 +58,7 @@ export default function PrivacyPage() {
           <p>
             Patients may request access to or correction of their records through their
             facility. For privacy questions, contact your facility administrator or{' '}
-            <a href="mailto:hello@tamamhealth.org" style={{ color: 'var(--accent-text)' }}>hello@tamamhealth.org</a>.
+            <a href="mailto:support.tamam@gmail.com" style={{ color: 'var(--accent-text)' }}>support.tamam@gmail.com</a>.
           </p>
 
           <p style={{ marginTop: 28, fontSize: 12.5, color: 'var(--text-muted)' }}>

@@ -1,16 +1,18 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import {
-  FlaskConical, Clock, CheckCircle2, AlertTriangle, Activity, Zap,
-  Radio, TestTubes, Microscope, Droplets, FileText,
+  FlaskConical, Clock, CheckCircle2, AlertTriangle, Activity,
+  Radio, Microscope, Droplets, FileText,
   MessageSquare, ChevronRight, Beaker, Thermometer, Loader2,
-  X, Save, Table, List, BarChart3, Timer, Bell, BellOff,
+  X, Save, Table, List, BarChart3, Timer, BellOff, Users,
 } from '@/components/icons/lucide';
 import PatientName from '@/components/PatientName';
 
@@ -116,6 +118,7 @@ interface CriticalAlert {
 
 interface BatchEntry {
   orderId: string;
+  patientId: string;
   patientName: string;
   specimen: string;
   resultValue: string;
@@ -125,7 +128,6 @@ interface BatchEntry {
 export default function LabDashboardPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { currentUser } = useApp();
   const { results, loading, update } = useLabResults();
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [eventCounter, setEventCounter] = useState(0);
@@ -284,6 +286,7 @@ export default function LabDashboardPage() {
       const orders = allPendingOrders.filter(o => o.testName === batchTestType);
       setBatchEntries(orders.map(o => ({
         orderId: o._id,
+        patientId: o.patientId,
         patientName: o.patientName,
         specimen: o.specimen,
         resultValue: '',
@@ -398,6 +401,12 @@ export default function LabDashboardPage() {
     setCriticalAlerts(prev => prev.map(a => a.id === alertId ? { ...a, acknowledged: true } : a));
   };
 
+  // Drop a patient row from the current batch-entry draft before saving. Only
+  // removes it from this in-progress batch; the order itself is untouched.
+  const handleRemoveBatchEntry = (orderId: string) => {
+    setBatchEntries(prev => prev.filter(e => e.orderId !== orderId));
+  };
+
   const handleBatchEntryChange = (orderId: string, value: string) => {
     setBatchEntries(prev => prev.map(e => {
       if (e.orderId !== orderId) return e;
@@ -422,7 +431,7 @@ export default function LabDashboardPage() {
   if (loading) {
     return (
       <>
-        <TopBar title={t('lab.laboratory')} />
+        <TopBar title={t('lab.laboratory')} hideSearch />
         <main className="flex-1 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: ACCENT }} />
         </main>
@@ -431,17 +440,6 @@ export default function LabDashboardPage() {
   }
 
   const unackAlerts = criticalAlerts.filter(a => !a.acknowledged);
-
-  const kpiStrip = [
-    { label: t('lab.pendingOrders'), value: kpis.pending, icon: Clock, color: 'var(--color-warning)' },
-    { label: t('lab.inProgress'), value: kpis.inProgress, icon: Loader2, color: '#A855F7' },
-    { label: t('lab.completedToday'), value: kpis.completedToday, icon: CheckCircle2, color: 'var(--color-success)' },
-    { label: t('lab.criticalResults'), value: kpis.critical, icon: AlertTriangle, color: 'var(--color-danger)' },
-    { label: t('lab.unackCritical'), value: kpis.unacknowledgedCritical, icon: Bell, color: 'var(--color-danger)' },
-    { label: t('lab.abnormal'), value: kpis.abnormal, icon: AlertTriangle, color: '#FB923C' },
-    { label: t('lab.avgTurnaround'), value: `${kpis.avgTurnaround}h`, icon: Zap, color: '#2563EB' },
-    { label: t('lab.totalTests'), value: kpis.total, icon: TestTubes, color: ACCENT },
-  ];
 
   const quickActions = [
     { label: t('lab.acceptOrder'), icon: FileText, color: 'var(--color-success)', onClick: () => {} },
@@ -452,8 +450,29 @@ export default function LabDashboardPage() {
 
   return (
     <>
-      <TopBar title="Laboratory" />
+      <TopBar title="Laboratory" hideSearch />
       <main className="page-container page-enter">
+
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Pending', value: kpis.pending },
+            { label: 'In Progress', value: kpis.inProgress },
+            { label: 'Completed Today', value: kpis.completedToday },
+            { label: 'Critical', value: kpis.critical },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={[
+            { label: 'All Patients', icon: Users, href: '/patients' },
+            { label: 'Blood Bank', icon: Droplets, href: '/blood-bank', color: '#C44536' },
+            { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
+            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#0D9488' },
+          ]}
+          secondaryCard={<SpotlightCard title="Critical Results" value={kpis.critical} caption={`${kpis.abnormal} abnormal · ${kpis.unacknowledgedCritical} unacknowledged`} />}
+        />
 
         {/* --- Feature 2: Critical Result Alert Banner --- */}
         {unackAlerts.length > 0 && (
@@ -464,7 +483,7 @@ export default function LabDashboardPage() {
                 border: '2px solid rgba(239,68,68,0.35)',
                 boxShadow: '0 0 12px rgba(239,68,68,0.15)',
               }}>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(239,68,68,0.15)' }}>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent' }}>
                   <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -494,18 +513,13 @@ export default function LabDashboardPage() {
         {/* --- Command Center Header --- */}
         <div className="flex items-center justify-between" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
-              background: 'var(--accent-primary)',
-            }}>
-              <FlaskConical className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center">
+              <FlaskConical className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
                 {t('lab.laboratory')}
               </h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {currentUser?.hospital?.name || currentUser?.hospitalName || t('lab.laboratory')} &middot; {new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -517,26 +531,20 @@ export default function LabDashboardPage() {
               <Microscope className="w-3.5 h-3.5" />
               {t('lab.enterResult')}
             </button>
-            <div className="text-[10px] text-right" style={{ color: 'var(--text-muted)' }}>
-              <div className="flex items-center gap-1">
-                <Radio className="w-3 h-3" style={{ color: ACCENT }} />
-                <span>{t('lab.eventsTracked', { count: eventCounter })}</span>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* --- KPI Strip --- */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
-          {kpiStrip.map((kpi) => (
-            <div key={kpi.label} className="dash-stat relative px-3 py-2.5 transition-all cursor-pointer overflow-hidden">
-              <div className="flex items-center gap-1.5 mb-1">
-                <kpi.icon className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />
-                <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{kpi.label}</span>
-              </div>
-              <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{kpi.value}</p>
-            </div>
-          ))}
+        {/* --- Quick Actions (moved up, full-width) --- */}
+        <div className="dash-card rounded-2xl p-3 mb-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('lab.quickActions')}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {quickActions.map(action => (
+              <button key={action.label} onClick={action.onClick} className="card-elevated flex items-center gap-3 px-3.5 py-3 text-left transition-all">
+                <action.icon className="w-[22px] h-[22px] flex-shrink-0" style={{ color: action.color }} />
+                <span className="text-[12px] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* --- Main Grid: Orders Queue (2col) + Specimen Pipeline (1col) + Result Entry (1col) --- */}
@@ -571,7 +579,7 @@ export default function LabDashboardPage() {
                   background: 'var(--overlay-subtle)', border: `1px solid ${order.critical ? 'rgba(239,68,68,0.25)' : 'var(--border-light)'}`,
                 }}>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{
-                    background: order.status === 'in_progress' ? 'rgba(168,85,247,0.12)' : 'rgba(251,191,36,0.12)',
+                    background: 'transparent',
                   }}>
                     {order.status === 'in_progress'
                       ? <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#A855F7' }} />
@@ -660,7 +668,7 @@ export default function LabDashboardPage() {
                       animation: evt.isNew ? 'fadeIn 0.3s ease-out' : undefined,
                     }}>
                       <div className="flex items-start gap-2">
-                        <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: `${evt.color}15` }}>
+                        <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: 'transparent' }}>
                           <Icon className="w-2.5 h-2.5" style={{ color: evt.color }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -679,21 +687,6 @@ export default function LabDashboardPage() {
                     </div>
                   );
                 })}
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="dash-card rounded-2xl p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('lab.quickActions')}</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {quickActions.map(action => (
-                  <button key={action.label} onClick={action.onClick} className="flex items-center gap-2 p-2 rounded-lg transition-all" style={{
-                    background: `${action.color}08`, border: `1px solid ${action.color}15`,
-                  }}>
-                    <action.icon className="w-3.5 h-3.5" style={{ color: action.color }} />
-                    <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
-                  </button>
-                ))}
               </div>
             </div>
           </div>
@@ -956,7 +949,7 @@ export default function LabDashboardPage() {
 
                       {/* Reference Range Display */}
                       {currentRefRange && (
-                        <div className="p-3 rounded-xl" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
+                        <div className="p-3 rounded-xl" style={{ background: 'rgba(33, 145, 208, 0.06)', border: '1px solid var(--accent-border)' }}>
                           <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: ACCENT }}>{t('lab.referenceRange')}</p>
                           <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
                             {currentRefRange.referenceStr}
@@ -1080,7 +1073,7 @@ export default function LabDashboardPage() {
                   {batchTestType && (() => {
                     const ref = getRefRange(batchTestType);
                     return ref ? (
-                      <div className="p-2.5 rounded-xl" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
+                      <div className="p-2.5 rounded-xl" style={{ background: 'rgba(33, 145, 208, 0.06)', border: '1px solid var(--accent-border)' }}>
                         <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: ACCENT }}>
                           {t('lab.reference')}: {ref.referenceStr}
                           {ref.criticalLow !== undefined && ` | ${t('lab.criticalLabel')}: <${ref.criticalLow}`}
@@ -1093,13 +1086,15 @@ export default function LabDashboardPage() {
                   {/* Batch Table */}
                   {batchEntries.length > 0 ? (
                     <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-light)' }}>
-                      <table className="w-full">
+                      <div className="overflow-x-auto">
+                      <table className="w-full" style={{ minWidth: 520 }}>
                         <thead>
                           <tr style={{ background: 'var(--overlay-subtle)' }}>
                             <th className="text-left px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</th>
                             <th className="text-left px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.specimen')}</th>
                             <th className="text-left px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.result')}</th>
                             <th className="text-center px-3 py-2 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('lab.flag')}</th>
+                            <th className="px-3 py-2"></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1108,7 +1103,7 @@ export default function LabDashboardPage() {
                             return (
                               <tr key={entry.orderId} style={{ borderTop: '1px solid var(--border-light)' }}>
                                 <td className="px-3 py-2">
-                                  <PatientName name={entry.patientName} size={24} nameClassName="text-[11px] font-medium" />
+                                  <PatientName patientId={entry.patientId} name={entry.patientName} size={24} nameClassName="text-[11px] font-medium" />
                                 </td>
                                 <td className="px-3 py-2">
                                   <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{entry.specimen}</span>
@@ -1156,11 +1151,23 @@ export default function LabDashboardPage() {
                                     <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>--</span>
                                   )}
                                 </td>
+                                <td className="px-3 py-2 text-right">
+                                  <button
+                                    onClick={() => handleRemoveBatchEntry(entry.orderId)}
+                                    title={t('action.remove')}
+                                    aria-label={t('action.remove')}
+                                    className="p-1 rounded-md transition-all hover:opacity-80"
+                                    style={{ color: 'var(--text-muted)' }}
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
                               </tr>
                             );
                           })}
                         </tbody>
                       </table>
+                      </div>
                     </div>
                   ) : batchTestType ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">

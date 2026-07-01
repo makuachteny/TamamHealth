@@ -14,28 +14,40 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const colors = {
+    bg: '#0F1117',
+    text: '#F1F5F9',
+    muted: '#94A3B8',
+    dangerBg: 'rgba(229,46,66,0.12)',
+    dangerBorder: 'rgba(229,46,66,0.25)',
+    primary: '#2563EB',
+    white: '#FFFFFF',
+    secondaryBorder: 'rgba(255,255,255,0.18)',
+    secondaryText: '#CBD5E1',
+  };
+
   return (
     <html lang="en">
-      <body style={{ margin: 0, background: '#0f1117', color: '#f1f5f9', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+      <body style={{ margin: 0, background: colors.bg, color: colors.text, fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '24px', boxSizing: 'border-box' }}>
           <div style={{ maxWidth: '420px', width: '100%', textAlign: 'center' }}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(229,46,66,0.12)', border: '1px solid rgba(229,46,66,0.25)' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: colors.dangerBg, border: `1px solid ${colors.dangerBorder}` }}>
               <span style={{ fontSize: 28, lineHeight: 1 }} aria-hidden>⚠️</span>
             </div>
             <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px' }}>Something went wrong</h2>
-            <p style={{ fontSize: '14px', color: '#94a3b8', margin: '0 0 24px', lineHeight: 1.5 }}>
+            <p style={{ fontSize: '14px', color: colors.muted, margin: '0 0 24px', lineHeight: 1.5 }}>
               The app ran into an unexpected problem. Reloading usually fixes it. If it keeps happening, contact your administrator.
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button
                 onClick={() => { try { reset(); } catch { window.location.reload(); } }}
-                style={{ background: '#2563EB', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ background: colors.primary, color: colors.white, border: 'none', padding: '12px 24px', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
               >
                 Try again
               </button>
               <button
                 onClick={() => window.location.reload()}
-                style={{ background: 'transparent', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.18)', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ background: 'transparent', color: colors.secondaryText, border: `1px solid ${colors.secondaryBorder}`, padding: '12px 24px', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
               >
                 Reload page
               </button>

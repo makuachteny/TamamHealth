@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react';
-import { Icon, type IconName } from '@/components/icons';
+import { type IconName } from '@/components/icons';
+import {
+  Heart, Activity, Thermometer, Droplet, Wind, Weight, Ruler, AlertTriangle,
+  type LucideIcon,
+} from '@/components/icons/lucide';
 import {
   getVitalStatus,
   getBloodPressureStatus,
@@ -8,6 +12,18 @@ import {
   type VitalKey,
   type VitalSeverity,
 } from '@/lib/clinical-guidelines';
+
+// Map the chart's semantic icon names to clean outline (lucide) glyphs.
+const VITAL_GLYPHS: Partial<Record<IconName, LucideIcon>> = {
+  heart: Heart,
+  bloodPressure: Activity,
+  thermometer: Thermometer,
+  oxygen: Droplet,
+  lungs: Wind,
+  weight: Weight,
+  patient: Ruler,
+  alert: AlertTriangle,
+};
 
 interface VitalCardProps {
   // 'bp' is a composite (pass systolic/diastolic).
@@ -59,97 +75,103 @@ export function VitalCard({
         padding: 14,
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: severity === 'danger'
-          ? `0 0 0 1px ${tokens.ring} inset, 0 4px 12px rgba(196, 69, 54, 0.10)`
-          : severity === 'warning'
-          ? `0 0 0 1px ${tokens.ring} inset`
-          : '0 1px 2px rgba(0,0,0,0.03)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        boxShadow: 'none',
       }}
     >
-      {/* Icon + alarm flag row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+      {/* Enlarged icon, left-aligned */}
+      <div
+        style={{
+          width: 52, height: 52, borderRadius: 12, flexShrink: 0,
+          background: severity === 'normal' ? 'var(--accent-light)' : tokens.badge,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        {(() => {
+          const Glyph = VITAL_GLYPHS[icon] ?? Activity;
+          return <Glyph size={26} color={tokens.accent} strokeWidth={2} />;
+        })()}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Label */}
         <div
           style={{
-            width: 32, height: 32, borderRadius: 9,
-            background: severity === 'normal' ? 'rgba(59, 130, 246, 0.12)' : tokens.badge,
+            fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6,
+            textTransform: 'uppercase',
+            color: severity === 'normal' ? 'var(--text-muted)' : tokens.accent,
+            marginBottom: 4,
+          }}
+        >
+          {label}
+        </div>
+
+        {/* Value + unit */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+          <div
+            style={{
+              fontSize: 22, fontWeight: 800, letterSpacing: -0.4,
+              color: tokens.text,
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1.05,
+            }}
+          >
+            {display}
+          </div>
+          {unit && display !== '—' && (
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{unit}</div>
+          )}
+        </div>
+
+        {/* Status / trend — plain text (no pill chrome) so the row scans cleanly.
+            Severity-tinted color carries the meaning. */}
+        <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, minHeight: 14 }}>
+          {hint ? (
+            <span
+              style={{
+                fontSize: 11.5, fontWeight: 700, letterSpacing: 0.1,
+                color: tokens.accent,
+              }}
+            >
+              {hint}
+            </span>
+          ) : vitalKey !== 'none' ? (
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-success-text)' }}>Normal</span>
+          ) : null}
+          {trend && (
+            <span
+              style={{
+                fontSize: 11, fontWeight: 700,
+                color: trend.direction === 'up' ? 'var(--color-success-text)' : trend.direction === 'down' ? 'var(--color-danger)' : 'var(--text-muted)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {trend.direction === 'up' ? '+' : trend.direction === 'down' ? '−' : ''}{trend.delta}
+            </span>
+          )}
+          {subtitle && (
+            <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{subtitle}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Alarm flag — corner badge for abnormal readings */}
+      {severity !== 'normal' && (
+        <div
+          aria-label={severity === 'danger' ? 'Abnormal — critical' : 'Abnormal'}
+          style={{
+            position: 'absolute', top: 8, right: 8,
+            width: 22, height: 22, borderRadius: 7,
+            background: tokens.badge,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Icon name={icon} size={44} color={tokens.accent} accent={tokens.accent} />
+          <AlertTriangle size={13} color={tokens.accent} strokeWidth={2} />
         </div>
-        {severity !== 'normal' && (
-          <div
-            aria-label={severity === 'danger' ? 'Abnormal — critical' : 'Abnormal'}
-            style={{
-              width: 22, height: 22, borderRadius: 7,
-              background: tokens.badge,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Icon name="alert" size={13} color={tokens.accent} accent={tokens.accent} />
-          </div>
-        )}
-      </div>
-
-      {/* Label */}
-      <div
-        style={{
-          fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6,
-          textTransform: 'uppercase',
-          color: severity === 'normal' ? 'var(--text-muted)' : tokens.accent,
-          marginBottom: 4,
-        }}
-      >
-        {label}
-      </div>
-
-      {/* Value + unit */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-        <div
-          style={{
-            fontSize: 22, fontWeight: 800, letterSpacing: -0.4,
-            color: tokens.text,
-            fontVariantNumeric: 'tabular-nums',
-            lineHeight: 1.05,
-          }}
-        >
-          {display}
-        </div>
-        {unit && display !== '—' && (
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{unit}</div>
-        )}
-      </div>
-
-      {/* Status / trend — plain text (no pill chrome) so the row scans cleanly.
-          Severity-tinted color carries the meaning. */}
-      <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, minHeight: 14 }}>
-        {hint ? (
-          <span
-            style={{
-              fontSize: 11.5, fontWeight: 700, letterSpacing: 0.1,
-              color: tokens.accent,
-            }}
-          >
-            {hint}
-          </span>
-        ) : vitalKey !== 'none' ? (
-          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#15795C' }}>Normal</span>
-        ) : null}
-        {trend && (
-          <span
-            style={{
-              fontSize: 11, fontWeight: 700,
-              color: trend.direction === 'up' ? '#15795C' : trend.direction === 'down' ? '#C44536' : 'var(--text-muted)',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {trend.direction === 'up' ? '+' : trend.direction === 'down' ? '−' : ''}{trend.delta}
-          </span>
-        )}
-        {subtitle && (
-          <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{subtitle}</span>
-        )}
-      </div>
+      )}
     </div>
   );
 }

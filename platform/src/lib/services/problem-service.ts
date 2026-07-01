@@ -98,6 +98,26 @@ export async function updateProblem(id: string, data: Partial<ProblemDoc>): Prom
   }
 }
 
+export async function deleteProblem(id: string): Promise<boolean> {
+  const db = problemsDB();
+  try {
+    const doc = await db.get(id);
+    const typed = doc as unknown as ProblemDoc;
+    await db.remove(doc);
+    await logAuditSafe('DELETE_PROBLEM', undefined, undefined, `Problem ${id}: ${typed.name} for ${typed.patientName || typed.patientId}`);
+    emitSyncEvent({
+      resourceType: 'problem',
+      resourceId: id,
+      operation: 'delete',
+      orgId: typed.orgId,
+      hospitalId: typed.hospitalId,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function setProblemStatus(id: string, status: ProblemStatus): Promise<ProblemDoc | null> {
   const patch: Partial<ProblemDoc> = { status };
   if (status === 'resolved') {

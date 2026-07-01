@@ -34,10 +34,9 @@ export interface AuthPayload {
  * JWT was issued. Without this check a deactivated user keeps full access
  * until the JWT's natural expiry (up to 8h), which defeats the point of
  * deactivation. We look the user up in the users DB and require
- * `isActive !== false`. The lookup is best-effort — if the DB itself is
- * unreachable we fall back to allowing the JWT (preferring availability
- * over a hard fail), but a *successful* lookup that returns `isActive:false`
- * is treated as revocation.
+ * `isActive !== false`. In production this check fails closed: a missing or
+ * unreadable user record invalidates the JWT, except for the synthetic
+ * bootstrap "admin" account used before the users DB exists.
  */
 export async function getAuthPayload(request: NextRequest): Promise<AuthPayload | null> {
   const token = request.cookies.get('tamamhealth-token')?.value;
@@ -50,6 +49,7 @@ export async function getAuthPayload(request: NextRequest): Promise<AuthPayload 
   const payload = await verifyToken(token);
   if (!payload) return null;
   const auth = payload as AuthPayload;
+  const isProduction = process.env.NODE_ENV === 'production';
 
   // Live deactivation check. Avoid the lookup for the synthetic "admin"
   // bootstrap account whose JWT is issued before any users DB exists.
@@ -57,11 +57,32 @@ export async function getAuthPayload(request: NextRequest): Promise<AuthPayload 
     const { getUserById } = await import('./services/user-service');
     const user = await getUserById(auth.sub);
     // If the user record exists and is explicitly deactivated, deny.
-    // Missing or unreadable user → fall through (keep behaviour open).
+    // Missing user in production → deny; non-production remains permissive for
+    // local/demo bootstrap data.
     if (user && user.isActive === false) return null;
-  } catch {
-    // DB lookup failed — preserve current behaviour and accept the JWT
-    // rather than hard-failing every request.
+    if (!user && isProduction && auth.sub !== 'admin') return null;
+  } catch (err) {
+    if (isProduction && auth.sub !== 'admin') {
+      captureException(err, { area: 'api-auth', check: 'user-active', sub: auth.sub });
+      return null;
+    }
+  }
+
+  // Tenant kill-switch (SaaS control plane). A suspended / cancelled /
+  // deactivated organization loses all access on the next request. Platform
+  // operators (super_admin) are exempt so they can lift the suspension. In
+  // production, tenant lookup errors fail closed rather than granting access
+  // while the control plane is unavailable.
+  if (auth.role !== 'super_admin' && auth.orgId) {
+    try {
+      const { isOrgAccessAllowed } = await import('./services/tenant-control-service');
+      if (!(await isOrgAccessAllowed(auth.orgId))) return null;
+    } catch (err) {
+      if (isProduction) {
+        captureException(err, { area: 'api-auth', check: 'tenant-access', orgId: auth.orgId });
+        return null;
+      }
+    }
   }
 
   return auth;

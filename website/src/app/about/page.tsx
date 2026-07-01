@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { Reveal } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
+import { CloudOff, Heart, Lightbulb, Code2 } from "@/components/marketing/icons";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth About — Our Story
@@ -13,34 +13,16 @@ import { DuoIcon } from "@/components/marketing/DuoIcon";
 export default function AboutPage() {
   return (
     <>
-      {/* ── HERO SECTION ────────────────────────────────────────────── */}
-      <section className="mk-hero-photo-bg mk-hero-photo-bg--tall">
-        <Image
-          src="/assets/team-derby-center.jpg"
-          alt="TamamHealth team"
-          fill
-          className="mk-hero-bg-img"
-          priority
-        />
-        <div className="mk-container" style={{ textAlign: "center", maxWidth: 720, margin: "0 auto" }}>
-          <Reveal>
-            <span className="mk-label" style={{ color: "var(--tb-gold)" }}>OUR STORY</span>
-            <h1 className="mk-h1" style={{ color: "#fff", marginTop: 10, fontWeight: 700 }}>
-              Born from scraps of paper.<br />
-              Built by people who lived it.<br />
-              Made to save lives.
-            </h1>
-            <p className="mk-body-lg" style={{ color: "var(--tb-text-inv-m)", marginTop: 14 }}>
-              TamamHealth began with one observation: across South Sudan, brilliant clinicians lose patients to broken paper systems — not to a lack of skill. We&apos;re here to change that.
-            </p>
-            <div className="mk-hero-buttons" style={{ justifyContent: "center", marginTop: 28 }}>
-              <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
-                Get in touch
-              </Link>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <MarketingHero
+        variant="photo"
+        eyebrow="OUR STORY"
+        title={<>Born from scraps of paper.<br />Built by people who lived it.<br />Made to save lives.</>}
+        subtitle="TamamHealth began with one observation: across South Sudan, brilliant clinicians lose patients to broken paper systems, not to a lack of skill. We're here to change that."
+        primaryCta={{ label: "Get in touch", href: "/about/contact#contact-form" }}
+        image="/assets/team-derby-center.jpg"
+        imageAlt="TamamHealth team"
+        imagePriority
+      />
 
       {/* ── THE ORIGIN STORY ────────────────────────────────────────── */}
       <section className="mk-section mk-section-cream">
@@ -50,10 +32,10 @@ export default function AboutPage() {
               <div className="mk-split-content" style={{ flex: "1 1 55%" }}>
                 <h2 className="mk-h2">Where it all started</h2>
                 <p className="mk-body" style={{ marginTop: 20, lineHeight: 1.7 }}>
-                  In Kakuma Refugee Camp, Kenya, healthcare meant handwritten notes on scraps of paper, filing cabinets that couldn&apos;t survive the rainy season, and patients whose medical histories vanished between visits. Teny Makuach grew up watching this — and decided to fix it.
+                  In Kakuma Refugee Camp, Kenya, healthcare meant handwritten notes on scraps of paper, filing cabinets that couldn&apos;t survive the rainy season, and patients whose medical histories vanished between visits. Teny Makuach grew up watching this and started TamamHealth so health workers would not have to rely on systems that forget patients.
                 </p>
                 <p className="mk-body" style={{ marginTop: 16, lineHeight: 1.7 }}>
-                  At Tufts University, he founded TamamHealth and designed the platform&apos;s core architecture: an offline-first engine built for the realities of African healthcare. He then connected with Toye Adebayo and Ekow Williams, and together they built the complete hospital information system that clinics across South Sudan now depend on.
+                  At Tufts University, that beginning became a shared team mission. We are building TamamHealth together across product, engineering, research, partnerships, and implementation so clinics, hospitals, communities, and governments can keep every patient story connected.
                 </p>
               </div>
               <div style={{ flex: "1 1 40%" }}>
@@ -98,21 +80,30 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── MEET THE FOUNDERS ───────────────────────────────────────── */}
+      {/* ── MEET THE TEAM ───────────────────────────────────────── */}
       <section className="mk-section mk-section-white">
         <div className="mk-container">
           <Reveal>
-            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 72 }}>Meet the founders</h2>
+            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 72 }}>Meet the team</h2>
           </Reveal>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 32, maxWidth: 880, margin: "0 auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 32, maxWidth: 1050, margin: "0 auto" }}>
             <Reveal delay={0}>
-              <FounderCard name="Teny Makuach" role="Founder & CEO" school="Computer Science, Tufts University" image="/assets/founder-teny.jpg" />
+              <FounderCard name="Teny Makuach" role="Founder" image="/assets/founder-teny.jpg" initials="TM" />
             </Reveal>
             <Reveal delay={0.1}>
-              <FounderCard name="Toye Adebayo" role="Co-founder & CTO" school="Computer Science, Tufts University" image="/assets/founder-toye.jpg" />
+              <FounderCard name="Ekow Williams" role="Community & Partnerships" image="/assets/founder-ekow.jpg" initials="EW" />
             </Reveal>
             <Reveal delay={0.2}>
-              <FounderCard name="Ekow Williams" role="Co-founder & COO" school="Electrical Engineering, Tufts University" image="/assets/founder-ekow.jpg" />
+              <FounderCard name="Toye Adebayo" role="Project Manager" image="/assets/founder-toye.jpg" initials="TA" />
+            </Reveal>
+            <Reveal delay={0.3}>
+              <FounderCard name="Mark Dosu" role="Software Developer" image="/assets/Mark-Dosu.jpeg" initials="MD" />
+            </Reveal>
+            <Reveal delay={0.4}>
+              <FounderCard name="Chinonye Hycent" role="Research Lead" image="/assets/chinonye-hycent.jpg" initials="CH" />
+            </Reveal>
+            <Reveal delay={0.5}>
+              <FounderCard name="Isaac Kyalo" role="Technical Lead" image="/assets/isaac-kyalo.jpg" initials="IK" />
             </Reveal>
           </div>
         </div>
@@ -149,26 +140,26 @@ export default function AboutPage() {
         <div className="mk-container">
           <Reveal>
             <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 72 }}>What we believe</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 32, maxWidth: 1100, margin: "0 auto" }}>
+            <div className="mk-about-values-grid">
               <ValueCard
                 title="Offline-first, always"
                 description="Across much of Africa, internet isn't guaranteed — it's a luxury. TamamHealth works without connectivity and syncs seamlessly when networks return. Healthcare can't wait for a signal bar."
-                icon={<DuoIcon name="offline" size={56} />}
+                icon={<CloudOff size={34} strokeWidth={1.65} />}
               />
               <ValueCard
-                title="Lived experience"
-                description="We don't build for communities we've never been part of. Our CEO grew up in a refugee camp. We design from understanding — not assumption, not research papers."
-                icon={<DuoIcon name="heart" size={56} />}
+                title="Shared mission"
+                description="TamamHealth started from lived experience, and the work now belongs to a team committed to building with the people and health systems the platform is meant to serve."
+                icon={<Heart size={34} strokeWidth={1.65} />}
               />
               <ValueCard
                 title="Radical simplicity"
                 description="Healthcare workers across Africa are brilliant and overstretched. Every feature we ship must be learnable in minutes — not months. If it's confusing, we haven't finished designing it."
-                icon={<DuoIcon name="lightbulb" size={56} />}
+                icon={<Lightbulb size={34} strokeWidth={1.65} />}
               />
               <ValueCard
                 title="Open standards"
                 description="TamamHealth integrates with DHIS2, supports HL7/FHIR, and works with national and regional health information systems across Africa. We don&apos;t build data silos — we break them."
-                icon={<DuoIcon name="api" size={56} />}
+                icon={<Code2 size={34} strokeWidth={1.65} />}
               />
             </div>
           </Reveal>
@@ -184,7 +175,7 @@ export default function AboutPage() {
               <ImpactCard number="Six" label="Integrated modules (EHR, billing, telehealth, pharmacy, lab, analytics)" highlight />
               <ImpactCard number="100%" label="Offline capability — Works without internet, syncs when connected" />
               <ImpactCard number="$10K" label="Competition winner — Tufts $100K New Ventures Healthcare Track" highlight />
-              <ImpactCard number="3" label="Co-founders from Tufts University (Computer Science & Electrical Engineering)" />
+              <ImpactCard number="6" label="Team members across product, engineering, research, partnerships, and implementation" />
             </div>
           </Reveal>
         </div>
@@ -199,12 +190,12 @@ export default function AboutPage() {
               <TimelineItem
                 year="2024"
                 title="Idea born"
-                description="Teny begins designing the platform architecture — an offline-first engine built for the realities of African healthcare."
+                description="Teny starts TamamHealth after seeing how fragile paper records fail patients and health workers."
               />
               <TimelineItem
                 year="2025"
                 title="Team forms"
-                description="Toye and Ekow join at Tufts, bringing distributed systems and electrical engineering expertise. Building begins."
+                description="The team begins turning the idea into a shared product mission across engineering, research, partnerships, and implementation."
               />
               <TimelineItem
                 year="Apr 2026"
@@ -214,7 +205,7 @@ export default function AboutPage() {
               <TimelineItem
                 year="Now"
                 title="Serving Africa"
-                description="Platform live in South Sudan clinics, transforming how healthcare workers document and deliver care."
+                description="Preparing pilots with health workers, facilities, and partners who want South Sudanese healthcare to have a stronger memory."
               />
             </div>
           </Reveal>
@@ -227,21 +218,26 @@ export default function AboutPage() {
 
 /* ── Components ──────────────────────────────────────────────────── */
 
-function FounderCard({ name, role, school, image }: { name: string; role: string; school: string; image: string }) {
+function FounderCard({ name, role, image, initials }: { name: string; role: string; image?: string; initials: string }) {
   return (
     <div style={{ textAlign: "center" }}>
       <div style={{ width: 180, height: 180, borderRadius: "50%", overflow: "hidden", margin: "0 auto 18px", boxShadow: "0 8px 24px rgba(26,58,58,0.08)", border: "3px solid var(--tb-gold)" }}>
-        <Image
-          src={image}
-          alt={`${name}, ${role} of TamamHealth`}
-          width={180}
-          height={180}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
+        {image ? (
+          <Image
+            src={image}
+            alt={`${name}, ${role} at TamamHealth`}
+            width={180}
+            height={180}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", background: "var(--tb-blue-50)", color: "var(--tb-blue-700)", fontSize: 42, fontWeight: 700 }}>
+            {initials}
+          </div>
+        )}
       </div>
       <h3 className="mk-h3" style={{ fontSize: "1.15rem", margin: "0 0 4px", fontWeight: 700 }}><strong>{name}</strong></h3>
       <p style={{ fontSize: 13, fontWeight: 700, color: "var(--tb-green)", margin: "0 0 6px", letterSpacing: "0.05em", textTransform: "uppercase" }}>{role}</p>
-      <p className="mk-body" style={{ color: "var(--tb-text-sec)", fontSize: 14, margin: 0 }}>{school}</p>
     </div>
   );
 }
@@ -249,8 +245,8 @@ function FounderCard({ name, role, school, image }: { name: string; role: string
 function ValueCard({ title, description, icon }: { title: string; description: string; icon: React.ReactNode }) {
   return (
     <div className="mk-value-card">
-      <div style={{ width: 56, height: 56, borderRadius: 14, background: "var(--tb-tint-blue)", color: "var(--tb-blue-700)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 28, height: 28 }}>{icon}</div>
+      <div className="mk-value-card-icon">
+        {icon}
       </div>
       <h3 className="mk-h3" style={{ fontSize: "1.15rem", marginTop: 20, marginBottom: 8, fontWeight: 700 }}><strong>{title}</strong></h3>
       <p className="mk-body" style={{ color: "var(--tb-text-sec)", margin: 0, fontSize: 15 }}>{description}</p>

@@ -3,13 +3,13 @@
 import { useState, useMemo } from 'react';
 import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
-import { Package, Plus, X, AlertTriangle, CheckCircle2, Clock, Settings as Wrench } from '@/components/icons/lucide';
+import { Plus, X, CheckCircle2, Settings as Wrench } from '@/components/icons/lucide';
+import RowActionsMenu from '@/components/RowActionsMenu';
 import { useApp } from '@/lib/context';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { FilterBar, SearchInput, FilterSelect } from '@/components/filters';
+import { FilterMenu } from '@/components/filters';
 import type { AssetDoc, AssetCategory, AssetStatus } from '@/lib/db-types-asset';
 
 const CATEGORIES: { id: AssetCategory; labelKey: string }[] = [
@@ -28,20 +28,23 @@ const CATEGORIES: { id: AssetCategory; labelKey: string }[] = [
 const STATUS_TOKENS: Record<AssetStatus, { labelKey: string; color: string; bg: string }> = {
   operational:    { labelKey: 'equipment.statusOperational',     color: '#15795C', bg: 'rgba(27, 158, 119, 0.12)' },
   needs_service:  { labelKey: 'equipment.statusNeedsService',   color: '#B8741C', bg: 'rgba(228, 168, 75, 0.16)' },
-  under_repair:   { labelKey: 'equipment.statusUnderRepair',    color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)' },
+  under_repair:   { labelKey: 'equipment.statusUnderRepair',    color: '#2191D0', bg: 'rgba(33, 145, 208, 0.12)' },
   decommissioned: { labelKey: 'equipment.statusDecommissioned',  color: '#5A7370', bg: 'rgba(90, 115, 112, 0.14)' },
   lost_or_stolen: { labelKey: 'equipment.statusLostOrStolen',   color: '#C44536', bg: 'rgba(196, 69, 54, 0.14)' },
 };
 
 export default function AssetsPage() {
-  const { currentUser } = useApp();
+  const { currentUser, globalSearch } = useApp();
   const { assets, summary, create, setStatus, logService } = useAssets();
   const { showToast } = useToast();
   const { t } = useTranslation();
 
   const [filter, setFilter] = useState<AssetCategory | ''>('');
   const [statusFilter, setStatusFilter] = useState<AssetStatus | ''>('');
-  const [q, setQ] = useState('');
+  // Text search comes from the shared global search bar (TopBar).
+  const q = globalSearch;
+  const activeFilterCount = (filter ? 1 : 0) + (statusFilter ? 1 : 0);
+  const clearFilters = () => { setFilter(''); setStatusFilter(''); };
   const [createOpen, setCreateOpen] = useState(false);
   const [serviceFor, setServiceFor] = useState<AssetDoc | null>(null);
 
@@ -133,27 +136,35 @@ export default function AssetsPage() {
 
   return (
     <>
-      <TopBar title={t('equipment.topBarTitle')} />
+      <TopBar title={t('equipment.topBarTitle')} searchTrailing={
+        <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+          <FilterMenu.Field label={t('equipment.allCategories')}>
+            <select value={filter} onChange={e => setFilter(e.target.value as AssetCategory | '')} className="w-full text-sm">
+              <option value="">{t('equipment.allCategories')}</option>
+              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{t(c.labelKey)}</option>)}
+            </select>
+          </FilterMenu.Field>
+          <FilterMenu.Field label={t('equipment.allStatuses')}>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as AssetStatus | '')} className="w-full text-sm">
+              <option value="">{t('equipment.allStatuses')}</option>
+              {(Object.entries(STATUS_TOKENS) as [AssetStatus, typeof STATUS_TOKENS[AssetStatus]][]).map(([id, tok]) => <option key={id} value={id}>{t(tok.labelKey)}</option>)}
+            </select>
+          </FilterMenu.Field>
+        </FilterMenu>
+      } actions={
+        <button onClick={() => setCreateOpen(true)} className="btn btn-primary">
+          <Plus className="w-4 h-4" /> {t('equipment.registerAsset')}
+        </button>
+      } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <PageHeader
-          icon={Package}
-          title={t('equipment.pageTitle')}
-          subtitle={t('equipment.pageSubtitle', { facility: facility.name, count: summary?.total ?? 0 })}
-          actions={
-            <button onClick={() => setCreateOpen(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('equipment.registerAsset')}
-            </button>
-          }
-        />
-
         {/* KPI strip */}
         {summary && (
           <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch' }}>
             {[
-              { label: t('equipment.kpiTotal'), value: summary.total, accent: 'var(--accent-primary)', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
+              { label: t('equipment.kpiTotal'), value: summary.total, accent: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
               { label: t('equipment.kpiOperational'), value: summary.operational, accent: '#15795C', bg: 'rgba(27, 158, 119, 0.10)', border: 'rgba(27, 158, 119, 0.26)' },
               { label: t('equipment.kpiNeedsService'), value: summary.needsService, accent: '#B8741C', bg: 'rgba(228, 168, 75, 0.12)', border: 'rgba(228, 168, 75, 0.30)' },
-              { label: t('equipment.kpiUnderRepair'), value: summary.underRepair, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
+              { label: t('equipment.kpiUnderRepair'), value: summary.underRepair, accent: '#2191D0', bg: 'rgba(33, 145, 208, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
               { label: t('equipment.kpiServiceDueSoon'), value: summary.serviceDueSoon, accent: '#C44536', bg: 'rgba(196, 69, 54, 0.10)', border: 'rgba(196, 69, 54, 0.26)' },
             ].map(k => (
               <div key={k.label} style={{ padding: '14px 16px', borderRadius: 10, background: k.bg, border: `1px solid ${k.border}` }}>
@@ -164,35 +175,10 @@ export default function AssetsPage() {
           </div>
         )}
 
-        {/* Search + filters */}
-        <FilterBar>
-          <SearchInput value={q} onChange={setQ} placeholder={t('equipment.searchPlaceholder')} />
-          <FilterSelect
-            aria-label={t('equipment.allCategories')}
-            value={filter}
-            neutralValue=""
-            onChange={v => setFilter(v as AssetCategory | '')}
-            options={[
-              { value: '', label: t('equipment.allCategories') },
-              ...CATEGORIES.map(c => ({ value: c.id, label: t(c.labelKey) })),
-            ]}
-          />
-          <FilterSelect
-            aria-label={t('equipment.allStatuses')}
-            value={statusFilter}
-            neutralValue=""
-            onChange={v => setStatusFilter(v as AssetStatus | '')}
-            options={[
-              { value: '', label: t('equipment.allStatuses') },
-              ...(Object.entries(STATUS_TOKENS) as [AssetStatus, typeof STATUS_TOKENS[AssetStatus]][]).map(([id, tok]) => ({ value: id, label: t(tok.labelKey) })),
-            ]}
-          />
-        </FilterBar>
-
         {/* Asset table */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          <table className="data-table">
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+          <table className="data-table" style={{ minWidth: 720 }}>
             <thead>
               <tr>
                 <th>{t('equipment.colAsset')}</th>
@@ -231,19 +217,18 @@ export default function AssetsPage() {
                     <td className="text-xs">
                       {a.nextServiceDueAt ? (
                         <span style={{ color: dueSoon ? '#C44536' : 'var(--text-secondary)' }} className="inline-flex items-center gap-1">
-                          {dueSoon ? <AlertTriangle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                           {a.nextServiceDueAt}
                         </span>
                       ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                     </td>
                     <td>
-                      <div className="flex gap-1">
-                        <button className="btn btn-secondary btn-sm" onClick={() => setServiceFor(a)} title={t('equipment.logServiceTitle')}><Wrench className="w-3 h-3" /></button>
-                        {a.status !== 'operational' && (
-                          <button className="btn btn-secondary btn-sm" onClick={() => setStatus(a._id, 'operational', { id: currentUser?._id || 'unknown', name: currentUser?.name || 'Staff' })} title={t('equipment.markOperationalTitle')}>
-                            <CheckCircle2 className="w-3 h-3" />
-                          </button>
-                        )}
+                      <div className="flex">
+                        <RowActionsMenu
+                          actions={[
+                            { key: 'service', label: t('equipment.logServiceTitle'), icon: <Wrench className="w-4 h-4" />, onClick: () => setServiceFor(a) },
+                            ...(a.status !== 'operational' ? [{ key: 'operational', label: t('equipment.markOperationalTitle'), tone: 'success' as const, icon: <CheckCircle2 className="w-4 h-4" />, onClick: () => setStatus(a._id, 'operational', { id: currentUser?._id || 'unknown', name: currentUser?.name || 'Staff' }) }] : []),
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>

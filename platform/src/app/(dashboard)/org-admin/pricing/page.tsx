@@ -2,15 +2,15 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import Modal from '@/components/Modal';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
-import { Receipt, Plus, Save, Search } from '@/components/icons/lucide';
+import { Plus, Save, Search, Trash2 } from '@/components/icons/lucide';
 import {
   getFeeSchedule, createFee, updateFee, deleteFee, type FeeInput,
 } from '@/lib/services/fee-schedule-service';
 import type { FeeScheduleDoc, ChargeCategory } from '@/lib/db-types-billing';
+import { formatMoney } from '@/lib/format-utils';
 
 const CATEGORIES: { value: ChargeCategory; label: string }[] = [
   { value: 'consultation', label: 'Consultation' },
@@ -23,8 +23,6 @@ const CATEGORIES: { value: ChargeCategory; label: string }[] = [
   { value: 'ambulance', label: 'Ambulance' },
   { value: 'other', label: 'Other' },
 ];
-
-const fmt = (n: number, c = 'SSP') => `${c} ${n.toLocaleString()}`;
 
 const emptyForm = (): FeeInput & { isActive: boolean } => ({
   facilityId: '', facilityName: '', category: 'consultation',
@@ -41,6 +39,9 @@ export default function ServicePricingPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
+  // Confirm before removing a catalog row so an accidental click on "Remove"
+  // is recoverable (the row isn't deleted until the user confirms).
+  const [removingFee, setRemovingFee] = useState<FeeScheduleDoc | null>(null);
 
   const actor = { id: currentUser?._id, name: currentUser?.name };
   const scope = currentUser
@@ -103,10 +104,12 @@ export default function ServicePricingPage() {
     }
   };
 
-  const remove = async (fee: FeeScheduleDoc) => {
+  const confirmRemove = async () => {
+    if (!removingFee) return;
     try {
-      await deleteFee(fee._id, actor);
+      await deleteFee(removingFee._id, actor);
       showToast('Service removed', 'success');
+      setRemovingFee(null);
       await load();
     } catch {
       showToast('Could not remove the service', 'error');
@@ -119,19 +122,12 @@ export default function ServicePricingPage() {
 
   return (
     <>
-      <TopBar title="Service Pricing" />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <PageHeader
-          icon={Receipt}
-          title="Service Pricing"
-          subtitle="Set the fee schedule used to charge patients across consultations, lab, pharmacy and more."
-          actions={
+      <TopBar title="Service Pricing" actions={
             <button onClick={openAdd} className="btn btn-primary inline-flex items-center gap-2">
               <Plus className="w-4 h-4" /> Add service
             </button>
-          }
-        />
-
+          } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <div className="dash-card overflow-hidden flex flex-col" style={{ marginTop: 16, flex: 1, minHeight: 0 }}>
           <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <Search className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -151,8 +147,8 @@ export default function ServicePricingPage() {
               {fees.length === 0 ? 'No services priced yet. Add your first service to start charging.' : 'No services match your search.'}
             </div>
           ) : (
-            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-            <table className="w-full">
+            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+            <table className="w-full" style={{ minWidth: 720 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                   {['Service', 'Code', 'Category', 'Price', 'Status', ''].map(h => (
@@ -166,7 +162,7 @@ export default function ServicePricingPage() {
                     <td className="px-4 py-2.5 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{fee.serviceName}</td>
                     <td className="px-4 py-2.5 text-[12px] font-mono" style={{ color: 'var(--text-muted)' }}>{fee.serviceCode || '—'}</td>
                     <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{CATEGORIES.find(c => c.value === fee.category)?.label || fee.category}</td>
-                    <td className="px-4 py-2.5 text-sm font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>{fmt(fee.unitPrice, fee.currency)}</td>
+                    <td className="px-4 py-2.5 text-sm font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>{formatMoney(fee.unitPrice, { currency: fee.currency, decimals: 2 })}</td>
                     <td className="px-4 py-2.5">
                       <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full" style={{
                         background: fee.isActive ? 'var(--accent-light)' : 'var(--overlay-medium)',
@@ -175,7 +171,7 @@ export default function ServicePricingPage() {
                     </td>
                     <td className="px-4 py-2.5 text-right whitespace-nowrap">
                       <button onClick={() => openEdit(fee)} className="text-[12px] font-semibold mr-3" style={{ color: 'var(--accent-text)' }}>Edit</button>
-                      <button onClick={() => remove(fee)} className="text-[12px] font-semibold" style={{ color: 'var(--color-danger)' }}>Remove</button>
+                      <button onClick={() => setRemovingFee(fee)} aria-label="Remove fee" title="Remove fee" className="p-1.5 rounded-lg transition-colors hover:bg-red-50" style={{ color: 'var(--color-danger)' }}><Trash2 className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 ))}
@@ -223,6 +219,26 @@ export default function ServicePricingPage() {
                 <button onClick={save} disabled={saving} className="btn btn-primary flex-1 inline-flex items-center justify-center gap-2">
                   <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save'}
                 </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* Confirm removal — gives the admin a chance to back out before the
+            catalog row is deleted, so an accidental Remove click is recoverable. */}
+        {removingFee && (
+          <Modal onClose={() => setRemovingFee(null)} width={400}>
+            <div className="card-elevated" style={{ background: 'var(--bg-card-solid)', borderRadius: 16, padding: 20, width: '100%' }}>
+              <h2 className="text-base font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Remove service?</h2>
+              <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>
+                {removingFee.serviceName} ({formatMoney(removingFee.unitPrice, { currency: removingFee.currency, decimals: 2 })}) will be removed from the price catalog.
+              </p>
+              <p className="text-[12px] mb-4" style={{ color: 'var(--text-muted)' }}>
+                It will no longer be available for charging.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => setRemovingFee(null)} className="btn btn-secondary flex-1">Cancel</button>
+                <button onClick={confirmRemove} className="btn flex-1 text-white" style={{ background: 'var(--color-danger)' }}>Remove</button>
               </div>
             </div>
           </Modal>

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { v4 as uuidv4 } from 'uuid';
 import { verifyPatientToken } from '@/lib/patient-portal-auth';
-import { messagesDB } from '@/lib/db';
 import { logAuditSafe } from '@/lib/services/audit-service';
 import type { MessageDoc } from '@/lib/db-types';
 
@@ -33,13 +31,10 @@ export async function POST(req: NextRequest) {
   // Patient → staff message. Direction + sender are forced server-side so a
   // patient cannot impersonate a clinician via the mobile push.
   try {
-    const db = messagesDB();
     const now = new Date().toISOString();
-    const id = (typeof body._id === 'string' && body._id) || `msg-${uuidv4().slice(0, 8)}`;
+    const { createMessage } = await import('@/lib/services/message-service');
 
-    const doc: MessageDoc = {
-      _id: id,
-      type: 'message',
+    const doc = await createMessage({
       recipientType: 'staff',
       direction: 'patient_to_staff',
       patientId: auth.sub,
@@ -55,15 +50,9 @@ export async function POST(req: NextRequest) {
       subject: typeof body.subject === 'string' ? body.subject : '(no subject)',
       body: typeof body.body === 'string' ? body.body : '',
       channel: 'app',
-      status: 'sent',
       sentAt: typeof body.sentAt === 'string' ? body.sentAt : now,
-      createdAt: now,
-      updatedAt: now,
       createdBy: auth.sub,
-    };
-
-    const resp = await db.put(doc);
-    doc._rev = resp.rev;
+    } as Omit<MessageDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'status'>);
 
     await logAuditSafe(
       'PATIENT_SEND_MESSAGE', auth.sub, auth.name,

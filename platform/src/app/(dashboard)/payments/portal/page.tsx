@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import TopBar from '@/components/TopBar';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import {
@@ -11,13 +11,12 @@ import {
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { BillingDoc } from '@/lib/db-types-billing';
+import { formatMoney } from '@/lib/format-utils';
 
 // Demo gate. In production (NEXT_PUBLIC_DEMO_MODE=false) the portal never
 // shows fake invoices or the hardcoded Equity Bank account — empty state
 // instead, and bank details fall back to a "contact billing" placeholder.
 const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
-
-const fmt = (n: number) => 'SSP ' + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 // Shape the portal renders against — independent of underlying BillingDoc so
 // we can keep the demo fallback when a patient has no real bills yet.
@@ -62,20 +61,28 @@ const DEMO_BILLS: PortalBill[] = [
 
 type PaymentMethod = 'mgurush' | 'mpesa' | 'mtn' | 'airtel' | 'card' | 'bank';
 
-// TODO: source bank-transfer details from the org settings doc once that
-// surface exists. For now: demo mode keeps the canned Equity Bank example;
-// real production deploys show a "contact billing" placeholder so we never
-// hand patients a fake account number.
+// Bank-transfer instructions are sourced from the org's `bankDetails` settings
+// field (set by the org admin on the branding page). When the org hasn't filled
+// it in, real production deploys show a "contact billing" placeholder so we
+// never hand patients a fake account number; demo mode keeps a canned Equity
+// Bank example so the flow still has something to show.
 const BANK_INSTRUCTIONS_DEMO = 'Bank: Equity Bank South Sudan\nAccount: 0012345678901\nBranch: Juba Main\nReference: Your Invoice #';
 const BANK_INSTRUCTIONS_FALLBACK = 'Contact billing for payment instructions.';
 
-const PAYMENT_METHODS: { id: PaymentMethod; label: string; desc: string; icon: typeof Smartphone; color: string; instructions: string }[] = [
+const resolveBankInstructions = (bankDetails?: string): string =>
+  (bankDetails && bankDetails.trim())
+    ? bankDetails.trim()
+    : (IS_DEMO ? BANK_INSTRUCTIONS_DEMO : BANK_INSTRUCTIONS_FALLBACK);
+
+type PaymentMethodDef = { id: PaymentMethod; label: string; desc: string; icon: typeof Smartphone; color: string; instructions: string };
+
+const buildPaymentMethods = (bankDetails?: string): PaymentMethodDef[] => [
   { id: 'mgurush', label: 'm-GURUSH', desc: 'Pay via m-GURUSH (South Sudan)', icon: Smartphone, color: '#0EA5A4', instructions: 'Dial *158# > Pay Bill\nBusiness Number: TamamHealth\nReference: Your Invoice #' },
   { id: 'mpesa', label: 'M-Pesa', desc: 'Pay via Safaricom M-Pesa', icon: Smartphone, color: '#4CAF50', instructions: 'Go to M-Pesa > Lipa na M-Pesa > Pay Bill\nBusiness Number: 247247\nAccount: Your Invoice #' },
   { id: 'mtn', label: 'MTN Mobile Money', desc: 'Pay via MTN MoMo', icon: Smartphone, color: '#FFCB05', instructions: 'Dial *165# > Pay Bill\nMerchant Code: TamamHealth\nReference: Your Invoice #' },
   { id: 'airtel', label: 'Airtel Money', desc: 'Pay via Airtel Money', icon: Smartphone, color: '#ED1C24', instructions: 'Dial *185# > Pay Bill\nBusiness Name: TamamHealth HEALTH\nReference: Your Invoice #' },
   { id: 'card', label: 'Visa / Mastercard', desc: 'Secure card payment via Flutterwave', icon: CreditCard, color: '#6366f1', instructions: 'Click "Pay Now" to be redirected to our secure payment gateway powered by Flutterwave.' },
-  { id: 'bank', label: 'Bank Transfer', desc: 'Direct bank deposit', icon: Building2, color: '#3b82f6', instructions: IS_DEMO ? BANK_INSTRUCTIONS_DEMO : BANK_INSTRUCTIONS_FALLBACK },
+  { id: 'bank', label: 'Bank Transfer', desc: 'Direct bank deposit', icon: Building2, color: '#2191D0', instructions: resolveBankInstructions(bankDetails) },
 ];
 
 export default function PatientPortalPage() {
@@ -86,6 +93,12 @@ export default function PatientPortalPage() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentStep, setPaymentStep] = useState<'select' | 'method' | 'confirm' | 'success'>('select');
   const [copied, setCopied] = useState(false);
+
+  // Bank-transfer instructions come from the org's configured bankDetails
+  // (set on the org-admin branding page). Falls back to a "contact billing"
+  // placeholder (or the demo example under IS_DEMO) when unset.
+  const orgBankDetails = currentUser?.organization?.bankDetails;
+  const PAYMENT_METHODS = useMemo(() => buildPaymentMethods(orgBankDetails), [orgBankDetails]);
 
   // Load real bills for the signed-in patient. Falls back to demo data when
   // the patient has no charges on file so the portal still has something
@@ -189,14 +202,14 @@ export default function PatientPortalPage() {
                 border: '1px solid rgba(255,255,255,0.15)', textAlign: 'center', minWidth: 110,
               }}>
                 <div style={{ fontSize: '0.625rem', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{t('billing.colBalanceDue')}</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: totalOwed > 0 ? '#E4A84B' : '#4ade80' }}>{fmt(totalOwed)}</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: totalOwed > 0 ? '#E4A84B' : '#4ade80' }}>{formatMoney(totalOwed)}</div>
               </div>
               <div style={{
                 background: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: '14px 20px',
                 border: '1px solid rgba(255,255,255,0.15)', textAlign: 'center', minWidth: 110,
               }}>
                 <div style={{ fontSize: '0.625rem', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{t('portal.totalPaid')}</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#4ade80' }}>{fmt(totalPaid)}</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#4ade80' }}>{formatMoney(totalPaid)}</div>
               </div>
             </div>
           </div>
@@ -244,7 +257,6 @@ export default function PatientPortalPage() {
                         {/* Icon */}
                         <div className="icon-box-sm" style={{
                           flexShrink: 0,
-                          background: isPaid ? 'var(--color-success-bg)' : 'var(--accent-light)',
                         }}>
                           {isPaid
                             ? <CheckCircle size={34} style={{ color: 'var(--color-success)' }} />
@@ -266,7 +278,7 @@ export default function PatientPortalPage() {
                         {/* Amount + Action */}
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontSize: '1rem', fontWeight: 800, color: isPaid ? 'var(--color-success)' : 'var(--text-primary)', marginBottom: 4 }}>
-                            {fmt(bill.amount)}
+                            {formatMoney(bill.amount)}
                           </div>
                           {isPaid ? (
                             <span style={{
@@ -277,7 +289,7 @@ export default function PatientPortalPage() {
                           ) : bill.status === 'partial' ? (
                             <div>
                               <span style={{ fontSize: '0.6875rem', color: 'var(--color-warning)', fontWeight: 600 }}>
-                                {t('portal.remaining', { amount: fmt(remaining) })}
+                                {t('portal.remaining', { amount: formatMoney(remaining) })}
                               </span>
                             </div>
                           ) : (
@@ -295,7 +307,7 @@ export default function PatientPortalPage() {
                             onClick={() => handlePayBill(bill)}
                             style={{
                               padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                              background: 'var(--accent-primary)', color: '#fff',
+                              background: '#2191D0', color: '#fff',
                               fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
                               transition: 'opacity 0.15s',
                             }}
@@ -331,7 +343,7 @@ export default function PatientPortalPage() {
                     textAlign: 'center', marginBottom: 16, border: '1px solid var(--border-light)',
                   }}>
                     <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{t('portal.totalDue')}</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>{fmt(totalOwed)}</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>{formatMoney(totalOwed)}</div>
                   </div>
                   <hr className="section-divider" />
                   <button
@@ -367,7 +379,6 @@ export default function PatientPortalPage() {
                       <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div className="icon-box-sm" style={{
                           flexShrink: 0,
-                          background: `${m.color}14`,
                         }}>
                           <Icon size={14} style={{ color: m.color }} />
                         </div>
@@ -420,7 +431,7 @@ export default function PatientPortalPage() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{t('portal.amountToPay')}</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-primary)' }}>{fmt(Number(paymentAmount))}</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-primary)' }}>{formatMoney(Number(paymentAmount))}</div>
                 </div>
               </div>
             </div>
@@ -468,9 +479,7 @@ export default function PatientPortalPage() {
                       transition: 'all 0.15s',
                     }}
                   >
-                    <div className="icon-box-sm" style={{
-                      background: `${m.color}14`,
-                    }}>
+                    <div className="icon-box-sm">
                       <Icon size={16} style={{ color: m.color }} />
                     </div>
                     <div style={{ flex: 1 }}>
@@ -539,7 +548,7 @@ export default function PatientPortalPage() {
                     </div>
                     <div style={{ textAlign: 'center', padding: '16px 0' }}>
                       <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{t('portal.amount')}</div>
-                      <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)' }}>{fmt(Number(paymentAmount))}</div>
+                      <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)' }}>{formatMoney(Number(paymentAmount))}</div>
                     </div>
                   </div>
 
@@ -626,7 +635,7 @@ export default function PatientPortalPage() {
                 {t('portal.paymentSubmitted')}
               </h2>
               <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0 0 24px', lineHeight: 1.6 }}>
-                {t('portal.paymentSubmittedDescPre')}<strong>{fmt(Number(paymentAmount))}</strong>{t('portal.paymentSubmittedDescPost')}
+                {t('portal.paymentSubmittedDescPre')}<strong>{formatMoney(Number(paymentAmount))}</strong>{t('portal.paymentSubmittedDescPost')}
               </p>
 
               <div className="data-row-divider-sm" style={{
@@ -639,7 +648,7 @@ export default function PatientPortalPage() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('portal.amount')}</span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>{fmt(Number(paymentAmount))}</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>{formatMoney(Number(paymentAmount))}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('portal.method')}</span>
@@ -653,7 +662,7 @@ export default function PatientPortalPage() {
                 onClick={resetPayment}
                 style={{
                   padding: '12px 32px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                  background: 'var(--accent-primary)', color: '#fff',
+                  background: '#2191D0', color: '#fff',
                   fontSize: '0.875rem', fontWeight: 700,
                 }}
               >

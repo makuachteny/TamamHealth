@@ -16,7 +16,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 const RISK_STYLES: Record<ConflictQueueDoc['risk'], { bg: string; fg: string; border: string; label: string }> = {
   high:   { bg: 'rgba(229,46,66,0.08)',  fg: '#C44536', border: 'rgba(229,46,66,0.25)', label: 'HIGH' },
   medium: { bg: 'rgba(228,168,75,0.12)', fg: '#8A5C0F', border: 'rgba(228,168,75,0.35)', label: 'MEDIUM' },
-  low:    { bg: 'rgba(59,130,246,0.08)', fg: '#1B4FA0', border: 'rgba(59,130,246,0.25)', label: 'LOW' },
+  low:    { bg: 'rgba(33,145,208,0.08)', fg: '#1B4FA0', border: 'rgba(33,145,208,0.25)', label: 'LOW' },
 };
 
 export default function ConflictsPage() {

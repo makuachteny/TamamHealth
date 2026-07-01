@@ -1,17 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   FileText,
   AlertTriangle,
 } from '@/components/icons/lucide';
+import RowActionsMenu from '@/components/RowActionsMenu';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import DataTile from '@/components/DataTile';
-import { SearchInput, FilterBar, FilterSelect } from '@/components/filters';
+import { FilterMenu } from '@/components/filters';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { ClaimDoc, ClaimStatus, PayerType } from '@/lib/db-types-payments';
+import { formatMoney } from '@/lib/format-utils';
 
 // Payer mix labels/colours — relocated from the old Billing cockpit so the
 // payer breakdown lives next to the claims it summarises.
@@ -30,7 +32,7 @@ const PAYER_COLORS: Record<PayerType, string> = {
   nhis: 'var(--color-success)',
   cbhi: '#0891B2',
   donor: 'var(--color-warning)',
-  government: '#7C3AED',
+  government: 'var(--accent-primary)',
   private: '#EA580C',
   employer: '#0F766E',
 };
@@ -57,7 +59,7 @@ interface AdjudicationForm {
 
 export default function ClaimsPage() {
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser, globalSearch } = useApp();
   const [claims, setClaims] = useState<ClaimDoc[]>([]);
   const [filteredClaims, setFilteredClaims] = useState<ClaimDoc[]>([]);
   const [kpis, setKpis] = useState<ClaimKPIs>({
@@ -70,8 +72,11 @@ export default function ClaimsPage() {
     denied: 0,
     deniedAmount: 0,
   });
-  const [searchQuery, setSearchQuery] = useState('');
+  // Text search comes from the shared global search bar (TopBar).
+  const searchQuery = globalSearch;
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const activeFilterCount = statusFilter !== 'all' ? 1 : 0;
+  const clearFilters = () => setStatusFilter('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adjForm, setAdjForm] = useState<AdjudicationForm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -267,20 +272,28 @@ export default function ClaimsPage() {
 
   return (
     <>
-      <TopBar title={t('claims.title')} />
+      <TopBar title={t('claims.title')} searchTrailing={
+        <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+          <FilterMenu.Field label={t('claims.filterAll')}>
+            <select className="w-full text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+              <option value="all">{t('claims.filterAll')}</option>
+              <option value="draft">{t('claims.status_draft')}</option>
+              <option value="submitted">{t('claims.status_submitted')}</option>
+              <option value="accepted">{t('claims.status_accepted')}</option>
+              <option value="denied">{t('claims.status_denied')}</option>
+              <option value="paid">{t('claims.status_paid')}</option>
+            </select>
+          </FilterMenu.Field>
+        </FilterMenu>
+      } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-
-      <PageHeader
-        icon={FileText}
-        title={t('claims.title')}
-      />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
         <DataTile label={t('claims.kpiTotalClaims')} value={kpis.totalClaims} />
-        <DataTile label={t('claims.kpiPendingReview')} value={kpis.pendingReview} hint={`SSP ${kpis.pendingAmount.toLocaleString()}`} tone={kpis.pendingReview > 0 ? 'warning' : 'default'} />
-        <DataTile label={t('claims.kpiApprovedClaims')} value={kpis.approved} hint={`SSP ${kpis.approvedAmount.toLocaleString()}`} tone={kpis.approved > 0 ? 'ok' : 'default'} />
-        <DataTile label={t('claims.kpiDeniedClaims')} value={kpis.denied} hint={`SSP ${kpis.deniedAmount.toLocaleString()}`} tone={kpis.denied > 0 ? 'danger' : 'default'} />
+        <DataTile label={t('claims.kpiPendingReview')} value={kpis.pendingReview} hint={formatMoney(kpis.pendingAmount)} tone={kpis.pendingReview > 0 ? 'warning' : 'default'} />
+        <DataTile label={t('claims.kpiApprovedClaims')} value={kpis.approved} hint={formatMoney(kpis.approvedAmount)} tone={kpis.approved > 0 ? 'ok' : 'default'} />
+        <DataTile label={t('claims.kpiDeniedClaims')} value={kpis.denied} hint={formatMoney(kpis.deniedAmount)} tone={kpis.denied > 0 ? 'danger' : 'default'} />
       </div>
 
       {/* Payer mix — revenue share by payer across all claims. */}
@@ -294,7 +307,7 @@ export default function ClaimsPage() {
               <div key={payer}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 3 }}>
                   <span style={{ fontWeight: 600 }}>{t(PAYER_LABEL_KEYS[payer])}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>SSP {amount.toLocaleString()} · {pct}%</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{formatMoney(amount)} · {pct}%</span>
                 </div>
                 <div style={{ height: 6, borderRadius: 3, background: 'var(--overlay-medium)', overflow: 'hidden' }}>
                   <div style={{ width: `${pct}%`, height: '100%', background: PAYER_COLORS[payer] }} />
@@ -304,28 +317,6 @@ export default function ClaimsPage() {
           </div>
         </section>
       )}
-
-      {/* Search and Filter Controls */}
-      <FilterBar>
-        <SearchInput
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder={t('claims.searchPlaceholder')}
-        />
-        <FilterSelect
-          value={statusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: 'all', label: t('claims.filterAll') },
-            { value: 'draft', label: t('claims.status_draft') },
-            { value: 'submitted', label: t('claims.status_submitted') },
-            { value: 'accepted', label: t('claims.status_accepted') },
-            { value: 'denied', label: t('claims.status_denied') },
-            { value: 'paid', label: t('claims.status_paid') },
-          ]}
-          aria-label="Filter by status"
-        />
-      </FilterBar>
 
       {/* Claims Table */}
       <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
@@ -351,6 +342,7 @@ export default function ClaimsPage() {
             width: '100%',
             borderCollapse: 'collapse',
             fontSize: '0.875rem',
+            minWidth: 1120,
           }}>
             <thead>
               <tr style={{
@@ -472,7 +464,20 @@ export default function ClaimsPage() {
                   <td style={{
                     padding: '12px 20px',
                     color: 'var(--text-primary)',
-                  }}>{claim.patientName}</td>
+                  }}>
+                    {claim.patientId && !claim.patientId.startsWith('demo-') && !claim.patientId.includes('_demo') ? (
+                      <Link
+                        href={`/patients/${claim.patientId}`}
+                        onClick={e => e.stopPropagation()}
+                        className="hover:underline"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        {claim.patientName}
+                      </Link>
+                    ) : (
+                      claim.patientName
+                    )}
+                  </td>
                   <td style={{
                     padding: '12px 20px',
                     color: 'var(--text-primary)',
@@ -487,19 +492,19 @@ export default function ClaimsPage() {
                     textAlign: 'right',
                     color: 'var(--text-primary)',
                     fontWeight: '500',
-                  }}>SSP {(claim.totalBilled || 0).toLocaleString()}</td>
+                  }}>{formatMoney(claim.totalBilled || 0)}</td>
                   <td style={{
                     padding: '12px 20px',
                     textAlign: 'right',
                     color: 'var(--text-primary)',
                     fontWeight: '500',
-                  }}>SSP {(claim.totalAllowed || 0).toLocaleString()}</td>
+                  }}>{formatMoney(claim.totalAllowed || 0)}</td>
                   <td style={{
                     padding: '12px 20px',
                     textAlign: 'right',
                     color: 'var(--text-primary)',
                     fontWeight: '500',
-                  }}>SSP {(claim.totalApproved || 0).toLocaleString()}</td>
+                  }}>{formatMoney(claim.totalApproved || 0)}</td>
                   <td style={{
                     padding: '12px 20px',
                     textAlign: 'center',
@@ -507,7 +512,7 @@ export default function ClaimsPage() {
                     <span style={{
                       display: 'inline-block',
                       padding: '3px 10px',
-                      borderRadius: '10px',
+                      borderRadius: '4px',
                       fontSize: '0.625rem',
                       fontWeight: '700',
                       textTransform: 'uppercase',
@@ -525,32 +530,13 @@ export default function ClaimsPage() {
                     padding: '12px 20px',
                     textAlign: 'center',
                   }}>
-                    {(claim.status === 'submitted' || claim.status === 'draft') && (
-                      <button
-                        onClick={() => handleAdjudicate(claim)}
-                        style={{
-                          padding: '8px 16px',
-                          backgroundColor: 'var(--accent-primary)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '0.8125rem',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease-in-out',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '0.9';
-                          e.currentTarget.style.transform = 'translateY(-1px)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}
-                      >
-                        {t('claims.actionAdjudicate')}
-                      </button>
-                    )}
+                    <div style={{ display: 'inline-flex' }}>
+                      <RowActionsMenu
+                        actions={[
+                          ...((claim.status === 'submitted' || claim.status === 'draft') ? [{ key: 'adjudicate', label: t('claims.actionAdjudicate'), onClick: () => handleAdjudicate(claim) }] : []),
+                        ]}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -615,7 +601,7 @@ export default function ClaimsPage() {
                   width: '100%',
                   padding: '10px 12px',
                   border: '1px solid var(--border-light)',
-                  borderRadius: '8px',
+                  borderRadius: '4px',
                   fontSize: '0.9375rem',
                   color: 'var(--text-primary)',
                   background: 'var(--bg-card)',
@@ -658,7 +644,7 @@ export default function ClaimsPage() {
                   width: '100%',
                   padding: '10px 12px',
                   border: '1px solid var(--border-light)',
-                  borderRadius: '8px',
+                  borderRadius: '4px',
                   fontSize: '0.9375rem',
                   color: 'var(--text-primary)',
                   background: 'var(--bg-card)',
@@ -692,7 +678,7 @@ export default function ClaimsPage() {
                   width: '100%',
                   padding: '10px 12px',
                   border: '1px solid var(--border-light)',
-                  borderRadius: '8px',
+                  borderRadius: '4px',
                   fontSize: '0.9375rem',
                   color: 'var(--text-primary)',
                   background: 'var(--bg-card)',
@@ -728,7 +714,7 @@ export default function ClaimsPage() {
                     width: '100%',
                     padding: '10px 12px',
                     border: '1px solid var(--border-light)',
-                    borderRadius: '8px',
+                    borderRadius: '4px',
                     fontSize: '0.9375rem',
                     color: 'var(--text-primary)',
                     background: 'var(--bg-card)',
@@ -760,7 +746,7 @@ export default function ClaimsPage() {
                   width: '100%',
                   padding: '10px 12px',
                   border: '1px solid var(--border-light)',
-                  borderRadius: '8px',
+                  borderRadius: '4px',
                   fontSize: '0.9375rem',
                   color: 'var(--text-primary)',
                   background: 'var(--bg-card)',
@@ -784,7 +770,7 @@ export default function ClaimsPage() {
                   backgroundColor: 'var(--overlay-subtle)',
                   color: 'var(--text-primary)',
                   border: 'none',
-                  borderRadius: '8px',
+                  borderRadius: '4px',
                   fontSize: '0.9375rem',
                   fontWeight: '600',
                   cursor: 'pointer',
@@ -806,7 +792,7 @@ export default function ClaimsPage() {
                   backgroundColor: 'var(--color-success)',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '8px',
+                  borderRadius: '4px',
                   fontSize: '0.9375rem',
                   fontWeight: '600',
                   cursor: 'pointer',

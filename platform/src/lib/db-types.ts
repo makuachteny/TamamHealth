@@ -76,11 +76,101 @@ export interface PatientDoc extends BaseDoc, Omit<Patient, 'id'> {
   orgId?: string;
 }
 
+/**
+ * NAMING CONVENTION — "hospital" vs "facility":
+ * The product UI uses the word **Facility** throughout. The data layer keeps
+ * the historical `hospital*` identifiers (`HospitalDoc`, `hospitalsDB`,
+ * `hospital-service`, `hospitalId`, `registrationHospital`) for backward
+ * compatibility — renaming the persisted keys would require a data migration
+ * across every synced DB and CouchDB remote, so they are intentionally left
+ * as-is. Treat `hospitalId` / `facilityId` as synonyms (a facility = a
+ * hospital record); prefer "facility" in user-facing copy, "hospital" in the
+ * storage/types layer.
+ */
 export interface HospitalDoc extends BaseDoc, Omit<Hospital, 'id' | 'type'> {
   type: 'hospital';
   facilityType: Hospital['type'];
   facilityLevel?: FacilityLevel;  // boma | payam | county | state | national
   orgId?: string;
+}
+
+/**
+ * Per-patient context carried in a shift handoff, captured in SBAR form so the
+ * oncoming nurse has structured situational awareness rather than free text.
+ */
+export interface HandoffPatientEntry {
+  patientId: string;
+  patientName: string;
+  hospitalNumber?: string;
+  priority?: 'RED' | 'YELLOW' | 'GREEN';
+  /** SBAR */
+  situation?: string;
+  background?: string;
+  assessment?: string;
+  recommendation?: string;
+  /** Outstanding tasks the oncoming shift must action. */
+  tasks?: string[];
+}
+
+/**
+ * A nurse shift handoff record. Persisted so the oncoming shift can retrieve
+ * and acknowledge the previous shift's handoff (closing the loop), and so the
+ * record survives reload/re-seed and syncs across devices.
+ */
+export interface ShiftHandoffDoc extends BaseDoc {
+  type: 'shift_handoff';
+  facilityId?: string;
+  facilityName?: string;
+  orgId?: string;
+  /** Local date key (YYYY-MM-DD) + shift, used to detect duplicate sign-offs. */
+  shiftDate: string;
+  shift: 'day' | 'evening' | 'night';
+  // Outgoing (signing) nurse
+  outgoingNurseId: string;
+  outgoingNurseName: string;
+  // Oncoming nurse (free text at compose time; id filled on acknowledge)
+  incomingNurseName?: string;
+  incomingNurseId?: string;
+  /** Shift-wide summary notes. */
+  notes?: string;
+  /** Structured per-patient SBAR + tasks. */
+  patients: HandoffPatientEntry[];
+  /** Snapshot of shift workload metrics at sign-off (real, not fabricated). */
+  metrics?: {
+    totalPatients?: number;
+    critical?: number;
+    overdueMar?: number;
+    dueMar?: number;
+  };
+  signedAt: string;
+  /** Lifecycle: signed by outgoing nurse, then acknowledged by oncoming nurse. */
+  status: 'signed' | 'acknowledged';
+  acknowledgedBy?: string;
+  acknowledgedByName?: string;
+  acknowledgedAt?: string;
+}
+
+/** Fluid balance (intake/output) captured during ward nursing rounds, in mL. */
+export interface FluidBalance {
+  oralIntakeMl?: number;
+  ivIntakeMl?: number;
+  urineOutputMl?: number;
+  otherOutputMl?: number;
+}
+
+/**
+ * Append-only amendment to a signed clinical document (P0.1).
+ *
+ * Once a record is signed it is locked against in-place edits; corrections and
+ * additions are captured as addenda so the original signed content stays
+ * immutable and the full clinical/legal history is preserved.
+ */
+export interface RecordAddendum {
+  text: string;
+  authorId?: string;
+  authorName: string;
+  authorRole?: string;
+  createdAt: string;
 }
 
 export interface MedicalRecordDoc extends BaseDoc, Omit<MedicalRecord, 'id'> {
@@ -92,6 +182,41 @@ export interface MedicalRecordDoc extends BaseDoc, Omit<MedicalRecord, 'id'> {
   triageId?: string;
   labOrderIds?: string[];
   prescriptionIds?: string[];
+  /** Intake/output recorded with a nursing vitals observation (ward). */
+  fluidBalance?: FluidBalance;
+
+  /**
+   * What kind of record this is. Absent is treated as 'consultation' for
+   * backward compatibility. 'nursing_vitals' marks a standalone nurse vitals
+   * snapshot so queues (e.g. the signing inbox) can exclude it structurally
+   * rather than by matching the chief-complaint string.
+   */
+  recordKind?: 'consultation' | 'nursing_vitals';
+
+  // --- Document signing & locking (P0.1) ------------------------------------
+  /**
+   * Document lifecycle. Absent is treated as 'draft' for backward
+   * compatibility — legacy records remain editable until first signed.
+   *  - 'draft'    : editable, not yet attested.
+   *  - 'signed'   : attested and locked; clinical fields are immutable.
+   *  - 'amended'  : signed and locked, with one or more addenda appended.
+   *  - 'awaiting_cosign' : signed by a trainee, pending supervisor co-signature.
+   */
+  documentStatus?: 'draft' | 'signed' | 'amended' | 'awaiting_cosign';
+  /** User id of the clinician who signed (attested) the document. */
+  signedBy?: string;
+  /** Display name captured at signing time (denormalised for the chart). */
+  signedByName?: string;
+  /** Role of the signer at signing time (e.g. doctor, clinical_officer). */
+  signedByRole?: string;
+  /** ISO timestamp the document was signed. */
+  signedAt?: string;
+  /** Co-signature (supervising provider) — see P0.2. */
+  cosignedBy?: string;
+  cosignedByName?: string;
+  cosignedAt?: string;
+  /** Append-only amendments made after signing. */
+  addenda?: RecordAddendum[];
 }
 
 export interface ReferralDoc extends BaseDoc, Omit<Referral, 'id'> {
@@ -148,7 +273,14 @@ export interface PrescriptionDoc extends BaseDoc {
   prescribedBy: string;
   /** Coarse status kept for backward compatibility + queue filters. Derived
    *  from the granular `orderStatus` below. */
-  status: 'pending' | 'dispensed';
+  status: 'pending' | 'dispensed' | 'discontinued';
+  /** Discontinuation — set when a clinician or patient reports stopping the medication. */
+  stoppedAt?: string;
+  stoppedReason?: string;
+  stoppedBy?: string;
+  stoppedByName?: string;
+  /** Source of the stop: 'clinician' | 'patient_reported' */
+  stoppedSource?: 'clinician' | 'patient_reported';
   /** Granular pharmacy dispensing lifecycle (Stage 8): prescribed →
    *  received_in_pharmacy_queue → under_review → cleared_for_dispensing →
    *  dispensed → counseled → complete, plus stockout/held/recalled branches.
@@ -181,6 +313,64 @@ export interface PrescriptionDoc extends BaseDoc {
    * administration.
    */
   administrations?: MedicationAdministration[];
+  /**
+   * Problem this medication is pinned to (problem-oriented charting). When set,
+   * the chart summary groups the medicine under the linked problem — e.g. a
+   * chronic inhaler pinned to "Asthma". Denormalised label kept for display.
+   */
+  linkedProblemId?: string;
+  linkedProblemLabel?: string;
+}
+
+/** One medication line inside an order set / clinical protocol. */
+export interface OrderSetMedication {
+  medication: string;
+  dose: string;
+  route: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
+  /** 'immediate' = give stat (emergency); 'definitive' = after diagnosis. */
+  urgency?: 'immediate' | 'definitive';
+  /** When true the dose is weight-based; `dose` holds the per-kg rule
+   *  (e.g. "10 mg/kg") for the dosing calculator to expand. */
+  weightBased?: boolean;
+}
+
+/**
+ * Order set / clinical protocol — a reusable bundle of orders (labs +
+ * medications + a treatment-plan note) for a presenting condition, e.g.
+ * "Malaria — uncomplicated" or "ETAT — convulsing child". Encodes national /
+ * WHO standard treatment guidelines so a clinician (or task-shifted clinical
+ * officer) can place the guideline-concordant order set in one action.
+ * Reference data: org-scoped, rarely edited.
+ */
+export interface OrderSetDoc extends BaseDoc {
+  type: 'order_set';
+  /** Display name, e.g. "Malaria — uncomplicated (adult)". */
+  name: string;
+  /** Grouping for the picker, e.g. 'malaria' | 'respiratory' | 'diarrhoea' |
+   *  'maternal' | 'emergency' | 'general'. Free string for extensibility. */
+  category: string;
+  /** Guideline provenance shown to the clinician, e.g. "WHO IMCI", "ETAT",
+   *  "South Sudan STG 2019". */
+  source?: string;
+  /** Who the protocol is for. */
+  ageGroup?: 'adult' | 'paediatric' | 'neonatal' | 'all';
+  description?: string;
+  /** Suggested diagnoses to attach when the set is applied. */
+  diagnoses?: { code?: string; label: string }[];
+  /** Lab test names to order (should match the facility lab catalog; any
+   *  unmatched name falls through as a custom lab). */
+  labs?: string[];
+  /** Medications to prescribe. */
+  medications?: OrderSetMedication[];
+  /** Treatment-plan / care-instructions text appended on apply. */
+  planText?: string;
+  /** Active sets show in the picker; inactive are retired without deletion. */
+  isActive?: boolean;
+  orgId?: string;
+  hospitalId?: string;
 }
 
 /**
@@ -209,6 +399,15 @@ export interface MedicationAdministration {
   /** Free-text reason when status is missed/refused/held */
   reason?: string;
   notes?: string;
+  /**
+   * Void marker — set when a mis-recorded administration is reversed. The row
+   * is never deleted (append-only legal record); a voided entry no longer
+   * satisfies its scheduled dose, so the slot returns to due/overdue.
+   */
+  voided?: boolean;
+  voidedAt?: string;
+  voidedBy?: string;
+  voidedReason?: string;
 }
 
 /**
@@ -380,6 +579,16 @@ export interface MessageDoc extends BaseDoc {
   deleted?: boolean;
   /** Set when the author edits a message within the edit window. */
   editedAt?: string;
+  /** File/image attachments (PDF, JPG, PNG — base64 encoded for offline-first sync). */
+  attachments?: Array<{
+    name: string;
+    mimeType: string;
+    base64Data: string;
+    sizeBytes: number;
+    phiWarningAcknowledged?: boolean;
+  }>;
+  /** PHI acknowledgement — true when sender confirmed content may contain patient data. */
+  phiAcknowledged?: boolean;
   /**
    * SMS gateway delivery status, stamped after the provider call resolves.
    * Absent when the message was app-only or when the gateway hasn't yet
@@ -410,6 +619,211 @@ export interface PatientNoteDoc extends BaseDoc {
   authorRole?: string;
   orgId?: string;
   hospitalId?: string;
+}
+
+/**
+ * Outcome-measure / intake assessment (P2.2) — a scored questionnaire (e.g.
+ * PHQ-9) entered at check-in (front desk) and reviewed + signed by the provider.
+ * Mirrors the Centricity "outcome measures" document: held as a draft, then
+ * signed. The instrument definitions + scoring live in
+ * lib/clinical/assessment-instruments.ts.
+ */
+export interface AssessmentDoc extends BaseDoc {
+  type: 'assessment';
+  patientId: string;
+  patientName?: string;
+  instrumentId: string;
+  instrumentName: string;
+  /** questionId → selected option value. */
+  answers: Record<string, number>;
+  totalScore: number;
+  answeredCount: number;
+  questionCount: number;
+  /** Interpretation band label + severity at the (partial) total. */
+  interpretation?: string;
+  severity?: string;
+  /** held = entered, awaiting provider review; signed = attested + locked. */
+  documentStatus: 'held' | 'signed';
+  enteredById?: string;
+  enteredByName?: string;
+  signedBy?: string;
+  signedByName?: string;
+  signedAt?: string;
+  encounterId?: string;
+  hospitalId?: string;
+  hospitalName?: string;
+  orgId?: string;
+}
+
+/**
+ * Phone note (P1.4) — documents a patient call when the provider is unavailable,
+ * routes it to a provider for response, and becomes a permanent part of the
+ * chart. Mirrors the Centricity phone note.
+ */
+export interface PhoneNoteDoc extends BaseDoc {
+  type: 'phone_note';
+  patientId: string;
+  patientName?: string;
+  /** Who called (patient, relative, pharmacy, etc.). */
+  callerName?: string;
+  callerPhone?: string;
+  subject: string;
+  /** The question / reason for the call. */
+  message: string;
+  /** Provider the note is routed to for a response. */
+  routedToId?: string;
+  routedToName?: string;
+  status: 'open' | 'responded' | 'closed';
+  /** Provider's response (added when actioned). */
+  response?: string;
+  respondedById?: string;
+  respondedByName?: string;
+  respondedAt?: string;
+  recordedById?: string;
+  recordedByName?: string;
+  hospitalId?: string;
+  hospitalName?: string;
+  orgId?: string;
+}
+
+/** Which clinical picker a favorite belongs to. */
+export type FavoriteKind = 'diagnosis' | 'medication' | 'procedure';
+
+/**
+ * A per-clinician "favorite" — a one-tap shortcut to a diagnosis, medicine or
+ * procedure the provider reaches for often. Stored one doc per (user, kind,
+ * code) so toggling is idempotent and the picker can show stars instantly.
+ * Personal/operational data: synced org-scoped so a clinician's favorites
+ * follow them to any workstation, but never flows to national analytics.
+ */
+export interface ClinicalFavoriteDoc extends BaseDoc {
+  type: 'clinical_favorite';
+  /** Owning clinician. */
+  userId: string;
+  kind: FavoriteKind;
+  /** Canonical code (ICD-10 / drug code / procedure code) — the identity key. */
+  code: string;
+  /** Human label shown in the picker. */
+  label: string;
+  /** Optional default dosing/instructions carried for medication favorites. */
+  meta?: {
+    dosage?: string;
+    frequency?: string;
+    durationDays?: number;
+    price?: number;
+    category?: string;
+  };
+  /** Usage counter — lets the UI sort favorites by how often they're used. */
+  useCount?: number;
+  hospitalId?: string;
+  orgId?: string;
+}
+
+/**
+ * A clinician-saved consultation template — a named bundle of diagnoses,
+ * medicines, labs and plan text captured from a real visit and re-applied in
+ * one click (HealthBridge "save this as a template … bronchitis adult"). Unlike
+ * order sets (admin-curated reference protocols), these are personal and owned
+ * by the clinician who saved them. Shapes mirror OrderSetDoc so the same merge
+ * applies both. Synced org-scoped, excluded from national analytics.
+ */
+export interface ConsultationTemplateDoc extends BaseDoc {
+  type: 'consultation_template';
+  userId: string;
+  name: string;
+  diagnoses?: { code?: string; label: string }[];
+  labs?: string[];
+  medications?: OrderSetMedication[];
+  planText?: string;
+  useCount?: number;
+  hospitalId?: string;
+  orgId?: string;
+}
+
+/** Category a scanned/uploaded chart document is filed under. */
+export type PatientDocumentCategory =
+  | 'radiology' | 'lab_report' | 'referral_letter' | 'discharge_summary'
+  | 'consent' | 'advance_directive' | 'legal_document' | 'treatment_agreement'
+  | 'insurance' | 'id_document' | 'prescription' | 'scanned_record'
+  | 'external_medical_record' | 'other';
+
+/**
+ * A scanned or uploaded document filed on the patient chart — radiology films,
+ * a referral letter, an ID, a previous paper record, etc. The HealthBridge
+ * "drop a PDF/photo, categorise it, filter on the timeline" capability. Stored
+ * in its own database (not on the patient doc) so large base64 payloads don't
+ * bloat patient reads. Facility-operational PHI; excluded from national
+ * analytics.
+ */
+export interface PatientDocumentDoc extends BaseDoc {
+  type: 'patient_document';
+  patientId: string;
+  title: string;
+  category: PatientDocumentCategory;
+  /** File payload + metadata (name, mimeType, base64Data, sizeBytes). */
+  fileName: string;
+  mimeType: string;
+  base64Data: string;
+  sizeBytes: number;
+  note?: string;
+  uploadedById?: string;
+  uploadedByName?: string;
+  hospitalId?: string;
+  orgId?: string;
+}
+
+export type ReminderChannel = 'sms' | 'whatsapp' | 'call' | 'in_person';
+export type ReminderStatus = 'queued' | 'sent' | 'cancelled';
+
+/**
+ * A patient reminder queued to go out on a future date — e.g. "Come fasted in 3
+ * weeks for your path tests." The HealthBridge "SMS the patient, queued and sent
+ * a few days before" idea. NOTE: this app has no SMS gateway wired in, so this
+ * is an honest reminder QUEUE that staff work from (and mark sent), not a claim
+ * of automated delivery; a real gateway can later consume `status === 'queued'`
+ * rows whose sendDate has arrived. Facility-operational; excluded from national
+ * analytics.
+ */
+export interface PatientReminderDoc extends BaseDoc {
+  type: 'patient_reminder';
+  patientId: string;
+  patientName?: string;
+  message: string;
+  /** Date the reminder should go out (yyyy-mm-dd). */
+  sendDate: string;
+  channel: ReminderChannel;
+  status: ReminderStatus;
+  createdById?: string;
+  createdByName?: string;
+  sentAt?: string;
+  hospitalId?: string;
+  orgId?: string;
+}
+
+export type ClinicianTaskStatus = 'open' | 'completed';
+
+/**
+ * A clinician's personal to-do — the HealthBridge "tasks" / sticky-note
+ * replacement: "phone John", "contact Dr Smith", with an optional reminder date
+ * and patient link. Completed tasks are retained (not deleted) so the done list
+ * stays visible. Owned by one user; synced org-scoped, excluded from national
+ * analytics.
+ */
+export interface ClinicianTaskDoc extends BaseDoc {
+  type: 'clinician_task';
+  userId: string;
+  title: string;
+  description?: string;
+  /** ISO date (yyyy-mm-dd) the task should resurface / is due. */
+  dueDate?: string;
+  status: ClinicianTaskStatus;
+  priority?: 'normal' | 'high';
+  /** Optional patient this task is about. */
+  patientId?: string;
+  patientName?: string;
+  completedAt?: string;
+  hospitalId?: string;
+  orgId?: string;
 }
 
 /**
@@ -680,9 +1094,17 @@ export interface TriageDoc extends BaseDoc {
   diastolic?: string;
   oxygenSaturation?: string;
   weight?: string;
+  painScore?: string;       // 0–10 numeric rating scale
+  bloodGlucose?: string;    // mmol/L
+  gcs?: string;             // Glasgow Coma Scale 3–15
+  muac?: string;            // mid-upper arm circumference, cm
   // Context
   chiefComplaint?: string;
   notes?: string;
+  modeOfArrival?: 'walk-in' | 'ambulance' | 'referral' | 'police' | 'other' | '';
+  symptomDuration?: string;   // free text, e.g. "2 days"
+  referralSource?: string;    // referring facility / person
+  knownAllergies?: string;    // free text; "" / "None known" when none
   // Audit
   triagedBy: string;       // user id
   triagedByName: string;   // display name at time of triage
@@ -881,6 +1303,14 @@ export interface OrganizationDoc extends BaseDoc {
   lockTimeoutMinutes?: number;
   /** App language for this organization's facilities. Set by org admin / hospital head. */
   locale?: string;
+  /**
+   * Free-text, multi-line bank-transfer instructions shown to patients in the
+   * payment portals (bank name / account number / branch / reference
+   * instructions). When unset, the portals fall back to a "contact billing"
+   * placeholder rather than displaying a fabricated account. Set by the org
+   * admin on the branding page.
+   */
+  bankDetails?: string;
 }
 
 export interface PlatformConfigDoc extends BaseDoc {
@@ -993,7 +1423,7 @@ export interface BloodBankDoc extends BaseDoc {
 }
 
 // ===== Appointment Booking (Payam Level & Above) =====
-export type AppointmentStatus = 'scheduled' | 'confirmed' | 'checked_in' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
+export type AppointmentStatus = 'requested' | 'scheduled' | 'confirmed' | 'checked_in' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
 export type AppointmentType = 'general' | 'follow_up' | 'specialist' | 'anc' | 'immunization' | 'lab' | 'telehealth' | 'surgical' | 'dental' | 'mental_health' | 'walk_in';
 export type AppointmentPriority = 'routine' | 'urgent' | 'emergency';
 

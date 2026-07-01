@@ -7,6 +7,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { PAYOR_LABELS, type PaymentMethodKey } from '@/lib/settings/facility-settings';
 import Modal from '@/components/Modal';
+import { formatMoney } from '@/lib/format-utils';
 import type { PaymentDoc } from '@/lib/db-types-payments';
 import type { FeeScheduleDoc } from '@/lib/db-types-billing';
 
@@ -254,7 +255,7 @@ export default function PaymentPanel({
           {/* Success header with green gradient */}
           <div style={{
             padding: '28px 20px', textAlign: 'center',
-            background: 'linear-gradient(135deg, rgba(59, 130, 246,0.12), rgba(59, 130, 246,0.04))',
+            background: 'linear-gradient(135deg, rgba(33, 145, 208, 0.12), rgba(59, 130, 246,0.04))',
             borderBottom: '1px solid var(--border-medium)',
           }}>
             <div style={{
@@ -265,7 +266,7 @@ export default function PaymentPanel({
             </div>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{t('payments.paymentRecorded')}</h3>
             <p style={{ margin: '6px 0 0', fontSize: 26, fontWeight: 800, color: 'var(--color-success)' }}>
-              {parseFloat(amount).toLocaleString()} {currency}
+              {formatMoney(parseFloat(amount), { currency })}
             </p>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>{patientName}</p>
           </div>
@@ -309,7 +310,7 @@ export default function PaymentPanel({
           {showEmailInput && !emailSent && (
             <div style={{ padding: '0 20px 12px', display: 'flex', gap: 8 }}>
               <input type="email" value={emailAddress} onChange={e => setEmailAddress(e.target.value)}
-                placeholder="patient@email.com"
+                placeholder="support.tamam@gmail.com"
                 style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 13, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
               />
               <button onClick={handleEmailReceipt} disabled={emailSending || !emailAddress} style={{
@@ -324,7 +325,7 @@ export default function PaymentPanel({
 
           {emailSent && (
             <div style={{ padding: '0 20px 12px' }}>
-              <div style={{ fontSize: 12, color: '#3b82f6', padding: '6px 12px', background: 'rgba(59, 130, 246,0.08)', borderRadius: 8, textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: 'var(--accent-primary)', padding: '6px 12px', background: 'rgba(33, 145, 208, 0.08)', borderRadius: 8, textAlign: 'center' }}>
                 {t('payments.receiptSentTo', { email: emailAddress })}
               </div>
             </div>
@@ -365,9 +366,6 @@ export default function PaymentPanel({
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 22px', borderBottom: '1px solid var(--border-light)' }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 15, background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover, #1e3a8a))' }}>
-            {patientName.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase() || '?'}
-          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{t('billing.collectPayment')}</h3>
             <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{patientName}</p>
@@ -380,7 +378,7 @@ export default function PaymentPanel({
         {/* Amount hero */}
         <div style={{ padding: '18px 22px', background: 'linear-gradient(135deg, var(--accent-light), transparent 80%)', borderBottom: '1px solid var(--border-light)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-text)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('payments.amountDueLabel')}</div>
-          <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--accent-text)', letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{currency} {amountDue.toLocaleString()}</div>
+          <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--accent-text)', letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{formatMoney(amountDue, { currency })}</div>
         </div>
 
         {/* Payment method selector */}
@@ -414,7 +412,20 @@ export default function PaymentPanel({
           {/* Service picker — fills the amount from the price catalog */}
           {fees.length > 0 && (
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>{t('billing.service', { defaultValue: 'Service' })}</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>{t('billing.service', { defaultValue: 'Service' })}</label>
+                {/* Deselect the chosen catalog service — clears the picker and the
+                    amount it auto-filled so the cashier can start over. */}
+                {selectedFeeId && (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedFeeId(''); setAmount(amountDue > 0 ? amountDue.toString() : ''); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--accent-text)', padding: 0 }}
+                  >
+                    {t('action.clear')}
+                  </button>
+                )}
+              </div>
               <select
                 value={selectedFeeId}
                 onChange={e => {
@@ -422,12 +433,13 @@ export default function PaymentPanel({
                   setSelectedFeeId(id);
                   const fee = fees.find(f => f._id === id);
                   if (fee) setAmount(String(fee.unitPrice));
+                  else setAmount(amountDue > 0 ? amountDue.toString() : '');
                 }}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', fontSize: 14, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
               >
                 <option value="">Select a service…</option>
                 {fees.map(f => (
-                  <option key={f._id} value={f._id}>{f.serviceName} — {f.currency} {f.unitPrice.toLocaleString()}</option>
+                  <option key={f._id} value={f._id}>{f.serviceName} — {formatMoney(f.unitPrice, { currency: f.currency, decimals: 2 })}</option>
                 ))}
               </select>
             </div>
@@ -615,7 +627,7 @@ export default function PaymentPanel({
             background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover, #1e3a8a))',
             color: '#fff', fontSize: 14, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer',
             opacity: processing ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-            boxShadow: '0 4px 14px var(--accent-glow, rgba(59,130,246,0.3))',
+            boxShadow: '0 4px 14px var(--accent-glow, rgba(33,145,208,0.3))',
           }}>
             {processing ? <><Loader2 size={14} className="animate-spin" /> {t('payments.processing')}</> : t('payments.recordAmount', { amount: parseFloat(amount).toLocaleString(), currency })}
           </button>

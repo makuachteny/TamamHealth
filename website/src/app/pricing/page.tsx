@@ -1,13 +1,12 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
   FAQItem,
   TestimonialSwoosh,
 } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
+import { Target, Rocket, Users, ShieldCheck, FileText, CreditCard, FlaskConical, Pill, Video, BarChart3, Check } from "@/components/marketing/icons";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth — Pricing / Get Pricing Page
@@ -17,50 +16,23 @@ import { DuoIcon } from "@/components/marketing/DuoIcon";
 export default function PricingPage() {
   return (
     <>
-      {/* ── HERO SECTION ────────────────────────────────────────────── */}
-      <section className="mk-hero">
-        <div className="mk-container">
-          <div className="mk-hero-flex">
-            {/* Left: headline + subtext */}
-            <div className="mk-hero-content">
-              <Reveal>
-                <h1 className="mk-h1">
-                  Transparent pricing that grows with your practice
-                </h1>
-              </Reveal>
-              <Reveal delay={0.1}>
-                <p className="mk-body-lg">
-                  Every practice is different. We tailor your plan to your size, specialty, and the modules you need — no hidden fees, no long-term lock-in, just pricing that makes sense.
-                </p>
-              </Reveal>
-              <Reveal delay={0.2}>
-                <div className="mk-hero-buttons" style={{ marginTop: 32 }}>
-                  <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">
-                    Request a quote
-                  </Link>
-                </div>
-              </Reveal>
-            </div>
-
-            {/* Center: Hero Photo */}
-            <div className="mk-hero-photo">
-              <Reveal delay={0.15}>
-                <Image
-                  src="/assets/doctor-tablet-smiling.jpg"
-                  alt="Doctor smiling while reviewing pricing options"
-                  width={220}
-                  height={360}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
-                  priority
-                />
-              </Reveal>
-            </div>
-          </div>
-        </div>
-      </section>
+      <MarketingHero
+        variant="showcase"
+        eyebrow="PRICING"
+        title="Pricing shaped around your facility"
+        subtitle="Every facility is different. Book a walkthrough and we will scope the right modules, rollout path, support model, and commercial terms with your team."
+        primaryCta={{ label: "Request a quote", href: "/about/contact?intent=pricing#contact-form" }}
+        secondaryCta={{ label: "See what's included", href: "#included" }}
+        stats={[
+          { value: "Scoped", label: "after walkthrough" },
+          { value: "Modular", label: "by service need" },
+          { value: "2 weeks", label: "typical onboarding" },
+        ]}
+        className="mk-hero-pricing"
+      />
 
       {/* ── WHY PRACTICES CHOOSE TamamHealth ──────────────────────────────── */}
-      <section className="mk-section mk-section-white">
+      <section className="mk-section mk-section-white" id="packages">
         <div className="mk-container">
           <Reveal>
             <div style={{ textAlign: "center", marginBottom: 64 }}>
@@ -78,22 +50,22 @@ export default function PricingPage() {
           }}>
             {[
               {
-                icon: <DuoIcon name="target" size={64} />,
-                title: "Transparent Pricing",
-                description: "Every cost is clear from day one. Your plan scales predictably as your practice grows — no surprise invoices, no hidden add-ons.",
+                icon: <Target size={64} strokeWidth={1.8} />,
+                title: "Scoped pricing",
+                description: "We quote after understanding your facility size, modules, users, and rollout needs, so the proposal matches the work instead of a generic package.",
               },
               {
-                icon: <DuoIcon name="rocket" size={64} />,
+                icon: <Rocket size={64} strokeWidth={1.8} />,
                 title: "Fast Implementation",
                 description: "Most practices are fully operational within two weeks. Our onboarding team handles data migration, staff training, and workflow setup.",
               },
               {
-                icon: <DuoIcon name="users" size={64} />,
+                icon: <Users size={64} strokeWidth={1.8} />,
                 title: "Dedicated Support",
                 description: "A named support team that knows your practice by name. Available around the clock via phone, chat, and email.",
               },
               {
-                icon: <DuoIcon name="shield-check" size={64} />,
+                icon: <ShieldCheck size={64} strokeWidth={1.8} />,
                 title: "Security & Compliance",
                 description: "HIPAA-compliant infrastructure with ISO 27001 certification and native DHIS2 integration. Your patient data is protected at every layer.",
               },
@@ -141,12 +113,12 @@ export default function PricingPage() {
       </section>
 
       {/* ── WHAT'S INCLUDED ──────────────────────────────────────────– */}
-      <section className="mk-section mk-section-cream">
+      <section className="mk-section mk-pricing-included-section" id="included">
         <div className="mk-container">
           <Reveal>
             <div style={{ textAlign: "center", marginBottom: 64 }}>
               <h2 className="mk-h2">What&apos;s included in TamamHealth</h2>
-              <p className="mk-body-lg" style={{ maxWidth: 600, margin: "24px auto 0", color: "var(--tb-text-sec)" }}>
+              <p className="mk-body-lg" style={{ maxWidth: 600, margin: "24px auto 0" }}>
                 A complete healthcare management platform built to handle everything your practice needs.
               </p>
             </div>
@@ -155,32 +127,32 @@ export default function PricingPage() {
           <div className="mk-module-grid">
             {[
               {
-                icon: <DuoIcon name="ehr" size={44} />,
+                icon: <FileText size={44} strokeWidth={1.8} />,
                 title: "Clinical EHR",
                 items: ["Customizable SOAP templates", "Clinical decision support", "Patient demographics & history", "Scheduling & calendar"],
               },
               {
-                icon: <DuoIcon name="billing" size={44} />,
+                icon: <CreditCard size={44} strokeWidth={1.8} />,
                 title: "Billing & Payments",
                 items: ["Automated claims submission", "Real-time eligibility checks", "Superbill generation", "Revenue cycle dashboard"],
               },
               {
-                icon: <DuoIcon name="lab" size={44} />,
+                icon: <FlaskConical size={44} strokeWidth={1.8} />,
                 title: "Lab & Imaging",
                 items: ["Direct lab ordering", "Real-time results", "Imaging integration", "Trend analysis"],
               },
               {
-                icon: <DuoIcon name="pharmacy" size={44} />,
+                icon: <Pill size={44} strokeWidth={1.8} />,
                 title: "Pharmacy",
                 items: ["Electronic prescribing", "Drug interaction alerts", "Formulary management", "Refill tracking"],
               },
               {
-                icon: <DuoIcon name="video" size={44} />,
+                icon: <Video size={44} strokeWidth={1.8} />,
                 title: "Telehealth",
                 items: ["HD video visits", "Virtual waiting rooms", "Secure messaging", "Session recordings"],
               },
               {
-                icon: <DuoIcon name="analytics" size={44} />,
+                icon: <BarChart3 size={44} strokeWidth={1.8} />,
                 title: "Analytics",
                 items: ["DHIS2 reporting", "Custom dashboards", "Population health", "Financial analytics"],
               },
@@ -202,12 +174,9 @@ export default function PricingPage() {
                   <h3 className="mk-h3" style={{ fontSize: "1.25rem", margin: 0 }}>
                     {module.title}
                   </h3>
-                  <ul className="mk-check-list">
+                  <ul className="mk-module-list">
                     {module.items.map((item, j) => (
-                      <li key={j} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9375rem", color: "var(--tb-text-sec)" }}>
-                        <DuoIcon name="check" size={16} />
-                        {item}
-                      </li>
+                      <li key={j}>{item}</li>
                     ))}
                   </ul>
                 </div>
@@ -223,9 +192,9 @@ export default function PricingPage() {
         <div className="mk-container">
           <Reveal>
             <div style={{ textAlign: "center", marginBottom: 64 }}>
-              <h2 className="mk-h2">Flexible pricing for practices of any size</h2>
+              <h2 className="mk-h2">Packages designed around your rollout</h2>
               <p className="mk-body-lg" style={{ maxWidth: 600, margin: "24px auto 0", color: "var(--tb-text-sec)" }}>
-                Start free, scale affordably. All plans include offline functionality, unlimited patient records, and core EHR features.
+                Compare the common starting points, then request pricing so we can confirm the right package after your walkthrough.
               </p>
             </div>
           </Reveal>
@@ -233,12 +202,11 @@ export default function PricingPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 32, maxWidth: 1200, margin: "0 auto" }}>
             <PricingCard
               name="Community"
-              price="Free"
-              period="forever"
+              packageLabel="Entry rollout"
               description="For small clinics and health posts getting started"
               features={[
                 "Up to 3 users",
-                "Up to 500 patient records",
+                "Starter patient record setup",
                 "Core clinical EHR",
                 "Basic reporting",
                 "Email support",
@@ -248,12 +216,11 @@ export default function PricingPage() {
             />
             <PricingCard
               name="Professional"
-              price="$299"
-              period="/month"
+              packageLabel="Most requested"
               description="For established clinics scaling their operations"
               features={[
-                "Up to 20 users",
-                "Unlimited patient records",
+                "Multi-team user setup",
+                "Expanded patient record workflows",
                 "Full clinical EHR + billing",
                 "Lab & pharmacy integration",
                 "Advanced reporting & analytics",
@@ -266,12 +233,11 @@ export default function PricingPage() {
             />
             <PricingCard
               name="Enterprise"
-              price="Custom"
-              period="pricing"
+              packageLabel="Custom scope"
               description="For health systems and large networks"
               features={[
                 "Unlimited users & locations",
-                "Unlimited patient records",
+                "Network-wide patient record workflows",
                 "All features included",
                 "Telehealth & advanced modules",
                 "White-label options",
@@ -285,17 +251,20 @@ export default function PricingPage() {
 
           <Reveal delay={0.3}>
             <div style={{ textAlign: "center", marginTop: 56, padding: "32px 40px", background: "var(--tb-tint-green)", borderRadius: 16, maxWidth: 700, margin: "56px auto 0" }}>
-              <p style={{ fontSize: 16, color: "var(--tb-green)", fontWeight: 600, margin: "0 0 8px" }}>Money-back guarantee</p>
+              <p style={{ fontSize: 16, color: "var(--tb-green)", fontWeight: 600, margin: "0 0 8px" }}>Pricing after walkthrough</p>
               <p style={{ margin: 0, color: "var(--tb-text)", lineHeight: 1.6 }}>
-                Not satisfied in your first 90 days? We&apos;ll refund your setup costs and help you migrate your data. We&apos;re confident you&apos;ll love TamamHealth.
+                Book a walkthrough first. We&apos;ll confirm your modules, users, sites, onboarding needs, and support model before sharing a practical quote.
               </p>
+              <a href="/about/contact?intent=pricing#contact-form" className="mk-btn mk-btn-green" style={{ marginTop: 20, display: "inline-flex" }}>
+                Request pricing
+              </a>
             </div>
           </Reveal>
         </div>
       </section>
 
       {/* ── FEATURE COMPARISON ──────────────────────────────────────– */}
-      <section className="mk-section mk-section-cream">
+      <section className="mk-section mk-section-cream" id="compare">
         <div className="mk-container">
           <Reveal>
             <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 56 }}>Feature comparison</h2>
@@ -374,17 +343,6 @@ export default function PricingPage() {
       <section className="mk-faq-section">
         <div className="mk-container">
           <Reveal>
-            <div style={{ marginBottom: 48 }}>
-              <Image
-                src="/assets/dashboard-screenshot.png"
-                alt="Data analytics dashboard showing healthcare metrics"
-                width={800}
-                height={400}
-                style={{ width: "100%", height: "auto", borderRadius: 12 }}
-              />
-            </div>
-          </Reveal>
-          <Reveal>
             <h2 className="mk-h2 mk-faq-title">Frequently asked questions about pricing</h2>
           </Reveal>
 
@@ -392,7 +350,7 @@ export default function PricingPage() {
             <div className="mk-faq-list">
               <FAQItem
                 question="Is there a free trial?"
-                answer="Yes! The Community tier is free forever for small clinics. It includes offline EHR, basic reporting, and email support. Upgrade to Professional anytime to unlock billing, lab integration, and advanced features."
+                answer="We usually start with a walkthrough and scoped pilot conversation. After we understand your facility, we can recommend the right package and commercial path."
               />
               <FAQItem
                 question="Can I switch plans or add more users later?"
@@ -403,12 +361,12 @@ export default function PricingPage() {
                 answer="Implementation includes: system setup customized to your workflows, data migration from existing systems, staff training sessions, and 30 days of onboarding support. Most practices are fully operational within 2 weeks."
               />
               <FAQItem
-                question="Do you offer discounts for nonprofits or government facilities?"
-                answer="Yes. We offer special pricing for government health centers, NGOs, and research institutions committed to improving healthcare in South Sudan. Contact our sales team to discuss your organization."
+                question="Do you support nonprofits or government facilities?"
+                answer="Yes. We support government health centers, NGOs, and research institutions committed to improving healthcare in South Sudan. Contact our sales team to discuss the right structure for your organization."
               />
               <FAQItem
                 question="What payment terms do you offer?"
-                answer="We offer monthly, quarterly, or annual billing. Annual prepayment gets a 10% discount. For government and nonprofit customers, we can arrange payment terms that work with your budget cycles."
+                answer="Payment terms are discussed after the walkthrough. For government and nonprofit customers, we can arrange terms that work with your budget cycles."
               />
               <FAQItem
                 question="What's included in support?"
@@ -441,10 +399,9 @@ export default function PricingPage() {
 
 /* ── Components ──────────────────────────────────────────────────── */
 
-function PricingCard({ name, price, period, description, features, highlight, badge }: {
+function PricingCard({ name, packageLabel, description, features, highlight, badge }: {
   name: string;
-  price: string;
-  period: string;
+  packageLabel: string;
   description: string;
   features: string[];
   highlight: boolean;
@@ -480,14 +437,14 @@ function PricingCard({ name, price, period, description, features, highlight, ba
         )}
         <h3 className="mk-h3" style={{ fontSize: "1.5rem", marginBottom: 8 }}>{name}</h3>
         <p style={{ color: "var(--tb-text-sec)", fontSize: 15, margin: "0 0 24px" }}>{description}</p>
-        <div style={{ marginBottom: 32 }}>
-          <span style={{ fontSize: "2.5rem", fontFamily: "var(--tb-serif)", fontWeight: 700 }}>{price}</span>
-          <span style={{ fontSize: 14, color: "var(--tb-text-sec)", marginLeft: 8 }}>{period}</span>
+        <div style={{ marginBottom: 32, padding: "14px 16px", borderRadius: 12, background: highlight ? "var(--tb-tint-blue)" : "rgba(1,86,151,0.08)", border: "1px solid var(--tb-blue-100)" }}>
+          <span style={{ fontSize: 13, color: "var(--tb-blue-800)", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>{packageLabel}</span>
+          <p style={{ margin: "6px 0 0", fontSize: 14, color: "var(--tb-text-sec)" }}>Pricing discussed after booking</p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {features.map((feature, idx) => (
             <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-              <DuoIcon name="check" size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+              <Check size={18} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 2 }} />
               <span style={{ fontSize: 14, color: "var(--tb-text-sec)", lineHeight: 1.4 }}>{feature}</span>
             </div>
           ))}

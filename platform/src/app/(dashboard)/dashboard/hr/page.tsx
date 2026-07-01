@@ -1,11 +1,14 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import TopBar from '@/components/TopBar';
 import {
   Users, Calendar, Clock, CheckCircle2, AlertCircle, ChevronRight,
-  Plus, ArrowRight, Wallet, Activity,
+  Plus, ArrowRight, Wallet, Activity, BarChart3,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -96,6 +99,26 @@ export default function HRDashboardPage() {
     <>
       <TopBar title={t('hr.dashboardTitle')} />
       <main className="page-container page-enter">
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Staff', value: facilityUsers.length },
+            { label: 'Present Today', value: presentToday },
+            { label: 'On Leave', value: onLeaveToday.length },
+            { label: 'On Call', value: onCallToday },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={[
+            { label: 'Staff Directory', icon: Users, href: '/hr' },
+            { label: 'Schedules', icon: Calendar, href: '/hr?tab=schedule', color: 'var(--accent-primary)' },
+            { label: 'Payroll', icon: Wallet, href: '/payments', color: '#0D9488' },
+            { label: 'Reports', icon: BarChart3, href: '/reports', color: '#F59E0B' },
+          ]}
+          secondaryCard={<SpotlightCard title="Pending Leave" value={pendingLeave.length} caption={`${onLeaveToday.length} on leave today`} href="/hr?tab=leave" />}
+        />
         <div className="flex items-end justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
           <div>
             <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>{t('hr.dashboardTitle')}</h1>
@@ -116,11 +139,11 @@ export default function HRDashboardPage() {
         {/* KPI strip */}
         <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', alignItems: 'stretch' }}>
           {[
-            { id: 'activeStaff', label: t('hr.kpiActiveStaff'), value: facilityUsers.length, accent: 'var(--accent-primary)', bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
+            { id: 'activeStaff', label: t('hr.kpiActiveStaff'), value: facilityUsers.length, accent: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
             { id: 'presentToday', label: t('hr.kpiPresentToday'), value: presentToday, accent: '#15795C', bg: 'rgba(27, 158, 119, 0.10)', border: 'rgba(27, 158, 119, 0.26)' },
-            { id: 'onLeaveToday', label: t('hr.kpiOnLeaveToday'), value: onLeaveToday.length, accent: onLeaveToday.length > 0 ? '#B8741C' : 'var(--accent-primary)', bg: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.12)' : 'rgba(59, 130, 246, 0.08)', border: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.30)' : 'rgba(59, 130, 246, 0.22)' },
-            { id: 'pendingDecisions', label: t('hr.kpiPendingDecisions'), value: pendingLeave.length, accent: pendingLeave.length > 0 ? '#C44536' : 'var(--accent-primary)', bg: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.10)' : 'rgba(59, 130, 246, 0.08)', border: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.28)' : 'rgba(59, 130, 246, 0.22)' },
-            { id: 'onCallToday', label: t('hr.kpiOnCallToday'), value: onCallToday, accent: '#3b82f6', bg: 'rgba(59, 130, 246, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
+            { id: 'onLeaveToday', label: t('hr.kpiOnLeaveToday'), value: onLeaveToday.length, accent: onLeaveToday.length > 0 ? '#B8741C' : 'var(--accent-primary)', bg: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.12)' : 'rgba(33, 145, 208, 0.08)', border: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.30)' : 'rgba(59, 130, 246, 0.22)' },
+            { id: 'pendingDecisions', label: t('hr.kpiPendingDecisions'), value: pendingLeave.length, accent: pendingLeave.length > 0 ? '#C44536' : 'var(--accent-primary)', bg: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.10)' : 'rgba(33, 145, 208, 0.08)', border: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.28)' : 'rgba(59, 130, 246, 0.22)' },
+            { id: 'onCallToday', label: t('hr.kpiOnCallToday'), value: onCallToday, accent: '#2191D0', bg: 'rgba(33, 145, 208, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
           ].map(k => (
             <div key={k.id} style={{ padding: '14px 16px', borderRadius: 10, background: k.bg, border: `1px solid ${k.border}`, position: 'relative' }}>
               {k.id === 'pendingDecisions' && pendingLeave.length > 0 && <span className="data-tile__alarm-pulse" aria-hidden="true" />}
@@ -179,7 +202,7 @@ export default function HRDashboardPage() {
                 <ShiftRow label={t('hr.shiftMorning')} count={morningStaff} accent="#15795C" />
                 <ShiftRow label={t('hr.shiftAfternoon')} count={schedules.filter(s => s.shiftType === 'afternoon').length} accent="#E4A84B" />
                 <ShiftRow label={t('hr.shiftNight')} count={nightStaff} accent="#1E3A8A" />
-                <ShiftRow label={t('hr.shiftOnCall')} count={onCallToday} accent="#3b82f6" />
+                <ShiftRow label={t('hr.shiftOnCall')} count={onCallToday} accent="#2191D0" />
               </div>
             </div>
 
@@ -194,16 +217,13 @@ export default function HRDashboardPage() {
                 <div>
                   {upcomingLeave.map(l => (
                     <div key={l._id} className="data-row" style={{ padding: '10px 14px' }}>
-                      <div className="data-row__icon" style={{ width: 28, height: 28 }}>
-                        <Calendar className="w-3.5 h-3.5" />
-                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-[12.5px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{l.userName}</div>
                         <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
                           <span className="capitalize">{l.leaveType}</span> · {l.startDate}
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.14)', color: '#3b82f6' }}>{l.days}d</span>
+                      <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.14)', color: '#2191D0' }}>{l.days}d</span>
                     </div>
                   ))}
                 </div>
@@ -232,10 +252,10 @@ export default function HRDashboardPage() {
         <div className="dash-card mt-4 p-4">
           <h3 className="font-semibold text-sm mb-3">{t('hr.quickActions')}</h3>
           <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', alignItems: 'stretch' }}>
-            <QuickAction href="/hr?tab=roster" icon={<Users className="w-4 h-4" />} label={t('hr.staffRoster')} subtitle={t('hr.staffCount', { count: facilityUsers.length })} />
-            <QuickAction href="/hr?tab=leave" icon={<Calendar className="w-4 h-4" />} label={t('hr.leaveQueue')} subtitle={t('hr.pendingCount', { count: pendingLeave.length })} alarm={pendingLeave.length > 0} />
-            <QuickAction href="/hr?tab=schedule" icon={<Clock className="w-4 h-4" />} label={t('hr.scheduleShifts')} subtitle={t('hr.todayCount', { count: schedules.length })} />
-            <QuickAction href="/hr?tab=payroll" icon={<Wallet className="w-4 h-4" />} label={t('hr.payrollRegister')} subtitle={t('hr.monthlyPayroll')} />
+            <QuickAction href="/hr?tab=roster" icon={<Users className="w-[22px] h-[22px]" />} label={t('hr.staffRoster')} subtitle={t('hr.staffCount', { count: facilityUsers.length })} />
+            <QuickAction href="/hr?tab=leave" icon={<Calendar className="w-[22px] h-[22px]" />} label={t('hr.leaveQueue')} subtitle={t('hr.pendingCount', { count: pendingLeave.length })} alarm={pendingLeave.length > 0} />
+            <QuickAction href="/hr?tab=schedule" icon={<Clock className="w-[22px] h-[22px]" />} label={t('hr.scheduleShifts')} subtitle={t('hr.todayCount', { count: schedules.length })} />
+            <QuickAction href="/hr?tab=payroll" icon={<Wallet className="w-[22px] h-[22px]" />} label={t('hr.payrollRegister')} subtitle={t('hr.monthlyPayroll')} />
           </div>
         </div>
       </main>
@@ -259,18 +279,17 @@ function QuickAction({ href, icon, label, subtitle, alarm }: { href: string; ico
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors"
-      style={{
-        background: alarm ? 'rgba(196, 69, 54, 0.06)' : 'var(--overlay-subtle)',
-        border: alarm ? '1px solid rgba(196, 69, 54, 0.28)' : '1px solid var(--border-light)',
-      }}
+      className="card-elevated flex items-center gap-3 px-3 py-2.5 transition-colors"
+      style={alarm ? {
+        background: 'rgba(196, 69, 54, 0.06)',
+        borderColor: 'rgba(196, 69, 54, 0.28)',
+      } : undefined}
     >
-      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{
-        background: alarm ? 'rgba(196, 69, 54, 0.12)' : 'var(--accent-light)',
+      <span className="flex-shrink-0 inline-flex items-center justify-center" style={{
         color: alarm ? '#C44536' : 'var(--accent-primary)',
       }}>
         {icon}
-      </div>
+      </span>
       <div className="flex-1 min-w-0">
         <div className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</div>
         <div className="text-[10.5px]" style={{ color: alarm ? '#8B2E24' : 'var(--text-muted)' }}>{subtitle}</div>

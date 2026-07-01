@@ -14,9 +14,10 @@ const ADMIN_ROLES: UserRole[] = ['super_admin', 'org_admin', 'medical_superinten
 
 async function postHandler(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const auth = await getAuthPayload(request);
     if (!auth) return unauthorized();
     if (!hasRole(auth, ADMIN_ROLES)) return forbidden();
@@ -46,8 +47,8 @@ async function postHandler(
     const actor = { userId: auth.sub, username: auth.name || auth.username, note: body.note };
 
     const result = body.action === 'resolve'
-      ? await resolveConflict(params.id, { ...actor, chosenRev: body.chosenRev! })
-      : await dismissConflict(params.id, actor);
+      ? await resolveConflict(id, { ...actor, chosenRev: body.chosenRev! })
+      : await dismissConflict(id, actor);
 
     if (!result) {
       return NextResponse.json({ error: 'Conflict not found' }, { status: 404 });

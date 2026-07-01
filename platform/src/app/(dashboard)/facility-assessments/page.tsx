@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useFacilityAssessments } from '@/lib/hooks/useFacilityAssessments';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
@@ -11,6 +10,7 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Building2, ClipboardCheck, Wifi, Droplets, Users, Activity, TrendingUp, ChevronDown, ChevronUp, Plus, X } from '@/components/icons/lucide';
+import Badge from '@/components/Badge';
 
 /**
  * Default values for the minimal create-assessment form. The full
@@ -57,7 +57,7 @@ export default function FacilityAssessmentsPage() {
   if (loading) return <><TopBar title={t('facilityAssessments.topBarTitle')} /><main className="page-container flex items-center justify-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('status.loading')}</p></main></>;
 
   const scoreColor = (score: number) => score >= 70 ? 'var(--accent-primary)' : score >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
-  const scoreBg = (score: number) => score >= 70 ? 'rgba(59, 130, 246,0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
+  const scoreBg = (score: number) => score >= 70 ? 'rgba(33, 145, 208, 0.12)' : score >= 50 ? 'rgba(252,211,77,0.12)' : 'rgba(229,46,66,0.12)';
 
   const handleSubmit = async () => {
     if (!form.facilityId) {
@@ -121,19 +121,12 @@ export default function FacilityAssessmentsPage() {
 
   return (
     <>
-      <TopBar title={t('facilityAssessments.topBarTitle')} />
+      <TopBar title={t('facilityAssessments.topBarTitle')} actions={canAssessFacility && (
+        <button onClick={() => setShowForm(true)} className="btn btn-primary">
+          <Plus className="w-4 h-4" /> {t('facilityAssessments.newAssessment')}
+        </button>
+      )} />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={ClipboardCheck}
-          title={t('facilityAssessments.pageTitle')}
-          subtitle={t('facilityAssessments.pageSubtitle')}
-          actions={canAssessFacility && (
-            <button onClick={() => setShowForm(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('facilityAssessments.newAssessment')}
-            </button>
-          )}
-        />
-
         {summary && (
           <>
             {/* National averages */}
@@ -167,7 +160,8 @@ export default function FacilityAssessmentsPage() {
           <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <h3 className="font-semibold text-sm">{t('facilityAssessments.individualTitle')}</h3>
           </div>
-          <table className="data-table">
+          <div className="overflow-x-auto">
+          <table className="data-table" style={{ minWidth: 1120 }}>
             <thead>
               <tr>
                 <th>{t('facilityAssessments.colFacility')}</th>
@@ -197,7 +191,7 @@ export default function FacilityAssessmentsPage() {
                   <td className="text-xs" style={{ color: scoreColor(a.staffingScore) }}>{a.staffingScore}%</td>
                   <td className="text-xs" style={{ color: scoreColor(a.reportingCompleteness) }}>{a.reportingCompleteness}%</td>
                   <td className="text-xs" style={{ color: scoreColor(a.dataQualityScore) }}>{a.dataQualityScore}%</td>
-                  <td>{a.hasDHIS2Reporting ? <span className="badge badge-normal text-[10px]">{t('facilityAssessments.yes')}</span> : <span className="badge badge-warning text-[10px]">{t('facilityAssessments.no')}</span>}</td>
+                  <td>{a.hasDHIS2Reporting ? <Badge tone="success">{t('facilityAssessments.yes')}</Badge> : <Badge tone="warning">{t('facilityAssessments.no')}</Badge>}</td>
                   <td className="text-sm text-center">{a.hisStaffCount} ({a.hisStaffTrained})</td>
                   <td>{a.hasCleanWater ? <Droplets className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /> : <span className="text-xs" style={{ color: 'var(--color-danger)' }}>{t('facilityAssessments.no')}</span>}</td>
                   <td className="text-xs font-mono">
@@ -237,7 +231,7 @@ export default function FacilityAssessmentsPage() {
                           ))}
                         </div>
                         {a.recommendations && (
-                          <div className="p-3 rounded-lg" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
+                          <div className="p-3 rounded-lg" style={{ background: 'rgba(33, 145, 208, 0.06)', border: '1px solid var(--accent-border)' }}>
                             <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{t('facilityAssessments.recommendations')}</p>
                             <p className="text-xs">{a.recommendations}</p>
                           </div>
@@ -249,6 +243,7 @@ export default function FacilityAssessmentsPage() {
               })()}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Create Assessment Modal */}

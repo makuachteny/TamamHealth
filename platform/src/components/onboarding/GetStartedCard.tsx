@@ -16,7 +16,7 @@ import { useOnboarding } from '@/lib/hooks/useOnboarding';
 import { getDefaultDashboard } from '@/lib/permissions';
 import type { OnboardingSection, OnboardingStep } from '@/lib/onboarding/steps';
 import {
-  Sparkles, Check, Lock, X, ArrowRight, Play, FileText, Star, ChevronUp,
+  Check, Lock, X, ArrowRight, Play, FileText, Star, ChevronUp,
 } from '@/components/icons/lucide';
 
 export default function GetStartedCard() {
@@ -37,17 +37,29 @@ export default function GetStartedCard() {
 
   if (collapsed) {
     return (
-      <button
-        onClick={() => setCollapsed(false)}
-        className="absolute bottom-4 left-4 z-30 flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform hover:scale-105"
+      <div
+        className="absolute bottom-4 left-4 z-30 flex items-center gap-0.5 rounded-full py-0.5 pl-1.5 pr-1 text-xs font-semibold text-white shadow-lg"
         style={{ background: 'var(--accent-primary, #0077d7)' }}
       >
-        <Sparkles className="w-4 h-4" />
-        Get started
-        <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs">
-          {completedCount}/{totalSteps}
-        </span>
-      </button>
+        <button
+          onClick={() => setCollapsed(false)}
+          className="flex items-center gap-1.5 rounded-full px-1.5 py-1 transition-transform"
+        >
+          Get started
+          <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px]">
+            {completedCount}/{totalSteps}
+          </span>
+        </button>
+        {/* Dismiss the onboarding entirely (same effect as "Skip setup"). */}
+        <button
+          onClick={() => dismiss()}
+          aria-label="Dismiss get started"
+          title="Dismiss"
+          className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/25"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
     );
   }
 

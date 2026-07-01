@@ -280,17 +280,14 @@ export default function MARPage() {
             >
               <ArrowLeft className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
             </button>
-            <div className="icon-box-lg" style={{ background: 'var(--accent-light)' }}>
+            <div className="icon-box-lg">
               <Pill className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
             </div>
             <div className="min-w-0">
               <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                {t('mar.heading')}
+                {admission.patientName}
               </h1>
               <div className="mt-1 text-sm flex items-center flex-wrap gap-x-3 gap-y-1" style={{ color: 'var(--text-secondary)' }}>
-                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  {admission.patientName}
-                </span>
                 <span className="inline-flex items-center gap-1.5">
                   <BedDouble className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
                   {admission.wardName}{admission.bedNumber ? ` · ${admission.bedNumber}` : ''}
@@ -331,7 +328,7 @@ export default function MARPage() {
                   borderColor: 'rgba(196,69,54,0.30)',
                 }}
               >
-                <div className="icon-box-sm shrink-0" style={{ background: 'rgba(196,69,54,0.16)' }}>
+                <div className="icon-box-sm shrink-0">
                   <ShieldAlert className="w-3.5 h-3.5" style={{ color: 'var(--tamamhealth-red)' }} />
                 </div>
                 <div>
@@ -354,7 +351,7 @@ export default function MARPage() {
                   borderColor: 'rgba(228,168,75,0.30)',
                 }}
               >
-                <div className="icon-box-sm shrink-0" style={{ background: 'rgba(228,168,75,0.20)' }}>
+                <div className="icon-box-sm shrink-0">
                   <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />
                 </div>
                 <div>
@@ -375,7 +372,7 @@ export default function MARPage() {
         {/* MAR grid */}
         {patientRx.length === 0 ? (
           <div className="card-elevated p-8 text-center" style={{ borderStyle: 'dashed' }}>
-            <div className="icon-box-lg mx-auto" style={{ background: 'var(--overlay-subtle)' }}>
+            <div className="icon-box-lg mx-auto">
               <Pill className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
             </div>
             <p className="text-sm font-semibold mt-3" style={{ color: 'var(--text-secondary)' }}>
@@ -388,7 +385,7 @@ export default function MARPage() {
         ) : (
           <div className="card-elevated overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+              <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: 760 }}>
                 <thead>
                   <tr style={{ background: 'var(--overlay-subtle)' }}>
                     <th
@@ -436,7 +433,7 @@ export default function MARPage() {
                         }}
                       >
                         <div className="flex items-start gap-2">
-                          <div className="icon-box-sm shrink-0" style={{ background: 'rgba(59, 130, 246,0.14)' }}>
+                          <div className="icon-box-sm shrink-0">
                             <Pill className="w-3.5 h-3.5" style={{ color: '#1E3A8A' }} />
                           </div>
                           <div className="min-w-0">
@@ -505,7 +502,7 @@ export default function MARPage() {
                 style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}
               >
                 <div className="flex items-start gap-3 min-w-0">
-                  <div className="icon-box" style={{ background: 'rgba(59, 130, 246,0.14)' }}>
+                  <div className="icon-box">
                     <Pill className="w-4 h-4" style={{ color: '#1E3A8A' }} />
                   </div>
                   <div className="min-w-0">
@@ -533,7 +530,7 @@ export default function MARPage() {
                   <label className="block text-[11px] font-bold uppercase mb-1.5" style={{
                     color: 'var(--text-muted)', letterSpacing: '0.06em',
                   }}>{t('mar.status')}</label>
-                  <div className="grid grid-cols-4 gap-1.5">
+                  <div className="grid grid-cols-4 gap-1.5 keep-cols">
                     {(['given', 'missed', 'refused', 'held'] as const).map(s => {
                       const tint = STATUS_TINT[s];
                       const on = modalStatus === s;

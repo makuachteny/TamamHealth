@@ -3,14 +3,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
-import FilterBar from '@/components/filters/FilterBar';
-import SearchInput from '@/components/filters/SearchInput';
-import FilterSelect from '@/components/filters/FilterSelect';
+import { FilterMenu } from '@/components/filters';
 import DataTile from '@/components/DataTile';
 import {
   CreditCard, Edit3, Check, X,
@@ -19,11 +16,14 @@ import {
 export default function AdminBillingPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { currentUser } = useApp();
+  const { currentUser, globalSearch } = useApp();
   const { organizations, loading, update } = useOrganizations();
 
-  const [search, setSearch] = useState('');
+  // Text search comes from the shared global search bar (TopBar).
+  const search = globalSearch;
   const [filterStatus, setFilterStatus] = useState('all');
+  const activeFilterCount = filterStatus !== 'all' ? 1 : 0;
+  const clearFilters = () => { setFilterStatus('all'); };
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPlan, setEditPlan] = useState<'basic' | 'professional' | 'enterprise'>('basic');
   const [editStatus, setEditStatus] = useState<'trial' | 'active' | 'suspended' | 'cancelled'>('trial');
@@ -80,8 +80,8 @@ export default function AdminBillingPage() {
 
   // Summary stats
   const planRevenue: Record<string, { count: number; color: string }> = {
-    enterprise: { count: organizations.filter(o => o.subscriptionPlan === 'enterprise' && o.subscriptionStatus === 'active').length, color: '#7C3AED' },
-    professional: { count: organizations.filter(o => o.subscriptionPlan === 'professional' && o.subscriptionStatus === 'active').length, color: '#3b82f6' },
+    enterprise: { count: organizations.filter(o => o.subscriptionPlan === 'enterprise' && o.subscriptionStatus === 'active').length, color: 'var(--accent-primary)' },
+    professional: { count: organizations.filter(o => o.subscriptionPlan === 'professional' && o.subscriptionStatus === 'active').length, color: '#2191D0' },
     basic: { count: organizations.filter(o => o.subscriptionPlan === 'basic' && o.subscriptionStatus === 'active').length, color: '#6B7280' },
   };
 
@@ -92,7 +92,7 @@ export default function AdminBillingPage() {
 
   const inputStyle: React.CSSProperties = {
     background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-    borderRadius: '8px', padding: '6px 10px', color: 'var(--text-primary)',
+    borderRadius: '4px', padding: '6px 10px', color: 'var(--text-primary)',
     fontSize: '13px', outline: 'none',
   };
   const selectStyle: React.CSSProperties = {
@@ -103,14 +103,20 @@ export default function AdminBillingPage() {
 
   return (
     <>
-      <TopBar title={t('adminBilling.title')} />
+      <TopBar title={t('adminBilling.title')} searchTrailing={
+            <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterMenu.Field label={t('adminBilling.filterByStatus')}>
+                <select className="w-full text-sm" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                  <option value="all">{t('adminBilling.statusAll')}</option>
+                  <option value="trial">{t('adminBilling.statusTrial')}</option>
+                  <option value="active">{t('adminBilling.statusActive')}</option>
+                  <option value="suspended">{t('adminBilling.statusSuspended')}</option>
+                  <option value="cancelled">{t('adminBilling.statusCancelled')}</option>
+                </select>
+              </FilterMenu.Field>
+            </FilterMenu>
+          } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-
-        <PageHeader
-          icon={CreditCard}
-          title={t('adminBilling.title')}
-          subtitle={t('adminBilling.activeSubscriptionsByPlan')}
-        />
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
@@ -139,32 +145,10 @@ export default function AdminBillingPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <FilterBar>
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder={t('adminBilling.searchPlaceholder')}
-            aria-label={t('adminBilling.searchPlaceholder')}
-          />
-          <FilterSelect
-            value={filterStatus}
-            onChange={setFilterStatus}
-            options={[
-              { value: 'all', label: t('adminBilling.statusAll') },
-              { value: 'trial', label: t('adminBilling.statusTrial') },
-              { value: 'active', label: t('adminBilling.statusActive') },
-              { value: 'suspended', label: t('adminBilling.statusSuspended') },
-              { value: 'cancelled', label: t('adminBilling.statusCancelled') },
-            ]}
-            aria-label={t('adminBilling.filterByStatus')}
-          />
-        </FilterBar>
-
         {/* Table */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 720 }}>
               <thead>
                 <tr>
                   {[
@@ -210,8 +194,8 @@ export default function AdminBillingPage() {
                           </select>
                         ) : (
                           <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{
-                            background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(59, 130, 246,0.12)' : 'rgba(107,114,128,0.12)',
-                            color: org.subscriptionPlan === 'enterprise' ? '#7C3AED' : org.subscriptionPlan === 'professional' ? '#3b82f6' : '#6B7280',
+                            background: org.subscriptionPlan === 'enterprise' ? 'rgba(124,58,237,0.12)' : org.subscriptionPlan === 'professional' ? 'rgba(33, 145, 208, 0.12)' : 'rgba(107,114,128,0.12)',
+                            color: org.subscriptionPlan === 'enterprise' ? 'var(--accent-primary)' : org.subscriptionPlan === 'professional' ? '#2191D0' : '#6B7280',
                           }}>{org.subscriptionPlan}</span>
                         )}
                       </td>

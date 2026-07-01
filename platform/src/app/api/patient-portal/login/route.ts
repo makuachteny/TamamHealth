@@ -3,9 +3,8 @@ import { getClientIp } from '@/lib/request-utils';
 import { createPatientToken } from '@/lib/patient-portal-auth';
 
 // Rate limit: 10 attempts / 15 min / IP + 10 attempts / 15 min / phone.
-// TODO: This is process-local and best-effort — a CouchDB- (or Redis-) backed
-// rate-limit store is the proper long-term fix so the limit persists across
-// replicas and restarts.
+// Operational note: this API is process-local and best-effort. Multi-replica
+// deployments should front it with an edge/shared rate limiter.
 const rateLimit: Record<string, { count: number; windowStart: number }> = {};
 const phoneAttempts: Record<string, { count: number; windowStart: number }> = {};
 const RATE_WINDOW_MS = 15 * 60 * 1000;
@@ -71,7 +70,7 @@ export async function POST(req: NextRequest) {
   // and "211912345678" all compare equal.
   const phone = phoneDigits(body.phone);
 
-  // Per-phone backoff (best-effort, in-memory — see TODO above).
+  // Per-phone backoff using the same process-local bucket described above.
   if (phone && isRateLimited(phone, phoneAttempts)) {
     return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
   }

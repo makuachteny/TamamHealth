@@ -2,6 +2,16 @@
 // TamamHealth - Mock Data for South Sudan Hospitals
 // ============================================
 
+// Patient-chart clinical list types now live in lib/types; re-exported here so
+// existing `from '@/data/mock'` imports keep working.
+import type {
+  AllergyEntry, DirectiveEntry, CareAlertEntry, ScreeningEntry,
+} from '@/lib/types/patient-clinical';
+export type {
+  AllergyEntry, DirectiveType, DirectiveEntry,
+  CareAlertCategory, CareAlertEntry, ScreeningEntry,
+} from '@/lib/types/patient-clinical';
+
 export interface Hospital {
   id: string;
   name: string;
@@ -1624,6 +1634,9 @@ const zandeFirstNames = ['Bazungula', 'Ezibon', 'Khamis', 'Samson', 'Zakaria', '
 const bariFirstNames = ['Ladu', 'Wani', 'Tombe', 'Lemi', 'Soro', 'Loro', 'Keji', 'Lado', 'Modi', 'TamamHealth', 'Bakhita', 'Hellen', 'Janet', 'Monica', 'Stella', 'Viola', 'Lucy', 'Tabitha', 'Cecilia', 'Patricia'];
 const familyNames = ['Deng', 'Garang', 'Mabior', 'Kuol', 'Bol', 'Atem', 'Kiir', 'Machar', 'Wani', 'TamamHealth', 'Lado', 'Laku', 'Gore', 'Tombura', 'Gbudue', 'Akot', 'Ajith', 'Mayom', 'Nyuon', 'Gatdet', 'Koang', 'Jok', 'Ring', 'Aguer', 'Achien', 'Makuei', 'Thiik', 'Ayuel', 'Malual', 'Madhol', 'Arou', 'Ngor', 'Biel', 'Ruot', 'Gai', 'Puok', 'Duoth'];
 
+// AllergyEntry, DirectiveType/Entry, CareAlertCategory/Entry and ScreeningEntry
+// moved to lib/types/patient-clinical.ts (imported + re-exported at the top).
+
 export interface Patient {
   id: string;
   hospitalNumber: string;
@@ -1658,12 +1671,31 @@ export interface Patient {
   tribe: string;
   primaryLanguage: string;
   bloodType: string;
+  /** Denormalised mirror: active substance names only. Source of truth is
+   *  `structuredAllergies`. Kept for backward-compatible read sites. */
   allergies: string[];
+  /** Structured allergy/adverse-reaction records (P0.3). */
+  structuredAllergies?: AllergyEntry[];
+  /** Directives / consent records on the chart (P2.1). */
+  directives?: DirectiveEntry[];
+  /** Chart-permanent care alerts / safety flags (P1.2). */
+  careAlerts?: CareAlertEntry[];
+  /** Preventive-care / health-maintenance screenings due on the chart. */
+  screenings?: ScreeningEntry[];
   chronicConditions: string[];
   nokName: string;
   nokRelationship: string;
   nokPhone: string;
   nokAddress?: string;
+  /** Additional next-of-kin contacts beyond the primary (up to 3 additional). */
+  additionalNextOfKin?: Array<{ name: string; relationship: string; phone: string; address?: string }>;
+  /** Payment coverage collected at registration. */
+  payorInfo?: {
+    coverageType: 'out-of-pocket' | 'program' | 'exemption' | 'ngo';
+    programEnrollment?: string;
+    ngoName?: string;
+    exemptionReason?: string;
+  };
   registrationHospital: string;
   registrationDate: string;
   /** ISO 8601 timestamp (date + time) captured when patient is first registered. */
@@ -1690,6 +1722,11 @@ export interface Patient {
   /** Optional handoff note from the nurse to the doctor. */
   assignmentNote?: string;
   isActive: boolean;
+  /** Set when patient death is recorded within the platform. */
+  deceasedAt?: string;
+  deathCause?: string;
+  deathPlace?: string;
+  deathInformant?: string;
   photoUrl?: string;
   // Follow-up tracking (expert-recommended)
   followUpStatus?: 'recovered' | 'died' | 'referred' | 'under_treatment' | 'lost_to_followup';
@@ -1708,9 +1745,17 @@ function generateHospitalNumber(index: number): string {
   return `JTH-${String(index + 1).padStart(6, '0')}`;
 }
 
+// Hospitals that have seeded staff accounts (mirrors the db-seed.ts user roster,
+// which only staffs hosp-001..004). Generated patients are distributed across
+// these so every demo user — at whichever of these facilities — sees a
+// populated registry, instead of being scattered across unstaffed hospitals.
+const STAFFED_HOSPITAL_IDS = ['hosp-001', 'hosp-002', 'hosp-003', 'hosp-004'];
+
 function generatePhone(): string {
-  const prefixes = ['0912', '0916', '0921', '0925', '0955', '0977'];
-  return `${randomFrom(prefixes)}${Math.floor(100000 + Math.random() * 900000)}`;
+  // Canonical stored form: E.164 with no separators (+211 + 9 national digits).
+  // National prefixes drop their leading 0 so the result is always +2119XXXXXXXX.
+  const prefixes = ['912', '916', '921', '925', '955', '977'];
+  return `+211${randomFrom(prefixes)}${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
 function generateDOB(): string {
@@ -1774,7 +1819,12 @@ function generatePatient(index: number): Patient {
   const dob = generateDOB();
   const state = randomFrom(states);
   const counties = statesAndCounties[state];
-  const hospital = randomFrom(hospitals);
+  // Place each patient at one of the STAFFED hospitals (round-robin by index),
+  // not a random one of all facilities. Only these hospitals have seeded user
+  // accounts, so a patient registered at an unstaffed facility would be visible
+  // to nobody. Deterministic distribution guarantees every staff login lands on
+  // a hospital with a populated patient registry.
+  const hospital = STAFFED_HOSPITAL_IDS[index % STAFFED_HOSPITAL_IDS.length];
 
   const numAllergies = Math.random() > 0.7 ? Math.floor(1 + Math.random() * 2) : 0;
   const allergies: string[] = numAllergies > 0
@@ -1806,7 +1856,7 @@ function generatePatient(index: number): Patient {
     nokName: `${randomFrom([...dinkaFirstNamesMale, ...nuerFirstNamesMale, ...bariFirstNames])} ${randomFrom(familyNames)}`,
     nokRelationship: randomFrom(relationships),
     nokPhone: generatePhone(),
-    registrationHospital: hospital.id,
+    registrationHospital: hospital,
     // registrationDate and registeredAt must describe the SAME event, so derive
     // the timestamp from the date rather than rolling two independent randoms
     // (which previously let a patient's two registration fields disagree).
@@ -1822,7 +1872,7 @@ function generatePatient(index: number): Patient {
       };
     })(),
     lastVisitDate: `2026-0${Math.floor(1 + Math.random() * 2)}-${String(Math.floor(1 + Math.random() * 9)).padStart(2, '0')}`,
-    lastVisitHospital: hospital.id,
+    lastVisitHospital: hospital,
     lastConsultedAt: (() => {
       const mo = Math.floor(1 + Math.random() * 2);
       const d = String(Math.floor(1 + Math.random() * 9)).padStart(2, '0');
@@ -1835,7 +1885,14 @@ function generatePatient(index: number): Patient {
   };
 }
 
-const _generatedPatients: Patient[] = Array.from({ length: 50 }, (_, i) => generatePatient(i));
+const _generatedPatients: Patient[] = [
+  // Core roster: pat-00001..pat-00050.
+  ...Array.from({ length: 50 }, (_, i) => generatePatient(i)),
+  // Extra roster: ids start at index 86 (→ pat-00087, JTH-000087) so they never
+  // collide with the hand-seeded patients pat-00051..pat-00086 in db-seed.ts.
+  // Gives every registry/list page a fuller, fully-detailed patient list.
+  ...Array.from({ length: 50 }, (_, i) => generatePatient(i + 86)),
+];
 
 // Override first 3 patients with deterministic data for Patient Portal demo login
 _generatedPatients[0] = {
@@ -1843,7 +1900,7 @@ _generatedPatients[0] = {
   firstName: 'Deng',
   middleName: 'Mabior',
   surname: 'Garang',
-  phone: '0912345678',
+  phone: '+211912345678',
   gender: 'Male',
   dateOfBirth: '1988-03-15',
   bloodType: 'O+',
@@ -1851,14 +1908,14 @@ _generatedPatients[0] = {
   chronicConditions: ['Hypertension'],
   registrationHospital: 'hosp-001',
   photoUrl: '/assets/patients/portrait-man-camera.jpg',
-  preferredPharmacy: { name: 'Konyokonyo Pharmacy', address: 'Konyokonyo Market, Juba', phone: '0911 220 145' },
+  preferredPharmacy: { name: 'Konyokonyo Pharmacy', address: 'Konyokonyo Market, Juba', phone: '+211911220145' },
 };
 _generatedPatients[1] = {
   ..._generatedPatients[1],
   firstName: 'Nyabol',
   middleName: 'Gatdet',
   surname: 'Koang',
-  phone: '0916111222',
+  phone: '+211916111222',
   gender: 'Female',
   dateOfBirth: '1995-07-22',
   bloodType: 'A+',
@@ -1872,7 +1929,7 @@ _generatedPatients[2] = {
   firstName: 'Achol',
   middleName: 'Mayen',
   surname: 'Deng',
-  phone: '0921333444',
+  phone: '+211921333444',
   gender: 'Female',
   dateOfBirth: '2001-11-05',
   bloodType: 'B+',
@@ -1880,7 +1937,7 @@ _generatedPatients[2] = {
   chronicConditions: ['Asthma'],
   registrationHospital: 'hosp-001',
   photoUrl: '/assets/patients/doctor-prescription.jpg',
-  preferredPharmacy: { name: 'Juba Pharmacy', address: 'Airport Road, Juba', phone: '0922 778 301' },
+  preferredPharmacy: { name: 'Juba Pharmacy', address: 'Airport Road, Juba', phone: '+211922778301' },
 };
 
 // Dedicated end-to-end demo patient (pat-00004 / JTH-000004). Fully populated —
@@ -1891,14 +1948,14 @@ _generatedPatients[3] = {
   firstName: 'Mary',
   middleName: 'Nyandeng',
   surname: 'Lado',
-  phone: '0912000004',
+  phone: '+211912000004',
   gender: 'Female',
   dateOfBirth: '1979-06-12',
   bloodType: 'O+',
   allergies: ['Penicillin', 'Sulfa'],
   chronicConditions: ['Diabetes Type 2', 'Hypertension'],
   registrationHospital: 'hosp-001',
-  preferredPharmacy: { name: 'Konyokonyo Pharmacy', address: 'Konyokonyo Market, Juba', phone: '0911 220 145' },
+  preferredPharmacy: { name: 'Konyokonyo Pharmacy', address: 'Konyokonyo Market, Juba', phone: '+211911220145' },
 };
 
 // Showcase patients that already carry seeded insurance policies (pat-00012 /
@@ -1906,13 +1963,13 @@ _generatedPatients[3] = {
 if (_generatedPatients[11]) {
   _generatedPatients[11] = {
     ..._generatedPatients[11],
-    preferredPharmacy: { name: 'All Heart Pharmacy', address: 'Hai Cinema, Juba', phone: '0918 540 922' },
+    preferredPharmacy: { name: 'All Heart Pharmacy', address: 'Hai Cinema, Juba', phone: '+211918540922' },
   };
 }
 if (_generatedPatients[21]) {
   _generatedPatients[21] = {
     ..._generatedPatients[21],
-    preferredPharmacy: { name: 'Nimra Talata Pharmacy', address: 'Nimra Talata, Juba', phone: '0915 332 110' },
+    preferredPharmacy: { name: 'Nimra Talata Pharmacy', address: 'Nimra Talata, Juba', phone: '+211915332110' },
   };
 }
 
@@ -1971,7 +2028,15 @@ export interface VitalSigns {
   height: number;
   bmi: number;
   muac?: number;
+  /** Pain score, 0–10 numeric rating scale. */
+  painScore?: number;
+  /** Capillary blood glucose, mmol/L. */
+  bloodGlucose?: number;
+  /** Glasgow Coma Scale, 3–15. */
+  gcs?: number;
   recordedAt: string;
+  recordedBy?: string;
+  recordedByRole?: string;
 }
 
 export interface Diagnosis {
@@ -2077,6 +2142,11 @@ export interface MedicalRecord {
   socialHistory?: SocialHistory;
   drugHistory?: DrugHistory;
   vitalSigns: VitalSigns;
+  triageVitals?: {
+    temperature?: string; systolic?: string; diastolic?: string; pulse?: string;
+    respiratoryRate?: string; oxygenSaturation?: string; weight?: string;
+    muac?: string; bloodGlucose?: string; capturedAt?: string; capturedBy?: string;
+  };
   diagnoses: Diagnosis[];
   prescriptions: Prescription[];
   labResults: LabResult[];

@@ -5,14 +5,11 @@
  * the country node; facility nodes fetch and cache it to translate local
  * codes into the country's canonical vocabulary before shipping data to
  * DHIS2 or the regional layer.
- *
- * This is a stub — it returns a country-profile document assembled from
- * static configuration. A real deployment will back it with
- * organizationsDB() + platformConfigDB() and/or a proper reference-data
- * management pipeline.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { logApiError, serverError } from '@/lib/api-auth';
+import { SOUTH_SUDAN_STATES } from '@/lib/geographic-data';
+import { FACILITY_LEVELS } from '@/lib/db-types';
 
 interface CountryMetadata {
   countryId: string;
@@ -32,39 +29,44 @@ interface CountryMetadata {
   generatedAt: string;
 }
 
-const COUNTRY_CATALOG: Record<string, CountryMetadata> = {
-  SS: {
+function envList(name: string, fallback: string[]): string[] {
+  const value = process.env[name];
+  if (!value) return fallback;
+  return value.split(',').map(v => v.trim()).filter(Boolean);
+}
+
+function southSudanMetadata(): CountryMetadata {
+  const countryName = process.env.NEXT_PUBLIC_ORG_COUNTRY || 'South Sudan';
+  return {
     countryId: 'SS',
-    name: 'South Sudan',
-    locale: 'en-SS',
-    currency: 'SSP',
-    timezone: 'Africa/Juba',
+    name: countryName,
+    locale: process.env.NEXT_PUBLIC_ORG_LOCALE || 'en-SS',
+    currency: process.env.NEXT_PUBLIC_DEFAULT_CURRENCY || 'SSP',
+    timezone: process.env.NEXT_PUBLIC_ORG_TIMEZONE || 'Africa/Juba',
     dhis2: {
-      baseUrl: 'https://dhis2.gov.ss/api',
-      rootOrgUnit: 'SS',
-      periodType: 'Monthly',
+      baseUrl: process.env.DHIS2_BASE_URL || process.env.NEXT_PUBLIC_DHIS2_BASE_URL,
+      rootOrgUnit: process.env.DHIS2_ROOT_ORG_UNIT || 'SS',
+      periodType: process.env.DHIS2_PERIOD_TYPE || 'Monthly',
     },
-    terminologies: ['ICD-11', 'LOINC', 'RxNorm'],
-    facilityLevels: [
-      { code: 'boma',     label: 'Boma PHCU',         order: 1 },
-      { code: 'payam',    label: 'Payam PHCC',        order: 2 },
-      { code: 'county',   label: 'County Hospital',   order: 3 },
-      { code: 'state',    label: 'State Hospital',    order: 4 },
-      { code: 'national', label: 'Teaching Hospital', order: 5 },
-    ],
+    terminologies: envList('NEXT_PUBLIC_TERMINOLOGIES', ['ICD-11', 'LOINC', 'RxNorm']),
+    facilityLevels: FACILITY_LEVELS.map((level, index) => ({
+      code: level.level,
+      label: level.name,
+      order: index + 1,
+    })),
     referralNetwork: [
       { from: 'boma',   to: ['payam', 'county', 'state', 'national'] },
       { from: 'payam',  to: ['county', 'state', 'national'] },
       { from: 'county', to: ['state', 'national'] },
       { from: 'state',  to: ['national'] },
     ],
-    states: [
-      'Central Equatoria', 'Eastern Equatoria', 'Western Equatoria',
-      'Jonglei', 'Unity', 'Upper Nile', 'Lakes', 'Warrap',
-      'Northern Bahr el Ghazal', 'Western Bahr el Ghazal',
-    ],
+    states: [...SOUTH_SUDAN_STATES],
     generatedAt: '',
-  },
+  };
+}
+
+const COUNTRY_CATALOG: Record<string, CountryMetadata> = {
+  SS: southSudanMetadata(),
   KE: {
     countryId: 'KE',
     name: 'Kenya',

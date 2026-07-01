@@ -1,13 +1,12 @@
 'use client';
 
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useVitalStatistics } from '@/lib/hooks/useVitalStatistics';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useDataQuality } from '@/lib/hooks/useDataQuality';
 import { useFacilityAssessments } from '@/lib/hooks/useFacilityAssessments';
-import { Globe, Baby, Skull, Activity, Heart, Shield, Building2, Users, BedDouble, Stethoscope, Wifi } from '@/components/icons/lucide';
+import { Baby, Skull, Activity, Heart, Shield, Building2, Users, BedDouble, Stethoscope, Wifi } from '@/components/icons/lucide';
 
 export default function PublicStatsPage() {
   const { t } = useTranslation();
@@ -31,11 +30,6 @@ export default function PublicStatsPage() {
     <>
       <TopBar title={t('hospitalManager.publicStatistics')} />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Globe}
-          title={t('publicStats.headerTitle')}
-          subtitle={t('publicStats.headerSubtitle')}
-        />
 
         {/* National Overview */}
         <div className="card-elevated p-5 mb-6" style={{ background: 'rgba(59, 130, 246,0.04)' }}>
@@ -45,14 +39,14 @@ export default function PublicStatsPage() {
           </div>
           <div className="kpi-grid">
             {[
-              { label: t('publicStats.healthFacilities'), value: hospitals.length, icon: Building2, color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)' },
-              { label: t('patients.kpiTotalPatients'), value: totalPop.toLocaleString(), icon: Users, color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246,0.12)' },
+              { label: t('publicStats.healthFacilities'), value: hospitals.length, icon: Building2, color: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.12)' },
+              { label: t('patients.kpiTotalPatients'), value: totalPop.toLocaleString(), icon: Users, color: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.12)' },
               { label: t('publicStats.hospitalBeds'), value: totalBeds.toLocaleString(), icon: BedDouble, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.12)' },
               { label: t('publicStats.healthWorkers'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: '#2563EB', bg: 'rgba(56,189,248,0.12)' },
-              { label: t('publicStats.dhis2Coverage'), value: `${dqData?.dhis2Adoption ?? 0}%`, icon: Wifi, color: scoreColor(dqData?.dhis2Adoption ?? 0), bg: 'rgba(59, 130, 246,0.12)' },
+              { label: t('publicStats.dhis2Coverage'), value: `${dqData?.dhis2Adoption ?? 0}%`, icon: Wifi, color: scoreColor(dqData?.dhis2Adoption ?? 0), bg: 'rgba(33, 145, 208, 0.12)' },
             ].map(stat => (
               <div key={stat.label} className="kpi">
-                <div className="kpi__icon" style={{ background: stat.bg }}>
+                <div className="kpi__icon">
                   <stat.icon style={{ color: stat.color }} />
                 </div>
                 <div className="kpi__body">

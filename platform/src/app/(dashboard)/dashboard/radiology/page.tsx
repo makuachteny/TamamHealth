@@ -1,4 +1,7 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useState, useMemo } from 'react';
 import TopBar from '@/components/TopBar';
@@ -10,11 +13,11 @@ import { useLabResults } from '@/lib/hooks/useLabResults';
 import {
   Scan, Upload, CheckCircle2, Clock, AlertTriangle,
   FileText, BarChart3, TrendingUp, Eye,
-  Image, Activity,
+  Image, Activity, Users, MessageSquare,
 } from '@/components/icons/lucide';
 import PatientName from '@/components/PatientName';
 
-const ACCENT = '#7C3AED';
+const ACCENT = 'var(--accent-primary)';
 
 const MODALITIES = ['X-Ray', 'Ultrasound', 'CT Scan', 'MRI', 'Fluoroscopy', 'Mammography'];
 
@@ -65,6 +68,17 @@ export default function RadiologyDashboard() {
     window.setTimeout(() => setSubmitToast(null), 3000);
   };
 
+  // Undo a report submitted in this session: drop the in-memory override so the
+  // study reverts to its prior (pending / in-progress) status and the findings
+  // box reappears. Only applies to findings entered here, not pre-existing ones.
+  const handleUndoReport = (studyId: string) => {
+    setSubmittedFindings(prev => {
+      const next = { ...prev };
+      delete next[studyId];
+      return next;
+    });
+  };
+
   const stats = useMemo(() => ({
     total: studies.length,
     pending: studies.filter(s => s.status === 'pending').length,
@@ -83,6 +97,27 @@ export default function RadiologyDashboard() {
       <TopBar title={t('radiology.title')} />
       <main className="page-container page-enter">
 
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Studies', value: stats.total },
+            { label: 'Pending', value: stats.pending },
+            { label: 'In Progress', value: stats.inProgress },
+            { label: 'Urgent', value: stats.urgent },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={[
+            { label: 'All Patients', icon: Users, href: '/patients' },
+            { label: 'Imaging Queue', icon: Scan, href: '/radiology', color: 'var(--accent-primary)' },
+            { label: 'Reports', icon: BarChart3, href: '/reports', color: '#0D9488' },
+            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#F59E0B' },
+          ]}
+          secondaryCard={<SpotlightCard title="Urgent Studies" value={stats.urgent} caption={`${stats.pending} pending · ${stats.inProgress} in progress`} />}
+        />
+
         {IS_DEMO && <DemoModeBanner />}
 
         {submitToast && (
@@ -98,7 +133,7 @@ export default function RadiologyDashboard() {
         {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
         <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-primary)' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
               <Scan className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -122,11 +157,9 @@ export default function RadiologyDashboard() {
             { label: t('radiology.kpiUltrasounds'), value: stats.ultrasound, icon: Eye, color: 'var(--accent-primary)' },
             { label: t('radiology.kpiAvgTat'), value: stats.avgTAT, icon: TrendingUp, color: 'var(--accent-primary)' },
           ].map(k => (
-            <div key={k.label} className="dash-card" style={{ padding: '14px 16px' }}>
+            <div key={k.label} className="card-elevated" style={{ padding: '14px 16px' }}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
-                  <k.icon className="w-3.5 h-3.5" style={{ color: k.color }} />
-                </div>
+                <k.icon className="w-[18px] h-[18px] flex-shrink-0" style={{ color: k.color }} />
                 <span className="kpi-card-title">{k.label}</span>
               </div>
               <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{k.value}</div>
@@ -145,7 +178,8 @@ export default function RadiologyDashboard() {
               </div>
               <div className="flex items-center gap-2">
                 {['all', 'pending', 'in_progress', 'completed'].map(s => (
-                  <button key={s} onClick={() => setFilterStatus(s)} style={{
+                  <button key={s} onClick={() => setFilterStatus(filterStatus === s && s !== 'all' ? 'all' : s)}
+                    title={filterStatus === s && s !== 'all' ? t('action.deselect') : undefined} style={{
                     padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700,
                     background: filterStatus === s ? ACCENT : 'var(--overlay-subtle)',
                     color: filterStatus === s ? '#fff' : 'var(--text-muted)',
@@ -176,7 +210,7 @@ export default function RadiologyDashboard() {
                   }}>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{
-                      background: study.status === 'completed' ? '#05966915' : study.priority === 'emergency' ? '#DC262615' : study.priority === 'urgent' ? '#D9770615' : `${ACCENT}15`,
+                      background: 'transparent',
                     }}>
                       {study.status === 'completed' ? <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} /> :
                        study.priority === 'emergency' ? <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} /> :
@@ -210,7 +244,18 @@ export default function RadiologyDashboard() {
 
                       {study.findings && (
                         <div className="mb-3 p-3 rounded-lg" style={{ background: '#05966908', border: '1px solid #05966920' }}>
-                          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>{t('radiology.findings')}</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>{t('radiology.findings')}</span>
+                            {submittedFindings[study.id] && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleUndoReport(study.id); }}
+                                className="text-[10px] font-semibold underline"
+                                style={{ color: ACCENT }}
+                              >
+                                {t('action.undo')}
+                              </button>
+                            )}
+                          </div>
                           <p className="text-xs mt-1" style={{ color: 'var(--text-primary)' }}>{study.findings}</p>
                         </div>
                       )}

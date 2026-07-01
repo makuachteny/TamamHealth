@@ -57,6 +57,9 @@ export interface FacilitySettings {
   payors: PayorKey[];
   /** Days into an unpaid balance before each collection stage triggers. */
   collectionStageDays: { followUp: number; warning: number; preWriteOff: number };
+  /** Default service tax / VAT applied to bills, as a percent (0 = none, e.g.
+   *  public facilities). Private facilities can set a default here. */
+  taxRatePercent: number;
 
   // ── Security ────────────────────────────────────────────────────────────
   /** Idle minutes before the screen auto-locks. */
@@ -117,6 +120,7 @@ export const DEFAULT_FACILITY_SETTINGS: FacilitySettings = {
   paymentMethods: ['cash', 'mobile_money', 'card', 'bank_transfer', 'voucher', 'partial_payment'],
   payors: ['out_of_pocket', 'gov_moh', 'ngo_donor', 'pepfar', 'global_fund', 'private_insurance', 'cbhi', 'exemption_waiver', 'sliding_scale'],
   collectionStageDays: { followUp: 30, warning: 60, preWriteOff: 90 },
+  taxRatePercent: 0,
   lockTimeoutMinutes: 2,
 };
 
@@ -140,6 +144,7 @@ export function mergeFacilitySettings(partial?: Partial<FacilitySettings> | null
     paymentMethods: partial.paymentMethods?.length ? partial.paymentMethods : [...d.paymentMethods],
     payors: partial.payors?.length ? partial.payors : [...d.payors],
     collectionStageDays: { ...d.collectionStageDays, ...(partial.collectionStageDays ?? {}) },
+    taxRatePercent: partial.taxRatePercent ?? d.taxRatePercent,
     lockTimeoutMinutes: partial.lockTimeoutMinutes ?? d.lockTimeoutMinutes,
   };
 }

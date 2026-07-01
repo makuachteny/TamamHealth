@@ -1,10 +1,13 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useApp } from '@/lib/context';
 import TopBar from '@/components/TopBar';
 import RoleGuard from '@/components/RoleGuard';
 import {
-  Baby, Skull, HeartPulse, Syringe, Building2, MapPin,
+  Baby, Skull, HeartPulse, Syringe, Building2, MapPin, Activity, BarChart3,
 } from '@/components/icons/lucide';
 import { useMCHAnalytics } from '@/lib/hooks/useMCHAnalytics';
 import { useBirths } from '@/lib/hooks/useBirths';
@@ -78,10 +81,31 @@ export default function StateDashboardPage() {
       <TopBar title={t('state.title')} />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Births (mo)', value: stateBirthsThisMonth },
+            { label: 'Deaths (mo)', value: stateDeathsThisMonth },
+            { label: 'Facilities', value: facilitiesInState.length },
+            { label: 'ANC-1 Rate', value: `${anc1Rate}%` },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={[
+            { label: 'Hospitals', icon: Building2, href: '/hospitals' },
+            { label: 'MCH Analytics', icon: HeartPulse, href: '/mch-analytics', color: '#EC4899' },
+            { label: 'Surveillance', icon: Activity, href: '/surveillance', color: '#C44536' },
+            { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
+          ]}
+          secondaryCard={<SpotlightCard title="ANC-1 Coverage" value={`${anc1Rate}%`} caption={`${facilitiesInState.length} facilities in state`} href="/mch-analytics" />}
+        />
+
         {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
         <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-primary)' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
               <Building2 className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -143,7 +167,7 @@ function Kpi({ label, value, icon: Icon }: { label: string; value: string | numb
   return (
     <div className="dash-card" style={{ padding: '14px 16px' }}>
       <div className="flex items-center gap-2 mb-2">
-        <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+        <div className="icon-box-sm">
           <Icon className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
         </div>
         <span className="kpi-card-title">{label}</span>

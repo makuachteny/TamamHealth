@@ -1,26 +1,42 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { createServer, loadAdapter } from './index.mjs';
 
 let server;
 let baseUrl;
+let port;
 
 before(async () => {
   const adapter = await loadAdapter('mock');
   server = createServer(adapter);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  port = server.address().port;
+  baseUrl = `http://127.0.0.1:${port}`;
 });
 
 after(() => new Promise(resolve => server.close(resolve)));
 
-async function post(path, body) {
+async function post(path, body, headers = {}) {
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
   return { status: res.status, body: await res.json() };
+}
+
+/** Raw request so we can spoof the Host header (fetch forbids overriding it). */
+function rawRequest(path, { method = 'GET', headers = {} } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port, path, method, headers }, res => {
+      let data = '';
+      res.on('data', c => (data += c));
+      res.on('end', () => resolve({ status: res.statusCode, body: data ? JSON.parse(data) : null }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
 }
 
 test('GET /health reports driver and scanner state', async () => {
@@ -87,4 +103,56 @@ test('CORS preflight is answered', async () => {
   const res = await fetch(`${baseUrl}/capture`, { method: 'OPTIONS' });
   assert.equal(res.status, 204);
   assert.ok(res.headers.get('access-control-allow-origin'));
+});
+
+test('rejects a non-loopback Host header (DNS rebinding defence)', async () => {
+  const res = await rawRequest('/health', { headers: { Host: 'evil.example.com' } });
+  assert.equal(res.status, 403);
+  assert.match(res.body.error, /host/i);
+});
+
+test('accepts a loopback Host header', async () => {
+  const res = await rawRequest('/health', { headers: { Host: `localhost:${port}` } });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.ok, true);
+});
+
+test('rejects a disallowed Origin before any scan side-effect', async () => {
+  const res = await post('/capture', { finger: 'right_index' }, { Origin: 'http://attacker.example' });
+  assert.equal(res.status, 403);
+  assert.match(res.body.error, /origin/i);
+});
+
+test('allows the configured app Origin', async () => {
+  const res = await post('/capture', { finger: 'right_index' }, { Origin: 'http://localhost:3000' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.format, 'MOCK');
+});
+
+test('enforces the shared-secret token when configured', async () => {
+  process.env.FINGERPRINT_BRIDGE_TOKEN = 's3cret';
+  try {
+    const missing = await post('/capture', { finger: 'right_index' });
+    assert.equal(missing.status, 401);
+
+    const wrong = await post('/capture', { finger: 'right_index' }, { 'X-Bridge-Token': 'nope' });
+    assert.equal(wrong.status, 401);
+
+    const ok = await post('/capture', { finger: 'right_index' }, { 'X-Bridge-Token': 's3cret' });
+    assert.equal(ok.status, 200);
+  } finally {
+    delete process.env.FINGERPRINT_BRIDGE_TOKEN;
+  }
+});
+
+test('clamps a zero/negative threshold so it cannot match everyone', async () => {
+  const probe = await post('/capture', { simulateId: 'pat-a' });
+  const other = await post('/capture', { simulateId: 'pat-b' });
+  const { body } = await post('/match', {
+    probe: probe.body.template,
+    candidates: [{ id: 'tpl-1', template: other.body.template }],
+    threshold: 0,
+  });
+  // Mock scores a non-match at 0; with clamping (min 1) it must NOT be returned.
+  assert.deepEqual(body.matches, []);
 });

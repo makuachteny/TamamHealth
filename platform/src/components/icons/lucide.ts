@@ -1,7 +1,16 @@
-// Auto-generated compatibility shim: every lucide name the codebase uses is
-// mapped to a duotone equivalent. Import from here instead of 'lucide-react'.
+// Compatibility shim: every lucide name the codebase uses maps to the shared
+// Tailwind Labs Heroicons renderer. Import from here for legacy icon aliases.
 
-export type { LucideIcon } from 'lucide-react';
+import type { ForwardRefExoticComponent, RefAttributes, SVGProps } from 'react';
+
+export type LucideIcon = ForwardRefExoticComponent<
+  Omit<SVGProps<SVGSVGElement>, 'ref' | 'color'> & {
+    size?: number | string;
+    color?: string;
+    strokeWidth?: number | string;
+    absoluteStrokeWidth?: boolean;
+  } & RefAttributes<SVGSVGElement>
+>;
 
 export { DuotoneActivity as Activity } from '@/components/icons';
 export { DuotoneAlert as AlertCircle } from '@/components/icons';
@@ -15,6 +24,7 @@ export { DuotoneBarChart as BarChart3 } from '@/components/icons';
 export { DuotoneFlask as Beaker } from '@/components/icons';
 export { DuotoneBell as Bell } from '@/components/icons';
 export { DuotoneBug as Bug } from '@/components/icons';
+export { DuotoneBug as Biohazard } from '@/components/icons';
 export { DuotoneBuilding as Building2 } from '@/components/icons';
 export { DuotoneCalendar as Calendar } from '@/components/icons';
 export { DuotoneCalendar as CalendarClock } from '@/components/icons';
@@ -25,15 +35,20 @@ export { DuotoneChevronDown as ChevronDown } from '@/components/icons';
 export { DuotoneChevronLeft as ChevronLeft } from '@/components/icons';
 export { DuotoneChevronRight as ChevronRight } from '@/components/icons';
 export { DuotoneChevronUp as ChevronUp } from '@/components/icons';
+export { DuotoneChevronLeft as ChevronsLeft } from '@/components/icons';
+export { DuotoneChevronRight as ChevronsRight } from '@/components/icons';
+export { DuotoneBarChart as ChartNoAxesCombined } from '@/components/icons';
 export { DuotoneAlert as CircleAlert } from '@/components/icons';
 export { DuotoneClaim as Clipboard } from '@/components/icons';
 export { DuotoneClaim as ClipboardCheck } from '@/components/icons';
 export { DuotoneRecord as ClipboardList } from '@/components/icons';
+export { DuotoneEdit as ClipboardPen } from '@/components/icons';
 export { DuotoneClock as Clock } from '@/components/icons';
 export { DuotoneCreditCard as CreditCard } from '@/components/icons';
 export { DuotoneServer as Database } from '@/components/icons';
 export { DuotoneDownload as Download } from '@/components/icons';
 export { DuotoneBloodPressure as Droplets } from '@/components/icons';
+export { DuotoneBloodPressure as Droplet } from '@/components/icons';
 export { DuotoneEdit as Edit3 } from '@/components/icons';
 export { DuotoneFileText as FileText } from '@/components/icons';
 export { DuotoneSliders as Filter } from '@/components/icons';
@@ -43,6 +58,7 @@ export { DuotoneQR as Hash } from '@/components/icons';
 export { DuotoneHeart as Heart } from '@/components/icons';
 export { DuotoneMCH as HeartPulse } from '@/components/icons';
 export { DuotoneHome as Home } from '@/components/icons';
+export { DuotoneHospital as Hospital } from '@/components/icons';
 export { DuotoneLayoutDashboard as LayoutDashboard } from '@/components/icons';
 export { DuotoneLogout as LogOut } from '@/components/icons';
 export { DuotoneMapPin as MapPin } from '@/components/icons';
@@ -116,6 +132,7 @@ export { DuotoneFileUp as FileUp } from '@/components/icons';
 export { DuotoneFlag as Flag } from '@/components/icons';
 export { DuotoneFolderOpen as FolderOpen } from '@/components/icons';
 export { DuotoneGift as Gift } from '@/components/icons';
+export { DuotoneGauge as Gauge } from '@/components/icons';
 export { DuotoneGitBranch as GitBranch } from '@/components/icons';
 export { DuotoneGitCompare as GitCompareArrows } from '@/components/icons';
 export { DuotoneHardDrive as HardDrive } from '@/components/icons';
@@ -150,11 +167,13 @@ export { DuotonePieChart as PieChart } from '@/components/icons';
 export { DuotonePlay as Play } from '@/components/icons';
 export { DuotoneRadio as Radio } from '@/components/icons';
 export { DuotoneRadio as Megaphone } from '@/components/icons';
+export { DuotoneAlert as Siren } from '@/components/icons';
 export { DuotoneRefresh as RefreshCcw } from '@/components/icons';
 export { DuotoneRefresh as RefreshCw } from '@/components/icons';
 export { DuotoneRotate as RotateCcw } from '@/components/icons';
 export { DuotoneSave as Save } from '@/components/icons';
 export { DuotoneWeight as Scale } from '@/components/icons';
+export { DuotoneWeight as Ruler } from '@/components/icons';
 export { DuotoneSend as Send } from '@/components/icons';
 export { DuotoneSendHorizontal as SendHorizontal } from '@/components/icons';
 export { DuotoneShoppingCart as ShoppingCart } from '@/components/icons';
@@ -177,5 +196,6 @@ export { DuotoneUserX as UserX } from '@/components/icons';
 export { DuotoneUtensils as Utensils } from '@/components/icons';
 export { DuotoneUtensilsCrossed as UtensilsCrossed } from '@/components/icons';
 export { DuotoneWind as Wind } from '@/components/icons';
+export { DuotoneSettings as Wrench } from '@/components/icons';
 export { DuotoneZap as Zap } from '@/components/icons';
 export { DuotoneZapOff as ZapOff } from '@/components/icons';

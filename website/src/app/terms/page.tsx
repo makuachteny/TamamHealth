@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { Reveal } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
+import { Users, ShieldCheck, Heart } from "@/components/marketing/icons";
 
 const SECTIONS = [
   { id: "acceptance", title: "1. Acceptance of Terms" },
@@ -21,18 +22,12 @@ const SECTIONS = [
 export default function TermsPage() {
   return (
     <>
-      {/* HERO */}
-      <section className="mk-section mk-section-cream">
-        <div className="mk-container" style={{ maxWidth: 760, margin: "0 auto", textAlign: "center" }}>
-          <Reveal>
-            <span className="mk-label">LEGAL</span>
-            <h1 className="mk-h1" style={{ marginTop: 12 }}>Terms &amp; Conditions</h1>
-            <p className="mk-body" style={{ color: "var(--tb-text-sec)", marginTop: 14 }}>
-              Last updated: April 15, 2026
-            </p>
-          </Reveal>
-        </div>
-      </section>
+      <MarketingHero
+        variant="legal"
+        eyebrow="LEGAL"
+        title="Terms & Conditions"
+        subtitle="Last updated: April 15, 2026"
+      />
 
       {/* KEY COMMITMENTS */}
       <section className="mk-section-tight mk-section-white" style={{ borderTop: "1px solid var(--tb-cream-300)", borderBottom: "1px solid var(--tb-cream-300)" }}>
@@ -66,7 +61,7 @@ export default function TermsPage() {
               <Reveal>
                 <Section id="acceptance" title="1. Acceptance of Terms">
                   <p>
-                    By accessing or using TamamHealth Health Technologies&apos; platform (&quot;the Service&quot;), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use the Service.
+                    By accessing or using TamamHealth Technologies&apos; platform (&quot;the Service&quot;), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use the Service.
                   </p>
                 </Section>
 
@@ -129,7 +124,7 @@ export default function TermsPage() {
                 <Section id="contact" title="11. Contact">
                   <p>
                     For questions about these terms, contact us at{" "}
-                    <a href="mailto:hello@tamamhealth.org" style={{ color: "var(--tb-green)", fontWeight: 600 }}>hello@tamamhealth.org</a>.
+                    <a href="mailto:support.tamam@gmail.com" style={{ color: "var(--tb-green)", fontWeight: 600 }}>support.tamam@gmail.com</a>.
                   </p>
                 </Section>
               </Reveal>
@@ -147,7 +142,7 @@ export default function TermsPage() {
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
             <Link href="/privacy" className="mk-btn mk-btn-outline-green">Privacy Policy</Link>
-            <Link href="/about/contact" className="mk-btn mk-btn-green">Contact us</Link>
+            <Link href="/about/contact#contact-form" className="mk-btn mk-btn-green">Contact us</Link>
           </div>
         </div>
       </section>
@@ -179,11 +174,18 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
+const COMMITMENT_ICON_MAP = {
+  users: Users,
+  "shield-check": ShieldCheck,
+  heart: Heart,
+} as const;
+
 function CommitmentItem({ icon, title, body }: { icon: "users" | "shield-check" | "heart"; title: string; body: string }) {
+  const IconComp = COMMITMENT_ICON_MAP[icon];
   return (
     <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-      <div style={{ flex: "0 0 44px", width: 44, height: 44, borderRadius: 12, background: "var(--tb-tint-blue)", color: "var(--tb-blue-700)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <DuoIcon name={icon} size={22} />
+      <div style={{ flex: "0 0 44px", width: 44, height: 44, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <IconComp size={22} strokeWidth={1.8} />
       </div>
       <div>
         <p style={{ fontSize: 15, fontWeight: 700, color: "var(--tb-text-pri)", margin: "0 0 4px" }}>{title}</p>

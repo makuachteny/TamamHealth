@@ -9,18 +9,18 @@ import { ROLE_LABEL } from '@/lib/role-display';
 import type { ConversationDoc, MessageDoc, UserRole, StaffPresence } from '@/lib/db-types';
 import {
   MessageSquare, Plus, Search, Send, Users as UsersIcon,
-  MoreVertical, Info, UserPlus, X, ChevronDown, Check, Lock, ShieldCheck,
+  MoreVertical, Info, UserPlus, X, ChevronDown, Check, ShieldCheck,
   Trash2, Edit3, ArrowLeft, Bell, BellOff, LogOut, Settings,
 } from '@/components/icons/lucide';
 
 /* ─────────────────────────── constants ─────────────────────────── */
 
-const AVATAR_PALETTE = ['#2563EB', '#7C3AED', '#0EA5E9', '#DB2777', '#059669', '#D97706', '#4F46E5', '#0891B2'];
+const AVATAR_PALETTE = ['#2191D0', '#015697', '#0E7490', '#1D4ED8', '#0369A1', '#1E40AF', '#0891B2', '#475569'];
 const PRESENCE: Record<StaffPresence, { label: string; color: string }> = {
   active: { label: 'Active', color: 'var(--color-success)' },
   busy: { label: 'Busy', color: 'var(--color-danger)' },
   away: { label: 'Away', color: 'var(--color-warning)' },
-  on_call: { label: 'On Call', color: '#7C3AED' },
+  on_call: { label: 'On Call', color: 'var(--accent-primary)' },
   in_clinic: { label: 'In Clinic', color: 'var(--accent-primary)' },
   offline: { label: 'Offline', color: 'var(--text-muted)' },
 };
@@ -62,7 +62,7 @@ function Avatar({ name, size = 38, seed, group, presence }: { name: string; size
   return (
     <div
       className="relative flex items-center justify-center flex-shrink-0 font-bold text-white"
-      style={{ width: size, height: size, borderRadius: '50%', background: group ? '#6366F1' : colorFor(seed), fontSize: size * 0.36 }}
+      style={{ width: size, height: size, borderRadius: '50%', background: group ? 'var(--accent-primary)' : colorFor(seed), fontSize: size * 0.36 }}
     >
       {group ? <UsersIcon className="text-white" style={{ width: size * 0.5, height: size * 0.5 }} /> : initials(name)}
       {!group && (
@@ -215,24 +215,17 @@ export default function MessagesPage() {
 
   return (
     <>
-      <TopBar title="Messages" />
+      <TopBar title="Messages" hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden', borderRadius: 'var(--card-radius)', border: '1px solid var(--border-light)', boxShadow: 'var(--card-shadow)', background: 'var(--bg-card-solid)' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden', borderRadius: 'var(--card-radius)', border: '1px solid var(--glass-border)', boxShadow: 'var(--card-shadow), var(--glass-highlight)', background: 'var(--glass-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
 
         {/* ── Conversation list ── */}
-        <section className="flex flex-col flex-shrink-0" style={{ width: 320, borderRight: '1px solid var(--border-light)', background: 'var(--bg-card-solid)' }}>
+        <section className="flex flex-col flex-shrink-0" style={{ width: 320, borderRight: '1px solid var(--glass-border)', background: 'var(--glass-bg-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
           <div className="px-3 pt-3 pb-2 flex items-center justify-between">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <h2 className="text-base font-bold truncate" style={{ color: 'var(--text-primary)' }}>Messages</h2>
-            </div>
-            <button onClick={() => setNewChatOpen(true)} title="New chat" className="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0" style={{ background: 'var(--accent-primary)' }}>
+            <h2 className="text-[11px] font-bold truncate uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Conversations</h2>
+            <button onClick={() => setNewChatOpen(true)} title="New chat" className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
               <Plus className="w-4 h-4" />
             </button>
-          </div>
-
-          {/* Encryption notice */}
-          <div className="mx-4 mb-2 flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            <Lock className="w-3 h-3" /> Encrypted &amp; audit-logged · internal staff only
           </div>
 
           {/* Current-user presence selector */}
@@ -262,7 +255,21 @@ export default function MessagesPage() {
           <div className="px-3 mb-2">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-              <input value={convSearch} onChange={e => setConvSearch(e.target.value)} placeholder="Search conversations" className="w-full text-[13px]" style={{ paddingLeft: 34, paddingTop: 8, paddingBottom: 8 }} />
+              <input
+                type="search"
+                value={convSearch}
+                onChange={e => setConvSearch(e.target.value)}
+                placeholder="Search conversations"
+                className="w-full text-[13px]"
+                style={{
+                  paddingLeft: 34, paddingTop: 8, paddingBottom: 8,
+                  background: 'var(--bg-card-solid)',
+                  border: '1px solid var(--border-medium)',
+                  borderRadius: 10,
+                  color: 'var(--text-primary)',
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+              />
             </div>
           </div>
 
@@ -278,15 +285,15 @@ export default function MessagesPage() {
         </section>
 
         {/* ── Thread ── */}
-        <section className="flex flex-col flex-1 min-w-0" style={{ background: 'var(--bg-card-solid)' }}>
+        <section className="flex flex-col flex-1 min-w-0" style={{ background: 'transparent' }}>
           {activeConversation ? (
             <>
               {/* Header */}
-              <div className="flex items-center justify-between px-5 py-3 flex-shrink-0 relative" style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card-solid)' }}>
+              <div className="flex items-center justify-between px-5 py-3 flex-shrink-0 relative" style={{ borderBottom: '1px solid var(--glass-border)', background: 'var(--glass-bg-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar name={convTitle(activeConversation)} seed={convSeed(activeConversation)} group={activeConversation.kind === 'group'} size={40} presence={activeConversation.kind === 'dm' ? otherPresence(activeConversation) : undefined} />
                   <div className="min-w-0">
-                    <p className="text-[15px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{convTitle(activeConversation)}</p>
+                    <p className="text-base font-bold truncate" style={{ color: 'var(--text-primary)' }}>{convTitle(activeConversation)}</p>
                     <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{convSubtitle(activeConversation)}</p>
                   </div>
                 </div>
@@ -312,7 +319,7 @@ export default function MessagesPage() {
 
               <div className="flex-1 min-h-0 flex">
                 {/* Messages */}
-                <div ref={threadRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{ minHeight: 0, background: 'var(--bg-secondary)' }}>
+                <div ref={threadRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{ minHeight: 0, background: 'var(--bg-app)' }}>
                   {runs.map((run, ri) => {
                     const mine = run.fromId === meId;
                     return (
@@ -342,7 +349,21 @@ export default function MessagesPage() {
                                 <div className="flex items-center gap-1" style={{ flexDirection: mine ? 'row-reverse' : 'row' }}>
                                   {editingId === m._id ? (
                                     <div className="flex flex-col gap-1" style={{ minWidth: 220 }}>
-                                      <textarea value={editDraft} onChange={e => setEditDraft(e.target.value)} rows={2} className="text-[13px] resize-none" style={{ padding: '6px 10px' }} />
+                                      <textarea
+                                        value={editDraft}
+                                        onChange={e => setEditDraft(e.target.value)}
+                                        rows={2}
+                                        className="text-[13px] resize-none"
+                                        style={{
+                                          padding: '8px 12px',
+                                          background: 'var(--bg-card-solid)',
+                                          border: '1px solid var(--border-medium)',
+                                          borderRadius: 10,
+                                          color: 'var(--text-primary)',
+                                          fontFamily: "'DM Sans', sans-serif",
+                                          outline: 'none',
+                                        }}
+                                      />
                                       <div className="flex gap-2 justify-end">
                                         <button onClick={() => setEditingId(null)} className="text-[11px] px-2 py-1 rounded" style={{ color: 'var(--text-muted)' }}>Cancel</button>
                                         <button onClick={saveEdit} className="text-[11px] px-2 py-1 rounded text-white" style={{ background: 'var(--accent-primary)' }}>Save</button>
@@ -375,7 +396,7 @@ export default function MessagesPage() {
                                       {mine && <button onClick={() => deleteMessage(m._id)} title="Delete" className="w-6 h-6 rounded flex items-center justify-center hover:bg-[var(--overlay-subtle)]" style={{ color: 'var(--color-danger)' }}><Trash2 className="w-3.5 h-3.5" /></button>}
                                       {reactingId === m._id && (
                                         <div className="absolute top-7 right-0 flex gap-1 px-2 py-1 rounded-full z-20" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}>
-                                          {QUICK_REACTIONS.map(em => <button key={em} onClick={() => { react(m._id, em); setReactingId(null); }} className="text-[15px] hover:scale-125 transition-transform">{em}</button>)}
+                                          {QUICK_REACTIONS.map(em => <button key={em} onClick={() => { react(m._id, em); setReactingId(null); }} className="text-[15px] transition-transform">{em}</button>)}
                                         </div>
                                       )}
                                     </div>
@@ -411,7 +432,7 @@ export default function MessagesPage() {
 
                 {/* Right info panel */}
                 {infoOpen && (
-                  <aside className="flex-shrink-0 overflow-y-auto" style={{ width: 280, borderLeft: '1px solid var(--border-light)', background: 'var(--bg-card-solid)' }}>
+                  <aside className="flex-shrink-0 overflow-y-auto" style={{ width: 280, borderLeft: '1px solid var(--glass-border)', background: 'var(--glass-bg-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Details</h3>
@@ -422,9 +443,19 @@ export default function MessagesPage() {
                         <div className="mb-4">
                           <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Group name</label>
                           <input
+                            type="text"
                             defaultValue={activeConversation.name || ''}
                             onBlur={e => { if (e.target.value.trim() && e.target.value !== activeConversation.name) renameGroup(activeConversation._id, e.target.value); }}
-                            className="w-full text-[13px] mt-1" style={{ padding: '6px 10px' }}
+                            className="w-full text-[13px] mt-1"
+                            style={{
+                              padding: '8px 12px',
+                              background: 'var(--bg-card-solid)',
+                              border: '1px solid var(--border-medium)',
+                              borderRadius: 10,
+                              color: 'var(--text-primary)',
+                              fontFamily: "'DM Sans', sans-serif",
+                              outline: 'none',
+                            }}
                           />
                         </div>
                       )}
@@ -461,7 +492,7 @@ export default function MessagesPage() {
               </div>
 
               {/* Composer */}
-              <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid var(--border-light)', background: 'var(--bg-card-solid)' }}>
+              <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid var(--glass-border)', background: 'var(--glass-bg-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
                 {replyTo && (
                   <div className="flex items-center justify-between mb-2 px-3 py-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', borderLeft: '2px solid var(--accent-primary)' }}>
                     <span className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>Replying to {replyTo.fromDoctorName}: {replyTo.body.slice(0, 50)}</span>
@@ -469,7 +500,7 @@ export default function MessagesPage() {
                   </div>
                 )}
                 <div className="flex items-end gap-2">
-                  <div className="flex-1 flex items-center gap-2 px-4 py-2" style={{ border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', borderRadius: 22 }}>
+                  <div className="flex-1 flex items-center gap-2 px-4 py-2" style={{ border: '1px solid var(--border-medium)', background: 'var(--bg-card-solid)', borderRadius: 22 }}>
                     <textarea
                       value={draft}
                       onChange={e => setDraft(e.target.value)}
@@ -477,7 +508,7 @@ export default function MessagesPage() {
                       rows={1}
                       placeholder="Type a message…"
                       className="flex-1 bg-transparent text-[13px] resize-none outline-none border-none"
-                      style={{ maxHeight: 120, padding: 0, lineHeight: 1.6 }}
+                      style={{ maxHeight: 120, padding: 0, lineHeight: 1.6, fontFamily: "'DM Sans', sans-serif", color: 'var(--text-primary)' }}
                     />
                   </div>
                   <button
@@ -574,7 +605,7 @@ function StaffPickerModal({
 
         <div className="px-5 pt-4">
           {mode === 'new' && (
-            <div className="grid grid-cols-2 gap-1 p-1 mb-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+            <div className="grid grid-cols-2 gap-1 p-1 mb-3 rounded-xl keep-cols" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               {(['dm', 'group'] as const).map(m => (
                 <button key={m} onClick={() => setTab(m)} className="py-1.5 rounded-lg text-[12px] font-semibold transition-colors" style={{ background: tab === m ? 'var(--accent-primary)' : 'transparent', color: tab === m ? '#fff' : 'var(--text-muted)' }}>
                   {m === 'dm' ? 'Direct message' : 'Group chat'}
@@ -583,11 +614,39 @@ function StaffPickerModal({
             </div>
           )}
           {multi && mode === 'new' && (
-            <input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="Group name (e.g. Morning RN Shift)" className="w-full text-[13px] mb-2.5" style={{ padding: '9px 12px', borderRadius: 10 }} />
+            <input
+              type="text"
+              value={groupName}
+              onChange={e => setGroupName(e.target.value)}
+              placeholder="Group name (e.g. Morning RN Shift)"
+              className="w-full text-[13px] mb-2.5"
+              style={{
+                padding: '9px 12px', borderRadius: 10,
+                background: 'var(--bg-card-solid)',
+                border: '1px solid var(--border-medium)',
+                color: 'var(--text-primary)',
+                fontFamily: "'DM Sans', sans-serif",
+                outline: 'none',
+              }}
+            />
           )}
           <div className="relative mb-2">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search staff by name or role" className="w-full text-[13px]" style={{ paddingLeft: 34, paddingTop: 9, paddingBottom: 9, borderRadius: 10 }} />
+            <input
+              type="search"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search staff by name or role"
+              className="w-full text-[13px]"
+              style={{
+                paddingLeft: 34, paddingTop: 9, paddingBottom: 9, borderRadius: 10,
+                background: 'var(--bg-card-solid)',
+                border: '1px solid var(--border-medium)',
+                color: 'var(--text-primary)',
+                fontFamily: "'DM Sans', sans-serif",
+                outline: 'none',
+              }}
+            />
           </div>
 
           {/* Selected chips (multi-select) */}

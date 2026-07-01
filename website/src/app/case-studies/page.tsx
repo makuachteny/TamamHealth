@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { Reveal } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
+import { ArrowRight } from "@/components/marketing/icons";
 import { CASE_STUDIES } from "@/data/case-studies";
 
 export const metadata: Metadata = {
@@ -14,42 +15,20 @@ export default function CaseStudiesIndex() {
     <>
       
       <main className="mk-main">
-        {/* Hero — side-by-side */}
-        <section className="mk-hero-split">
-          <div className="mk-container">
-            <div className="mk-hero-split-grid">
-              <Reveal>
-                <div className="mk-hero-split-text">
-                  <p className="mk-label">SCENARIOS · WHAT TAMAMHEALTH COULD DO FOR YOU</p>
-                  <h1 className="mk-h1">What changes when a South Sudan facility goes digital</h1>
-                  <p>
-                    TamamHealth is pre-launch — these stories are forward-looking scenarios, not deployment claims.
-                    Each one shows the kind of problem we built the platform to solve and what comparable
-                    digital-health rollouts elsewhere in East Africa have delivered.
-                  </p>
-                  <div className="mk-hero-split-actions">
-                    <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-lg">Talk to our team</Link>
-                    <Link href="#case-studies-grid" className="mk-btn mk-btn-outline mk-btn-lg">See scenarios</Link>
-                  </div>
-                  <span className="mk-hero-split-meta">
-                    <DuoIcon name="info" size={12} />
-                    Projected outcomes · pilot facilities welcome
-                  </span>
-                </div>
-              </Reveal>
-              <Reveal delay={0.1}>
-                <div className="mk-hero-split-image">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/assets/team-derby-center.jpg"
-                    alt="TamamHealth team ready to deploy across South Sudan"
-                    loading="eager"
-                  />
-                </div>
-              </Reveal>
-            </div>
-          </div>
-        </section>
+        <MarketingHero
+          variant="showcase"
+          eyebrow="SCENARIOS · WHAT TAMAMHEALTH COULD DO FOR YOU"
+          title="What changes when a South Sudan facility goes digital"
+          subtitle="TamamHealth is pre-launch. These stories are forward-looking scenarios, not deployment claims, showing the problems we built the platform to solve."
+          primaryCta={{ label: "Talk to our team", href: "/about/contact#contact-form" }}
+          secondaryCta={{ label: "See scenarios", href: "#case-studies-grid" }}
+          stats={[
+            { value: "Projected", label: "facility outcomes" },
+            { value: "Pilot", label: "partners welcome" },
+            { value: "South Sudan", label: "built for local care" },
+          ]}
+          className="mk-hero-case-index"
+        />
 
         {/* Case study grid */}
         <section id="case-studies-grid" className="mk-section mk-section-after-hero mk-section-white">
@@ -150,7 +129,7 @@ export default function CaseStudiesIndex() {
                         </div>
                         <span style={{ fontSize: 14, fontWeight: 700, color: c.accent, display: "inline-flex", alignItems: "center", gap: 6 }}>
                           Read the story
-                          <DuoIcon name="arrow-right" size={14} />
+                          <ArrowRight size={14} strokeWidth={1.8} />
                         </span>
                       </div>
                     </article>

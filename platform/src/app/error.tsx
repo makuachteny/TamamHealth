@@ -18,26 +18,25 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--bg-base, #0f1117)' }}>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--bg-app)' }}>
       <div className="max-w-md w-full text-center">
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6" style={{
-          background: 'rgba(229, 46, 66, 0.1)',
-          border: '1px solid rgba(229, 46, 66, 0.2)',
+          background: 'transparent',
         }}>
-          <AlertTriangle className="w-8 h-8" style={{ color: '#E52E42' }} />
+          <AlertTriangle className="w-8 h-8" style={{ color: 'var(--color-danger)' }} />
         </div>
-        <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary, #f1f5f9)' }}>
+        <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
           {t('error.title')}
         </h2>
-        <p className="text-sm mb-6" style={{ color: 'var(--text-muted, #64748b)' }}>
+        <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
           {t('error.description')}
         </p>
         {process.env.NODE_ENV !== 'production' && (
           <div className="mb-6 p-3 rounded-xl text-left" style={{
-            background: 'rgba(229, 46, 66, 0.06)',
-            border: '1px solid rgba(229, 46, 66, 0.12)',
+            background: 'var(--color-danger-bg)',
+            border: '1px solid color-mix(in srgb, var(--color-danger) 12%, transparent)',
           }}>
-            <p className="text-xs font-mono break-all" style={{ color: '#F87171' }}>
+            <p className="text-xs font-mono break-all" style={{ color: 'var(--color-danger-text)' }}>
               {error.message}
             </p>
           </div>
@@ -47,8 +46,8 @@ export default function Error({
             onClick={reset}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
             style={{
-              background: 'linear-gradient(135deg, #3b82f6, #1d5bc4)',
-              boxShadow: '0 4px 16px rgba(59, 130, 246,0.3)',
+              background: 'var(--accent-primary)',
+              boxShadow: 'none',
             }}
           >
             <RotateCcw className="w-4 h-4" /> {t('error.tryAgain')}
@@ -57,9 +56,9 @@ export default function Error({
             href="/dashboard"
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
             style={{
-              background: 'var(--overlay-subtle, rgba(255,255,255,0.05))',
-              color: 'var(--text-secondary, #64748b)',
-              border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
+              background: 'var(--overlay-subtle)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border-light)',
             }}
           >
             <Home className="w-4 h-4" /> {t('error.dashboard')}

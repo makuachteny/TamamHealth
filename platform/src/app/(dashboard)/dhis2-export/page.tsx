@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import {
-  Globe, RefreshCw, CheckCircle, Clock, AlertTriangle,
+  RefreshCw, CheckCircle, Clock, AlertTriangle,
   Download, FileJson, FileSpreadsheet, Upload, Loader2,
   Wifi, Database, FileText, BarChart3,
 } from '@/components/icons/lucide';
@@ -149,29 +148,22 @@ export default function DHIS2ExportPage() {
 
   return (
     <>
-      <TopBar title={t('dhis2.pageTitle')} />
+      <TopBar title={t('dhis2.pageTitle')} actions={
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
+          style={{
+            background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
+            color: syncing ? 'var(--text-muted)' : '#fff',
+            boxShadow: syncing ? 'none' : '0 4px 12px rgba(33, 145, 208, 0.3)',
+          }}
+        >
+          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+          {syncing ? t('dhis2.syncing') : t('dhis2.syncNow')}
+        </button>
+      } />
       <main className="page-container page-enter">
-
-        <PageHeader
-          icon={Globe}
-          title={t('dhis2.pageTitle')}
-          subtitle={`${hospitalName} → hmis.southsudan.health`}
-          actions={
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
-              style={{
-                background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
-                color: syncing ? 'var(--text-muted)' : '#fff',
-                boxShadow: syncing ? 'none' : '0 4px 12px rgba(59, 130, 246,0.3)',
-              }}
-            >
-              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? t('dhis2.syncing') : t('dhis2.syncNow')}
-            </button>
-          }
-        />
 
         {/* Status Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -241,7 +233,6 @@ export default function DHIS2ExportPage() {
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
                     de.synced ? 'badge-normal' : 'badge-warning'
                   }`}>
-                    {de.synced ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                     {de.synced ? t('sync.synced') : t('lab.filterPending')}
                   </span>
                 </div>
@@ -358,7 +349,7 @@ export default function DHIS2ExportPage() {
               className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all"
               style={{
                 background: 'linear-gradient(135deg, #3b82f6, #1E40AF)',
-                boxShadow: '0 4px 12px rgba(59, 130, 246,0.3)',
+                boxShadow: '0 4px 12px rgba(33, 145, 208, 0.3)',
               }}
             >
               <Upload className="w-4 h-4" />
@@ -459,7 +450,7 @@ export default function DHIS2ExportPage() {
             </div>
 
             {exportResult && (
-              <div className="card-elevated p-4" style={{ background: 'rgba(59, 130, 246,0.06)', border: '1px solid var(--accent-border)' }}>
+              <div className="card-elevated p-4" style={{ background: 'rgba(33, 145, 208, 0.06)', border: '1px solid var(--accent-border)' }}>
                 <div className="flex items-center gap-2 mb-1">
                   <CheckCircle className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                   <span className="font-semibold text-sm" style={{ color: 'var(--accent-primary)' }}>{t('dhis2.exportSuccessful')}</span>

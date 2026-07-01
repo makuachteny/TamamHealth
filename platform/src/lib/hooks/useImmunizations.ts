@@ -53,5 +53,12 @@ export function useImmunizations() {
     return doc;
   }, [load]);
 
-  return { immunizations, stats, coverage, loading, error, register, reload: load };
+  const update = useCallback(async (id: string, data: Partial<ImmunizationDoc>) => {
+    const { updateImmunization } = await import('../services/immunization-service');
+    const doc = await updateImmunization(id, data);
+    await load();
+    return doc;
+  }, [load]);
+
+  return { immunizations, stats, coverage, loading, error, register, update, reload: load };
 }

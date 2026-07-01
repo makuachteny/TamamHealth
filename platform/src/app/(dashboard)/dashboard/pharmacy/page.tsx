@@ -1,16 +1,18 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useMessagingDock } from '@/lib/messaging-dock-context';
 import {
   Pill, AlertTriangle, Package, Clock, ShieldCheck,
-  MessageSquare, Activity, Radio, Zap, Wifi, ChevronRight,
+  MessageSquare, Activity, Radio, ChevronRight,
   Search, ClipboardList, Send, CheckCircle2, XCircle,
-  AlertOctagon, X, Check, Plus,
+  AlertOctagon, X, Check, Plus, Filter, Users, BarChart3,
 } from '@/components/icons/lucide';
 
 const ACCENT = 'var(--accent-primary)';
@@ -324,10 +326,8 @@ export default function PharmacyDashboardPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const { openDock } = useMessagingDock();
-  const { currentUser } = useApp();
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [eventCounter, setEventCounter] = useState(0);
-  const [dataRate, setDataRate] = useState(0);
 
   // State for prescription queue (mutable for dispense)
   const [prescriptionQueue, setPrescriptionQueue] = useState<PrescriptionItem[]>(INITIAL_PRESCRIPTION_QUEUE);
@@ -341,6 +341,19 @@ export default function PharmacyDashboardPage() {
   const [showReceiveStock, setShowReceiveStock] = useState(false);
   // Prescription queue status filter
   const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'dispensed' | 'awaiting_pickup' | 'controlled'>('all');
+  // Inline search + the filter-icon dropdown that houses both the search and the
+  // status chips (replaces the platform-wide top search bar on this dashboard).
+  const [queueSearch, setQueueSearch] = useState('');
+  const [showQueueFilter, setShowQueueFilter] = useState(false);
+  const queueFilterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showQueueFilter) return;
+    const onDown = (e: MouseEvent) => {
+      if (queueFilterRef.current && !queueFilterRef.current.contains(e.target as Node)) setShowQueueFilter(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [showQueueFilter]);
 
   const generateEvent = useCallback((): LiveEvent => {
     const evtType = EVENT_TYPES[Math.floor(Math.random() * EVENT_TYPES.length)];
@@ -369,7 +382,6 @@ export default function PharmacyDashboardPage() {
         return [newEvent, ...prev.slice(0, 9).map(e => ({ ...e, isNew: false }))];
       });
       setEventCounter(c => c + 1);
-      setDataRate(14 + Math.floor(Math.random() * 10) - 5);
     }, 5000);
 
     return () => clearInterval(interval);
@@ -384,12 +396,21 @@ export default function PharmacyDashboardPage() {
   const isControlled = (rx: PrescriptionItem) => rx.medication.includes('Morphine') || rx.medication.includes('Diazepam');
   const controlledCount = prescriptionQueue.filter(isControlled).length;
 
-  // Queue filtered by the selected status chip
-  const visibleQueue = prescriptionQueue.filter(rx =>
-    queueFilter === 'all' ? true :
-    queueFilter === 'controlled' ? isControlled(rx) :
-    rx.status === queueFilter
-  );
+  // Queue filtered by the selected status chip and the inline search query.
+  const queueQuery = queueSearch.trim().toLowerCase();
+  const visibleQueue = prescriptionQueue.filter(rx => {
+    const statusOk =
+      queueFilter === 'all' ? true :
+      queueFilter === 'controlled' ? isControlled(rx) :
+      rx.status === queueFilter;
+    if (!statusOk) return false;
+    if (!queueQuery) return true;
+    return (
+      rx.patient.toLowerCase().includes(queueQuery) ||
+      rx.medication.toLowerCase().includes(queueQuery) ||
+      (rx.prescriber || '').toLowerCase().includes(queueQuery)
+    );
+  });
 
   // Dispense handler
   const handleDispense = (rx: PrescriptionItem) => {
@@ -411,6 +432,23 @@ export default function PharmacyDashboardPage() {
     }));
     setToast(t('pharmacy.dispensedToast', { medication: dispenseTarget.medication, patient: dispenseTarget.patient }));
     setDispenseTarget(null);
+  };
+
+  // Undo a dispense recorded in this session: restore the prescription to
+  // pending and return the deducted unit to stock. Local-state only (this
+  // dashboard does not persist), so the reversal is exact.
+  const handleUndoDispense = (rx: PrescriptionItem) => {
+    setPrescriptionQueue(prev => prev.map(r =>
+      r.id === rx.id ? { ...r, status: 'pending' as const } : r
+    ));
+    setStockAlerts(prev => prev.map(s => {
+      if (rx.medication.toLowerCase().includes(s.name.toLowerCase().split(' ')[0].toLowerCase())) {
+        const newStock = s.stock + 1;
+        return { ...s, stock: newStock, status: computeStockStatus(newStock, s.reorder) };
+      }
+      return s;
+    }));
+    setToast(t('pharmacy.dispensedToast', { medication: rx.medication, patient: rx.patient }));
   };
 
   // Drug interaction check for dispense modal — compare against the patient's
@@ -443,32 +481,60 @@ export default function PharmacyDashboardPage() {
 
   return (
     <>
-      <TopBar title={t('pharmacy.operations')} />
+      <TopBar title={t('pharmacy.operations')} hideSearch />
       <main className="page-container page-enter">
+
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Pending Rx', value: pendingRx },
+            { label: 'Dispensed Today', value: dispensedToday },
+            { label: 'Low Stock', value: lowStockCount },
+            { label: 'Awaiting Pickup', value: awaitingPickup },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={[
+            { label: 'All Patients', icon: Users, href: '/patients' },
+            { label: 'Controlled Substances', icon: ShieldCheck, href: '/controlled-substances', color: '#C44536' },
+            { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
+            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#0D9488' },
+          ]}
+          secondaryCard={<SpotlightCard title="Low Stock Items" value={lowStockCount} caption={`${criticalCount} critical · ${awaitingPickup} awaiting pickup`} />}
+        />
 
         {/* Command Center Header */}
         <div className="flex items-center justify-between" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
-              background: 'var(--accent-primary)',
-            }}>
-              <Pill className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center">
+              <Pill className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
                 {t('nav.pharmacy')}
               </h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                {currentUser?.hospitalName ? ` · ${currentUser.hospitalName}` : ''}
-              </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-[10px] text-right" style={{ color: 'var(--text-muted)' }}>
-              <div className="flex items-center gap-1"><Zap className="w-3 h-3" style={{ color: ACCENT }} /><span>{t('pharmacy.dispensingPerHr', { count: dataRate || 14 })}</span></div>
-              <div className="flex items-center gap-1"><Wifi className="w-3 h-3" style={{ color: 'var(--color-success)' }} /><span>{t('pharmacy.inventorySynced')}</span></div>
-            </div>
+        </div>
+
+        {/* Quick Actions (moved up to the top of the dashboard) */}
+        <div className="dash-card rounded-2xl p-3 mb-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.quickActions')}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { label: t('pharmacy.dispense'), icon: Pill, color: ACCENT },
+              { label: t('pharmacy.checkStock'), icon: Search, href: '/pharmacy', color: '#2563EB' },
+              { label: t('pharmacy.message'), icon: Send, href: '/messages', color: '#EC4899' },
+              { label: t('pharmacy.inventory'), icon: Package, href: '/pharmacy', color: 'var(--color-success)' },
+            ].map(action => (
+              <button key={action.label} onClick={() => action.href === '/messages' ? openDock() : action.href ? router.push(action.href) : undefined}
+                className="card-elevated flex items-center gap-3 px-3.5 py-3 text-left transition-all">
+                <action.icon className="w-[22px] h-[22px] flex-shrink-0" style={{ color: action.color }} />
+                <span className="text-[12px] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -525,36 +591,75 @@ export default function PharmacyDashboardPage() {
                 <ClipboardList className="w-4 h-4" style={{ color: ACCENT }} />
                 <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.prescriptionQueue')}</span>
               </div>
-              <button onClick={() => router.push('/pharmacy')} className="text-[10px] font-medium flex items-center gap-1" style={{ color: ACCENT }}>
-                {t('pharmacy.viewAll')} <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            {/* Status filter chips — surface pending / dispensed / pickup / controlled counts and filter the list */}
-            <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-              {([
-                { key: 'all', label: t('pharmacy.viewAll'), count: prescriptionQueue.length, color: 'var(--text-secondary)' },
-                { key: 'pending', label: t('pharmacy.kpiPendingRx'), count: pendingRx, color: ACCENT },
-                { key: 'dispensed', label: t('pharmacy.kpiDispensed'), count: dispensedToday, color: 'var(--color-success)' },
-                { key: 'awaiting_pickup', label: t('pharmacy.kpiPickup'), count: awaitingPickup, color: '#2563EB' },
-                { key: 'controlled', label: t('pharmacy.kpiControlled'), count: controlledCount, color: '#A855F7' },
-              ] as const).map(chip => {
-                const active = queueFilter === chip.key;
-                return (
+              <div className="flex items-center gap-2">
+                {/* Search + status filters live behind this filter icon, between the
+                    queue title and "View all". */}
+                <div className="relative" ref={queueFilterRef}>
                   <button
-                    key={chip.key}
-                    onClick={() => setQueueFilter(chip.key)}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all"
+                    onClick={() => setShowQueueFilter(o => !o)}
+                    title={t('pharmacy.prescriptionQueue')}
+                    aria-label={t('pharmacy.prescriptionQueue')}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
                     style={{
-                      background: active ? `${chip.color}18` : 'var(--overlay-subtle)',
-                      border: `1px solid ${active ? chip.color : 'var(--border-light)'}`,
-                      color: active ? chip.color : 'var(--text-secondary)',
+                      background: (queueSearch || queueFilter !== 'all') ? `${ACCENT}18` : 'var(--overlay-subtle)',
+                      border: `1px solid ${(queueSearch || queueFilter !== 'all') ? ACCENT : 'var(--border-light)'}`,
+                      color: (queueSearch || queueFilter !== 'all') ? ACCENT : 'var(--text-muted)',
                     }}
                   >
-                    {chip.label}
-                    <span className="px-1 rounded text-[9px] font-bold" style={{ background: `${chip.color}20`, color: chip.color }}>{chip.count}</span>
+                    <Filter className="w-3.5 h-3.5" />
                   </button>
-                );
-              })}
+                  {showQueueFilter && (
+                    <div
+                      className="absolute right-0 top-full mt-1.5 z-30 p-2.5 rounded-xl"
+                      style={{ width: 260, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}
+                    >
+                      {/* Search */}
+                      <div className="relative mb-2">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                        <input
+                          type="search"
+                          value={queueSearch}
+                          onChange={e => setQueueSearch(e.target.value)}
+                          placeholder={t('topbar.searchPlaceholder')}
+                          className="w-full !pl-8 !pr-2 !py-1.5 text-[12px]"
+                          style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', borderRadius: 8, color: 'var(--text-primary)' }}
+                        />
+                      </div>
+                      {/* Status filter chips — pending / dispensed / pickup / controlled counts */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {([
+                          { key: 'all', label: t('pharmacy.viewAll'), count: prescriptionQueue.length, color: 'var(--text-secondary)' },
+                          { key: 'pending', label: t('pharmacy.kpiPendingRx'), count: pendingRx, color: ACCENT },
+                          { key: 'dispensed', label: t('pharmacy.kpiDispensed'), count: dispensedToday, color: 'var(--color-success)' },
+                          { key: 'awaiting_pickup', label: t('pharmacy.kpiPickup'), count: awaitingPickup, color: '#2563EB' },
+                          { key: 'controlled', label: t('pharmacy.kpiControlled'), count: controlledCount, color: '#A855F7' },
+                        ] as const).map(chip => {
+                          const active = queueFilter === chip.key;
+                          return (
+                            <button
+                              key={chip.key}
+                              onClick={() => setQueueFilter(active && chip.key !== 'all' ? 'all' : chip.key)}
+                              title={active && chip.key !== 'all' ? t('action.deselect') : undefined}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all"
+                              style={{
+                                background: active ? `${chip.color}18` : 'var(--overlay-subtle)',
+                                border: `1px solid ${active ? chip.color : 'var(--border-light)'}`,
+                                color: active ? chip.color : 'var(--text-secondary)',
+                              }}
+                            >
+                              {chip.label}
+                              <span className="px-1 rounded text-[9px] font-bold" style={{ background: `${chip.color}20`, color: chip.color }}>{chip.count}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => router.push('/pharmacy')} className="text-[10px] font-medium flex items-center gap-1" style={{ color: ACCENT }}>
+                  {t('pharmacy.viewAll')} <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
             <div className="p-3 space-y-1.5 flex-1" style={{ overflowY: 'auto', minHeight: 0 }}>
               {visibleQueue.length === 0 && (
@@ -565,11 +670,6 @@ export default function PharmacyDashboardPage() {
                   background: rx.priority === 'urgent' ? `${ACCENT}08` : 'var(--overlay-subtle)',
                   border: `1px solid ${rx.priority === 'urgent' ? `${ACCENT}25` : 'var(--border-light)'}`,
                 }}>
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0" style={{
-                    background: 'var(--accent-primary)',
-                  }}>
-                    {rx.patient.split(' ').slice(0, 2).map(n => n[0]).join('')}
-                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{rx.patient}</p>
                     <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
@@ -596,6 +696,15 @@ export default function PharmacyDashboardPage() {
                         style={{ background: 'var(--color-success)' }}
                       >
                         <Pill className="w-3 h-3" /> {t('pharmacy.dispense')}
+                      </button>
+                    )}
+                    {rx.status === 'dispensed' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleUndoDispense(rx); }}
+                        className="mt-1 px-3 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-90 flex items-center gap-1"
+                        style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                      >
+                        {t('action.undo')}
                       </button>
                     )}
                   </div>
@@ -679,7 +788,7 @@ export default function PharmacyDashboardPage() {
                     animation: evt.isNew ? 'fadeIn 0.3s ease-out' : undefined,
                   }}>
                     <div className="flex items-start gap-2">
-                      <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: `${evt.color}15` }}>
+                      <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: 'transparent' }}>
                         <Icon className="w-3 h-3" style={{ color: evt.color }} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -700,26 +809,6 @@ export default function PharmacyDashboardPage() {
                 );
               })}
             </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="dash-card rounded-2xl p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.quickActions')}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            {[
-              { label: t('pharmacy.dispense'), icon: Pill, color: ACCENT },
-              { label: t('pharmacy.checkStock'), icon: Search, href: '/pharmacy', color: '#2563EB' },
-              { label: t('pharmacy.message'), icon: Send, href: '/messages', color: '#EC4899' },
-              { label: t('pharmacy.inventory'), icon: Package, href: '/pharmacy', color: 'var(--color-success)' },
-            ].map(action => (
-              <button key={action.label} onClick={() => action.href === '/messages' ? openDock() : action.href ? router.push(action.href) : undefined}
-                className="flex items-center gap-2 p-2.5 rounded-lg transition-all"
-                style={{ background: `${action.color}08`, border: `1px solid ${action.color}15` }}>
-                <action.icon className="w-3.5 h-3.5" style={{ color: action.color }} />
-                <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
-              </button>
-            ))}
           </div>
         </div>
 

@@ -27,9 +27,10 @@ const DEFAULT_HISTORY_DAYS = 90;
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const auth = await getAuthPayload(request);
     if (!auth) return unauthorized();
     if (!hasRole(auth, READ_ROLES)) return forbidden();
@@ -56,7 +57,7 @@ export async function GET(
       import('@/lib/fhir'),
     ]);
 
-    const referral = await getReferralById(params.id);
+    const referral = await getReferralById(id);
     if (!referral) {
       return NextResponse.json(
         { resourceType: 'OperationOutcome', issue: [{ severity: 'error', code: 'not-found', diagnostics: 'Referral not found' }] },

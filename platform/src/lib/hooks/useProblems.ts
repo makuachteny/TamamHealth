@@ -62,6 +62,13 @@ export function useProblems(patientId?: string) {
     return doc;
   }, [load]);
 
+  const remove = useCallback(async (id: string) => {
+    const { deleteProblem } = await import('../services/problem-service');
+    const ok = await deleteProblem(id);
+    await load();
+    return ok;
+  }, [load]);
+
   // Filtered to a single patient when caller passes a patientId.
   const patientProblems = useMemo(
     () => patientId ? problems.filter(p => p.patientId === patientId) : problems,
@@ -81,6 +88,7 @@ export function useProblems(patientId?: string) {
     create,
     update,
     setStatus,
+    remove,
     reload: load,
   };
 }

@@ -3,7 +3,10 @@
   "short_name": "TamamHealth",
   "description": "Offline-first health records system. Secure, scalable EMR for hospitals and community health workers across Africa.",
   "start_url": "/",
+  "id": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#eff6ff",
   "theme_color": "#1e3a8a",
   "orientation": "any",
@@ -27,7 +30,7 @@
       "src": "/assets/tamamhealth-icon.svg",
       "sizes": "64x64",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
   "screenshots": [],

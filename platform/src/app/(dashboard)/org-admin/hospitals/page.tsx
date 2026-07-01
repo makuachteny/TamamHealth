@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import {
   Building2, Plus, X, MapPin, ChevronDown, AlertCircle, Users,
@@ -37,7 +36,7 @@ export default function OrgHospitalsPage() {
   const [formType, setFormType] = useState<string>('phcc');
   const [formBeds, setFormBeds] = useState('');
 
-  const brandColor = currentUser?.branding?.primaryColor || '#7C3AED';
+  const brandColor = currentUser?.branding?.primaryColor || 'var(--accent-primary)';
 
   const loadData = useCallback(async () => {
     if (!currentUser?.orgId) return;
@@ -133,7 +132,7 @@ export default function OrgHospitalsPage() {
   const facilityColor = (ft: string) => {
     const map: Record<string, string> = {
       national_referral: 'var(--color-danger)',
-      state_hospital: '#7C3AED',
+      state_hospital: 'var(--accent-primary)',
       county_hospital: 'var(--accent-primary)',
       phcc: 'var(--accent-primary)',
       phcu: '#06B6D4',
@@ -154,7 +153,16 @@ export default function OrgHospitalsPage() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title={t('orgHospitals.topBarTitle')} />
+      <TopBar title={t('orgHospitals.topBarTitle')} actions={
+        <button
+          onClick={() => { setError(''); setShowCreateModal(true); }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
+          style={{ background: brandColor }}
+        >
+          <Plus className="w-4 h-4" />
+          {t('orgHospitals.addFacility')}
+        </button>
+      } />
 
       <div className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Success/Error */}
@@ -169,22 +177,6 @@ export default function OrgHospitalsPage() {
           </div>
         )}
 
-        <PageHeader
-          icon={Building2}
-          title={t('orgHospitals.headerTitle')}
-          subtitle={t('orgHospitals.headerSubtitle', { count: hospitals.length })}
-          actions={
-            <button
-              onClick={() => { setError(''); setShowCreateModal(true); }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
-              style={{ background: brandColor }}
-            >
-              <Plus className="w-4 h-4" />
-              {t('orgHospitals.addFacility')}
-            </button>
-          }
-        />
-
         {/* Hospitals Table */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
@@ -192,7 +184,7 @@ export default function OrgHospitalsPage() {
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('orgHospitals.headerTitle')}</h3>
           </div>
           <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          <table className="w-full">
+          <table className="w-full" style={{ minWidth: 720 }}>
             <thead>
               <tr>
                 <th className="text-left px-4 py-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>{t('hospitals.colName')}</th>
@@ -217,7 +209,7 @@ export default function OrgHospitalsPage() {
                       <div className="flex items-center gap-3">
                         <div
                           className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ background: `${facilityColor(hospital.facilityType)}15` }}
+                          style={{ background: 'transparent' }}
                         >
                           <Building2 className="w-4 h-4" style={{ color: facilityColor(hospital.facilityType) }} />
                         </div>

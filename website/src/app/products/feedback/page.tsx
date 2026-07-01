@@ -18,9 +18,9 @@ export default function PatientFeedbackPage() {
           title="Hear every patient. Close every loop."
           subtitle="Capture satisfaction ratings and open-ended comments from patients in person, by SMS, by WhatsApp, or at a kiosk. Negative feedback auto-flags for follow-up so nothing falls through the cracks."
           accentColor="var(--tb-gold-dark)"
-          primaryCta={{ label: "Request a demo", href: "/about/contact" }}
-          secondaryCta={{ label: "See the dashboard", href: "/about/contact" }}
-          illustration={<ProductIllustration accent="var(--tb-gold-dark)" variant="feedback" />}
+          primaryCta={{ label: "Request a demo", href: "/about/contact?intent=demo#contact-form" }}
+          secondaryCta={{ label: "See the dashboard", href: "/about/contact?intent=demo#contact-form" }}
+          illustration={<ProductIllustration accent="#2191D0" variant="feedback" />}
         />
 
         <ProductModuleGrid

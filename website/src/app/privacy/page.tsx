@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { Reveal } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
+import { Shield, CloudOff, Code2 } from "@/components/marketing/icons";
 
 const SECTIONS = [
   { id: "introduction", title: "Introduction" },
@@ -22,18 +23,12 @@ const SECTIONS = [
 export default function PrivacyPage() {
   return (
     <>
-      {/* HERO */}
-      <section className="mk-section mk-section-cream">
-        <div className="mk-container" style={{ maxWidth: 760, margin: "0 auto", textAlign: "center" }}>
-          <Reveal>
-            <span className="mk-label">LEGAL</span>
-            <h1 className="mk-h1" style={{ marginTop: 12 }}>Privacy Policy</h1>
-            <p className="mk-body" style={{ color: "var(--tb-text-sec)", marginTop: 14 }}>
-              Last updated: April 15, 2026
-            </p>
-          </Reveal>
-        </div>
-      </section>
+      <MarketingHero
+        variant="legal"
+        eyebrow="LEGAL"
+        title="Privacy Policy"
+        subtitle="Last updated: April 15, 2026"
+      />
 
       {/* TRUST COMMITMENTS */}
       <section className="mk-section-tight mk-section-white" style={{ borderTop: "1px solid var(--tb-cream-300)", borderBottom: "1px solid var(--tb-cream-300)" }}>
@@ -67,7 +62,7 @@ export default function PrivacyPage() {
               <Reveal>
                 <Section id="introduction" title="Introduction">
                   <p>
-                    TamamHealth Health Technologies (&quot;TamamHealth,&quot; &quot;we,&quot; &quot;our&quot;) is committed to protecting the privacy and security of your personal and health information. This Privacy Policy describes how we collect, use, store, and share data when you use our digital health platform.
+                    TamamHealth Technologies (&quot;TamamHealth,&quot; &quot;we,&quot; &quot;our&quot;) is committed to protecting the privacy and security of your personal and health information. This Privacy Policy describes how we collect, use, store, and share data when you use our digital health platform.
                   </p>
                 </Section>
 
@@ -107,7 +102,7 @@ export default function PrivacyPage() {
                 <Section id="your-rights" title="Your Rights">
                   <p>
                     You have the right to access, correct, or delete your personal information. Healthcare providers can export patient data in standard formats (HL7 FHIR, CSV). To exercise these rights, contact us at{" "}
-                    <a href="mailto:hello@tamamhealth.org" style={{ color: "var(--tb-green)", fontWeight: 600 }}>hello@tamamhealth.org</a>.
+                    <a href="mailto:support.tamam@gmail.com" style={{ color: "var(--tb-green)", fontWeight: 600 }}>support.tamam@gmail.com</a>.
                   </p>
                 </Section>
 
@@ -138,9 +133,9 @@ export default function PrivacyPage() {
                 <Section id="contact" title="Contact Us">
                   <p>
                     For privacy-related questions or concerns, contact us at{" "}
-                    <a href="mailto:hello@tamamhealth.org" style={{ color: "var(--tb-green)", fontWeight: 600 }}>hello@tamamhealth.org</a>
+                    <a href="mailto:support.tamam@gmail.com" style={{ color: "var(--tb-green)", fontWeight: 600 }}>support.tamam@gmail.com</a>
                     {" "}or visit our{" "}
-                    <Link href="/about/contact" style={{ color: "var(--tb-green)", fontWeight: 600 }}>contact page</Link>.
+                    <Link href="/about/contact#contact-form" style={{ color: "var(--tb-green)", fontWeight: 600 }}>contact page</Link>.
                   </p>
                 </Section>
               </Reveal>
@@ -158,7 +153,7 @@ export default function PrivacyPage() {
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
             <Link href="/terms" className="mk-btn mk-btn-outline-green">Terms &amp; Conditions</Link>
-            <Link href="/about/contact" className="mk-btn mk-btn-green">Contact us</Link>
+            <Link href="/about/contact#contact-form" className="mk-btn mk-btn-green">Contact us</Link>
           </div>
         </div>
       </section>
@@ -190,11 +185,18 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
+const TRUST_ICON_MAP = {
+  shield: Shield,
+  offline: CloudOff,
+  api: Code2,
+} as const;
+
 function TrustItem({ icon, title, body }: { icon: "shield" | "offline" | "api"; title: string; body: string }) {
+  const IconComp = TRUST_ICON_MAP[icon];
   return (
     <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-      <div style={{ flex: "0 0 44px", width: 44, height: 44, borderRadius: 12, background: "var(--tb-tint-blue)", color: "var(--tb-blue-700)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <DuoIcon name={icon} size={22} />
+      <div style={{ flex: "0 0 44px", width: 44, height: 44, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <IconComp size={22} strokeWidth={1.8} />
       </div>
       <div>
         <p style={{ fontSize: 15, fontWeight: 700, color: "var(--tb-text-pri)", margin: "0 0 4px" }}>{title}</p>

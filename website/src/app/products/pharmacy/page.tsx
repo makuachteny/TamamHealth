@@ -18,8 +18,8 @@ export default function PharmacyManagementPage() {
           title="Stock in. Rx out. Counted right."
           subtitle="Tight inventory control with batch + expiry tracking, electronic prescription dispensing, POS for over-the-counter sales, and a clean audit trail for controlled substances."
           accentColor="var(--tb-green-dark)"
-          primaryCta={{ label: "Request a demo", href: "/about/contact" }}
-          illustration={<ProductIllustration accent="var(--tb-green-dark)" variant="pharmacy" />}
+          primaryCta={{ label: "Request a demo", href: "/about/contact?intent=demo#contact-form" }}
+          illustration={<ProductIllustration accent="#2191D0" variant="pharmacy" />}
         />
 
         <ProductModuleGrid

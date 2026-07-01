@@ -9,6 +9,9 @@ import {
   checkInteractions,
   checkNewPrescription,
   getInteractionsForDrug,
+  checkAllergies,
+  checkAllergiesStructured,
+  findDuplicateMedications,
 } from '@/lib/services/drug-interaction-service';
 
 describe('drug-interaction-service', () => {
@@ -401,6 +404,105 @@ describe('drug-interaction-service', () => {
       // Paracetamol has no interactions, Amoxicillin + Diazepam have none
       // (Only with warfarin and morphine respectively)
       expect(result.hasInteractions).toBe(false);
+    });
+  });
+
+  describe('checkAllergies', () => {
+    it('flags a direct drug–allergy name match', () => {
+      const alerts = checkAllergies(['Amoxicillin 500mg'], ['amoxicillin']);
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].reason).toBe('direct');
+    });
+
+    it('flags a class match (penicillin allergy → amoxicillin)', () => {
+      const alerts = checkAllergies(['Amoxicillin 500mg'], ['Penicillin']);
+      expect(alerts.length).toBeGreaterThanOrEqual(1);
+      expect(alerts.some(a => a.medication.toLowerCase().includes('amoxicillin'))).toBe(true);
+    });
+
+    it('flags sulfa allergy against cotrimoxazole', () => {
+      const alerts = checkAllergies(['Cotrimoxazole 960mg'], ['sulfa']);
+      expect(alerts.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('ignores NKDA / none sentinels', () => {
+      expect(checkAllergies(['Amoxicillin'], ['NKDA'])).toHaveLength(0);
+      expect(checkAllergies(['Amoxicillin'], ['None'])).toHaveLength(0);
+    });
+
+    it('returns nothing when no allergy matches', () => {
+      expect(checkAllergies(['Paracetamol'], ['penicillin'])).toHaveLength(0);
+    });
+  });
+
+  describe('findDuplicateMedications', () => {
+    it('detects the same drug at different strengths', () => {
+      const dupes = findDuplicateMedications(['Amoxicillin 250mg', 'Amoxicillin 500mg']);
+      expect(dupes).toHaveLength(1);
+    });
+
+    it('does not flag distinct drugs', () => {
+      expect(findDuplicateMedications(['Amoxicillin', 'Paracetamol'])).toHaveLength(0);
+    });
+
+    it('flags the same drug at different strengths', () => {
+      expect(findDuplicateMedications(['Amoxicillin 250mg', 'Amoxicillin 500mg'])).toHaveLength(1);
+    });
+
+    it('does NOT flag a combination drug against its single-agent namesake (L3)', () => {
+      // "Artemether-Lumefantrine" must not collide with "Artemether".
+      expect(findDuplicateMedications(['Artemether-Lumefantrine 20/120mg', 'Artemether 80mg injection'])).toHaveLength(0);
+    });
+
+    it('ignores dose/form tokens when keying', () => {
+      expect(findDuplicateMedications(['Paracetamol 500mg tablet PO', 'Paracetamol 1g IV'])).toHaveLength(1);
+    });
+  });
+
+  describe('checkAllergiesStructured (P0.3)', () => {
+    it('flags a severe allergy with requiresOverride and carries criticality + reaction', () => {
+      const alerts = checkAllergiesStructured(
+        ['Amoxicillin 500mg'],
+        [{ substance: 'Penicillin', criticality: 'severe', reaction: 'anaphylaxis', status: 'active' }],
+      );
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].criticality).toBe('severe');
+      expect(alerts[0].reaction).toBe('anaphylaxis');
+      expect(alerts[0].requiresOverride).toBe(true);
+      expect(alerts[0].reason).toBe('class'); // penicillin class → amoxicillin
+    });
+
+    it('does not require override for explicitly mild/moderate criticality', () => {
+      const mild = checkAllergiesStructured(['Aspirin'], [{ substance: 'Aspirin', criticality: 'mild', status: 'active' }]);
+      expect(mild[0].requiresOverride).toBe(false);
+      const moderate = checkAllergiesStructured(['Aspirin'], [{ substance: 'Aspirin', criticality: 'moderate', status: 'active' }]);
+      expect(moderate[0].requiresOverride).toBe(false);
+    });
+
+    it('escalates unknown-criticality matches to requiresOverride (fail-safe)', () => {
+      // Common real-world case: a migrated "Penicillin" allergy with unknown
+      // criticality matching amoxicillin must not be silently treated as safe.
+      const alerts = checkAllergiesStructured(['Amoxicillin 500mg'], [{ substance: 'Penicillin', status: 'active' }]);
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].criticality).toBe('unknown');
+      expect(alerts[0].requiresOverride).toBe(true);
+    });
+
+    it('ignores inactive / resolved allergies', () => {
+      const alerts = checkAllergiesStructured(
+        ['Amoxicillin'],
+        [{ substance: 'Penicillin', criticality: 'severe', status: 'inactive' }],
+      );
+      expect(alerts).toHaveLength(0);
+    });
+
+    it('treats missing status as active', () => {
+      const alerts = checkAllergiesStructured(['Amoxicillin'], [{ substance: 'Penicillin', criticality: 'severe' }]);
+      expect(alerts).toHaveLength(1);
+    });
+
+    it('skips no-known-allergy sentinels', () => {
+      expect(checkAllergiesStructured(['Amoxicillin'], [{ substance: 'NKDA', status: 'active' }])).toHaveLength(0);
     });
   });
 });

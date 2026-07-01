@@ -3,13 +3,15 @@
 import { useMemo, useState } from 'react';
 import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import {
   AlertTriangle, Shield, TrendingUp, TrendingDown,
   Minus, MapPin, Activity, FileText, Calendar, ChevronRight,
   Download, Plus, X, BarChart3,
 } from '@/components/icons/lucide';
 import EmptyState from '@/components/EmptyState';
+import Badge, { type BadgeTone } from '@/components/Badge';
+import { FilterMenu } from '@/components/filters';
+import { formatDate } from '@/lib/format-utils';
 // `states` is a static reference list (28 states/oblasts) used only to
 // populate a dropdown. It contains no PHI, so importing from the mock
 // module is fine. The disease aggregates that used to come from the same
@@ -23,8 +25,9 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, LineChart, Line, Legend
+  ResponsiveContainer, LineChart, Line, AreaChart, Area, Legend
 } from 'recharts';
+import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick, AreaGradients } from '@/components/ChartCard';
 
 // Chart colors
 const COLORS = {
@@ -34,7 +37,7 @@ const COLORS = {
   pneumonia: '#2563EB',
   diarrhea: 'var(--color-success)',
   tb: '#D4A843',
-  hiv: '#7C3AED',
+  hiv: 'var(--accent-primary)',
 };
 
 // Alert level ordering for severity sorting
@@ -66,6 +69,15 @@ function latLngToSvg(lat: number, lng: number): { x: number; y: number } {
   return { x, y };
 }
 
+
+// Alert level → semantic Badge tone (emergency→danger, warning/watch→warning,
+// normal→success).
+const alertLevelTone: Record<string, BadgeTone> = {
+  emergency: 'danger',
+  warning: 'warning',
+  watch: 'warning',
+  normal: 'success',
+};
 
 const alertDotColors: Record<string, string> = {
   emergency: 'var(--color-danger)',
@@ -250,6 +262,9 @@ export default function SurveillancePage() {
 
   const uniqueDiseases = [...new Set((diseaseAlerts || []).map(a => a.disease))];
 
+  const activeFilterCount = (selectedDisease !== 'all' ? 1 : 0);
+  const clearFilters = () => { setSelectedDisease('all'); };
+
   // ── Aggregations derived from the live alert feed (replaces the
   // previous hard-coded weeklyDiseaseData / casesByState / idsrSummary).
   const idsrSummary = useMemo(() => buildIDSRSummary(diseaseAlerts || []), [diseaseAlerts]);
@@ -351,13 +366,20 @@ export default function SurveillancePage() {
 
   return (
     <>
-      <TopBar title={t('nav.surveillance')} />
-      <main className="page-container page-enter">
-          <PageHeader
-            icon={Activity}
-            title={t('surveillance.dashboardTitle')}
-            subtitle={t('surveillance.dashboardSubtitle', { week: reportingWeek })}
-            actions={
+      <TopBar title={t('nav.surveillance')} searchTrailing={
+                <FilterMenu activeCount={activeFilterCount} onClear={clearFilters} size="sm">
+                  <FilterMenu.Field label={t('surveillance.allDiseases')}>
+                    <select
+                      className="w-full text-sm"
+                      value={selectedDisease}
+                      onChange={e => setSelectedDisease(e.target.value)}
+                    >
+                      <option value="all">{t('surveillance.allDiseases')}</option>
+                      {uniqueDiseases.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </FilterMenu.Field>
+                </FilterMenu>
+              } actions={
               <>
                 {canReportAlert && (
                   <button className="btn btn-primary btn-sm" onClick={() => setShowNewAlert(true)}>
@@ -370,14 +392,14 @@ export default function SurveillancePage() {
                   {t('surveillance.exportReport')}
                 </button>
               </>
-            }
-          />
+            } />
+      <main className="page-container page-enter">
 
           {/* Aggregate summary strip */}
           <div className="card-elevated p-4 mb-6 flex items-center justify-between">
             <div className="flex items-center gap-8">
               <div className="flex items-center gap-2">
-                <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+                <div className="icon-box-sm">
                   <Activity className="w-3.5 h-3.5" style={{ color: '#2563EB' }} />
                 </div>
                 <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('surveillance.totalCasesThisWeek')}</span>
@@ -410,7 +432,7 @@ export default function SurveillancePage() {
             </div>
             <div className="flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('surveillance.updated', { date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) })}</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('surveillance.updated', { date: formatDate(new Date().toISOString()) })}</span>
             </div>
           </div>
 
@@ -439,11 +461,11 @@ export default function SurveillancePage() {
                   <svg viewBox="0 0 600 400" className="w-full" style={{ maxHeight: '340px' }}>
                     {/* Background - South Sudan shape approximation */}
                     <rect x="30" y="20" width="540" height="360" rx="24" ry="24"
-                      fill="rgba(59, 130, 246,0.08)" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+                      fill="rgba(33, 145, 208, 0.08)" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
 
                     {/* Country label */}
                     <text x="300" y="55" textAnchor="middle" fontSize="16" fontWeight="600"
-                      fill="rgba(255,255,255,0.35)" fontFamily="'Manrope', sans-serif" opacity="0.35">
+                      fill="rgba(255,255,255,0.35)" fontFamily="'DM Sans', sans-serif" opacity="0.35">
                       South Sudan
                     </text>
 
@@ -524,78 +546,145 @@ export default function SurveillancePage() {
               </div>
 
               {/* Weekly Disease Trends */}
-              <div className="card-elevated">
-                <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                  <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                    <TrendingUp className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
-                    {t('surveillance.weeklyTrendsTitle')}
-                  </h3>
-                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('surveillance.sourceIdsrReports')}</span>
-                </div>
-                <div className="p-4">
-                  {weeklyDiseaseData.length === 0 ? (
-                    <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <EmptyState icon={TrendingUp} title="No data yet" message="No weekly disease trends for this period." />
-                    </div>
-                  ) : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={weeklyDiseaseData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                      <XAxis dataKey="week" tick={{ fontSize: 11, fill: '#7B8FA8' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: '#7B8FA8' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend iconType="circle" iconSize={8}
-                        wrapperStyle={{ fontSize: '0.75rem', paddingTop: '8px' }} />
-                      <Line type="monotone" dataKey="malaria" name={t('surveillance.diseaseMalaria')} stroke={COLORS.malaria}
-                        strokeWidth={2.5} dot={{ r: 4, fill: COLORS.malaria }} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="cholera" name={t('surveillance.diseaseCholera')} stroke={COLORS.cholera}
-                        strokeWidth={2} dot={{ r: 3, fill: COLORS.cholera }} activeDot={{ r: 5 }} />
-                      <Line type="monotone" dataKey="measles" name={t('surveillance.diseaseMeasles')} stroke={COLORS.measles}
-                        strokeWidth={2} dot={{ r: 3, fill: COLORS.measles }} activeDot={{ r: 5 }} />
-                      <Line type="monotone" dataKey="pneumonia" name={t('surveillance.diseasePneumonia')} stroke={COLORS.pneumonia}
-                        strokeWidth={2} dot={{ r: 3, fill: COLORS.pneumonia }} activeDot={{ r: 5 }} />
-                      <Line type="monotone" dataKey="diarrhea" name={t('surveillance.diseaseDiarrhea')} stroke={COLORS.diarrhea}
-                        strokeWidth={2} dot={{ r: 3, fill: COLORS.diarrhea }} activeDot={{ r: 5 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                  )}
-                </div>
-              </div>
+              <ChartCard
+                title={t('surveillance.weeklyTrendsTitle')}
+                subtitle={t('surveillance.sourceIdsrReports')}
+                defaultType="line"
+                defaultPeriod="month"
+              >
+                {({ chartType, period }) => {
+                  const sliced = period === 'week' ? weeklyDiseaseData.slice(-7)
+                    : period === 'quarter' ? weeklyDiseaseData
+                    : weeklyDiseaseData.slice(-30);
+                  const data = sliced.length > 0 ? sliced : weeklyDiseaseData;
+                  if (data.length === 0) {
+                    return (
+                      <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <EmptyState icon={TrendingUp} title="No data yet" message="No weekly disease trends for this period." />
+                      </div>
+                    );
+                  }
+                  const diseaseLines = [
+                    { key: 'malaria', name: t('surveillance.diseaseMalaria'), color: COLORS.malaria },
+                    { key: 'cholera', name: t('surveillance.diseaseCholera'), color: COLORS.cholera },
+                    { key: 'measles', name: t('surveillance.diseaseMeasles'), color: COLORS.measles },
+                    { key: 'pneumonia', name: t('surveillance.diseasePneumonia'), color: COLORS.pneumonia },
+                    { key: 'diarrhea', name: t('surveillance.diseaseDiarrhea'), color: COLORS.diarrhea },
+                  ];
+                  const commonProps = { data, margin: { top: 10, right: 20, left: 0, bottom: 5 } };
+                  const legendProps = { iconType: 'circle' as const, iconSize: 8, wrapperStyle: { fontSize: '0.75rem', paddingTop: '8px' } };
+                  if (chartType === 'area') {
+                    return (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <AreaChart {...commonProps}>
+                          <AreaGradients />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                          <XAxis dataKey="week" tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
+                          <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
+                          <Tooltip {...chartTooltipStyle} />
+                          <Legend {...legendProps} />
+                          {diseaseLines.map(d => <Area key={d.key} type="monotone" dataKey={d.key} name={d.name} stroke={d.color} fill={d.color} fillOpacity={0.12} strokeWidth={2} />)}
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    );
+                  }
+                  if (chartType === 'bar') {
+                    return (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart {...commonProps}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                          <XAxis dataKey="week" tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
+                          <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
+                          <Tooltip {...chartTooltipStyle} />
+                          <Legend {...{ ...legendProps, iconType: 'square' as const }} />
+                          {diseaseLines.map(d => <Bar key={d.key} dataKey={d.key} name={d.name} fill={d.color} radius={[2, 2, 0, 0]} />)}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    );
+                  }
+                  return (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart {...commonProps}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                        <XAxis dataKey="week" tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
+                        <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend {...legendProps} />
+                        {diseaseLines.map(d => <Line key={d.key} type="monotone" dataKey={d.key} name={d.name} stroke={d.color} strokeWidth={d.key === 'malaria' ? 2.5 : 2} dot={{ r: 3, fill: d.color }} activeDot={{ r: 5 }} />)}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  );
+                }}
+              </ChartCard>
 
               {/* Cases by State */}
-              <div className="card-elevated">
-                <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                  <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                    <Activity className="w-4 h-4" style={{ color: '#2563EB' }} />
-                    {t('surveillance.casesByStateTitle')}
-                  </h3>
-                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('surveillance.top5Diseases')}</span>
-                </div>
-                <div className="p-4">
-                  {casesByState.length === 0 ? (
-                    <div style={{ height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <EmptyState icon={BarChart3} title="No data yet" message="No cases reported by state." />
-                    </div>
-                  ) : (
-                  <ResponsiveContainer width="100%" height={360}>
-                    <BarChart data={casesByState} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                      <XAxis dataKey="state" tick={{ fontSize: 10, fill: '#7B8FA8' }} axisLine={{ stroke: 'var(--border-light)' }}
-                        tickLine={false} angle={-25} textAnchor="end" height={60} />
-                      <YAxis tick={{ fontSize: 11, fill: '#7B8FA8' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend iconType="square" iconSize={10}
-                        wrapperStyle={{ fontSize: '0.75rem', paddingTop: '4px' }} />
-                      <Bar dataKey="malaria" name={t('surveillance.diseaseMalaria')} fill={COLORS.malaria} radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="cholera" name={t('surveillance.diseaseCholera')} fill={COLORS.cholera} radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="measles" name={t('surveillance.diseaseMeasles')} fill={COLORS.measles} radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="tb" name={t('surveillance.diseaseTb')} fill={COLORS.tb} radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="hiv" name={t('surveillance.diseaseHiv')} fill={COLORS.hiv} radius={[2, 2, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                  )}
-                </div>
-              </div>
+              <ChartCard
+                title={t('surveillance.casesByStateTitle')}
+                subtitle={t('surveillance.top5Diseases')}
+                defaultType="bar"
+                defaultPeriod="month"
+              >
+                {({ chartType }) => {
+                  if (casesByState.length === 0) {
+                    return (
+                      <div style={{ height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <EmptyState icon={BarChart3} title="No data yet" message="No cases reported by state." />
+                      </div>
+                    );
+                  }
+                  const stateBars = [
+                    { key: 'malaria', name: t('surveillance.diseaseMalaria'), color: COLORS.malaria },
+                    { key: 'cholera', name: t('surveillance.diseaseCholera'), color: COLORS.cholera },
+                    { key: 'measles', name: t('surveillance.diseaseMeasles'), color: COLORS.measles },
+                    { key: 'tb', name: t('surveillance.diseaseTb'), color: COLORS.tb },
+                    { key: 'hiv', name: t('surveillance.diseaseHiv'), color: COLORS.hiv },
+                  ];
+                  const commonProps = { data: casesByState, margin: { top: 10, right: 20, left: 0, bottom: 5 } };
+                  const xProps = { dataKey: 'state', tick: { ...axisTick, fontSize: 10 }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false, angle: -25, textAnchor: 'end' as const, height: 60 };
+                  const legendProps = { iconType: 'square' as const, iconSize: 10, wrapperStyle: { fontSize: '0.75rem', paddingTop: '4px' } };
+                  if (chartType === 'area') {
+                    return (
+                      <ResponsiveContainer width="100%" height={360}>
+                        <AreaChart {...commonProps}>
+                          <AreaGradients />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                          <XAxis {...xProps} />
+                          <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
+                          <Tooltip {...chartTooltipStyle} />
+                          <Legend {...legendProps} />
+                          {stateBars.map(d => <Area key={d.key} type="monotone" dataKey={d.key} name={d.name} stroke={d.color} fill={d.color} fillOpacity={0.12} strokeWidth={2} />)}
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    );
+                  }
+                  if (chartType === 'line') {
+                    return (
+                      <ResponsiveContainer width="100%" height={360}>
+                        <LineChart {...commonProps}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                          <XAxis {...xProps} />
+                          <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Legend {...legendProps} />
+                          {stateBars.map(d => <Line key={d.key} type="monotone" dataKey={d.key} name={d.name} stroke={d.color} strokeWidth={2} dot={{ r: 3 }} />)}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    );
+                  }
+                  return (
+                    <ResponsiveContainer width="100%" height={360}>
+                      <BarChart {...commonProps}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                        <XAxis {...xProps} />
+                        <YAxis tick={axisTick} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend {...legendProps} />
+                        {stateBars.map(d => <Bar key={d.key} dataKey={d.key} name={d.name} fill={d.color} radius={[2, 2, 0, 0]} />)}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  );
+                }}
+              </ChartCard>
             </div>
 
             {/* Right Column - 1/3 width */}
@@ -608,23 +697,6 @@ export default function SurveillancePage() {
                     <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
                     {t('surveillance.activeAlertsTitle')}
                   </h3>
-                  <select
-                    value={selectedDisease}
-                    onChange={e => setSelectedDisease(e.target.value)}
-                    className="text-xs py-1 px-2 rounded-md"
-                    style={{
-                      width: 'auto',
-                      border: '1px solid var(--border-light)',
-                      background: 'var(--overlay-subtle)',
-                      fontSize: '0.7rem',
-                      padding: '4px 28px 4px 8px',
-                    }}
-                  >
-                    <option value="all">{t('surveillance.allDiseases')}</option>
-                    {uniqueDiseases.map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
                 </div>
                 <div className="p-3 data-row-divider-sm" style={{ maxHeight: '480px', overflowY: 'auto' }}>
                   {filteredAlerts.map(alert => {
@@ -633,7 +705,7 @@ export default function SurveillancePage() {
                       <div key={alert._id} className="p-3 rounded-lg cursor-pointer" onClick={() => setSelectedDisease(alert.disease)} style={{ background: config.bg }}>
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
-                            <div className="icon-box-sm" style={{ background: config.bg }}>
+                            <div className="icon-box-sm">
                               {alert.alertLevel === 'normal' ? (
                                 <Shield className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
                               ) : (
@@ -642,9 +714,9 @@ export default function SurveillancePage() {
                             </div>
                             <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{alert.disease}</span>
                           </div>
-                          <span className={`badge badge-${alert.alertLevel} text-[10px]`}>
+                          <Badge tone={alertLevelTone[alert.alertLevel] ?? 'neutral'} uppercase>
                             {alert.alertLevel.toUpperCase()}
-                          </span>
+                          </Badge>
                         </div>
                         <p className="text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                           {alert.county}, {alert.state}
@@ -675,7 +747,7 @@ export default function SurveillancePage() {
                         </div>
                         <hr className="section-divider" />
                         <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                          {t('surveillance.reported', { date: new Date(alert.reportDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) })}
+                          {t('surveillance.reported', { date: formatDate(alert.reportDate) })}
                         </p>
                       </div>
                     );
@@ -695,7 +767,7 @@ export default function SurveillancePage() {
                   </span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                  <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 720 }}>
                     <thead>
                       <tr>
                         <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-3 py-2.5"
@@ -806,7 +878,7 @@ export default function SurveillancePage() {
                 </div>
                 <div className="px-4 py-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
                   <button onClick={handleExport} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--tamamhealth-blue)' }}>
-                    <div className="icon-box-sm" style={{ background: 'rgba(59, 130, 246,0.12)' }}>
+                    <div className="icon-box-sm">
                       <FileText className="w-3.5 h-3.5" />
                     </div>
                     {t('surveillance.downloadFullReport')}
@@ -823,7 +895,7 @@ export default function SurveillancePage() {
               <div className="modal-content card-elevated p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <div className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.12)' }}>
+                    <div className="icon-box-sm">
                       <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
                     </div>
                     <h3 className="text-base font-semibold">{t('surveillance.modalTitle')}</h3>

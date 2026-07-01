@@ -205,7 +205,7 @@ function buildBPMetric(records: MedicalRecordDoc[], t: TFn): MetricSummary | nul
     normalLabel: '90–120 / 60–80',
     normalRange: [90, 120],
     message,
-    color: '#2563EB',
+    color: 'var(--color-chart-1)',
   };
 }
 
@@ -231,7 +231,7 @@ export default function VitalsTrends({ records }: VitalsTrendsProps) {
     if (bp) out.push(bp);
 
     const temp = buildMetric(
-      records, 'temperature', t('vitals.temperature'), '°C', '#E4A84B',
+      records, 'temperature', t('vitals.temperature'), '°C', 'var(--color-warning)',
       [36.1, 37.5], '36.1–37.5°C',
       (r) => r.vitalSigns?.temperature ?? null,
       t,
@@ -239,7 +239,7 @@ export default function VitalsTrends({ records }: VitalsTrendsProps) {
     if (temp) out.push(temp);
 
     const pulse = buildMetric(
-      records, 'pulse', t('vitalsTrends.heartRate'), 'bpm', '#C44536',
+      records, 'pulse', t('vitalsTrends.heartRate'), 'bpm', 'var(--color-danger)',
       [60, 100], '60–100 bpm',
       (r) => r.vitalSigns?.pulse ?? null,
       t,
@@ -247,7 +247,7 @@ export default function VitalsTrends({ records }: VitalsTrendsProps) {
     if (pulse) out.push(pulse);
 
     const weight = buildMetric(
-      records, 'weight', t('vitals.weight'), 'kg', '#1F9D6F',
+      records, 'weight', t('vitals.weight'), 'kg', 'var(--color-success)',
       // Weight has no universal normal range; treat anything as normal and
       // highlight only big swings via the warning path.
       [0, 500], '—',
@@ -257,7 +257,7 @@ export default function VitalsTrends({ records }: VitalsTrendsProps) {
     if (weight) out.push(weight);
 
     const spo2 = buildMetric(
-      records, 'spo2', t('vitals.spo2'), '%', '#8b5cf6',
+      records, 'spo2', t('vitals.spo2'), '%', 'var(--color-purple-500)',
       [95, 100], '≥95%',
       (r) => r.vitalSigns?.oxygenSaturation ?? null,
       t,
@@ -265,7 +265,7 @@ export default function VitalsTrends({ records }: VitalsTrendsProps) {
     if (spo2) out.push(spo2);
 
     const glucose = buildMetric(
-      records, 'glucose', t('vitalsTrends.bloodGlucose'), 'mg/dL', '#ec4899',
+      records, 'glucose', t('vitalsTrends.bloodGlucose'), 'mg/dL', 'var(--color-chart-6)',
       [70, 140], '70–140 mg/dL',
       extractGlucose,
       t,
@@ -302,20 +302,20 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
   } = metric;
 
   const statusBg =
-    status === 'danger' ? 'rgba(196, 69, 54, 0.14)' :
-    status === 'warning' ? 'rgba(228, 168, 75, 0.16)' :
-    'rgba(27, 158, 119, 0.12)';
+    status === 'danger' ? 'var(--color-danger-bg)' :
+    status === 'warning' ? 'var(--color-warning-bg)' :
+    'var(--color-success-bg)';
   const statusColor =
-    status === 'danger' ? '#C44536' :
-    status === 'warning' ? '#B8741C' :
-    '#15795C';
+    status === 'danger' ? 'var(--color-danger)' :
+    status === 'warning' ? 'var(--color-warning-700)' :
+    'var(--color-success-text)';
   // The whole trend card picks up a tinted surface when a vital is off —
   // matches the Latest Vitals grid so readers never miss a red card.
   const cardSurface =
     status === 'danger'
-      ? { background: 'rgba(196, 69, 54, 0.06)', border: '1px solid rgba(196, 69, 54, 0.32)', boxShadow: '0 0 0 1px rgba(196, 69, 54, 0.18) inset, 0 4px 14px rgba(196, 69, 54, 0.08)' }
+      ? { background: 'var(--color-danger-bg)', border: '1px solid color-mix(in srgb, var(--color-danger) 32%, transparent)', boxShadow: 'none' }
       : status === 'warning'
-      ? { background: 'rgba(228, 168, 75, 0.06)', border: '1px solid rgba(228, 168, 75, 0.30)', boxShadow: '0 0 0 1px rgba(228, 168, 75, 0.16) inset' }
+      ? { background: 'var(--color-warning-bg)', border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)', boxShadow: 'none' }
       : undefined;
 
   const Arrow = dir === 'up' ? TrendingUp : dir === 'down' ? TrendingDown : Minus;
@@ -386,8 +386,8 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
             />
             <Tooltip
               contentStyle={{
-                background: 'var(--bg-card, #1f2937)',
-                border: '1px solid var(--border-light, #374151)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-light)',
                 borderRadius: 6,
                 fontSize: 11,
                 padding: '6px 8px',

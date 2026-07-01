@@ -26,8 +26,7 @@ export default function RoleGuard({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex items-center justify-center p-8" style={{ background: 'var(--bg-primary)' }}>
         <div className="text-center max-w-md">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{
-            background: 'rgba(229,46,66,0.1)',
-            border: '1px solid rgba(229,46,66,0.2)',
+            background: 'transparent',
           }}>
             <ShieldAlert className="w-8 h-8" style={{ color: 'var(--color-danger)' }} />
           </div>

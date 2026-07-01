@@ -3,12 +3,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { Droplets, Plus, X } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { getAllUnits, addUnit } from '@/lib/services/blood-bank-service';
 import type { BloodBankDoc } from '@/lib/db-types';
+import Badge, { type BadgeTone } from '@/components/Badge';
+import EmptyState from '@/components/EmptyState';
+import { formatDate } from '@/lib/format-utils';
 
 const BLOOD_GROUPS: BloodBankDoc['bloodGroup'][] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -23,13 +25,15 @@ const COMPONENTS: { value: BloodBankDoc['component']; label: string }[] = [
 const COMPONENT_LABEL: Record<BloodBankDoc['component'], string> =
   Object.fromEntries(COMPONENTS.map(c => [c.value, c.label])) as Record<BloodBankDoc['component'], string>;
 
-const STATUS_BADGE: Record<BloodBankDoc['status'], string> = {
-  available: 'badge-normal',
-  reserved: 'badge-warning',
-  crossmatched: 'badge-warning',
-  transfused: 'badge-normal',
-  expired: 'badge-emergency',
-  discarded: 'badge-emergency',
+// Unit status → semantic Badge tone (available→success, reserved/crossmatched→
+// warning, transfused→neutral, expired/discarded→danger).
+const STATUS_TONE: Record<BloodBankDoc['status'], BadgeTone> = {
+  available: 'success',
+  reserved: 'warning',
+  crossmatched: 'warning',
+  transfused: 'neutral',
+  expired: 'danger',
+  discarded: 'danger',
 };
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -137,40 +141,50 @@ export default function BloodBankPage() {
 
   return (
     <>
-      <TopBar title="Blood Bank" />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <PageHeader
-          icon={Droplets}
-          title="Blood Bank"
-          subtitle={`Register, track and stock blood units at ${facilityName}`}
-          actions={
+      <TopBar title="Blood Bank" actions={
             <button onClick={openModal} className="btn btn-primary">
               <Plus className="w-4 h-4" /> Add unit
             </button>
-          }
-        />
-
+          } />
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Availability by blood group — one tile per group, count of AVAILABLE units */}
         <div className="dash-card mb-4">
           <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <h3 className="font-semibold text-sm">Availability by blood group</h3>
           </div>
-          <div className="p-4 grid grid-cols-4 sm:grid-cols-8 gap-3">
-            {BLOOD_GROUPS.map(g => {
-              const count = availableByGroup[g] || 0;
-              const color = count === 0 ? 'var(--color-danger)' : count <= 2 ? 'var(--color-warning)' : 'var(--color-success)';
-              return (
-                <div
-                  key={g}
-                  className="rounded-xl p-3 text-center"
-                  style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card)' }}
-                >
-                  <div className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent-primary)' }}>{g}</div>
-                  <div className="text-2xl font-bold" style={{ color, fontVariantNumeric: 'tabular-nums' }}>{count}</div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>available</div>
-                </div>
-              );
-            })}
+          <div className="p-3 overflow-x-auto">
+            <table className="w-full text-center" style={{ borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <thead>
+                <tr>
+                  {BLOOD_GROUPS.map((g, i) => (
+                    <th
+                      key={g}
+                      className="text-[11px] font-bold uppercase tracking-wider px-2 py-1.5"
+                      style={{ color: 'var(--accent-primary)', borderBottom: '1px solid var(--border-light)', borderLeft: i === 0 ? undefined : '1px solid var(--border-light)' }}
+                    >
+                      {g}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {BLOOD_GROUPS.map((g, i) => {
+                    const count = availableByGroup[g] || 0;
+                    const color = count === 0 ? 'var(--color-danger)' : count <= 2 ? 'var(--color-warning)' : 'var(--color-success)';
+                    return (
+                      <td
+                        key={g}
+                        className="text-base font-bold px-2 py-2"
+                        style={{ color, fontVariantNumeric: 'tabular-nums', borderLeft: i === 0 ? undefined : '1px solid var(--border-light)' }}
+                      >
+                        {count}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -184,15 +198,17 @@ export default function BloodBankPage() {
               </span>
             </div>
           </div>
-          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           {loading ? (
             <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading…</div>
           ) : units.length === 0 ? (
-            <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>
-              No blood units stocked yet. Use “Add unit” to register one.
-            </div>
+            <EmptyState
+              icon={Droplets}
+              title="No blood units stocked yet"
+              message="Use “Add unit” to register one."
+            />
           ) : (
-            <table className="data-table">
+            <table className="data-table" style={{ minWidth: 840 }}>
               <thead>
                 <tr>
                   <th>Unit ID</th>
@@ -220,13 +236,13 @@ export default function BloodBankPage() {
                       </td>
                       <td className="text-sm">{COMPONENT_LABEL[u.component] || u.component}</td>
                       <td className="text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>{u.volume}</td>
-                      <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{u.collectionDate}</td>
+                      <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatDate(u.collectionDate)}</td>
                       <td className="text-xs font-medium" style={{ color: expiryColor }}>
-                        {u.expiryDate}
+                        {formatDate(u.expiryDate)}
                         {expired ? ' · expired' : expiringSoon ? ` · ${days}d left` : ''}
                       </td>
                       <td>
-                        <span className={`badge text-[10px] ${STATUS_BADGE[u.status]}`}>{u.status}</span>
+                        <Badge tone={STATUS_TONE[u.status]}>{u.status}</Badge>
                       </td>
                     </tr>
                   );
@@ -243,7 +259,7 @@ export default function BloodBankPage() {
             <div className="modal-panel modal-panel--md" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <div className="icon-box-sm">
                     <Droplets className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                   </div>
                   <h3 className="text-base font-semibold">Add blood unit</h3>

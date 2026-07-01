@@ -83,16 +83,16 @@ async function main() {
       if (wantEmail.toLowerCase().startsWith('y')) {
         const provider = await ask('Provider [resend/sendgrid]', 'resend');
         const apiKey = await ask(`${provider === 'sendgrid' ? 'SENDGRID' : 'RESEND'} API key`);
-        const fromEmail = await ask('From email', 'noreply@tamamhealth.org');
-        const notifyEmail = await ask('Send submissions to', 'hello@tamamhealth.org');
+        const fromEmail = await ask('From email', 'support.tamam@gmail.com');
+        const notifyEmail = await ask('Send submissions to', 'support.tamam@gmail.com');
 
         if (provider === 'sendgrid') {
           envContent = envContent.replace('# SENDGRID_API_KEY=', `SENDGRID_API_KEY=${apiKey}`);
         } else {
           envContent = envContent.replace('# RESEND_API_KEY=', `RESEND_API_KEY=${apiKey}`);
         }
-        envContent = envContent.replace('# DEMO_FROM_EMAIL=noreply@tamamhealth.org', `DEMO_FROM_EMAIL=${fromEmail}`);
-        envContent = envContent.replace('# DEMO_NOTIFY_EMAIL=your-email@example.com', `DEMO_NOTIFY_EMAIL=${notifyEmail}`);
+        envContent = envContent.replace('# DEMO_FROM_EMAIL=support.tamam@gmail.com', `DEMO_FROM_EMAIL=${fromEmail}`);
+        envContent = envContent.replace('# DEMO_NOTIFY_EMAIL=support.tamam@gmail.com', `DEMO_NOTIFY_EMAIL=${notifyEmail}`);
       }
     }
 

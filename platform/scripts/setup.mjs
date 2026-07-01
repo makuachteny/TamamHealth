@@ -123,7 +123,7 @@ async function main() {
     if (licenseInfo && !licenseInfo.expired) {
       success(`Licensed to: ${licenseInfo.org} (${licenseInfo.plan}, expires ${licenseInfo.expiry.slice(0, 4)}-${licenseInfo.expiry.slice(4, 6)}-${licenseInfo.expiry.slice(6, 8)})`);
     } else if (licenseInfo && licenseInfo.expired) {
-      warn('License has expired. Please contact hello@tamamhealth.org to renew.');
+      warn('License has expired. Please contact support.tamam@gmail.com to renew.');
       licenseKey = null;
       licenseInfo = null;
     } else {
@@ -137,14 +137,14 @@ async function main() {
     if (!licenseKey) {
       log('');
       info('A valid license key is required to use TamamHealth.');
-      info('Contact hello@tamamhealth.org to obtain a license.');
+      info('Contact support.tamam@gmail.com to obtain a license.');
       log('');
       licenseKey = await ask('Enter your license key');
     }
 
     if (!licenseKey) {
       error('No license key provided. Setup cannot continue.');
-      log(`  ${DIM}Contact hello@tamamhealth.org to purchase a license.${RESET}`);
+      log(`  ${DIM}Contact support.tamam@gmail.com to purchase a license.${RESET}`);
       log('');
       close();
       process.exit(1);
@@ -154,7 +154,7 @@ async function main() {
 
     if (!licenseInfo) {
       error('Invalid license key. Please check and try again.');
-      log(`  ${DIM}Contact hello@tamamhealth.org if you need assistance.${RESET}`);
+      log(`  ${DIM}Contact support.tamam@gmail.com if you need assistance.${RESET}`);
       log('');
       close();
       process.exit(1);
@@ -162,7 +162,7 @@ async function main() {
 
     if (licenseInfo.expired) {
       error(`License expired on ${licenseInfo.expiry.slice(0, 4)}-${licenseInfo.expiry.slice(4, 6)}-${licenseInfo.expiry.slice(6, 8)}.`);
-      log(`  ${DIM}Contact hello@tamamhealth.org to renew your license.${RESET}`);
+      log(`  ${DIM}Contact support.tamam@gmail.com to renew your license.${RESET}`);
       log('');
       close();
       process.exit(1);
@@ -242,7 +242,7 @@ async function main() {
         'Admin password (leave blank to auto-generate; saved to .seed-credentials.json)',
         '',
       );
-      const orgEmail = await ask('Organization email', 'admin@organization.org');
+      const orgEmail = await ask('Organization email', 'support.tamam@gmail.com');
       const orgCountry = await ask('Country', 'South Sudan');
 
       envContent = envContent.replace(
@@ -258,7 +258,7 @@ async function main() {
         );
       }
       envContent = envContent.replace(
-        'NEXT_PUBLIC_ORG_EMAIL=admin@organization.org',
+        'NEXT_PUBLIC_ORG_EMAIL=support.tamam@gmail.com',
         `NEXT_PUBLIC_ORG_EMAIL=${orgEmail}`,
       );
       envContent = envContent.replace(

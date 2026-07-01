@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
 } from "@/components/marketing/MarketingShared";
-import { DuoIcon } from "@/components/marketing/DuoIcon";
+import { ArrowRight, CloudOff, Code2, Handshake } from "@/components/marketing/icons";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Careers — Build healthcare technology that matters
@@ -80,33 +81,26 @@ export default function CareersPage() {
 
   return (
     <>
-      {/* ── HERO SECTION ────────────────────────────────────────────── */}
-      <section className="mk-hero">
-        <div className="mk-container">
-          <div style={{ textAlign: "center", maxWidth: "700px", margin: "0 auto" }}>
-            <Reveal>
-              <div style={{ marginBottom: 40 }}>
-                <Image
-                  src="/assets/doctor-nurse-consultation.jpg"
-                  alt="Medical team collaborating during a meeting"
-                  width={600}
-                  height={350}
-                  style={{ width: "100%", height: "auto", borderRadius: 12 }}
-                />
-              </div>
-            </Reveal>
-            <Reveal>
-              <h1 className="mk-h1">Build healthcare technology that matters</h1>
-              <p className="mk-body-lg" style={{ marginTop: "24px", color: "var(--tb-text-sec)" }}>
-                Join TamamHealth and help transform healthcare in South Sudan. We&apos;re looking for talented engineers, designers, and healthcare professionals who want to solve real problems in underserved regions.
-              </p>
-            </Reveal>
-          </div>
-        </div>
-      </section>
+      <MarketingHero
+        variant="mosaic"
+        eyebrow="CAREERS"
+        title="Build software health workers can depend on"
+        subtitle="Join a team building offline-first clinical and operational tools for facilities where reliable health information can change outcomes."
+        primaryCta={{ label: "See open roles", href: "#open-positions" }}
+        secondaryCta={{ label: "Send your CV", href: "mailto:support.tamam@gmail.com" }}
+        stats={[
+          { value: "Remote", label: "first team" },
+          { value: "Equity", label: "for full-time roles" },
+          { value: "Mission", label: "healthcare that works" },
+        ]}
+        image="/assets/team-tufts-win.jpg"
+        imageAlt="TamamHealth team celebrating a milestone"
+        imagePriority
+        className="mk-hero-careers"
+      />
 
       {/* ── WHY TamamHealth SECTION ───────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
+      <section className="mk-section mk-section-white" id="open-positions">
         <div className="mk-container">
           <Reveal>
             <div style={{ textAlign: "center", maxWidth: 800, margin: "0 auto", marginBottom: 60 }}>
@@ -115,26 +109,26 @@ export default function CareersPage() {
                 At TamamHealth, you&apos;re not building another SaaS product. You&apos;re building healthcare technology
                 for people who literally can&apos;t afford for it to fail. Every line of code, every design decision,
                 every conversation is in service of doctors and nurses in South Sudan who are trying to save lives
-                with limited resources. You work alongside founders who grew up in refugee camps and understand
-                the problem you&apos;re solving.
+                with limited resources. You work alongside a team shaped by lived experience, technical rigor,
+                research, partnerships, and direct conversations with health workers.
               </p>
             </div>
           </Reveal>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 32, maxWidth: 1100, margin: "0 auto", marginBottom: 60 }}>
+          <div className="mk-careers-why-grid">
             <WhyCard
-              title="Ship code that saves lives"
-              description="Your commits don&apos;t just close tickets — they keep patient records alive when the power goes out. Every feature you build serves healthcare workers in some of the world&apos;s toughest environments."
-              icon={<DuoIcon name="heart" size={44} />}
+              title="Ship code that reaches the bedside"
+              description="Your work supports registration, triage, consultation, pharmacy, lab, billing, and reporting workflows used by real health teams."
+              icon={<Code2 size={44} strokeWidth={1.8} />}
             />
             <WhyCard
-              title="Hard problems, real constraints"
-              description="Offline-first sync across unreliable networks. Sub-second search over thousands of encrypted records on low-end Android tablets. FHIR compliance for national health systems. This isn&apos;t CRUD — it&apos;s engineering at the edge."
-              icon={<DuoIcon name="rocket" size={44} />}
+              title="Solve hard infrastructure problems"
+              description="Offline sync, secure records, low-bandwidth workflows, and national reporting are not edge cases here. They are the product."
+              icon={<CloudOff size={44} strokeWidth={1.8} />}
             />
             <WhyCard
-              title="Ground-floor equity, outsized ownership"
-              description="We&apos;re three co-founders building from Tufts University. You won&apos;t be employee #500 lost in a Slack channel. You&apos;ll be in the room where architecture decisions happen and product direction gets set."
-              icon={<DuoIcon name="users" size={44} />}
+              title="Build early, own deeply"
+              description="You will work close to product, engineering, and healthcare users, with room to shape architecture and direction from the ground up."
+              icon={<Handshake size={44} strokeWidth={1.8} />}
             />
           </div>
 
@@ -160,8 +154,8 @@ export default function CareersPage() {
             </Reveal>
             <Reveal>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 32, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 8, fontFamily: "var(--tb-serif)" }}>3</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--tb-text-sec)" }}>co-founders, all from Tufts</div>
+                <div style={{ fontSize: 32, fontWeight: 700, color: "var(--tb-blue-700)", marginBottom: 8, fontFamily: "var(--tb-serif)" }}>6</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--tb-text-sec)" }}>team members across product, research, and engineering</div>
               </div>
             </Reveal>
           </div>
@@ -169,12 +163,16 @@ export default function CareersPage() {
       </section>
 
       {/* ── BENEFITS SECTION ────────────────────────────────────────── */}
-      <section className="mk-section mk-section-cream">
+      <section className="mk-section mk-section-cream mk-careers-benefits-section">
         <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: "60px" }}>Compensation & benefits</h2>
-          </Reveal>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center" }}>
+          <div className="mk-careers-benefits-card">
+            <Reveal>
+              <div className="mk-careers-benefits-heading">
+                <p className="mk-label">What we offer</p>
+                <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: "60px" }}>Compensation & benefits</h2>
+              </div>
+            </Reveal>
+            <div className="mk-careers-benefits-layout" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center" }}>
             <Reveal>
               <div className="mk-benefits-grid">
                 {benefits.map((benefit, idx) => (
@@ -188,9 +186,11 @@ export default function CareersPage() {
                 alt="Community health worker providing care"
                 width={450}
                 height={500}
+                className="mk-careers-benefits-image"
                 style={{ width: "100%", height: "auto", borderRadius: 12 }}
               />
             </Reveal>
+            </div>
           </div>
         </div>
       </section>
@@ -200,7 +200,7 @@ export default function CareersPage() {
         <div className="mk-container">
           <Reveal>
             <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 56, color: "white" }}>Application process</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 32, maxWidth: 1000, margin: "0 auto" }}>
+            <div className="mk-careers-process-flow">
               <ProcessStep number="1" title="Apply" description="Submit your CV and a brief note about why TamamHealth excites you." />
               <ProcessStep number="2" title="Screening call" description="Chat with our team about your background and what you're looking for (30 min)." />
               <ProcessStep number="3" title="Project or interview" description="Depending on the role, a technical project, design exercise, or deep-dive conversation." />
@@ -212,7 +212,7 @@ export default function CareersPage() {
       </section>
 
       {/* ── OPEN POSITIONS ──────────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
+      <section className="mk-section mk-section-white mk-careers-jobs-section">
         <div className="mk-container">
           <Reveal>
             <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: "60px" }}>Open positions</h2>
@@ -234,7 +234,7 @@ export default function CareersPage() {
               <p className="mk-body-lg" style={{ marginTop: "16px", marginBottom: "32px", color: "var(--tb-text-sec)" }}>
                 We&apos;re always interested in talented people excited about our mission. Send us your CV and tell us what you&apos;d like to work on.
               </p>
-              <Link href="mailto:careers@tamamhealth.org" className="mk-btn mk-btn-green mk-btn-lg">
+              <Link href="mailto:support.tamam@gmail.com" className="mk-btn mk-btn-green mk-btn-lg">
                 Send your CV
               </Link>
             </div>
@@ -250,9 +250,9 @@ export default function CareersPage() {
 
 function WhyCard({ title, description, icon }: { title: string; description: string; icon: React.ReactNode }) {
   return (
-    <div style={{ background: "white", borderRadius: 16, padding: 32, border: "1px solid var(--tb-border)" }}>
-      <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--tb-tint-blue)", color: "var(--tb-blue-700)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
-        <div style={{ width: 24, height: 24 }}>{icon}</div>
+    <div className="mk-careers-why-card">
+      <div className="mk-careers-why-icon" aria-hidden="true">
+        {icon}
       </div>
       <h3 className="mk-h3" style={{ fontSize: "1.15rem", marginBottom: 12 }}>{title}</h3>
       <p className="mk-body" style={{ color: "var(--tb-text-sec)", margin: 0, lineHeight: 1.6 }}>{description}</p>
@@ -273,25 +273,13 @@ function BenefitCard({ benefit }: { benefit: { title: string; description: strin
 
 function ProcessStep({ number, title, description }: { number: string; title: string; description: string }) {
   return (
-    <div style={{ textAlign: "center", color: "white" }}>
-      <div style={{
-        width: 56,
-        height: 56,
-        borderRadius: "50%",
-        background: "rgba(255, 255, 255, 0.2)",
-        border: "2px solid rgba(255, 255, 255, 0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        margin: "0 auto 20px",
-        fontSize: "1.5rem",
-        fontWeight: 700,
-        fontFamily: "var(--tb-serif)"
-      }}>
-        {number}
+    <div className="mk-careers-process-step">
+      <div className="mk-careers-process-marker">
+        <span>{number}</span>
+        <ArrowRight className="mk-careers-process-arrow" size={28} strokeWidth={1.8} aria-hidden="true" />
       </div>
-      <h3 style={{ fontSize: "1.15rem", fontWeight: 600, margin: "0 0 8px", color: "white" }}>{title}</h3>
-      <p style={{ fontSize: 14, margin: 0, opacity: 0.9, lineHeight: 1.5 }}>{description}</p>
+      <h3>{title}</h3>
+      <p>{description}</p>
     </div>
   );
 }
@@ -310,8 +298,8 @@ function JobCard({ job }: { job: { title: string; location: string; type: string
         <p className="mk-body" style={{ color: "var(--tb-text-sec)", marginTop: "16px", lineHeight: "1.6" }}>
           {job.description}
         </p>
-        <Link href="/about/contact" className="mk-btn mk-btn-outline-green" style={{ marginTop: "16px", display: "inline-block" }}>
-          Apply now
+        <Link href="/about/contact?intent=careers#contact-form" className="mk-btn mk-btn-outline-green mk-job-apply" style={{ marginTop: "16px", display: "inline-block" }}>
+          Apply now <ArrowRight size={16} strokeWidth={1.9} aria-hidden="true" />
         </Link>
       </div>
     </Reveal>

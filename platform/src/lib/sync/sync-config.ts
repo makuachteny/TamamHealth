@@ -43,6 +43,15 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   { localName: 'tamamhealth_conversations',         direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_patient_notes',         direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_encounters',            direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_handoffs',              direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_order_sets',            direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_phone_notes',           direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_assessments',           direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_clinical_favorites',    direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_consultation_templates', direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_clinician_tasks',        direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_patient_documents',      direction: 'both', orgScoped: true },
+  { localName: 'tamamhealth_patient_reminders',      direction: 'both', orgScoped: true },
   { localName: 'tamamhealth_telehealth',            direction: 'both', orgScoped: true },
   // Fingerprint templates — synced so identification works at any facility in
   // the org, scoped to the org like other patient-identifying data.

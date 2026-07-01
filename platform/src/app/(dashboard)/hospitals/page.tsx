@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import {
   Building2, BedDouble, Users, Stethoscope, WifiOff,
   Zap, ZapOff, Sun, Truck, Signal, Clock, Activity,
@@ -223,25 +222,19 @@ function HospitalsPageInner() {
 
   return (
     <>
-      <TopBar title={t('hospitals.topBarTitle')} />
+      <TopBar title={t('hospitals.topBarTitle')}
+        searchTrailing={
+          <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary btn-sm btn-filter" aria-pressed={showFilters} style={{ gap: 4 }}>
+            <Filter style={{ width: 13, height: 13 }} /> {t('hospitals.filters')}
+            <ChevronDown style={{ width: 12, height: 12, transform: showFilters ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+          </button>
+        }
+        actions={
+          <button onClick={handleExport} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
+            <Download style={{ width: 13, height: 13 }} /> {t('action.export')}
+          </button>
+        } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <PageHeader
-          icon={Building2}
-          title={t('hospitalManager.hospitalNetwork')}
-          subtitle={t('hospitals.facilitiesCount', { count: filteredHospitals.length })}
-          actions={
-            <>
-              <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-                <Filter style={{ width: 13, height: 13 }} /> {t('hospitals.filters')}
-                <ChevronDown style={{ width: 12, height: 12, transform: showFilters ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-              </button>
-              <button onClick={handleExport} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-                <Download style={{ width: 13, height: 13 }} /> {t('action.export')}
-              </button>
-            </>
-          }
-        />
-
         {/* ── KPIs ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5" style={{ marginBottom: 12 }}>
           <KpiCard label={t('hospitals.kpiFacilities')} value={kpis.total} icon={Building2} color="#3B82F6" />
@@ -316,7 +309,7 @@ function KpiCard({ label, value, icon: Icon, color }: {
       className="flex items-center gap-2.5 p-3 rounded-xl"
       style={{ background: `color-mix(in srgb, ${color} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 22%, transparent)` }}
     >
-      <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `color-mix(in srgb, ${color} 16%, transparent)` }}>
+      <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent' }}>
         <Icon className="w-[18px] h-[18px]" style={{ color }} />
       </span>
       <span className="flex flex-col justify-center min-w-0 leading-tight">
@@ -502,10 +495,10 @@ function FacilityProfile({ hospital, onClose, canManage }: {
 
       {/* Quick stats row */}
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Users style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.patientCount.toLocaleString()}</div><div className="kpi__label">{t('hospitals.statPatients')}</div></div></div>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}><Activity style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.todayVisits}</div><div className="kpi__label">{t('hospitals.statToday')}</div></div></div>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'rgba(168,85,247,0.08)' }}><BedDouble style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.totalBeds}</div><div className="kpi__label">{t('hospitals.statBeds')}</div></div></div>
-        <div className="kpi"><div className="icon-box-sm" style={{ background: 'rgba(168,85,247,0.08)' }}><Stethoscope style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{totalStaff}</div><div className="kpi__label">{t('hospitals.statStaff')}</div></div></div>
+        <div className="kpi"><div className="icon-box-sm"><Users style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.patientCount.toLocaleString()}</div><div className="kpi__label">{t('hospitals.statPatients')}</div></div></div>
+        <div className="kpi"><div className="icon-box-sm"><Activity style={{ color: 'var(--accent-primary)' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.todayVisits}</div><div className="kpi__label">{t('hospitals.statToday')}</div></div></div>
+        <div className="kpi"><div className="icon-box-sm"><BedDouble style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{hospital.totalBeds}</div><div className="kpi__label">{t('hospitals.statBeds')}</div></div></div>
+        <div className="kpi"><div className="icon-box-sm"><Stethoscope style={{ color: '#A78BFA' }} /></div><div className="kpi__body"><div className="kpi__value">{totalStaff}</div><div className="kpi__label">{t('hospitals.statStaff')}</div></div></div>
       </div>
 
       <hr className="section-divider" />
@@ -550,7 +543,7 @@ function FacilityProfile({ hospital, onClose, canManage }: {
             ) : (
             <ResponsiveContainer width="100%" height={50}>
               <LineChart data={hospital.monthlyTrends} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
-                <Line type="monotone" dataKey="opdVisits" stroke="#3b82f6" strokeWidth={1.5} dot={false} />
+                <Line type="monotone" dataKey="opdVisits" stroke="#2191D0" strokeWidth={1.5} dot={false} />
                 <Line type="monotone" dataKey="reportingTimeliness" stroke="#1F9D6F" strokeWidth={1.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>

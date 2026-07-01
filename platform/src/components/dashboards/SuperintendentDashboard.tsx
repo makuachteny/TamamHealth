@@ -1,4 +1,7 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 // Admin-oriented landing for the Medical Superintendent — the clinical
 // administrator who runs the hospital. Unlike the doctor/clinical-officer
@@ -101,6 +104,21 @@ export default function SuperintendentDashboard() {
     <>
       <TopBar title={t('superintendent.topBarTitle')} />
       <main className="page-container page-enter">
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Staff', value: facilityUsers.length },
+            { label: 'Pending Referrals', value: pendingReferrals.length },
+            { label: 'Active Alerts', value: activeAlerts.length },
+            { label: 'Pending Leave', value: pendingLeave.length },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={QUICK_ACTIONS.slice(0, 4).map(a => ({ label: t(a.labelKey), icon: a.Icon, href: a.href }))}
+          secondaryCard={<SpotlightCard title="Active Alerts" value={activeAlerts.length} caption={`${pendingReferrals.length} pending referrals`} href="/surveillance" />}
+        />
         <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>
@@ -127,7 +145,7 @@ export default function SuperintendentDashboard() {
             >
               {k.alarm && <span className="data-tile__alarm-pulse" aria-hidden="true" />}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <k.Icon className="w-3.5 h-3.5" style={{ color: k.color }} />
                 </div>
                 <span className="kpi-card-title">{k.label}</span>
@@ -138,33 +156,7 @@ export default function SuperintendentDashboard() {
           ))}
         </div>
 
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)' }}>
-          {/* ═══ ADMIN QUICK ACTIONS ═══ */}
-          <div className="dash-card overflow-hidden">
-            <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{t('superintendent.administration')}</h3>
-            </div>
-            <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {QUICK_ACTIONS.map(a => (
-                <button
-                  key={a.href}
-                  onClick={() => router.push(a.href)}
-                  className="flex items-center gap-3 p-3 rounded-xl transition-all hover:bg-[var(--accent-light)]"
-                  style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', textAlign: 'left' }}
-                >
-                  <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
-                    <a.Icon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{t(a.labelKey)}</div>
-                    <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t(a.descKey)}</div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
-                </button>
-              ))}
-            </div>
-          </div>
-
+        <div className="grid gap-4">
           {/* ═══ SURVEILLANCE / ALERTS ═══ */}
           <div className="dash-card overflow-hidden">
             <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
@@ -187,7 +179,7 @@ export default function SuperintendentDashboard() {
                     className="data-row data-row--warning w-full"
                     style={{ textAlign: 'left' }}
                   >
-                    <div className="icon-box-sm flex-shrink-0" style={{ background: a.alertLevel === 'emergency' ? 'rgba(196, 69, 54, 0.14)' : 'rgba(228, 168, 75, 0.16)' }}>
+                    <div className="icon-box-sm flex-shrink-0">
                       <AlertTriangle className="w-4 h-4" style={{ color: a.alertLevel === 'emergency' ? '#C44536' : '#B8741C' }} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -212,7 +204,7 @@ export default function SuperintendentDashboard() {
             { Icon: SendHorizontal, label: t('dashboard.pendingReferrals'), value: pendingReferrals.length, href: '/referrals' },
           ].map(s => (
             <button key={s.label} onClick={() => router.push(s.href)} className="dash-card flex items-center gap-3" style={{ padding: '14px 16px', textAlign: 'left' }}>
-              <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+              <div className="icon-box-sm">
                 <s.Icon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <span className="text-[13px]" style={{ color: 'var(--text-secondary)', flex: 1 }}>{s.label}</span>

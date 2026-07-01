@@ -38,8 +38,8 @@ chokepoints:
 | `/api/auth/me` | The session bootstrap that `context.tsx` calls on every app load. A revoked token → `401 { user: null }` → client logs out the user. | [route.ts](../../src/app/api/auth/me/route.ts) |
 | `getAuthPayload(request)` | Used by every authenticated `/api/*` route handler. A revoked token never returns a payload, so no PHI read or mutation can land. | [api-auth.ts](../../src/lib/api-auth.ts) |
 
-The page-level Edge middleware **does not** call `isTokenRevoked` —
-Next.js 14 middleware runs on the Edge runtime which has no `node:fs`. A
+The page-level Edge proxy **does not** call `isTokenRevoked` —
+Next.js proxy runs on the Edge runtime which has no `node:fs`. A
 stolen-cookie page navigation can render the route shell, but the
 shell's bootstrap call to `/api/auth/me` triggers the logout flow and any
 subsequent API call (mutation or PHI read) is rejected at `getAuthPayload`.

@@ -91,6 +91,13 @@ export default function FingerprintCapture({ value, onChange }: FingerprintCaptu
 
   const removeCapture = (f: FingerPosition) => onChange(value.filter(c => c.finger !== f));
 
+  // Consent gates capture AND retention: withdrawing consent discards any
+  // templates already captured so stored biometrics always have live consent.
+  const handleConsentChange = (checked: boolean) => {
+    setConsented(checked);
+    if (!checked && value.length > 0) onChange([]);
+  };
+
   return (
     <div className="border-t pt-4" style={{ borderColor: 'var(--border-light)' }}>
       <h4 className="text-sm font-medium mb-1 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
@@ -114,7 +121,7 @@ export default function FingerprintCapture({ value, onChange }: FingerprintCaptu
             <input
               type="checkbox"
               checked={consented}
-              onChange={e => setConsented(e.target.checked)}
+              onChange={e => handleConsentChange(e.target.checked)}
               className="mt-0.5"
               style={{ width: 'auto' }}
             />

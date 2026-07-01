@@ -1,4 +1,6 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import TodaysAppointmentsCard from '@/components/dashboard/TodaysAppointmentsCard';
 
 import { useState, useMemo, useCallback, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,24 +10,27 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
-import { useMessagingDock } from '@/lib/messaging-dock-context';
 import type { AppointmentDoc } from '@/lib/db-types';
-import { formatCompactDateTime } from '@/lib/format-utils';
-import { patientRegisteredAt, patientFullName, patientGenderAge } from '@/lib/patient-utils';
+import { formatCompactDateTime, formatMoney } from '@/lib/format-utils';
+import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel } from '@/lib/patient-utils';
+import { priorityColor } from '@/lib/clinical/triage-display';
 import PatientName from '@/components/PatientName';
+import QueueFilters from '@/components/front-desk/QueueFilters';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import Modal from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import {
-  Calendar, ClipboardCheck, ArrowRightLeft, MessageSquare,
-  UserPlus, ChevronRight, Shield,
+  Calendar, ClipboardCheck, ArrowRightLeft,
+  UserPlus, ChevronRight,
   ClipboardList,
   AlertCircle,
   MapPin, LogOut, Wallet, CheckCircle, X,
-  QrCode, Search,
+  QrCode, Stethoscope, FileText,
 } from '@/components/icons/lucide';
+import RowActionsMenu from '@/components/referrals/RowActionsMenu';
+import { formatPhoneDisplay } from '@/lib/field-formats';
 
 // Exam rooms / bays a walk-in patient can be placed in to meet the provider.
 // Fallback used only when facility settings provide no rooms.
@@ -51,6 +56,17 @@ function suggestDepartment(complaint: string): string {
   return 'General Medicine';
 }
 
+// Split a timestamp into separate date / time pieces so the queue can show them
+// in their own columns. Date-only values (e.g. "YYYY-MM-DD") yield an empty time.
+function splitDateTime(iso?: string | null): { date: string; time: string } {
+  if (!iso) return { date: '—', time: '' };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: iso, time: '' };
+  const date = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const time = /T\d{2}:\d{2}/.test(iso) ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+  return { date, time };
+}
+
 // Final-checkout target: closing out a completed visit at the front desk.
 interface CheckoutTarget {
   patientId: string;
@@ -71,14 +87,13 @@ export default function FrontDeskDashboardPage() {
   const { triages, update: updateTriage } = useTriage();
   const { showToast } = useToast();
   const { t } = useTranslation();
-  const { openDock } = useMessagingDock();
   const { rooms } = useSettings();
   // Reactive room list from facility settings; fall back to the static list.
   const roomOptions = rooms.length ? rooms : ROOM_OPTIONS;
 
   const [queueFilter, setQueueFilter] = useState<'all' | 'walk-in' | 'appointment' | 'referral'>('all');
-  const [queueSearch, setQueueSearch] = useState('');
   const [queueSort, setQueueSort] = useState<'priority' | 'name' | 'time' | 'status'>('priority');
+  const [queueSearch, setQueueSearch] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
@@ -117,6 +132,9 @@ export default function FrontDeskDashboardPage() {
     priority: 'RED' | 'YELLOW' | 'GREEN' | 'normal';
     complaint: string;
     department: string;
+    gender: string;
+    age: string;
+    date: string;
     time: string;
     status: 'WAITING' | 'IN CONSULT' | 'DONE';
     sourceId: string; // triage / appointment / patient ID
@@ -126,6 +144,11 @@ export default function FrontDeskDashboardPage() {
 
   const queue = useMemo(() => {
     const items: QueueItem[] = [];
+    // Look up gender/age per queue entry from the patient record (all entry
+    // types carry a patientId), so Gender and Age render in their own columns.
+    const patientById = new Map(patients.map(p => [p._id, p]));
+    const genderOf = (pid: string) => patientById.get(pid)?.gender || '—';
+    const ageOf = (pid: string) => { const p = patientById.get(pid); return p ? patientAgeLabel(p) : '—'; };
 
     // Add triaged patients (walk-ins and triaged appointments)
     for (const t of todaysTriages) {
@@ -139,7 +162,9 @@ export default function FrontDeskDashboardPage() {
         priority: t.priority as 'RED' | 'YELLOW' | 'GREEN',
         complaint: t.chiefComplaint || 'ETAT Assessment',
         department: t.chiefComplaint ? suggestDepartment(t.chiefComplaint) : 'Triage',
-        time: new Date(t.triagedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        gender: genderOf(t.patientId),
+        age: ageOf(t.patientId),
+        ...splitDateTime(t.triagedAt),
         status,
         sourceId: t._id,
         assignedRoom: t.assignedRoom,
@@ -165,6 +190,9 @@ export default function FrontDeskDashboardPage() {
         priority: a.priority === 'emergency' ? 'RED' : a.priority === 'urgent' ? 'YELLOW' : 'normal',
         complaint: a.reason || 'Scheduled visit',
         department: a.department || 'OPD',
+        gender: genderOf(a.patientId),
+        age: ageOf(a.patientId),
+        date: splitDateTime(a.appointmentDate).date,
         time: a.appointmentTime,
         status,
         sourceId: a._id,
@@ -190,7 +218,9 @@ export default function FrontDeskDashboardPage() {
         priority: 'normal',
         complaint: 'Newly registered',
         department: patientGenderAge(p),
-        time: registeredAt ? formatCompactDateTime(registeredAt) : '—',
+        gender: p.gender || '—',
+        age: patientAgeLabel(p),
+        ...splitDateTime(registeredAt),
         status: 'WAITING',
         sourceId: p._id,
         registeredAt,
@@ -319,55 +349,48 @@ export default function FrontDeskDashboardPage() {
     setCheckInTarget(null);
   }, [updateAppointmentStatus, showToast]);
 
+  // ── Reverse an appointment check-in: send the patient back to scheduled so
+  //    a mistaken "arrived" can be corrected. Appointment status has no
+  //    forward-only guard, so this round-trips cleanly. (Triage check-in has
+  //    no equivalent here — see BACKEND GAPS.) ──
+  const handleUndoCheckIn = useCallback(async (appt: AppointmentDoc) => {
+    try {
+      await updateAppointmentStatus(appt._id, 'scheduled');
+      showToast(`${appt.patientName} check-in reversed`, 'success');
+      setCheckInTarget(null);
+    } catch {
+      showToast('Failed to reverse check-in', 'error');
+    }
+  }, [updateAppointmentStatus, showToast]);
+
+  // ── Reverse a completed checkout for an APPOINTMENT-sourced visit: set the
+  //    appointment back to checked_in so the patient re-enters the live queue.
+  //    Only appointment checkouts are reversible — a triage checkout writes the
+  //    terminal `discharged` status (see BACKEND GAPS). ──
+  const handleUndoCheckout = useCallback(async (appointmentId: string, patientName: string) => {
+    try {
+      await updateAppointmentStatus(appointmentId, 'checked_in');
+      showToast(`Checkout reversed for ${patientName}`, 'success');
+    } catch {
+      showToast('Failed to reverse checkout', 'error');
+    }
+  }, [updateAppointmentStatus, showToast]);
+
   if (!currentUser) return null;
-
-  const hospital = currentUser.hospital;
-  const todayDate = new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-  const priorityColor = (p: string) =>
-    p === 'RED' ? '#EF4444' : p === 'YELLOW' ? 'var(--color-warning)' : p === 'GREEN' ? 'var(--color-success)' : 'var(--accent-primary)';
-  const statusColor = (s: string) =>
-    s === 'WAITING' ? '#2563EB' : s === 'IN CONSULT' ? 'var(--color-warning)' : 'var(--color-success)';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <TopBar title={t('frontDesk.receptionCenter')} />
+      <TopBar title={t('frontDesk.receptionCenter')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
-        {/* HEADER — stays at top, aligned with the sidebar role card. The extra
-            bottom gap drops Quick Actions + Today's Schedule down so they line up
-            with the sidebar's "RECEPTION" section label and nav items. */}
-        <div className="flex items-center justify-between flex-shrink-0" style={{ marginBottom: 44 }}>
-          <div className="flex items-center gap-3">
-            <div className="page-header__icon">
-              <Shield size={22} strokeWidth={1.8} />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('frontDesk.reception')}</h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{todayDate} · {hospital?.name || currentUser.hospitalName || ''}</p>
-            </div>
-          </div>
-
-          {/* Primary front-desk actions — to the right of the title */}
-          <div className="flex items-center gap-2.5 flex-shrink-0">
-            <button
-              onClick={() => router.push('/patients')}
-              className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold transition-all hover:shadow-sm"
-              style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
-            >
-              <QrCode className="w-[18px] h-[18px]" style={{ color: 'var(--accent-primary)' }} />
-              <span className="hidden sm:inline">{t('frontDesk.findPatient')}</span>
-            </button>
-            <button
-              onClick={() => router.push('/patients/new')}
-              className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold text-white transition-all hover:shadow-md"
-              style={{ background: 'var(--accent-primary)' }}
-            >
-              <UserPlus className="w-[18px] h-[18px]" />
-              <span className="hidden sm:inline">{t('frontDesk.registerNewPatient')}</span>
-            </button>
-          </div>
-        </div>
+        <DashboardHero
+          className="mb-4"
+          stats={[
+            { label: "Today's Appts", value: todaysAppointments.length },
+            { label: 'In Queue', value: todaysTriages.length },
+            { label: 'Patients', value: patients.length },
+          ]}
+        />
 
         {/* PATIENT QUEUE TABLE — below the cards (order: 2) */}
         <div className="dash-card rounded-2xl overflow-hidden mb-4 flex flex-col" style={{ padding: '0', flex: 1, minHeight: 0, order: 2 }}>
@@ -376,55 +399,42 @@ export default function FrontDeskDashboardPage() {
               <ClipboardList className="w-4 h-4" style={{ color: ACCENT }} />
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('frontDesk.patientQueue')}</span>
             </div>
-            <div className="relative flex-1 min-w-[180px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+            {/* In-list search + filters (matches the clinical-officer table). */}
+            <div className="flex items-center gap-2.5 flex-1 justify-end min-w-[200px]">
               <input
                 type="search"
                 value={queueSearch}
                 onChange={(e) => setQueueSearch(e.target.value)}
-                placeholder={t('frontDesk.searchQueue')}
-                className="search-icon-input text-xs"
-                style={{ background: 'var(--overlay-subtle)', paddingTop: '7px', paddingBottom: '7px' }}
+                placeholder="Search by name or patient ID…"
+                className="min-w-0 flex-1 max-w-xs"
+                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '8px 16px', fontSize: 13 }}
               />
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <select
-                value={queueSort}
-                onChange={(e) => setQueueSort(e.target.value as typeof queueSort)}
-                aria-label={t('patients.sortBy')}
-                className="text-[11px] font-medium px-2 py-1.5 rounded-lg cursor-pointer"
-                style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
-              >
-                <option value="priority">{t('frontDesk.sortPriority')}</option>
-                <option value="name">{t('frontDesk.sortName')}</option>
-                <option value="time">{t('frontDesk.sortTime')}</option>
-                <option value="status">{t('frontDesk.sortStatus')}</option>
-              </select>
-              <div className="flex items-center gap-1 p-0.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                {(['all', 'walk-in', 'appointment', 'referral'] as const).map(tab => {
-                  const tabCount = tab === 'all' ? queue.length : queue.filter(q => q.type === tab).length;
-                  return (
-                  <button key={tab} onClick={() => setQueueFilter(tab)} className="px-3 py-1 rounded-md text-[10px] font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap" style={{ background: queueFilter === tab ? ACCENT : 'transparent', color: queueFilter === tab ? '#FFF' : 'var(--text-muted)' }}>
-                    {tab === 'all' ? t('frontDesk.tabAll') : tab === 'walk-in' ? t('frontDesk.tabWalkIns') : tab === 'appointment' ? t('frontDesk.tabAppts') : t('frontDesk.tabReferrals')}
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none tabular-nums" style={{ background: queueFilter === tab ? 'rgba(255,255,255,0.22)' : 'var(--border-light)', color: queueFilter === tab ? '#FFF' : 'var(--text-secondary)' }}>{tabCount}</span>
-                  </button>
-                  );
-                })}
-              </div>
-              <button onClick={() => router.push('/patients')} className="text-xs font-medium flex items-center gap-1" style={{ color: ACCENT }}>{t('frontDesk.viewAll')} <ChevronRight className="w-3.5 h-3.5" /></button>
+              <QueueFilters
+                filter={queueFilter}
+                setFilter={setQueueFilter}
+                sort={queueSort}
+                setSort={setQueueSort}
+                counts={{
+                  all: queue.length,
+                  'walk-in': queue.filter(q => q.type === 'walk-in').length,
+                  appointment: queue.filter(q => q.type === 'appointment').length,
+                  referral: queue.filter(q => q.type === 'referral').length,
+                }}
+              />
+              <button onClick={() => router.push('/patients')} className="text-xs font-medium flex items-center gap-1 flex-shrink-0" style={{ color: ACCENT }}>{t('frontDesk.viewAll')} <ChevronRight className="w-3.5 h-3.5" /></button>
             </div>
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            <table className="w-full" style={{ tableLayout: 'fixed' }}>
+            <table className="w-full" style={{ tableLayout: 'fixed', minWidth: 760 }}>
               <colgroup>
-                {['23%', '9%', '9%', '21%', '14%', '8%', '8%', '8%'].map((w, i) => (
+                {['24%', '13%', '11%', '9%', '13%', '13%', '9%', '8%'].map((w, i) => (
                   <col key={i} style={{ width: w }} />
                 ))}
               </colgroup>
               <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-card, var(--bg-card-solid, #fff))' }}>
                 <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
-                  {[t('frontDesk.colPatient'), t('frontDesk.colPriority'), t('frontDesk.colType'), t('frontDesk.colComplaint'), t('frontDesk.department'), t('frontDesk.colTime'), t('frontDesk.colStatus'), t('frontDesk.colAction')].map(h => (
-                    <th key={h} className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                  {[t('frontDesk.colPatient'), t('frontDesk.colPriority'), t('frontDesk.colGender'), t('frontDesk.colAge'), t('frontDesk.colDate'), t('frontDesk.colTime'), t('frontDesk.colStatus'), t('frontDesk.colAction')].map((h, i, arr) => (
+                    <th key={h} className={`py-2.5 text-[10px] font-semibold uppercase tracking-wider ${i === 0 ? 'pl-10 pr-3' : 'px-3'} ${i === arr.length - 1 ? 'text-right' : 'text-left'}`} style={{ color: 'var(--text-muted)' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -433,67 +443,94 @@ export default function FrontDeskDashboardPage() {
                   <tr><td colSpan={8} className="text-center py-8 text-xs" style={{ color: 'var(--text-muted)' }}>{t('frontDesk.noPatientsInQueue')}</td></tr>
                 ) : filteredQueue.map((entry) => {
                   const pColor = priorityColor(entry.priority);
-                  const sColor = statusColor(entry.status);
+                  const pLabel = entry.priority === 'RED' ? t('appointments.priorityEmergency')
+                    : entry.priority === 'YELLOW' ? t('appointments.priorityUrgent')
+                    : entry.priority === 'GREEN' ? t('appointments.priorityRoutine')
+                    : t('lab.normal');
                   const isOpen = selectedPatientId === entry.patientId;
                   return (
                     <Fragment key={entry.id}>
                     <tr className="cursor-pointer transition-all hover:bg-[var(--overlay-subtle)]" style={{ borderBottom: isOpen ? 'none' : '1px solid var(--border-light)', background: isOpen ? 'var(--overlay-subtle)' : undefined }} onClick={() => setSelectedPatientId(isOpen ? null : entry.patientId)}>
-                      <td className="px-3 py-3">
+                      <td className="pl-10 pr-3 py-3">
                         <div className="flex flex-col gap-0.5">
-                          <PatientName name={entry.patientName} size={30} nameClassName="text-[12px] !font-normal" />
+                          <PatientName patientId={entry.patientId} name={entry.patientName} size={30} nameClassName="text-[12px] !font-normal" />
                           <div className="flex items-center gap-1 flex-wrap">
                             {entry.assignedRoom && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded w-fit flex items-center gap-0.5" style={{ background: 'var(--accent-light)', color: ACCENT }}>
-                                <MapPin className="w-2.5 h-2.5" />{entry.assignedRoom}
+                                {entry.assignedRoom}
                               </span>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3"><span className="text-[12px] lowercase" style={{ color: pColor }}>{entry.priority}</span></td>
-                      <td className="px-3 py-3"><span className="text-[12px] lowercase" style={{ color: entry.type === 'walk-in' ? '#FB923C' : entry.type === 'referral' ? 'var(--color-warning)' : entry.type === 'registered' ? '#64748B' : '#A855F7' }}>{entry.type}</span></td>
-                      <td className="px-3 py-3 text-[12px] truncate" style={{ color: 'var(--text-secondary)' }}>{entry.complaint}</td>
-                      <td className="px-3 py-3 text-[12px]" style={{ color: 'var(--text-primary)' }}>{entry.department}</td>
-                      <td className="px-3 py-3 text-[12px] font-mono" style={{ color: 'var(--text-muted)' }}>{entry.time}</td>
-                      <td className="px-3 py-3"><span className="text-[12px] lowercase" style={{ color: sColor }}>{entry.status}</span></td>
                       <td className="px-3 py-3">
-                        {entry.status !== 'DONE' ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const p = patients.find(pp => pp._id === entry.patientId);
-                              setAssignTarget({
-                                patientId: entry.patientId,
-                                patientName: entry.patientName,
-                                hospitalNumber: p?.hospitalNumber,
-                                triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
-                                currentDoctorId: p?.assignedDoctor,
-                              });
-                            }}
-                            className="text-[11px] font-semibold px-3 py-1.5 rounded-lg text-white transition-opacity hover:opacity-90"
-                            style={{ background: ACCENT }}
-                          >
-                            Assign
-                          </button>
-                        ) : (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const p = patients.find(pp => pp._id === entry.patientId);
-                              setCheckoutTarget({
-                                patientId: entry.patientId,
-                                patientName: entry.patientName,
-                                hospitalNumber: p?.hospitalNumber,
-                                appointmentId: entry.id.startsWith('appt-') ? entry.sourceId : undefined,
-                                triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
-                              });
-                            }}
-                            className="text-[11px] font-semibold px-3 py-1.5 rounded-lg text-white transition-opacity hover:opacity-90 flex items-center gap-1"
-                            style={{ background: 'var(--color-success)' }}
-                          >
-                            <LogOut className="w-3 h-3" />Checkout
-                          </button>
-                        )}
+                        <span className="text-[11px] font-semibold whitespace-nowrap" style={{ color: pColor }}>{pLabel}</span>
+                      </td>
+                      <td className="px-3 py-3 text-[12px] whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>{entry.gender}</td>
+                      <td className="px-3 py-3 text-[12px] tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{entry.age}</td>
+                      <td className="px-3 py-3 text-[12px] whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{entry.date}</td>
+                      <td className="px-3 py-3 text-[12px] font-mono whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{entry.time || '—'}</td>
+                      <td className="px-3 py-3"><span className="text-[12px] lowercase" style={{ color: 'var(--text-secondary)' }}>{entry.status}</span></td>
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                          <RowActionsMenu
+                            ariaLabel={t('frontDesk.colAction')}
+                            actions={[
+                              ...(entry.status !== 'DONE' ? [{
+                                key: 'assign',
+                                label: t('frontDesk.assign'),
+                                icon: <UserPlus className="w-4 h-4" />,
+                                onClick: () => {
+                                  const p = patients.find(pp => pp._id === entry.patientId);
+                                  setAssignTarget({
+                                    patientId: entry.patientId,
+                                    patientName: entry.patientName,
+                                    hospitalNumber: p?.hospitalNumber,
+                                    triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
+                                    currentDoctorId: p?.assignedDoctor,
+                                  });
+                                },
+                              }] : []),
+                              ...(canConsult && entry.status !== 'DONE' ? [{
+                                key: 'consult',
+                                label: t('frontDesk.startConsultation'),
+                                icon: <Stethoscope className="w-4 h-4" />,
+                                onClick: () => router.push(`/consultation?patientId=${entry.patientId}`),
+                              }] : []),
+                              {
+                                key: 'view',
+                                label: t('frontDesk.viewRecord'),
+                                icon: <FileText className="w-4 h-4" />,
+                                onClick: () => router.push(`/patients/${entry.patientId}`),
+                              },
+                              ...(entry.status === 'DONE' ? [{
+                                key: 'checkout',
+                                label: t('frontDesk.checkout'),
+                                tone: 'success' as const,
+                                icon: <LogOut className="w-4 h-4" />,
+                                onClick: () => {
+                                  const p = patients.find(pp => pp._id === entry.patientId);
+                                  setCheckoutTarget({
+                                    patientId: entry.patientId,
+                                    patientName: entry.patientName,
+                                    hospitalNumber: p?.hospitalNumber,
+                                    appointmentId: entry.id.startsWith('appt-') ? entry.sourceId : undefined,
+                                    triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
+                                  });
+                                },
+                              }] : []),
+                              // Reverse a completed appointment checkout — sends the patient
+                              // back to the live queue. Only appointment checkouts are
+                              // reversible (triage discharge is terminal — see BACKEND GAPS).
+                              ...(entry.status === 'DONE' && entry.id.startsWith('appt-') ? [{
+                                key: 'undo',
+                                label: t('action.undo'),
+                                icon: <ArrowRightLeft className="w-4 h-4" />,
+                                onClick: () => handleUndoCheckout(entry.sourceId, entry.patientName),
+                              }] : []),
+                            ]}
+                          />
+                        </div>
                       </td>
                     </tr>
                     {isOpen && selectedPatient && (
@@ -516,7 +553,7 @@ export default function FrontDeskDashboardPage() {
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                               <div><p className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>{t('frontDesk.genderAge')}</p><p className="text-[11px] mt-0.5" style={{ color: 'var(--text-primary)' }}>{patientGenderAge(selectedPatient)}</p></div>
-                              <div><p className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>{t('patient.phone')}</p><p className="text-[11px] mt-0.5 font-mono" style={{ color: 'var(--text-primary)' }}>{selectedPatient.phone || 'N/A'}</p></div>
+                              <div><p className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>{t('patient.phone')}</p><p className="text-[11px] mt-0.5 font-mono" style={{ color: 'var(--text-primary)' }}>{selectedPatient.phone ? formatPhoneDisplay(selectedPatient.phone) : 'N/A'}</p></div>
                               <div><p className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>{t('patient.location')}</p><p className="text-[11px] mt-0.5" style={{ color: 'var(--text-primary)' }}>{selectedPatient.county}, {selectedPatient.state}</p></div>
                               <div><p className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>{t('frontDesk.lastVisit')}</p><p className="text-[11px] mt-0.5" style={{ color: 'var(--text-primary)' }}>{selectedPatient.lastConsultedAt ? formatCompactDateTime(selectedPatient.lastConsultedAt) : selectedPatient.lastVisitDate || t('frontDesk.firstVisit')}</p></div>
                             </div>
@@ -568,67 +605,35 @@ export default function FrontDeskDashboardPage() {
         </div>
 
         {/* CARDS GRID: Quick Actions + Today's Appointments — above the queue (order: 1) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3 flex-shrink-0 lg:items-start" style={{ order: 1 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-3 flex-shrink-0 lg:items-stretch" style={{ order: 1 }}>
 
           {/* Quick Actions — compact tile grid (clinician-dashboard style) */}
-          <div className="dash-card p-3 flex flex-col lg:self-start" style={{ order: 1 }}>
-            <h3 className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('frontDesk.quickActions')}</h3>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="dash-card px-3 py-2.5 flex flex-col lg:col-span-2" style={{ order: 1 }}>
+            <div className="flex items-center mb-2" style={{ height: 20 }}>
+              <h3 className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('frontDesk.quickActions')}</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 keep-cols">
               {[
-                { label: t('frontDesk.registerNewPatient'), icon: UserPlus, href: '/patients/new', color: 'var(--accent-primary)', bg: 'rgba(59,130,246,0.10)' },
+                { label: 'Check In Patient', icon: ClipboardCheck, href: '/check-in', color: 'var(--color-success)', bg: 'rgba(21,121,92,0.10)' },
+                { label: t('frontDesk.registerNewPatient'), icon: UserPlus, href: '/patients/new', color: 'var(--accent-primary)', bg: 'rgba(33,145,208,0.10)' },
+                { label: t('frontDesk.findPatient'), icon: QrCode, href: '/patients', color: '#0D9488', bg: 'rgba(13,148,136,0.10)' },
                 { label: t('frontDesk.viewReferrals'), icon: ArrowRightLeft, href: '/referrals', color: '#F59E0B', bg: 'rgba(245,158,11,0.10)' },
                 { label: t('nav.appointments'), icon: Calendar, href: '/appointments', color: '#2563EB', bg: 'rgba(37,99,235,0.10)' },
-                { label: t('action.sendMessage'), icon: MessageSquare, href: '/messages', color: '#A855F7', bg: 'rgba(168,85,247,0.10)' },
               ].map(action => (
                 <button
                   key={action.label}
-                  onClick={() => (action.href === '/messages' ? openDock() : router.push(action.href))}
-                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all hover:shadow-sm hover:-translate-y-0.5"
-                  style={{ background: action.bg, border: '1px solid var(--border-light)' }}
+                  onClick={() => router.push(action.href)}
+                  className="card-elevated flex items-center gap-2.5 px-3 py-2.5 text-left transition-all"
                 >
-                  <span className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'var(--bg-card-solid)' }}>
-                    <action.icon className="w-4 h-4" style={{ color: action.color }} />
-                  </span>
+                  <action.icon className="w-5 h-5 flex-shrink-0" style={{ color: action.color }} />
                   <span className="text-[11px] font-semibold leading-tight text-left" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Today's Appointments — list card, shows ~one appointment then scrolls */}
-          <div className="dash-card overflow-hidden flex flex-col lg:self-start" style={{ order: 2 }}>
-            <div className="px-3 py-2.5 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
-              <h3 className="font-semibold text-sm inline-flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                <Calendar className="w-4 h-4" style={{ color: '#2563EB' }} /> {t('frontDesk.todaysAppointments')}
-              </h3>
-              <div className="flex items-center gap-2.5">
-                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('frontDesk.scheduledCount', { count: todaysAppointments.length })}</span>
-                <button onClick={() => router.push('/appointments')} className="text-xs font-medium flex items-center gap-1" style={{ color: ACCENT }}>{t('frontDesk.viewAll')} <ChevronRight className="w-3.5 h-3.5" /></button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5" style={{ minHeight: 0, maxHeight: 76 }}>
-              {todaysAppointments.length === 0 ? (
-                <p className="text-center text-[12px] py-8" style={{ color: 'var(--text-muted)' }}>{t('frontDesk.noAppointmentsToday')}</p>
-              ) : todaysAppointments.map(appt => {
-                const arrived = appt.status === 'checked_in' || appt.status === 'in_progress' || appt.status === 'completed';
-                return (
-                <div key={appt._id} onClick={() => setCheckInTarget(appt)} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all hover:bg-[var(--table-row-hover)]" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }} title={t('frontDesk.checkInTitle')}>
-                  <span className="text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{appt.patientName}</span>
-                  <span className="flex items-center gap-2 flex-shrink-0">
-                    {arrived ? (
-                      <span className="text-[10px] font-semibold inline-flex items-center gap-1" style={{ color: 'var(--color-success)' }}>
-                        <CheckCircle className="w-3 h-3" />{t('frontDesk.checkedIn')}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-semibold" style={{ color: ACCENT }}>{t('frontDesk.checkIn')}</span>
-                    )}
-                    <span className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{appt.appointmentTime}</span>
-                  </span>
-                </div>
-                );
-              })}
-            </div>
-          </div>
+          <TodaysAppointmentsCard className="lg:col-span-1" />
+
         </div>
 
         {assignTarget && (
@@ -652,6 +657,7 @@ export default function FrontDeskDashboardPage() {
             appt={checkInTarget}
             onClose={() => setCheckInTarget(null)}
             onCheckIn={handleCheckIn}
+            onUndoCheckIn={handleUndoCheckIn}
             onViewPatient={(pid) => router.push(`/patients/${pid}`)}
           />
         )}
@@ -673,6 +679,7 @@ function CheckoutModal({
   onCollectPayment: (patientId: string) => void;
 }) {
   const [balance, setBalance] = useState<number | null>(null);
+  const [charges, setCharges] = useState<{ description: string; amount: number }[]>([]);
   const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
@@ -685,6 +692,16 @@ function CheckoutModal({
       } catch {
         if (!cancelled) setBalance(0);
       }
+      // Itemized fee ticket for this visit so the desk sees what was billed.
+      try {
+        const { getOpenEncounterForPatient } = await import('@/lib/services/encounter-service');
+        const enc = await getOpenEncounterForPatient(target.patientId);
+        if (enc) {
+          const { getChargesByEncounter } = await import('@/lib/services/payment-service');
+          const ch = await getChargesByEncounter(enc._id);
+          if (!cancelled) setCharges(ch.map(c => ({ description: c.description, amount: c.billedAmount })));
+        }
+      } catch { /* non-fatal — balance still shows */ }
     })();
     return () => { cancelled = true; };
   }, [target.patientId]);
@@ -712,6 +729,19 @@ function CheckoutModal({
 
         {/* Body */}
         <div className="p-4 space-y-3">
+          {charges.length > 0 && (
+            <div className="rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Visit charges</p>
+              <ul className="space-y-1">
+                {charges.map((c, i) => (
+                  <li key={i} className="flex justify-between text-[12px]">
+                    <span style={{ color: 'var(--text-primary)' }}>{c.description}</span>
+                    <span className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>{formatMoney(c.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {balance === null ? (
             <p className="text-sm text-center py-4" style={{ color: 'var(--text-muted)' }}>Checking balance…</p>
           ) : owes ? (
@@ -720,7 +750,7 @@ function CheckoutModal({
                 <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#EF4444' }}>Outstanding balance</span>
                 <Wallet className="w-4 h-4" style={{ color: '#EF4444' }} />
               </div>
-              <p className="text-2xl font-bold mt-1 tabular-nums" style={{ color: '#EF4444' }}>SSP {balance.toLocaleString()}</p>
+              <p className="text-2xl font-bold mt-1 tabular-nums" style={{ color: '#EF4444' }}>{formatMoney(balance)}</p>
               <button
                 onClick={() => onCollectPayment(target.patientId)}
                 className="mt-2.5 w-full text-[12px] font-semibold py-2 rounded-lg text-white transition-opacity hover:opacity-90 flex items-center justify-center gap-1.5"
@@ -766,16 +796,22 @@ function CheckInModal({
   appt,
   onClose,
   onCheckIn,
+  onUndoCheckIn,
   onViewPatient,
 }: {
   appt: AppointmentDoc;
   onClose: () => void;
   onCheckIn: (appt: AppointmentDoc) => Promise<void>;
+  onUndoCheckIn: (appt: AppointmentDoc) => Promise<void>;
   onViewPatient: (patientId: string) => void;
 }) {
   const { t } = useTranslation();
   const [checking, setChecking] = useState(false);
+  const [reversing, setReversing] = useState(false);
   const alreadyIn = appt.status === 'checked_in' || appt.status === 'in_progress' || appt.status === 'completed';
+  // Only a plain check-in (not yet in consult / completed) can be cleanly
+  // reversed back to scheduled without stepping over later workflow state.
+  const canReverseCheckIn = appt.status === 'checked_in';
 
   return (
     <Modal onClose={onClose} width={440}>
@@ -818,6 +854,19 @@ function CheckInModal({
             <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-semibold transition-colors hover:bg-black/5" style={{ color: 'var(--text-muted)' }}>
               {t('action.cancel')}
             </button>
+            {/* Reverse a mistaken check-in — sends the appointment back to
+                scheduled and drops it from the live queue. */}
+            {canReverseCheckIn && (
+              <button
+                onClick={async () => { setReversing(true); try { await onUndoCheckIn(appt); } finally { setReversing(false); } }}
+                disabled={reversing}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors hover:bg-black/5 disabled:opacity-50"
+                style={{ color: 'var(--text-muted)', border: '1px solid var(--border-light)' }}
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+                {reversing ? '…' : t('action.undo')}
+              </button>
+            )}
             {!alreadyIn && (
               <button
                 onClick={async () => { setChecking(true); try { await onCheckIn(appt); } finally { setChecking(false); } }}

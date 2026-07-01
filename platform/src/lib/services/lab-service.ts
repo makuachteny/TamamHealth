@@ -7,6 +7,27 @@ import { v4 as uuidv4 } from 'uuid';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 import { labOrder, getResultReviewSLA, type LabOrderStatus } from '../clinical-flow/order-lifecycles';
+import { maybeDecrypt, maybeEncrypt } from '../field-encryption';
+
+const ENCRYPTED_LAB_FIELDS = ['result', 'clinicalNotes'] as const;
+
+function decryptLabResult(doc: LabResultDoc): LabResultDoc {
+  const out = { ...doc };
+  for (const field of ENCRYPTED_LAB_FIELDS) {
+    const value = out[field];
+    if (typeof value === 'string') out[field] = maybeDecrypt(value);
+  }
+  return out;
+}
+
+function encryptLabFields<T extends Partial<LabResultDoc>>(data: T): T {
+  const out = { ...data };
+  for (const field of ENCRYPTED_LAB_FIELDS) {
+    const value = out[field];
+    if (typeof value === 'string' && value.length > 0) out[field] = maybeEncrypt(value);
+  }
+  return out;
+}
 
 /**
  * The granular diagnostics-lifecycle stage of an order, defaulting older
@@ -64,12 +85,14 @@ async function inferOrgIdFromHospital(hospitalId?: string): Promise<string | und
 export async function getAllLabResults(scope?: DataScope): Promise<LabResultDoc[]> {
   const db = labResultsDB();
   const all = (await findByType<LabResultDoc>(db, 'lab_result'))
+    .map(decryptLabResult)
     .sort((a, b) => (b.orderedAt || '').localeCompare(a.orderedAt || ''));
   return scope ? filterByScope(all, scope) : all;
 }
 
 export async function getLabResultsByPatient(patientId: string): Promise<LabResultDoc[]> {
-  return findByType<LabResultDoc>(labResultsDB(), 'lab_result', { patientId }, { indexFields: ['type', 'patientId'] });
+  return (await findByType<LabResultDoc>(labResultsDB(), 'lab_result', { patientId }, { indexFields: ['type', 'patientId'] }))
+    .map(decryptLabResult);
 }
 
 export async function createLabResult(
@@ -78,45 +101,47 @@ export async function createLabResult(
   const db = labResultsDB();
   const now = new Date().toISOString();
   const orgId = data.orgId || await inferOrgIdFromHospital(data.hospitalId);
-  const doc: LabResultDoc = {
+  const doc: LabResultDoc = encryptLabFields({
     _id: `lab-${uuidv4().slice(0, 8)}`,
     type: 'lab_result',
     ...data,
     orgId,
     createdAt: now,
     updatedAt: now,
-  } as LabResultDoc;
+  } as LabResultDoc);
   const resp = await db.put(doc);
   doc._rev = resp.rev;
-  await logAuditSafe('CREATE_LAB_ORDER', undefined, undefined, `Lab order ${doc._id}: ${doc.testName} for ${doc.patientName}`);
+  const plaintextDoc = decryptLabResult(doc);
+  await logAuditSafe('CREATE_LAB_ORDER', undefined, undefined, `Lab order ${plaintextDoc._id}: ${plaintextDoc.testName} for ${plaintextDoc.patientName}`);
   emitSyncEvent({
     resourceType: 'lab_result',
-    resourceId: doc._id,
+    resourceId: plaintextDoc._id,
     operation: 'create',
-    resourceVersion: doc._rev,
-    orgId: doc.orgId,
-    hospitalId: doc.hospitalId,
+    resourceVersion: plaintextDoc._rev,
+    orgId: plaintextDoc.orgId,
+    hospitalId: plaintextDoc.hospitalId,
   });
-  return doc;
+  return plaintextDoc;
 }
 
 export async function updateLabResult(id: string, data: Partial<LabResultDoc>): Promise<LabResultDoc | null> {
   const db = labResultsDB();
   try {
     const existing = await db.get(id) as LabResultDoc;
-    const updated = { ...existing, ...data, _id: existing._id, _rev: existing._rev, updatedAt: new Date().toISOString() };
+    const updated = encryptLabFields({ ...existing, ...data, _id: existing._id, _rev: existing._rev, updatedAt: new Date().toISOString() });
     const resp = await db.put(updated);
     updated._rev = resp.rev;
-    await logAuditSafe('UPDATE_LAB_RESULT', undefined, undefined, `Lab ${id} status: ${updated.status}${updated.result ? `, result: ${updated.result}` : ''}`);
+    const plaintextUpdated = decryptLabResult(updated);
+    await logAuditSafe('UPDATE_LAB_RESULT', undefined, undefined, `Lab ${id} status: ${plaintextUpdated.status}${plaintextUpdated.result ? `, result: ${plaintextUpdated.result}` : ''}`);
     emitSyncEvent({
       resourceType: 'lab_result',
-      resourceId: updated._id,
+      resourceId: plaintextUpdated._id,
       operation: 'update',
-      resourceVersion: updated._rev,
-      orgId: updated.orgId,
-      hospitalId: updated.hospitalId,
+      resourceVersion: plaintextUpdated._rev,
+      orgId: plaintextUpdated.orgId,
+      hospitalId: plaintextUpdated.hospitalId,
     });
-    return updated;
+    return plaintextUpdated;
   } catch {
     return null;
   }

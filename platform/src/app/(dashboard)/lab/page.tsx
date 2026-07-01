@@ -1,19 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
+import Badge from '@/components/Badge';
+import EmptyState from '@/components/EmptyState';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
-import { FlaskConical, AlertTriangle, X, Plus } from '@/components/icons/lucide';
+import { FlaskConical, AlertTriangle, X, Plus, Radio, CheckCircle2, Filter } from '@/components/icons/lucide';
 import { useLabResults } from '@/lib/hooks/useLabResults';
+import { evaluateCritical } from '@/lib/services/lab-critical-flag';
+import { parseInstrumentPayload, type ParsedInstrumentResult } from '@/lib/services/instrument-intake-service';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { FilterBar, SearchInput, FilterTabs } from '@/components/filters';
 import type { LabOrderStatus } from '@/lib/clinical-flow/order-lifecycles';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 
@@ -47,6 +49,9 @@ interface ResultDraft {
   referenceRange: string;
   abnormal: boolean;
   critical: boolean;
+  /** Whether the tech has manually toggled the critical checkbox; once true we
+   *  stop auto-deriving it from the QC critical-value table so the override sticks. */
+  criticalManual?: boolean;
 }
 
 const LAB_TESTS_CATALOG = [
@@ -66,8 +71,21 @@ const LAB_TESTS_CATALOG = [
 ];
 
 export default function LabPage() {
-  const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
+  // Per-column filters (replace the old search + status-tabs top bar).
+  const [colFilters, setColFilters] = useState({ patient: '', test: '', specimen: '', status: '', result: '', orderedBy: '' });
+  const setColFilter = (k: string, v: string) => setColFilters(f => ({ ...f, [k]: v }));
+  const anyColFilter = Object.values(colFilters).some(Boolean);
+  const clearColFilters = () => setColFilters({ patient: '', test: '', specimen: '', status: '', result: '', orderedBy: '' });
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+  const filterRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!openFilter) return;
+    const onDown = (e: MouseEvent) => { if (filterRef.current && !filterRef.current.contains(e.target as Node)) setOpenFilter(null); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenFilter(null); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [openFilter]);
   const { globalSearch, currentUser } = useApp();
   const { results: labResults, update: updateLabResult, advance: advanceLabOrder, loading: labLoading, reload: reloadLabs } = useLabResults();
   const { patients } = usePatients();
@@ -78,6 +96,70 @@ export default function LabPage() {
   const { resultReviewSLA } = useSettings();
   const [resultDraft, setResultDraft] = useState<ResultDraft | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Analyzer import: paste a raw instrument payload (LIS-2A / HL7) and parse it
+  // into structured results the tech can review before pre-filling an order.
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importRaw, setImportRaw] = useState('');
+  const [importParsed, setImportParsed] = useState<ParsedInstrumentResult[] | null>(null);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const [importProtocol, setImportProtocol] = useState<'lis2a' | 'hl7' | 'unknown' | null>(null);
+
+  const handleParseImport = () => {
+    const out = parseInstrumentPayload(importRaw);
+    setImportProtocol(out.protocol);
+    setImportParsed(out.results);
+    setImportWarnings(out.warnings);
+  };
+
+  const resetImport = () => {
+    setShowImportModal(false);
+    setImportRaw('');
+    setImportParsed(null);
+    setImportWarnings([]);
+    setImportProtocol(null);
+  };
+
+  // Take one parsed analyzer result and open the standard result-entry modal
+  // pre-filled for review. We try to match it to a pending order by test name;
+  // otherwise the tech still reviews/edits before saving (never auto-saved).
+  const prefillFromAnalyzer = (parsed: ParsedInstrumentResult) => {
+    const value = parsed.numericValue != null ? String(parsed.numericValue) : (parsed.textValue || '');
+    const matchOrder = labResults.find(o =>
+      o.status !== 'completed' &&
+      (o.testName || '').toLowerCase().includes((parsed.testName || '').toLowerCase().split(' (')[0])
+    ) || labResults.find(o =>
+      o.status !== 'completed' &&
+      (parsed.testName || '').toLowerCase().includes((o.testName || '').toLowerCase())
+    );
+    const crit = evaluateCritical(parsed.testName, value);
+    setResultDraft({
+      orderId: matchOrder?._id || '',
+      patientName: matchOrder?.patientName || '',
+      testName: parsed.testName || parsed.testCode,
+      result: value,
+      unit: parsed.unit || matchOrder?.unit || '',
+      referenceRange: parsed.referenceRange || matchOrder?.referenceRange || '',
+      abnormal: !!parsed.abnormalFlag && parsed.abnormalFlag.toUpperCase() !== 'N',
+      critical: crit.isCriticalValue,
+      criticalManual: false,
+    });
+    resetImport();
+  };
+
+  // Update the draft's result value and auto-derive the critical flag from the
+  // QC critical-value table — unless the tech has manually overridden it.
+  const updateDraftResult = (value: string) => {
+    setResultDraft(prev => {
+      if (!prev) return prev;
+      const crit = evaluateCritical(prev.testName, value);
+      const critical = prev.criticalManual ? prev.critical : crit.isCriticalValue;
+      return { ...prev, result: value, critical, abnormal: prev.abnormal || (critical && !prev.criticalManual ? true : prev.abnormal) };
+    });
+  };
+
+  // Live QC verdict for the open draft (for the in-modal banner).
+  const draftCritical = resultDraft ? evaluateCritical(resultDraft.testName, resultDraft.result) : { isCriticalValue: false };
 
   // Create-order modal state
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -145,15 +227,43 @@ export default function LabPage() {
   };
 
   const filtered = labResults.filter(o => {
-    const q = search || globalSearch;
-    const matchStatus = filter === 'all' || o.status === filter;
-    const matchSearch = !q || (o.patientName || '').toLowerCase().includes(q.toLowerCase()) || (o.testName || '').toLowerCase().includes(q.toLowerCase());
-    return matchStatus && matchSearch;
+    const f = colFilters;
+    if (globalSearch && !((o.patientName || '').toLowerCase().includes(globalSearch.toLowerCase()) || (o.testName || '').toLowerCase().includes(globalSearch.toLowerCase()))) return false;
+    if (f.patient && !`${o.patientName || ''} ${o.hospitalNumber || ''}`.toLowerCase().includes(f.patient.toLowerCase())) return false;
+    if (f.test && !(o.testName || '').toLowerCase().includes(f.test.toLowerCase())) return false;
+    if (f.specimen && !(o.specimen || '').toLowerCase().includes(f.specimen.toLowerCase())) return false;
+    if (f.status && o.status !== f.status) return false;
+    if (f.result && !(o.result || '').toLowerCase().includes(f.result.toLowerCase())) return false;
+    if (f.orderedBy && !(o.orderedBy || '').toLowerCase().includes(f.orderedBy.toLowerCase())) return false;
+    return true;
   });
 
-  const pending = labResults.filter(o => o.status === 'pending').length;
-  const inProgress = labResults.filter(o => o.status === 'in_progress').length;
-  const completed = labResults.filter(o => o.status === 'completed').length;
+  // Per-column filter controls + column config (funnel dropdown per header).
+  type ColFilter = { field: keyof typeof colFilters; node: React.ReactNode };
+  const fieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', padding: '5px 9px', borderRadius: 8, fontSize: 11, width: '100%', minWidth: 0 } as const;
+  const textFilter = (key: keyof typeof colFilters, label: string): ColFilter => ({
+    field: key,
+    node: <input type="text" autoFocus value={colFilters[key]} onChange={(e) => setColFilter(key, e.target.value)} placeholder={label} className="normal-case font-normal tracking-normal w-full" style={fieldStyle} />,
+  });
+  const selectFilter = (key: keyof typeof colFilters, opts: { v: string; l: string }[]): ColFilter => ({
+    field: key,
+    node: (
+      <select value={colFilters[key]} onChange={(e) => setColFilter(key, e.target.value)} className="normal-case font-normal tracking-normal w-full" style={fieldStyle}>
+        <option value="">{t('patients.all')}</option>
+        {opts.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </select>
+    ),
+  });
+  const labCols: { key: string; label: string; filter?: ColFilter }[] = [
+    { key: 'patient', label: t('lab.patient'), filter: textFilter('patient', t('lab.patient')) },
+    { key: 'test', label: t('lab.testName'), filter: textFilter('test', t('lab.testName')) },
+    { key: 'specimen', label: t('lab.specimen'), filter: textFilter('specimen', t('lab.specimen')) },
+    { key: 'status', label: t('lab.status'), filter: selectFilter('status', [{ v: 'pending', l: t('lab.filterPending') }, { v: 'in_progress', l: t('lab.inProgress') }, { v: 'completed', l: t('referral.completed') }]) },
+    { key: 'result', label: t('lab.result'), filter: textFilter('result', t('lab.result')) },
+    { key: 'orderedBy', label: t('lab.orderedByLabel'), filter: textFilter('orderedBy', t('lab.orderedByLabel')) },
+    { key: 'time', label: t('lab.time') },
+    ...(canEnterLabResults ? [{ key: 'action', label: t('lab.action') }] : []),
+  ];
 
   // Results back but not yet reviewed by a clinician past their SLA
   // (24h critical / 7 days routine) — surfaced so they can't sit unseen.
@@ -232,19 +342,27 @@ export default function LabPage() {
 
   return (
     <>
-      <TopBar title={t('lab.laboratory')} />
+      <TopBar title={t('lab.laboratory')} actions={
+        <div className="flex items-center gap-2">
+          {anyColFilter && (
+            <button onClick={clearColFilters} className="btn btn-secondary" title={t('nurse.clearAllFilters')} aria-label={t('nurse.clearAllFilters')}>
+              <X className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('nurse.clearAllFilters')}</span>
+            </button>
+          )}
+          {canEnterLabResults && (
+            <button onClick={() => setShowImportModal(true)} className="btn btn-secondary">
+              <Radio className="w-4 h-4" /> Import from analyzer
+            </button>
+          )}
+          {canOrderLabs && (
+            <button onClick={() => setShowOrderModal(true)} className="btn btn-primary">
+              <Plus className="w-4 h-4" /> {t('lab.newOrder')}
+            </button>
+          )}
+        </div>
+      } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-          <PageHeader
-            icon={FlaskConical}
-            title={t('lab.infoSystem')}
-            subtitle={t('lab.infoSystemSubtitle')}
-            actions={canOrderLabs && (
-              <button onClick={() => setShowOrderModal(true)} className="btn btn-primary">
-                <Plus className="w-4 h-4" /> {t('lab.newOrder')}
-              </button>
-            )}
-          />
-
           {overdueReviews.length > 0 && (
             <div className="card-elevated p-3 mb-4 flex items-start gap-2" style={{ background: 'rgba(229,46,66,0.08)', border: '1px solid var(--color-danger)' }}>
               <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-danger)' }} />
@@ -266,22 +384,6 @@ export default function LabPage() {
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('lab.loadingOrders')}</span>
             </div>
           )}
-
-          {/* Filters */}
-          <FilterBar>
-            <SearchInput value={search} onChange={setSearch} placeholder={t('lab.searchByPatientOrTest')} />
-            <FilterTabs
-              ariaLabel={t('lab.title')}
-              active={filter}
-              onChange={setFilter}
-              tabs={[
-                { key: 'all', label: t('lab.filterAll'), count: labResults.length },
-                { key: 'pending', label: t('lab.filterPending'), count: pending },
-                { key: 'in_progress', label: t('lab.inProgress'), count: inProgress },
-                { key: 'completed', label: t('referral.completed'), count: completed },
-              ]}
-            />
-          </FilterBar>
 
           {/* Result Entry Modal */}
           {resultDraft && (
@@ -310,14 +412,23 @@ export default function LabPage() {
                 </button>
 
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                     <FlaskConical className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                   </div>
                   <div>
                     <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.enterLabResult')}</h3>
-                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{resultDraft.testName} · {resultDraft.patientName}</p>
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{resultDraft.testName}{resultDraft.patientName ? ` · ${resultDraft.patientName}` : ''}</p>
                   </div>
                 </div>
+
+                {!resultDraft.orderId && (
+                  <div className="mt-3 p-2.5 rounded-lg flex items-start gap-2" style={{ background: 'rgba(228,168,75,0.1)', border: '1px solid rgba(228,168,75,0.3)' }}>
+                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#8F6823' }} />
+                    <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                      This analyzer result could not be matched to a pending order. Review the values, then create or select the matching order to save against it.
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-3 mt-5">
                   <div>
@@ -326,7 +437,7 @@ export default function LabPage() {
                       type="text"
                       autoFocus
                       value={resultDraft.result}
-                      onChange={(e) => setResultDraft({ ...resultDraft, result: e.target.value })}
+                      onChange={(e) => updateDraftResult(e.target.value)}
                       placeholder={t('lab.resultExamplePlaceholder')}
                       className="w-full p-2.5 rounded-lg outline-none text-sm"
                       style={{
@@ -362,6 +473,27 @@ export default function LabPage() {
                     </div>
                   </div>
 
+                  {/* QC critical-value banner — auto-derived from the qc-service
+                      DEFAULT_CRITICAL_VALUES table when the entered value breaches
+                      a critical threshold. Manual override remains available below. */}
+                  {draftCritical.isCriticalValue && draftCritical.rule ? (
+                    <div className="p-3 rounded-lg flex items-start gap-2.5" style={{ background: 'rgba(229,46,66,0.08)', border: '1px solid var(--color-danger)' }}>
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-danger)' }} />
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--color-danger)' }}>Critical value</p>
+                        <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                          {resultDraft.result} breaches the critical range for {draftCritical.rule.testName}
+                          {draftCritical.rule.rationale ? ` — ${draftCritical.rule.rationale}.` : '.'} Flagged for urgent review.
+                        </p>
+                      </div>
+                    </div>
+                  ) : draftCritical.rule ? (
+                    <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
+                      <span>Within QC critical limits for {draftCritical.rule.testName}.</span>
+                    </div>
+                  ) : null}
+
                   <div className="flex items-center gap-4 pt-1">
                     <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
                       <input
@@ -376,7 +508,7 @@ export default function LabPage() {
                         type="checkbox"
                         checked={resultDraft.critical}
                         disabled={!resultDraft.abnormal}
-                        onChange={(e) => setResultDraft({ ...resultDraft, critical: e.target.checked })}
+                        onChange={(e) => setResultDraft({ ...resultDraft, critical: e.target.checked, criticalManual: true })}
                       />
                       {t('lab.criticalLabel')}
                     </label>
@@ -393,9 +525,9 @@ export default function LabPage() {
                   </button>
                   <button
                     onClick={submitResult}
-                    disabled={submitting || !resultDraft.result.trim()}
+                    disabled={submitting || !resultDraft.result.trim() || !resultDraft.orderId}
                     className="btn btn-primary btn-sm"
-                    style={{ opacity: submitting || !resultDraft.result.trim() ? 0.6 : 1 }}
+                    style={{ opacity: submitting || !resultDraft.result.trim() || !resultDraft.orderId ? 0.6 : 1 }}
                   >
                     {submitting ? t('lab.saving') : t('lab.saveResult')}
                   </button>
@@ -421,7 +553,7 @@ export default function LabPage() {
                 }}
               >
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(229,46,66,0.12)' }}>
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
                     <AlertTriangle className="w-5 h-5" style={{ color: 'var(--color-danger)' }} />
                   </div>
                   <h3 className="text-base font-semibold" style={{ color: 'var(--color-danger)' }}>{t('lab.confirmCriticalResult')}</h3>
@@ -458,48 +590,71 @@ export default function LabPage() {
 
           {/* Lab Orders Table */}
           <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-            <table className="data-table">
+            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+            <table className="data-table" style={{ minWidth: 960 }}>
               <thead>
                 <tr>
-                  <th>{t('lab.patient')}</th>
-                  <th>{t('lab.testName')}</th>
-                  <th>{t('lab.specimen')}</th>
-                  <th>{t('lab.status')}</th>
-                  <th>{t('lab.result')}</th>
-                  <th>{t('lab.orderedByLabel')}</th>
-                  <th>{t('lab.time')}</th>
-                  {canEnterLabResults && <th>{t('lab.action')}</th>}
+                  {labCols.map(c => (
+                    <th key={c.key}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="whitespace-nowrap">{c.label}</span>
+                        {c.filter && (
+                          <span ref={openFilter === c.key ? filterRef : null} className="relative inline-flex items-center">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === c.key ? null : c.key); }}
+                              className="inline-flex items-center justify-center w-4 h-4 rounded transition-colors hover:bg-[var(--overlay-subtle)]"
+                              aria-label={`${c.label} filter`}
+                            >
+                              <Filter className="w-3 h-3" style={{ color: colFilters[c.filter.field] ? 'var(--accent-primary)' : 'var(--text-muted)', fill: colFilters[c.filter.field] ? 'var(--accent-primary)' : 'transparent' }} />
+                            </button>
+                            {openFilter === c.key && (
+                              <div className="absolute top-full right-0 mt-2 normal-case rounded-xl overflow-hidden flex flex-col" style={{ zIndex: 50, width: 220, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}>
+                                <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
+                                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{c.label}</span>
+                                  <button type="button" onClick={() => setOpenFilter(null)} className="p-0.5 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
+                                    <X className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
+                                  </button>
+                                </div>
+                                <div className="p-2 flex flex-col gap-1.5">
+                                  {c.filter.node}
+                                  {colFilters[c.filter.field] && (
+                                    <button type="button" onClick={() => setColFilter(c.filter!.field, '')} className="text-[11px] font-medium text-left px-1" style={{ color: 'var(--accent-primary)' }}>{t('nurse.filterClear')}</button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(order => (
                   <tr key={order._id} className="cursor-pointer hover:bg-white/[0.03]" onClick={() => { if (order.patientId) router.push(`/patients/${order.patientId}`); }}>
                     <td>
-                      <PatientName name={order.patientName} nameClassName="font-medium text-sm" />
+                      <PatientName patientId={order.patientId} name={order.patientName} nameClassName="font-medium text-sm" />
                       <p className="text-xs font-mono" style={{ color: 'var(--accent-primary)' }}>{order.hospitalNumber}</p>
                     </td>
                     <td className="font-medium text-sm">
                       {order.testName}
                       {order.tier && (
-                        <span className="ml-2 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded align-middle" style={{ background: order.tier === 'special' ? 'rgba(124,58,237,0.12)' : 'var(--overlay-medium)', color: order.tier === 'special' ? '#7C3AED' : 'var(--text-muted)' }}>{order.tier}</span>
+                        <Badge tone={order.tier === 'special' ? 'accent' : 'neutral'} uppercase className="ml-2 align-middle">{order.tier}</Badge>
                       )}
                     </td>
                     <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{order.specimen}</td>
                     <td>
-                      <span className={`badge text-[10px] ${
-                        order.status === 'pending' ? 'badge-warning' :
-                        order.status === 'in_progress' ? 'badge-syncing' :
-                        'badge-normal'
-                      }`}>
+                      <Badge tone={order.status === 'pending' ? 'warning' : order.status === 'in_progress' ? 'info' : 'neutral'}>
                         {ORDER_STAGE_LABEL[effOrderStatus(order)]}
-                      </span>
+                      </Badge>
                     </td>
                     <td>
                       {order.result ? (
                         <div>
                           <p className="text-sm" style={{ color: order.abnormal ? 'var(--color-danger)' : 'inherit', fontWeight: order.abnormal ? 600 : 400 }}>{order.result}</p>
-                          {order.abnormal && <span className="badge badge-emergency text-[9px] mt-0.5">{t('lab.abnormal')}</span>}
+                          {order.abnormal && <Badge tone="danger" className="mt-0.5">{t('lab.abnormal')}</Badge>}
                         </div>
                       ) : (
                         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
@@ -564,7 +719,28 @@ export default function LabPage() {
                             );
                           }
                           // resulted and beyond — awaiting the clinician's review.
-                          return <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Awaiting clinician review</span>;
+                          // Allow correcting the entered result value (saved via the
+                          // raw update path, which does not advance the lifecycle).
+                          return (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Awaiting clinician review</span>
+                              <button className="btn btn-secondary btn-sm" style={btn}
+                                onClick={() => setResultDraft({
+                                  orderId: order._id,
+                                  patientName: order.patientName || '',
+                                  testName: order.testName || '',
+                                  result: order.result || '',
+                                  unit: order.unit || '',
+                                  referenceRange: order.referenceRange || '',
+                                  abnormal: !!order.abnormal,
+                                  critical: !!order.critical,
+                                  criticalManual: !!order.critical,
+                                })}
+                              >
+                                {t('action.edit')}
+                              </button>
+                            </div>
+                          );
                         })()}
                       </td>
                     )}
@@ -572,8 +748,116 @@ export default function LabPage() {
                 ))}
               </tbody>
             </table>
+            {!labLoading && filtered.length === 0 && (
+              <EmptyState
+                icon={FlaskConical}
+                title={t('lab.noPendingOrders')}
+                message={anyColFilter ? t('lab.noPatientsMatch') : t('lab.infoSystemSubtitle')}
+              />
+            )}
             </div>
           </div>
+
+          {/* Import from Analyzer Modal */}
+          {showImportModal && (
+            <Modal onClose={resetImport}>
+              <div className="modal-content card-elevated p-6 max-w-2xl w-full" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Radio className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+                    <h3 className="text-base font-semibold">Import from analyzer</h3>
+                  </div>
+                  <button onClick={resetImport} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+                  Paste a raw instrument result message (LIS-2A / ASTM or HL7 ORU^R01). Parsed results are shown for review — nothing is saved automatically.
+                </p>
+                <textarea
+                  rows={6}
+                  value={importRaw}
+                  onChange={e => setImportRaw(e.target.value)}
+                  placeholder={'H|\\^&|||Sysmex^XN-330|...\nO|1|ACC-7788|...\nR|1|^^^HGB^Hemoglobin|9.8|g/dL|...'}
+                  className="w-full p-2.5 rounded-lg outline-none text-xs font-mono"
+                  style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+                />
+                <div className="flex items-center gap-2 mt-3">
+                  <button onClick={handleParseImport} className="btn btn-primary btn-sm" disabled={!importRaw.trim()} style={{ opacity: importRaw.trim() ? 1 : 0.5 }}>
+                    Parse payload
+                  </button>
+                  {importProtocol && (
+                    <span className="text-[11px] font-mono px-2 py-1 rounded" style={{
+                      background: importProtocol === 'unknown' ? 'rgba(229,46,66,0.1)' : 'var(--accent-light)',
+                      color: importProtocol === 'unknown' ? 'var(--color-danger)' : 'var(--accent-primary)',
+                    }}>
+                      protocol: {importProtocol}
+                    </span>
+                  )}
+                </div>
+
+                {importWarnings.length > 0 && (
+                  <div className="mt-3 p-2.5 rounded-lg" style={{ background: 'rgba(229,46,66,0.06)', border: '1px solid var(--color-danger)' }}>
+                    {importWarnings.map((w, i) => (
+                      <p key={i} className="text-[11px]" style={{ color: 'var(--color-danger)' }}>{w}</p>
+                    ))}
+                  </div>
+                )}
+
+                {importParsed && importParsed.length > 0 && (
+                  <div className="mt-3 rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-light)' }}>
+                    <div className="overflow-x-auto">
+                    <table className="data-table" style={{ minWidth: 720 }}>
+                      <thead>
+                        <tr>
+                          <th>Test</th>
+                          <th>Value</th>
+                          <th>Unit</th>
+                          <th>Ref</th>
+                          <th>Flag</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importParsed.map((p, i) => {
+                          const value = p.numericValue != null ? String(p.numericValue) : (p.textValue || '');
+                          const crit = evaluateCritical(p.testName, value);
+                          return (
+                            <tr key={`${p.testCode}-${i}`}>
+                              <td className="text-sm font-medium">{p.testName || p.testCode}</td>
+                              <td className="text-sm" style={{ color: crit.isCriticalValue ? 'var(--color-danger)' : 'inherit', fontWeight: crit.isCriticalValue ? 600 : 400 }}>{value}</td>
+                              <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{p.unit || '—'}</td>
+                              <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{p.referenceRange || '—'}</td>
+                              <td>
+                                {crit.isCriticalValue ? (
+                                  <Badge tone="danger" uppercase>CRITICAL</Badge>
+                                ) : p.abnormalFlag && p.abnormalFlag.toUpperCase() !== 'N' ? (
+                                  <Badge tone="warning">{p.abnormalFlag}</Badge>
+                                ) : (
+                                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                                )}
+                              </td>
+                              <td>
+                                <button className="btn btn-secondary btn-sm" style={{ padding: '4px 10px', fontSize: '0.7rem' }}
+                                  onClick={() => prefillFromAnalyzer(p)}>
+                                  Review &amp; enter
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    </div>
+                  </div>
+                )}
+
+                {importParsed && importParsed.length === 0 && importProtocol !== 'unknown' && (
+                  <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>No results found in the payload.</p>
+                )}
+              </div>
+            </Modal>
+          )}
 
           {/* New Lab Order Modal */}
           {showOrderModal && (
@@ -654,8 +938,20 @@ export default function LabPage() {
                     })()}
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: 'var(--text-muted)' }}>{t('lab.testsSelectedLabel', { count: orderTests.length })}</label>
-                    <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-semibold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>{t('lab.testsSelectedLabel', { count: orderTests.length })}</label>
+                      {orderTests.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setOrderTests([])}
+                          className="text-xs underline"
+                          style={{ color: 'var(--accent-primary)' }}
+                        >
+                          {t('action.clear')}
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 rounded-lg keep-cols" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                       {LAB_TESTS_CATALOG.map(t => {
                         const checked = orderTests.includes(t.name);
                         return (

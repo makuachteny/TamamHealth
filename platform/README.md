@@ -68,7 +68,7 @@ Works on **Windows**, **macOS**, and **Linux**.
 
 ### Installation
 
-The platform is distributed as a downloadable archive (`.tar.gz` or `.zip`). Contact [hello@tamamhealth.org](mailto:hello@tamamhealth.org) to obtain a license key and download link.
+The platform is distributed as a downloadable archive (`.tar.gz` or `.zip`). Contact [support.tamam@gmail.com](mailto:support.tamam@gmail.com) to obtain a license key and download link.
 
 ```bash
 # 1. Extract the archive

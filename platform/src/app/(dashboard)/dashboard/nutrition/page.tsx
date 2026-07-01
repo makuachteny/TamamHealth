@@ -1,4 +1,7 @@
 'use client';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
+import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useMemo } from 'react';
 import TopBar from '@/components/TopBar';
@@ -9,7 +12,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   AlertTriangle, CheckCircle2, TrendingDown,
   Baby, HeartPulse, BarChart3, Activity, Scale,
-  Utensils, Droplets,
+  Utensils, Droplets, Users, MessageSquare,
 } from '@/components/icons/lucide';
 
 const ACCENT = '#EA580C';
@@ -79,12 +82,33 @@ export default function NutritionDashboard() {
       <TopBar title={t('nutrition.title')} />
       <main className="page-container page-enter">
 
+        <DashboardHero
+          className="mb-5"
+          stats={[
+            { label: 'Screenings', value: stats.total },
+            { label: 'SAM', value: stats.sam },
+            { label: 'MAM', value: stats.mam },
+            { label: 'At Risk', value: stats.atRisk },
+          ]}
+        />
+
+        <DashboardActionsRow
+          className="mb-5"
+          actions={[
+            { label: 'All Patients', icon: Users, href: '/patients' },
+            { label: 'ANC Visits', icon: HeartPulse, href: '/anc', color: '#EC4899' },
+            { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
+            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#0D9488' },
+          ]}
+          secondaryCard={<SpotlightCard title="Acute Malnutrition (SAM)" value={stats.sam} caption={`${stats.mam} MAM · ${stats.atRisk} at risk`} />}
+        />
+
         {IS_DEMO && <DemoModeBanner />}
 
         {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
         <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-primary)' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
               <Utensils className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -110,7 +134,7 @@ export default function NutritionDashboard() {
           ].map(k => (
             <div key={k.label} className="dash-card" style={{ padding: '14px 16px' }}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <k.icon className="w-3.5 h-3.5" style={{ color: k.color }} />
                 </div>
                 <span className="kpi-card-title">{k.label}</span>
@@ -144,43 +168,40 @@ export default function NutritionDashboard() {
               </div>
             ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table className="data-table">
+              <table className="w-full" style={{ minWidth: 960 }}>
                 <thead>
                   <tr>
-                    <th>{t('nutrition.colPatient')}</th>
-                    <th>{t('nutrition.colAgeType')}</th>
-                    <th>{t('nutrition.colMuac')}</th>
-                    <th>{t('nutrition.colWeight')}</th>
-                    <th>{t('nutrition.colHeight')}</th>
-                    <th>{t('nutrition.colEdema')}</th>
-                    <th>{t('nutrition.colStatus')}</th>
-                    <th>{t('nutrition.colDate')}</th>
+                    {[t('nutrition.colPatient'), t('nutrition.colAgeType'), t('nutrition.colMuac'), t('nutrition.colWeight'), t('nutrition.colHeight'), t('nutrition.colEdema'), t('nutrition.colStatus'), t('nutrition.colDate')].map(h => (
+                      <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {screenings.map(s => (
-                    <tr key={s.id}>
-                      <td>
+                    <tr key={s.id} className="transition-colors hover:bg-[var(--table-row-hover)]" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full" style={{ background: getStatusColor(s.status) }} />
                           <span className="text-xs font-semibold">{s.name}</span>
                         </div>
                       </td>
-                      <td className="text-xs">{s.age} &middot; {s.sex}</td>
-                      <td>
+                      <td className="px-4 py-2.5 text-xs">{s.age} &middot; {s.sex}</td>
+                      <td className="px-4 py-2.5">
                         <span className="text-xs font-bold" style={{ color: s.muac < MUAC_THRESHOLDS.severe ? 'var(--color-danger)' : s.muac < MUAC_THRESHOLDS.moderate ? 'var(--color-warning)' : 'var(--text-primary)' }}>
                           {s.muac}
                         </span>
                       </td>
-                      <td className="text-xs">{s.weight}</td>
-                      <td className="text-xs">{s.height}</td>
-                      <td>{s.edema ? <span className="text-[10px] font-bold" style={{ color: 'var(--color-danger)' }}>{t('nutrition.edemaYes')}</span> : <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nutrition.edemaNo')}</span>}</td>
-                      <td>
+                      <td className="px-4 py-2.5 text-xs">{s.weight}</td>
+                      <td className="px-4 py-2.5 text-xs">{s.height}</td>
+                      <td className="px-4 py-2.5">{s.edema ? <span className="text-[10px] font-bold" style={{ color: 'var(--color-danger)' }}>{t('nutrition.edemaYes')}</span> : <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nutrition.edemaNo')}</span>}</td>
+                      <td className="px-4 py-2.5">
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${getStatusColor(s.status)}15`, color: getStatusColor(s.status) }}>
                           {s.status}
                         </span>
                       </td>
-                      <td className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{s.date}</td>
+                      <td className="px-4 py-2.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>{s.date}</td>
                     </tr>
                   ))}
                 </tbody>

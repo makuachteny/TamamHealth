@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
 import { apiFetch } from '@/lib/api-fetch';
@@ -200,7 +199,7 @@ export default function AdminSystemPage() {
 
   const inputStyle: React.CSSProperties = {
     background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-    borderRadius: '10px', padding: '10px 14px', color: 'var(--text-primary)',
+    borderRadius: '4px', padding: '10px 14px', color: 'var(--text-primary)',
     fontSize: '14px', width: '100%', outline: 'none',
   };
   const labelStyle: React.CSSProperties = {
@@ -237,12 +236,6 @@ export default function AdminSystemPage() {
     <>
       <TopBar title={t('system.title')} />
       <main className="page-container page-enter">
-
-        <PageHeader
-          icon={Settings}
-          title={t('system.title')}
-          subtitle={t('system.platformSettingsDesc')}
-        />
 
         {/* SYNC OPERATIONS — manual triggers for the same endpoints that the
             scheduled cron sidecar calls. Useful for verifying end-to-end push
@@ -472,7 +465,7 @@ export default function AdminSystemPage() {
 
             {/* Save Button */}
             <div className="flex items-center gap-3">
-              <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: '#7C3AED', opacity: saving ? 0.6 : 1 }}>
+              <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: 'var(--accent-primary)', opacity: saving ? 0.6 : 1 }}>
                 <Save className="w-4 h-4" />
                 {saving ? t('system.saving') : t('system.saveConfiguration')}
               </button>
@@ -494,10 +487,10 @@ export default function AdminSystemPage() {
               {/* Total docs */}
               <div className="p-4 rounded-xl mb-4" style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)' }}>
                 <div className="flex items-center gap-2 mb-1">
-                  <HardDrive className="w-4 h-4" style={{ color: '#7C3AED' }} />
+                  <HardDrive className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                   <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('system.totalDocuments')}</span>
                 </div>
-                <p className="text-2xl font-bold" style={{ color: '#7C3AED' }}>{dbStatsLoading ? '...' : totalDocs.toLocaleString()}</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--accent-primary)' }}>{dbStatsLoading ? '...' : totalDocs.toLocaleString()}</p>
               </div>
 
               {/* Per-DB */}

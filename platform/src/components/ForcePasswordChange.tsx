@@ -78,7 +78,7 @@ export default function ForcePasswordChange({
       >
         <div
           className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
-          style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}
+          style={{ background: 'transparent', color: 'var(--accent-primary)' }}
         >
           <ShieldCheck className="w-6 h-6" />
         </div>

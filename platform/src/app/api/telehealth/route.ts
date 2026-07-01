@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       getUpcomingSessions,
       getTelehealthStats,
     } = await import('@/lib/services/telehealth-service');
-    const { buildScopeFromAuth } = await import('@/lib/services/data-scope');
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
     const scope = buildScopeFromAuth(auth);
     const filter = request.nextUrl.searchParams.get('filter');
     const patientId = request.nextUrl.searchParams.get('patientId');
@@ -43,9 +43,9 @@ export async function GET(request: NextRequest) {
       const stats = await getTelehealthStats(scope);
       return NextResponse.json({ stats });
     } else if (patientId) {
-      sessions = await getSessionsByPatient(patientId);
+      sessions = filterByScope(await getSessionsByPatient(patientId), scope);
     } else if (providerId) {
-      sessions = await getSessionsByProvider(providerId);
+      sessions = filterByScope(await getSessionsByProvider(providerId), scope);
     } else {
       sessions = await getAllSessions(scope);
     }
@@ -60,6 +60,7 @@ async function postHandler(request: NextRequest) {
     const auth = await getAuthPayload(request);
     if (!auth) return unauthorized();
     if (!hasRole(auth, WRITE_ROLES)) return forbidden();
+    const checkedAuth = auth;
     let body: Record<string, unknown>;
     try {
       body = await request.json();
@@ -69,8 +70,23 @@ async function postHandler(request: NextRequest) {
     const { sanitizePayload } = await import('@/lib/validation');
     body = sanitizePayload(body);
     const action = body.action as string;
+    async function assertSessionInScope(sessionId: string): Promise<NextResponse | null> {
+      const { telehealthDB } = await import('@/lib/db');
+      const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+      try {
+        const existing = await telehealthDB().get(sessionId);
+        if (filterByScope([existing as unknown as Record<string, unknown>], buildScopeFromAuth(checkedAuth)).length === 0) {
+          return forbidden('Access denied to this telehealth session');
+        }
+        return null;
+      } catch {
+        return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      }
+    }
     // Update session status
     if (action === 'update_status' && body.sessionId) {
+      const scopeError = await assertSessionInScope(body.sessionId as string);
+      if (scopeError) return scopeError;
       const { updateSessionStatus } = await import('@/lib/services/telehealth-service');
       const updated = await updateSessionStatus(
         body.sessionId as string,
@@ -82,6 +98,8 @@ async function postHandler(request: NextRequest) {
     }
     // Add clinical notes
     if (action === 'add_clinical_notes' && body.sessionId) {
+      const scopeError = await assertSessionInScope(body.sessionId as string);
+      if (scopeError) return scopeError;
       if (!body.notes) {
         return NextResponse.json(
           { error: 'notes are required' },
@@ -100,6 +118,8 @@ async function postHandler(request: NextRequest) {
     }
     // Rate session
     if (action === 'rate_session' && body.sessionId) {
+      const scopeError = await assertSessionInScope(body.sessionId as string);
+      if (scopeError) return scopeError;
       if (body.rating === undefined) {
         return NextResponse.json(
           { error: 'rating is required' },
@@ -121,6 +141,13 @@ async function postHandler(request: NextRequest) {
         { error: 'patientId, providerId, scheduledDate, and scheduledTime are required' },
         { status: 400 }
       );
+    }
+    const { getPatientById } = await import('@/lib/services/patient-service');
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+    const patient = await getPatientById(body.patientId as string);
+    if (!patient) return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+    if (filterByScope([patient], buildScopeFromAuth(auth)).length === 0) {
+      return forbidden('Access denied to this patient record');
     }
     const { createSession } = await import('@/lib/services/telehealth-service');
     const session = await createSession({

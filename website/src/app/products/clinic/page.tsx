@@ -18,8 +18,8 @@ export default function ClinicManagementPage() {
           title="Everything a clinic needs. Nothing it doesn't."
           subtitle="Run your full patient day on one screen — registration, consultation, prescription, dispensing, billing — without paying for inpatient features your facility doesn't have."
           accentColor="var(--tb-green-dark)"
-          primaryCta={{ label: "Request a demo", href: "/about/contact" }}
-          illustration={<ProductIllustration accent="var(--tb-green-dark)" variant="clinic" />}
+          primaryCta={{ label: "Request a demo", href: "/about/contact?intent=demo#contact-form" }}
+          illustration={<ProductIllustration accent="#2191D0" variant="clinic" />}
         />
 
         <ProductModuleGrid

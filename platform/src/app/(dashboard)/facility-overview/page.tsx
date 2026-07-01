@@ -15,7 +15,6 @@ import { useState, useCallback } from 'react';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import RoleGuard from '@/components/RoleGuard';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useBirths } from '@/lib/hooks/useBirths';
@@ -29,8 +28,10 @@ import {
   ArrowRightLeft, AlertTriangle, Send, CheckCircle, Clock, Loader2, TrendingUp,
 } from '@/components/icons/lucide';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
+import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick } from '@/components/ChartCard';
 
 export default function FacilityOverviewPage() {
   return (
@@ -140,18 +141,12 @@ function FacilityOverview() {
     <>
       <TopBar title="Facility Overview" />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Building2}
-          title={hospital?.name || 'Facility Overview'}
-          subtitle={`${hospital?.state || ''} · Facility management — your facility's data, as reported to the Ministry of Health`}
-        />
-
         {/* ═══ MINISTRY OF HEALTH SUBMISSION GATE ═══ */}
         <div className="card-elevated p-5 mb-4">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex-1 min-w-[240px]">
               <div className="flex items-center gap-2 mb-1.5">
-                <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                <div className="icon-box-sm">
                   <Send className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
                 </div>
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Ministry of Health Reporting</h3>
@@ -202,15 +197,27 @@ function FacilityOverview() {
           </div>
         </div>
 
-        {/* ═══ KPI STRIP ═══ */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-          <StatCard icon={Users} label="Patients" value={String(hospital?.patientCount ?? 0)} tint="var(--accent-primary)" />
-          <StatCard icon={BedDouble} label="Beds" value={String(hospital?.totalBeds ?? 0)} tint="var(--color-warning)" />
-          <StatCard icon={Users} label="Clinical Staff" value={String(staff)} tint="var(--accent-primary)" />
-          <StatCard icon={Activity} label="Today's Visits" value={String(hospital?.todayVisits ?? 0)} tint="var(--accent-primary)" />
-          <StatCard icon={ArrowRightLeft} label="Referrals (in / out)" value={`${referralsIn} / ${referralsOut}`} tint="var(--accent-primary)" />
-          <StatCard icon={AlertTriangle} label="Active Alerts" value={String(activeAlerts)} tint={activeAlerts > 0 ? 'var(--color-danger)' : 'var(--color-success)'} />
-          <StatCard icon={CheckCircle} label="Data Quality" value={`${Math.round(dataQuality)}%`} tint={dataQuality >= 80 ? 'var(--color-success)' : dataQuality >= 50 ? 'var(--color-warning)' : 'var(--color-danger)'} />
+        {/* ═══ KEY METRICS — operational stats + vital events & care programs,
+              wrapped in one background card with quick-action style tiles ═══ */}
+        <div className="dash-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Key Metrics</h3>
+            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>· operations &amp; care programs</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+            <StatCard icon={Users} label="Patients" value={String(hospital?.patientCount ?? 0)} tint="var(--accent-primary)" />
+            <StatCard icon={BedDouble} label="Beds" value={String(hospital?.totalBeds ?? 0)} tint="var(--color-warning)" />
+            <StatCard icon={Users} label="Clinical Staff" value={String(staff)} tint="var(--accent-primary)" />
+            <StatCard icon={Activity} label="Today's Visits" value={String(hospital?.todayVisits ?? 0)} tint="var(--accent-primary)" />
+            <StatCard icon={ArrowRightLeft} label="Referrals (in / out)" value={`${referralsIn} / ${referralsOut}`} tint="var(--accent-primary)" />
+            <StatCard icon={AlertTriangle} label="Active Alerts" value={String(activeAlerts)} tint={activeAlerts > 0 ? 'var(--color-danger)' : 'var(--color-success)'} />
+            <StatCard icon={CheckCircle} label="Data Quality" value={`${Math.round(dataQuality)}%`} tint={dataQuality >= 80 ? 'var(--color-success)' : dataQuality >= 50 ? 'var(--color-warning)' : 'var(--color-danger)'} />
+            <StatCard icon={Baby} label="Births Registered" value={String(births.length)} tint="var(--accent-primary)" />
+            <StatCard icon={Skull} label="Deaths Registered" value={String(deaths.length)} tint="var(--text-muted)" />
+            <StatCard icon={HeartPulse} label="ANC Visits" value={String(ancVisits.length)} tint="#ec4899" />
+            <StatCard icon={Syringe} label="Immunizations" value={String(immunizations.length)} tint="#22c55e" />
+          </div>
         </div>
 
         {/* ═══ OPERATIONAL STATUS + PERFORMANCE GAUGES ═══ */}
@@ -235,57 +242,88 @@ function FacilityOverview() {
         </div>
 
         {/* ═══ HEALTH VISITS TREND ═══ */}
-        <div className="card-elevated p-5 mt-4">
-          <SectionTitle icon={<TrendingUp className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />} title="Health Visits Trend" />
-          {trend.length > 0 ? (
-            <div className="mt-3" style={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trend} margin={{ top: 8, right: 16, left: -8, bottom: 0 }}>
+        <ChartCard
+          title="Health Visits Trend"
+          defaultType="area"
+          defaultPeriod="month"
+          className="mt-4"
+        >
+          {({ chartType }) => {
+            if (trend.length === 0) {
+              return <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No monthly trend data recorded for this facility yet.</p>;
+            }
+            const visitSeries = [
+              { key: 'OPD Visits', color: '#2191D0' },
+              { key: 'ANC Visits', color: '#ec4899' },
+              { key: 'Immunizations', color: '#22c55e' },
+            ];
+            const commonProps = { data: trend, margin: { top: 8, right: 16, left: -8, bottom: 0 } };
+            const legendProps = { iconType: 'circle' as const, iconSize: 8, wrapperStyle: { fontSize: '0.75rem', paddingTop: '4px' } };
+            if (chartType === 'bar') {
+              return (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart {...commonProps}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                    <XAxis dataKey="month" tick={axisTick} />
+                    <YAxis tick={axisTick} />
+                    <Tooltip {...chartTooltipStyle} />
+                    <Legend {...{ ...legendProps, iconType: 'square' as const }} />
+                    {visitSeries.map(s => <Bar key={s.key} dataKey={s.key} fill={s.color} radius={[3, 3, 0, 0]} />)}
+                  </BarChart>
+                </ResponsiveContainer>
+              );
+            }
+            if (chartType === 'line') {
+              return (
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart {...commonProps}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                    <XAxis dataKey="month" tick={axisTick} />
+                    <YAxis tick={axisTick} />
+                    <Tooltip {...chartTooltipStyle} />
+                    <Legend {...legendProps} />
+                    {visitSeries.map(s => <Line key={s.key} type="monotone" dataKey={s.key} stroke={s.color} strokeWidth={2} dot={{ r: 3 }} />)}
+                  </LineChart>
+                </ResponsiveContainer>
+              );
+            }
+            return (
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart {...commonProps}>
                   <defs>
-                    <linearGradient id="gOpd" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0} /></linearGradient>
+                    <linearGradient id="gOpd" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#2191D0" stopOpacity={0.4} /><stop offset="95%" stopColor="#2191D0" stopOpacity={0} /></linearGradient>
                     <linearGradient id="gAnc" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} /><stop offset="95%" stopColor="#ec4899" stopOpacity={0} /></linearGradient>
                     <linearGradient id="gImm" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} /><stop offset="95%" stopColor="#22c55e" stopOpacity={0} /></linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                  <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                  <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', borderRadius: 8, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="OPD Visits" stroke="#3b82f6" fill="url(#gOpd)" strokeWidth={2} />
+                  <XAxis dataKey="month" tick={axisTick} />
+                  <YAxis tick={axisTick} />
+                  <Tooltip {...chartTooltipStyle} />
+                  <Legend {...legendProps} />
+                  <Area type="monotone" dataKey="OPD Visits" stroke="#2191D0" fill="url(#gOpd)" strokeWidth={2} />
                   <Area type="monotone" dataKey="ANC Visits" stroke="#ec4899" fill="url(#gAnc)" strokeWidth={2} />
                   <Area type="monotone" dataKey="Immunizations" stroke="#22c55e" fill="url(#gImm)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>No monthly trend data recorded for this facility yet.</p>
-          )}
-        </div>
+            );
+          }}
+        </ChartCard>
 
-        {/* ═══ VITAL EVENTS ═══ */}
-        <div className="card-elevated p-5 mt-4 mb-2">
-          <SectionTitle icon={<HeartPulse className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />} title="Vital Events & Care Programs" />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3">
-            <StatCard icon={Baby} label="Births Registered" value={String(births.length)} tint="var(--accent-primary)" />
-            <StatCard icon={Skull} label="Deaths Registered" value={String(deaths.length)} tint="var(--text-muted)" />
-            <StatCard icon={HeartPulse} label="ANC Visits" value={String(ancVisits.length)} tint="#ec4899" />
-            <StatCard icon={Syringe} label="Immunizations" value={String(immunizations.length)} tint="var(--color-success)" />
-          </div>
-        </div>
       </main>
     </>
   );
 }
 
+// Matches the lab / pharmacy KPI tile: card-elevated surface with a small
+// colored icon + tiny UPPERCASE muted label on one line, value beneath.
 function StatCard({ icon: Icon, label, value, tint }: { icon: typeof Users; label: string; value: string; tint: string }) {
   return (
-    <div className="dash-card" style={{ padding: '14px 16px' }}>
-      <div className="flex items-center gap-2 mb-2">
-        <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
-          <Icon className="w-3.5 h-3.5" style={{ color: tint }} />
-        </div>
-        <span className="kpi-card-title">{label}</span>
+    <div className="card-elevated px-3 py-2.5">
+      <div className="flex items-center gap-1.5 mb-1">
+        <Icon className="w-[18px] h-[18px] flex-shrink-0" style={{ color: tint }} />
+        <span className="text-[9px] font-semibold uppercase tracking-wider truncate" style={{ color: 'var(--text-muted)' }}>{label}</span>
       </div>
-      <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800, letterSpacing: '-0.03em' }}>{value}</div>
+      <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{value}</p>
     </div>
   );
 }
@@ -293,7 +331,7 @@ function StatCard({ icon: Icon, label, value, tint }: { icon: typeof Users; labe
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
     <div className="flex items-center gap-2 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-      <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>{icon}</div>
+      <div className="icon-box-sm">{icon}</div>
       <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
     </div>
   );

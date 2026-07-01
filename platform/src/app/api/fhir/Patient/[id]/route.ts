@@ -16,9 +16,10 @@ const READ_ROLES: UserRole[] = [
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const auth = await getAuthPayload(request);
     if (!auth) return unauthorized();
     if (!hasRole(auth, READ_ROLES)) return forbidden();
@@ -26,7 +27,7 @@ export async function GET(
     const { getPatientById } = await import('@/lib/services/patient-service');
     const { filterByScope, buildScopeFromAuth } = await import('@/lib/services/data-scope');
     const { toFhirPatient } = await import('@/lib/fhir');
-    const patient = await getPatientById(params.id);
+    const patient = await getPatientById(id);
     if (!patient) {
       return NextResponse.json(
         { resourceType: 'OperationOutcome', issue: [{ severity: 'error', code: 'not-found', diagnostics: 'Patient not found' }] },

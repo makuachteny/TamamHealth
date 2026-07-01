@@ -2,29 +2,33 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import PatientName from '@/components/PatientName';
 import { useDeaths } from '@/lib/hooks/useDeaths';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { patientAge } from '@/lib/patient-utils';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { SearchInput, FilterSelect, FilterBar } from '@/components/filters';
+import { FilterBar } from '@/components/filters';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
 import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck } from '@/components/icons/lucide';
 
 export default function DeathsPage() {
   const { t } = useTranslation();
-  const { deaths, stats, register } = useDeaths();
+  const { deaths, register } = useDeaths();
   const { hospitals } = useHospitals();
   const { patients } = usePatients();
   const { currentUser } = useApp();
   const { canRecordVitalEvents } = usePermissions();
   const { showToast } = useToast();
-  const [search, setSearch] = useState('');
-  const [genderFilter, setGenderFilter] = useState('all');
+  // Per-column filters (replace the old search + gender top bar).
+  const [colFilters, setColFilters] = useState({ certificate: '', name: '', sex: '', age: '', cause: '', manner: '', facility: '', registered: '' });
+  const setColFilter = (k: string, v: string) => setColFilters(f => ({ ...f, [k]: v }));
+  const anyColFilter = Object.values(colFilters).some(Boolean);
+  const clearColFilters = () => setColFilters({ certificate: '', name: '', sex: '', age: '', cause: '', manner: '', facility: '', registered: '' });
+  const ageBandOf = (age: number | null) => age == null ? null : age < 18 ? 'child' : age < 65 ? 'adult' : 'elderly';
   const [showForm, setShowForm] = useState(false);
   const [expandedDeath, setExpandedDeath] = useState<string | null>(null);
   const [patientLookup, setPatientLookup] = useState('');
@@ -66,11 +70,30 @@ export default function DeathsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientLookup, patients]);
 
-  const filtered = (deaths || []).filter(d =>
-    (genderFilter === 'all' || d.deceasedGender === genderFilter) &&
-    (!search || `${d.deceasedFirstName} ${d.deceasedSurname}`.toLowerCase().includes(search.toLowerCase()) ||
-    (d.certificateNumber || '').toLowerCase().includes(search.toLowerCase()) || (d.underlyingICD11 || '').toLowerCase().includes(search.toLowerCase()))
-  );
+  const filtered = (deaths || []).filter(d => {
+    const f = colFilters;
+    if (f.certificate && !(d.certificateNumber || '').toLowerCase().includes(f.certificate.toLowerCase())) return false;
+    if (f.name && !`${d.deceasedFirstName} ${d.deceasedSurname}`.toLowerCase().includes(f.name.toLowerCase())) return false;
+    if (f.sex && d.deceasedGender !== f.sex) return false;
+    if (f.age && ageBandOf(d.ageAtDeath) !== f.age) return false;
+    if (f.cause && !`${d.underlyingICD11 || ''} ${d.underlyingCause || ''} ${d.immediateCause || ''}`.toLowerCase().includes(f.cause.toLowerCase())) return false;
+    if (f.manner && !(d.mannerOfDeath || '').replace(/_/g, ' ').toLowerCase().includes(f.manner.toLowerCase())) return false;
+    if (f.facility && !(d.facilityName || '').toLowerCase().includes(f.facility.toLowerCase())) return false;
+    if (f.registered && (f.registered === 'yes') !== !!d.deathRegistered) return false;
+    return true;
+  });
+
+  const deathCols = [
+    { key: 'certificate', label: t('deaths.colCertificate') },
+    { key: 'deceased', label: t('deaths.colDeceased') },
+    { key: 'sex', label: t('nurse.colGender') },
+    { key: 'age', label: t('deaths.colAge') },
+    { key: 'dateOfDeath', label: t('deaths.colDateOfDeath') },
+    { key: 'cause', label: t('deaths.colCause') },
+    { key: 'manner', label: t('deaths.colManner') },
+    { key: 'facility', label: t('deaths.colFacility') },
+    { key: 'registered', label: t('deaths.colRegistered') },
+  ];
 
   const handleSubmit = async () => {
     if (!form.deceasedFirstName || !form.immediateCause) return;
@@ -101,7 +124,7 @@ export default function DeathsPage() {
     setPatientLookup('');
     // Pre-fill the form with the patient's known data
     const dob = p.dateOfBirth || '';
-    const ageAtDeath = p.estimatedAge ?? (dob ? new Date().getFullYear() - new Date(dob).getFullYear() : 0);
+    const ageAtDeath = patientAge(p) ?? 0;
     setForm(f => ({
       ...f,
       deceasedFirstName: p.firstName || f.deceasedFirstName,
@@ -126,72 +149,61 @@ export default function DeathsPage() {
 
   return (
     <>
-      <TopBar title={t('deaths.title')} />
+      <TopBar title={t('deaths.title')} actions={
+            canRecordVitalEvents ? (
+              <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
+                <Plus className="w-4 h-4" /> {t('deaths.registerDeath')}
+              </button>
+            ) : undefined
+          } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <PageHeader
-          icon={FileText}
-          title={t('deaths.title')}
-          subtitle={t('deaths.subtitle')}
-          actions={canRecordVitalEvents && (
-            <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
-              <Plus className="w-4 h-4" /> {t('deaths.registerDeath')}
-            </button>
-          )}
-        />
-
-        {/* Search + filters, with the registry stats surfaced inline on the right */}
+        {/* Single unified filter */}
         <FilterBar>
-          <SearchInput value={search} onChange={setSearch} placeholder={t('deaths.searchPlaceholder')} />
-          <FilterSelect
-            value={genderFilter}
-            onChange={setGenderFilter}
-            options={[
-              { value: 'all', label: 'All sexes' },
-              { value: 'Male', label: 'Male' },
-              { value: 'Female', label: 'Female' },
-            ]}
-            aria-label="Filter by sex"
-          />
-          <FilterBar.Spacer />
-          {stats && (
-            <div className="flex items-center gap-4 sm:gap-5 pr-1">
-              {[
-                { label: t('deaths.statTotalDeaths'), value: stats.total, color: 'var(--color-danger)' },
-                { label: t('deaths.statMaternalDeaths'), value: stats.maternalDeaths, color: 'var(--color-danger)' },
-                { label: t('deaths.statUnder5Deaths'), value: stats.under5Deaths, color: 'var(--color-warning)' },
-                { label: t('deaths.statWithIcd11'), value: `${stats.withICD11Code}/${stats.total}`, color: 'var(--accent-primary)' },
-                { label: t('deaths.statRegistered'), value: `${stats.registered}/${stats.total}`, color: 'var(--accent-primary)' },
-              ].map(s => (
-                <div key={s.label} className="text-center leading-tight">
-                  <div className="text-base font-bold" style={{ color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
+          <div className="relative flex-1" style={{ maxWidth: 360 }}>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder={t('deaths.searchPlaceholder') || 'Search by name, certificate, cause…'}
+              value={colFilters.name}
+              onChange={e => setColFilter('name', e.target.value)}
+              className="input-field"
+              style={{ paddingLeft: 36 }}
+            />
+          </div>
+          <select value={colFilters.sex} onChange={e => setColFilter('sex', e.target.value)} className="input-field" style={{ width: 'auto' }}>
+            <option value="">All Genders</option>
+            <option value="Male">{t('patient.male')}</option>
+            <option value="Female">{t('patient.female')}</option>
+          </select>
+          <select value={colFilters.registered} onChange={e => setColFilter('registered', e.target.value)} className="input-field" style={{ width: 'auto' }}>
+            <option value="">All Status</option>
+            <option value="yes">{t('deaths.yes')}</option>
+            <option value="no">{t('deaths.no')}</option>
+          </select>
+          {anyColFilter && (
+            <button onClick={clearColFilters} className="btn btn-secondary btn-sm" title={t('nurse.clearAllFilters')}>
+              <X className="w-4 h-4" />
+            </button>
           )}
         </FilterBar>
 
         {/* Table */}
         <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          <table className="data-table">
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+          <table className="data-table" style={{ minWidth: 960 }}>
             <thead>
               <tr>
-                <th>{t('deaths.colCertificate')}</th>
-                <th>{t('deaths.colDeceased')}</th>
-                <th>{t('deaths.colAge')}</th>
-                <th>{t('deaths.colDateOfDeath')}</th>
-                <th>{t('deaths.colCause')}</th>
-                <th>{t('deaths.colManner')}</th>
-                <th>{t('deaths.colFacility')}</th>
-                <th>{t('deaths.colRegistered')}</th>
+                {deathCols.map(c => (
+                  <th key={c.key}>{c.label}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map(d => (
                 <tr key={d._id} className="cursor-pointer hover:bg-[var(--table-row-hover)]" onClick={() => setExpandedDeath(expandedDeath === d._id ? null : d._id)}>
                   <td className="font-mono text-xs">{d.certificateNumber}</td>
-                  <td><PatientName name={`${d.deceasedFirstName} ${d.deceasedSurname}`} gender={d.deceasedGender} nameClassName="text-sm font-medium" /></td>
+                  <td><PatientName patientId={d.patientId} name={`${d.deceasedFirstName} ${d.deceasedSurname}`} gender={d.deceasedGender} nameClassName="text-sm font-medium" /></td>
+                  <td className="text-sm">{d.deceasedGender}</td>
                   <td className="text-sm">{d.ageAtDeath < 1 ? t('deaths.neonate') : `${d.ageAtDeath}y`}</td>
                   <td className="text-xs font-mono">{d.dateOfDeath}</td>
                   <td>
@@ -217,7 +229,7 @@ export default function DeathsPage() {
                 if (!d) return null;
                 return (
                   <tr>
-                    <td colSpan={8} style={{ background: 'var(--overlay-subtle)', padding: 0 }}>
+                    <td colSpan={9} style={{ background: 'var(--overlay-subtle)', padding: 0 }}>
                       <div className="p-4">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                           <div><span className="font-semibold block mb-0.5" style={{ color: 'var(--text-muted)' }}>{t('deaths.fullName')}</span>{d.deceasedFirstName} {d.deceasedSurname}</div>

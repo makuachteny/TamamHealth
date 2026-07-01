@@ -30,8 +30,7 @@ export default function EmptyState({ icon: Icon = Inbox, title, message, action 
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
       <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{
-        background: 'var(--overlay-subtle, rgba(255,255,255,0.05))',
-        border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
+        background: 'transparent',
       }}>
         <Icon className="w-6 h-6" style={{ color: 'var(--text-muted, #64748b)' }} />
       </div>
@@ -43,7 +42,7 @@ export default function EmptyState({ icon: Icon = Inbox, title, message, action 
           className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all"
           style={{
             background: 'linear-gradient(135deg, #3b82f6, #1E40AF)',
-            boxShadow: '0 2px 8px rgba(59, 130, 246,0.3)',
+            boxShadow: '0 2px 8px rgba(33, 145, 208, 0.3)',
           }}
         >
           {action.label}

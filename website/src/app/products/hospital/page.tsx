@@ -18,8 +18,8 @@ export default function HospitalManagementPage() {
           title="One platform for the whole hospital."
           subtitle="From the OPD queue at 6am to the night-shift handover, TamamHealth HMIS runs every department on one shared patient record. Built for the realities of intermittent power and bandwidth in South Sudan."
           accentColor="var(--tb-blue-700)"
-          primaryCta={{ label: "Request a demo", href: "/about/contact" }}
-          illustration={<ProductIllustration accent="var(--tb-blue-700)" variant="vitals" />}
+          primaryCta={{ label: "Request a demo", href: "/about/contact?intent=demo#contact-form" }}
+          illustration={<ProductIllustration accent="#2191D0" variant="vitals" />}
         />
 
         <ProductModuleGrid

@@ -4,20 +4,22 @@ import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import EmptyState from '@/components/EmptyState';
 import PatientName from '@/components/PatientName';
+import Badge, { type BadgeTone } from '@/components/Badge';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { patientAge } from '@/lib/patient-utils';
 import { useBodyScrollLock } from '@/lib/hooks/useBodyScrollLock';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { SearchInput, FilterSelect, FilterBar } from '@/components/filters';
+import { FilterMenu } from '@/components/filters';
 import type { ImmunizationDefaulter } from '@/lib/services/immunization-service';
+import type { ImmunizationDoc } from '@/lib/db-types';
 import {
   Syringe, Search, Plus, X, CheckCircle2, Clock, AlertTriangle,
-  XCircle, ChevronDown, ChevronUp, Users, ExternalLink,
+  XCircle, ChevronDown, ChevronUp, Users, ExternalLink, Edit3,
 } from '@/components/icons/lucide';
 
 const VACCINES = ['BCG', 'OPV', 'Penta', 'PCV', 'Rota', 'Measles', 'Yellow Fever', 'Vitamin A'];
@@ -33,21 +35,29 @@ const statusConfig = {
 export default function ImmunizationsPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser } = useApp();
-  const { immunizations, stats, coverage, loading, register } = useImmunizations();
+  const { currentUser, globalSearch } = useApp();
+  const { immunizations, stats, coverage, loading, register, update } = useImmunizations();
   const { patients } = usePatients();
   const { canRecordVitalEvents } = usePermissions();
   // Coverage analytics (summary cards, coverage-by-antigen, coverage-by-age) are
   // a population-health view for facility management and the Ministry of Health.
   // Clinical roles (doctors, nurses, etc.) just work the records and defaulters.
   const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
-  const [search, setSearch] = useState('');
+  // Text search comes from the shared global search bar (TopBar).
+  const search = globalSearch;
   const [vaccineFilter, setVaccineFilter] = useState('all');
+  const activeFilterCount = (vaccineFilter !== 'all' ? 1 : 0);
+  const clearFilters = () => { setVaccineFilter('all'); };
   const [showModal, setShowModal] = useState(false);
-  useBodyScrollLock(showModal);
+  // Edit/correct affordance for a saved dose. Clinical records are corrected
+  // (via updateImmunization), never hard-deleted, so a fix preserves audit/sync.
+  const [editDose, setEditDose] = useState<ImmunizationDoc | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  useBodyScrollLock(showModal || !!editDose);
   const [expandedChild, setExpandedChild] = useState<string | null>(null);
   const [patientLookup, setPatientLookup] = useState('');
-  const [activeTab, setActiveTab] = useState<'records' | 'defaulters'>('records');
+  const [activeTab, setActiveTab] = useState<'records' | 'by_vaccine' | 'defaulters'>('records');
+  const [vaccineExpanded, setVaccineExpanded] = useState<Record<string, boolean>>({});
   const [defaulters, setDefaulters] = useState<ImmunizationDefaulter[]>([]);
   const [defaulterStats, setDefaulterStats] = useState<{ totalDefaulters: number; uniqueChildren: number; critical: number; high: number; medium: number; byVaccine: Record<string, number> } | null>(null);
   const [defaulterFilter, setDefaulterFilter] = useState<'all' | 'critical' | 'high' | 'medium'>('all');
@@ -98,7 +108,7 @@ export default function ImmunizationsPage() {
     const q = patientLookup.toLowerCase();
     return (patients || [])
       .filter(p => {
-        const age = p.estimatedAge ?? (p.dateOfBirth ? new Date().getFullYear() - new Date(p.dateOfBirth).getFullYear() : 99);
+        const age = patientAge(p) ?? 99;
         if (age > 15) return false; // immunizations are pediatric
         return (
           `${p.firstName} ${p.surname}`.toLowerCase().includes(q) ||
@@ -165,6 +175,27 @@ export default function ImmunizationsPage() {
     setForm({ patientId: '', patientName: '', gender: 'Male', dateOfBirth: '', vaccine: 'BCG', doseNumber: 1, dateGiven: new Date().toISOString().slice(0, 10), nextDueDate: '', batchNumber: '', site: 'left arm', adverseReaction: false, adverseReactionDetails: '' });
   };
 
+  // Persist a correction to a saved dose, then close the edit modal.
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editDose) return;
+    setEditSaving(true);
+    try {
+      await update(editDose._id, {
+        vaccine: editDose.vaccine,
+        doseNumber: editDose.doseNumber,
+        dateGiven: editDose.dateGiven,
+        nextDueDate: editDose.nextDueDate,
+        batchNumber: editDose.batchNumber,
+        site: editDose.site,
+        status: editDose.status,
+      });
+      setEditDose(null);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -183,28 +214,41 @@ export default function ImmunizationsPage() {
 
   return (
     <>
-      <TopBar title={t('immun.title')} />
+      <TopBar title={t('immun.title')} searchTrailing={
+          activeTab === 'records' && (
+            <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterMenu.Field label="Filter by vaccine">
+                <select value={vaccineFilter} onChange={e => setVaccineFilter(e.target.value)} className="w-full text-sm">
+                  <option value="all">All vaccines</option>
+                  {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </FilterMenu.Field>
+            </FilterMenu>
+          )
+      } actions={
+        canRecordVitalEvents && (
+          <button onClick={() => setShowModal(true)} className="btn btn-primary">
+            <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}
+          </button>
+        )
+      } />
       <main className="page-container page-enter">
-        <PageHeader
-          icon={Syringe}
-          title={t('immun.trackerTitle')}
-          subtitle={t('immun.trackerSubtitle')}
-          actions={canRecordVitalEvents && (
-            <button onClick={() => setShowModal(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}
-            </button>
-          )}
-        />
-
         {/* Tab switcher */}
-        <div className="flex gap-0 border-b mb-5" style={{ borderColor: 'var(--border-light)' }}>
+        <div className="flex gap-0 border-b mb-5 overflow-x-auto" style={{ borderColor: 'var(--border-light)' }}>
           <button onClick={() => setActiveTab('records')}
-            className={`px-4 py-3 text-sm font-medium ${activeTab === 'records' ? 'tab-active' : ''}`}
+            className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${activeTab === 'records' ? 'tab-active' : ''}`}
             style={{ color: activeTab === 'records' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
             {t('immun.tabRecords', { count: stats?.totalChildren || 0 })}
           </button>
+          {canViewCoverage && (
+            <button onClick={() => setActiveTab('by_vaccine')}
+              className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${activeTab === 'by_vaccine' ? 'tab-active' : ''}`}
+              style={{ color: activeTab === 'by_vaccine' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+              By Vaccine
+            </button>
+          )}
           <button onClick={() => setActiveTab('defaulters')}
-            className={`px-4 py-3 text-sm font-medium flex items-center gap-2 ${activeTab === 'defaulters' ? 'tab-active' : ''}`}
+            className={`px-4 py-3 text-sm font-medium flex items-center gap-2 whitespace-nowrap ${activeTab === 'defaulters' ? 'tab-active' : ''}`}
             style={{ color: activeTab === 'defaulters' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
             {t('immun.tabDefaulters', { count: defaulterStats?.uniqueChildren || 0 })}
             {defaulterStats && defaulterStats.critical > 0 && (
@@ -215,11 +259,128 @@ export default function ImmunizationsPage() {
           </button>
         </div>
 
+        {/* By Vaccine — population-level outreach view */}
+        {activeTab === 'by_vaccine' && canViewCoverage && (
+          <div className="space-y-4">
+            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+              Population-level vaccine coverage. Use this view to identify children needing doses and plan outreach.
+            </p>
+            {VACCINES.map(vaccine => {
+              const given = immunizations.filter(i => i.vaccine === vaccine && i.status === 'completed');
+              const overdueItems = defaulters.filter(d => d.vaccine === vaccine);
+              const expanded = !!vaccineExpanded[vaccine];
+              const total = given.length;
+              const overdueCount = overdueItems.length;
+              return (
+                <div key={vaccine} className="card-elevated overflow-hidden">
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3 text-left"
+                    onClick={() => setVaccineExpanded(s => ({ ...s, [vaccine]: !s[vaccine] }))}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="icon-box-sm">
+                        <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
+                      </span>
+                      <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{vaccine}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(5,150,105,0.1)', color: '#059669' }}>
+                        {total} completed
+                      </span>
+                      {overdueCount > 0 && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(229,46,66,0.1)', color: 'var(--color-danger)' }}>
+                          {overdueCount} overdue
+                        </span>
+                      )}
+                    </div>
+                    {expanded ? <ChevronUp className="w-4 h-4" style={{ color: 'var(--text-muted)' }} /> : <ChevronDown className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}
+                  </button>
+
+                  {expanded && (
+                    <div style={{ borderTop: '1px solid var(--border-light)' }}>
+                      {/* Completed */}
+                      {given.length > 0 && (
+                        <div className="px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: '#059669' }}>
+                            Completed ({given.length})
+                          </p>
+                          <div className="space-y-1.5">
+                            {given.slice(0, 20).map(i => {
+                              const scheduledOnTime = !i.nextDueDate || new Date(i.dateGiven) <= new Date(i.nextDueDate);
+                              return (
+                                <div key={i._id} className="flex items-center justify-between text-xs py-1 px-2 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                                    {i.patientName || 'Unknown'}
+                                  </span>
+                                  <div className="flex items-center gap-3">
+                                    <span style={{ color: 'var(--text-secondary)' }}>
+                                      {new Date(i.dateGiven).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{
+                                      background: scheduledOnTime ? 'rgba(5,150,105,0.1)' : 'rgba(245,158,11,0.1)',
+                                      color: scheduledOnTime ? '#059669' : '#B8741C',
+                                    }}>
+                                      {scheduledOnTime ? 'On schedule' : 'Late'}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {given.length > 20 && (
+                              <p className="text-[11px] text-center pt-1" style={{ color: 'var(--text-muted)' }}>+{given.length - 20} more</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Overdue */}
+                      {overdueItems.length > 0 && (
+                        <div className="px-4 py-3" style={{ borderTop: given.length > 0 ? '1px solid var(--border-light)' : undefined }}>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-danger)' }}>
+                            Overdue ({overdueItems.length})
+                          </p>
+                          <div className="space-y-1.5">
+                            {overdueItems.slice(0, 20).map(d => {
+                              const overdueDays = Math.floor((Date.now() - new Date(d.dueDate).getTime()) / 86400000);
+                              const overdueMo = Math.floor(overdueDays / 30);
+                              const overdueLabel = overdueMo >= 1 ? `Overdue by ${overdueMo}mo` : `Overdue by ${overdueDays}d`;
+                              return (
+                                <div key={`${d.patientId}-${d.vaccine}-${d.doseNumber}`} className="flex items-center justify-between text-xs py-1 px-2 rounded-lg" style={{ background: 'rgba(229,46,66,0.05)', border: '1px solid rgba(229,46,66,0.15)' }}>
+                                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                                    {d.patientName || 'Unknown'}
+                                  </span>
+                                  <div className="flex items-center gap-3">
+                                    <span style={{ color: 'var(--text-muted)' }}>Due: {new Date(d.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>
+                                      {overdueLabel}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {overdueItems.length > 20 && (
+                              <p className="text-[11px] text-center pt-1" style={{ color: 'var(--text-muted)' }}>+{overdueItems.length - 20} more</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {given.length === 0 && overdueItems.length === 0 && (
+                        <div className="px-4 py-6 text-center">
+                          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No records for {vaccine} yet.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Coverage by Antigen */}
         {activeTab === 'records' && canViewCoverage && coverage && (
           <div className="card-elevated p-5 mb-6">
             <h3 className="font-semibold text-sm mb-0 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <span className="icon-box-sm" style={{ background: 'rgba(5,150,105,0.12)' }}>
+              <span className="icon-box-sm">
                 <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
               </span>
               {t('immun.coverageByAntigen')}
@@ -254,7 +415,7 @@ export default function ImmunizationsPage() {
           <div className="card-elevated p-5 mb-6">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <span className="icon-box-sm" style={{ background: 'rgba(5,150,105,0.12)' }}>
+                <span className="icon-box-sm">
                   <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
                 </span>
                 <h3 className="font-semibold text-sm">{t('immun.coverageByAgeCohort')}</h3>
@@ -262,7 +423,7 @@ export default function ImmunizationsPage() {
               <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>{t('immun.epiScheduleAlignment')}</span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-xs" style={{ minWidth: 720 }}>
                 <thead>
                   <tr>
                     <th className="text-left p-2" style={{ color: 'var(--text-muted)' }}>{t('immun.colVaccine')}</th>
@@ -298,50 +459,13 @@ export default function ImmunizationsPage() {
           </div>
         )}
 
-        {/* Search */}
-        {activeTab === 'records' && (
-        <FilterBar>
-          <SearchInput value={search} onChange={setSearch} placeholder={t('immun.searchByChildName')} />
-          <FilterSelect
-            value={vaccineFilter}
-            onChange={setVaccineFilter}
-            options={[
-              { value: 'all', label: 'All vaccines' },
-              ...VACCINES.map(v => ({ value: v, label: v })),
-            ]}
-            aria-label="Filter by vaccine"
-          />
-        </FilterBar>
-        )}
-
         {/* Defaulters Panel */}
         {activeTab === 'defaulters' && (
           <>
-            {defaulterStats && (
-              <div className="kpi-grid mb-4">
-                {[
-                  { label: t('immun.critical30Days'), value: defaulterStats.critical, bg: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)', filter: 'critical' as const },
-                  { label: t('immun.high14Days'), value: defaulterStats.high, bg: 'rgba(252,211,77,0.12)', color: 'var(--color-warning)', filter: 'high' as const },
-                  { label: t('immun.medium0Days'), value: defaulterStats.medium, bg: 'rgba(59, 130, 246,0.12)', color: 'var(--accent-primary)', filter: 'medium' as const },
-                  { label: t('immun.uniqueChildren'), value: defaulterStats.uniqueChildren, bg: 'rgba(59, 130, 246,0.08)', color: 'var(--accent-primary)', filter: 'all' as const },
-                ].map(k => (
-                  <div key={k.label} className="kpi cursor-pointer" onClick={() => setDefaulterFilter(k.filter)}>
-                    <div className="icon-box-sm" style={{ background: k.bg }}>
-                      <AlertTriangle className="w-4 h-4" style={{ color: k.color }} />
-                    </div>
-                    <div className="kpi__body">
-                      <div className="kpi__value">{k.value}</div>
-                      <div className="kpi__label">{k.label}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div className="card-elevated overflow-hidden">
               <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
                 <div className="flex items-center gap-2">
-                  <span className="icon-box-sm" style={{ background: 'rgba(229,46,66,0.12)' }}>
+                  <span className="icon-box-sm">
                     <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
                   </span>
                   <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -352,7 +476,8 @@ export default function ImmunizationsPage() {
                   <button onClick={() => setDefaulterFilter('all')} className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>{t('immun.clearFilter')}</button>
                 )}
               </div>
-              <table className="data-table">
+              <div className="overflow-x-auto">
+              <table className="data-table" style={{ minWidth: 1080 }}>
                 <thead>
                   <tr>
                     <th>{t('immun.colChild')}</th>
@@ -373,10 +498,10 @@ export default function ImmunizationsPage() {
                     </td></tr>
                   ) : defaulters.filter(d => defaulterFilter === 'all' || d.urgency === defaulterFilter).map((d, i) => {
                     const urgencyColor = d.urgency === 'critical' ? 'var(--color-danger)' : d.urgency === 'high' ? 'var(--color-warning)' : 'var(--accent-primary)';
-                    const urgencyBg = d.urgency === 'critical' ? 'rgba(229,46,66,0.10)' : d.urgency === 'high' ? 'rgba(252,211,77,0.10)' : 'rgba(59, 130, 246,0.10)';
+                    const urgencyTone: BadgeTone = d.urgency === 'critical' ? 'danger' : d.urgency === 'high' ? 'warning' : 'info';
                     return (
                       <tr key={`${d.patientId}-${d.vaccine}-${i}`} className="cursor-pointer" onClick={() => router.push(`/patients/${d.patientId}`)}>
-                        <td><PatientName name={d.patientName} gender={d.gender} nameClassName="font-medium text-sm" /></td>
+                        <td><PatientName patientId={d.patientId} name={d.patientName} gender={d.gender} nameClassName="font-medium text-sm" /></td>
                         <td className="text-xs">{Math.floor(d.ageMonths / 12)}y {d.ageMonths % 12}m</td>
                         <td className="text-xs">{d.gender}</td>
                         <td className="text-sm font-medium">{d.vaccine}</td>
@@ -385,15 +510,14 @@ export default function ImmunizationsPage() {
                         <td className="text-sm font-bold" style={{ color: urgencyColor }}>{d.daysOverdue}d</td>
                         <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{d.facilityName}</td>
                         <td>
-                          <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full" style={{ background: urgencyBg, color: urgencyColor }}>
-                            {d.urgency}
-                          </span>
+                          <Badge tone={urgencyTone} uppercase>{d.urgency}</Badge>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           </>
         )}
@@ -402,7 +526,7 @@ export default function ImmunizationsPage() {
         {activeTab === 'records' && (
         <div className="card-elevated overflow-hidden">
           <div className="p-4 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-            <span className="icon-box-sm" style={{ background: 'rgba(5,150,105,0.12)' }}>
+            <span className="icon-box-sm">
               <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
             </span>
             <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -426,10 +550,6 @@ export default function ImmunizationsPage() {
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
                   className="w-full flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--table-row-hover)] cursor-pointer"
                 >
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                    style={{ background: 'var(--accent-primary)' }}>
-                    {child.patientName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  </div>
                   <div className="flex-1 text-left min-w-0">
                     <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{child.patientName}</p>
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -437,13 +557,9 @@ export default function ImmunizationsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
-                      {t('immun.given', { count: completedCount })}
-                    </span>
+                    <Badge tone="accent">{t('immun.given', { count: completedCount })}</Badge>
                     {overdueCount > 0 && (
-                      <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(229,46,66,0.12)', color: 'var(--color-danger)' }}>
-                        {t('immun.overdueCount', { count: overdueCount })}
-                      </span>
+                      <Badge tone="danger">{t('immun.overdueCount', { count: overdueCount })}</Badge>
                     )}
                     <Link
                       href={`/patients/${childId}`}
@@ -474,8 +590,19 @@ export default function ImmunizationsPage() {
                           return (
                             <div key={dose._id} className="p-2 rounded-lg border" style={{ borderColor: 'var(--border-light)', background: cfg.bg }}>
                               <div className="flex items-center gap-1 mb-1">
-                                <cfg.icon className="w-3 h-3" style={{ color: cfg.color }} />
-                                <p className="text-xs font-medium" style={{ color: cfg.color }}>{dose.vaccine} {dose.doseNumber > 0 ? `#${dose.doseNumber}` : ''}</p>
+                                <p className="text-xs font-medium flex-1 min-w-0" style={{ color: cfg.color }}>{dose.vaccine} {dose.doseNumber > 0 ? `#${dose.doseNumber}` : ''}</p>
+                                {canRecordVitalEvents && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setEditDose(dose); }}
+                                    aria-label={t('action.edit')}
+                                    title={t('action.edit')}
+                                    className="p-0.5 rounded hover:bg-[var(--overlay-light)] shrink-0"
+                                    style={{ color: 'var(--text-muted)' }}
+                                  >
+                                    <Edit3 size={12} />
+                                  </button>
+                                )}
                               </div>
                               <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
                                 {dose.status === 'completed' ? dose.dateGiven : dose.status === 'scheduled' ? t('immun.due', { date: dose.nextDueDate }) : t(`immun.status${dose.status.charAt(0).toUpperCase()}${dose.status.slice(1)}`)}
@@ -642,6 +769,66 @@ export default function ImmunizationsPage() {
                   <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary flex-1">{t('immun.cancel')}</button>
                   <button type="submit" className="btn btn-primary flex-1">
                     <Syringe className="w-4 h-4" /> {t('immun.recordVaccination')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit / Correct a saved dose */}
+        {editDose && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+            <div className="card-elevated p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fadeIn" style={{ margin: '20px' }}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{t('action.edit')} · {editDose.patientName}</h3>
+                <button onClick={() => setEditDose(null)} className="p-1 rounded-lg hover:bg-[var(--overlay-light)]">
+                  <X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
+                </button>
+              </div>
+
+              <form onSubmit={handleEditSave} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label>{t('immun.vaccine')}</label>
+                    <select value={editDose.vaccine} onChange={e => setEditDose({ ...editDose, vaccine: e.target.value })}>
+                      {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label>{t('immun.doseNumber')}</label>
+                    <input type="number" min={0} max={5} value={editDose.doseNumber} onChange={e => setEditDose({ ...editDose, doseNumber: parseInt(e.target.value, 10) || 0 })} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label>{t('immun.dateGiven')}</label>
+                    <input type="date" value={editDose.dateGiven} onChange={e => setEditDose({ ...editDose, dateGiven: e.target.value })} />
+                  </div>
+                  <div>
+                    <label>{t('immun.nextDueDate')}</label>
+                    <input type="date" value={editDose.nextDueDate || ''} onChange={e => setEditDose({ ...editDose, nextDueDate: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label>{t('immun.batchNumber')}</label>
+                    <input type="text" value={editDose.batchNumber || ''} onChange={e => setEditDose({ ...editDose, batchNumber: e.target.value })} placeholder={t('immun.batchNumberPlaceholder')} />
+                  </div>
+                  <div>
+                    <label>{t('immun.site')}</label>
+                    <select value={editDose.site} onChange={e => setEditDose({ ...editDose, site: e.target.value as typeof SITES[number] })}>
+                      {SITES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setEditDose(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
+                  <button type="submit" disabled={editSaving} className="btn btn-primary flex-1">
+                    {t('action.saveChanges')}
                   </button>
                 </div>
               </form>

@@ -3,19 +3,20 @@
 import { useRef, useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+// Clean single-stroke Tailwind Labs Heroicons via the local compatibility shim.
 import {
-  DuotoneSettings as Settings,
-  DuotoneLogout as LogOut,
-  DuotoneGlobe as Globe,
-  DuotoneBuilding as Building2,
-  DuotoneClose as X,
-  DuotoneChevronLeft as ChevronsLeft,
-  DuotoneChevronRight as ChevronsRight,
-  DuotoneCheck as Check,
-} from '@/components/icons';
+  Settings,
+  LogOut,
+  Globe,
+  X,
+  ChevronsLeft,
+  ChevronsRight,
+  Check,
+} from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { getRoleConfig } from '@/lib/permissions';
 import type { NavItem } from '@/lib/permissions';
+import { useSidebarBadges } from '@/lib/hooks/useSidebarBadges';
 import AvailabilityModal from '@/components/AvailabilityModal';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { SUPPORTED_LOCALES } from '@/lib/i18n';
@@ -63,8 +64,8 @@ export default function Sidebar() {
     return item.label; // fallback to original
   };
 
+  const badges = useSidebarBadges();
   const role = currentUser?.role;
-  const isAdminLevel = role === 'super_admin' || role === 'org_admin' || role === 'government';
   const canChangeLang = role === 'super_admin' || role === 'org_admin' || role === 'government' || role === 'medical_superintendent';
   const roleConfig = currentUser ? getRoleConfig(currentUser.role) : null;
   const navItems = roleConfig?.navItems || [];
@@ -93,11 +94,30 @@ export default function Sidebar() {
   };
 
   const collapsed = sidebarCollapsed;
+  const compactItemClass = collapsed ? 'mx-auto w-10 justify-center !px-0' : '';
+  const compactFooterClass = collapsed ? 'mx-auto w-10 justify-center !px-0' : 'w-full text-left';
 
   // Render a single nav entry. Items with an `action` are in-place triggers
   // (e.g. the Schedule tab opens the Add availability modal) rather than route
   // links, so they render as buttons instead of <Link>.
-  const renderNavItem = (item: NavItem) => {
+  const renderNavItem = (item: NavItem, collapsed: boolean) => {
+    const badgeCount = item.badgeKey ? ((badges as unknown as Record<string, number>)[item.badgeKey] ?? 0) : 0;
+
+    const badgePill = badgeCount > 0 ? (
+      <span
+        className="ml-auto flex-shrink-0 flex items-center justify-center rounded-full text-[10px] font-bold leading-none"
+        style={{
+          background: '#F8593E4D',
+          color: '#F8593E',
+          minWidth: 18,
+          height: 18,
+          padding: '0 5px',
+        }}
+      >
+        {badgeCount > 99 ? '99+' : badgeCount}
+      </span>
+    ) : null;
+
     if (item.action === 'availability') {
       return (
         <button
@@ -105,10 +125,11 @@ export default function Sidebar() {
           type="button"
           onClick={() => { handleNavClick(); setShowAvailability(true); }}
           title={collapsed ? navLabel(item) : undefined}
-          className={`nav-item w-full text-left ${collapsed ? 'justify-center !px-0' : ''}`}
+          className={`nav-item w-full text-left ${compactItemClass}`}
         >
-          <item.icon className="w-[22px] h-[22px] flex-shrink-0" style={{ opacity: 0.7 }} />
-          {!collapsed && <span className="font-medium text-[13px]">{navLabel(item)}</span>}
+          <item.icon className="w-[20px] h-[20px] flex-shrink-0" color="var(--accent-primary)" />
+          {!collapsed && <span>{navLabel(item)}</span>}
+          {!collapsed && badgePill}
         </button>
       );
     }
@@ -119,22 +140,23 @@ export default function Sidebar() {
         href={item.href}
         onClick={handleNavClick}
         title={collapsed ? navLabel(item) : undefined}
-        className={`nav-item ${isActive ? 'nav-item-active' : ''} ${collapsed ? 'justify-center !px-0' : ''}`}
+        className={`nav-item ${isActive ? 'nav-item-active' : ''} ${compactItemClass}`}
       >
-        <item.icon className="w-[22px] h-[22px] flex-shrink-0" style={{ opacity: isActive ? 1 : 0.7 }} />
-        {!collapsed && <span className="font-medium text-[13px]">{navLabel(item)}</span>}
+        <item.icon className="w-[20px] h-[20px] flex-shrink-0" color="var(--accent-primary)" />
+        {!collapsed && <span>{navLabel(item)}</span>}
+        {!collapsed && badgePill}
       </Link>
     );
   };
 
   // Drag-to-collapse/expand
-  const dragRef = useRef<{ startX: number; startWidth: number; dragging: boolean }>({ startX: 0, startWidth: 256, dragging: false });
+  const dragRef = useRef<{ startX: number; startWidth: number; dragging: boolean }>({ startX: 0, startWidth: 220, dragging: false });
   const sidebarRef = useRef<HTMLElement>(null);
 
   const handleDragStart = useCallback((clientX: number) => {
     dragRef.current = {
       startX: clientX,
-      startWidth: collapsed ? 80 : 256,
+      startWidth: collapsed ? 80 : 220,
       dragging: true,
     };
     document.body.style.cursor = 'col-resize';
@@ -195,20 +217,20 @@ export default function Sidebar() {
     window.addEventListener('touchend', onTouchEnd);
   }, [handleDragStart, handleDragMove, handleDragEnd]);
 
-  const sidebarContent = (
+  const sidebarBody = (collapsed: boolean) => (
     <>
       {/* Logo — pt tuned so the brand row lines up with the body's first row
           (breadcrumb / page header), which sits ~20px from the viewport top. */}
-      <div className={`pt-3 pb-4 ${collapsed ? 'px-2' : 'px-5'}`}>
+      <div className={`pt-4 pb-4 ${collapsed ? 'px-2' : 'px-4'}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-2.5'}`}>
           {collapsed ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={brandLogo || '/assets/tamamhealth-logo.svg'}
+                src={brandLogo || '/assets/tamam-icon.svg'}
                 alt={brandName}
                 className="flex-shrink-0 object-contain"
-                style={{ width: 34, height: 34 }}
+                style={{ width: 32, height: 32 }}
               />
             </>
           ) : (
@@ -218,7 +240,7 @@ export default function Sidebar() {
                 src={brandLogo || '/assets/tamamhealth-logo-full.svg'}
                 alt={brandName}
                 className="flex-1 min-w-0 object-contain object-left"
-                style={{ height: 36, width: 'auto', maxWidth: 190 }}
+                style={{ height: 28, width: 'auto', maxWidth: 180 }}
               />
             </>
           )}
@@ -227,7 +249,7 @@ export default function Sidebar() {
             <button
               onClick={() => setSidebarOpen(false)}
               aria-label="Close navigation menu"
-              className="lg:hidden p-2 rounded-xl transition-all hover:scale-105 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="lg:hidden p-2 rounded-xl transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
               style={{ background: 'var(--overlay-subtle)' }}
             >
               <X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
@@ -236,65 +258,29 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* User role & facility — nudged down so the card's centre lines up with
-          the page header title ("Patient Registry") in the content column. */}
-      {currentUser && !collapsed && (
-        <div className="mx-4 mt-2.5 mb-3 p-3 rounded-xl" style={{
-          background: 'var(--overlay-subtle)',
-          border: '1px solid var(--border-medium)',
-        }}>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{
-              background: 'linear-gradient(135deg, var(--accent-light) 0%, transparent 100%)',
-              border: '1px solid var(--accent-border)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.3)',
-            }}>
-              {isAdminLevel
-                ? <Globe className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-                : <Building2 className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-              }
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                {role === 'super_admin' ? 'Platform Administrator'
-                  : role === 'government' ? 'Government Admin'
-                  : role === 'org_admin' ? 'Organization Admin'
-                  : roleConfig?.label || 'Staff'}
-              </p>
-              <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
-                {role === 'super_admin' ? 'All Organizations'
-                  : role === 'government' ? 'Ministry of Health'
-                  : role === 'org_admin' ? (currentUser.organization?.name || 'My Organization')
-                  : (currentUser.hospital?.name || currentUser.hospitalName || 'Unassigned')}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Navigation */}
-      {/* Extra top gap (expanded only) drops the first section label ("RECEPTION")
-          to the same line as the page search bar in the content column. */}
-      <nav aria-label="Main navigation" className={`flex-1 overflow-y-auto overflow-x-hidden no-scrollbar ${collapsed ? 'mt-1 px-2' : 'mt-6 px-3'}`}>
+      {/* First section label starts near the top so it aligns with the page's
+          first content block (e.g. the "QUICK ACTIONS" heading) in the column. */}
+      <nav aria-label="Main navigation" className={`flex-1 overflow-y-auto overflow-x-hidden sidebar-scrollbar ${collapsed ? 'mt-1 px-2' : 'mt-1 px-3'}`}>
         {hasSections ? (
           groups.map((group, gi) => (
             <div key={gi} className={gi > 0 ? 'mt-4' : ''}>
               {group.section && !collapsed && (
-                <p className="px-3 pt-1 pb-2 text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
+                <p className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-muted)' }}>
                   {group.section}
                 </p>
               )}
               {group.section && collapsed && (
-                <div className="w-6 h-px mx-auto my-2" style={{ background: 'var(--border-medium)' }} />
+                <div className="w-6 h-px mx-auto my-2" style={{ background: 'var(--border-light)' }} />
               )}
               <div className="space-y-1">
-                {group.items.map(item => renderNavItem(item))}
+                {group.items.map(item => renderNavItem(item, collapsed))}
               </div>
             </div>
           ))
         ) : (
           <div className="space-y-1">
-            {navItems.map(item => renderNavItem(item))}
+            {navItems.map(item => renderNavItem(item, collapsed))}
           </div>
         )}
       </nav>
@@ -305,15 +291,15 @@ export default function Sidebar() {
         <button
           onClick={() => setSidebarCollapsed(!collapsed)}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="hidden lg:flex nav-item w-full text-left items-center"
+          className={`hidden lg:flex nav-item items-center ${collapsed ? 'mx-auto w-10 justify-center !px-0' : 'w-full text-left'}`}
           style={{ color: 'var(--nav-text)' }}
         >
           {collapsed ? (
-            <ChevronsRight className="w-[17px] h-[17px] mx-auto" />
+            <ChevronsRight className="w-[18px] h-[18px] mx-auto" color="var(--accent-primary)" />
           ) : (
             <>
-              <ChevronsLeft className="w-[22px] h-[22px]" />
-              <span className="text-[13px]">Collapse</span>
+              <ChevronsLeft className="w-[18px] h-[18px]" color="var(--accent-primary)" />
+              <span>Collapse</span>
             </>
           )}
         </button>
@@ -324,10 +310,10 @@ export default function Sidebar() {
             <button
               onClick={() => setShowLangPicker(!showLangPicker)}
               title={collapsed ? `Language: ${currentLocaleConfig?.nativeName || 'English'}` : undefined}
-              className={`nav-item w-full text-left ${collapsed ? 'justify-center !px-0' : ''}`}
+              className={`nav-item ${compactFooterClass}`}
               style={{ color: 'var(--nav-text)' }}
             >
-              <Globe className="w-[22px] h-[22px]" style={{ opacity: 0.7 }} />
+              <Globe className="w-[18px] h-[18px]" color="var(--accent-primary)" />
               {!collapsed && (
                 <span className="text-[13px] flex-1">{currentLocaleConfig?.nativeName || 'English'}</span>
               )}
@@ -383,58 +369,24 @@ export default function Sidebar() {
             href="/settings"
             onClick={handleNavClick}
             title={collapsed ? t('nav.settings') : undefined}
-            className={`nav-item ${pathname === '/settings' ? 'nav-item-active' : ''} ${collapsed ? 'justify-center !px-0' : ''}`}
+            className={`nav-item ${pathname === '/settings' ? 'nav-item-active' : ''} ${compactFooterClass}`}
           >
-            <Settings className="w-[22px] h-[22px]" style={{ opacity: pathname === '/settings' ? 1 : 0.7 }} />
-            {!collapsed && <span className="font-medium text-[13px]">{t('nav.settings')}</span>}
+            <Settings className="w-[18px] h-[18px]" color="var(--accent-primary)" />
+            {!collapsed && <span>{t('nav.settings')}</span>}
           </Link>
         )}
 
         <button
           onClick={() => { setSidebarOpen(false); logout(); }}
           aria-label="Sign Out"
-          className={`nav-item w-full text-left ${collapsed ? 'justify-center !px-0' : ''}`}
+          className={`nav-item ${compactFooterClass}`}
           style={{ color: 'var(--nav-text)' }}
         >
-          <LogOut className="w-[22px] h-[22px]" />
-          {!collapsed && <span className="text-[13px]">{t('auth.logout')}</span>}
+          <LogOut className="w-[18px] h-[18px]" color="var(--accent-primary)" />
+          {!collapsed && <span>{t('auth.logout')}</span>}
         </button>
       </div>
 
-      {/* User profile card */}
-      {currentUser && !collapsed && (
-        <div className="mx-3 mb-3 p-3 rounded-2xl" style={{
-          background: 'var(--overlay-subtle)',
-          border: '1px solid var(--border-medium)',
-        }}>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{
-              background: `var(--accent-primary)`,
-              boxShadow: `0 2px 8px var(--accent-primary)`,
-            }}>
-              {(currentUser.name || '').split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2) || '?'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{currentUser.name}</p>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{roleConfig?.badgeLabel || currentUser.role}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Collapsed user avatar */}
-      {currentUser && collapsed && (
-        <div className="flex justify-center mb-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{
-            background: `var(--accent-primary)`,
-            boxShadow: `0 2px 8px var(--accent-primary)`,
-          }}
-          title={currentUser.name}
-          >
-            {(currentUser.name || '').split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2) || '?'}
-          </div>
-        </div>
-      )}
     </>
   );
 
@@ -443,21 +395,20 @@ export default function Sidebar() {
       {/* Desktop sidebar — solid floating panel */}
       <aside
         ref={sidebarRef}
-        className="hidden lg:flex fixed left-0 top-0 bottom-0 flex-col z-40 overflow-hidden transition-all duration-300 ease-in-out"
+        className="hidden lg:flex fixed left-0 top-0 bottom-0 flex-col z-40 transition-all duration-300 ease-in-out"
         style={{
-          width: collapsed ? '80px' : '256px',
-          margin: '12px',
-          marginRight: '0',
-          height: 'calc(100vh - 24px)',
+          width: collapsed ? '80px' : '220px',
+          margin: '10px 0 10px 10px',
+          height: 'calc(100vh - 20px)',
           background: 'var(--glass-bg-strong)',
           backdropFilter: 'var(--glass-blur)',
           WebkitBackdropFilter: 'var(--glass-blur)',
-          borderRadius: 'var(--card-radius)',
           border: '1px solid var(--glass-border)',
+          borderRadius: 18,
           boxShadow: 'var(--panel-shadow), var(--glass-highlight)',
         }}
       >
-        {sidebarContent}
+        {sidebarBody(collapsed)}
         {/* Drag handle on right edge */}
         <div
           onMouseDown={onMouseDown}
@@ -481,24 +432,23 @@ export default function Sidebar() {
         />
       )}
 
-      {/* Mobile/Tablet drawer — always expanded */}
+      {/* Off-canvas drawer — the full LABELLED sidebar, opened from the TopBar
+          hamburger. Slides over the persistent icon rail when you need labels. */}
       <aside
-        className={`lg:hidden fixed left-0 top-0 bottom-0 flex flex-col z-50 overflow-hidden transition-transform duration-300 ease-in-out ${
+        className={`lg:hidden fixed left-0 top-0 bottom-0 flex flex-col z-50 transition-transform duration-300 ease-in-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
           width: '280px',
-          margin: '8px',
-          height: 'calc(100vh - 16px)',
-          background: 'var(--glass-bg-strong)',
-          backdropFilter: 'var(--glass-blur)',
-          WebkitBackdropFilter: 'var(--glass-blur)',
-          borderRadius: '10px',
-          border: '1px solid var(--glass-border)',
-          boxShadow: sidebarOpen ? 'var(--card-shadow-xl)' : 'none',
+          margin: '10px 0 10px 10px',
+          height: 'calc(100vh - 20px)',
+          background: 'var(--sidebar-bg)',
+          borderRadius: 18,
+          borderRight: 'none',
+          boxShadow: sidebarOpen ? '0 4px 32px rgba(1, 86, 151, 0.24)' : 'none',
         }}
       >
-        {sidebarContent}
+        {sidebarBody(false)}
       </aside>
 
       {/* Add availability — opened from the Schedule nav item */}

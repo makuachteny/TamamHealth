@@ -97,9 +97,7 @@ export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, on
       <div className="flex flex-col items-center gap-4 w-full max-w-xs px-6">
         {/* TamamHealth logo */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/tamamhealth-logo.svg" alt="TamamHealth" className="w-16 h-16" style={{
-          filter: 'drop-shadow(0 4px 12px rgba(10, 61, 107, 0.3))',
-        }} />
+        <img src="/assets/tamamhealth-logo.svg" alt="TamamHealth" className="w-16 h-16" />
 
         {/* Name & status */}
         <div className="text-center">
@@ -132,7 +130,7 @@ export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, on
 
         {/* Number pad */}
         <div className="w-full">
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-3 gap-2.5 keep-cols">
             {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(key => (
               <button
                 key={key || 'empty'}
@@ -142,7 +140,7 @@ export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, on
                   if (key === 'del') handleBackspace();
                   else if (key) handleDigit(key);
                 }}
-                className="h-14 rounded-xl text-lg font-semibold transition-all duration-100 flex items-center justify-center active:scale-95"
+                className="h-14 rounded-xl text-lg font-semibold transition-all duration-100 flex items-center justify-center"
                 style={{
                   background: !key ? 'transparent' : 'var(--overlay-subtle)',
                   color: key === 'del' ? 'var(--text-muted)' : 'var(--text-primary)',

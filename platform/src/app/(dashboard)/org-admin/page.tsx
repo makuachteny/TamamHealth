@@ -3,14 +3,13 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import PageHeader from '@/components/PageHeader';
 import RoleGuard from '@/components/RoleGuard';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Users, Building2, UserCheck, CreditCard, Shield,
   TrendingUp, TrendingDown, CheckCircle, XCircle, Zap, BarChart3,
-  Activity, Clock, ArrowUpDown, Minus, AlertTriangle, Palette, Settings,
+  Activity, ArrowUpDown, Minus, AlertTriangle, Palette, Settings,
 } from '@/components/icons/lucide';
 import type { OrganizationDoc, AuditLogDoc, HospitalDoc } from '@/lib/db-types';
 
@@ -47,7 +46,7 @@ function OrgAdminDashboard() {
   const [thisMonthConsultations, setThisMonthConsultations] = useState(0);
   const [thisMonthReferrals, setThisMonthReferrals] = useState(0);
 
-  const brandColor = currentUser?.branding?.primaryColor || '#7C3AED';
+  const brandColor = currentUser?.branding?.primaryColor || 'var(--accent-primary)';
 
   useEffect(() => {
     if (!currentUser?.orgId) return;
@@ -258,14 +257,7 @@ function OrgAdminDashboard() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title={t('orgAdmin.pageTitle')} />
-
-      <div className="page-container page-enter">
-        <PageHeader
-          icon={Building2}
-          title={org?.name || currentUser?.branding?.name || t('orgAdmin.organization')}
-          subtitle={t('orgAdmin.subtitle')}
-          actions={org?.subscriptionPlan ? (
+      <TopBar title={t('orgAdmin.pageTitle')} actions={org?.subscriptionPlan ? (
             <div
               className="px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider"
               style={{
@@ -276,9 +268,9 @@ function OrgAdminDashboard() {
             >
               {t('orgAdmin.planBadge', { plan: planLabels[org.subscriptionPlan] || org.subscriptionPlan })}
             </div>
-          ) : null}
-        />
+          ) : null} />
 
+      <div className="page-container page-enter">
         {/* Stat Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {statCards.map((card) => {
@@ -295,7 +287,7 @@ function OrgAdminDashboard() {
                 }}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="icon-box-sm" style={{ background: 'var(--accent-light)' }}>
+                  <div className="icon-box-sm">
                     <Icon className="w-3.5 h-3.5" style={{ color: card.color }} />
                   </div>
                   <span className="kpi-card-title">{card.displayLabel}</span>
@@ -349,7 +341,7 @@ function OrgAdminDashboard() {
             <div className="p-4 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.referrals')}</span>
-                <TrendingUp className="w-4 h-4" style={{ color: '#7C3AED' }} />
+                <TrendingUp className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{thisMonthReferrals}</p>
               <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('orgAdmin.thisMonth')}</p>
@@ -366,7 +358,7 @@ function OrgAdminDashboard() {
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 520 }}>
               <thead>
                 <tr>
                   {[
@@ -447,7 +439,7 @@ function OrgAdminDashboard() {
                 <span
                   className="text-xs font-medium px-2 py-0.5 rounded-full"
                   style={{
-                    background: org?.subscriptionStatus === 'active' ? 'rgba(59, 130, 246,0.12)' : 'rgba(245,158,11,0.12)',
+                    background: org?.subscriptionStatus === 'active' ? 'rgba(33, 145, 208, 0.12)' : 'rgba(245,158,11,0.12)',
                     color: org?.subscriptionStatus === 'active' ? 'var(--accent-primary)' : 'var(--color-warning)',
                   }}
                 >
@@ -545,7 +537,7 @@ function OrgAdminDashboard() {
             )}
           </div>
           <div style={{ overflowX: 'auto', maxHeight: '320px', overflowY: 'auto' }}>
-            <table className="w-full">
+            <table className="w-full" style={{ minWidth: 520 }}>
               <thead>
                 <tr>
                   {[t('orgAdmin.colUser'), t('orgAdmin.colAction'), t('orgAdmin.colTimestamp'), t('orgAdmin.colStatus')].map(header => (
@@ -578,7 +570,6 @@ function OrgAdminDashboard() {
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{log.action}</td>
                       <td className="px-4 py-3">
                         <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                          <Clock className="w-3 h-3" />
                           {formatTimestamp(log.createdAt)}
                         </span>
                       </td>
@@ -619,7 +610,7 @@ function OrgAdminDashboard() {
                 <a
                   key={action.href}
                   href={action.href}
-                  className="flex items-center gap-3 p-4 rounded-lg transition-all hover:scale-[1.01]"
+                  className="flex items-center gap-3 p-4 rounded-lg transition-all"
                   style={{
                     background: 'var(--overlay-subtle)',
                     border: '1px solid var(--border-light)',
