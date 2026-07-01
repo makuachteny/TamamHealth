@@ -385,7 +385,7 @@ export default function AdminSystemPage() {
                         <input type="color" value={defaultPrimaryColor} onChange={e => setDefaultPrimaryColor(e.target.value)}
                           className="w-10 h-10 rounded-lg cursor-pointer border-0" />
                         <input type="text" value={defaultPrimaryColor} onChange={e => setDefaultPrimaryColor(e.target.value)}
-                          style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '12px' }} />
+                          style={{ ...inputStyle, fontFamily: 'var(--font-platform-mono)', fontSize: '12px' }} />
                       </div>
                     </div>
                     <div>
@@ -394,7 +394,7 @@ export default function AdminSystemPage() {
                         <input type="color" value={defaultSecondaryColor} onChange={e => setDefaultSecondaryColor(e.target.value)}
                           className="w-10 h-10 rounded-lg cursor-pointer border-0" />
                         <input type="text" value={defaultSecondaryColor} onChange={e => setDefaultSecondaryColor(e.target.value)}
-                          style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '12px' }} />
+                          style={{ ...inputStyle, fontFamily: 'var(--font-platform-mono)', fontSize: '12px' }} />
                       </div>
                     </div>
                   </div>

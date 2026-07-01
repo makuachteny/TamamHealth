@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { LabResultDoc, OrderSetDoc } from '@/lib/db-types';
 import { labTier, specimenFor } from '@/lib/clinical-flow/lab-catalog';
@@ -17,6 +18,8 @@ import {
 } from '@/components/icons/lucide';
 import { useFavorites } from '@/lib/hooks/useFavorites';
 import { FavoritesBar, FavoriteStar } from '@/components/consultation/FavoritesBar';
+import SearchInput from '@/components/filters/SearchInput';
+import SearchAddField from '@/components/consultation/SearchAddField';
 import SymptomTemplateForm from '@/components/consultation/SymptomTemplateForm';
 import { SYMPTOM_TEMPLATES, getSymptomTemplate, compileSymptomNote, type SymptomAnswers } from '@/lib/clinical/symptom-templates';
 import { medications } from '@/data/mock';
@@ -42,6 +45,21 @@ import { formatMoney } from '@/lib/format-utils';
 import { Icon as DuotoneInfoIcon } from '@/components/icons';
 import { useToast } from '@/components/Toast';
 import { ROS_SYSTEMS, CHRONIC_CONDITIONS, SMOKING_OPTIONS, ALCOHOL_OPTIONS, SES_OPTIONS } from '@/lib/clinical-history';
+import {
+  CONSULT_SECTION,
+  COMMON_SURGERIES,
+  COMMON_ADMISSIONS,
+  COMMON_OCCUPATIONS,
+  COMMON_SUBSTANCE_USE,
+  COMMON_INSURANCE,
+  COMMON_ALLERGIES,
+  COMMON_CHIEF_COMPLAINTS,
+  PHYS_EXAM_QUICK_PICKS,
+  COMMON_TREATMENT_PLANS,
+  COMMON_FOLLOWUP_REASONS,
+  COMMON_REFERRAL_REASONS,
+  COMMON_CHRONIC_MEDICATIONS,
+} from '@/lib/consultation-options';
 import { saveDraft, loadDraft, dropDraft } from '@/lib/draft-storage';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
@@ -67,9 +85,8 @@ interface PrescriptionEntry {
   urgency: 'immediate' | 'definitive';
 }
 
-// Basic panel = ordered broadly; special = doctor-selected targeted investigations.
-
 const routeOptions = ['Oral', 'IV', 'IM', 'SC', 'Topical', 'Rectal', 'Inhaled'];
+// Basic panel = ordered broadly; special = doctor-selected targeted investigations.
 
 // Joins patient name parts and skips missing/empty pieces so legacy records
 // without a middleName don't render "Deng undefined Garang".
@@ -106,12 +123,14 @@ export default function ConsultationPage() {
   const { currentUser } = useApp();
   const { canConsult } = usePermissions();
   const { triages } = useTriage();
+  const [historySearch, setHistorySearch] = useState('');
+  const [pmhSearch, setPmhSearch] = useState('');
 
   // Section collapse state (11 sections — includes AI section at index 3 and Attachments at index 8)
   // In the stepped wizard every section is expanded; the active step controls
   // which section cards are visible (others are hidden), so sections start open.
-  const [openSections, setOpenSections] = useState<boolean[]>(() => Array(11).fill(true));
-  // Current wizard step (0..4), mapping to the workflow stages below.
+  const [openSections, setOpenSections] = useState<boolean[]>(() => Array(CONSULT_SECTION.referral + 1).fill(true));
+  // Current wizard step (0..6), mapping to the workflow stages below.
   const [step, setStep] = useState(0);
 
   // AI Clinical Scribe
@@ -142,6 +161,8 @@ export default function ConsultationPage() {
   });
   const [ros, setRos] = useState<Record<string, { status: 'negative' | 'positive'; findings: string }>>({});
   const [customLab, setCustomLab] = useState('');
+  const hpiRef = useRef<HTMLTextAreaElement | null>(null);
+  const familyHistoryRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Patient selector
   const [patientSearch, setPatientSearch] = useState('');
@@ -165,6 +186,7 @@ export default function ConsultationPage() {
   const [restorePromptFor, setRestorePromptFor] = useState<{ key: string; savedAt: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextAutosave = useRef(false);
+  const consultPageRef = useRef<HTMLElement | null>(null);
 
   // Pre-select patient from URL (?patientId=...) once patients load.
   useEffect(() => {
@@ -331,6 +353,32 @@ export default function ConsultationPage() {
     setSymptomAnswers({});
     showToast('Screening added to the history', 'success');
   };
+  const addPmhCondition = (condition: string) => {
+    const cleaned = condition.trim();
+    if (!cleaned) return;
+    setHistory(h => {
+      const next = Array.from(new Set([...h.pmhConditions, cleaned].map(c => c.trim()).filter(Boolean)));
+      return { ...h, pmhConditions: next };
+    });
+    setPmhSearch('');
+  };
+  const appendExamFinding = (field: keyof typeof physExam, value: string) => {
+    const text = value.trim();
+    if (!text) return;
+    setPhysExam(prev => ({
+      ...prev,
+      [field]: prev[field].trim() ? `${prev[field].trim()}\n${text}` : text,
+    }));
+  };
+  const appendWorkflowText = (
+    setter: Dispatch<SetStateAction<string>>,
+    current: string,
+    value: string,
+  ) => {
+    const text = value.trim();
+    if (!text) return;
+    setter(current.trim() ? `${current.trim()}\n${text}` : text);
+  };
 
   // Prescriptions
   const [prescriptions, setPrescriptions] = useState<PrescriptionEntry[]>([]);
@@ -365,6 +413,39 @@ export default function ConsultationPage() {
   // Medical records hook
   const { create: createRecord, records: patientRecords } = useMedicalRecords(selectedPatient || undefined);
   const prefilledForRef = useRef<string | null>(null);
+  const selectedPatientData = useMemo(
+    () => patients.find(p => p._id === selectedPatient) || null,
+    [patients, selectedPatient]
+  );
+  const latestRecord = patientRecords?.[0] || null;
+  const filteredPmhConditions = useMemo(
+    () => CHRONIC_CONDITIONS.filter(c => c.toLowerCase().includes(pmhSearch.trim().toLowerCase())),
+    [pmhSearch]
+  );
+  const chartHistorySummary = useMemo(() => {
+    const entries = [
+      { key: 'hpi', label: 'HPI', value: latestRecord?.historyOfPresentIllness || '' },
+      { key: 'pmh', label: 'Past medical history', value: latestRecord?.pastMedicalHistory?.chronicConditions?.join(', ') || selectedPatientData?.chronicConditions?.join(', ') || '' },
+      { key: 'surgeries', label: 'Past surgeries', value: latestRecord?.pastMedicalHistory?.pastSurgeries || '' },
+      { key: 'admissions', label: 'Prior admissions', value: latestRecord?.pastMedicalHistory?.pastAdmissions || '' },
+      { key: 'transfusion', label: 'Blood transfusion', value: latestRecord?.pastMedicalHistory?.bloodTransfusion ? 'Yes' : '' },
+      { key: 'family', label: 'Family history', value: latestRecord?.familyHistory || '' },
+      { key: 'smoking', label: 'Smoking', value: latestRecord?.socialHistory?.smoking || '' },
+      { key: 'alcohol', label: 'Alcohol', value: latestRecord?.socialHistory?.alcohol || '' },
+      { key: 'substance', label: 'Substance use', value: latestRecord?.socialHistory?.substanceUse || '' },
+      { key: 'occupation', label: 'Occupation', value: latestRecord?.socialHistory?.occupation || '' },
+      { key: 'insurance', label: 'Insurance', value: latestRecord?.socialHistory?.hasHealthInsurance ? 'Yes' : '' },
+      { key: 'provider', label: 'Insurance provider', value: latestRecord?.socialHistory?.insuranceProvider || '' },
+      { key: 'ses', label: 'Socioeconomic status', value: latestRecord?.socialHistory?.socioeconomicStatus || '' },
+      { key: 'medications', label: 'Current chronic medications', value: latestRecord?.drugHistory?.chronicMedications || '' },
+      { key: 'allergies', label: 'Drug allergies', value: latestRecord?.drugHistory?.noKnownAllergies ? 'No known drug allergies' : latestRecord?.drugHistory?.allergies?.join(', ') || selectedPatientData?.allergies?.join(', ') || '' },
+    ].filter(item => {
+      const q = historySearch.trim().toLowerCase();
+      if (!q) return true;
+      return `${item.label} ${item.value}`.toLowerCase().includes(q);
+    });
+    return entries;
+  }, [latestRecord, selectedPatientData, historySearch]);
 
   // Pre-fill the Past Medical History (and known drug allergies) from the
   // patient's own record + their most recent visit, instead of starting from a
@@ -394,17 +475,54 @@ export default function ConsultationPage() {
     const fromRecord = latestRecord?.pastMedicalHistory?.chronicConditions || [];
     const conditions = Array.from(new Set([...fromPatient, ...fromRecord].map(matchCatalog)));
     const allergyList = (patient.allergies || []).filter(a => a && !isNone(a));
-    const hasNoKnownAllergies = (patient.allergies || []).some(isNone) && allergyList.length === 0;
+    const recordAllergies = latestRecord?.drugHistory?.allergies || [];
+    const mergedAllergies = Array.from(new Set([...allergyList, ...recordAllergies].filter(a => a && !isNone(a))));
+    const hasNoKnownAllergies = (patient.allergies || []).some(isNone) || !!latestRecord?.drugHistory?.noKnownAllergies;
 
-    if (conditions.length === 0 && allergyList.length === 0 && !hasNoKnownAllergies) return;
+    if (
+      conditions.length === 0 &&
+      mergedAllergies.length === 0 &&
+      !hasNoKnownAllergies &&
+      !latestRecord?.historyOfPresentIllness &&
+      !latestRecord?.pastMedicalHistory?.pastSurgeries &&
+      !latestRecord?.pastMedicalHistory?.pastAdmissions &&
+      !latestRecord?.familyHistory &&
+      !latestRecord?.socialHistory &&
+      !latestRecord?.drugHistory
+    ) return;
 
     setHistory(h => {
       // Only fill while still at defaults — never overwrite real input.
-      if (h.pmhConditions.length > 0 || h.hpi.trim() || h.dhAllergies.trim() || h.dhNKDA) return h;
+      if (
+        h.pmhConditions.length > 0 ||
+        h.hpi.trim() ||
+        h.pmhSurgeries.trim() ||
+        h.pmhAdmissions.trim() ||
+        h.familyHistory.trim() ||
+        h.shSubstance.trim() ||
+        h.shOccupation.trim() ||
+        h.shInsuranceProvider.trim() ||
+        h.dhChronicMeds.trim() ||
+        h.dhAllergies.trim() ||
+        h.dhNKDA
+      ) return h;
       return {
         ...h,
+        hpi: latestRecord?.historyOfPresentIllness || '',
         pmhConditions: conditions,
-        dhAllergies: allergyList.join(', '),
+        pmhSurgeries: latestRecord?.pastMedicalHistory?.pastSurgeries || '',
+        pmhAdmissions: latestRecord?.pastMedicalHistory?.pastAdmissions || '',
+        pmhTransfusion: !!latestRecord?.pastMedicalHistory?.bloodTransfusion,
+        familyHistory: latestRecord?.familyHistory || '',
+        shSmoking: latestRecord?.socialHistory?.smoking || 'never',
+        shAlcohol: latestRecord?.socialHistory?.alcohol || 'never',
+        shSubstance: latestRecord?.socialHistory?.substanceUse || '',
+        shOccupation: latestRecord?.socialHistory?.occupation || '',
+        shInsurance: !!latestRecord?.socialHistory?.hasHealthInsurance,
+        shInsuranceProvider: latestRecord?.socialHistory?.insuranceProvider || '',
+        shSES: latestRecord?.socialHistory?.socioeconomicStatus || '',
+        dhChronicMeds: latestRecord?.drugHistory?.chronicMedications || '',
+        dhAllergies: mergedAllergies.join(', '),
         dhNKDA: hasNoKnownAllergies,
       };
     });
@@ -534,8 +652,6 @@ export default function ConsultationPage() {
         p.hospitalNumber.toLowerCase().includes(patientSearch.toLowerCase())
       ).slice(0, 8)
     : [];
-
-  const selectedPatientData = selectedPatient ? patients.find(p => p._id === selectedPatient) : null;
 
   // Prescribing safety screen (clinical decision support): drug–drug
   // interactions, drug–allergy conflicts (class-aware), and duplicate orders,
@@ -695,8 +811,8 @@ export default function ConsultationPage() {
     setPrescriptions(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
   };
 
-  const addComplaint = () => {
-    const v = complaintInput.trim();
+  const addComplaint = (value?: string) => {
+    const v = (value ?? complaintInput).trim();
     if (!v || complaints.length >= 3) return;
     const next = [...complaints, v];
     setComplaints(next);
@@ -997,9 +1113,33 @@ export default function ConsultationPage() {
   const handleSubmit = async () => {
     if (!selectedPatient || isSaving) return;
 
-    // Validate chief complaint before saving
-    if (!chiefComplaint || chiefComplaint.trim().length < 3) {
+    if (!hasHistoryInput()) {
+      showToast('Complete the history before saving the consultation.', 'error');
+      return;
+    }
+
+    if (!hasChiefComplaint()) {
       showToast(t('consultation.chiefComplaintRequired'), 'error');
+      return;
+    }
+
+    if (!hasVitalsInput() && !todaysTriage) {
+      showToast('Capture vitals or complete triage before saving the consultation.', 'error');
+      return;
+    }
+
+    if (!hasExamInput()) {
+      showToast('Document the physical examination before saving the consultation.', 'error');
+      return;
+    }
+
+    if (diagnoses.length === 0) {
+      showToast('Add at least one diagnosis before saving the consultation.', 'error');
+      return;
+    }
+
+    if (!hasPlanInput()) {
+      showToast('Add a treatment plan, follow-up, referral, or attachment before saving the consultation.', 'error');
       return;
     }
 
@@ -1625,17 +1765,17 @@ export default function ConsultationPage() {
   };
 
   const sectionHeaders: { icon: React.ElementType; label: string }[] = [
-    { icon: ClipboardList, label: t('consultation.sectionChiefComplaint') },      // 0
-    { icon: Thermometer, label: t('consultation.sectionVitalSigns') },             // 1
-    { icon: Stethoscope, label: t('consultation.sectionPhysicalExam') },    // 2
-    { icon: Brain, label: 'History & review' },        // 3
-    { icon: AlertTriangle, label: t('consultation.sectionDiagnosis') },             // 4
-    { icon: Pill, label: t('consultation.sectionPrescriptions') },                  // 5
-    { icon: FlaskConical, label: t('consultation.sectionLabOrders') },             // 6
-    { icon: FileText, label: t('consultation.sectionTreatmentPlan') },             // 7
-    { icon: Paperclip, label: t('consultation.sectionAttachments') },      // 8
-    { icon: Calendar, label: t('consultation.sectionFollowUp') },                  // 9
-    { icon: Building2, label: t('consultation.sectionReferral') },                  // 10
+    { icon: ClipboardList, label: 'History' },
+    { icon: Thermometer, label: 'Intake' },
+    { icon: Stethoscope, label: t('consultation.sectionPhysicalExam') },
+    { icon: Brain, label: 'Summary' },
+    { icon: AlertTriangle, label: t('consultation.sectionDiagnosis') },
+    { icon: Pill, label: t('consultation.sectionPrescriptions') },
+    { icon: FlaskConical, label: t('consultation.sectionLabOrders') },
+    { icon: FileText, label: t('consultation.sectionTreatmentPlan') },
+    { icon: Paperclip, label: t('consultation.sectionAttachments') },
+    { icon: Calendar, label: t('consultation.sectionFollowUp') },
+    { icon: Building2, label: t('consultation.sectionReferral') },
   ];
 
   const SectionHeader = ({ index }: { index: number }) => {
@@ -1661,59 +1801,146 @@ export default function ConsultationPage() {
     );
   };
 
-  // The 11 form sections grouped into the labelled stages of the clinical
-  // workflow, so the clinician can see where they are in the visit and where
-  // the hand-off to the lab happens (Investigations → Awaiting results).
+  const WORKFLOW_PANEL = {
+    history: 0,
+    intake: 1,
+    exam: 2,
+    assessment: 3,
+    orders: 4,
+    plan: 5,
+    summary: 6,
+  } as const;
+
+  const hasHistoryInput = () => (
+    history.hpi.trim().length > 0 ||
+    history.pmhConditions.length > 0 ||
+    history.pmhSurgeries.trim().length > 0 ||
+    history.pmhAdmissions.trim().length > 0 ||
+    history.familyHistory.trim().length > 0 ||
+    history.shOccupation.trim().length > 0 ||
+    history.shSubstance.trim().length > 0 ||
+    history.dhChronicMeds.trim().length > 0 ||
+    history.dhAllergies.trim().length > 0 ||
+    history.dhNKDA ||
+    Object.keys(ros).length > 0
+  );
+  const hasChiefComplaint = () => chiefComplaint.trim().length >= 3;
+  const hasVitalsInput = () => Object.values(vitals).some(value => value !== '');
+  const hasExamInput = () => Object.values(physExam).some(value => value.trim().length > 0);
+  const hasOrdersInput = () => prescriptions.length > 0 || Object.values(labOrders).some(Boolean);
+  const hasPlanInput = () => (
+    treatmentPlan.trim().length > 0 ||
+    consultAttachments.length > 0 ||
+    followUpDate !== '' ||
+    followUpReason.trim().length > 0 ||
+    (addReferral && (referralHospital !== '' || referralReason.trim().length > 0))
+  );
+  const intakeReady = () => hasChiefComplaint() && (hasVitalsInput() || !!todaysTriage);
+  const consultationReadyForSummary = () => (
+    hasHistoryInput() &&
+    intakeReady() &&
+    hasExamInput() &&
+    diagnoses.length > 0 &&
+    hasPlanInput()
+  );
+
+  // The consultation wizard is intentionally linear: history first, intake with
+  // vitals next, and summary last as a read-only review step.
   const workflowStages: { label: string; sections: number[] }[] = [
-    { label: 'Intake & History', sections: [0, 1, 2, 3] },
-    { label: 'Assessment', sections: [4] },
-    { label: 'Investigations', sections: [6] },
-    { label: 'Treatment', sections: [5, 7] },
-    { label: 'Plan & checkout', sections: [8, 9, 10] },
+    { label: 'History', sections: [WORKFLOW_PANEL.history] },
+    { label: 'Intake', sections: [WORKFLOW_PANEL.intake] },
+    { label: 'Examination', sections: [WORKFLOW_PANEL.exam] },
+    { label: 'Assessment', sections: [WORKFLOW_PANEL.assessment] },
+    { label: 'Orders', sections: [WORKFLOW_PANEL.orders] },
+    { label: 'Plan & checkout', sections: [WORKFLOW_PANEL.plan] },
+    { label: 'Summary', sections: [WORKFLOW_PANEL.summary] },
+  ];
+  const workflowStageIcons: React.ElementType[] = [
+    ClipboardList,
+    Thermometer,
+    Stethoscope,
+    AlertTriangle,
+    FlaskConical,
+    FileText,
+    Brain,
   ];
   // Which section cards belong to the current wizard step (others are hidden).
   const stepHas = (sectionIndex: number) => workflowStages[step]?.sections.includes(sectionIndex) ?? false;
   const isLastStep = step === workflowStages.length - 1;
 
-  // Advance to the next step, enforcing the one hard requirement (a chief
-  // complaint) before leaving the first step — mirrors the registration wizard.
+  const validateStep = (currentStep: number): string | null => {
+    if (currentStep === WORKFLOW_PANEL.history && !hasHistoryInput()) {
+      return 'Enter the patient history before moving to intake.';
+    }
+    if (currentStep === WORKFLOW_PANEL.intake) {
+      if (!hasChiefComplaint()) return t('consultation.chiefComplaintRequired');
+      if (!hasVitalsInput() && !todaysTriage) return 'Capture vitals or complete triage before moving to examination.';
+    }
+    if (currentStep === WORKFLOW_PANEL.exam && !hasExamInput()) {
+      return 'Document the physical examination before moving to assessment.';
+    }
+    if (currentStep === WORKFLOW_PANEL.assessment && diagnoses.length === 0) {
+      return 'Add at least one diagnosis before moving to orders.';
+    }
+    if (currentStep === WORKFLOW_PANEL.plan && !hasPlanInput()) {
+      return 'Add a treatment plan, follow-up, referral, or attachment before reviewing the summary.';
+    }
+    return null;
+  };
+
   const goNext = () => {
-    if (step === 0 && (!chiefComplaint || chiefComplaint.trim().length < 3)) {
-      showToast(t('consultation.chiefComplaintRequired'), 'error');
+    const validationMessage = validateStep(step);
+    if (validationMessage) {
+      showToast(validationMessage, 'error');
       return;
     }
     setStep(s => Math.min(s + 1, workflowStages.length - 1));
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+    consultPageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const goBack = () => {
     setStep(s => Math.max(s - 1, 0));
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+    consultPageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Whether a section has any clinician-entered data. Single source of truth for
   // both the stage rail and the progress checklist — progress is driven by what
   // has been filled in, not by which section happens to be open.
+  const workflowPanelFilled = (i: number): boolean => (
+    i === WORKFLOW_PANEL.history ? hasHistoryInput()
+    : i === WORKFLOW_PANEL.intake ? intakeReady()
+    : i === WORKFLOW_PANEL.exam ? hasExamInput()
+    : i === WORKFLOW_PANEL.assessment ? diagnoses.length > 0
+    : i === WORKFLOW_PANEL.orders ? hasOrdersInput()
+    : i === WORKFLOW_PANEL.plan ? hasPlanInput()
+    : consultationReadyForSummary()
+  );
   const sectionFilled = (i: number): boolean => (
-    i === 0 ? chiefComplaint.length > 0
-    : i === 1 ? Object.values(vitals).some(v => v !== '')
-    : i === 2 ? Object.values(physExam).some(v => v !== '')
-    : i === 3 ? history.hpi.trim().length > 0 || history.pmhConditions.length > 0
+    i === 0 ? hasHistoryInput()
+    : i === 1 ? intakeReady()
+    : i === 2 ? hasExamInput()
+    : i === 3 ? consultationReadyForSummary()
     : i === 4 ? diagnoses.length > 0
     : i === 5 ? prescriptions.length > 0
-    : i === 6 ? Object.values(labOrders).some(v => v)
-    : i === 7 ? treatmentPlan.length > 0
+    : i === 6 ? Object.values(labOrders).some(Boolean)
+    : i === 7 ? treatmentPlan.trim().length > 0
     : i === 8 ? consultAttachments.length > 0
-    : i === 9 ? followUpDate !== ''
+    : i === 9 ? followUpDate !== '' || followUpReason.trim().length > 0
     : addReferral && referralHospital !== '' && referralReason.trim() !== ''
   );
   // A stage counts as done when at least one of its sections has data; the first
   // not-yet-started stage is the "current" one. (Plan & checkout is optional.)
-  const stageDone = (sections: number[]) => sections.some(s => sectionFilled(s));
+  const stageDone = (sections: number[]) => sections.some(s => workflowPanelFilled(s));
+  const workflowProgressItems = workflowStages.map((stage, index) => ({
+    label: stage.label,
+    icon: workflowStageIcons[index] || ClipboardList,
+    filled: stageDone(stage.sections),
+    active: index === step,
+  }));
 
   return (
     <>
       <TopBar title={t('action.newConsultation')} hideSearch />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+      <main ref={consultPageRef} className="page-container page-enter ehr-consultation-page" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div className="flex items-center justify-between gap-3 mb-4">
             <button onClick={() => router.push('/patients')} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--accent-primary)' }}>
               <ArrowLeft className="w-4 h-4" /> {t('consultation.backToPatients')}
@@ -1772,7 +1999,7 @@ export default function ConsultationPage() {
               search dropdown (which overflows the card) is never hidden behind
               them. Each .card-elevated makes its own stacking context via
               backdrop-filter, so without this the later cards paint on top. */}
-          <div className="card-elevated p-3 mb-4 relative z-50">
+          <div className="card-elevated p-3 mb-3 relative z-50 ehr-consult-patient-picker">
             <div className="flex items-center gap-3">
             {selectedPatientData ? (() => {
               const demoBits: { icon: 'qr' | 'patient' | 'mapPin'; value: string; accent: string; mono?: boolean }[] = [
@@ -1781,27 +2008,26 @@ export default function ConsultationPage() {
                 ...(selectedPatientData.state ? [{ icon: 'mapPin' as const, value: selectedPatientData.state, accent: '#1F9D6F' }] : []),
               ];
               return (
-              <div className="flex items-center justify-between gap-3 flex-1 p-2 rounded-xl" style={{ background: 'var(--accent-light)', border: '1px solid var(--accent-primary)' }}>
-                <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="ehr-consult-patient-summary">
+                <div className="ehr-consult-patient-identity">
                   <button
                     onClick={() => router.push(`/patients/${selectedPatientData._id}`)}
-                    className="text-sm font-semibold text-left hover:underline flex-shrink-0"
+                    className="ehr-consult-patient-name"
                     title={t('payments.openPatientRecord')}
                   >
                     {formatPatientName(selectedPatientData)}
                   </button>
-                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                  <div className="ehr-consult-patient-chips">
                     {demoBits.map(bit => (
                       <span
                         key={bit.value}
-                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg min-w-0"
-                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}
+                        className="ehr-consult-chip"
                       >
                         <DuotoneInfoIcon name={bit.icon} size={13} color={bit.accent} accent={bit.accent} />
                         <span
                           title={bit.value}
                           className="truncate"
-                          style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: bit.mono ? 'JetBrains Mono, ui-monospace, monospace' : 'inherit' }}
+                          style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: bit.mono ? 'var(--font-platform-mono)' : 'inherit' }}
                         >
                           {bit.value}
                         </span>
@@ -1809,7 +2035,21 @@ export default function ConsultationPage() {
                     ))}
                   </div>
                 </div>
-                <button onClick={() => { setSelectedPatient(null); setPatientSearch(''); }} className="btn btn-secondary btn-sm flex-shrink-0">
+                <div className="ehr-consult-visit-controls">
+                  <label>
+                    Assigned to
+                    <select value={currentUser?.name || ''} onChange={() => undefined}>
+                      <option>{currentUser?.name || 'Tamam clinician'}</option>
+                    </select>
+                  </label>
+                  <label>
+                    Note type
+                    <select value="SOAP" onChange={() => undefined}>
+                      <option>SOAP</option>
+                    </select>
+                  </label>
+                </div>
+                <button onClick={() => { setSelectedPatient(null); setPatientSearch(''); }} className="ehr-consult-change-btn">
                   {t('consultation.change')}
                 </button>
               </div>
@@ -1826,7 +2066,7 @@ export default function ConsultationPage() {
                   style={{ background: 'var(--overlay-subtle)' }}
                 />
                 {showPatientDropdown && filteredPatients.length > 0 && (
-                  <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+                  <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)', boxShadow: 'none' }}>
                     {filteredPatients.map(p => {
                       return (
                         <button
@@ -1849,13 +2089,13 @@ export default function ConsultationPage() {
             </div>
           </div>
 
-          <div className="flex gap-6 flex-1 min-h-0">
+          <div className="flex gap-3 flex-1 min-h-0 ehr-consult-workspace">
           {/* AI Clinical Scribe Panel */}
           {scribeOpen && (
-            <div className="w-[380px] flex-shrink-0 sticky top-6 self-start rounded-2xl overflow-hidden" style={{
+            <div className="w-[380px] flex-shrink-0 sticky top-6 self-start rounded-2xl overflow-hidden ehr-consult-sidecar" style={{
               height: 'calc(100vh - 180px)',
               border: '1px solid var(--border-light)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+              boxShadow: 'none',
             }}>
               <ClinicalScribe
                 onApply={applyScribeExtraction}
@@ -1870,7 +2110,7 @@ export default function ConsultationPage() {
                 stage is a step with Back/Next below. A tick means the step has
                 data; click any step to jump to it. Fixed at the top of the form
                 column while the step's content scrolls beneath it. */}
-            <div className="card-elevated px-4 py-2.5 flex-shrink-0 mb-3">
+            <div className="card-elevated px-4 py-2.5 flex-shrink-0 mb-3 ehr-soap-stepper">
               <div className="flex items-center">
                 {workflowStages.map((stage, i) => {
                   const done = stageDone(stage.sections);
@@ -1902,11 +2142,285 @@ export default function ConsultationPage() {
             </div>
             {/* Scrolling step content — only this region scrolls; the header,
                 patient selector and step indicator above stay fixed. */}
-            <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
-            {/* Section 0: Chief Complaint */}
+            <div className="space-y-3 pr-1 ehr-soap-scroll">
+            {/* Section 0: History */}
             <div className="card-elevated overflow-hidden" style={{ display: stepHas(0) ? undefined : 'none' }}>
               <SectionHeader index={0} />
               {openSections[0] && (
+                <div className="p-5">
+                  {/* Symptom screening templates — branching question sets that
+                      compile into the history (pick a visit type, tap answers). */}
+                  <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border-light)' }}>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <ClipboardList className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Symptom screen (optional)</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {SYMPTOM_TEMPLATES.map(tmpl => {
+                        const active = symptomTemplateId === tmpl.id;
+                        return (
+                          <button
+                            key={tmpl.id}
+                            type="button"
+                            onClick={() => { setSymptomTemplateId(active ? null : tmpl.id); setSymptomAnswers({}); }}
+                            className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors"
+                            style={{ background: active ? 'var(--accent-primary)' : 'var(--overlay-subtle)', color: active ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                          >
+                            {tmpl.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  {symptomTemplateId && getSymptomTemplate(symptomTemplateId) && (
+                      <>
+                        <SymptomTemplateForm
+                          template={getSymptomTemplate(symptomTemplateId)!}
+                          answers={symptomAnswers}
+                          onAnswer={setSymptomAnswer}
+                        />
+                        <div className="flex items-center gap-2 mt-2">
+                          <button type="button" onClick={insertSymptomTemplate} className="btn btn-sm btn-primary">Add to history</button>
+                          <button type="button" onClick={() => { setSymptomTemplateId(null); setSymptomAnswers({}); }} className="btn btn-sm btn-secondary">Cancel</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="mt-5 pt-5 border-t" style={{ borderColor: 'var(--border-light)' }}>
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div>
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>History</div>
+                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          Capture the full history here before moving on to the rest of the note.
+                        </div>
+                      </div>
+                      <SearchInput
+                        value={historySearch}
+                        onChange={setHistorySearch}
+                        placeholder="Search chart history"
+                        className="max-w-[320px]"
+                      />
+                    </div>
+
+                    <div className="ehr-consult-history-summary">
+                      <div className="rounded-2xl border overflow-hidden ehr-consult-subcard" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                        <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Chart history</div>
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            Prior history appears here first. Blank items below still need input.
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          {chartHistorySummary.length > 0 ? (
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {chartHistorySummary.map(item => (
+                                <div key={item.key} className="rounded-xl border px-3 py-3" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
+                                  <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                                    {item.label}
+                                  </div>
+                                  <div className="mt-1 text-sm font-medium leading-5" style={{ color: item.value ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                    {item.value || 'Needs input'}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="rounded-xl border border-dashed px-4 py-6 text-sm" style={{ color: 'var(--text-muted)', borderColor: 'var(--border-light)' }}>
+                              No history is on the chart yet. Use the fields below to capture it.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    <div className="ehr-consult-history-grid mt-4">
+                      <div className="space-y-4 ehr-consult-history-column">
+                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--hpi" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                          <div className="ehr-consult-card-head ehr-consult-card-head--align-end">
+                            <div>
+                              <label>History of present illness</label>
+                              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>OLDCARTS structure. Edit directly in the note below.</div>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                hpiRef.current?.focus();
+                                const len = hpiRef.current?.value.length ?? 0;
+                                hpiRef.current?.setSelectionRange(len, len);
+                              }}
+                            >
+                              Edit
+                            </button>
+                          </div>
+                          <textarea
+                            ref={hpiRef}
+                            value={history.hpi}
+                            onChange={e => setHistory(h => ({ ...h, hpi: e.target.value }))}
+                            rows={5}
+                            className="mt-3"
+                            placeholder="Onset, location, duration, character, aggravating/relieving, radiation, timing, severity."
+                          />
+                        </div>
+
+                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--pmh" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                          <div className="ehr-consult-card-head">
+                          <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Past medical history</label>
+                          <div className="w-full max-w-[320px] ehr-consult-card-search">
+                            <SearchAddField
+                              placeholder="Search or add a condition"
+                              options={CHRONIC_CONDITIONS}
+                              value={pmhSearch}
+                              onChange={setPmhSearch}
+                              onPick={addPmhCondition}
+                              onAdd={addPmhCondition}
+                            />
+                          </div>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {filteredPmhConditions.length > 0 ? filteredPmhConditions.slice(0, 8).map(c => {
+                              const on = history.pmhConditions.includes(c);
+                              return (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  onClick={() => addPmhCondition(c)}
+                                  className="text-[12px] font-medium px-2.5 py-1 rounded-full"
+                                  style={{ border: `1px solid ${on ? 'var(--accent-primary)' : 'var(--border-medium)'}`, background: on ? 'var(--accent-light)' : 'transparent', color: on ? 'var(--accent-text)' : 'var(--text-secondary)' }}
+                                >
+                                  {c}
+                                </button>
+                              );
+                            }) : (
+                              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>No matching chronic condition.</div>
+                            )}
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {history.pmhConditions.map(c => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => setHistory(h => ({ ...h, pmhConditions: h.pmhConditions.filter(x => x !== c) }))}
+                                className="text-[12px] font-medium px-2.5 py-1 rounded-full"
+                                style={{ border: '1px solid var(--accent-primary)', background: 'var(--accent-light)', color: 'var(--accent-text)' }}
+                              >
+                                {c}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                            <div>
+                              <label>Past surgeries</label>
+                              <input value={history.pmhSurgeries} list="surgeries-list" onChange={e => setHistory(h => ({ ...h, pmhSurgeries: e.target.value }))} placeholder="e.g. appendectomy 2019" />
+                            </div>
+                            <div>
+                              <label>Prior admissions</label>
+                              <input value={history.pmhAdmissions} list="admissions-list" onChange={e => setHistory(h => ({ ...h, pmhAdmissions: e.target.value }))} placeholder="e.g. severe malaria 2024" />
+                            </div>
+                          </div>
+                          <label className="flex items-center gap-2 mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                            <input type="checkbox" checked={history.pmhTransfusion} onChange={e => setHistory(h => ({ ...h, pmhTransfusion: e.target.checked }))} style={{ width: 'auto' }} />
+                            Previous blood transfusion
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 ehr-consult-history-column">
+                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--family" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                          <div className="ehr-consult-card-head">
+	                            <div>
+	                              <label>Family history</label>
+	                              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Capture the relevant family history directly below.</div>
+	                            </div>
+	                            <button
+	                              type="button"
+	                              className="btn btn-secondary btn-sm"
+	                              onClick={() => {
+	                                familyHistoryRef.current?.focus();
+	                                const len = familyHistoryRef.current?.value.length ?? 0;
+	                                familyHistoryRef.current?.setSelectionRange(len, len);
+	                              }}
+	                            >
+	                              Edit
+	                            </button>
+                          </div>
+                          <textarea ref={familyHistoryRef} value={history.familyHistory} onChange={e => setHistory(h => ({ ...h, familyHistory: e.target.value }))} rows={3} className="mt-3" placeholder="Relevant conditions in close family" />
+                        </div>
+
+                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--social" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                          <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Social history</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 ehr-consult-social-grid">
+                            <div><label>Smoking</label><select value={history.shSmoking} onChange={e => setHistory(h => ({ ...h, shSmoking: e.target.value as typeof h.shSmoking }))}>{SMOKING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+                            <div><label>Alcohol</label><select value={history.shAlcohol} onChange={e => setHistory(h => ({ ...h, shAlcohol: e.target.value as typeof h.shAlcohol }))}>{ALCOHOL_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+                            <div><label>Occupation</label><input value={history.shOccupation} list="occupation-list" onChange={e => setHistory(h => ({ ...h, shOccupation: e.target.value }))} /></div>
+                            <div><label>Substance use</label><input value={history.shSubstance} list="substance-list" onChange={e => setHistory(h => ({ ...h, shSubstance: e.target.value }))} placeholder="None / details" /></div>
+                            <div>
+                              <label>Socioeconomic status</label>
+                              <select value={history.shSES} onChange={e => setHistory(h => ({ ...h, shSES: e.target.value as typeof h.shSES }))}>
+                                <option value="">Not assessed</option>
+                                {SES_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label>Health insurance</label>
+                              <div className="mt-1 space-y-2">
+                                <label
+                                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors"
+                                  style={{
+                                    background: history.shInsurance ? 'var(--accent-light)' : 'var(--overlay-subtle)',
+                                    border: `1px solid ${history.shInsurance ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+                                  }}
+                                >
+                                  <span className="text-sm font-medium" style={{ color: history.shInsurance ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
+                                    {history.shInsurance ? 'Insured' : 'Not insured'}
+                                  </span>
+                                  <input
+                                    type="checkbox"
+                                    checked={history.shInsurance}
+                                    onChange={e => setHistory(h => ({ ...h, shInsurance: e.target.checked, shInsuranceProvider: e.target.checked ? h.shInsuranceProvider : '' }))}
+                                    style={{ width: 'auto', accentColor: 'var(--accent-primary)' }}
+                                  />
+                                </label>
+                                {history.shInsurance && (
+                                  <input
+                                    value={history.shInsuranceProvider}
+                                    list="insurance-provider-list"
+                                    onChange={e => setHistory(h => ({ ...h, shInsuranceProvider: e.target.value }))}
+                                    placeholder="Insurance provider / scheme"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--drug" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                          <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Drug history &amp; allergies</label>
+                          <div className="mt-3">
+                            <label>Current chronic medications</label>
+                            <input value={history.dhChronicMeds} list="medication-list" onChange={e => setHistory(h => ({ ...h, dhChronicMeds: e.target.value }))} placeholder="e.g. metformin, amlodipine" />
+                          </div>
+                          <div className="mt-3">
+                            <label>Drug allergies (comma separated)</label>
+                            <input value={history.dhAllergies} list="allergy-list" disabled={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhAllergies: e.target.value }))} placeholder="e.g. penicillin, sulfa" />
+                          </div>
+                          <label className="flex items-center gap-2 mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                            <input type="checkbox" checked={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhNKDA: e.target.checked, dhAllergies: e.target.checked ? '' : h.dhAllergies }))} style={{ width: 'auto' }} />
+                            No known drug allergies
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Section 1: Intake + Vital Signs */}
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(1) ? undefined : 'none' }}>
+              <SectionHeader index={1} />
+              {openSections[1] && (
                 <div className="p-5">
                   {selectedPatient && !todaysTriage && (
                     <div className="flex items-start gap-2 p-3 mb-4 rounded-lg" style={{ background: 'rgba(217,119,6,0.10)', border: '1px solid var(--color-warning)' }}>
@@ -1937,67 +2451,18 @@ export default function ConsultationPage() {
                       ))}
                     </div>
                   )}
-                  {complaints.length < 3 ? (
-                    <div className="flex gap-2 items-start">
-                      <textarea
-                        value={complaintInput}
-                        onChange={e => setComplaintInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComplaint(); } }}
-                        rows={2}
-                        style={{ flex: 1, resize: 'vertical', minHeight: 44 }}
-                      />
-                      <button type="button" onClick={addComplaint} className="btn btn-secondary btn-sm">Add</button>
-                    </div>
-                  ) : (
+	                  {complaints.length < 3 ? (
+	                    <SearchAddField
+	                      placeholder="Type or search a complaint"
+	                      options={COMMON_CHIEF_COMPLAINTS}
+	                      value={complaintInput}
+	                      onChange={setComplaintInput}
+	                      onPick={(value) => addComplaint(value)}
+	                      onAdd={(value) => addComplaint(value)}
+	                    />
+	                  ) : (
                     <p className="text-[11px]" style={{ color: 'var(--color-warning)' }}>Maximum of 3 complaints reached.</p>
                   )}
-
-                  {/* Symptom screening templates — branching question sets that
-                      compile into the history (pick a visit type, tap answers). */}
-                  <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border-light)' }}>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <ClipboardList className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Symptom screen (optional)</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {SYMPTOM_TEMPLATES.map(tmpl => {
-                        const active = symptomTemplateId === tmpl.id;
-                        return (
-                          <button
-                            key={tmpl.id}
-                            type="button"
-                            onClick={() => { setSymptomTemplateId(active ? null : tmpl.id); setSymptomAnswers({}); }}
-                            className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors"
-                            style={{ background: active ? 'var(--accent-primary)' : 'var(--overlay-subtle)', color: active ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
-                          >
-                            {tmpl.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {symptomTemplateId && getSymptomTemplate(symptomTemplateId) && (
-                      <>
-                        <SymptomTemplateForm
-                          template={getSymptomTemplate(symptomTemplateId)!}
-                          answers={symptomAnswers}
-                          onAnswer={setSymptomAnswer}
-                        />
-                        <div className="flex items-center gap-2 mt-2">
-                          <button type="button" onClick={insertSymptomTemplate} className="btn btn-sm btn-primary">Add to history</button>
-                          <button type="button" onClick={() => { setSymptomTemplateId(null); setSymptomAnswers({}); }} className="btn btn-sm btn-secondary">Cancel</button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Section 1: Vital Signs */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(1) ? undefined : 'none' }}>
-              <SectionHeader index={1} />
-              {openSections[1] && (
-                <div className="p-5">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label>{t('consultation.vitalTemperature')}</label>
@@ -2096,12 +2561,19 @@ export default function ConsultationPage() {
                     { key: 'abdominal', label: t('consultation.examAbdominal'), placeholder: t('consultation.examAbdominalPlaceholder') },
                     { key: 'neurological', label: t('consultation.examNeurological'), placeholder: t('consultation.examNeurologicalPlaceholder') },
                   ] as const).map(field => (
-                    <div key={field.key}>
-                      <label>{field.label}</label>
+                    <div key={field.key} className="rounded-2xl border p-4" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-card)' }}>
+                      <SearchAddField
+                        label={field.label}
+                        placeholder="Type or search a finding"
+                        options={PHYS_EXAM_QUICK_PICKS[field.key]}
+                        onPick={value => appendExamFinding(field.key, value)}
+                        onAdd={value => appendExamFinding(field.key, value)}
+                      />
                       <textarea
                         value={physExam[field.key]}
                         onChange={e => setPhysExam(prev => ({ ...prev, [field.key]: e.target.value }))}
-                        rows={2}
+                        rows={3}
+                        className="mt-3"
                         placeholder={field.placeholder}
                       />
                     </div>
@@ -2110,174 +2582,219 @@ export default function ConsultationPage() {
               )}
             </div>
 
-            {/* Section 3: Patient History & Review of Systems */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(3) ? undefined : 'none' }}>
+            {/* Section 6: Summary */}
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(6) ? undefined : 'none' }}>
               <SectionHeader index={3} />
               {openSections[3] && (
                 <div className="p-5 space-y-5">
-                  <div>
-                    <label>History of present illness</label>
-                    <textarea value={history.hpi} onChange={e => setHistory(h => ({ ...h, hpi: e.target.value }))} rows={3}
-                      placeholder="Onset, location, duration, character, aggravating/relieving, radiation, timing, severity (OLDCARTS)" />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Past medical history</label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {CHRONIC_CONDITIONS.map(c => {
-                        const on = history.pmhConditions.includes(c);
-                        return (
-                          <button key={c} type="button" onClick={() => setHistory(h => ({ ...h, pmhConditions: on ? h.pmhConditions.filter(x => x !== c) : [...h.pmhConditions, c] }))}
-                            className="text-[12px] font-medium px-2.5 py-1 rounded-full"
-                            style={{ border: `1px solid ${on ? 'var(--accent-primary)' : 'var(--border-medium)'}`, background: on ? 'var(--accent-light)' : 'transparent', color: on ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
-                            {c}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                      <div><label>Past surgeries</label><input value={history.pmhSurgeries} onChange={e => setHistory(h => ({ ...h, pmhSurgeries: e.target.value }))} placeholder="e.g. appendectomy 2019" /></div>
-                      <div><label>Prior admissions</label><input value={history.pmhAdmissions} onChange={e => setHistory(h => ({ ...h, pmhAdmissions: e.target.value }))} placeholder="e.g. severe malaria 2024" /></div>
-                    </div>
-                    <label className="flex items-center gap-2 mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      <input type="checkbox" checked={history.pmhTransfusion} onChange={e => setHistory(h => ({ ...h, pmhTransfusion: e.target.checked }))} style={{ width: 'auto' }} />
-                      Previous blood transfusion
-                    </label>
-                  </div>
-
-                  <div>
-                    <label>Family history</label>
-                    <textarea value={history.familyHistory} onChange={e => setHistory(h => ({ ...h, familyHistory: e.target.value }))} rows={2} placeholder="Relevant conditions in close family" />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Social history</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-                      <div><label>Smoking</label><select value={history.shSmoking} onChange={e => setHistory(h => ({ ...h, shSmoking: e.target.value as typeof h.shSmoking }))}>{SMOKING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
-                      <div><label>Alcohol</label><select value={history.shAlcohol} onChange={e => setHistory(h => ({ ...h, shAlcohol: e.target.value as typeof h.shAlcohol }))}>{ALCOHOL_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
-                      <div><label>Occupation</label><input value={history.shOccupation} onChange={e => setHistory(h => ({ ...h, shOccupation: e.target.value }))} /></div>
-                      <div><label>Substance use</label><input value={history.shSubstance} onChange={e => setHistory(h => ({ ...h, shSubstance: e.target.value }))} placeholder="None / details" /></div>
-                      <div>
-                        <label>Socioeconomic status</label>
-                        <select value={history.shSES} onChange={e => setHistory(h => ({ ...h, shSES: e.target.value as typeof h.shSES }))}>
-                          <option value="">Not assessed</option>
-                          {SES_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
+                  <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr] ehr-consult-summary-grid">
+                    <div className="rounded-2xl border overflow-hidden ehr-consult-subcard" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                      <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>History snapshot</div>
+                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          Review the charted history before completing the note.
+                        </div>
                       </div>
-                      <div>
-                        <label>Health insurance</label>
-                        <div className="mt-1 space-y-2">
-                          <label
-                            className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors"
-                            style={{
-                              background: history.shInsurance ? 'var(--accent-light)' : 'var(--overlay-subtle)',
-                              border: `1px solid ${history.shInsurance ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                            }}
-                          >
-                            <span className="text-sm font-medium" style={{ color: history.shInsurance ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
-                              {history.shInsurance ? 'Insured' : 'Not insured'}
-                            </span>
-                            <input
-                              type="checkbox"
-                              checked={history.shInsurance}
-                              onChange={e => setHistory(h => ({ ...h, shInsurance: e.target.checked, shInsuranceProvider: e.target.checked ? h.shInsuranceProvider : '' }))}
-                              style={{ width: 'auto', accentColor: 'var(--accent-primary)' }}
-                            />
-                          </label>
-                          {history.shInsurance && (
-                            <input
-                              value={history.shInsuranceProvider}
-                              onChange={e => setHistory(h => ({ ...h, shInsuranceProvider: e.target.value }))}
-                              placeholder="Insurance provider / scheme"
-                            />
-                          )}
+                      <div className="p-4">
+                        {chartHistorySummary.length > 0 ? (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {chartHistorySummary.map(item => (
+                              <div key={item.key} className="rounded-xl border px-3 py-3" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
+                                <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                                  {item.label}
+                                </div>
+                                <div className="mt-1 text-sm font-medium leading-5" style={{ color: item.value ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                  {item.value || 'Needs input'}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-dashed px-4 py-6 text-sm" style={{ color: 'var(--text-muted)', borderColor: 'var(--border-light)' }}>
+                            No history is on the chart yet.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border overflow-hidden ehr-consult-subcard" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                      <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Workflow assessments</div>
+                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          Progress across the consultation workflow.
+                        </div>
+                      </div>
+                      <div className="p-4 ehr-consult-progress-list">
+                        {workflowProgressItems.map(({ label, icon: Icon, filled, active }) => (
+                          <div key={label} className="ehr-consult-progress-row" style={{ borderColor: active ? 'var(--accent-primary)' : 'var(--border-light)', background: filled ? 'var(--accent-light)' : 'transparent' }}>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: filled ? 'rgba(59,130,246,0.14)' : 'var(--overlay-subtle)', border: `1px solid ${filled || active ? 'var(--accent-primary)' : 'var(--border-light)'}` }}>
+                                <Icon className="w-4 h-4" style={{ color: filled || active ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</div>
+                                <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                                  {filled ? 'Completed or in progress' : 'Needs attention'}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-xs font-semibold" style={{ color: filled ? 'var(--accent-text)' : 'var(--text-muted)' }}>
+                              {filled ? 'Done' : 'Open'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2 ehr-consult-summary-grid">
+                    <div className="rounded-2xl border p-4 ehr-consult-subcard" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>History review</div>
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>What has been entered for this visit.</div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          { label: 'HPI', value: history.hpi || 'Needs input' },
+                          { label: 'PMH', value: history.pmhConditions.length ? history.pmhConditions.join(', ') : 'Needs input' },
+                          { label: 'Family', value: history.familyHistory || 'Needs input' },
+                          { label: 'Social', value: [history.shSmoking, history.shAlcohol, history.shOccupation].filter(Boolean).join(' · ') || 'Needs input' },
+                          { label: 'Drugs', value: history.dhChronicMeds || 'Needs input' },
+                          { label: 'Allergies', value: history.dhNKDA ? 'No known drug allergies' : (history.dhAllergies || 'Needs input') },
+                        ].map(item => (
+                          <div key={item.label} className="rounded-xl border px-3 py-3" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
+                            <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{item.label}</div>
+                            <div className="mt-1 text-sm" style={{ color: item.value === 'Needs input' ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                              {item.value}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border p-4 ehr-consult-subcard" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Review of systems</div>
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Summary of the ROS entries from this consultation.</div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {ROS_SYSTEMS.map(system => {
+                          const entry = ros[system.key];
+                          return (
+                            <div key={system.key} className="rounded-xl border px-3 py-2.5" style={{ borderColor: 'var(--border-light)', background: entry?.status === 'positive' ? 'rgba(217,119,6,0.06)' : 'var(--overlay-subtle)' }}>
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{system.label}</div>
+                                  <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{system.hint}</div>
+                                </div>
+                                <div className="text-xs font-semibold" style={{ color: entry?.status === 'positive' ? 'var(--color-warning)' : 'var(--text-muted)' }}>
+                                  {entry ? entry.status : 'Not reviewed'}
+                                </div>
+                              </div>
+                              {entry?.findings && (
+                                <div className="mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                  {entry.findings}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2 ehr-consult-summary-grid">
+                    <div className="rounded-2xl border p-4 ehr-consult-subcard" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                      <div className="mb-3">
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Clinical review</div>
+                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Confirm the key findings from this visit before signing.</div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          { label: 'Chief complaint', value: chiefComplaint || 'Needs input' },
+                          { label: 'Vitals', value: hasVitalsInput() ? [vitals.temperature && `Temp ${vitals.temperature}`, vitals.systolic && vitals.diastolic && `BP ${vitals.systolic}/${vitals.diastolic}`, vitals.pulse && `Pulse ${vitals.pulse}`, vitals.respRate && `RR ${vitals.respRate}`, vitals.o2Sat && `O2 ${vitals.o2Sat}%`].filter(Boolean).join(' · ') : (todaysTriage ? 'Captured during triage' : 'Needs input') },
+                          { label: 'Examination', value: hasExamInput() ? Object.entries(physExam).filter(([, value]) => value.trim()).map(([system]) => system).join(', ') : 'Needs input' },
+                          { label: 'Diagnosis', value: diagnoses.length > 0 ? diagnoses.map(dx => dx.name).join(', ') : 'Needs input' },
+                          { label: 'Orders', value: hasOrdersInput() ? [prescriptions.length > 0 ? `${prescriptions.length} prescription${prescriptions.length === 1 ? '' : 's'}` : '', Object.values(labOrders).some(Boolean) ? `${Object.values(labOrders).filter(Boolean).length} lab order${Object.values(labOrders).filter(Boolean).length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ') : 'No orders placed' },
+                          { label: 'Disposition', value: treatmentPlan.trim() || followUpReason.trim() || (addReferral ? 'Referral added' : '') || 'Needs input' },
+                        ].map(item => (
+                          <div key={item.label} className="rounded-xl border px-3 py-3" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
+                            <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{item.label}</div>
+                            <div className="mt-1 text-sm" style={{ color: item.value === 'Needs input' ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                              {item.value}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border p-4 ehr-consult-subcard" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                      <div className="mb-3">
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Disposition review</div>
+                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Check the plan, follow-up, and handoff details.</div>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="rounded-xl border px-3 py-3" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
+                          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Treatment plan</div>
+                          <div className="mt-1 text-sm whitespace-pre-line" style={{ color: treatmentPlan.trim() ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                            {treatmentPlan.trim() || 'Needs input'}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border px-3 py-3" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
+                          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Follow-up</div>
+                          <div className="mt-1 text-sm" style={{ color: followUpDate || followUpReason.trim() ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                            {[followUpDate, followUpReason.trim()].filter(Boolean).join(' · ') || 'Not scheduled'}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border px-3 py-3" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
+                          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Referral</div>
+                          <div className="mt-1 text-sm" style={{ color: addReferral ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                            {addReferral ? [hospitals.find(h => h._id === referralHospital)?.name || 'Hospital pending', referralUrgency, referralReason.trim()].filter(Boolean).join(' · ') : 'No referral added'}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border px-3 py-3" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
+                          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Attachments</div>
+                          <div className="mt-1 text-sm" style={{ color: consultAttachments.length > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                            {consultAttachments.length > 0 ? `${consultAttachments.length} attachment${consultAttachments.length === 1 ? '' : 's'} added` : 'No attachments added'}
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Drug history &amp; allergies</label>
-                    <div className="mt-2"><label>Current chronic medications</label><input value={history.dhChronicMeds} onChange={e => setHistory(h => ({ ...h, dhChronicMeds: e.target.value }))} placeholder="e.g. metformin, amlodipine" /></div>
-                    <div className="mt-3"><label>Drug allergies (comma separated)</label><input value={history.dhAllergies} disabled={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhAllergies: e.target.value }))} placeholder="e.g. penicillin, sulfa" /></div>
-                    <label className="flex items-center gap-2 mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      <input type="checkbox" checked={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhNKDA: e.target.checked, dhAllergies: e.target.checked ? '' : h.dhAllergies }))} style={{ width: 'auto' }} />
-                      No known drug allergies
-                    </label>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Review of systems</label>
-                      <div className="flex items-center gap-3">
-                        <button type="button" onClick={() => setRos(prev => { const next = { ...prev }; for (const s of ROS_SYSTEMS) { if (!next[s.key]) next[s.key] = { status: 'negative', findings: '' }; } return next; })}
-                          className="text-[11px] font-semibold" style={{ color: 'var(--accent-text)' }}>Mark all negative</button>
-                        {Object.keys(ros).length > 0 && (
-                          // Inverse of the bulk action above — clears every ROS selection.
-                          <button type="button" onClick={() => setRos({})}
-                            className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>{t('action.clear')}</button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-light)' }}>
-                      {ROS_SYSTEMS.map((s, idx) => {
-                        const entry = ros[s.key];
-                        const status = entry?.status;
-                        return (
-                          <div
-                            key={s.key}
-                            className="px-3 py-2.5"
-                            style={{
-                              borderTop: idx === 0 ? 'none' : '1px solid var(--border-light)',
-                              background: status === 'positive' ? 'rgba(217,119,6,0.06)' : status === 'negative' ? 'rgba(59,130,246,0.04)' : 'transparent',
-                            }}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1 min-w-0">
-                                <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{s.label}</div>
-                                <div className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{s.hint}</div>
-                              </div>
-                              {/* Segmented toggle */}
-                              <div className="inline-flex rounded-lg p-0.5 flex-shrink-0" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                                {(['negative', 'positive'] as const).map(st => {
-                                  const active = status === st;
-                                  const accent = st === 'positive' ? 'var(--color-warning)' : 'var(--accent-primary)';
-                                  return (
-                                    <button key={st} type="button"
-                                      // Re-clicking the active option deselects it, clearing this
-                                      // system back to "not assessed" — reversible toggle.
-                                      title={active ? t('action.deselect') : undefined}
-                                      onClick={() => setRos(prev => {
-                                        if (active) {
-                                          const next = { ...prev };
-                                          delete next[s.key];
-                                          return next;
-                                        }
-                                        return { ...prev, [s.key]: { status: st, findings: prev[s.key]?.findings || '' } };
-                                      })}
-                                      className="text-[11px] font-semibold px-3 py-1 rounded-md transition-colors"
-                                      style={{ background: active ? accent : 'transparent', color: active ? '#fff' : 'var(--text-muted)' }}>
-                                      {st === 'negative' ? 'No symptoms' : 'Positive'}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                            {status === 'positive' && (
-                              <input className="mt-2" value={entry?.findings || ''} onChange={e => setRos(prev => ({ ...prev, [s.key]: { status: 'positive', findings: e.target.value } }))} placeholder={`Describe ${s.label.toLowerCase()} findings`} />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <datalist id="pmh-condition-list">
+                    {CHRONIC_CONDITIONS.map(c => <option key={c} value={c} />)}
+                  </datalist>
+                  <datalist id="surgeries-list">
+                    {COMMON_SURGERIES.map(item => <option key={item} value={item} />)}
+                  </datalist>
+                  <datalist id="admissions-list">
+                    {COMMON_ADMISSIONS.map(item => <option key={item} value={item} />)}
+                  </datalist>
+                  <datalist id="occupation-list">
+                    {COMMON_OCCUPATIONS.map(item => <option key={item} value={item} />)}
+                  </datalist>
+                  <datalist id="substance-list">
+                    {COMMON_SUBSTANCE_USE.map(item => <option key={item} value={item} />)}
+                  </datalist>
+                  <datalist id="insurance-provider-list">
+                    {COMMON_INSURANCE.map(item => <option key={item} value={item} />)}
+                  </datalist>
+                  <datalist id="medication-list">
+                    {COMMON_CHRONIC_MEDICATIONS.map(item => <option key={item} value={item} />)}
+                  </datalist>
+                  <datalist id="allergy-list">
+                    {COMMON_ALLERGIES.map(item => <option key={item} value={item} />)}
+                  </datalist>
                 </div>
               )}
             </div>
-
-
             {/* Section 4: Diagnosis */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(4) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(3) ? undefined : 'none' }}>
               <SectionHeader index={4} />
               {openSections[4] && (
                 <div className="p-5">
@@ -2303,7 +2820,7 @@ export default function ConsultationPage() {
                       />
                     </div>
                     {showDiagDropdown && filteredICD.length > 0 && (
-                      <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+                      <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)', boxShadow: 'none' }}>
                         {filteredICD.map(c => (
                           <button
                             key={c.code}
@@ -2372,7 +2889,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 5: Prescriptions */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(5) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(4) ? undefined : 'none' }}>
               <SectionHeader index={5} />
               {openSections[5] && (
                 <div className="p-5">
@@ -2436,7 +2953,7 @@ export default function ConsultationPage() {
                       />
                     </div>
                     {showRxDropdown && filteredMeds.length > 0 && (
-                      <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+                      <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)', boxShadow: 'none' }}>
                         {filteredMeds.map(m => (
                           <button
                             key={m.name}
@@ -2554,7 +3071,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 6: Lab Orders */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(6) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(4) ? undefined : 'none' }}>
               <SectionHeader index={6} />
               {openSections[6] && (
                 <div className="p-5 space-y-5">
@@ -2727,23 +3244,31 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 7: Treatment Plan */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(7) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(5) ? undefined : 'none' }}>
               <SectionHeader index={7} />
               {openSections[7] && (
-                <div className="p-5">
-                  <label>{t('consultation.treatmentPlanLabel')}</label>
-                  <textarea
-                    value={treatmentPlan}
-                    onChange={e => setTreatmentPlan(e.target.value)}
-                    rows={4}
-                    placeholder={t('consultation.treatmentPlanPlaceholder')}
+                <div className="p-5 space-y-3">
+                  <SearchAddField
+                    placeholder="Type or search a plan"
+                    options={COMMON_TREATMENT_PLANS}
+                    onPick={value => appendWorkflowText(setTreatmentPlan, treatmentPlan, value)}
+                    onAdd={value => appendWorkflowText(setTreatmentPlan, treatmentPlan, value)}
                   />
+                  <div>
+                    <label>{t('consultation.treatmentPlanLabel')}</label>
+                    <textarea
+                      value={treatmentPlan}
+                      onChange={e => setTreatmentPlan(e.target.value)}
+                      rows={4}
+                      placeholder={t('consultation.treatmentPlanPlaceholder')}
+                    />
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Section 8: Attachments / Scans */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(8) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(5) ? undefined : 'none' }}>
               <SectionHeader index={8} />
               {openSections[8] && (
                 <div className="p-5">
@@ -2762,10 +3287,16 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 9: Follow-up */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(9) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(5) ? undefined : 'none' }}>
               <SectionHeader index={9} />
               {openSections[9] && (
-                <div className="p-5">
+                <div className="p-5 space-y-3">
+                  <SearchAddField
+                    placeholder="Type or search a follow-up reason"
+                    options={COMMON_FOLLOWUP_REASONS}
+                    onPick={setFollowUpReason}
+                    onAdd={setFollowUpReason}
+                  />
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label>{t('consultation.followUpDate')}</label>
@@ -2782,7 +3313,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 10: Referral */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(10) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden" style={{ display: stepHas(5) ? undefined : 'none' }}>
               <SectionHeader index={10} />
               {openSections[10] && (
                 <div className="p-5">
@@ -2820,6 +3351,14 @@ export default function ConsultationPage() {
                       </div>
                       <div>
                         <label>{t('consultation.reasonForReferral')}</label>
+                        <div className="mb-2">
+                          <SearchAddField
+                            placeholder="Type or search a referral reason"
+                            options={COMMON_REFERRAL_REASONS}
+                            onPick={setReferralReason}
+                            onAdd={setReferralReason}
+                          />
+                        </div>
                         <textarea
                           value={referralReason}
                           onChange={e => setReferralReason(e.target.value)}
@@ -2899,8 +3438,8 @@ export default function ConsultationPage() {
           </div>
 
           {/* Right: Patient summary panel */}
-          <div className="hidden xl:block w-[320px] flex-shrink-0 overflow-y-auto min-h-0">
-            <div className="space-y-4">
+          <div className="hidden xl:block w-[320px] flex-shrink-0 min-h-0 ehr-chart-details">
+            <div className="space-y-3">
               {selectedPatientData ? (
                 <>
                   {/* Patient card */}
@@ -2982,30 +3521,35 @@ export default function ConsultationPage() {
                   )}
 
                   {/* Consultation progress */}
-                  <div className="card-elevated p-4">
+                  <div className="card-elevated p-4 ehr-consult-progress-card">
                     <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('consultation.progress')}</p>
-                    <div className="space-y-2">
-                      {sectionHeaders.map((s, i) => {
-                        const Icon = s.icon;
-                        const filled = sectionFilled(i);
-                        return (
-                          <div key={s.label} className="flex items-center gap-3">
-                            <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{
-                              background: filled ? 'rgba(59, 130, 246,0.15)' : 'var(--overlay-subtle)',
-                              border: `1px solid ${filled ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+                    <div className="ehr-consult-progress-list">
+                      {workflowProgressItems.map(({ label, icon: Icon, filled, active }) => (
+                        <div key={label} className="ehr-consult-progress-row" style={{
+                          borderColor: active ? 'var(--accent-primary)' : 'var(--border-light)',
+                          background: filled ? 'var(--accent-light)' : 'var(--bg-card)',
+                        }}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{
+                              background: filled ? 'rgba(59, 130, 246,0.12)' : 'var(--overlay-subtle)',
+                              border: `1px solid ${filled || active ? 'var(--accent-primary)' : 'var(--border-light)'}`,
                             }}>
                               {filled ? (
-                                <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                               ) : (
-                                <Icon className="w-2.5 h-2.5" style={{ color: 'var(--text-muted)' }} />
+                                <Icon className="w-4 h-4" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
                               )}
                             </div>
-                            <span className="text-xs" style={{ color: filled ? 'var(--text-primary)' : 'var(--text-muted)' }}>{s.label}</span>
+                            <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{label}</span>
                           </div>
-                        );
-                      })}
+                          <span className="text-[11px] font-semibold" style={{ color: filled ? 'var(--accent-text)' : active ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+                            {filled ? 'Done' : active ? 'Current' : 'Open'}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
+
                 </>
               ) : (
                 <div className="card-elevated p-6 text-center">

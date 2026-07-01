@@ -148,6 +148,17 @@ export function getRemoteDB(name: string): PouchDatabase | null {
   return remoteDatabases[name];
 }
 
+/** Drop cached DB handles so the next `getDB()` call reopens them cleanly. */
+export function clearDBCache(name?: string): void {
+  if (name) {
+    delete databases[name];
+    delete remoteDatabases[name];
+    return;
+  }
+  for (const key of Object.keys(databases)) delete databases[key];
+  for (const key of Object.keys(remoteDatabases)) delete remoteDatabases[key];
+}
+
 // Typed database accessors
 export const usersDB = () => getDB('tamamhealth_users');
 export const patientsDB = () => getDB('tamamhealth_patients');
@@ -251,7 +262,9 @@ export const ledgerDB = () => getDB('tamamhealth_ledger');
 // populated and scrollable.
 // Bumped to 42: per-patient sample problem list + current medications for every
 // patient (all rosters) so all four chart-summary windows are populated.
-export const SEED_VERSION = 43;
+// Bumped to 46: generated billing now covers every seeded patient roster, not
+// just the main outpatient patient list, so payments screens stay populated.
+export const SEED_VERSION = 46;
 
 export async function isSeeded(): Promise<boolean> {
   try {

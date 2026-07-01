@@ -5,7 +5,7 @@ import { Icon as PlatformIcon } from "@/components/icons";
 import type { IconName as PlatformIconName } from "@/components/icons";
 
 /* ═══════════════════════════════════════════════════════════════════
-   TamamHealth Marketing — platform icon adapter
+   Tamam Marketing — platform icon adapter
 
    The website uses the exact same icon renderer and semantic icon names from:
    platform/src/components/icons/Icon.tsx

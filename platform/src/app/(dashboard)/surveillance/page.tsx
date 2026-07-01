@@ -465,7 +465,7 @@ export default function SurveillancePage() {
 
                     {/* Country label */}
                     <text x="300" y="55" textAnchor="middle" fontSize="16" fontWeight="600"
-                      fill="rgba(255,255,255,0.35)" fontFamily="'DM Sans', sans-serif" opacity="0.35">
+                      fill="rgba(255,255,255,0.35)" fontFamily="var(--font-platform)" opacity="0.35">
                       South Sudan
                     </text>
 

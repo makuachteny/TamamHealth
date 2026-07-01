@@ -80,7 +80,7 @@ export default function BootIntegrityGuard() {
         position: 'fixed', inset: 0, zIndex: 2147483647,
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, boxSizing: 'border-box',
         background: '#0f1117', color: '#f1f5f9',
-        fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+        fontFamily: "'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
       }}
     >
       <div style={{ maxWidth: 420, width: '100%', textAlign: 'center' }}>

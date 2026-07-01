@@ -591,7 +591,7 @@ export default function ReferralsPage() {
                 <button
                   onClick={() => setActiveTab('incoming')}
                   className="transition-colors focus:outline-none"
-                  style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'incoming' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                  style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'incoming' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                 >
                   {t('referrals.incoming')}
                   {newIncomingCount > 0 && (
@@ -603,7 +603,7 @@ export default function ReferralsPage() {
                 <button
                   onClick={() => setActiveTab('outgoing')}
                   className="transition-colors focus:outline-none"
-                  style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'outgoing' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                  style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'outgoing' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                 >
                   {t('referrals.outgoing')}
                 </button>

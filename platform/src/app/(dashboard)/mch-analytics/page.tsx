@@ -149,7 +149,7 @@ export default function MCHAnalyticsPage() {
                     <div className="relative h-4 rounded-full" style={{ background: 'var(--overlay-light)' }}>
                       <div className="h-full rounded-full transition-all" style={{
                         width: `${Math.min(100, item.rate)}%`,
-                        background: `linear-gradient(90deg, ${item.color}, ${item.color}80)`,
+                        background: `var(--accent-primary)`,
                       }} />
                       <div className="absolute top-0 bottom-0 w-0.5" style={{
                         left: `${item.target}%`,
@@ -289,7 +289,7 @@ export default function MCHAnalyticsPage() {
                         <div className="h-2 rounded-full mb-2" style={{ background: 'var(--overlay-light)' }}>
                           <div className="h-full rounded-full" style={{
                             width: `${gap.coverageRate}%`,
-                            background: `linear-gradient(90deg, ${color}80, ${color})`,
+                            background: `var(--accent-primary)`,
                           }} />
                         </div>
                         <div className="flex justify-between text-[9px]">
@@ -356,7 +356,7 @@ export default function MCHAnalyticsPage() {
                         <div className="w-full rounded-t-xl transition-all" style={{
                           height: `${barHeight}%`,
                           minHeight: '8px',
-                          background: `linear-gradient(180deg, ${item.color}, ${item.color}40)`,
+                          background: `var(--accent-primary)`,
                         }} />
                       </div>
                       <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.label}</p>
@@ -511,7 +511,7 @@ export default function MCHAnalyticsPage() {
                           <div className="w-full rounded-t-md" style={{
                             height: `${height}%`,
                             minHeight: m.births > 0 ? '4px' : '0',
-                            background: 'linear-gradient(180deg, #3b82f6, rgba(0,119,215,0.3))',
+                            background: 'var(--accent-primary)',
                           }} />
                         </div>
                         <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>{m.month}</span>

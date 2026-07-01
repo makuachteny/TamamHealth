@@ -267,7 +267,7 @@ export default function MessagesPage() {
                   border: '1px solid var(--border-medium)',
                   borderRadius: 10,
                   color: 'var(--text-primary)',
-                  fontFamily: "'DM Sans', sans-serif",
+                  fontFamily: "var(--font-platform)",
                 }}
               />
             </div>
@@ -360,7 +360,7 @@ export default function MessagesPage() {
                                           border: '1px solid var(--border-medium)',
                                           borderRadius: 10,
                                           color: 'var(--text-primary)',
-                                          fontFamily: "'DM Sans', sans-serif",
+                                          fontFamily: "var(--font-platform)",
                                           outline: 'none',
                                         }}
                                       />
@@ -453,7 +453,7 @@ export default function MessagesPage() {
                               border: '1px solid var(--border-medium)',
                               borderRadius: 10,
                               color: 'var(--text-primary)',
-                              fontFamily: "'DM Sans', sans-serif",
+                              fontFamily: "var(--font-platform)",
                               outline: 'none',
                             }}
                           />
@@ -508,7 +508,7 @@ export default function MessagesPage() {
                       rows={1}
                       placeholder="Type a message…"
                       className="flex-1 bg-transparent text-[13px] resize-none outline-none border-none"
-                      style={{ maxHeight: 120, padding: 0, lineHeight: 1.6, fontFamily: "'DM Sans', sans-serif", color: 'var(--text-primary)' }}
+                      style={{ maxHeight: 120, padding: 0, lineHeight: 1.6, fontFamily: "var(--font-platform)", color: 'var(--text-primary)' }}
                     />
                   </div>
                   <button
@@ -625,7 +625,7 @@ function StaffPickerModal({
                 background: 'var(--bg-card-solid)',
                 border: '1px solid var(--border-medium)',
                 color: 'var(--text-primary)',
-                fontFamily: "'DM Sans', sans-serif",
+                fontFamily: "var(--font-platform)",
                 outline: 'none',
               }}
             />
@@ -643,7 +643,7 @@ function StaffPickerModal({
                 background: 'var(--bg-card-solid)',
                 border: '1px solid var(--border-medium)',
                 color: 'var(--text-primary)',
-                fontFamily: "'DM Sans', sans-serif",
+                fontFamily: "var(--font-platform)",
                 outline: 'none',
               }}
             />

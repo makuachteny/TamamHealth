@@ -190,12 +190,12 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
     border: '1px solid var(--border-medium)', borderRadius: 4,
     background: 'var(--bg-card-solid)', color: 'var(--text-primary)',
     outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
-    fontFamily: "'DM Sans', Arial, sans-serif",
+    fontFamily: "var(--font-platform)",
   };
   const labelStyle: React.CSSProperties = {
     display: 'block', fontSize: 13, fontWeight: 600,
     color: 'var(--text-secondary)', marginBottom: 6,
-    fontFamily: "'DM Sans', Arial, sans-serif",
+    fontFamily: "var(--font-platform)",
   };
 
   return (
@@ -208,7 +208,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
             <div className="pp-form-lede">
               <div className="pp-logo-wrap">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/assets/tamamhealth-logo.svg" alt="" aria-hidden className="pp-logo-img" />
+                <img src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="" aria-hidden className="pp-logo-img" />
               </div>
               <h1 className="pp-heading">{t('patientPortal.heroHeading')}</h1>
               <p className="pp-subheading">
@@ -216,8 +216,8 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
               </p>
             </div>
             <div className="pp-form-card">
-            <h2 className="text-[15px] font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: "'DM Sans', Arial, sans-serif", letterSpacing: '-0.01em' }}>{t('patientPortal.signInTitle')}</h2>
-            <p className="text-[13px] mb-6" style={{ color: 'var(--text-muted)', fontFamily: "'DM Sans', Arial, sans-serif" }}>{t('patientPortal.signInSubtitle')}</p>
+            <h2 className="text-[15px] font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: "var(--font-platform)", letterSpacing: '-0.01em' }}>{t('patientPortal.signInTitle')}</h2>
+            <p className="text-[13px] mb-6" style={{ color: 'var(--text-muted)', fontFamily: "var(--font-platform)" }}>{t('patientPortal.signInSubtitle')}</p>
 
             {!dbReady && (
               <div className="mb-4 p-3 rounded-lg text-center" style={{
@@ -297,11 +297,11 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
               <button type="submit" disabled={loading || !dbReady}
                 className="w-full flex items-center justify-center gap-2 text-[15px] font-semibold text-white transition-all duration-200 mt-3"
                 style={{
-                  fontFamily: "'DM Sans', Arial, sans-serif",
+                  fontFamily: "var(--font-platform)",
                   background: BLUE, padding: '14px 20px', borderRadius: 4,
                   border: 'none', cursor: loading ? 'wait' : 'pointer',
                   opacity: loading || !dbReady ? 0.6 : 1,
-                  boxShadow: '0 2px 8px rgba(0,119,215,0.25)',
+                  boxShadow: 'none',
                 }}>
                 {loading ? t('patientPortal.searching') : t('patientPortal.signInTitle')} <ArrowRight size={14} />
               </button>
@@ -354,7 +354,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
       {/* ═══ Right: imagery panel (desktop only) ═══ */}
       <aside className="pp-image-panel" aria-hidden>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/doctor-nurse-consultation.jpg" alt={t('patientPortal.heroImageAlt')} />
+        <img src="/assets/patients/doctor-nurse-consultation.jpg" alt={t('patientPortal.heroImageAlt')} />
         <div className="pp-image-scrim" />
 
         <div className="pp-image-body">
@@ -429,12 +429,12 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           border-radius: 20px;
           background: var(--bg-card-solid);
           border: 1px solid var(--border-medium);
-          box-shadow: 0 6px 18px rgba(26,58,58,0.08);
+          box-shadow: none;
           margin-bottom: 20px;
         }
         .pp-logo-img { width: 42px; height: 42px; }
         .pp-heading {
-          font-family: 'DM Sans', Arial, sans-serif;
+          font-family: var(--font-platform);
           font-size: clamp(28px, 3.2vw, 36px);
           font-weight: 700;
           letter-spacing: -0.02em;
@@ -454,7 +454,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           background: var(--bg-card-solid);
           border-radius: 16px;
           border: 1px solid var(--border-medium);
-          box-shadow: 0 12px 40px rgba(26,58,58,0.08), 0 1px 2px rgba(26,58,58,0.04);
+          box-shadow: none;
           text-align: left;
           position: relative;
           overflow: hidden;
@@ -464,7 +464,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           position: absolute;
           top: 0; left: 0; right: 0;
           height: 3px;
-          background: linear-gradient(90deg, #3b82f6 0%, #3B82F6 50%, #E4A84B 100%);
+          background: var(--bg-card-solid);
         }
 
         .pp-form-footer {
@@ -523,9 +523,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         .pp-image-scrim {
           position: absolute;
           inset: 0;
-          background:
-            linear-gradient(135deg, rgba(26,58,58,0.72) 0%, rgba(26,58,58,0.40) 40%, rgba(45,155,106,0.40) 100%),
-            linear-gradient(180deg, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.0) 30%, rgba(0,0,0,0.40) 100%);
+          background: var(--bg-card-solid);
           z-index: 1;
         }
         .pp-image-body, .pp-image-footer {
@@ -541,7 +539,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           padding: 48px 0;
         }
         .pp-image-title {
-          font-family: 'DM Sans', Arial, sans-serif;
+          font-family: var(--font-platform);
           font-size: clamp(32px, 3.6vw, 48px);
           font-weight: 700;
           line-height: 1.08;
@@ -575,7 +573,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           border-radius: 50%;
           background: #E4A84B;
           flex-shrink: 0;
-          box-shadow: 0 0 0 3px rgba(228,168,75,0.18);
+          box-shadow: none;
         }
       `}</style>
     </div>
@@ -1040,7 +1038,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
 
           {/* ── Welcome Banner ── */}
           <div style={{
-            background: 'linear-gradient(135deg, #1E40AF 0%, #3b82f6 60%, #60A5FA 100%)',
+            background: 'var(--accent-primary)',
             borderRadius: 14, padding: '22px 24px', color: '#fff', position: 'relative', overflow: 'hidden',
           }}>
             <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
@@ -1250,7 +1248,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             </div>
 
             {/* Quick Actions */}
-            <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #1e3a8a 100%)', border: 'none', display: 'flex', flexDirection: 'column' }}>
+            <div className="card-elevated" style={{ padding: 18, background: 'var(--accent-primary)', border: 'none', display: 'flex', flexDirection: 'column' }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{t('patientPortal.quickActions')}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
                 {[
@@ -2375,7 +2373,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
           )}
           <div style={{ padding: 16, borderRadius: 10, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', textAlign: 'left', marginBottom: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('patientPortal.reference')}</p><p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace' }}>{refNum}</p></div>
+              <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('patientPortal.reference')}</p><p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-platform-mono)' }}>{refNum}</p></div>
               <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('portal.amount')}</p><p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(paidAmount)}</p></div>
               <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('portal.method')}</p><p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{paymentMethods.find(m => m.key === payMethod)?.name}</p></div>
               <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('patientPortal.bills')}</p><p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.itemCount', { count: billCount })}</p></div>
@@ -2541,7 +2539,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
     return (
       <div>
         <div style={{
-          background: 'linear-gradient(135deg, #1E40AF 0%, #3b82f6 60%, #60A5FA 100%)',
+          background: 'var(--accent-primary)',
           borderRadius: 14, padding: '20px 24px', color: '#fff', marginBottom: 16, position: 'relative', overflow: 'hidden',
         }}>
           <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 4 }}>{t('patientPortal.accountSummary')}</p>
@@ -2562,7 +2560,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
     <div>
       {/* Balance banner */}
       <div style={{
-        background: 'linear-gradient(135deg, #1E40AF 0%, #3b82f6 60%, #60A5FA 100%)',
+        background: 'var(--accent-primary)',
         borderRadius: 14, padding: '20px 24px', color: '#fff', marginBottom: 16, position: 'relative', overflow: 'hidden',
       }}>
         <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
@@ -2691,7 +2689,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
           </div>
 
           {/* Payment history summary */}
-          <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #1e3a8a 100%)', border: 'none' }}>
+          <div className="card-elevated" style={{ padding: 18, background: 'var(--accent-primary)', border: 'none' }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>{t('patientPortal.paymentSummary')}</p>
             {[
               { label: t('patientPortal.totalBilled'), value: formatMoney(safeBills.reduce((s, b) => s + b.amount, 0)) },
@@ -2723,7 +2721,7 @@ function SH({ icon: Icon, title }: { icon: typeof User; title: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
       <Icon size={14} style={{ color: 'var(--accent-primary)' }} />
-      <span style={{ fontFamily: "'DM Sans', Arial, sans-serif", fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</span>
+      <span style={{ fontFamily: "var(--font-platform)", fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</span>
     </div>
   );
 }
@@ -2766,12 +2764,12 @@ function Empty({ icon: Icon, text, action, onAction }: { icon: typeof User; text
    ═══════════════════════════════════════════════════════════════ */
 const patientPortalCSS = `
 .pp-title {
-  font-family: 'DM Sans', Arial, sans-serif;
+  font-family: var(--font-platform);
   font-size: 32px; font-weight: 700; color: var(--text-primary);
   letter-spacing: -0.02em; margin-bottom: 8px; line-height: 1.2;
 }
 .pp-subtitle {
-  font-family: 'DM Sans', Arial, sans-serif;
+  font-family: var(--font-platform);
   font-size: 16px; color: var(--text-secondary); line-height: 1.6;
   max-width: 380px; margin: 0 auto;
 }
@@ -2785,39 +2783,39 @@ const patientPortalCSS = `
   background: var(--bg-secondary);
 }
 .pp-toggle__btn {
-  flex: 1; padding: 14px 0; font-family: 'DM Sans', Arial, sans-serif;
+  flex: 1; padding: 14px 0; font-family: var(--font-platform);
   font-size: 14px; font-weight: 700; border: none; cursor: pointer;
   background: transparent; color: var(--text-secondary); transition: all 0.2s ease;
   border-radius: 7px; margin: 2px;
 }
 .pp-toggle__btn--active {
   background: var(--accent-primary); color: #fff;
-  box-shadow: 0 2px 8px rgba(0,119,215,0.25);
+  box-shadow: none;
 }
 .pp-field { margin-bottom: 20px; }
 .pp-label {
-  display: block; font-family: 'DM Sans', Arial, sans-serif;
+  display: block; font-family: var(--font-platform);
   font-size: 14px; font-weight: 600; color: var(--text-primary);
   margin-bottom: 8px; letter-spacing: 0;
   text-transform: none;
 }
 .pp-input {
   width: 100%; padding: 14px 16px; border-radius: 8px;
-  border: 1px solid var(--border-medium); font-family: 'DM Sans', Arial, sans-serif;
+  border: 1px solid var(--border-medium); font-family: var(--font-platform);
   font-size: 16px; color: var(--text-primary); background: var(--bg-card-solid);
   transition: border-color 0.2s, box-shadow 0.2s; outline: none;
 }
-.pp-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 4px var(--accent-light); }
+.pp-input:focus { border-color: var(--accent-primary); box-shadow: none; }
 .pp-input::placeholder { color: var(--text-muted); }
 .pp-btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
   gap: 10px; padding: 16px 28px; border-radius: 8px;
-  font-family: 'DM Sans', Arial, sans-serif; font-size: 16px;
+  font-family: var(--font-platform); font-size: 16px;
   font-weight: 700; cursor: pointer; border: none;
   background: var(--accent-primary); color: #fff; transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0,119,215,0.2);
+  box-shadow: none;
 }
-.pp-btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,119,215,0.3); }
+.pp-btn-primary:hover { filter: none; transform: translateY(-1px); box-shadow: none; }
 .pp-error {
   padding: 14px 16px; border-radius: 8px; background: rgba(218,18,48,0.06);
   border: 1px solid rgba(218,18,48,0.15); margin-bottom: 18px;

@@ -174,7 +174,7 @@ function DispenseModal({ rx, onConfirm, onCancel, interactions }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
       <div className="dash-card rounded-2xl p-5 w-full max-w-md mx-4" style={{
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+        boxShadow: 'none',
       }}>
         <div className="flex items-center gap-2 mb-4">
           <Pill className="w-5 h-5" style={{ color: ACCENT }} />
@@ -255,7 +255,7 @@ function ReceiveStockModal({ items, onConfirm, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="dash-card rounded-2xl p-5 w-full max-w-md mx-4" style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+      <div className="dash-card rounded-2xl p-5 w-full max-w-md mx-4" style={{ boxShadow: 'none' }}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5" style={{ color: ACCENT }} />

@@ -57,7 +57,7 @@ export default function ChartSummaryPanel({
   }
 
   return (
-    <div className="card-elevated lg:col-span-3 lg:order-1 flex flex-col" style={{ overflow: 'hidden', height: 320 }}>
+    <div className="card-elevated chart-summary-panel lg:col-span-3 lg:order-1 flex flex-col" style={{ overflow: 'hidden', height: 320 }}>
       {/* Header */}
       <div className="px-5 py-3 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
         <div className="flex items-center gap-2.5">

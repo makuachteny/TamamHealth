@@ -34,7 +34,7 @@ export default function SearchInput({
     >
       <Search
         size={15}
-        className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+        className="search-input-icon"
         style={{ color: 'var(--text-muted)' }}
       />
       <input

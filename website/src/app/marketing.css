@@ -1,13 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════
-   TamamHealth Marketing Site — Design System
-   Pixel-perfect Tebra layout structure + TamamHealth brand colors.
+   Tamam Marketing Site — Design System
+   Pixel-perfect Tebra layout structure + Tamam brand colors.
    Uses exact Tebra CSS variables and sizing.
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Google Fonts (Lora = Tebra serif, DM Sans ≈ AkkuratLL) ───── */
 @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&family=DM+Mono:wght@400;500&display=swap');
 
-/* ── CSS Custom Properties — TamamHealth Platform Palette ────── */
+/* ── CSS Custom Properties — Tamam Platform Palette ────── */
 :root {
   /* ─ Layout ─ */
   --containerBaseWidth: 1280px;
@@ -80,11 +80,11 @@
   --tb-shadow-lg:  0 16px 48px rgba(30,58,138,0.10);
   --tb-shadow-xl:  0 24px 64px rgba(30,58,138,0.14);
 
-  /* ─ Motion disabled ─ */
+  /* ─ Motion ─ */
   --tb-ease:       cubic-bezier(0.4, 0, 0.2, 1);
   --tb-ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
-  --tb-duration:   0s;
-  --tb-duration-sm: 0s;
+  --tb-duration:   280ms;
+  --tb-duration-sm: 160ms;
 
   /* Aliases */
   --tb-serif: var(--Lora);
@@ -95,29 +95,58 @@
   --tb-max-w: var(--containerBaseWidth);
 }
 
-/* ── No Motion Policy ──────────────────────────────────────────────
-   The marketing site should not animate, slide, scale, shimmer, count
-   upward, or move on hover. Keep interactive states static and instant.
+/* ── Motion Policy ─────────────────────────────────────────────────
+   Keep movement restrained: smooth anchor scrolling, one-time section
+   reveals, page-entry fades, and the intentional hero image rails.
 */
 html,
 body {
-  scroll-behavior: auto !important;
-}
-
-.mk-page *,
-.mk-page *::before,
-.mk-page *::after {
-  animation: none !important;
-  transition: none !important;
-  animation-duration: 0s !important;
-  animation-delay: 0s !important;
-  transition-duration: 0s !important;
-  transition-delay: 0s !important;
+  scroll-behavior: smooth;
 }
 
 .mk-compliance-marquee {
   width: 100% !important;
   transform: none !important;
+}
+
+.mk-route-transition {
+  animation: mkRouteEnter 420ms var(--tb-ease-out) both;
+}
+
+.mk-reveal {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+  transition:
+    opacity 560ms var(--tb-ease-out) var(--mk-reveal-delay, 0s),
+    transform 560ms var(--tb-ease-out) var(--mk-reveal-delay, 0s);
+  will-change: opacity, transform;
+}
+
+.mk-reveal--visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+@keyframes mkRouteEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-route-transition,
+  .mk-reveal {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
 }
 
 .mk-nav-dropdown,
@@ -7576,22 +7605,7 @@ body,
   display: block !important;
 }
 
-/* ── Final No Motion Override ────────────────────────────────────── */
-html,
-body {
-  scroll-behavior: auto !important;
-}
-
-.mk-page *,
-.mk-page *::before,
-.mk-page *::after {
-  animation: none !important;
-  transition: none !important;
-  animation-duration: 0s !important;
-  animation-delay: 0s !important;
-  transition-duration: 0s !important;
-  transition-delay: 0s !important;
-}
+/* ── Stability Overrides ─────────────────────────────────────────── */
 
 .mk-compliance-marquee {
   width: 100% !important;
@@ -10105,24 +10119,7 @@ body,
   }
 }
 
-/* ── Final motion audit: only hero image rails move ─────────────── */
-.mk-page *,
-.mk-page *::before,
-.mk-page *::after {
-  transition: none !important;
-  transition-duration: 0s !important;
-  transition-delay: 0s !important;
-  scroll-behavior: auto !important;
-}
-
-.mk-page *:not(.mk-home-hero-rail-track)::before,
-.mk-page *:not(.mk-home-hero-rail-track)::after,
-.mk-page *:not(.mk-home-hero-rail-track) {
-  animation: none !important;
-  animation-duration: 0s !important;
-  animation-delay: 0s !important;
-  animation-iteration-count: 1 !important;
-}
+/* ── Final motion audit: hero rails keep their ambient movement ──── */
 
 .mk-home-hero-rail-1 .mk-home-hero-rail-track {
   animation: mkHeroRailUp 30s linear infinite !important;
@@ -10462,6 +10459,20 @@ body,
   font-size: clamp(18px, 1.5vw, 24px);
   font-weight: 700;
   line-height: 1.18;
+}
+
+.mk-product-photo-caption small {
+  display: block;
+  margin-top: 8px;
+  color: rgba(16, 25, 90, 0.68);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.mk-product-compact-section {
+  padding-top: clamp(52px, 6vw, 86px) !important;
+  padding-bottom: clamp(52px, 6vw, 86px) !important;
 }
 
 .mk-hero-billing .mk-mod-hero-visual-img,
@@ -12773,9 +12784,19 @@ button.mk-mobile-top-demo {
 }
 
 /* ── Final invariant header controls ───────────────────────────── */
-.mk-navbar,
+.mk-navbar {
+  transition:
+    background-color 220ms var(--tb-ease),
+    border-color 220ms var(--tb-ease),
+    box-shadow 220ms var(--tb-ease),
+    color 180ms var(--tb-ease) !important;
+}
+
 .mk-navbar * {
-  transition: none !important;
+  transition:
+    background-color 180ms var(--tb-ease),
+    border-color 180ms var(--tb-ease),
+    color 180ms var(--tb-ease) !important;
 }
 
 .mk-navbar .mk-navbar-inner {
@@ -12914,62 +12935,175 @@ button.mk-mobile-top-demo {
   }
 }
 
-/* ── Final restore: whitish landing hero ───────────────────────── */
+/* ── Final restore: blue landing hero ──────────────────────────── */
 .mk-home-hero {
-  background: linear-gradient(135deg, #FEFFF9 0%, #F7FBF8 52%, #EFF8FD 100%) !important;
-  color: #10195A !important;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(255,255,255,0.11) 0 1px, transparent 1px 100%),
+    radial-gradient(circle at 15% 76%, rgba(54,159,218,0.18), transparent 34%),
+    linear-gradient(135deg, #0B145F 0%, #014F91 56%, #268FCE 100%) !important;
+  background-size: 42px 42px, auto, auto !important;
+  color: #fff !important;
 }
 
 .mk-home-hero::before {
   background:
-    radial-gradient(circle at center, rgba(33,145,208,0.08) 0 1px, transparent 1px 100%),
-    linear-gradient(135deg, rgba(254,255,249,0.92), rgba(239,248,253,0.72)) !important;
-  background-size: 42px 42px, auto !important;
-  opacity: 1 !important;
+    radial-gradient(circle at 18% 20%, transparent 0 18px, rgba(255,255,255,0.075) 19px 20px, transparent 21px),
+    radial-gradient(circle at 78% 34%, transparent 0 28px, rgba(255,255,255,0.07) 29px 30px, transparent 31px),
+    radial-gradient(circle at 62% 82%, transparent 0 14px, rgba(255,255,255,0.055) 15px 16px, transparent 17px) !important;
+  background-size: 260px 260px, 330px 330px, 220px 220px !important;
+  opacity: 0.5 !important;
 }
 
 .mk-home-hero::after {
-  background: linear-gradient(90deg, rgba(254,255,249,0.58), rgba(239,248,253,0.22)) !important;
+  background:
+    linear-gradient(90deg, rgba(11,20,95,0.22) 0%, transparent 42%, rgba(38,143,206,0.08) 100%),
+    linear-gradient(180deg, transparent 0%, rgba(16,25,90,0.20) 100%) !important;
   opacity: 1 !important;
 }
 
 .mk-home-hero-kicker {
-  color: #015697 !important;
+  color: rgba(255,255,255,0.9) !important;
 }
 
 .mk-home-hero .mk-h1,
 .mk-home-hero-title,
 .mk-home-hero-title-lead {
-  color: #10195A !important;
+  color: #fff !important;
 }
 
 .mk-home-hero-subtitle {
-  color: #1d2f75 !important;
+  color: rgba(255,255,255,0.88) !important;
 }
 
 .mk-home-union-field {
-  opacity: 0.22 !important;
-  mix-blend-mode: normal !important;
+  opacity: 0.16 !important;
+  mix-blend-mode: screen !important;
 }
 
 .mk-home-union-field span {
-  filter: none !important;
+  filter: brightness(0) invert(1) !important;
 }
 
 .mk-home-hero-tile {
-  border-color: rgba(1,86,151,0.18) !important;
-  background: rgba(254,255,249,0.68) !important;
+  border-color: rgba(255,255,255,0.26) !important;
+  background: rgba(255,255,255,0.10) !important;
   box-shadow: none !important;
 }
 
 .mk-home-hero-tile::after {
-  background: linear-gradient(180deg, rgba(254,255,249,0.04), rgba(254,255,249,0.58)) !important;
+  background: linear-gradient(180deg, rgba(16,25,90,0.02), rgba(16,25,90,0.42)) !important;
 }
 
 .mk-home-hero-tile span {
   background: rgba(255,255,255,0.92) !important;
-  border-color: rgba(1,86,151,0.18) !important;
+  border-color: rgba(255,255,255,0.26) !important;
   color: #015697 !important;
+}
+
+.mk-home-hero-panel {
+  background: rgba(241, 250, 255, 0.9) !important;
+  border: 1px solid rgba(226, 244, 252, 0.88) !important;
+  color: #10195A !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(18px) saturate(1.08) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.08) !important;
+}
+
+.mk-home-hero-panel::before {
+  opacity: 0.18 !important;
+}
+
+.mk-home-hero-panel h2 {
+  color: #10195A !important;
+}
+
+.mk-home-hero-panel p {
+  color: #1B3378 !important;
+}
+
+.mk-home-hero-field span {
+  color: #10195A !important;
+}
+
+.mk-home-hero-form-fields input,
+.mk-home-hero-slot {
+  border-color: rgba(1, 86, 151, 0.34) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: #10195A !important;
+}
+
+.mk-home-hero-form-fields input::placeholder {
+  color: rgba(16, 25, 90, 0.68) !important;
+}
+
+.mk-home-hero-form-fields input:focus,
+.mk-home-hero-slot:focus-visible,
+.mk-home-hero-panel-button:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.88) !important;
+  outline-offset: 3px !important;
+  border-color: #015697 !important;
+}
+
+.mk-home-hero-panel-button {
+  background: #015697 !important;
+  border: 1px solid #015697 !important;
+  color: #fff !important;
+}
+
+.mk-home-hero-panel-button:hover {
+  background: #014A82 !important;
+  border-color: #014A82 !important;
+}
+
+/* ── Floating chat entry point ─────────────────────────────────── */
+.mk-chat-button {
+  position: fixed;
+  right: clamp(18px, 2.4vw, 34px);
+  bottom: clamp(18px, 2.4vw, 32px);
+  z-index: 260;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  min-height: 46px;
+  padding: 0 22px;
+  border: 1px solid rgba(254, 255, 249, 0.16);
+  border-radius: 7px;
+  background: #28944f;
+  color: #fff;
+  font-family: var(--AkkuratLL);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: none !important;
+}
+
+.mk-chat-button svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  color: currentColor;
+}
+
+.mk-chat-button:hover {
+  background: #218143;
+  color: #fff;
+}
+
+.mk-chat-button:focus-visible {
+  outline: 3px solid rgba(33, 145, 208, 0.34);
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .mk-chat-button {
+    right: 14px;
+    bottom: 14px;
+    min-height: 44px;
+    padding-inline: 16px;
+    font-size: 15px;
+  }
 }
 
 .mk-home-platform-heading {
@@ -12992,16 +13126,16 @@ button.mk-mobile-top-demo {
 
 /* ── Final page-matched header tones ───────────────────────────── */
 .mk-navbar--tone-home {
-  --mk-nav-hero-bg: linear-gradient(135deg, #FEFFF9 0%, #F7FBF8 52%, #EFF8FD 100%);
-  --mk-nav-hero-text: #014d55;
-  --mk-nav-logo-filter: none;
-  --mk-nav-pricing-bg: rgba(254,255,249,0.9);
-  --mk-nav-pricing-border: #014d55;
-  --mk-nav-pricing-color: #014d55;
-  --mk-nav-demo-bg: #015697;
-  --mk-nav-demo-border: #015697;
-  --mk-nav-demo-color: #fff;
-  --mk-nav-sales-bg: rgba(254,255,249,0.84);
+  --mk-nav-hero-bg: linear-gradient(135deg, #10195A 0%, #015697 58%, #2191D0 100%);
+  --mk-nav-hero-text: rgba(255,255,255,0.96);
+  --mk-nav-logo-filter: brightness(0) invert(1);
+  --mk-nav-pricing-bg: rgba(255,255,255,0.08);
+  --mk-nav-pricing-border: rgba(255,255,255,0.92);
+  --mk-nav-pricing-color: #fff;
+  --mk-nav-demo-bg: #fff;
+  --mk-nav-demo-border: #fff;
+  --mk-nav-demo-color: #015697;
+  --mk-nav-sales-bg: rgba(255,255,255,0.08);
 }
 
 .mk-navbar--tone-platform {
@@ -13337,5 +13471,164 @@ button.mk-mobile-top-demo {
   .mk-mod-hero-actions,
   .mk-mod-hero-stats {
     justify-content: center !important;
+  }
+}
+
+/* ── Careers hero: landing-blue theme ───────────────────────────── */
+.mk-hero-careers {
+  min-height: calc(100svh - var(--navbar-height)) !important;
+  isolation: isolate !important;
+  color: #fff !important;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(255,255,255,0.16) 0 1px, transparent 1px 100%),
+    radial-gradient(circle at 15% 76%, rgba(54,159,218,0.28), transparent 34%),
+    linear-gradient(135deg, #10195A 0%, #015697 58%, #2191D0 100%) !important;
+  background-size: 42px 42px, auto, auto !important;
+}
+
+.mk-hero-careers::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  background:
+    radial-gradient(circle at 18% 20%, transparent 0 18px, rgba(255,255,255,0.12) 19px 20px, transparent 21px),
+    radial-gradient(circle at 78% 34%, transparent 0 28px, rgba(255,255,255,0.10) 29px 30px, transparent 31px),
+    radial-gradient(circle at 62% 82%, transparent 0 14px, rgba(255,255,255,0.08) 15px 16px, transparent 17px);
+  background-size: 260px 260px, 330px 330px, 220px 220px !important;
+  opacity: 0.72 !important;
+}
+
+.mk-hero-careers::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: auto 0 0 !important;
+  z-index: 0 !important;
+  height: 34% !important;
+  pointer-events: none !important;
+  background: linear-gradient(180deg, transparent 0%, rgba(16,25,90,0.18) 100%) !important;
+}
+
+.mk-hero-careers > .mk-container,
+.mk-hero-careers .mk-mod-hero-inner,
+.mk-hero-careers .mk-mod-hero-copy,
+.mk-hero-careers .mk-mod-hero-visual {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.mk-hero-careers .mk-mod-hero-inner {
+  grid-template-columns: minmax(0, 0.88fr) minmax(390px, 0.8fr) !important;
+  gap: clamp(42px, 6vw, 88px) !important;
+}
+
+.mk-hero-careers .mk-mod-hero-copy {
+  max-width: 760px !important;
+}
+
+.mk-hero-careers .mk-mod-hero-eyebrow {
+  color: rgba(255,255,255,0.86) !important;
+  letter-spacing: 0.16em !important;
+}
+
+.mk-hero-careers .mk-mod-hero-title {
+  max-width: 760px !important;
+  color: #fff !important;
+  font-size: clamp(58px, 6.6vw, 104px) !important;
+  line-height: 0.98 !important;
+  text-wrap: balance !important;
+}
+
+.mk-hero-careers .mk-mod-hero-subtitle {
+  max-width: 660px !important;
+  color: rgba(255,255,255,0.84) !important;
+  font-size: clamp(19px, 1.45vw, 24px) !important;
+}
+
+.mk-hero-careers .mk-mod-hero-primary {
+  background: #fff !important;
+  border-color: #fff !important;
+  color: #015697 !important;
+}
+
+.mk-hero-careers .mk-mod-hero-secondary {
+  background: rgba(255,255,255,0.08) !important;
+  border-color: rgba(255,255,255,0.72) !important;
+  color: #fff !important;
+}
+
+.mk-hero-careers .mk-mod-hero-stats {
+  margin-top: clamp(30px, 4vw, 46px) !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.mk-hero-careers .mk-mod-hero-stats div {
+  min-width: 0 !important;
+  padding: 18px 16px !important;
+  border: 1px solid rgba(255,255,255,0.22) !important;
+  border-radius: 16px !important;
+  background: rgba(255,255,255,0.08) !important;
+  color: #fff !important;
+  backdrop-filter: blur(12px) saturate(1.04) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(1.04) !important;
+}
+
+.mk-hero-careers .mk-mod-hero-stats strong {
+  color: #fff !important;
+  font-size: clamp(20px, 1.8vw, 28px) !important;
+}
+
+.mk-hero-careers .mk-mod-hero-stats span {
+  color: rgba(255,255,255,0.76) !important;
+}
+
+.mk-hero-careers .mk-mod-hero-visual {
+  width: min(100%, 600px) !important;
+  justify-self: end !important;
+}
+
+.mk-hero-careers .mk-mod-hero-visual-img {
+  height: clamp(430px, 42vw, 620px) !important;
+  border: 1px solid rgba(255,255,255,0.32) !important;
+  border-radius: 22px !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+@media (max-width: 940px) {
+  .mk-hero-careers {
+    min-height: auto !important;
+  }
+
+  .mk-hero-careers .mk-mod-hero-inner {
+    grid-template-columns: 1fr !important;
+    text-align: center !important;
+  }
+
+  .mk-hero-careers .mk-mod-hero-copy,
+  .mk-hero-careers .mk-mod-hero-title,
+  .mk-hero-careers .mk-mod-hero-subtitle {
+    margin-inline: auto !important;
+  }
+
+  .mk-hero-careers .mk-mod-hero-visual {
+    justify-self: center !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .mk-hero-careers .mk-mod-hero-title {
+    font-size: clamp(42px, 12vw, 62px) !important;
+  }
+
+  .mk-hero-careers .mk-mod-hero-stats {
+    grid-template-columns: 1fr !important;
+  }
+
+  .mk-hero-careers .mk-mod-hero-visual-img {
+    height: clamp(300px, 78vw, 430px) !important;
   }
 }

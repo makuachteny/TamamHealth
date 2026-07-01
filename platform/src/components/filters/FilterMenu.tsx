@@ -88,7 +88,7 @@ export default function FilterMenu({
             width: `min(92vw, ${width}px)`,
             background: 'var(--bg-card-solid)',
             border: '1px solid var(--border-medium)',
-            boxShadow: 'var(--card-shadow-lg, 0 16px 48px rgba(0,0,0,0.2))',
+            boxShadow: 'none',
           }}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>

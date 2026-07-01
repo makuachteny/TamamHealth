@@ -224,8 +224,8 @@ export default function MyFacilityPage() {
             disabled={saving}
             className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all"
             style={{
-              background: saving ? 'var(--text-muted)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
-              boxShadow: '0 2px 8px rgba(0,119,215,0.3)',
+              background: saving ? 'var(--text-muted)' : 'var(--accent-primary)',
+              boxShadow: 'none',
             }}
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -408,8 +408,8 @@ export default function MyFacilityPage() {
                         disabled={submitting || (!!submittedAt && !hasPendingChanges)}
                         className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{
-                          background: submitting ? 'var(--text-muted)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
-                          boxShadow: '0 2px 8px rgba(0,119,215,0.3)',
+                          background: submitting ? 'var(--text-muted)' : 'var(--accent-primary)',
+                          boxShadow: 'none',
                         }}
                       >
                         {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

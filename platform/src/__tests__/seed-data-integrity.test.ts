@@ -8,9 +8,78 @@
  * - IDs follow naming conventions
  * - Cross-references between seed data arrays are valid
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import { patients, hospitals, referrals, diseaseAlerts } from '@/data/mock';
+import {
+  DEMO_LOGIN_ACCOUNTS,
+  DEMO_ROLE_PROFILE,
+  DEMO_USER_PROFILES,
+  PRIVATE_ORG_ID,
+  PUBLIC_ORG_ID,
+} from '@/lib/demo-users';
 
 describe('Seed Data Integrity', () => {
+  describe('Demo user roster', () => {
+    const removedOverlapUsers = [
+      'reg.clerk',
+      'clinic.clerk',
+      'clinician.peter',
+      'hmis.john',
+      'facadmin.rita',
+    ];
+
+    test('canonical demo users have unique usernames and complete workflow details', () => {
+      const usernames = DEMO_USER_PROFILES.map((user) => user.username);
+      expect(new Set(usernames).size).toBe(usernames.length);
+
+      DEMO_USER_PROFILES.forEach((user) => {
+        expect(user.username).toMatch(/^[a-z0-9.]+$/);
+        expect(user.name).toBeTruthy();
+        expect(user.title).toBeTruthy();
+        expect(user.group).toBeTruthy();
+        expect(user.loginDescription).toBeTruthy();
+        expect(DEMO_ROLE_PROFILE[user.role]).toBeDefined();
+
+        if (user.role !== 'super_admin') {
+          expect([PUBLIC_ORG_ID, PRIVATE_ORG_ID]).toContain(user.orgId);
+        }
+
+        if (!['super_admin', 'government', 'county_health_director', 'org_admin'].includes(user.role)) {
+          expect(user.hospitalId).toBeTruthy();
+          expect(user.hospitalName).toBeTruthy();
+        }
+      });
+    });
+
+    test('login picker is generated from seeded canonical users', () => {
+      const usersByUsername = new Map(DEMO_USER_PROFILES.map((user) => [user.username, user]));
+      const loginUsers = DEMO_LOGIN_ACCOUNTS.map((account) => account.user);
+
+      expect(new Set(loginUsers).size).toBe(loginUsers.length);
+      loginUsers.forEach((username) => {
+        const user = usersByUsername.get(username);
+        expect(user).toBeDefined();
+        expect(user?.role).toBe(DEMO_LOGIN_ACCOUNTS.find((account) => account.user === username)?.roleKey);
+      });
+    });
+
+    test('deleted overlap users and orphan user ids are not referenced by seed data', () => {
+      const seedSource = fs.readFileSync(path.join(process.cwd(), 'src/lib/db-seed.ts'), 'utf8');
+      const seededUsernames = new Set(DEMO_USER_PROFILES.map((user) => user.username));
+      const literalUserRefs = [...seedSource.matchAll(/['"`]user-([a-z0-9.]+)['"`]/g)].map((match) => match[1]);
+
+      removedOverlapUsers.forEach((username) => {
+        expect(seededUsernames.has(username)).toBe(false);
+        expect(DEMO_LOGIN_ACCOUNTS.some((account) => account.user === username)).toBe(false);
+        expect(seedSource).not.toContain(username);
+      });
+
+      literalUserRefs.forEach((username) => {
+        expect(seededUsernames.has(username)).toBe(true);
+      });
+    });
+  });
 
   describe('Patient records', () => {
     test('all patients have required fields', () => {

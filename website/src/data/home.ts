@@ -15,16 +15,16 @@ export const HOME_PRINCIPLES = [
   },
   {
     number: "03",
-    title: "Accountable Data",
-    body: "Facility and country layers protect sensitive health records while making encounter-level reporting easier to trust.",
-    href: "/resources/api-docs",
+    title: "Clear facility data",
+    body: "Teams can see the care delivered, the medicines dispensed, the payments collected, and the reports that need attention.",
+    href: "/products",
     icon: "shield",
   },
   {
     number: "04",
-    title: "Facility data to national insight",
-    body: "Clean clinical records become facility dashboards, surveillance signals, DHIS2-ready reports, and better national health planning.",
-    href: "/analytics",
+    title: "Built with implementation in mind",
+    body: "The product is designed for training, low-bandwidth work, and gradual rollout instead of forcing every department to change at once.",
+    href: "/about/contact",
     icon: "network",
   },
 ] as const;
@@ -32,17 +32,17 @@ export const HOME_PRINCIPLES = [
 export const HOME_LEARN_MORE = [
   {
     title: "For health workers",
-    body: "See how TamamHealth supports registration, triage, consultation, lab, pharmacy, wards, referrals, and follow-up without adding paperwork.",
+    body: "See how Tamam supports registration, triage, consultation, lab, pharmacy, wards, referrals, and follow-up without adding paperwork.",
     href: "/products/hospital",
   },
   {
     title: "For partners",
-    body: "Explore pilot conversations, implementation needs, and ways to support connected care in South Sudan.",
+    body: "Talk with us about pilot needs, implementation planning, and what a responsible first deployment should look like.",
     href: "/about/contact",
   },
   {
-    title: "For builders",
-    body: "Learn how offline-first sync, secure records, FHIR, DHIS2, and low-bandwidth workflows fit together.",
-    href: "/resources/api-docs",
+    title: "For decision makers",
+    body: "Review pricing, deployment options, and which workflow makes sense to start with.",
+    href: "/pricing",
   },
 ] as const;

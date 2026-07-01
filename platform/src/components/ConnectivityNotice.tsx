@@ -188,7 +188,7 @@ export default function ConnectivityNotice() {
           color: colors.text,
           borderRadius: 'var(--card-radius)',
           border: `1px solid ${colors.border}`,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+          boxShadow: 'none',
         }}
       >
         {notice.tone === 'warning' && syncPaused && isNetworkUp ? (

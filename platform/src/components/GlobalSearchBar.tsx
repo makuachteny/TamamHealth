@@ -52,8 +52,10 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
     if (q.length < 2) return [];
     return (patients || [])
       .filter(p =>
-        `${p.firstName || ''} ${p.surname || ''}`.toLowerCase().includes(q) ||
+        `${p.firstName || ''} ${p.middleName || ''} ${p.surname || ''}`.toLowerCase().includes(q) ||
         (p.hospitalNumber || '').toLowerCase().includes(q) ||
+        (p.nationalId || '').toLowerCase().includes(q) ||
+        (p.geocodeId || '').toLowerCase().includes(q) ||
         (p.phone || '').includes(q)
       )
       .slice(0, 6);
@@ -121,7 +123,7 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
               width: 'min(100%, 420px)',
               background: 'var(--bg-card-solid)',
               border: '1px solid var(--border-medium)',
-              boxShadow: '0 16px 48px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.06)',
+              boxShadow: 'none',
             }}
           >
             {patientMatches.length === 0 ? (

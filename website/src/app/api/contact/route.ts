@@ -32,7 +32,7 @@ const isRateLimited = createIpRateLimiter(60 * 60 * 1000, 5);
  */
 async function sendEmail(to: string, subject: string, text: string, html?: string, replyTo?: string): Promise<boolean> {
   const msg: EmailMessage = { to, subject, text, html, replyTo };
-  return sendMarketingEmail('contact', msg, 'TamamHealth');
+  return sendMarketingEmail('contact', msg, 'Tamam');
 }
 
 export async function POST(req: NextRequest) {
@@ -131,17 +131,17 @@ export async function POST(req: NextRequest) {
     const confirmText = [
       `Hi ${contact.name},`,
       '',
-      `Thank you for reaching out to TamamHealth. We've received your message and will get back to you within 4 business hours.`,
+      `Thank you for reaching out to Tamam. We've received your message and will get back to you within 4 business hours.`,
       '',
       'Best regards,',
-      'The TamamHealth Team',
+      'The Tamam Team',
     ].join('\n');
     const confirmHtml = `
       <p>Hi ${safeName},</p>
-      <p>Thank you for reaching out to TamamHealth. We've received your message and will get back to you within 4 business hours.</p>
-      <p>Best regards,<br/>The TamamHealth Team</p>
+      <p>Thank you for reaching out to Tamam. We've received your message and will get back to you within 4 business hours.</p>
+      <p>Best regards,<br/>The Tamam Team</p>
     `;
-    await sendEmail(contact.email, 'We received your message — TamamHealth', confirmText, confirmHtml);
+    await sendEmail(contact.email, 'We received your message — Tamam', confirmText, confirmHtml);
 
     return NextResponse.json({ ok: true });
   } catch (err) {

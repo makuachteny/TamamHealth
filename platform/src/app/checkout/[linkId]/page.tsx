@@ -175,7 +175,7 @@ export default function CheckoutPage({ params }: { params: { linkId: string } })
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Reference</p>
-                <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace' }}>{reference}</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-platform-mono)' }}>{reference}</p>
               </div>
               <div>
                 <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Amount</p>
@@ -221,7 +221,7 @@ export default function CheckoutPage({ params }: { params: { linkId: string } })
     <Shell>
       {/* Amount banner */}
       <div style={{
-        background: 'linear-gradient(135deg, #1E40AF 0%, #3b82f6 60%, #60A5FA 100%)',
+        background: 'var(--accent-primary)',
         borderRadius: 14, padding: '22px 24px', color: '#fff', marginBottom: 16, position: 'relative', overflow: 'hidden',
       }}>
         <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />

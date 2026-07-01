@@ -6,27 +6,21 @@ import { usePathname } from "next/navigation";
 import { DuoIcon } from "./DuoIcon";
 
 /* ═══════════════════════════════════════════════════════════════════
-   TamamHealth Marketing — Navbar (Simplified)
+   Tamam Marketing — Navbar (Simplified)
    Logo left, nav links center, CTA button right
    No dropdowns — flat structure
    ═══════════════════════════════════════════════════════════════════ */
-
-// Fundraising entry points are locked off for now. Flip to true to re-enable.
-const SHOW_FUNDRAISING = false;
 
 const PRODUCTS_LINKS = [
   { label: "Hospital Management System", href: "/products/hospital" },
   { label: "Clinic Management System", href: "/products/clinic" },
   { label: "Laboratory Information System", href: "/products/lab" },
-  { label: "Radiology Information System", href: "/products/radiology" },
   { label: "Pharmacy Management System", href: "/products/pharmacy" },
-  { label: "Patient Experience Platform", href: "/patient-experience" },
 ];
 
 const COMPANY_LINKS = [
   { label: "Our Story", href: "/about" },
   { label: "Our Team", href: "/about/team" },
-  { label: "Careers", href: "/about/careers" },
   { label: "Contact", href: "/about/contact" },
 ];
 
@@ -39,10 +33,9 @@ type NavTone = "home" | "platform" | "company" | "commerce" | "resource" | "clin
 
 function getNavTone(pathname: string): NavTone {
   if (pathname === "/") return "home";
-  if (pathname === "/billing" || pathname === "/pricing" || pathname === "/donate") return "commerce";
+  if (pathname === "/pricing") return "commerce";
   if (pathname.startsWith("/about")) return "company";
-  if (pathname === "/download" || pathname.startsWith("/resources") || pathname.startsWith("/case-studies")) return "resource";
-  if (pathname.startsWith("/products") || pathname === "/ehr" || pathname === "/pharmacy-lab") return "clinical";
+  if (pathname.startsWith("/products")) return "clinical";
   return "platform";
 }
 
@@ -88,7 +81,6 @@ export default function MarketingNav() {
       const heroBottom = hero ? hero.offsetTop + hero.offsetHeight - navHeight : 0;
       const nextLightHero = Boolean(
         hero?.matches([
-          ".mk-home-hero",
           ".mk-mod-hero--showcase",
           ".mk-mod-hero--data",
           ".mk-mod-hero--legal",
@@ -125,7 +117,7 @@ export default function MarketingNav() {
       <nav className={`mk-navbar ${navClass} mk-navbar--tone-${tone}`}>
         <div className="mk-container mk-navbar-inner">
           {/* Logo */}
-          <Link href="/" className="mk-nav-logo" aria-label="Tamam Healthcare System — home">
+          <Link href="/" className="mk-nav-logo" aria-label="Tamam — home">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/assets/logos/SVG/Tamam_Style_Guide-33.svg"
@@ -135,7 +127,7 @@ export default function MarketingNav() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/assets/logos/SVG/Tamam_Style_Guide-31.svg"
-              alt="Tamam Healthcare System"
+              alt="Tamam"
               className="mk-nav-logo-type"
             />
           </Link>
@@ -151,7 +143,7 @@ export default function MarketingNav() {
                 ))}
               </div>
             </div>
-            <Link href="/case-studies" className="mk-nav-item">Testimonials</Link>
+            <Link href="/pricing" className="mk-nav-item">Pricing</Link>
             <div className="mk-nav-item">
               <Link href="/about" className="mk-nav-item-link">Company</Link>
               <DuoIcon name="chevron-down" size={14} />
@@ -161,7 +153,7 @@ export default function MarketingNav() {
                 ))}
               </div>
             </div>
-            <Link href="/about/careers" className="mk-nav-item">Careers</Link>
+            <Link href="/about/contact" className="mk-nav-item">Contact</Link>
           </div>
 
           {/* Desktop right CTA actions */}
@@ -170,31 +162,6 @@ export default function MarketingNav() {
               <DuoIcon name="phone" size={17} strokeWidth={1.8} aria-hidden="true" />
               {DISPLAY_PHONE}
             </a>
-            {SHOW_FUNDRAISING && (
-              <>
-                <div style={{ width: 1, height: 20, background: "var(--tb-cream-300)" }} />
-                <Link
-                  href="/donate"
-                  className="mk-nav-donate-link"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "var(--tb-gold-dark)",
-                    textDecoration: "none",
-                    padding: "7px 14px",
-                    borderRadius: 8,
-                    background: "var(--tb-tint-gold)",
-                    border: "1px solid var(--tb-gold)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <DuoIcon name="heart" size={14} /> Fund Our Pilot
-                </Link>
-              </>
-            )}
             <Link href={PRICING_HREF} className="mk-btn mk-btn-sm mk-nav-pricing">
               Get pricing
             </Link>
@@ -235,11 +202,8 @@ export default function MarketingNav() {
               <Link href="/products" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
                 Products
               </Link>
-              <Link href="/case-studies" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                Testimonials
-              </Link>
-              <Link href="/about/careers" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                Careers
+              <Link href="/pricing" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                Pricing
               </Link>
               <Link href="/about" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
                 About
@@ -253,22 +217,6 @@ export default function MarketingNav() {
                 <DuoIcon name="phone" size={17} strokeWidth={1.8} aria-hidden="true" />
                 {DISPLAY_PHONE}
               </a>
-
-              {SHOW_FUNDRAISING && (
-                <Link
-                  href="/donate"
-                  onClick={() => setMobileOpen(false)}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    fontSize: 15, fontWeight: 700, color: "var(--tb-gold-dark)",
-                    textDecoration: "none", padding: "12px 0",
-                    background: "var(--tb-tint-gold)", borderRadius: 10,
-                    border: "1px solid var(--tb-gold)", textAlign: "center",
-                  }}
-                >
-                  <DuoIcon name="heart" size={16} /> Fund Our Pilot
-                </Link>
-              )}
 
               <Link
                 href={PRICING_HREF}

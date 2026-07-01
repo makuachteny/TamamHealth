@@ -1,30 +1,24 @@
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
-import AvailabilityModal from '@/components/AvailabilityModal';
 import {
-  Calendar, Plus, Clock, CheckCircle2, User,
+  Calendar, User,
   AlertTriangle, RefreshCw,
   Video, Stethoscope, Syringe, HeartPulse, FlaskConical,
-  Building2, X, UserPlus, ClipboardList,
-  Filter, ExternalLink, ChevronLeft, ChevronRight,
+  X, UserPlus,
+  ChevronLeft, ChevronRight,
 } from '@/components/icons/lucide';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { useSettings } from '@/lib/settings/SettingsProvider';
-import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { FilterBar, SearchInput, FilterSelect } from '@/components/filters';
-import type { AppointmentType, AppointmentPriority, AppointmentStatus, FacilityLevel } from '@/lib/db-types';
+import type { AppointmentType, AppointmentPriority, AppointmentStatus, FacilityLevel, PatientDoc, AppointmentDoc } from '@/lib/db-types';
 import dynamic from 'next/dynamic';
 import PortalModal from '@/components/Modal';
-import PatientName from '@/components/PatientName';
-import { jubaDate, jubaNow, jubaTime } from '@/lib/time-juba';
+import { jubaDate, jubaNow } from '@/lib/time-juba';
 
 // react-big-calendar (and its CSS) is a heavy client-only library. Split it out
 // of the route's initial bundle so it loads only when the calendar view renders.
@@ -81,7 +75,6 @@ export default function AppointmentsPage() {
   const { appointments, create, updateStatus, reschedule, update } = useAppointments();
   const { patients } = usePatients();
   const { currentUser, globalSearch } = useApp();
-  const { canBookAppointments } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();
   const { departments: facilityDepartments } = useSettings();
@@ -110,28 +103,13 @@ export default function AppointmentsPage() {
 
   const router = useRouter();
   const [calView, setCalView] = useState<'month' | 'week' | 'day'>('month');
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
-  const [listSearch, setListSearch] = useState('');
-  const [listStatus, setListStatus] = useState('all');
-  const [listSort, setListSort] = useState<'date_asc' | 'date_desc' | 'name' | 'priority'>('date_asc');
   // Appointment opened in the click-to-view detail popup.
   const [eventApt, setEventApt] = useState<typeof appointments[0] | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
-  const [showWalkIn, setShowWalkIn] = useState(false);
-  const [showAvailability, setShowAvailability] = useState(false);
-  // Providers publish their own bookable windows ("Schedule"). This used to be a
-  // sidebar tab; it now lives on the appointments page where it belongs.
-  const canSetAvailability = ['doctor', 'clinical_officer', 'clinician', 'medical_superintendent', 'nurse', 'midwife'].includes(currentUser?.role ?? '');
-  const [showDayPopup, setShowDayPopup] = useState(false);
   const [editingApt, setEditingApt] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  // Deep link: TopBar "+ → Schedule appointment" routes here with ?new=1 to
-  // open the booking form straight away. Read on the client to avoid needing a
-  // Suspense boundary around useSearchParams, then strip the param.
+  // Deep link: ?new=1 opens the booking form straight away. Read on the client
+  // to avoid needing a Suspense boundary around useSearchParams, then strip the param.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
@@ -142,6 +120,19 @@ export default function AppointmentsPage() {
       window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || appointments.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const appointmentId = params.get('appointment');
+    if (!appointmentId) return;
+    const appointment = appointments.find(a => a._id === appointmentId);
+    if (!appointment) return;
+    setEventApt(appointment);
+    params.delete('appointment');
+    const qs = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
+  }, [appointments]);
 
   // Keyboard ← → to step through appointments while the detail modal is open.
   useEffect(() => {
@@ -178,13 +169,6 @@ export default function AppointmentsPage() {
   const [formRecurrencePattern, setFormRecurrencePattern] = useState<'weekly' | 'biweekly' | 'monthly' | 'quarterly'>('monthly');
   const [submitting, setSubmitting] = useState(false);
 
-  // Walk-in form
-  const [wiPatient, setWiPatient] = useState('');
-  const [wiReason, setWiReason] = useState('');
-  const [wiDepartment, setWiDepartment] = useState('Outpatient');
-  const [wiPriority, setWiPriority] = useState<AppointmentPriority>('routine');
-  const [wiNotes, setWiNotes] = useState('');
-
   // Reschedule / Cancel
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
@@ -200,12 +184,7 @@ export default function AppointmentsPage() {
   // appointment on `resource` so clicking can open the existing detail/edit flow.
   const calendarEvents = useMemo(() => {
     let list = appointments;
-    if (filterStatus === 'pending_approval') {
-      list = list.filter(a => a.status === 'scheduled' && a.appointmentDate >= today);
-    } else if (filterStatus !== 'all') {
-      list = list.filter(a => a.status === filterStatus);
-    }
-    const q = `${search} ${globalSearch}`.toLowerCase().trim();
+    const q = globalSearch.toLowerCase().trim();
     if (q) list = list.filter(a =>
       a.patientName.toLowerCase().includes(q) ||
       a.providerName.toLowerCase().includes(q) ||
@@ -223,39 +202,14 @@ export default function AppointmentsPage() {
         resource: a,
       };
     });
-  }, [appointments, filterStatus, search, globalSearch, today]);
+  }, [appointments, globalSearch]);
 
-  // Same scope as the calendar (date + search) but WITHOUT the status filter, so the
-  // status tab badges show how many appointments each status holds in the current view.
-  const statusBaseList = useMemo(() => {
-    let list = appointments;
-    if (selectedDate) list = list.filter(a => a.appointmentDate === selectedDate);
-    const q = `${search} ${globalSearch}`.toLowerCase().trim();
-    if (q) list = list.filter(a =>
-      a.patientName.toLowerCase().includes(q) ||
-      a.providerName.toLowerCase().includes(q) ||
-      a.department.toLowerCase().includes(q) ||
-      a.reason.toLowerCase().includes(q)
-    );
-    return list;
-  }, [appointments, selectedDate, search, globalSearch]);
-
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: statusBaseList.length };
-    for (const a of statusBaseList) counts[a.status] = (counts[a.status] || 0) + 1;
-    return counts;
-  }, [statusBaseList]);
-
-  const statusTabs = useMemo(() => {
-    const base = [{ key: 'all', label: t('appointments.allStatus'), count: statusCounts.all }];
-    const fromStatuses = (Object.keys(statusConfig) as AppointmentStatus[])
-      .filter(k => (statusCounts[k] || 0) > 0 || filterStatus === k)
-      .map(k => ({ key: k, label: t(statusLabelKey[k]), count: statusCounts[k] || 0 }));
-    return [...base, ...fromStatuses];
-  }, [statusCounts, filterStatus, t, statusLabelKey]);
-
-  // Pending approvals
-  const pendingApprovals = useMemo(() => appointments.filter(a => a.status === 'scheduled' && a.appointmentDate >= today), [appointments, today]);
+  const selectedAppointment = eventApt
+    ? appointments.find(a => a._id === eventApt._id) || eventApt
+    : null;
+  const selectedPatient = selectedAppointment
+    ? patients.find(p => p._id === selectedAppointment.patientId)
+    : undefined;
 
   const resetForm = () => {
     setFormPatient(''); setFormDate(jubaDate()); setFormTime('09:00');
@@ -294,29 +248,6 @@ export default function AppointmentsPage() {
     finally { setSubmitting(false); }
   };
 
-  const handleWalkIn = async () => {
-    if (!wiPatient || !wiReason) { showToast(t('appointments.toastFillRequiredShort'), 'error'); return; }
-    const patient = patients.find(p => p._id === wiPatient);
-    if (!patient) { showToast(t('appointments.toastSelectValidPatientShort'), 'error'); return; }
-    setSubmitting(true);
-    try {
-      await create({
-        patientId: patient._id, patientName: `${patient.firstName} ${patient.surname}`,
-        patientPhone: patient.phone || undefined, providerId: currentUser?._id || '',
-        providerName: currentUser?.name || '', facilityId: currentUser?.hospitalId || '',
-        facilityName: currentUser?.hospitalName || '', facilityLevel: 'payam' as FacilityLevel,
-        appointmentDate: today, appointmentTime: jubaTime(),
-        duration: 30, appointmentType: 'walk_in', priority: wiPriority,
-        department: wiDepartment, reason: wiReason, notes: wiNotes || undefined,
-        status: 'checked_in', reminderSent: false, isRecurring: false,
-        bookedBy: currentUser?._id || '', bookedByName: currentUser?.name || '', state: '',
-      });
-      showToast(t('appointments.toastWalkInRegistered'), 'success'); setShowWalkIn(false);
-      setWiPatient(''); setWiReason(''); setWiNotes(''); setWiDepartment('Outpatient'); setWiPriority('routine');
-    } catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailed'), 'error'); }
-    finally { setSubmitting(false); }
-  };
-
   const handleStatusChange = useCallback(async (id: string, status: AppointmentStatus) => {
     try { await updateStatus(id, status); showToast(t('appointments.toastStatusChanged', { status: t(statusLabelKey[status]).toLowerCase() }), 'success'); }
     catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
@@ -344,247 +275,85 @@ export default function AppointmentsPage() {
     catch { showToast(t('appointments.toastFailedCancel'), 'error'); }
   };
 
-  // List view — filtered + sorted appointments
-  const listAppointments = useMemo(() => {
-    const q = listSearch.toLowerCase();
-    let result = appointments.filter(a => {
-      const matchSearch = !q || a.patientName.toLowerCase().includes(q) || a.reason.toLowerCase().includes(q);
-      const matchStatus = listStatus === 'all' || a.status === listStatus;
-      return matchSearch && matchStatus;
-    });
-    if (listSort === 'date_asc') result = result.sort((a, b) => `${a.appointmentDate}${a.appointmentTime}`.localeCompare(`${b.appointmentDate}${b.appointmentTime}`));
-    else if (listSort === 'date_desc') result = result.sort((a, b) => `${b.appointmentDate}${b.appointmentTime}`.localeCompare(`${a.appointmentDate}${a.appointmentTime}`));
-    else if (listSort === 'name') result = result.sort((a, b) => a.patientName.localeCompare(b.patientName));
-    else if (listSort === 'priority') {
-      const order: Record<string, number> = { emergency: 0, urgent: 1, routine: 2 };
-      result = result.sort((a, b) => (order[a.priority] ?? 2) - (order[b.priority] ?? 2));
-    }
-    return result;
-  }, [appointments, listSearch, listStatus, listSort]);
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <TopBar
-          searchTrailing={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* Calendar / List view toggle */}
-              <div style={{ display: 'flex', borderRadius: 10, border: '1px solid var(--border-medium)', overflow: 'hidden', height: 36 }}>
-                <button
-                  onClick={() => setViewMode('calendar')}
-                  style={{ padding: '0 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === 'calendar' ? 'var(--accent-primary)' : 'var(--bg-card-solid)', color: viewMode === 'calendar' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}
-                >
-                  <Calendar size={13} /> Calendar
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  style={{ padding: '0 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', borderLeft: '1px solid var(--border-medium)', background: viewMode === 'list' ? 'var(--accent-primary)' : 'var(--bg-card-solid)', color: viewMode === 'list' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}
-                >
-                  <Filter size={13} /> List
-                </button>
-              </div>
-              {/* Calendar granularity — only when in calendar mode */}
-              {viewMode === 'calendar' && (
-                <select
-                  value={calView}
-                  onChange={(e) => setCalView(e.target.value as 'month' | 'week' | 'day')}
-                  aria-label={t('appointments.viewCalendar')}
-                  className="text-[13px] font-medium cursor-pointer"
-                  style={{ height: 36, padding: '0 10px', borderRadius: 'var(--input-radius)', border: '1px solid var(--border-medium)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)' }}
-                >
-                  <option value="day">Day</option>
-                  <option value="week">Week</option>
-                  <option value="month">Month</option>
-                </select>
-              )}
-              {viewMode === 'calendar' && (
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`btn btn-secondary btn-filter${(selectedDate || filterStatus !== 'all') ? ' is-active' : ''}`}
-                  aria-pressed={showFilters}
-                  style={{ gap: 6 }}
-                >
-                  <Filter size={14} /> {t('appointments.filters')}
-                </button>
-              )}
-            </div>
-          }
-          actions={
-            (canSetAvailability || canBookAppointments) ? (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {canSetAvailability && (
-                  <button onClick={() => setShowAvailability(true)} className="btn btn-secondary" style={{ gap: 6 }}>
-                    <Clock size={16} /> {t('appointments.schedule')}
-                  </button>
-                )}
-                {canBookAppointments && (
-                  <>
-                    <button onClick={() => setShowWalkIn(true)} className="btn btn-secondary" style={{ gap: 6, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }}>
-                      <UserPlus size={16} /> {t('appointments.walkIn')}
-                    </button>
-                    <button onClick={() => setShowNewForm(true)} className="btn btn-primary" style={{ gap: 6 }}>
-                      <Plus size={16} /> {t('appointments.bookAppointment')}
-                    </button>
-                  </>
-                )}
-              </div>
-            ) : undefined
-          } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        {/* View toggle + Filters live beside the search bar above (TopBar
-            searchTrailing); the list/calendar body renders directly here. */}
-
-        {/* Filters bar */}
-        {showFilters && (
-          <FilterBar>
-            <SearchInput value={search} onChange={setSearch} placeholder={t('appointments.searchPlaceholder')} />
-            <FilterSelect
-              aria-label={t('appointments.allStatus')}
-              value={filterStatus}
-              onChange={setFilterStatus}
-              options={[
-                ...(pendingApprovals.length > 0 ? [{ value: 'pending_approval', label: `${t('appointments.pendingApproval')} (${pendingApprovals.length})` }] : []),
-                ...statusTabs.map(tab => ({ value: tab.key, label: `${tab.label} (${tab.count})` })),
-              ]}
-            />
-            {selectedDate && (
-              <button onClick={() => setSelectedDate(null)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
-                <X size={12} /> {t('appointments.clearDate')}
-              </button>
-            )}
-          </FilterBar>
-        )}
-
-        {/* ═══ LIST VIEW ═══ */}
-        {viewMode === 'list' && (
-          <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-            {/* Toolbar — matches "Patients assigned to you" design */}
-            <div className="flex items-center gap-3 px-4 py-3 flex-wrap flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <input
-                type="search"
-                value={listSearch}
-                onChange={e => setListSearch(e.target.value)}
-                placeholder="Search by name or reason…"
-                className="flex-1 min-w-[200px]"
-                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 18px', fontSize: 13 }}
+        {/* ═══ Calendar (react-big-calendar) ═══ */}
+        <div className="card-elevated appointments-card">
+          <div className={`appointments-workspace${selectedAppointment ? ' has-detail' : ''}`}>
+            <div className="appointments-calendar-pane rbc-tamam">
+              <AppointmentsCalendar
+                events={calendarEvents}
+                calView={calView}
+                calDate={calDate}
+                today={today}
+                statusConfig={statusConfig}
+                onNavigate={(d) => setCalDate(d)}
+                onView={(v) => setCalView(v)}
+                onSelectEvent={(apt) => setEventApt(apt)}
+                onSelectSlot={(slot) => {
+                  const d = slot.start;
+                  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                  setFormDate(iso);
+                  if (calView !== 'month') {
+                    setFormTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+                  }
+                  setShowNewForm(true);
+                }}
               />
-              <select
-                value={listStatus}
-                onChange={e => setListStatus(e.target.value)}
-                className="w-full sm:w-44"
-                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 16px', fontSize: 13 }}
-                aria-label="Filter by status"
-              >
-                <option value="all">All Status</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="no_show">No Show</option>
-              </select>
-              <select
-                value={listSort}
-                onChange={e => setListSort(e.target.value as typeof listSort)}
-                className="w-full sm:w-44"
-                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 16px', fontSize: 13 }}
-                aria-label="Sort"
-              >
-                <option value="date_asc">Date (earliest first)</option>
-                <option value="date_desc">Date (latest first)</option>
-                <option value="name">Name (A–Z)</option>
-                <option value="priority">Priority (urgent first)</option>
-              </select>
             </div>
-
-            {/* Table */}
-            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-              <table className="data-table" style={{ minWidth: 760 }}>
-                <thead>
-                  <tr>
-                    {['Patient', 'Reason', 'Date & Time', 'Type', 'Priority', 'Status', 'Actions'].map(h => (
-                      <th key={h} className="text-left px-4 py-2.5" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {listAppointments.length === 0 ? (
-                    <tr><td colSpan={7} className="px-4 py-12 text-center" style={{ color: 'var(--text-muted)', fontSize: 13 }}>No appointments match your search.</td></tr>
-                  ) : listAppointments.map(apt => {
-                    const sc = statusConfig[apt.status];
-                    const pc = priorityConfig[apt.priority];
-                    const typeInfo = appointmentTypes.find(ti => ti.value === apt.appointmentType);
-                    return (
-                      <tr
-                        key={apt._id}
-                        className="cursor-pointer hover:bg-[var(--table-row-hover)]"
-                        onClick={() => setEventApt(apt)}
-                        style={{ borderBottom: '1px solid var(--border-light)' }}
-                      >
-                        <td className="px-4 py-3">
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{apt.patientName}</div>
-                          {apt.providerName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{apt.providerName}</div>}
-                        </td>
-                        <td className="px-4 py-3" style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 220 }}>
-                          <div className="truncate">{apt.reason || '—'}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'monospace' }}>{apt.appointmentDate}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{apt.appointmentTime} · {apt.duration}min</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {typeInfo ? (
-                            <span style={{ fontSize: 11, fontWeight: 600, color: typeInfo.color, background: typeInfo.bg, borderRadius: 6, padding: '2px 8px' }}>{typeInfo.label}</span>
-                          ) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span style={{ fontSize: 11, fontWeight: 700, color: pc.color, background: `${pc.color}15`, borderRadius: 6, padding: '2px 8px' }}>{t(priorityLabelKey[apt.priority])}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span style={{ fontSize: 11, fontWeight: 700, color: sc.color, background: sc.bg, borderRadius: 6, padding: '2px 8px' }}>{t(statusLabelKey[apt.status])}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                            {apt.status === 'scheduled' && (
-                              <button onClick={() => handleStatusChange(apt._id, 'confirmed')} className="btn btn-sm btn-secondary" style={{ fontSize: 11 }}>Confirm</button>
-                            )}
-                            {apt.status === 'confirmed' && (
-                              <button onClick={() => handleStatusChange(apt._id, 'completed')} className="btn btn-sm btn-primary" style={{ fontSize: 11 }}>Complete</button>
-                            )}
-                            <button onClick={() => { setEditingApt(apt._id); loadEditForm(apt); }} className="btn btn-sm btn-secondary" style={{ fontSize: 11 }}>Edit</button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {selectedAppointment && (
+              <>
+                <button
+                  type="button"
+                  className="appointment-detail-backdrop"
+                  aria-label="Close appointment details"
+                  onClick={() => setEventApt(null)}
+                />
+                <AppointmentDetailSidebar
+                  appointment={selectedAppointment}
+                  patient={selectedPatient}
+                  statusLabel={t(statusLabelKey[selectedAppointment.status])}
+                  priorityLabel={t(priorityLabelKey[selectedAppointment.priority])}
+                  typeLabel={t(typeLabelKey[selectedAppointment.appointmentType])}
+                  onClose={() => setEventApt(null)}
+                  onOpenPatient={() => {
+                    const id = selectedAppointment.patientId;
+                    setEventApt(null);
+                    router.push(`/patients/${id}`);
+                  }}
+                  onEdit={() => {
+                    loadEditForm(selectedAppointment);
+                    setEditingApt(selectedAppointment._id);
+                    setEventApt(null);
+                  }}
+                  onReschedule={() => {
+                    setRescheduleId(selectedAppointment._id);
+                    setRescheduleDate(selectedAppointment.appointmentDate);
+                    setRescheduleTime(selectedAppointment.appointmentTime);
+                    setEventApt(null);
+                  }}
+                  onCancel={() => {
+                    setCancelId(selectedAppointment._id);
+                    setEventApt(null);
+                  }}
+                  onUndo={PRIOR_STATUS[selectedAppointment.status] ? () => {
+                    const id = selectedAppointment._id;
+                    const to = PRIOR_STATUS[selectedAppointment.status]!;
+                    setEventApt(null);
+                    handleStatusChange(id, to);
+                  } : undefined}
+                  onReopen={(selectedAppointment.status === 'completed' || selectedAppointment.status === 'cancelled' || selectedAppointment.status === 'no_show') ? () => {
+                    const id = selectedAppointment._id;
+                    setEventApt(null);
+                    handleStatusChange(id, 'scheduled');
+                  } : undefined}
+                  canCancel={selectedAppointment.status !== 'cancelled' && selectedAppointment.status !== 'completed'}
+                />
+              </>
+            )}
           </div>
-        )}
-
-        {/* ═══ Calendar (react-big-calendar) — the only appointments view ═══ */}
-        {viewMode === 'calendar' && <div className="card-elevated" style={{ padding: 16, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', marginBottom: -8 }}>
-          <div className="rbc-tamam" style={{ flex: 1, minHeight: 560 }}>
-            <AppointmentsCalendar
-              events={calendarEvents}
-              calView={calView}
-              calDate={calDate}
-              today={today}
-              statusConfig={statusConfig}
-              onNavigate={(d) => setCalDate(d)}
-              onView={(v) => setCalView(v)}
-              onSelectEvent={(apt) => setEventApt(apt)}
-              onSelectSlot={(slot) => {
-                const d = slot.start;
-                const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                setFormDate(iso);
-                if (calView !== 'month') {
-                  setFormTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
-                }
-                setShowNewForm(true);
-              }}
-            />
-          </div>
-        </div>}
+        </div>
 
 
 
@@ -627,125 +396,6 @@ export default function AppointmentsPage() {
           </Modal>
         )}
 
-        {/* Walk-In */}
-        {showWalkIn && (
-          <Modal onClose={() => setShowWalkIn(false)} title={t('appointments.registerWalkIn')} icon={<UserPlus size={34} style={{ color: 'var(--accent-primary)' }} />}>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
-              {t('appointments.walkInIntro')}
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label>{t('appointments.labelPatient')}</label>
-                <select value={wiPatient} onChange={e => setWiPatient(e.target.value)}>
-                  <option value="">{t('appointments.selectPatient')}</option>
-                  {patients.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.surname}</option>)}
-                </select>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>{t('appointments.labelDepartment')}</label><select value={wiDepartment} onChange={e => setWiDepartment(e.target.value)}>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
-                <div><label>{t('appointments.labelPriority')}</label><select value={wiPriority} onChange={e => setWiPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
-              </div>
-              <div><label>{t('appointments.labelReasonForVisit')}</label><textarea value={wiReason} onChange={e => setWiReason(e.target.value)} rows={2} placeholder={t('appointments.reasonForVisitPlaceholder')} /></div>
-              <div><label>{t('appointments.labelNotes')}</label><textarea value={wiNotes} onChange={e => setWiNotes(e.target.value)} rows={2} placeholder={t('appointments.walkInNotesPlaceholder')} /></div>
-              <ModalActions onCancel={() => setShowWalkIn(false)} onConfirm={handleWalkIn} confirmLabel={submitting ? t('appointments.registering') : t('appointments.registerWalkIn')} cancelLabel={t('action.cancel')} confirmColor="var(--accent-primary)" disabled={submitting} />
-            </div>
-          </Modal>
-        )}
-
-        {/* Provider availability ("Schedule") — opened from the action bar */}
-        {showAvailability && <AvailabilityModal onClose={() => setShowAvailability(false)} />}
-
-        {/* Appointment detail — opens when an event on the calendar is clicked.
-            Sorted list enables prev/next navigation without closing the modal. */}
-        {eventApt && (() => {
-          const sorted = [...appointments].sort((a, b) =>
-            `${a.appointmentDate}${a.appointmentTime}`.localeCompare(`${b.appointmentDate}${b.appointmentTime}`)
-          );
-          const idx = sorted.findIndex(a => a._id === eventApt._id);
-          const hasPrev = idx > 0;
-          const hasNext = idx < sorted.length - 1;
-          return (
-            <Modal
-              onClose={() => setEventApt(null)}
-              title={eventApt.patientName}
-              size="md"
-              nav={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>
-                    {idx + 1} / {sorted.length}
-                  </span>
-                  <button
-                    onClick={() => setEventApt(sorted[idx - 1])}
-                    disabled={!hasPrev}
-                    aria-label="Previous appointment"
-                    style={{
-                      width: 30, height: 30, borderRadius: 8, border: '1px solid var(--glass-border)',
-                      background: hasPrev ? 'var(--bg-card-solid)' : 'transparent',
-                      color: hasPrev ? 'var(--text-secondary)' : 'var(--text-muted)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: hasPrev ? 'pointer' : 'default', opacity: hasPrev ? 1 : 0.35,
-                    }}
-                  >
-                    <ChevronLeft size={15} />
-                  </button>
-                  <button
-                    onClick={() => setEventApt(sorted[idx + 1])}
-                    disabled={!hasNext}
-                    aria-label="Next appointment"
-                    style={{
-                      width: 30, height: 30, borderRadius: 8, border: '1px solid var(--glass-border)',
-                      background: hasNext ? 'var(--bg-card-solid)' : 'transparent',
-                      color: hasNext ? 'var(--text-secondary)' : 'var(--text-muted)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: hasNext ? 'pointer' : 'default', opacity: hasNext ? 1 : 0.35,
-                    }}
-                  >
-                    <ChevronRight size={15} />
-                  </button>
-                </div>
-              }
-            >
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: statusConfig[eventApt.status].color, background: statusConfig[eventApt.status].bg }}>
-                  {t(statusLabelKey[eventApt.status])}
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: priorityConfig[eventApt.priority].color, background: `${priorityConfig[eventApt.priority].color}14` }}>
-                  {t(priorityLabelKey[eventApt.priority])}
-                </span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 18 }}>
-                <Detail label="Date" value={new Date(eventApt.appointmentDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} icon={<Calendar size={14} />} />
-                <Detail label="Time" value={`${eventApt.appointmentTime} · ${eventApt.duration}m`} icon={<Clock size={14} />} />
-                <Detail label="Type" value={appointmentTypes.find(x => x.value === eventApt.appointmentType)?.label || eventApt.appointmentType} icon={<ClipboardList size={14} />} />
-                <Detail label="Provider" value={eventApt.providerName} icon={<Stethoscope size={14} />} />
-                <Detail label="Department" value={eventApt.department} icon={<Building2 size={14} />} />
-              </div>
-              {eventApt.reason && (
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Reason</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{eventApt.reason}</div>
-                </div>
-              )}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <button onClick={() => { const id = eventApt.patientId; setEventApt(null); router.push(`/patients/${id}`); }} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
-                  <User size={14} /> Open patient record
-                </button>
-                <button onClick={() => { loadEditForm(eventApt); setEditingApt(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('action.edit')}</button>
-                <button onClick={() => { setRescheduleId(eventApt._id); setRescheduleDate(eventApt.appointmentDate); setRescheduleTime(eventApt.appointmentTime); setEventApt(null); }} className="btn btn-secondary btn-sm">{t('appointments.actionReschedule')}</button>
-                {PRIOR_STATUS[eventApt.status] && (
-                  <button onClick={() => { const id = eventApt._id; const to = PRIOR_STATUS[eventApt.status]!; setEventApt(null); handleStatusChange(id, to); }} className="btn btn-secondary btn-sm">{t('action.undo')}</button>
-                )}
-                {(eventApt.status === 'completed' || eventApt.status === 'cancelled' || eventApt.status === 'no_show') && (
-                  <button onClick={() => { const id = eventApt._id; setEventApt(null); handleStatusChange(id, 'scheduled'); }} className="btn btn-secondary btn-sm">{t('action.reopen')}</button>
-                )}
-                {eventApt.status !== 'cancelled' && eventApt.status !== 'completed' && (
-                  <button onClick={() => { setCancelId(eventApt._id); setEventApt(null); }} className="btn btn-secondary btn-sm" style={{ color: 'var(--color-danger)' }}>{t('appointments.actionCancel')}</button>
-                )}
-              </div>
-            </Modal>
-          );
-        })()}
-
         {/* Reschedule */}
         {rescheduleId && (
           <Modal onClose={() => setRescheduleId(null)} title={t('appointments.rescheduleTitle')} size="sm">
@@ -762,97 +412,6 @@ export default function AppointmentsPage() {
           <Modal onClose={() => { setCancelId(null); setCancelReason(''); }} title={t('appointments.cancelTitle')} titleColor="#EF4444" icon={<AlertTriangle size={34} style={{ color: 'var(--color-danger)' }} />} size="sm">
             <div><label>{t('appointments.labelCancelReason')}</label><textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)} rows={3} placeholder={t('appointments.cancelReasonPlaceholder')} /></div>
             <ModalActions onCancel={() => { setCancelId(null); setCancelReason(''); }} onConfirm={handleCancel} confirmLabel={t('appointments.cancelTitle')} confirmColor="#EF4444" cancelLabel={t('appointments.goBack')} />
-          </Modal>
-        )}
-
-        {/* Day Popup — appears when clicking a date on the calendar */}
-        {showDayPopup && selectedDate && (
-          <Modal onClose={() => { setShowDayPopup(false); }} title={new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} size="lg">
-            {/* Quick actions */}
-            {canBookAppointments && (
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                <button className="btn btn-primary btn-sm" style={{ gap: 4 }} onClick={() => { setShowDayPopup(false); setFormDate(selectedDate); setShowNewForm(true); }}>
-                  <Plus size={14} /> {t('appointments.newAppointment')}
-                </button>
-                <button className="btn btn-secondary btn-sm" style={{ gap: 4, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }} onClick={() => { setShowDayPopup(false); setShowWalkIn(true); }}>
-                  <UserPlus size={14} /> {t('appointments.walkIn')}
-                </button>
-              </div>
-            )}
-
-            {/* Day's appointments */}
-            {(() => {
-              const dayApts = appointments.filter(a => a.appointmentDate === selectedDate).sort((a, b) => a.appointmentTime.localeCompare(b.appointmentTime));
-              if (dayApts.length === 0) return (
-                <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
-                  <Calendar size={44} style={{ opacity: 0.3, marginBottom: 8 }} />
-                  <p style={{ fontSize: 13 }}>{t('appointments.noneOnDate')}</p>
-                </div>
-              );
-              return (
-                <div className="data-row-divider-sm" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{t('appointments.appointmentsCount', { count: dayApts.length })}</p>
-                  {dayApts.map(apt => {
-                    const sc = statusConfig[apt.status];
-                    const pc = priorityConfig[apt.priority];
-                    const typeInfo = appointmentTypes.find(t => t.value === apt.appointmentType);
-                    const isWI = apt.appointmentType === 'walk_in';
-                    return (
-                      <div key={apt._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 'var(--card-radius)', border: '1px solid var(--border-medium)', background: 'var(--overlay-subtle)' }}>
-                        <div style={{ minWidth: 44, textAlign: 'center' }}>
-                          <div className="stat-value" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{apt.appointmentTime}</div>
-                          <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{apt.duration}m</div>
-                        </div>
-                        <div className="icon-box-sm" style={{ flexShrink: 0 }}>
-                          {typeInfo ? <typeInfo.icon size={14} style={{ color: typeInfo.color }} /> : <Calendar size={14} style={{ color: '#6366F1' }} />}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            {apt.patientId ? (
-                              <Link
-                                href={`/patients/${apt.patientId}`}
-                                onClick={(e) => { e.stopPropagation(); setShowDayPopup(false); }}
-                                style={{ color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: 3 }}
-                                className="hover:underline"
-                                title={t('appointments.viewPatientRecord')}
-                              >
-                                <PatientName name={apt.patientName} nameClassName="text-[13px] font-normal" />
-                                <ExternalLink size={10} style={{ opacity: 0.55 }} />
-                              </Link>
-                            ) : (
-                              <PatientName name={apt.patientName} nameClassName="text-[13px] font-normal" />
-                            )}
-                            {isWI && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: 'rgba(124,58,237,0.08)', color: 'var(--accent-primary)' }}>{t('appointments.walkInBadge')}</span>}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{apt.reason.slice(0, 40)}{apt.reason.length > 40 ? '...' : ''}</div>
-                        </div>
-                        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, color: pc.color, background: `${pc.color}12` }}>{t(priorityLabelKey[apt.priority])}</span>
-                        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4, color: sc.color, background: sc.bg }}>{t(statusLabelKey[apt.status])}</span>
-                        {/* Action buttons */}
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          {apt.status === 'scheduled' && (
-                            <button onClick={() => { handleStatusChange(apt._id, 'confirmed'); }} title={t('appointments.actionApprove')} style={miniBtn('var(--accent-primary)')}>
-                              <CheckCircle2 size={12} />
-                            </button>
-                          )}
-                          <button onClick={() => { setShowDayPopup(false); setEditingApt(apt._id); loadEditForm(apt); }} title={t('action.edit')} style={miniBtn('var(--accent-primary)')}>
-                            <ClipboardList size={12} />
-                          </button>
-                          <button onClick={() => { setShowDayPopup(false); setRescheduleId(apt._id); setRescheduleDate(apt.appointmentDate); setRescheduleTime(apt.appointmentTime); }} title={t('appointments.actionReschedule')} style={miniBtn('var(--color-warning)')}>
-                            <RefreshCw size={12} />
-                          </button>
-                          {(apt.status !== 'completed' && apt.status !== 'cancelled') && (
-                            <button onClick={() => { setShowDayPopup(false); setCancelId(apt._id); }} title={t('appointments.actionCancel')} style={miniBtn('var(--color-danger)')}>
-                              <X size={12} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
           </Modal>
         )}
 
@@ -904,6 +463,213 @@ export default function AppointmentsPage() {
 
 /* ─── Reusable Components ─── */
 
+function AppointmentDetailSidebar({
+  appointment,
+  patient,
+  statusLabel,
+  priorityLabel,
+  typeLabel,
+  onClose,
+  onOpenPatient,
+  onEdit,
+  onReschedule,
+  onCancel,
+  onUndo,
+  onReopen,
+  canCancel,
+}: {
+  appointment: AppointmentDoc;
+  patient?: PatientDoc;
+  statusLabel: string;
+  priorityLabel: string;
+  typeLabel: string;
+  onClose: () => void;
+  onOpenPatient: () => void;
+  onEdit: () => void;
+  onReschedule: () => void;
+  onCancel: () => void;
+  onUndo?: () => void;
+  onReopen?: () => void;
+  canCancel: boolean;
+}) {
+  const [activeTab, setActiveTab] = useState<'visit' | 'financial'>('visit');
+  const patientMeta = formatPatientMeta(patient);
+  const location = appointment.facilityName || appointment.department || 'Not assigned';
+  const intakeStatus = appointment.reminderSent ? 'Sent to patient' : 'Not sent to patient';
+  const noteStatus = appointment.notes ? 'Note started' : 'Note not started';
+  const chargeStatus = appointment.status === 'completed' ? 'Ready for charge capture' : 'Charge not started';
+  const visitRows = [
+    { label: 'Resources', value: appointment.providerName || 'Unassigned' },
+    { label: 'Appointment Mode', value: appointment.appointmentType === 'telehealth' ? 'Telehealth' : appointment.appointmentType === 'walk_in' ? 'Walk-in' : 'In Office' },
+    { label: 'Location', value: location },
+    { label: 'Visit Reason', value: appointment.reason || typeLabel },
+    { label: 'Patient Intake', value: intakeStatus },
+    { label: 'Date', value: formatAppointmentDate(appointment.appointmentDate) },
+    { label: 'Time', value: formatAppointmentTimeRange(appointment) },
+    { label: 'Duration', value: `${appointment.duration} minutes` },
+    { label: 'Department', value: appointment.department || 'Not assigned' },
+    { label: 'Phone', value: appointment.patientPhone || patient?.phone || 'Not recorded' },
+    { label: 'Reminder', value: appointment.reminderSent ? `Sent${appointment.reminderChannel ? ` by ${appointment.reminderChannel}` : ''}` : 'Not sent' },
+    { label: 'Recurring', value: appointment.isRecurring ? formatReadable(appointment.recurrencePattern || 'recurring') : 'No' },
+    { label: 'Note', value: noteStatus },
+    ...(appointment.cancelledReason ? [{ label: 'Cancel Reason', value: appointment.cancelledReason }] : []),
+    ...(appointment.checkedInAt ? [{ label: 'Checked In', value: formatDateTime(appointment.checkedInAt) }] : []),
+    ...(appointment.completedAt ? [{ label: 'Completed', value: formatDateTime(appointment.completedAt) }] : []),
+    ...(appointment.notes ? [{ label: 'Notes', value: appointment.notes }] : []),
+  ];
+  const financialRows = [
+    { label: 'Balance', value: '$0.00' },
+    { label: 'Charge', value: chargeStatus },
+    { label: 'Payment Responsibility', value: 'Not recorded' },
+    { label: 'Insurance', value: 'Not recorded' },
+    { label: 'Claim Status', value: 'Not started' },
+    { label: 'Patient Intake', value: intakeStatus },
+    { label: 'Facility', value: location },
+    { label: 'Facility Level', value: formatReadable(appointment.facilityLevel) },
+    { label: 'Booked By', value: appointment.bookedByName || appointment.bookedBy || 'Not recorded' },
+    { label: 'Booked On', value: formatDateTime(appointment.createdAt) },
+    { label: 'Last Updated', value: formatDateTime(appointment.updatedAt) },
+  ];
+  const rows = activeTab === 'visit' ? visitRows : financialRows;
+
+  return (
+    <aside className="appointment-detail-sidebar" aria-label="Appointment details" role="dialog" aria-modal="true">
+      <div className="appointment-detail-sidebar__header">
+        <button type="button" className="appointment-detail-sidebar__back" onClick={onClose} aria-label="Close appointment details">
+          <ChevronLeft size={22} />
+        </button>
+        <div className="appointment-detail-sidebar__title">
+          <h2>{formatAppointmentTimeRange(appointment)}</h2>
+          <button type="button" onClick={onOpenPatient}>{appointment.patientName}</button>
+          {patientMeta && <p>{patientMeta}</p>}
+          <div className="appointment-detail-sidebar__status">
+            <span>{statusLabel}</span>
+            <span>{priorityLabel}</span>
+          </div>
+        </div>
+        <button type="button" className="appointment-detail-sidebar__close" onClick={onClose} aria-label="Close appointment details">
+          <X size={16} />
+        </button>
+      </div>
+
+      <div className="appointment-detail-sidebar__tabs" role="tablist" aria-label="Appointment detail sections">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'visit'}
+          className={activeTab === 'visit' ? 'active' : undefined}
+          onClick={() => setActiveTab('visit')}
+        >
+          Visit Information
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'financial'}
+          className={activeTab === 'financial' ? 'active' : undefined}
+          onClick={() => setActiveTab('financial')}
+        >
+          Financial Information
+        </button>
+      </div>
+
+      <div className="appointment-detail-sidebar__body" role="tabpanel">
+        {rows.map(row => (
+          <DetailRow key={row.label} label={row.label} value={row.value} />
+        ))}
+      </div>
+
+      <div className="appointment-detail-sidebar__actions">
+        <button type="button" className="btn btn-primary btn-sm" onClick={onOpenPatient}>
+          <User size={14} /> Open patient record
+        </button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={onEdit}>Edit</button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={onReschedule}>Reschedule</button>
+        {onUndo && <button type="button" className="btn btn-secondary btn-sm" onClick={onUndo}>Undo</button>}
+        {onReopen && <button type="button" className="btn btn-secondary btn-sm" onClick={onReopen}>Reopen</button>}
+        {canCancel && (
+          <button type="button" className="btn btn-secondary btn-sm danger" onClick={onCancel}>Cancel</button>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="appointment-detail-row">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function formatAppointmentDate(date: string) {
+  return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function formatAppointmentTimeRange(appointment: AppointmentDoc) {
+  const [hours, minutes] = appointment.appointmentTime.split(':').map(Number);
+  const start = new Date(`${appointment.appointmentDate}T${appointment.appointmentTime || '00:00'}:00`);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return `${appointment.appointmentTime} · ${appointment.duration}m`;
+  const end = appointment.endTime
+    ? new Date(`${appointment.appointmentDate}T${appointment.endTime}:00`)
+    : new Date(start.getTime() + appointment.duration * 60000);
+  const fmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `${fmt.format(start)} - ${fmt.format(end)}`;
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return 'Not recorded';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function formatReadable(value?: string) {
+  if (!value) return 'Not recorded';
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function formatPatientMeta(patient?: PatientDoc) {
+  if (!patient) return '';
+  const age = patient.dateOfBirth ? calculateAge(patient.dateOfBirth) : patient.estimatedAge;
+  const ageText = typeof age === 'number' ? `${age} y/o` : undefined;
+  const sexText = patient.gender;
+  if (patient.dateOfBirth && ageText) return `DOB: ${formatShortDate(patient.dateOfBirth)} (${ageText} ${sexText})`;
+  if (ageText) return `${ageText} ${sexText}`;
+  return sexText || '';
+}
+
+function calculateAge(dateOfBirth: string) {
+  const dob = new Date(`${dateOfBirth}T12:00:00`);
+  if (Number.isNaN(dob.getTime())) return undefined;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDelta = now.getMonth() - dob.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < dob.getDate())) age -= 1;
+  return age;
+}
+
+function formatShortDate(date: string) {
+  const d = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return date;
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+}
+
 function Modal({ children, onClose, title, titleColor, icon, size = 'md', nav }: {
   children: React.ReactNode; onClose: () => void; title: string; titleColor?: string;
   icon?: React.ReactNode; size?: 'sm' | 'md' | 'lg'; nav?: React.ReactNode;
@@ -946,22 +712,4 @@ function ModalActions({ onCancel, onConfirm, confirmLabel, confirmColor, cancelL
       }}>{confirmLabel}</button>
     </div>
   );
-}
-
-function Detail({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
-  return (
-    <div>
-      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
-      <div style={{ fontSize: 13, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 5 }}>{icon}{value}</div>
-    </div>
-  );
-}
-
-/* ─── Styles ─── */
-function miniBtn(color: string): React.CSSProperties {
-  return {
-    width: 26, height: 26, borderRadius: 'var(--card-radius)', border: `1px solid ${color}25`,
-    background: `${color}08`, color, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', flexShrink: 0, padding: 0,
-  };
 }

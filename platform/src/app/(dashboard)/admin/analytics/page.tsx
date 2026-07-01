@@ -158,12 +158,11 @@ export default function AdminAnalyticsPage() {
                 return (
                   <ResponsiveContainer width="100%" height={280}>
                     <AreaChart {...commonProps}>
-                      <AreaGradients />
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                       <XAxis dataKey="name" tick={axisTick} />
                       <YAxis tick={axisTick} />
                       <Tooltip {...chartTooltipStyle} />
-                      <Area type="monotone" dataKey="patients" stroke="#2191D0" fill="url(#grad1)" strokeWidth={2} />
+                      <Area type="monotone" dataKey="patients" stroke="#2191D0" fill="#2191D0" fillOpacity={0.12} strokeWidth={2} />
                     </AreaChart>
                   </ResponsiveContainer>
                 );
@@ -293,7 +292,6 @@ export default function AdminAnalyticsPage() {
                 return (
                   <ResponsiveContainer width="100%" height={260}>
                     <AreaChart {...commonProps}>
-                      <AreaGradients />
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                       <XAxis dataKey="month" tick={axisTick} />
                       <YAxis tick={axisTick} />
@@ -351,12 +349,11 @@ export default function AdminAnalyticsPage() {
                 return (
                   <ResponsiveContainer width="100%" height={260}>
                     <AreaChart {...commonProps}>
-                      <AreaGradients color1="#D97706" />
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                       <XAxis dataKey="name" tick={axisTick} />
                       <YAxis tick={axisTick} />
                       <Tooltip {...chartTooltipStyle} />
-                      <Area type="monotone" dataKey="users" stroke="#D97706" fill="url(#grad1)" strokeWidth={2} />
+                      <Area type="monotone" dataKey="users" stroke="#D97706" fill="#D97706" fillOpacity={0.12} strokeWidth={2} />
                     </AreaChart>
                   </ResponsiveContainer>
                 );

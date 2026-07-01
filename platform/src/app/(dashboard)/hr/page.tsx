@@ -413,7 +413,7 @@ export default function HRPage() {
                     <tr key={u._id}>
                       <td>
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)' }}>{initials || '?'}</div>
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ background: 'var(--accent-primary)' }}>{initials || '?'}</div>
                           <div>
                             <div className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{u.name}</div>
                             <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>@{u.username}</div>

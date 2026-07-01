@@ -497,19 +497,19 @@ export default function GovernmentDashboardPage() {
   const [dtSelectedDiseases, setDtSelectedDiseases] = useState<string[]>([...WEEKLY_DISEASE_KEYS]);
 
   // Cases by State panel
-  const [csChartType, setCsChartType] = useState('bar');
-  const [csDisplayMode] = useState<'single' | 'multi'>('single');
-  const [csSingleDisease, setCsSingleDisease] = useState('malaria');
-  const [csSelectedDiseases, setCsSelectedDiseases] = useState<string[]>([...STATE_DISEASE_KEYS]);
+  const [casesChartType, setCasesChartType] = useState('bar');
+  const [casesDisplayMode] = useState<'single' | 'multi'>('single');
+  const [singleDisease, setSingleDisease] = useState('malaria');
+  const [selectedDiseases, setSelectedDiseases] = useState<string[]>([...STATE_DISEASE_KEYS]);
 
   // Health Visits panel
-  const [hvChartType, setHvChartType] = useState('line');
-  const [hvSelectedSeries, setHvSelectedSeries] = useState<string[]>(['OPD Visits', 'ANC Visits', 'Immunizations']);
+  const [visitsChartType, setVisitsChartType] = useState('line');
+  const [visitsSeries, setVisitsSeries] = useState<string[]>(['OPD Visits', 'ANC Visits', 'Immunizations']);
 
   // Staff Distribution panel
-  const [sdChartType, setSdChartType] = useState('bar');
-  const [sdMetric, setSdMetric] = useState<'count' | 'ratio'>('count');
-  const [sdSelectedRoles, setSdSelectedRoles] = useState<string[]>(['Doctors', 'Nurses', 'Clinical Officers']);
+  const [staffChartType, setStaffChartType] = useState('bar');
+  const [staffMetric, setStaffMetric] = useState<'count' | 'ratio'>('count');
+  const [staffRoles, setStaffRoles] = useState<string[]>(['Doctors', 'Nurses', 'Clinical Officers']);
 
   // Performance panel
   const [perfView, setPerfView] = useState('gauges');
@@ -604,11 +604,11 @@ export default function GovernmentDashboardPage() {
   // State disease pie data
   const statePieData = useMemo(() => {
     const totals: Record<string, number> = {};
-    csSelectedDiseases.forEach(d => {
+    selectedDiseases.forEach(d => {
       totals[d] = stateBarData.reduce((s, row) => s + ((row as Record<string, unknown>)[d] as number || 0), 0);
     });
     return Object.entries(totals).map(([name, value]) => ({ name, value }));
-  }, [stateBarData, csSelectedDiseases]);
+  }, [stateBarData, selectedDiseases]);
 
   // Staff distribution
   const staffDistribution = useMemo(() => {
@@ -617,7 +617,7 @@ export default function GovernmentDashboardPage() {
       .slice(0, 8)
       .map(h => {
         const total = h.doctors + h.nurses + h.clinicalOfficers;
-        const isRatio = sdMetric === 'ratio' && total > 0;
+        const isRatio = staffMetric === 'ratio' && total > 0;
         return {
           name: h.name.replace(' Hospital', '').replace(' Teaching', '').replace('Juba ', 'J.').slice(0, 15),
           Doctors: isRatio ? Math.round((h.doctors / total) * 100) : h.doctors,
@@ -625,7 +625,7 @@ export default function GovernmentDashboardPage() {
           'Clinical Officers': isRatio ? Math.round((h.clinicalOfficers / total) * 100) : h.clinicalOfficers,
         };
       });
-  }, [filteredHospitals, sdMetric]);
+  }, [filteredHospitals, staffMetric]);
 
   const staffPieData = useMemo(() => [
     { name: 'Doctors', value: totalDoctors, color: '#2563EB' },
@@ -662,14 +662,14 @@ export default function GovernmentDashboardPage() {
     && dtSelectedDiseases.length > 0
     && weeklyDiseaseData.some(row => WEEKLY_DISEASE_KEYS.some(k => dtSelectedDiseases.includes(k) && ((row as Record<string, unknown>)[k] as number) > 0));
   const stateCasesHasData = stateBarData.length > 0
-    && (csChartType === 'pie'
+    && (casesChartType === 'pie'
       ? statePieData.some(d => d.value > 0)
       : stateBarData.some(row => Object.entries(row).some(([k, v]) => k !== 'state' && typeof v === 'number' && v > 0)));
-  const visitsHasData = hvSelectedSeries.length > 0
-    && opdTrendData.some(row => hvSelectedSeries.some(s => ((row as unknown as Record<string, number>)[s] || 0) > 0));
+  const visitsHasData = visitsSeries.length > 0
+    && opdTrendData.some(row => visitsSeries.some(s => ((row as unknown as Record<string, number>)[s] || 0) > 0));
   const staffHasData = staffDistribution.length > 0
-    && sdSelectedRoles.length > 0
-    && staffDistribution.some(row => sdSelectedRoles.some(r => ((row as Record<string, unknown>)[r] as number) > 0));
+    && staffRoles.length > 0
+    && staffDistribution.some(row => staffRoles.some(r => ((row as Record<string, unknown>)[r] as number) > 0));
   const performanceHasData = perfRadarData.some(d => d.value > 0);
 
   const sortedAlerts = useMemo(() => {
@@ -814,8 +814,8 @@ export default function GovernmentDashboardPage() {
 
   // Cases by State
   const renderStateCases = () => {
-    if (csChartType === 'stacked' || csDisplayMode === 'multi') {
-      const activeKeys = STATE_DISEASE_KEYS.filter(d => csSelectedDiseases.includes(d));
+    if (casesChartType === 'stacked' || casesDisplayMode === 'multi') {
+      const activeKeys = STATE_DISEASE_KEYS.filter(d => selectedDiseases.includes(d));
       return (
         <BarChart data={stateBarData} layout="vertical" margin={{ top: 5, right: 15, left: 5, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" horizontal={false} />
@@ -827,8 +827,8 @@ export default function GovernmentDashboardPage() {
         </BarChart>
       );
     }
-    if (csChartType === 'radar') {
-      const activeKeys = STATE_DISEASE_KEYS.filter(d => csSelectedDiseases.includes(d));
+    if (casesChartType === 'radar') {
+      const activeKeys = STATE_DISEASE_KEYS.filter(d => selectedDiseases.includes(d));
       return (
         <RadarChart data={stateBarData} cx="50%" cy="50%" outerRadius="70%">
           <PolarGrid stroke="var(--border-light)" />
@@ -840,7 +840,7 @@ export default function GovernmentDashboardPage() {
         </RadarChart>
       );
     }
-    if (csChartType === 'pie') {
+    if (casesChartType === 'pie') {
       return (
         <PieChart>
           <Pie data={statePieData} dataKey="value" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={3} label={({ name, value }) => `${(name as string).charAt(0).toUpperCase() + (name as string).slice(1)}: ${(value as number).toLocaleString()}`}>
@@ -857,20 +857,20 @@ export default function GovernmentDashboardPage() {
         <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
         <YAxis type="category" dataKey="state" tick={{ fontSize: 9, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} width={55} />
         <Tooltip content={<ChartTooltip />} />
-        <Bar dataKey={csSingleDisease} name={csSingleDisease.charAt(0).toUpperCase() + csSingleDisease.slice(1)} fill={DISEASE_COLORS[csSingleDisease] || '#E52E42'} radius={[0, 6, 6, 0]} barSize={14} />
+        <Bar dataKey={singleDisease} name={singleDisease.charAt(0).toUpperCase() + singleDisease.slice(1)} fill={DISEASE_COLORS[singleDisease] || '#E52E42'} radius={[0, 6, 6, 0]} barSize={14} />
       </BarChart>
     );
   };
 
   // Health Visits
   const renderVisits = () => {
-    const activeVisits = hvSelectedSeries;
+    const activeVisits = visitsSeries;
     const visitColors: Record<string, string> = { 'OPD Visits': '#2563EB', 'ANC Visits': '#EC4899', 'Immunizations': '#A855F7' };
     const commonProps = { data: opdTrendData, margin: { top: 5, right: 15, left: 0, bottom: 5 } };
     const xProps = { dataKey: 'month' as const, tick: { fontSize: 10, fill: 'var(--text-muted)' }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false };
     const yProps = { tick: { fontSize: 10, fill: 'var(--text-muted)' }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false };
 
-    if (hvChartType === 'area') {
+    if (visitsChartType === 'area') {
       return (
         <AreaChart {...commonProps}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" /><XAxis {...xProps} /><YAxis {...yProps} />
@@ -879,7 +879,7 @@ export default function GovernmentDashboardPage() {
         </AreaChart>
       );
     }
-    if (hvChartType === 'bar') {
+    if (visitsChartType === 'bar') {
       return (
         <BarChart {...commonProps}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" /><XAxis {...xProps} /><YAxis {...yProps} />
@@ -900,9 +900,9 @@ export default function GovernmentDashboardPage() {
   // Staff
   const renderStaff = () => {
     const staffColors: Record<string, string> = { Doctors: '#2563EB', Nurses: '#1B9E77', 'Clinical Officers': '#A855F7' };
-    const activeRoles = sdSelectedRoles;
+    const activeRoles = staffRoles;
 
-    if (sdChartType === 'stacked') {
+    if (staffChartType === 'stacked') {
       return (
         <BarChart data={staffDistribution} margin={{ top: 5, right: 10, left: -5, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
@@ -913,7 +913,7 @@ export default function GovernmentDashboardPage() {
         </BarChart>
       );
     }
-    if (sdChartType === 'pie') {
+    if (staffChartType === 'pie') {
       const filtered = staffPieData.filter(d => activeRoles.includes(d.name));
       return (
         <PieChart>
@@ -1230,27 +1230,27 @@ export default function GovernmentDashboardPage() {
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.casesByState')}</span>
               <div className="flex items-center gap-1.5">
                 <ChartTypeSelector
-                  value={csChartType}
+                  value={casesChartType}
                   options={[
                     { value: 'bar', label: t('government.chartBar'), icon: BarChart3 },
                     { value: 'stacked', label: t('government.chartStacked'), icon: Layers },
                     { value: 'radar', label: t('government.chartRadar'), icon: Activity },
                     { value: 'pie', label: t('government.chartPie'), icon: PieChartIcon },
                   ]}
-                  onChange={setCsChartType}
+                  onChange={setCasesChartType}
                 />
                 <ExpandButton onClick={() => setFullscreenChart('stateCases')} />
               </div>
             </div>
             <div className="px-3 pt-2 flex items-center gap-2 flex-wrap">
-              {csChartType === 'bar' ? (
+              {casesChartType === 'bar' ? (
                 <TableauSelect
                   label={t('government.disease')}
-                  value={csSingleDisease}
+                  value={singleDisease}
                   options={[
                     ...STATE_DISEASE_KEYS.map(d => ({ value: d, label: d.charAt(0).toUpperCase() + d.slice(1) })),
                   ]}
-                  onChange={setCsSingleDisease}
+                  onChange={setSingleDisease}
                   icon={Filter}
                   width="110px"
                 />
@@ -1260,8 +1260,8 @@ export default function GovernmentDashboardPage() {
                   options={STATE_DISEASE_KEYS.map(d => ({
                     value: d, label: d.charAt(0).toUpperCase() + d.slice(1), color: DISEASE_COLORS[d],
                   }))}
-                  selected={csSelectedDiseases}
-                  onChange={setCsSelectedDiseases}
+                  selected={selectedDiseases}
+                  onChange={setSelectedDiseases}
                   icon={Filter}
                 />
               )}
@@ -1288,13 +1288,13 @@ export default function GovernmentDashboardPage() {
               </div>
               <div className="flex items-center gap-1.5">
                 <ChartTypeSelector
-                  value={hvChartType}
+                  value={visitsChartType}
                   options={[
                     { value: 'line', label: t('government.chartLine'), icon: LineChartIcon },
                     { value: 'area', label: t('government.chartArea'), icon: Activity },
                     { value: 'bar', label: t('government.chartBar'), icon: BarChart3 },
                   ]}
-                  onChange={setHvChartType}
+                  onChange={setVisitsChartType}
                 />
                 <ExpandButton onClick={() => setFullscreenChart('healthVisits')} />
               </div>
@@ -1307,8 +1307,8 @@ export default function GovernmentDashboardPage() {
                   { value: 'ANC Visits', label: t('government.ancVisits'), color: '#EC4899' },
                   { value: 'Immunizations', label: t('government.immunizations'), color: '#A855F7' },
                 ]}
-                selected={hvSelectedSeries}
-                onChange={setHvSelectedSeries}
+                selected={visitsSeries}
+                onChange={setVisitsSeries}
                 icon={Filter}
               />
             </div>
@@ -1331,13 +1331,13 @@ export default function GovernmentDashboardPage() {
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.staffDistribution')}</span>
               <div className="flex items-center gap-1.5">
                 <ChartTypeSelector
-                  value={sdChartType}
+                  value={staffChartType}
                   options={[
                     { value: 'bar', label: t('government.chartGrouped'), icon: BarChart3 },
                     { value: 'stacked', label: t('government.chartStacked'), icon: Layers },
                     { value: 'pie', label: t('government.chartPie'), icon: PieChartIcon },
                   ]}
-                  onChange={setSdChartType}
+                  onChange={setStaffChartType}
                 />
                 <ExpandButton onClick={() => setFullscreenChart('staffDist')} />
               </div>
@@ -1345,9 +1345,9 @@ export default function GovernmentDashboardPage() {
             <div className="px-3 pt-2 flex items-center gap-2 flex-wrap">
               <TableauSelect
                 label={t('government.show')}
-                value={sdMetric}
+                value={staffMetric}
                 options={[{ value: 'count', label: t('government.headcount') }, { value: 'ratio', label: t('government.ratioPct') }]}
-                onChange={v => setSdMetric(v as 'count' | 'ratio')}
+                onChange={v => setStaffMetric(v as 'count' | 'ratio')}
                 icon={Sliders}
                 width="100px"
               />
@@ -1358,8 +1358,8 @@ export default function GovernmentDashboardPage() {
                   { value: 'Nurses', label: t('government.roleNurses'), color: '#1B9E77' },
                   { value: 'Clinical Officers', label: t('government.roleClinicalOfficers'), color: '#A855F7' },
                 ]}
-                selected={sdSelectedRoles}
-                onChange={setSdSelectedRoles}
+                selected={staffRoles}
+                onChange={setStaffRoles}
                 icon={Users}
               />
             </div>

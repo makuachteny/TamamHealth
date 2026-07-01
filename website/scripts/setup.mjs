@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // =============================================================================
-// TamamHealth Website — Setup Script
+// Tamam Website — Setup Script
 // =============================================================================
 // Cross-platform (Windows, macOS, Linux) first-time setup.
 //
@@ -46,8 +46,8 @@ async function main() {
   const isQuick = process.argv.includes('--quick');
 
   log('');
-  log(`${BOLD}${GREEN}  TamamHealth Website Setup${RESET}`);
-  log(`${DIM}  Marketing site for TamamHealth Health${RESET}`);
+  log(`${BOLD}${GREEN}  Tamam Website Setup${RESET}`);
+  log(`${DIM}  Marketing site for Tamam${RESET}`);
   log('');
 
   // ---- Step 1: Check Node version ----

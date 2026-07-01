@@ -191,7 +191,7 @@ export default function PatientTimeline(props: PatientTimelineProps) {
 
   if (events.length === 0) {
     return (
-      <div className="card-elevated p-8 text-center">
+      <div className="card-elevated px-6 py-7 text-center">
         <FileText className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
           {t('timeline.emptyState')}

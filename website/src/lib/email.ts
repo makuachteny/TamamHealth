@@ -90,7 +90,7 @@ async function sendWithSendGrid(msg: EmailMessage, defaultFromName: string): Pro
 export async function sendMarketingEmail(
   context: string,
   msg: EmailMessage,
-  defaultFromName = 'TamamHealth',
+  defaultFromName = 'Tamam',
 ): Promise<boolean> {
   if (process.env.RESEND_API_KEY) {
     await sendWithResend(msg, defaultFromName);

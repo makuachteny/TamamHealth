@@ -32,7 +32,7 @@ type CalendlyWebhookPayload = {
 
 async function sendEmail(to: string, subject: string, text: string, html?: string, replyTo?: string): Promise<boolean> {
   const msg: EmailMessage = { to, subject, text, html, replyTo };
-  return sendMarketingEmail('calendly-webhook', msg, 'TamamHealth');
+  return sendMarketingEmail('calendly-webhook', msg, 'Tamam');
 }
 
 export async function POST(req: NextRequest) {

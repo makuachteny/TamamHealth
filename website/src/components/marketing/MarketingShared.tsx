@@ -1,22 +1,52 @@
 "use client";
 
-import { useState, ReactNode } from "react";
+import { CSSProperties, ReactNode, useEffect, useRef, useState } from "react";
 import { Check, Minus, Plus } from "@/components/marketing/icons";
 
 /* ═══════════════════════════════════════════════════════════════════
-   TamamHealth Marketing — Shared Utility Components
+   Tamam Marketing — Shared Utility Components
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Reveal ─────────────────────────────────────────────────────
-   No-op passthrough. Reveal animations were removed across the
-   marketing site — content renders immediately, no fade-in, no
-   scroll-triggered state. The wrapper div is preserved so existing
-   grid/flex layouts that treat <Reveal> as a child item are
-   unaffected. The `delay` prop is accepted for backwards compat
-   but ignored.
+   Lightweight scroll reveal used by the existing marketing pages.
+   It respects reduced-motion and reveals each section only once.
 */
-export function Reveal({ children }: { children: ReactNode; delay?: number }) {
-  return <div>{children}</div>;
+export function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.unobserve(entry.target);
+        }
+      },
+      { rootMargin: "0px 0px -10% 0px", threshold: 0.12 },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={`mk-reveal${visible ? " mk-reveal--visible" : ""}`}
+      style={{ "--mk-reveal-delay": `${delay}s` } as CSSProperties}
+    >
+      {children}
+    </div>
+  );
 }
 
 /* ── FAQ Accordion Item ────────────────────────────────────────── */

@@ -504,6 +504,15 @@ Tests use Jest 30 with ts-jest for TypeScript support and JSDOM for browser envi
 
 ---
 
+## Code Conventions
+
+- Use short, professional names for state, helpers, and UI labels. Prefer `checkInOpen` or `panelView` over opaque abbreviations.
+- Document exported pages, shared components, and services with a brief purpose comment when the intent is not obvious.
+- Keep role labels, route names, and seed data aligned so the UI reads consistently across modules.
+- Prefer shared components and service functions over page-local duplicates.
+
+---
+
 ## Environment Variables
 
 Run `npm run setup` to configure automatically, or copy `.env.example` to `.env.local` and edit manually. See `.env.example` for all available variables with documentation.

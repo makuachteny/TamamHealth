@@ -100,6 +100,7 @@ const FACILITY_NAV: NavItem[] = [
   { href: '/wards', label: 'Bed Management', icon: BedDouble, section: 'HOSPITAL' },
   { href: '/hr', label: 'Doctors & Staff', icon: Stethoscope, section: 'HOSPITAL' },
   { href: '/patients', label: 'Patients', icon: Users, section: 'HOSPITAL' },
+  { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'HOSPITAL' },
   { href: '/pharmacy', label: 'Prescriptions & Medicines', icon: Pill, section: 'SERVICES' },
   { href: '/blood-bank', label: 'Blood Bank', icon: Droplets, section: 'SERVICES' },
   { href: '/messages', label: 'Enquiries', icon: MessageSquare, section: 'SERVICES' },
@@ -162,6 +163,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/messages', label: 'Messages', icon: MessageSquare, badgeKey: 'messages' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'CLINICAL' },
       { href: '/consultation', label: 'Consultation', icon: ClipboardPen, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
@@ -182,13 +184,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
   },
 
   clinical_officer: {
-    label: 'Clinical Officer',
+    label: 'Doctor',
     defaultDashboard: ROLE_ROUTE_TABLE.clinical_officer.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.clinical_officer.allowed],
     navItems: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/messages', label: 'Messages', icon: MessageSquare, badgeKey: 'messages' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'CLINICAL' },
       { href: '/consultation', label: 'Consultation', icon: ClipboardPen, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
@@ -204,7 +207,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     color: '#2191D0',
     gradientFrom: '#015697',
     gradientTo: '#2191D0',
-    badgeLabel: 'Clinical Officer',
+    badgeLabel: 'Doctor',
   },
 
   nurse: {
@@ -218,6 +221,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/dashboard/nurse/triage', label: 'Triage (ETAT)', icon: Siren, section: 'STATION' },
       { href: '/dashboard/nurse/handoff', label: 'Shift Handoff', icon: ClipboardPen, section: 'STATION' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINICAL' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'CLINICAL' },
@@ -240,6 +244,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     navItems: [
       { href: '/dashboard/nurse', label: 'Midwife Station', icon: LayoutDashboard, section: 'MATERNITY' },
       { href: '/patients', label: 'Mothers & Babies', icon: Users, section: 'MATERNITY' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'MATERNITY' },
       { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'MATERNITY' },
       { href: '/births', label: 'Deliveries', icon: Baby, section: 'MATERNITY' },
       { href: '/wards', label: 'Maternity Ward', icon: BedDouble, section: 'MATERNITY' },
@@ -295,6 +300,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/dashboard/front-desk', label: 'Reception', icon: LayoutDashboard, section: 'RECEPTION' },
       { href: '/check-in', label: 'Check-In', icon: ClipboardCheck, section: 'RECEPTION' },
       { href: '/patients', label: 'Patient Registry', icon: Users, section: 'RECEPTION' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'RECEPTION' },
       { href: '/referrals', label: 'Referrals', icon: Send, section: 'RECEPTION' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'RECEPTION' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
@@ -413,6 +419,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/controlled-substances', label: 'Controlled Substances', icon: ClipboardCheck, section: 'SERVICES' },
       { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'ADMINISTRATION' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/consultation', label: 'Consultation', icon: ClipboardPen, section: 'CLINICAL' },
       { href: '/referrals', label: 'Referrals', icon: Send, section: 'CLINICAL' },
@@ -514,6 +521,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/dhis2-export', label: 'DHIS2 Export', icon: Download, section: 'REPORTING' },
       { href: '/public-stats', label: 'Public Statistics', icon: Globe, section: 'REPORTING' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/referrals', label: 'Referrals', icon: Send, section: 'CLINICAL' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
@@ -549,6 +557,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     navItems: [
       { href: '/dashboard/front-desk', label: 'Reception', icon: LayoutDashboard, section: 'RECEPTION' },
       { href: '/patients', label: 'Patient Registry', icon: Users, section: 'RECEPTION' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'RECEPTION' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'RECEPTION' },
       { href: '/referrals', label: 'Referrals', icon: Send, section: 'RECEPTION' },
       { href: '/payments', label: 'Checkout Payments', icon: Wallet, section: 'CHECKOUT' },
@@ -564,6 +573,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     navItems: [
       { href: '/dashboard/front-desk', label: 'Reception', icon: LayoutDashboard, section: 'CLINIC' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINIC' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'CLINIC' },
       { href: '/appointments', label: 'Appointments', icon: Calendar, section: 'CLINIC' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
     ],
@@ -590,6 +600,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     navItems: [
       { href: '/dashboard/nurse', label: 'Rooming Station', icon: LayoutDashboard, section: 'CLINIC' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINIC' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'CLINIC' },
       { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'CARE' },
       { href: '/anc', label: 'Antenatal Care', icon: HeartPulse, section: 'CARE' },
       { href: '/lab', label: 'Lab', icon: Microscope, section: 'MORE' },
@@ -605,6 +616,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     navItems: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'CLINICAL' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'CLINICAL' },
       { href: '/consultation', label: 'Consultation', icon: ClipboardPen, section: 'CLINICAL' },
       { href: '/referrals', label: 'Referrals', icon: Send, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
@@ -629,6 +641,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     navItems: [
       { href: '/dashboard/data-entry', label: 'Records Dashboard', icon: LayoutDashboard, section: 'RECORDS' },
       { href: '/patients', label: 'Patient Registry', icon: Users, section: 'RECORDS' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'RECORDS' },
       { href: '/data-quality', label: 'Data Quality', icon: Database, section: 'RECORDS' },
       { href: '/reports', label: 'Reports', icon: BarChart3, section: 'RECORDS' },
       { href: '/dhis2-export', label: 'DHIS2 Export', icon: Download, section: 'GOVERNANCE' },
@@ -649,6 +662,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/equipment', label: 'Assets', icon: Wrench, section: 'ADMINISTRATION' },
       { href: '/facility-assessments', label: 'Facility Assessments', icon: ClipboardCheck, section: 'ADMINISTRATION' },
       { href: '/patients', label: 'Patients', icon: Users, section: 'CLINICAL' },
+      { href: '/patient-intake', label: 'Patient Intake', icon: ClipboardCheck, section: 'CLINICAL' },
       { href: '/wards', label: 'Wards', icon: BedDouble, section: 'CLINICAL' },
       { href: '/referrals', label: 'Referrals', icon: Send, section: 'CLINICAL' },
       { href: '/blood-bank', label: 'Blood Bank', icon: Droplets, section: 'CLINICAL' },

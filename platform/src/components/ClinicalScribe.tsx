@@ -470,7 +470,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             {scribe.soapNote ? (
               <pre className="text-xs leading-relaxed whitespace-pre-wrap font-mono" style={{
                 color: 'var(--text-primary)',
-                fontFamily: "'Fragment Mono', monospace",
+                fontFamily: "var(--font-platform-mono)",
               }}>
                 {scribe.soapNote}
               </pre>

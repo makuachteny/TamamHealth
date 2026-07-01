@@ -143,7 +143,7 @@ export default function WardsPage() {
           <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
             {/* Title + bed stats */}
             <div className="flex items-end justify-between gap-3 mb-3">
-              <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
+              <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
                 {t('ward.currentAdmissions')}
               </span>
               <div className="flex items-center gap-3 flex-shrink-0 pb-0.5">
@@ -192,7 +192,7 @@ export default function WardsPage() {
                   </button>
                   {showWardFilter && (
                     <div className="absolute left-0 mt-2 rounded-2xl overflow-hidden z-50"
-                      style={{ width: 240, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: '0 16px 48px rgba(0,0,0,0.15)' }}>
+                      style={{ width: 240, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'none' }}>
                       <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
                         <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Filter by ward</span>
                         {activeFilterCount > 0 && (
