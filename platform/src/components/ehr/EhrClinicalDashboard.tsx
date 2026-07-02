@@ -17,10 +17,16 @@ import {
   Stethoscope,
   X,
 } from '@/components/icons/lucide';
-
-function initials(name: string) {
-  return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || '?';
-}
+import { initials } from '@/lib/patient-utils';
+import {
+  toIsoDate,
+  parseIsoDate,
+  startOfMonth,
+  addMonths,
+  addDays,
+  formatDateTitle,
+  formatMonthTitle,
+} from '@/components/ehr/EhrMiniCalendar';
 
 function appointmentTriage(priority: AppointmentDoc['priority']) {
   if (priority === 'emergency') return 'RED';
@@ -49,40 +55,6 @@ type OutstandingItem = {
 };
 
 const statusOptions: AppointmentStatus[] = ['requested', 'scheduled', 'confirmed', 'checked_in', 'in_progress', 'completed', 'cancelled', 'no_show'];
-
-function toIsoDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function parseIsoDate(value: string) {
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, (month || 1) - 1, day || 1);
-}
-
-function startOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function addMonths(date: Date, offset: number) {
-  return new Date(date.getFullYear(), date.getMonth() + offset, 1);
-}
-
-function addDays(date: Date, offset: number) {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() + offset);
-  return copy;
-}
-
-function formatDateTitle(value: string) {
-  return new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(parseIsoDate(value));
-}
-
-function formatMonthTitle(value: Date) {
-  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(value);
-}
 
 function statusLabel(status: AppointmentStatus) {
   if (status === 'checked_in') return 'Checked in';

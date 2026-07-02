@@ -13,6 +13,7 @@ import { verifyPassword } from './auth';
 import { createToken } from './auth-token';
 import { logAudit } from './services/audit-service';
 import { captureException } from './observability';
+import { CSRF_COOKIE_NAME } from './csrf';
 
 /** True when an error came from a failed dynamic-chunk fetch (stale tab after
  *  a hot-reload, network blip, etc.). The recovery for these is always a
@@ -128,10 +129,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.error('[TamamHealth] Database seed error:', err);
       }
-      setDbReady(true);
 
-      // Check for existing session via cookie (skip API call if no cookie)
-      const hasCookie = document.cookie.split(';').some(c => c.trim().startsWith('tamamhealth-token='));
+      // Check for existing session via cookie (skip API call if no cookie).
+      // `tamamhealth-token` is httpOnly on the server-issued (online) login
+      // path, so it's invisible to document.cookie — check the readable
+      // CSRF cookie (set alongside it) too, or this always misses online
+      // sessions and force-logs-out the user on every hard refresh. The
+      // offline/PouchDB fallback login sets `tamamhealth-token` itself
+      // (non-httpOnly), so that name still needs checking directly.
+      const hasCookie = document.cookie.split(';').some(c => {
+        const name = c.trim().split('=')[0];
+        return name === 'tamamhealth-token' || name === CSRF_COOKIE_NAME;
+      });
       if (hasCookie) {
         try {
           const res = await fetch('/api/auth/me');
@@ -183,6 +192,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // Offline - OK
         }
       }
+
+      // Gate route-guarding on dbReady only once the session check above has
+      // resolved — flipping this before that finishes lets DashboardLayout's
+      // isAuthenticated effect fire on a false negative and bounce a
+      // logged-in user to /login (which then redirects to the *default*
+      // dashboard, not the page they actually requested).
+      setDbReady(true);
     };
 
     init();

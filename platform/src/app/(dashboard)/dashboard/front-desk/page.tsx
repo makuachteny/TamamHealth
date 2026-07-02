@@ -9,7 +9,7 @@ import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
 import type { AppointmentDoc, EncounterDoc } from '@/lib/db-types';
 import { formatCompactDateTime, formatMoney } from '@/lib/format-utils';
-import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel } from '@/lib/patient-utils';
+import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel, initials } from '@/lib/patient-utils';
 import { priorityColor } from '@/lib/clinical/triage-display';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import Modal from '@/components/Modal';
@@ -33,9 +33,6 @@ import { formatPhoneDisplay } from '@/lib/field-formats';
  * Shows the live queue, today's appointments, and registry snapshots in one
  * view so reception can move patients without jumping between screens.
  */
-function initials(name: string) {
-  return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || '?';
-}
 
 // Exam rooms / bays a walk-in patient can be placed in to meet the provider.
 // Fallback used only when facility settings provide no rooms.

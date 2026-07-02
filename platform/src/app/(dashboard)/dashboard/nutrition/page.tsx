@@ -15,7 +15,9 @@ import {
   Utensils, Droplets, Users, MessageSquare,
 } from '@/components/icons/lucide';
 
-const ACCENT = '#EA580C';
+// Use the platform accent token so this dashboard matches the reference
+// Clinical Officer design instead of a one-off hardcoded hex.
+const ACCENT = 'var(--accent-primary)';
 
 const MUAC_THRESHOLDS = { severe: 11.5, moderate: 12.5, normal: 13.5 };
 

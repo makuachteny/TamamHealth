@@ -38,63 +38,6 @@ const PLATFORM_OUTCOMES = [
   },
 ] as const;
 
-export function HomeStatementSection() {
-  return (
-    <section className="mk-section mk-section-white mk-home-statement" id="why">
-      <div className="mk-container">
-        <Reveal>
-          <div className="mk-home-mission-card">
-            <div className="mk-mission-panel">
-              <div className="mk-mission-panel-copy">
-                <p>
-                  We are building for the nurse searching for yesterday&apos;s note, the doctor seeing a patient with no history, and the ministry trying to plan with incomplete data.
-                </p>
-              </div>
-              <div className="mk-mission-panel-image">
-                <Image
-                  src="/assets/doctor-nurse-consultation.jpg"
-                  alt="Healthcare team reviewing patient information"
-                  width={720}
-                  height={520}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </div>
-            </div>
-
-            <div className="mk-home-why-grid">
-              <h2 className="mk-h2">Why Tamam?</h2>
-              <div className="mk-home-suite-card">
-                <span>01</span>
-                <h3>Built around the full patient story.</h3>
-                <p>
-                  From the front desk to the ward, every workflow links back to the same encounter so teams do not duplicate data across paper forms, spreadsheets, and disconnected tools.
-                </p>
-                <div className="mk-home-suite-stats">
-                  <div>
-                    <strong>One</strong>
-                    <small>patient story</small>
-                  </div>
-                  <div>
-                    <strong>Offline</strong>
-                    <small>by design</small>
-                  </div>
-                  <div>
-                    <strong>Secure</strong>
-                    <small>by default</small>
-                  </div>
-                </div>
-                <Link href="/products#products-grid" className="mk-home-suite-link">
-                  Learn more about the platform <ArrowRight size={15} strokeWidth={1.8} />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
 export function HomePrinciplesSection() {
   return (
     <section className="mk-products-section">

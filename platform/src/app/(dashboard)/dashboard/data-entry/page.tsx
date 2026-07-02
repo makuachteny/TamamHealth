@@ -19,7 +19,9 @@ import {
   ShieldCheck, Truck, FileText,
 } from '@/components/icons/lucide';
 
-const ACCENT = '#0891B2';
+// Use the platform accent token so this dashboard matches the reference
+// Clinical Officer design instead of a one-off hardcoded hex.
+const ACCENT = 'var(--accent-primary)';
 
 interface CensusData {
   date: string;

@@ -699,6 +699,13 @@ export default function SurveillancePage() {
                   </h3>
                 </div>
                 <div className="p-3 data-row-divider-sm" style={{ maxHeight: '480px', overflowY: 'auto' }}>
+                  {filteredAlerts.length === 0 && (
+                    <EmptyState
+                      icon={Shield}
+                      title="No active alerts"
+                      message="Disease surveillance alerts will appear here as they're reported."
+                    />
+                  )}
                   {filteredAlerts.map(alert => {
                     const config = alertLevelConfig[alert.alertLevel];
                     return (

@@ -6,171 +6,127 @@ import { useEffect, useState } from "react";
 import { MarketingActionModalButton } from "./MarketingActionModal";
 import { Reveal } from "./MarketingShared";
 
-type IntroContent = {
-  kind: "intro";
-};
-
-type StatContent = {
-  kind: "stat";
-  eyebrow: string;
-  value: string;
-  /** Longer values (e.g. "64 per 1,000") need a smaller ceiling than short
-   *  ones (e.g. "45-50%") to stay on a single line at the same container
-   *  width — this overrides the default clamp() per slide. */
-  valueSize?: string;
-  body: string;
-};
-
-type HeroContent = IntroContent | StatContent;
-
-// Single fixed background image — the content overlay is what slides, not
-// the photo. Existing asset only.
-const HERO_BACKGROUND = {
-  src: "/assets/landing-img.jpg",
-  alt: "TamamHealth field team of nurses outside a maternity tent in South Sudan",
-};
-
-const HERO_CONTENT: HeroContent[] = [
-  { kind: "intro" },
+// Real field photos — South Sudanese health workers and the everyday strain
+// of running a facility on paper — to make "the problem" concrete rather
+// than abstract. (No stand-ins from other countries/faith contexts — South
+// Sudan is majority Christian/traditional, not Muslim, so imagery needs to
+// reflect that.)
+const HERO_SLIDES = [
   {
-    kind: "stat",
-    eyebrow: "South Sudan today",
-    value: "45-50%",
-    body: "of the population can physically reach a functioning health facility",
+    src: "/assets/landing-img.jpg",
+    alt: "A team of South Sudanese midwives outside a maternity tent",
   },
   {
-    kind: "stat",
-    eyebrow: "South Sudan today",
-    value: "64 per 1,000",
-    valueSize: "clamp(36px, 6vw, 84px)",
-    body: "newborn deaths at live births",
+    src: "/assets/images/reviewing-health-records.jpeg",
+    alt: "A family reviewing paper health records",
   },
   {
-    kind: "stat",
-    eyebrow: "South Sudan today",
-    value: "2-3%",
-    body: "of annual government spending goes to health",
+    src: "/assets/images/doctor-clipboard-review.jpeg",
+    alt: "A clinician reviewing a patient's paper chart on a clipboard",
+  },
+  {
+    src: "/assets/images/community-medication-distribution.jpeg",
+    alt: "A health worker distributing medication and recording it in a paper register",
+  },
+  {
+    src: "/assets/images/pediatric-ward-interior.jpeg",
+    alt: "A crowded pediatric ward with limited beds",
   },
 ];
 
-const SLIDE_DURATION_MS = 6000;
+const SLIDE_DURATION_MS = 5000;
 
 export function HomeHero() {
   const [active, setActive] = useState(0);
 
   useEffect(() => {
     const id = setInterval(() => {
-      setActive((current) => (current + 1) % HERO_CONTENT.length);
+      setActive((current) => (current + 1) % HERO_SLIDES.length);
     }, SLIDE_DURATION_MS);
     return () => clearInterval(id);
   }, []);
 
   return (
     <>
-    <section className="mk-photo-hero">
-      <div className="mk-photo-hero-slides" aria-hidden="true">
-        <Image
-          src={HERO_BACKGROUND.src}
-          alt={HERO_BACKGROUND.alt}
-          fill
-          priority
-          sizes="100vw"
-          className="mk-photo-hero-img"
-        />
-        <div className="mk-photo-hero-scrim" />
-      </div>
-
-      <div className="mk-photo-hero-content">
-        <div className={`mk-container mk-photo-hero-top mk-photo-hero-top--${HERO_CONTENT[active].kind}`}>
+    <section className="mk-home-split-hero">
+      <div className="mk-home-split-hero-body">
+        <div className="mk-container mk-home-split-hero-grid">
           <Reveal>
-            <div className="mk-photo-hero-slider">
-              {HERO_CONTENT.map((content, index) => (
-                <div
-                  key={index}
-                  className={`mk-photo-hero-slide-content${index === active ? " is-active" : ""}`}
-                  aria-hidden={index !== active}
+            <div className="mk-home-split-hero-copy">
+              <h1 className="mk-h1 mk-home-split-hero-title">
+                Many communities.
+                <br />
+                One system of care.
+              </h1>
+              <p className="mk-body-lg mk-home-split-hero-subtitle">
+                Tamam brings patients, wards, pharmacy, lab, blood bank, maternal &amp; child health, and
+                registration into a single platform for the whole facility — built to work in every corner
+                of South Sudan, online or off.
+              </p>
+              <div className="mk-home-split-hero-actions">
+                <MarketingActionModalButton
+                  intent="demo"
+                  className="mk-btn mk-btn-green"
+                  source="home-split-hero"
                 >
-                  {content.kind === "stat" ? (
-                    <div className="mk-photo-hero-stat" role="status" aria-live="polite">
-                      <p className="mk-photo-hero-stat-eyebrow">{content.eyebrow}</p>
-                      <span className="mk-photo-hero-stat-rule" aria-hidden="true" />
-                      <strong
-                        className="mk-photo-hero-stat-value"
-                        style={content.valueSize ? { fontSize: content.valueSize } : undefined}
-                      >
-                        {content.value}
-                      </strong>
-                      <p className="mk-photo-hero-stat-body">{content.body}</p>
-                    </div>
-                  ) : (
-                    <div className="mk-photo-hero-intro">
-                      <h1 className="mk-photo-hero-title">
-                        Many communities.
-                        <br />
-                        One system of care.
-                      </h1>
-                      <p className="mk-photo-hero-subtitle">
-                        Tamam brings patients, wards, pharmacy, lab, blood bank, maternal &amp; child health, and
-                        registration into a single platform for the whole facility — built to work in every corner
-                        of South Sudan, online or off.
-                      </p>
-                      <div className="mk-photo-hero-actions">
-                        <MarketingActionModalButton
-                          intent="demo"
-                          className="mk-btn mk-btn-green mk-photo-hero-cta"
-                          source="home-photo-hero"
-                        >
-                          Book a Demo
-                        </MarketingActionModalButton>
-                        <Link href="/about/contact" className="mk-photo-hero-secondary">
-                          Get in Touch
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                  Book a Demo
+                </MarketingActionModalButton>
+                <Link href="/about/contact" className="mk-btn mk-btn-outline">
+                  Get in Touch
+                </Link>
+              </div>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.1}>
+            <div className="mk-home-split-hero-visual mk-home-split-hero-visual--sm">
+              <span className="mk-home-split-hero-glow" aria-hidden="true" />
+              <div className="mk-home-split-hero-image" role="group" aria-label="Photos illustrating the problem Tamam solves">
+                {HERO_SLIDES.map((slide, index) => (
+                  <Image
+                    key={slide.src}
+                    src={slide.src}
+                    alt={slide.alt}
+                    fill
+                    priority={index === 0}
+                    sizes="(max-width: 900px) 100vw, 50vw"
+                    className={`mk-home-split-hero-slide${index === active ? " is-active" : ""}`}
+                    aria-hidden={index !== active}
+                  />
+                ))}
+              </div>
+              <div className="mk-home-split-hero-dots" role="tablist" aria-label="Hero photos">
+                {HERO_SLIDES.map((_, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    role="tab"
+                    aria-selected={index === active}
+                    aria-label={`Show photo ${index + 1}`}
+                    className={index === active ? "is-active" : ""}
+                    onClick={() => setActive(index)}
+                  />
+                ))}
+              </div>
             </div>
           </Reveal>
         </div>
+      </div>
 
-        <div className="mk-container mk-photo-hero-bottom">
-          <div className="mk-photo-hero-brand">
-            <Image
-              src="/assets/logos/SVG/Tamam_Style_Guide-31.svg"
-              alt="Tamam"
-              width={220}
-              height={45}
-              className="mk-photo-hero-wordmark"
-            />
-            <p className="mk-photo-hero-tagline">
-              <span className="mk-photo-hero-dot" aria-hidden="true" />
-              Offline-ready digital health infrastructure
-            </p>
-          </div>
-
-          <div className="mk-photo-hero-dots" role="tablist" aria-label="Hero slides">
-            {HERO_CONTENT.map((_, index) => (
-              <button
-                key={index}
-                type="button"
-                role="tab"
-                aria-selected={index === active}
-                aria-label={`Show slide ${index + 1}`}
-                className={index === active ? "is-active" : ""}
-                onClick={() => setActive(index)}
-              />
-            ))}
-          </div>
-        </div>
+      <div className="mk-container">
+        <p className="mk-home-split-hero-eyebrow">
+          <span className="mk-home-split-hero-eyebrow-dot" aria-hidden="true" />
+          Offline-ready digital health infrastructure
+        </p>
       </div>
     </section>
 
     <div className="mk-photo-hero-statement">
-      <p>
-        Starting in South Sudan &ndash; built to scale to every{" "}
-        <span className="mk-photo-hero-statement-accent">underserved</span> health system.
+      <p className="mk-photo-hero-statement-lead">Starting in South Sudan &ndash; built to</p>
+      <p className="mk-photo-hero-statement-main">
+        scale to every <span className="mk-photo-hero-statement-accent">underserved</span>
       </p>
+      <p className="mk-photo-hero-statement-lead">health system.</p>
     </div>
     </>
   );

@@ -37,6 +37,14 @@ export function patientInitials(p: { firstName?: string; surname?: string }): st
 }
 
 /**
+ * Two-letter initials from a single display name string (e.g. "Deng Mabior").
+ * Shared avatar helper so the same logic isn't re-implemented per component.
+ */
+export function initials(name: string): string {
+  return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || '?';
+}
+
+/**
  * Patient age in whole years. Prefers an explicit estimatedAge, otherwise
  * derives it from dateOfBirth with a month/day adjustment so it never reads a
  * year too high. Returns null when age is genuinely unknown — every display

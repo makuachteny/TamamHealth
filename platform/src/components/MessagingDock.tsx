@@ -13,6 +13,7 @@ import { useStaffChat } from '@/lib/hooks/useStaffChat';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useMessagingDock } from '@/lib/messaging-dock-context';
 import { getRoleConfig } from '@/lib/permissions';
+import { initials } from '@/lib/patient-utils';
 import { ROLE_LABEL } from '@/lib/role-display';
 import { BRAND_PRIMARY, BRAND_SECONDARY } from '@/lib/theme-colors';
 import type { ConversationDoc, UserRole } from '@/lib/db-types';
@@ -49,9 +50,6 @@ function colorFor(seed: string): string {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
   return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
-}
-function initials(name: string): string {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
 }
 function relTime(iso?: string): string {
   if (!iso) return '';

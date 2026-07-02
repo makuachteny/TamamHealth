@@ -6416,6 +6416,11 @@ body,
   padding-top: clamp(64px, 7vw, 108px);
 }
 
+.mk-home-statement-label {
+  text-align: center;
+  margin: 0 0 20px;
+}
+
 .mk-home-mission-card {
   position: relative;
   max-width: 1180px;
@@ -6457,8 +6462,7 @@ body,
   margin: 0;
   overflow: hidden;
   border-radius: 14px;
-  background: linear-gradient(135deg, #10195A 0%, #015697 62%, #2191D0 100%);
-  border: 1px solid rgba(16,25,90,0.12);
+  background: linear-gradient(135deg, #FEFFF9 0%, #EAF4FB 100%);
 }
 
 .mk-mission-panel::before {
@@ -6473,9 +6477,7 @@ body,
   background-size: 170px auto, 110px auto, 138px auto, 230px auto;
   background-position: 50% 50%, 69% 30%, 31% 66%, 86% 82%;
   background-repeat: no-repeat;
-  filter: brightness(0) invert(1);
-  opacity: 0.075;
-  mix-blend-mode: screen;
+  opacity: 0.07;
   pointer-events: none;
 }
 
@@ -6488,11 +6490,11 @@ body,
 }
 
 .mk-mission-panel-copy p {
-  color: #fff;
+  color: var(--tb-blue-900);
   margin: 0;
   font-size: clamp(22px, 2vw, 31px);
   line-height: 1.34;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: 0;
   text-wrap: balance;
 }
@@ -13396,7 +13398,7 @@ button.mk-mobile-top-demo {
 .mk-photo-hero-scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(32, 47, 57, 0) 39.63%, #202F39 100%);
+  background: linear-gradient(180deg, rgba(32, 47, 57, 0) 39.63%, #202F39 98%);
   backdrop-filter: blur(10.6px);
   -webkit-backdrop-filter: blur(10.6px);
 }
@@ -13628,36 +13630,37 @@ button.mk-mobile-top-demo {
   position: relative;
   z-index: 1;
   background: #202F39;
-  padding: 56px var(--containerPadding);
+  padding: 40px var(--containerPadding);
   text-align: center;
-  overflow: hidden;
-}
-
-/* Echoes the hero photo's fade-to-navy scrim so the gradient reads as one
-   continuous sweep across the hero/statement boundary, not two flat blocks. */
-.mk-photo-hero-statement::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 140px;
-  background: linear-gradient(180deg, rgba(78, 99, 112, 0.35) 0%, rgba(32, 47, 57, 0) 100%);
-  pointer-events: none;
 }
 
 .mk-photo-hero-statement p {
-  max-width: 760px;
+  max-width: 780px;
   margin: 0 auto;
   font-family: var(--AkkuratLL);
-  font-size: clamp(20px, 2.6vw, 28px);
-  font-weight: 500;
+}
+
+/* The lines flanking the highlighted phrase — small, light-weight, muted. */
+.mk-photo-hero-statement-lead {
+  font-size: clamp(14px, 1.4vw, 18px);
+  font-weight: 300;
   line-height: 1.4;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* The highlighted middle line — large and bold, the visual anchor of the
+   whole statement. */
+.mk-photo-hero-statement-main {
+  font-size: clamp(28px, 4.2vw, 48px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: #fff;
+  margin-top: 2px;
+  margin-bottom: 2px;
 }
 
 .mk-photo-hero-statement-accent {
-  color: #ff8a3d;
+  color: #FF7F00;
   font-weight: 700;
 }
 
@@ -13686,34 +13689,32 @@ button.mk-mobile-top-demo {
   }
 }
 
-/* ── Nav overlay treatment for the photo hero (homepage only) ────── */
+
+/* ── Nav overlay treatment for the photo hero (homepage only) ─────
+   Absolutely positioned so it floats transparently over the hero photo
+   instead of sitting in normal flow (which would push the photo down and
+   leave a solid page-background bar above it). No logo on this variant —
+   the nav links and "Book a Demo" group flush right, matching the
+   reference design. Once scrolled past the hero, the component swaps to
+   the existing generic .mk-navbar--scrolled class (solid page background,
+   already shared by every other page) — nothing custom needed there. */
+/* A dedicated dark fade behind just the nav bar — independent of the hero's
+   own scrim (which is deliberately transparent for the top ~40% of the
+   photo). Without this, white nav text loses all contrast whenever the
+   photo happens to be bright/sky-colored at the very top. */
 .mk-navbar--photo-hero {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  background: transparent !important;
+  background: linear-gradient(180deg, rgba(8, 15, 28, 0.55) 0%, rgba(8, 15, 28, 0.28) 65%, rgba(8, 15, 28, 0) 100%) !important;
   border-bottom-color: transparent !important;
 }
 
+.mk-navbar--photo-hero .mk-nav-item,
 .mk-navbar--photo-hero .mk-nav-logo-type,
 .mk-navbar--photo-hero .mk-nav-logo-mark {
-  filter: brightness(0) invert(1);
-}
-
-/* No logo on this variant (the reference design omits it), so switch the
-   3-column logo/links/actions grid to a simple flex row with everything —
-   nav links and "Book a Demo" — grouped together on the right. */
-.mk-navbar--photo-hero .mk-navbar-inner {
-  display: flex !important;
-  align-items: center;
-  justify-content: flex-end;
-  gap: clamp(20px, 3vw, 40px);
-}
-
-.mk-navbar--photo-hero .mk-nav-center {
-  justify-content: flex-start;
-  justify-self: auto;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
 }
 
 .mk-navbar--photo-hero .mk-nav-item,
@@ -13802,4 +13803,317 @@ button.mk-mobile-top-demo {
   background: #fff !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+
+/* ── Platform page: "Tamam health infrastructure connects" ──────── */
+.mk-platform-connects-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) 1fr;
+  gap: 56px;
+  align-items: center;
+}
+
+.mk-platform-connects-copy .mk-h2 {
+  margin: 0 0 18px;
+}
+
+.mk-platform-connects-copy .mk-body {
+  margin: 0 0 28px;
+}
+
+.mk-label-orange {
+  color: #FF7F00;
+}
+
+.mk-platform-connects-cta {
+  display: inline-flex;
+}
+
+.mk-platform-connects-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.mk-platform-card {
+  display: block;
+  padding: 32px 40px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.mk-platform-card h3 {
+  font-family: var(--Lora);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--tb-text);
+  margin: 0 0 12px;
+}
+
+.mk-platform-card-desc {
+  font-size: 14.5px;
+  color: var(--tb-text-sec);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.mk-platform-connects-cards > .mk-platform-card:nth-child(2) {
+  border-left: 1px solid var(--tb-cream-300);
+}
+.mk-platform-connects-cards > .mk-platform-card:nth-child(3) {
+  border-top: 1px solid var(--tb-cream-300);
+}
+.mk-platform-connects-cards > .mk-platform-card:nth-child(4) {
+  border-top: 1px solid var(--tb-cream-300);
+  border-left: 1px solid var(--tb-cream-300);
+}
+.mk-platform-connects-cards > .mk-platform-card:nth-child(5) {
+  border-top: 1px solid var(--tb-cream-300);
+}
+.mk-platform-connects-cards > .mk-platform-card:nth-child(6) {
+  border-top: 1px solid var(--tb-cream-300);
+  border-left: 1px solid var(--tb-cream-300);
+}
+
+.mk-platform-card--featured {
+  grid-column: 1;
+  grid-row: 1;
+  background: var(--tb-blue-700);
+  border-radius: 20px;
+  padding: 32px 32px 28px;
+  margin: 0 24px 24px 0;
+}
+
+.mk-platform-card-mark {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fff;
+  margin-bottom: 20px;
+}
+
+.mk-platform-card--featured h3 {
+  color: #fff;
+  font-size: 24px;
+}
+
+.mk-platform-card--featured .mk-platform-card-desc {
+  color: rgba(255, 255, 255, 0.88);
+  margin-bottom: 16px;
+}
+
+.mk-platform-card--featured .mk-platform-card-tagline {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0 0 18px;
+}
+
+.mk-platform-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mk-platform-card-tags span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+@media (max-width: 959.98px) {
+  .mk-platform-connects-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+@media (max-width: 639.98px) {
+  .mk-platform-connects-cards {
+    grid-template-columns: 1fr;
+  }
+  .mk-platform-connects-cards > .mk-platform-card:nth-child(n) {
+    border-left: none;
+  }
+  .mk-platform-connects-cards > .mk-platform-card:nth-child(n+2) {
+    border-top: 1px solid var(--tb-cream-300);
+  }
+  .mk-platform-card--featured {
+    margin: 0 0 8px;
+  }
+  .mk-platform-card {
+    padding: 24px 4px;
+  }
+}
+
+/* ── Homepage split hero: text left, large image right ──────────── */
+.mk-home-split-hero {
+  background: var(--tb-cream-50);
+  min-height: 720px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(72px, 10vw, 120px) 0 clamp(32px, 4vw, 48px);
+  overflow: hidden;
+}
+
+.mk-home-split-hero-body {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.mk-home-split-hero-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 1fr;
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+}
+
+.mk-home-split-hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 40px 0 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--tb-cream-300);
+  font-family: var(--AkkuratMonoLL);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tb-text-muted);
+}
+
+.mk-home-split-hero-eyebrow-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--tb-blue-700);
+  flex-shrink: 0;
+}
+
+.mk-home-split-hero-title {
+  margin: 0 0 24px;
+}
+
+.mk-home-split-hero-subtitle {
+  margin: 0 0 32px;
+  max-width: 460px;
+}
+
+.mk-home-split-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.mk-home-split-hero-visual {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  aspect-ratio: 1 / 1;
+  margin-left: auto;
+}
+
+.mk-home-split-hero-visual--sm {
+  max-width: 500px;
+}
+
+.mk-home-split-hero-glow {
+  position: absolute;
+  top: 16px;
+  right: 0;
+  bottom: -16px;
+  left: -16px;
+  display: block;
+  border-radius: 32px;
+  background: linear-gradient(160deg, #60A5FA 0%, var(--tb-blue-700) 55%, #818CF8 100%);
+  z-index: 0;
+}
+
+.mk-home-split-hero-image {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 24px 56px -24px rgba(16, 25, 90, 0.35);
+}
+
+.mk-home-split-hero-dots {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mk-home-split-hero-dots button {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: background 0.2s ease, width 0.2s ease;
+}
+
+.mk-home-split-hero-dots button.is-active {
+  width: 22px;
+  background: #fff;
+}
+
+.mk-home-split-hero-slide {
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+.mk-home-split-hero-slide.is-active {
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  .mk-home-split-hero {
+    min-height: 0;
+  }
+  .mk-home-split-hero-grid {
+    grid-template-columns: 1fr;
+  }
+  .mk-home-split-hero-visual {
+    margin: 32px auto 0;
+    max-width: 420px;
+  }
+  .mk-home-split-hero-subtitle {
+    max-width: none;
+  }
+}
+
+@media (max-width: 539.98px) {
+  .mk-home-split-hero-visual {
+    max-width: 320px;
+  }
+  .mk-home-split-hero-glow {
+    top: 10px;
+    bottom: -10px;
+    left: -10px;
+    border-radius: 24px;
+  }
+  .mk-home-split-hero-image {
+    border-radius: 20px;
+  }
 }

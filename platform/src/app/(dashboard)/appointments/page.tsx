@@ -368,7 +368,7 @@ export default function AppointmentsPage() {
           searchTrailing={
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* Calendar / List view toggle */}
-              <div style={{ display: 'flex', borderRadius: 10, border: '1px solid var(--border-medium)', overflow: 'hidden', height: 36 }}>
+              <div style={{ display: 'flex', flexShrink: 0, borderRadius: 10, border: '1px solid var(--border-medium)', overflow: 'hidden', height: 36 }}>
                 <button
                   onClick={() => setViewMode('calendar')}
                   style={{ padding: '0 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === 'calendar' ? 'var(--accent-primary)' : 'var(--bg-card-solid)', color: viewMode === 'calendar' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}

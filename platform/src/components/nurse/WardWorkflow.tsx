@@ -4,8 +4,9 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
+import Modal from '@/components/Modal';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
-import { patientFullName, patientAgeLabel } from '@/lib/patient-utils';
+import { patientFullName, patientAgeLabel, initials } from '@/lib/patient-utils';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   ChevronDown, Thermometer, Activity, ClipboardList, UserPlus,
@@ -17,10 +18,6 @@ import {
 } from './shared';
 import WardFilters, { type WardFilterState } from './WardFilters';
 import ListSearch from './ListSearch';
-
-function initials(name: string) {
-  return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || '?';
-}
 
 export default function WardWorkflow({ filters, setFilters }: { filters: WardFilterState; setFilters: (f: WardFilterState) => void }) {
   const { t } = useTranslation();
@@ -319,10 +316,10 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
 
       {/* MODAL: Quick Vitals Entry */}
       {vitalsModalOpen && vitalsPatient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+        <Modal onClose={() => setVitalsModalOpen(false)} width={512}>
           <div
-            className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', maxHeight: '90vh', overflowY: 'auto' }}
+            className="modal-content card-elevated"
+            style={{ width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
@@ -713,7 +710,7 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
               </div>
             )}
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

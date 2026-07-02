@@ -8,11 +8,9 @@ import { MarketingActionModalButton } from "./MarketingActionModal";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Marketing — Navbar
-   Consolidated into two grouped dropdowns (Product, About Us) plus a
-   single "Book a Demo" CTA, matching the reference design. Every link
-   that used to be a separate top-level item still exists — Testimonials
-   and Pricing moved into the Product dropdown, Careers moved into the
-   About Us dropdown — just grouped rather than spread across the bar.
+   Two grouped dropdowns (Product, About Us) for the deeper page lists,
+   plus top-level links for the pages people look for directly —
+   Case Studies, Pricing, Resources — and a "Book a Demo" CTA.
    ═══════════════════════════════════════════════════════════════════ */
 
 // Fundraising entry points are locked off for now. Flip to true to re-enable.
@@ -25,8 +23,14 @@ const PRODUCT_LINKS = [
   { label: "Radiology Information System", href: "/products/radiology" },
   { label: "Pharmacy Management System", href: "/products/pharmacy" },
   { label: "Patient Experience Platform", href: "/patient-experience" },
-  { label: "Testimonials", href: "/case-studies" },
-  { label: "Pricing", href: "/pricing" },
+  { label: "Telehealth", href: "/telehealth" },
+  { label: "EHR", href: "/ehr" },
+];
+
+const RESOURCES_LINKS = [
+  { label: "Case Studies", href: "/case-studies" },
+  { label: "Download", href: "/download" },
+  { label: "Analytics", href: "/analytics" },
 ];
 
 const ABOUT_LINKS = [
@@ -59,11 +63,9 @@ export default function MarketingNav() {
   const tone = getNavTone(pathname);
   const navClass = scrollState === "past"
     ? "mk-navbar--scrolled"
-    : tone === "home"
-      ? "mk-navbar--photo-hero"
-      : lightHero
-        ? "mk-navbar--light-hero"
-        : "mk-navbar--hero-solid";
+    : lightHero
+      ? "mk-navbar--light-hero"
+      : "mk-navbar--hero-solid";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -72,6 +74,7 @@ export default function MarketingNav() {
       const hero = document.querySelector<HTMLElement>(
         [
           ".mk-home-hero",
+          ".mk-home-split-hero",
           ".mk-mod-hero",
           ".mk-product-hero",
           ".mk-subpage-hero",
@@ -96,6 +99,7 @@ export default function MarketingNav() {
       const nextLightHero = Boolean(
         hero?.matches([
           ".mk-home-hero",
+          ".mk-home-split-hero",
           ".mk-mod-hero--showcase",
           ".mk-mod-hero--data",
           ".mk-mod-hero--legal",
@@ -131,24 +135,20 @@ export default function MarketingNav() {
       {/* Main navbar */}
       <nav className={`mk-navbar ${navClass} mk-navbar--tone-${tone}`}>
         <div className="mk-container mk-navbar-inner">
-          {/* Logo — omitted on the homepage's photo hero, which pushes the
-              nav links flush left instead (matches the reference design). */}
-          {tone !== "home" && (
-            <Link href="/" className="mk-nav-logo" aria-label="Tamam Healthcare System — home">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/assets/logos/SVG/Tamam_Style_Guide-33.svg"
-                alt=""
-                className="mk-nav-logo-mark"
-              />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/assets/logos/SVG/Tamam_Style_Guide-31.svg"
-                alt="Tamam Healthcare System"
-                className="mk-nav-logo-type"
-              />
-            </Link>
-          )}
+          <Link href="/" className="mk-nav-logo" aria-label="Tamam Healthcare System — home">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/logos/SVG/Tamam_Style_Guide-33.svg"
+              alt=""
+              className="mk-nav-logo-mark"
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/logos/SVG/Tamam_Style_Guide-31.svg"
+              alt="Tamam Healthcare System"
+              className="mk-nav-logo-type"
+            />
+          </Link>
 
           {/* Desktop center nav links */}
           <div className="mk-nav-center desktop-only">
@@ -161,6 +161,16 @@ export default function MarketingNav() {
                 ))}
               </div>
             </div>
+            <div className="mk-nav-item">
+              <Link href="/case-studies" className="mk-nav-item-link">Resources</Link>
+              <DuoIcon name="chevron-down" size={14} />
+              <div className="mk-nav-dropdown">
+                {RESOURCES_LINKS.map((item) => (
+                  <Link key={item.href} href={item.href}>{item.label}</Link>
+                ))}
+              </div>
+            </div>
+            <Link href="/pricing" className="mk-nav-item-link">Pricing</Link>
             <div className="mk-nav-item">
               <Link href="/about" className="mk-nav-item-link">About Us</Link>
               <DuoIcon name="chevron-down" size={14} />
@@ -244,6 +254,18 @@ export default function MarketingNav() {
                   {item.label}
                 </Link>
               ))}
+
+              <div className="mk-mobile-menu-divider" />
+
+              <p className="mk-mobile-group-label">Resources</p>
+              {RESOURCES_LINKS.map((item) => (
+                <Link key={item.href} href={item.href} className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                  {item.label}
+                </Link>
+              ))}
+              <Link href="/pricing" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                Pricing
+              </Link>
 
               <div className="mk-mobile-menu-divider" />
 

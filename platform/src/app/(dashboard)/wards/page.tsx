@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef } from 'react';
+import TopBar from '@/components/TopBar';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import Badge from '@/components/Badge';
@@ -134,6 +135,7 @@ export default function WardsPage() {
 
   return (
     <>
+      <TopBar title={t('ward.wards')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>

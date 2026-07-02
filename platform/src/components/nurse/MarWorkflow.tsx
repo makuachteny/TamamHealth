@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
+import Modal from '@/components/Modal';
 import { Pill, Check, X, CheckCircle2, RotateCcw, FileText } from '@/components/icons/lucide';
 import type { MedicationAdministration } from '@/lib/db-types';
 import { useMarEntries, type MAREntry } from './shared';
@@ -198,15 +199,10 @@ export default function MarWorkflow() {
 
       {/* Record-administration modal */}
       {modalEntry && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(10,18,16,0.55)', backdropFilter: 'blur(2px)' }}
-          onClick={closeModal}
-        >
+        <Modal onClose={closeModal} width={448}>
           <div
-            className="w-full max-w-md card-elevated overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-            style={{ boxShadow: 'var(--card-shadow-xl)' }}
+            className="modal-content card-elevated overflow-hidden"
+            style={{ width: '100%' }}
           >
             <header
               className="px-5 py-3 border-b flex items-start justify-between gap-3"
@@ -352,7 +348,7 @@ export default function MarWorkflow() {
               </div>
             </footer>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
