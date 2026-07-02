@@ -11619,7 +11619,13 @@ span:has(> svg:only-child) {
   font-family: var(--font-platform);
 }
 
-.ehr-appointment-row {
+/* 4-column layout (icon, time, main, actions) — only for the native
+   EhrClinicalDashboard appointment row, which renders a dedicated
+   `.ehr-appointment-time` child. EhrCareDashboard's rows (`.ehr-care-row`,
+   used by Nurse/Front Desk/etc.) have no time column and must keep the
+   3-column layout from the base `.ehr-appointment-row` rule above, or the
+   main content and action buttons collide into the wrong grid tracks. */
+.ehr-appointment-row:not(.ehr-care-row) {
   grid-template-columns: 42px minmax(72px, 92px) minmax(0, 1fr) 150px;
   min-height: 60px;
   padding: 4px 12px;
