@@ -18,6 +18,10 @@ import {
 import WardFilters, { type WardFilterState } from './WardFilters';
 import ListSearch from './ListSearch';
 
+function initials(name: string) {
+  return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || '?';
+}
+
 export default function WardWorkflow({ filters, setFilters }: { filters: WardFilterState; setFilters: (f: WardFilterState) => void }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -47,17 +51,6 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
     return true;
   }), [wardPatients, patientTriageMap, filters, q]);
 
-  // Column widths (percent). Filtering now lives in the search bar + WardFilters
-  // dropdown, so the header just shows labels.
-  const WARD_COLS = [
-    { key: 'name', label: t('nurse.colPatientName'), width: 18 },
-    { key: 'hn', label: t('nurse.colId'), width: 11 },
-    { key: 'gender', label: t('nurse.colGender'), width: 13 },
-    { key: 'age', label: t('nurse.colAge'), width: 11 },
-    { key: 'complaint', label: t('nurse.colChiefComplaint'), width: 19 },
-    { key: 'status', label: t('nurse.colStatus'), width: 14 },
-    { key: 'actions', label: t('nurse.colActions'), width: 14 },
-  ] as const;
 
   // Assign-doctor modal
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
@@ -171,173 +164,146 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
         {/* Ward Patient table */}
-        <div className="dash-card mb-4 overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0, order: 1 }}>
+        <div className="dash-card mb-4 overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0, minWidth: 0, order: 1 }}>
           {/* Inline search + structured filters — lives in the list header rather
               than the platform-wide top search bar. */}
           <div className="px-3 py-2.5 flex items-center gap-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
             <ListSearch value={search} onChange={setSearch} placeholder={t('nurse.searchPatientPlaceholder')} />
             <WardFilters filters={filters} setFilters={setFilters} />
           </div>
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            <table className="w-full" style={{ tableLayout: 'fixed', minWidth: 840 }}>
-              <colgroup>
-                {WARD_COLS.map(c => <col key={c.key} style={{ width: `${c.width}%` }} />)}
-              </colgroup>
-              <thead>
-                <tr>
-                  {WARD_COLS.map((c) => (
-                    <th key={c.key} className={`${c.key === 'actions' ? 'text-right' : 'text-left'} px-4 py-2.5`} style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 2 }}>
-                      <div className={`flex items-center gap-2 ${c.key === 'actions' ? 'justify-end' : ''}`}>
-                        <span className="text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap">{c.label}</span>
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {displayedPatients.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                      {t('patients.patientsFound', { count: 0 })}
-                    </td>
-                  </tr>
-                )}
-                {displayedPatients.map((patient) => {
-                  const realTriage = patientTriageMap.get(patient._id);
-                  const triage = realTriage || patient._triage;
-                  const triagePriority = triage?.priority;
-                  const triageStatus = triage?.status || 'none';
-                  const isRed = triagePriority === 'RED';
-                  return (
-                    <tr
-                      key={patient._id}
-                      role={patient._demo ? undefined : 'button'}
-                      tabIndex={patient._demo ? undefined : 0}
-                      onClick={patient._demo ? undefined : () => router.push(`/patients/${patient._id}`)}
-                      onKeyDown={patient._demo ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${patient._id}`); } }}
-                      className={`${patient._demo ? '' : 'cursor-pointer'} transition-colors hover:bg-[var(--table-row-hover)]`}
-                      style={{
-                        borderBottom: '1px solid var(--border-light)',
-                        background: isRed ? 'rgba(196,69,54,0.04)' : 'transparent',
-                      }}
+          <div className="ehr-worklist-table" style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'auto' }}>
+            {displayedPatients.length > 0 && (
+              <div className="ehr-worklist-head" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr)', minWidth: 0 }}>
+                <span>{t('nurse.colPatientName')}</span>
+                <span>{t('nurse.colAge')} / {t('nurse.colGender')}</span>
+                <span>{t('nurse.colChiefComplaint')}</span>
+                <span>{t('nurse.colStatus')}</span>
+                <span>{t('nurse.colActions')}</span>
+              </div>
+            )}
+            {displayedPatients.length === 0 && (
+              <div className="ehr-worklist-empty">
+                {t('patients.patientsFound', { count: 0 })}
+              </div>
+            )}
+            {displayedPatients.map((patient) => {
+              const realTriage = patientTriageMap.get(patient._id);
+              const triage = realTriage || patient._triage;
+              const triagePriority = triage?.priority;
+              const triageStatus = triage?.status || 'none';
+              const statusLabel = triageStatus === 'pending' ? t('nurse.statusWaiting')
+                : triageStatus === 'seen' ? t('nurse.statusInConsult')
+                : (triageStatus === 'discharged' || triageStatus === 'admitted') ? triageStatus
+                : t('nurse.statusNotTriaged');
+              const statusTone = triageStatus === 'pending' ? 'ready'
+                : triageStatus === 'seen' ? 'active'
+                : (triageStatus === 'discharged' || triageStatus === 'admitted') ? 'active'
+                : 'done';
+              return (
+                <div
+                  key={patient._id}
+                  className="ehr-worklist-row"
+                  data-triage={triagePriority || 'GREEN'}
+                  role={patient._demo ? undefined : 'button'}
+                  tabIndex={patient._demo ? undefined : 0}
+                  onClick={patient._demo ? undefined : () => router.push(`/patients/${patient._id}`)}
+                  onKeyDown={patient._demo ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${patient._id}`); } }}
+                  style={{
+                    cursor: patient._demo ? 'default' : 'pointer',
+                    gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr)',
+                    minWidth: 0,
+                  }}
+                >
+                  <span className="ehr-worklist-name">
+                    <span className="ehr-patient-icon ehr-patient-icon--sm">{initials(patientFullName(patient))}</span>
+                    <span>
+                      <strong>{patientFullName(patient)}</strong>
+                      <small>{patient.hospitalNumber || 'No ID'}</small>
+                    </span>
+                  </span>
+                  <span className="ehr-worklist-room">{patientAgeLabel(patient)} · {patient.gender || '—'}</span>
+                  <span><b className="ehr-department-pill opd">{triage?.chiefComplaint || '—'}</b></span>
+                  <span><b className={`ehr-worklist-status ${statusTone}`}>{statusLabel}</b></span>
+                  <span className="relative flex justify-end" onClick={(e) => e.stopPropagation()}>
+                    {patient._demo ? (
+                      <span className="text-[10px] font-medium px-2 py-1 rounded-md" style={{ color: 'var(--text-muted)', background: 'var(--overlay-subtle)' }}>{t('nurse.demoRow')}</span>
+                    ) : (
+                    <button
+                      onClick={() => setOpenActionsFor(openActionsFor === patient._id ? null : patient._id)}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors hover:bg-[var(--overlay-subtle)]"
+                      style={{ border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
                     >
-                      <td className="px-4 py-2.5">
-                        <span className="text-[12px] font-medium truncate block hover:opacity-80" style={{ color: 'var(--text-primary)' }}>{patientFullName(patient)}</span>
-                      </td>
-                      <td className="px-4 py-2.5 text-[12px] font-mono tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{patient.hospitalNumber}</td>
-                      <td className="px-4 py-2.5 text-[12px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                        {patient.gender || '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-[12px] tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                        {patientAgeLabel(patient)}
-                      </td>
-                      <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
-                        <span className="block truncate">{triage?.chiefComplaint || '—'}</span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        {triageStatus === 'pending' && (
-                          <span className="text-[11px] font-medium whitespace-nowrap" style={{ color: 'var(--color-warning)' }}>{t('nurse.statusWaiting')}</span>
-                        )}
-                        {triageStatus === 'seen' && (
-                          <span className="text-[11px] font-medium whitespace-nowrap" style={{ color: '#2563EB' }}>{t('nurse.statusInConsult')}</span>
-                        )}
-                        {(triageStatus === 'discharged' || triageStatus === 'admitted') && (
-                          <span className="text-[11px] font-medium whitespace-nowrap capitalize" style={{ color: 'var(--color-success)' }}>{triageStatus}</span>
-                        )}
-                        {triageStatus === 'none' && !triagePriority && (
-                          <span className="text-[11px] font-medium whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{t('nurse.statusNotTriaged')}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="relative flex justify-end">
-                          {patient._demo ? (
-                            <span className="text-[10px] font-medium px-2 py-1 rounded-md" style={{ color: 'var(--text-muted)', background: 'var(--overlay-subtle)' }}>{t('nurse.demoRow')}</span>
-                          ) : (
+                      {t('nurse.colActions')}
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                    )}
+                    {!patient._demo && openActionsFor === patient._id && (
+                      <>
+                        {/* Click-away backdrop */}
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenActionsFor(null)} />
+                        <div
+                          className="absolute right-0 top-full mt-1 z-20 py-1 rounded-xl overflow-hidden min-w-[170px]"
+                          style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}
+                        >
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenActionsFor(openActionsFor === patient._id ? null : patient._id);
+                            onClick={() => {
+                              setOpenActionsFor(null);
+                              setVitalsPatient({ id: patient._id, name: patientFullName(patient) });
+                              setVitalsForm({
+                                systolic: '', diastolic: '', temperature: '', pulse: '', spo2: '', weight: '', respiratoryRate: '', notes: '',
+                                painScore: '', bloodGlucose: '', gcs: '', muac: '',
+                                oralIntakeMl: '', ivIntakeMl: '', urineOutputMl: '', otherOutputMl: '',
+                              });
+                              setVitalsSaved(false);
+                              setVitalsModalOpen(true);
                             }}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors hover:bg-[var(--overlay-subtle)]"
-                            style={{ border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
+                            style={{ color: 'var(--text-primary)' }}
                           >
-                            {t('nurse.colActions')}
-                            <ChevronDown className="w-3 h-3" />
+                            <Activity className="w-3.5 h-3.5 flex-shrink-0" style={{ color: ACCENT }} />
+                            {t('nurse.actionVitals')}
                           </button>
+                          {(!triage || triageStatus === 'none') && (
+                            <button
+                              onClick={() => {
+                                setOpenActionsFor(null);
+                                startTriage(patient._id);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
+                              style={{ color: 'var(--text-primary)' }}
+                            >
+                              <ClipboardList className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C2410C' }} />
+                              {t('nurse.actionTriage')}
+                            </button>
                           )}
-                          {!patient._demo && openActionsFor === patient._id && (
-                            <>
-                              {/* Click-away backdrop */}
-                              <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setOpenActionsFor(null); }} />
-                              <div
-                                className="absolute right-0 top-full mt-1 z-20 py-1 rounded-xl overflow-hidden min-w-[170px]"
-                                style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}
-                              >
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenActionsFor(null);
-                                    setVitalsPatient({ id: patient._id, name: patientFullName(patient) });
-                                    setVitalsForm({
-                                      systolic: '', diastolic: '', temperature: '', pulse: '', spo2: '', weight: '', respiratoryRate: '', notes: '',
-                                      painScore: '', bloodGlucose: '', gcs: '', muac: '',
-                                      oralIntakeMl: '', ivIntakeMl: '', urineOutputMl: '', otherOutputMl: '',
-                                    });
-                                    setVitalsSaved(false);
-                                    setVitalsModalOpen(true);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
-                                  style={{ color: 'var(--text-primary)' }}
-                                >
-                                  <Activity className="w-3.5 h-3.5 flex-shrink-0" style={{ color: ACCENT }} />
-                                  {t('nurse.actionVitals')}
-                                </button>
-                                {!patient._demo && (!triage || triageStatus === 'none') && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenActionsFor(null);
-                                      startTriage(patient._id);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
-                                    style={{ color: 'var(--text-primary)' }}
-                                  >
-                                    <ClipboardList className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C2410C' }} />
-                                    {t('nurse.actionTriage')}
-                                  </button>
-                                )}
-                                {!patient._demo && triageStatus === 'pending' && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenActionsFor(null);
-                                      setAssignTarget({
-                                        patientId: patient._id,
-                                        patientName: patientFullName(patient),
-                                        hospitalNumber: patient.hospitalNumber,
-                                        triageId: realTriage?._id,
-                                        currentDoctorId: patient.assignedDoctor,
-                                      });
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
-                                    style={{ color: 'var(--text-primary)' }}
-                                  >
-                                    <UserPlus className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
-                                    {t('nurse.actionAssign')}
-                                  </button>
-                                )}
-                              </div>
-                            </>
+                          {triageStatus === 'pending' && (
+                            <button
+                              onClick={() => {
+                                setOpenActionsFor(null);
+                                setAssignTarget({
+                                  patientId: patient._id,
+                                  patientName: patientFullName(patient),
+                                  hospitalNumber: patient.hospitalNumber,
+                                  triageId: realTriage?._id,
+                                  currentDoctorId: patient.assignedDoctor,
+                                });
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
+                              style={{ color: 'var(--text-primary)' }}
+                            >
+                              <UserPlus className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
+                              {t('nurse.actionAssign')}
+                            </button>
                           )}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
 

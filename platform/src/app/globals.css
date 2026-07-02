@@ -3692,20 +3692,21 @@ thead th {
   white-space: nowrap;
 }
 
-.ehr-day-tabs button {
+.ehr-day-tabs button:not(.ehr-mobile-day-check) {
   height: 38px;
-  padding: 0 13px;
-  border: 1px solid var(--border-light);
-  border-radius: 999px;
-  background: var(--bg-card);
+  padding: 0 4px 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
   color: var(--ehr-muted);
   font-weight: 800;
 }
 
-.ehr-day-tabs button.active {
-  border-color: transparent;
-  background: var(--color-brand-700);
-  color: #fff;
+.ehr-day-tabs button.active:not(.ehr-mobile-day-check) {
+  border-bottom-color: var(--ehr-blue);
+  background: transparent;
+  color: var(--ehr-blue);
 }
 
 .ehr-appointment-list {
@@ -11966,6 +11967,21 @@ span:has(> svg:only-child) {
 .ehr-appointment-list {
   border-bottom: 1px solid #DDEAF3;
   overflow: hidden auto;
+}
+
+/* The date/stats bar and the appointment rows below it read as one card
+   (header row + divider + list), not two stacked cards with a gap. */
+.ehr-daybar {
+  background: #FFFFFF;
+  border: 1px solid #DDEAF3;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 1px 2px rgba(18, 52, 78, 0.04) !important;
+}
+
+.ehr-daybar + .ehr-appointment-list {
+  margin-top: -8px;
+  border-top: 0;
+  border-radius: 0 0 16px 16px;
 }
 
 .ehr-worklist-panel {

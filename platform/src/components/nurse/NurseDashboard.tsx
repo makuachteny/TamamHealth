@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
@@ -175,7 +174,6 @@ export default function NurseDashboard() {
 
   return (
     <>
-      <TopBar title={t('nurse.title')} hideSearch />
       <main className="page-container page-enter">
         <EhrCareDashboard
           title={currentUser.role === 'triage_nurse' ? 'Triage station' : currentUser.role === 'rooming_nurse' ? 'Rooming station' : t('nurse.title')}

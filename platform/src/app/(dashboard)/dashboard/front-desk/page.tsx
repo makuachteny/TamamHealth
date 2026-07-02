@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -34,6 +33,10 @@ import { formatPhoneDisplay } from '@/lib/field-formats';
  * Shows the live queue, today's appointments, and registry snapshots in one
  * view so reception can move patients without jumping between screens.
  */
+function initials(name: string) {
+  return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || '?';
+}
+
 // Exam rooms / bays a walk-in patient can be placed in to meet the provider.
 // Fallback used only when facility settings provide no rooms.
 const ROOM_OPTIONS = ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5', 'Room 6', 'Bay A', 'Bay B', 'Bay C', 'Bay D'];
@@ -72,10 +75,6 @@ function formatDayMonthYear(iso?: string | null): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-function patientDob(patient: { dateOfBirth?: string; dob?: string }): string {
-  return formatDayMonthYear(patient.dateOfBirth || patient.dob);
 }
 
 function isoDateKey(value?: string | null): string {
@@ -824,7 +823,6 @@ export default function FrontDeskDashboardPage() {
 
   return (
     <>
-      <TopBar title={t('frontDesk.receptionCenter')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <EhrCareDashboard
           title=""
@@ -856,63 +854,44 @@ export default function FrontDeskDashboardPage() {
           missionDescription="Show the next action clearly so reception can register, check in, route, and close visits."
           showMissionCard={false}
           footerContent={(
-            <section className="card-elevated overflow-hidden recently-registered-card">
-              <div className="px-5 py-3 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
-                <div>
-                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Recently registered</h3>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    Patients added most recently.
-                  </p>
-                </div>
-                <button type="button" onClick={() => setRegisterOpen(true)} className="btn btn-primary btn-sm">
-                  <UserPlus className="w-4 h-4" />
-                  Register New Patient
-                </button>
+            <section className="ehr-worklist-panel" style={{ minWidth: 0 }}>
+              <div>
+                <h3>Recently registered</h3>
+                <span>{recentPatients.length} patients</span>
               </div>
-              <div className="recently-registered-tablewrap">
-                <table className="data-table" style={{ minWidth: 860 }}>
-                  <thead>
-                    <tr>
-                      <th>Patient</th>
-                      <th>Gender</th>
-                      <th>DOB</th>
-                      <th>Phone</th>
-                      <th>Location</th>
-                      <th>Last Activity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentPatients.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
-                          No patients registered yet.
-                        </td>
-                      </tr>
-                    ) : recentPatients.map(patient => (
-                      <tr key={patient._id} onClick={() => router.push(`/patients/${patient._id}`)} style={{ cursor: 'pointer' }}>
-                        <td>
-                          <div className="font-medium" style={{ color: 'var(--text-primary)' }}>{patientFullName(patient)}</div>
-                          <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{patient.hospitalNumber || 'No hospital number'}</div>
-                        </td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {patient.gender || 'Not recorded'}
-                        </td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {patientDob(patient)}
-                        </td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {patient.phone ? formatPhoneDisplay(patient.phone) : 'Not recorded'}
-                        </td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {[patient.county, patient.state].filter(Boolean).join(', ') || 'Not recorded'}
-                        </td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {formatDayMonthYear(patient.lastConsultedAt || patient.lastVisitDate || patientRegisteredAt(patient))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="ehr-worklist-table" style={{ minWidth: 0 }}>
+                {recentPatients.length > 0 && (
+                  <div className="ehr-worklist-head" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr)', minWidth: 0 }}>
+                    <span>Patient</span>
+                    <span>Phone</span>
+                    <span>Location</span>
+                    <span>Last Activity</span>
+                    <span>Status</span>
+                  </div>
+                )}
+                {recentPatients.length === 0 && (
+                  <div className="ehr-worklist-empty">
+                    No patients registered yet.
+                    <button type="button" onClick={() => setRegisterOpen(true)}>Register new patient</button>
+                  </div>
+                )}
+                {recentPatients.map(patient => (
+                  <button key={patient._id} type="button" className="ehr-worklist-row" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr)', minWidth: 0 }} onClick={() => router.push(`/patients/${patient._id}`)}>
+                    <span className="ehr-worklist-name">
+                      <span className="ehr-patient-icon ehr-patient-icon--sm">{initials(patientFullName(patient))}</span>
+                      <span>
+                        <strong>{patientFullName(patient)}</strong>
+                        <small>{patient.hospitalNumber || 'No hospital number'} · {patientGenderAge(patient)}</small>
+                      </span>
+                    </span>
+                    <span className="ehr-worklist-room">{patient.phone ? formatPhoneDisplay(patient.phone) : 'Not recorded'}</span>
+                    <span className="ehr-worklist-room">{[patient.county, patient.state].filter(Boolean).join(', ') || 'Not recorded'}</span>
+                    <span className="ehr-worklist-care">
+                      <strong>{formatDayMonthYear(patient.lastConsultedAt || patient.lastVisitDate || patientRegisteredAt(patient))}</strong>
+                    </span>
+                    <span><b className="ehr-worklist-status active">Registered</b></span>
+                  </button>
+                ))}
               </div>
             </section>
           )}
