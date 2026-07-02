@@ -29,8 +29,8 @@ const statusConfig: Record<TelehealthStatus, { color: string; bg: string; label:
   in_session: { color: 'var(--color-success)', bg: 'rgba(5,150,105,0.08)', label: 'In Session', icon: Video },
   completed: { color: 'var(--color-success)', bg: 'rgba(31, 157, 111,0.08)', label: 'Completed', icon: CheckCircle2 },
   cancelled: { color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.08)', label: 'Cancelled', icon: XCircle },
-  failed: { color: '#6B7280', bg: 'rgba(107,114,128,0.08)', label: 'Failed', icon: WifiOff },
-  no_show: { color: '#9CA3AF', bg: 'rgba(156,163,175,0.08)', label: 'No Show', icon: XCircle },
+  failed: { color: 'var(--text-secondary)', bg: 'rgba(107,114,128,0.08)', label: 'Failed', icon: WifiOff },
+  no_show: { color: 'var(--text-muted)', bg: 'rgba(107,114,128,0.1)', label: 'No Show', icon: XCircle },
 };
 
 const typeConfig: Record<TelehealthType, { label: string; icon: typeof Video }> = {
@@ -511,7 +511,7 @@ function Modal({ children, title, onClose, sm }: { children: React.ReactNode; ti
       <div className={`modal-panel ${sm ? 'modal-panel--sm' : 'modal-panel--md'}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h3>
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}><X size={14} /></button>
+          <button onClick={onClose} aria-label="Close" style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}><X size={14} /></button>
         </div>
         {children}
       </div>

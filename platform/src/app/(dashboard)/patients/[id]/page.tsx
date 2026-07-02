@@ -1060,9 +1060,9 @@ export default function PatientDetailPage() {
                         })()}
                         {isPregnant && (
                           <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-bold" style={{
-                            background: 'rgba(217, 110, 89, 0.12)', color: '#C44536', border: '1px solid rgba(217, 110, 89, 0.32)', letterSpacing: 0.2,
+                            background: 'rgba(217, 110, 89, 0.12)', color: 'var(--color-danger-500)', border: '1px solid rgba(217, 110, 89, 0.32)', letterSpacing: 0.2,
                           }}>
-                            <DuotoneInfoIcon name="pregnant" size={11} color="#C44536" accent="#C44536" />
+                            <DuotoneInfoIcon name="pregnant" size={11} color="var(--color-danger-500)" accent="var(--color-danger-500)" />
                             Pregnant{activeANC?.gestationalAge ? ` · ${activeANC.gestationalAge} wk` : ''}
                           </span>
                         )}
@@ -1210,7 +1210,7 @@ export default function PatientDetailPage() {
                   <div className="ehr-vitals-header px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
                     <div className="flex items-center gap-2.5">
                       <div className="icon-box-sm">
-                        <Activity className="w-4 h-4" style={{ color: '#C44536' }} />
+                        <Activity className="w-4 h-4" style={{ color: 'var(--color-danger-500)' }} />
                       </div>
                       <div>
                         <h3 className="font-semibold text-sm" style={{ letterSpacing: -0.1 }}>{t('vitals.title')}</h3>
@@ -1467,7 +1467,7 @@ export default function PatientDetailPage() {
                   <div className="card-elevated">
                     <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
                       <div className="icon-box-sm">
-                        <FileText className="w-3.5 h-3.5" style={{ color: '#E4A84B' }} />
+                        <FileText className="w-3.5 h-3.5" style={{ color: 'var(--color-warning-400)' }} />
                       </div>
                       <h3 className="font-semibold text-sm">Care Notes</h3>
                     </div>
@@ -1907,7 +1907,7 @@ export default function PatientDetailPage() {
                             {rec.visitType}
                           </span>
                           {ai && (
-                            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(139,92,246,0.12)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.2)' }}>
+                            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(139,92,246,0.12)', color: 'var(--color-purple-500)', border: '1px solid rgba(139,92,246,0.2)' }}>
                               <Brain className="w-3 h-3" /> AI
                             </span>
                           )}
@@ -2033,7 +2033,7 @@ export default function PatientDetailPage() {
                             {(rec.labResults || []).length > 0 && (
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                                  <FlaskConical className="w-3 h-3" style={{ color: '#8B5CF6' }} />
+                                  <FlaskConical className="w-3 h-3" style={{ color: 'var(--color-purple-500)' }} />
                                   Lab results ({rec.labResults!.length})
                                 </p>
                                 <ul className="space-y-1">
@@ -2065,7 +2065,7 @@ export default function PatientDetailPage() {
                               return next;
                             })}
                             className="flex items-center gap-1 text-xs mt-2 font-medium"
-                            style={{ color: '#8B5CF6' }}
+                            style={{ color: 'var(--color-purple-500)' }}
                           >
                             <Brain className="w-3 h-3" />
                             {isAIExpanded ? 'Hide' : 'View'} AI Evaluation
@@ -2079,7 +2079,7 @@ export default function PatientDetailPage() {
                               </div>
                               {ai.suggestedDiagnoses.slice(0, 3).map(dx => (
                                 <div key={dx.icd10Code} className="flex items-center gap-2 text-xs">
-                                  <span className="font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(139,92,246,0.12)', color: '#8B5CF6', fontSize: '10px' }}>{dx.icd10Code}</span>
+                                  <span className="font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(139,92,246,0.12)', color: 'var(--color-purple-500)', fontSize: '10px' }}>{dx.icd10Code}</span>
                                   <span className="font-medium">{dx.name}</span>
                                   <span style={{ color: 'var(--text-muted)' }}>({dx.confidence}%)</span>
                                 </div>
@@ -2113,7 +2113,7 @@ export default function PatientDetailPage() {
               <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
                 <div className="flex items-center gap-2">
                   <div className="icon-box-sm">
-                    <FlaskConical className="w-3.5 h-3.5" style={{ color: '#8B5CF6' }} />
+                    <FlaskConical className="w-3.5 h-3.5" style={{ color: 'var(--color-purple-500)' }} />
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.title')}</span>
                 </div>

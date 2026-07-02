@@ -230,8 +230,7 @@ export default function EhrClinicalDashboard({
       .filter(appointment => appointment.appointmentDate === selectedDate)
       .filter(appointment => locationFilter === 'all' || appointment.facilityName === locationFilter)
       .filter(matchesProviderFilter)
-      .sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || ''))
-      .slice(0, 12);
+      .sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || ''));
   }, [appointments, locationFilter, matchesProviderFilter, selectedDate]);
 
   const scheduledCount = selectedAppointmentsForDay.filter(appointment => ['scheduled', 'confirmed', 'requested'].includes(appointment.status)).length;

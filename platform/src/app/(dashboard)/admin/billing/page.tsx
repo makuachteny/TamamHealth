@@ -235,10 +235,10 @@ export default function AdminBillingPage() {
                       <td className="px-4 py-3">
                         {isEditing ? (
                           <div className="flex items-center gap-1">
-                            <button onClick={() => saveEdit(org._id)} disabled={saving} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-success)' }}>
+                            <button onClick={() => saveEdit(org._id)} disabled={saving} aria-label="Save" className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-success)' }}>
                               <Check className="w-4 h-4" />
                             </button>
-                            <button onClick={cancelEdit} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-danger)' }}>
+                            <button onClick={cancelEdit} aria-label="Cancel" className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-danger)' }}>
                               <X className="w-4 h-4" />
                             </button>
                           </div>

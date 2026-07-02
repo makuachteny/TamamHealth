@@ -39,7 +39,7 @@ export default function GetStartedCard() {
     return (
       <div
         className="absolute bottom-4 left-4 z-30 flex items-center gap-0.5 rounded-full py-0.5 pl-1.5 pr-1 text-xs font-semibold text-white shadow-lg"
-        style={{ background: 'var(--accent-primary, #0077d7)' }}
+        style={{ background: 'var(--accent-primary)' }}
       >
         <button
           onClick={() => setCollapsed(false)}
@@ -68,7 +68,7 @@ export default function GetStartedCard() {
   return (
     <div
       className="absolute inset-0 z-30 overflow-y-auto"
-      style={{ background: 'var(--bg-primary, #f6f8fb)' }}
+      style={{ background: 'var(--bg-primary)' }}
     >
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
@@ -155,7 +155,7 @@ function AllDoneBanner({ onFinish }: { onFinish: () => void }) {
       <button
         onClick={onFinish}
         className="rounded-lg px-4 py-2 text-sm font-semibold text-white"
-        style={{ background: 'var(--accent-primary, #0077d7)' }}
+        style={{ background: 'var(--accent-primary)' }}
       >
         Finish
       </button>
@@ -217,7 +217,7 @@ function SectionCard({
           className="h-0.5 w-full"
           style={{ background: 'var(--border-light)' }}
         >
-          <div className="h-full transition-all" style={{ width: `${total ? (done / total) * 100 : 0}%`, background: 'var(--accent-primary, #0077d7)' }} />
+          <div className="h-full transition-all" style={{ width: `${total ? (done / total) * 100 : 0}%`, background: 'var(--accent-primary)' }} />
         </div>
       )}
 
@@ -288,8 +288,8 @@ function ResourcesPanel({ resources }: { resources: { id: string; title: string;
             onClick={() => setTab(t)}
             className="rounded-t-lg px-3 py-1.5 text-xs font-semibold capitalize"
             style={{
-              color: tab === t ? 'var(--accent-primary, #0077d7)' : 'var(--text-muted)',
-              borderBottom: tab === t ? '2px solid var(--accent-primary, #0077d7)' : '2px solid transparent',
+              color: tab === t ? 'var(--accent-primary)' : 'var(--text-muted)',
+              borderBottom: tab === t ? '2px solid var(--accent-primary)' : '2px solid transparent',
             }}
           >
             {t === 'video' ? 'Videos' : 'Articles'}
@@ -310,8 +310,8 @@ function ResourcesPanel({ resources }: { resources: { id: string; title: string;
                 style={{ background: 'rgba(0,119,215,0.10)' }}
               >
                 {r.type === 'video'
-                  ? <Play className="w-4 h-4" style={{ color: 'var(--accent-primary, #0077d7)' }} />
-                  : <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary, #0077d7)' }} />}
+                  ? <Play className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                  : <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{r.title}</p>

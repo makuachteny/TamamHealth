@@ -1,4 +1,5 @@
 import type { OrganizationDoc } from './db-types';
+import { BRAND_PRIMARY, BRAND_SECONDARY } from './theme-colors';
 
 export interface OrgBranding {
   name: string;
@@ -10,10 +11,9 @@ export interface OrgBranding {
 
 export const DEFAULT_BRANDING: OrgBranding = {
   name: 'TamamHealth',
-  // Tamam Healthcare System brand greens (style guide, June 2026).
-  primaryColor: '#2191D0',
-  secondaryColor: '#015697',
-  accentColor: '#2191D0',
+  primaryColor: BRAND_PRIMARY,
+  secondaryColor: BRAND_SECONDARY,
+  accentColor: BRAND_PRIMARY,
 };
 
 export function getOrgBranding(org?: OrganizationDoc | null): OrgBranding {

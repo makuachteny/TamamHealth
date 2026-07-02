@@ -390,6 +390,7 @@ function ExpandedChartView({ title, onClose, children, hasData = true, emptyMess
         </div>
         <button
           onClick={onClose}
+          aria-label="Close"
           className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:opacity-70"
           style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
           title={t('government.closeEsc')}
@@ -436,12 +437,12 @@ function ExpandButton({ onClick }: { onClick: () => void }) {
 const FACILITY_COLORS = ['var(--color-success)', '#2563EB', '#A855F7', 'var(--color-warning)', 'var(--text-muted)'];
 
 const DISEASE_COLORS: Record<string, string> = {
-  malaria: '#E52E42', cholera: '#1B9E77', measles: '#A855F7',
+  malaria: '#E52E42', cholera: 'var(--color-success-500)', measles: '#A855F7',
   pneumonia: '#FCD34D', diarrhea: '#2563EB', tb: '#F97316', hiv: '#EC4899',
-  'Malaria': '#E52E42', 'Cholera': '#1B9E77', 'Measles': '#A855F7',
+  'Malaria': '#E52E42', 'Cholera': 'var(--color-success-500)', 'Measles': '#A855F7',
   'Pneumonia': '#FCD34D', 'Diarrhea': '#2563EB', 'Tuberculosis': '#F97316',
   'HIV/AIDS': '#EC4899', 'Acute Watery Diarrhea': '#2563EB',
-  'Meningitis': '#06B6D4', 'Kala-azar': '#8B5CF6', 'Hepatitis E': '#F43F5E',
+  'Meningitis': '#06B6D4', 'Kala-azar': 'var(--color-purple-500)', 'Hepatitis E': '#F43F5E',
 };
 
 // Master list of all diseases collected across the system
@@ -629,7 +630,7 @@ export default function GovernmentDashboardPage() {
 
   const staffPieData = useMemo(() => [
     { name: 'Doctors', value: totalDoctors, color: '#2563EB' },
-    { name: 'Nurses', value: totalNurses, color: '#1B9E77' },
+    { name: 'Nurses', value: totalNurses, color: 'var(--color-success-500)' },
     { name: 'Clinical Officers', value: totalCOs, color: '#A855F7' },
   ], [totalDoctors, totalNurses, totalCOs]);
 
@@ -899,7 +900,7 @@ export default function GovernmentDashboardPage() {
 
   // Staff
   const renderStaff = () => {
-    const staffColors: Record<string, string> = { Doctors: '#2563EB', Nurses: '#1B9E77', 'Clinical Officers': '#A855F7' };
+    const staffColors: Record<string, string> = { Doctors: '#2563EB', Nurses: 'var(--color-success-500)', 'Clinical Officers': '#A855F7' };
     const activeRoles = sdSelectedRoles;
 
     if (sdChartType === 'stacked') {
@@ -969,7 +970,7 @@ export default function GovernmentDashboardPage() {
               <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
               <Tooltip content={<ChartTooltip />} />
               <Bar dataKey="value" name={t('government.scorePct')} radius={[4, 4, 0, 0]} barSize={24}>
-                {perfRadarData.map((e, i) => <Cell key={i} fill={e.value >= 80 ? '#1B9E77' : e.value >= 60 ? '#FCD34D' : '#E52E42'} />)}
+                {perfRadarData.map((e, i) => <Cell key={i} fill={e.value >= 80 ? 'var(--color-success-500)' : e.value >= 60 ? '#FCD34D' : '#E52E42'} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -979,7 +980,7 @@ export default function GovernmentDashboardPage() {
     return (
       <div className="p-3 grid grid-cols-2 gap-2">
         <CircularGauge value={avgReporting} label={t('government.metricReporting')} color="#2563EB" size={96} strokeWidth={5} />
-        <CircularGauge value={avgReadiness} label={t('government.metricReadiness')} color="#2191D0" size={96} strokeWidth={5} />
+        <CircularGauge value={avgReadiness} label={t('government.metricReadiness')} color="var(--accent-primary)" size={96} strokeWidth={5} />
         <CircularGauge value={avgImmCoverage} label={t('government.metricEpiCoverage')} color="#A855F7" size={96} strokeWidth={5} />
         <CircularGauge value={functionalPct} label={t('government.metricFunctional')} color="#FCD34D" size={96} strokeWidth={5} />
       </div>
@@ -1014,7 +1015,7 @@ export default function GovernmentDashboardPage() {
                   <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} axisLine={{ stroke: 'var(--border-light)' }} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="value" name={t('government.scorePct')} radius={[6, 6, 0, 0]} barSize={40}>
-                    {perfRadarData.map((e, i) => <Cell key={i} fill={e.value >= 80 ? '#1B9E77' : e.value >= 60 ? '#FCD34D' : '#E52E42'} />)}
+                    {perfRadarData.map((e, i) => <Cell key={i} fill={e.value >= 80 ? 'var(--color-success-500)' : e.value >= 60 ? '#FCD34D' : '#E52E42'} />)}
                   </Bar>
                 </BarChart>
               )}
@@ -1054,9 +1055,9 @@ export default function GovernmentDashboardPage() {
             { label: t('government.kpiBeds'), value: totalBeds.toLocaleString(), icon: BedDouble, color: 'var(--accent-primary)', bg: 'rgba(124,58,237,0.10)', href: '/hospitals' },
             { label: t('government.kpiStaff'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: '#0891B2', bg: 'rgba(8,145,178,0.10)', href: '/hospitals' },
             { label: t('government.kpiOnline'), value: onlineHospitals.toString(), icon: Wifi, color: '#15803D', bg: 'rgba(21,128,61,0.10)', href: '/hospitals' },
-            { label: t('government.kpiOffline'), value: offlineHospitals.toString(), icon: WifiOff, color: '#64748B', bg: 'rgba(100,116,139,0.12)', href: '/hospitals' },
-            { label: t('government.kpiAlerts'), value: activeAlerts.toString(), icon: AlertTriangle, color: '#C44536', bg: 'rgba(196,69,54,0.10)', href: '/surveillance' },
-            { label: t('government.kpiReferrals'), value: pendingReferrals.toString(), icon: ArrowRightLeft, color: '#B8741C', bg: 'rgba(184,116,28,0.12)', href: '/referrals' },
+            { label: t('government.kpiOffline'), value: offlineHospitals.toString(), icon: WifiOff, color: 'var(--text-muted)', bg: 'rgba(100,116,139,0.12)', href: '/hospitals' },
+            { label: t('government.kpiAlerts'), value: activeAlerts.toString(), icon: AlertTriangle, color: 'var(--color-danger-500)', bg: 'rgba(196,69,54,0.10)', href: '/surveillance' },
+            { label: t('government.kpiReferrals'), value: pendingReferrals.toString(), icon: ArrowRightLeft, color: 'var(--color-warning-text)', bg: 'rgba(184,116,28,0.12)', href: '/referrals' },
           ].map(stat => (
             <button
               key={stat.label}
@@ -1355,7 +1356,7 @@ export default function GovernmentDashboardPage() {
                 label={t('government.roles')}
                 options={[
                   { value: 'Doctors', label: t('government.roleDoctors'), color: '#2563EB' },
-                  { value: 'Nurses', label: t('government.roleNurses'), color: '#1B9E77' },
+                  { value: 'Nurses', label: t('government.roleNurses'), color: 'var(--color-success-500)' },
                   { value: 'Clinical Officers', label: t('government.roleClinicalOfficers'), color: '#A855F7' },
                 ]}
                 selected={sdSelectedRoles}

@@ -90,7 +90,7 @@ export default function PaymentPlanWizard({
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{t('payments.paymentPlan')}</h3>
             <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>{t('payments.patientStep', { name: patientName, step })}</p>
           </div>
-          <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+          <button onClick={onCancel} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
             <X size={44} />
           </button>
         </div>

@@ -767,7 +767,7 @@ export default function LabPage() {
                     <Radio className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
                     <h3 className="text-base font-semibold">Import from analyzer</h3>
                   </div>
-                  <button onClick={resetImport} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                  <button onClick={resetImport} aria-label="Close" className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
                     <X className="w-4 h-4" />
                   </button>
                 </div>

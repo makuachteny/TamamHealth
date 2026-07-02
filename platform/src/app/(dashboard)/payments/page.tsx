@@ -301,12 +301,12 @@ export default function PaymentsPage() {
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {error && (
           <div style={{
-            background: 'rgba(196, 69, 54, 0.08)', borderLeft: '4px solid #C44536',
+            background: 'rgba(196, 69, 54, 0.08)', borderLeft: '4px solid var(--color-danger-500)',
             borderRadius: 'var(--card-radius)', padding: '14px 18px', marginBottom: 20,
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
-            <AlertCircle size={16} style={{ color: '#C44536', flexShrink: 0 }} />
-            <span style={{ color: '#8B2E24', fontSize: '0.8125rem' }}>{error}</span>
+            <AlertCircle size={16} style={{ color: 'var(--color-danger-500)', flexShrink: 0 }} />
+            <span style={{ color: 'var(--color-danger-text)', fontSize: '0.8125rem' }}>{error}</span>
           </div>
         )}
 
@@ -417,7 +417,7 @@ export default function PaymentsPage() {
                       </div>
 
                       {/* Patient ID */}
-                      <div className="font-mono text-[12px] truncate" style={{ color: line.hospitalNumber ? '#2191D0' : 'var(--text-muted)', fontWeight: 600 }}>
+                      <div className="font-mono text-[12px] truncate" style={{ color: line.hospitalNumber ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: 600 }}>
                         {line.hospitalNumber || '—'}
                       </div>
 
@@ -442,12 +442,12 @@ export default function PaymentsPage() {
                       </div>
 
                       {/* Balance */}
-                      <div className="text-right font-bold text-sm" style={{ color: owing ? '#8B2E24' : '#15795C', fontVariantNumeric: 'tabular-nums' }}>
+                      <div className="text-right font-bold text-sm" style={{ color: owing ? 'var(--color-danger-text)' : 'var(--color-success-text)', fontVariantNumeric: 'tabular-nums' }}>
                         {formatMoney(owing ? line.outstanding : line.totalCollected)}
                       </div>
 
                       {/* Status */}
-                      <div className="text-right text-[10px] font-bold uppercase tracking-wider" style={{ color: owing ? '#C44536' : '#15795C' }}>
+                      <div className="text-right text-[10px] font-bold uppercase tracking-wider" style={{ color: owing ? 'var(--color-danger-500)' : 'var(--color-success-text)' }}>
                         {owing ? t('billing.kpiOutstanding') : t('payments.paid')}
                       </div>
 
@@ -483,7 +483,7 @@ export default function PaymentsPage() {
           <div className="card-elevated" style={{ background: 'var(--bg-card-solid)', borderRadius: 16, padding: 0, overflow: 'hidden' }}>
             <div className="px-5 py-4 border-b flex items-center gap-2.5" style={{ borderColor: 'var(--border-light)' }}>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
-                <AlertTriangle className="w-4 h-4" style={{ color: '#C44536' }} />
+                <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger-500)' }} />
               </div>
               <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
                 {reverseFor.mode === 'void' ? t('action.reverse') : t('action.undo')}
@@ -498,7 +498,7 @@ export default function PaymentsPage() {
                     {reverseFor.payment.reference && <span className="font-mono"> · {reverseFor.payment.reference}</span>}
                   </div>
                 </div>
-                <div className="text-[14px] font-bold font-mono" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(reverseFor.payment.amount)}</div>
+                <div className="text-[14px] font-bold font-mono" style={{ color: 'var(--color-danger-text)', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(reverseFor.payment.amount)}</div>
               </div>
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('billing.reason')}</label>
@@ -518,7 +518,7 @@ export default function PaymentsPage() {
                 onClick={handleConfirmReverse}
                 disabled={!reverseReason.trim() || reversing}
                 className="btn inline-flex items-center gap-1.5 text-white"
-                style={{ background: '#C44536' }}
+                style={{ background: 'var(--color-danger-500)' }}
               >
                 {reverseFor.mode === 'void' ? <Ban className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
                 {t('action.confirm')}
@@ -564,7 +564,7 @@ export default function PaymentsPage() {
                         <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{line.patientName}</div>
                         {line.hospitalNumber && <div className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{line.hospitalNumber}</div>}
                       </div>
-                      <div className="text-[13px] font-bold flex-shrink-0" style={{ color: '#8B2E24', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(line.outstanding)}</div>
+                      <div className="text-[13px] font-bold flex-shrink-0" style={{ color: 'var(--color-danger-text)', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(line.outstanding)}</div>
                     </button>
                   ));
                 })()}
@@ -716,13 +716,13 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                 <h2 id="billing-detail-name" className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{line.patientName}</h2>
               </button>
               {line.hospitalNumber && (
-                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.10)', color: '#2191D0', fontWeight: 600 }}>
+                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.10)', color: 'var(--accent-primary)', fontWeight: 600 }}>
                   {line.hospitalNumber}
                 </span>
               )}
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -736,16 +736,16 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
         }}>
           <div className="flex items-end justify-between gap-3 flex-wrap">
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: owing ? '#8B2E24' : '#15795C' }}>
+              <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: owing ? 'var(--color-danger-text)' : 'var(--color-success-text)' }}>
                 {owing ? t('billing.outstandingBalance') : t('billing.accountStatus')}
               </div>
-              <div className="text-2xl font-extrabold" style={{ letterSpacing: -0.5, color: owing ? '#8B2E24' : '#15795C', fontVariantNumeric: 'tabular-nums' }}>
+              <div className="text-2xl font-extrabold" style={{ letterSpacing: -0.5, color: owing ? 'var(--color-danger-text)' : 'var(--color-success-text)', fontVariantNumeric: 'tabular-nums' }}>
                 {owing ? formatMoney(line.outstanding) : t('billing.paidInFull')}
               </div>
             </div>
             <div className="text-right text-[11px]" style={{ color: 'var(--text-muted)' }}>
               <div>{t('payments.charged')}: <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{formatMoney(line.totalCharged)}</span></div>
-              <div>{t('payments.collected')}: <span className="font-mono" style={{ color: '#15795C' }}>{formatMoney(line.totalCollected)}</span></div>
+              <div>{t('payments.collected')}: <span className="font-mono" style={{ color: 'var(--color-success-text)' }}>{formatMoney(line.totalCollected)}</span></div>
             </div>
           </div>
         </div>
@@ -773,7 +773,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                     {m.brand && <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{m.brand}</div>}
                   </div>
                   {m.isDefault && (
-                    <span className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.14)', color: '#15795C', border: '1px solid rgba(33, 145, 208, 0.30)' }}>
+                    <span className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.14)', color: 'var(--color-success-text)', border: '1px solid rgba(33, 145, 208, 0.30)' }}>
                       {t('payments.default')}
                     </span>
                   )}
@@ -799,7 +799,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                   </div>
                   <div className="text-right">
                     <div className="text-[12px] font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>{formatMoney(b.totalAmount)}</div>
-                    <div className="text-[10px]" style={{ color: b.balanceDue > 0 ? '#C44536' : '#15795C' }}>
+                    <div className="text-[10px]" style={{ color: b.balanceDue > 0 ? 'var(--color-danger-500)' : 'var(--color-success-text)' }}>
                       {b.balanceDue > 0 ? t('payments.amountDue', { amount: formatMoney(b.balanceDue) }) : t('payments.paid')}
                     </div>
                   </div>
@@ -830,7 +830,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                     <div className="flex-1 min-w-0">
                       <div className="text-[12px] font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                         {cfg.label}
-                        {reversed && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(196, 69, 54, 0.14)', color: '#8B2E24' }}>{p.status}</span>}
+                        {reversed && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(196, 69, 54, 0.14)', color: 'var(--color-danger-text)' }}>{p.status}</span>}
                       </div>
                       <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
                         {p.reference && <span className="font-mono">{p.reference} · </span>}
@@ -844,7 +844,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
-                      <div className={`text-[13px] font-bold font-mono`} style={{ color: reversed ? '#8B2E24' : '#15795C', fontVariantNumeric: 'tabular-nums', textDecoration: reversed ? 'line-through' : 'none' }}>
+                      <div className={`text-[13px] font-bold font-mono`} style={{ color: reversed ? 'var(--color-danger-text)' : 'var(--color-success-text)', fontVariantNumeric: 'tabular-nums', textDecoration: reversed ? 'line-through' : 'none' }}>
                         {formatMoney(p.amount)}
                       </div>
                       {/* Undo a recorded payment — Void reverses it, Refund gives money
@@ -861,7 +861,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                           <button
                             onClick={() => onReversePayment(p, 'refund')}
                             className="text-[10.5px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-opacity hover:opacity-80"
-                            style={{ border: '1px solid rgba(196, 69, 54, 0.30)', color: '#C44536' }}
+                            style={{ border: '1px solid rgba(196, 69, 54, 0.30)', color: 'var(--color-danger-500)' }}
                           >
                             <RotateCcw className="w-3 h-3" /> {t('action.undo')}
                           </button>
@@ -892,7 +892,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                   </div>
                   <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
                     background: c.status === 'paid' ? 'rgba(33, 145, 208, 0.14)' : c.status === 'denied' ? 'rgba(196, 69, 54, 0.14)' : 'rgba(228, 168, 75, 0.14)',
-                    color: c.status === 'paid' ? '#15795C' : c.status === 'denied' ? '#8B2E24' : '#B8741C',
+                    color: c.status === 'paid' ? 'var(--color-success-text)' : c.status === 'denied' ? 'var(--color-danger-text)' : 'var(--color-warning-text)',
                     border: c.status === 'paid' ? '1px solid rgba(33, 145, 208, 0.30)' : c.status === 'denied' ? '1px solid rgba(196, 69, 54, 0.30)' : '1px solid rgba(228, 168, 75, 0.30)',
                   }}>
                     {c.status}
@@ -924,15 +924,15 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                       </div>
                       <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md whitespace-nowrap" style={{
                         background: p.status === 'active' ? 'rgba(33, 145, 208, 0.14)' : p.status === 'completed' ? 'rgba(33, 145, 208, 0.14)' : 'rgba(228, 168, 75, 0.14)',
-                        color: p.status === 'active' ? '#15795C' : p.status === 'completed' ? '#2191D0' : '#B8741C',
+                        color: p.status === 'active' ? 'var(--color-success-text)' : p.status === 'completed' ? 'var(--accent-primary)' : 'var(--color-warning-text)',
                       }}>
                         {p.status}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-3 mt-2 pt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
                       <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
-                        {t('payments.paid')}: <span className="font-mono" style={{ color: '#15795C' }}>{formatMoney(p.paidToDate)}</span>
-                        {' · '}{t('billing.kpiOutstanding')}: <span className="font-mono" style={{ color: planOutstanding > 0 ? '#C44536' : 'var(--text-secondary)' }}>{formatMoney(planOutstanding)}</span>
+                        {t('payments.paid')}: <span className="font-mono" style={{ color: 'var(--color-success-text)' }}>{formatMoney(p.paidToDate)}</span>
+                        {' · '}{t('billing.kpiOutstanding')}: <span className="font-mono" style={{ color: planOutstanding > 0 ? 'var(--color-danger-500)' : 'var(--text-secondary)' }}>{formatMoney(planOutstanding)}</span>
                       </div>
                       {p.status === 'active' && (
                         <button

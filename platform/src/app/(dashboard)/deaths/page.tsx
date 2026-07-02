@@ -181,7 +181,7 @@ export default function DeathsPage() {
             <option value="no">{t('deaths.no')}</option>
           </select>
           {anyColFilter && (
-            <button onClick={clearColFilters} className="btn btn-secondary btn-sm" title={t('nurse.clearAllFilters')}>
+            <button onClick={clearColFilters} className="btn btn-secondary btn-sm" title={t('nurse.clearAllFilters')} aria-label={t('nurse.clearAllFilters')}>
               <X className="w-4 h-4" />
             </button>
           )}

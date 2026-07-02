@@ -1,5 +1,6 @@
 import { platformConfigDB } from '../db';
 import type { PlatformConfigDoc } from '../db-types';
+import { BRAND_PRIMARY, BRAND_SECONDARY } from '../theme-colors';
 
 const CONFIG_ID = 'platform-config';
 
@@ -12,8 +13,8 @@ const DEFAULT_CONFIG: Omit<PlatformConfigDoc, '_id' | '_rev' | 'createdAt' | 'up
     trialDays: 30,
     maxOrganizations: 100,
   },
-  defaultPrimaryColor: '#2191D0',
-  defaultSecondaryColor: '#1E40AF',
+  defaultPrimaryColor: BRAND_PRIMARY,
+  defaultSecondaryColor: BRAND_SECONDARY,
 };
 
 export async function getPlatformConfig(): Promise<PlatformConfigDoc> {

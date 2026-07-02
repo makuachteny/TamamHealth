@@ -485,7 +485,7 @@ function FacilityProfile({ hospital, onClose, canManage }: {
               <Settings style={{ width: 13, height: 13 }} /> {t('hospitals.manage')}
             </Link>
           )}
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button onClick={onClose} aria-label="Close" style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X style={{ width: 14, height: 14, color: 'var(--text-muted)' }} />
           </button>
         </div>

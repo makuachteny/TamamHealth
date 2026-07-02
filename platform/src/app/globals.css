@@ -161,6 +161,11 @@
   box-shadow: none;
 }
 
+.ti-search:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-light) !important;
+}
+
 .ti-search svg {
   flex: 0 0 auto;
   color: var(--ehr-blue);
@@ -210,6 +215,11 @@
   color: var(--ehr-text);
   font-size: 13px;
   font-weight: 700;
+}
+
+.ti-filter:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-light) !important;
 }
 
 .ti-filter select {
@@ -1085,6 +1095,10 @@
   --color-info: var(--color-brand-500);                /* fills/icons */
   --color-info-text: var(--color-brand-700);           /* AA-passing variant for text */
   --color-info-bg: rgba(33, 145, 208, 0.12);
+  --color-success-border: #15B8A6;
+  --color-warning-border: #F59E0B;
+  --color-danger-border: #F87171;
+  --color-info-border: #177FBE;
 
   /* Chart colors — brand-aligned series */
   --color-chart-1: var(--color-brand-500);
@@ -1105,6 +1119,28 @@
   --map-tooltip-text: var(--color-slate-900);
   --map-tooltip-sub: var(--color-slate-500);
   --map-dot-stroke: var(--color-cream-25);
+
+  --ehr-page-bg: #F8FBFD;
+  --ehr-panel: #FFFFFF;
+  --ehr-border: #DDEAF3;
+  --ehr-border-soft: #E7EEF5;
+  --ehr-text: #102634;
+  --ehr-muted: #8395A8;
+  --ehr-text-body: #39536B;
+  --ehr-text-title: #132C44;
+  --ehr-hover: #FAFCFE;
+  --ehr-head: #F7FAFC;
+  --ehr-soft: #E9F0F5;
+  --ehr-info-soft: #DCEFFB;
+  --ehr-info-bg: #EAF2F8;
+  --ehr-danger-bg: #FCE4DE;
+  --ehr-danger-text: #B93328;
+  --ehr-warning-bg: #FFF1C7;
+  --ehr-warning-text: #9C640E;
+  --ehr-success-bg: #DDF2E9;
+  --ehr-success-text: #0E7155;
+  --ehr-neutral-text: #4E6477;
+  --ehr-mission-bg: #115B91;
 }
 
 /* ============ DARK THEME ============ */
@@ -1114,7 +1150,7 @@
   --bg-app: var(--color-slate-950);
 
   --bg-primary: var(--color-slate-950);
-  --bg-secondary: #015697;
+  --bg-secondary: var(--color-brand-700);
   --bg-sidebar: var(--color-dark-surface);
   --bg-card: var(--color-dark-surface);
   --bg-card-solid: var(--color-dark-surface);
@@ -2675,21 +2711,21 @@ thead th {
   --ehr-rail: var(--color-brand-gradient);
   --ehr-rail-2: var(--color-brand-700);
   --ehr-rail-muted: rgba(255, 255, 255, 0.68);
-  --ehr-page-bg: #F3F6F8;
+  --ehr-page-bg: #F8FBFD;
   --ehr-panel: #FFFFFF;
-  --ehr-panel-soft: rgba(33, 145, 208, 0.08);
-  --ehr-table-head: rgba(33, 145, 208, 0.12);
-  --ehr-table-head-strong: rgba(33, 145, 208, 0.18);
-  --ehr-border: var(--color-slate-100);
-  --ehr-text: #1B2B34;
-  --ehr-muted: #627784;
-  --ehr-blue: #2191D0;
-  --ehr-blue-light: rgba(33, 145, 208, 0.12);
-  --ehr-coral: #F7826D;
-  --ehr-conflict: #FFE7ED;
-  --ehr-conflict-text: #B23B55;
-  --ehr-good: #247B6D;
-  --ehr-warning: #FFF0B8;
+  --ehr-panel-soft: rgba(25, 136, 202, 0.075);
+  --ehr-table-head: rgba(25, 136, 202, 0.11);
+  --ehr-table-head-strong: rgba(25, 136, 202, 0.18);
+  --ehr-border: #D8E3EC;
+  --ehr-text: #102634;
+  --ehr-muted: #597386;
+  --ehr-blue: #177FBE;
+  --ehr-blue-light: rgba(23, 127, 190, 0.11);
+  --ehr-coral: #E96D57;
+  --ehr-conflict: #FFE9ED;
+  --ehr-conflict-text: #A9354B;
+  --ehr-good: #1F7A67;
+  --ehr-warning: #FFF2CC;
 }
 
 .tamam-ehr-app {
@@ -3001,6 +3037,11 @@ thead th {
   border-radius: 999px;
   background: var(--color-white);
   color: var(--accent-primary);
+}
+
+.ehr-top-search:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-light) !important;
 }
 
 .ehr-top-search-spacer {
@@ -3334,12 +3375,15 @@ thead th {
 }
 
 .tamam-ehr-app .page-container:has(> .ehr-schedule-shell) {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
   overflow: hidden;
 }
 
 .ehr-schedule-shell {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -3464,7 +3508,7 @@ thead th {
   display: grid;
   grid-template-columns: minmax(230px, 260px) minmax(0, 1fr) minmax(230px, 270px);
   gap: 10px;
-  align-items: start;
+  align-items: stretch;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -3699,7 +3743,7 @@ thead th {
 }
 
 .ehr-appointment-list {
-  flex: 0 0 clamp(220px, 42%, 420px);
+  flex: 1 1 0%;
   min-height: 0;
   max-height: none;
   overflow-x: hidden;
@@ -3710,6 +3754,17 @@ thead th {
   padding: 10px;
 }
 
+.ehr-workspace-grid.is-dashboard > .ehr-center-panel > .ehr-appointment-list,
+.ehr-workspace-grid.is-calendar > .ehr-center-panel > .ehr-appointment-list {
+  min-height: clamp(320px, calc(100svh - var(--ehr-top-rail-height) - 420px), 500px);
+}
+
+.ehr-care-dashboard .ehr-care-list {
+  flex: 1 1 0%;
+  min-height: clamp(320px, calc(100svh - var(--ehr-top-rail-height) - 420px), 500px);
+  max-height: none;
+}
+
 .ehr-workspace-grid.is-calendar .ehr-appointment-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -3718,7 +3773,7 @@ thead th {
 
 .ehr-empty-state,
 .ehr-worklist-empty {
-  min-height: 220px;
+  min-height: 0;
   display: grid;
   place-items: center;
   align-content: center;
@@ -3726,6 +3781,10 @@ thead th {
   padding: 24px;
   color: var(--ehr-muted);
   text-align: center;
+}
+
+.ehr-empty-state {
+  flex: 1 1 auto;
 }
 
 .ehr-empty-state strong {
@@ -3755,9 +3814,9 @@ thead th {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) max-content;
   align-items: center;
-  gap: 12px;
-  min-height: 102px;
-  padding: 12px 16px;
+  gap: 8px;
+  min-height: 60px;
+  padding: 4px 12px;
   border: 1px solid var(--ehr-border);
   border-radius: 14px;
   background: #fff;
@@ -3814,7 +3873,7 @@ thead th {
   grid-template-columns: 84px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   column-gap: 12px;
-  row-gap: 2px;
+  row-gap: 0;
   align-items: center;
   min-width: 0;
 }
@@ -4332,6 +4391,11 @@ thead th {
   background: #fff;
 }
 
+.ehr-care-search:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-light) !important;
+}
+
 .ehr-care-search svg {
   color: var(--ehr-blue);
 }
@@ -4391,7 +4455,7 @@ thead th {
 }
 
 .ehr-care-list {
-  flex: 0 0 clamp(210px, 40%, 390px);
+  flex: 1 1 0%;
   min-height: 0;
   max-height: none;
   overflow-x: hidden;
@@ -6888,19 +6952,19 @@ thead th {
 /* ============ Patient chart: blue clinical record theme ============ */
 
 .ehr-chart-page {
-  --ehr-page-bg: #F3F6F8;
+  --ehr-page-bg: #F8FBFD;
   --ehr-panel: #ffffff;
-  --ehr-panel-soft: #eef8ff;
-  --ehr-table-head: #eef8ff;
-  --ehr-table-head-strong: #dff1ff;
-  --ehr-border: var(--color-slate-100);
-  --ehr-border-soft: #EEF3F7;
-  --ehr-text: #162b3c;
-  --ehr-muted: #60778a;
-  --ehr-blue: #1c97df;
-  --ehr-blue-strong: #0879bd;
-  --ehr-blue-light: rgba(28, 151, 223, 0.09);
-  --ehr-focus-ring: rgba(28, 151, 223, 0.18);
+  --ehr-panel-soft: #F1F8FE;
+  --ehr-table-head: #EAF4FC;
+  --ehr-table-head-strong: #DCECF9;
+  --ehr-border: #D8E3EC;
+  --ehr-border-soft: #E5EDF4;
+  --ehr-text: #102634;
+  --ehr-muted: #5B7284;
+  --ehr-blue: #177FBE;
+  --ehr-blue-strong: #0B6FAE;
+  --ehr-blue-light: rgba(23, 127, 190, 0.10);
+  --ehr-focus-ring: rgba(23, 127, 190, 0.20);
   background: var(--ehr-page-bg) !important;
 }
 
@@ -9512,15 +9576,17 @@ span:has(> svg:only-child) {
   font-size: 12px;
 }
 
-.ehr-avatar {
+.ehr-avatar:not(.ehr-avatar--labeled) {
   width: 34px !important;
   min-width: 34px;
   height: 34px !important;
   padding: 0 !important;
 }
 
-.ehr-avatar-role {
-  display: none;
+.ehr-avatar--labeled {
+  width: auto !important;
+  height: 34px !important;
+  padding: 2px 12px 2px 2px !important;
 }
 
 .ehr-avatar-mark {
@@ -9630,9 +9696,13 @@ span:has(> svg:only-child) {
 
 .ehr-empty-state,
 .ehr-worklist-empty {
-  min-height: 168px;
+  min-height: 0;
   gap: 7px;
   padding: 18px;
+}
+
+.ehr-empty-state {
+  flex: 1 1 auto;
 }
 
 .ehr-empty-state strong {
@@ -9927,7 +9997,7 @@ span:has(> svg:only-child) {
   }
 
   .ehr-empty-state {
-    min-height: 138px;
+    min-height: 0;
     padding: 14px;
   }
 
@@ -11551,6 +11621,8 @@ span:has(> svg:only-child) {
 
 .ehr-appointment-row {
   grid-template-columns: 42px minmax(72px, 92px) minmax(0, 1fr) 150px;
+  min-height: 60px;
+  padding: 4px 12px;
 }
 
 .ehr-appointment-time {
@@ -11660,7 +11732,7 @@ span:has(> svg:only-child) {
 /* Assigned patients: reference-style clinical worklist. */
 .ehr-worklist-panel {
   border-radius: 18px;
-  border-color: #DDEAF3;
+  border-color: var(--ehr-border);
   background: #FFFFFF;
   box-shadow: 0 1px 2px rgba(18, 52, 78, 0.04) !important;
 }
@@ -11668,18 +11740,18 @@ span:has(> svg:only-child) {
 .ehr-worklist-panel > div:first-child {
   min-height: 54px;
   padding: 0 18px;
-  border-bottom: 1px solid #E7EEF5;
+  border-bottom: 1px solid var(--ehr-border-soft);
 }
 
 .ehr-worklist-panel h3 {
-  color: #132C44;
+  color: var(--ehr-text-title);
   font-size: 17px;
   font-weight: 800;
   letter-spacing: 0;
 }
 
 .ehr-worklist-panel > div:first-child > span {
-  color: #8395A8;
+  color: var(--ehr-muted);
   font-size: 13px;
   font-weight: 600;
 }
@@ -11699,8 +11771,8 @@ span:has(> svg:only-child) {
 .ehr-worklist-head {
   min-height: 44px;
   border-top: 0;
-  border-bottom-color: #E7EEF5;
-  background: #F7FAFC;
+  border-bottom-color: var(--ehr-border-soft);
+  background: var(--ehr-head);
   color: #8496A8;
   font-size: 12px;
   font-weight: 800;
@@ -11709,16 +11781,16 @@ span:has(> svg:only-child) {
 
 .ehr-worklist-row {
   min-height: 68px;
-  border-bottom-color: #E7EEF5;
+  border-bottom-color: var(--ehr-border-soft);
   border-left-width: 4px;
   background: #FFFFFF;
-  color: #39536B;
+  color: var(--ehr-text-body);
   font-size: 13px;
   font-weight: 700;
 }
 
 .ehr-worklist-row:hover {
-  background: #FAFCFE;
+  background: var(--ehr-hover);
 }
 
 .ehr-worklist-name {
@@ -11730,7 +11802,7 @@ span:has(> svg:only-child) {
 }
 
 .ehr-worklist-row strong {
-  color: #102A43;
+  color: var(--ehr-text-title);
   font-size: 15px;
   font-weight: 800;
   line-height: 1.1;
@@ -11755,28 +11827,28 @@ span:has(> svg:only-child) {
 }
 
 .ehr-worklist-row[data-triage="RED"] .ehr-patient-icon {
-  background: #F9E9E5;
-  color: #C94134;
+  background: var(--ehr-danger-bg);
+  color: var(--ehr-danger-text);
 }
 
 .ehr-worklist-row[data-triage="YELLOW"] .ehr-patient-icon {
-  background: #FFF4DF;
-  color: #B87516;
+  background: var(--ehr-warning-bg);
+  color: var(--ehr-warning-text);
 }
 
 .ehr-worklist-row[data-triage="GREEN"] .ehr-patient-icon {
-  background: #E6F4EE;
-  color: #178160;
+  background: var(--ehr-success-bg);
+  color: var(--ehr-success-text);
 }
 
 .ehr-worklist-row[data-triage="GREEN"] .ehr-patient-icon[aria-hidden],
 .ehr-worklist-row[data-triage="GREEN"] .ehr-patient-icon.ehr-patient-icon--sm {
-  background: #EAF6FD;
-  color: #2698D8;
+  background: var(--ehr-info-soft);
+  color: #177FBE;
 }
 
 .ehr-worklist-room {
-  color: #39536B;
+  color: var(--ehr-text-body);
   font-family: var(--font-platform-mono);
   font-size: 14px;
   font-weight: 600;
@@ -11784,7 +11856,7 @@ span:has(> svg:only-child) {
 }
 
 .ehr-worklist-care strong {
-  color: #39536B;
+  color: var(--ehr-text-body);
   font-size: 13px;
   font-weight: 600;
 }
@@ -11806,37 +11878,37 @@ span:has(> svg:only-child) {
 }
 
 .ehr-department-pill.emergency {
-  background: #F8E8E4;
-  color: #9D372C;
+  background: var(--ehr-danger-bg);
+  color: var(--ehr-danger-text);
 }
 
 .ehr-department-pill.maternity {
-  background: #E4F4ED;
-  color: #147E5D;
+  background: var(--ehr-success-bg);
+  color: var(--ehr-success-text);
 }
 
 .ehr-department-pill.pediatrics,
 .ehr-department-pill.surgery,
 .ehr-department-pill.lab,
 .ehr-department-pill.opd {
-  background: #EDF3F7;
-  color: #496174;
+  background: var(--ehr-info-bg);
+  color: var(--ehr-text-body);
 }
 
 .ehr-worklist-status.active {
-  background: #E1F3EC;
-  color: #157A5D;
+  background: var(--ehr-success-bg);
+  color: var(--ehr-success-text);
 }
 
 .ehr-worklist-status.ready,
 .ehr-worklist-status.scheduled {
-  background: #FFF1D9;
-  color: #B87316;
+  background: var(--ehr-warning-bg);
+  color: var(--ehr-warning-text);
 }
 
 .ehr-worklist-status.done {
-  background: #EEF2F5;
-  color: #5F7285;
+  background: var(--ehr-soft);
+  color: var(--ehr-neutral-text);
 }
 
 /* Right rail cards: reference layout, normal dashboard scale. */
@@ -11845,7 +11917,7 @@ span:has(> svg:only-child) {
 }
 
 .ehr-side-card {
-  border-color: #DDEAF3;
+  border-color: var(--ehr-border);
   border-radius: 16px;
   padding: 18px;
   background: #FFFFFF;
@@ -11853,13 +11925,13 @@ span:has(> svg:only-child) {
 
 .ehr-side-card h2 {
   margin-bottom: 14px;
-  color: #132C44;
+  color: var(--ehr-text-title);
   font-size: 17px;
   font-weight: 800;
 }
 
 .ehr-side-card p {
-  color: #8395A8;
+  color: var(--ehr-muted);
   font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
@@ -11871,7 +11943,7 @@ span:has(> svg:only-child) {
 
 .ehr-outstanding-chips button {
   min-height: 38px;
-  border-bottom: 1px solid #E7EEF5;
+  border-bottom: 1px solid var(--ehr-border-soft);
   color: #3E5870;
   font-size: 14px;
   font-weight: 600;
@@ -11885,7 +11957,7 @@ span:has(> svg:only-child) {
   min-width: auto;
   height: auto;
   background: transparent;
-  color: #8395A8;
+  color: var(--ehr-muted);
   font-family: var(--font-platform-mono);
   font-size: 14px;
   font-weight: 800;
@@ -11898,7 +11970,7 @@ span:has(> svg:only-child) {
 }
 
 .ehr-outstanding-chips button.neutral b {
-  color: #8395A8;
+  color: var(--ehr-muted);
 }
 
 .ehr-side-card label {
@@ -11911,12 +11983,12 @@ span:has(> svg:only-child) {
 .ehr-side-card input {
   width: 18px;
   height: 18px;
-  accent-color: #21A67A;
+  accent-color: var(--color-success-500);
 }
 
 .ehr-mission-card {
   border-color: transparent;
-  background: #115B91 !important;
+  background: var(--ehr-mission-bg) !important;
   color: #FFFFFF;
 }
 
@@ -11946,7 +12018,7 @@ span:has(> svg:only-child) {
 .ehr-side-card,
 .ehr-worklist-panel,
 .ehr-appointment-list {
-  border: 1px solid #DDEAF3;
+  border: 1px solid var(--ehr-border);
   border-radius: 16px;
   background: #FFFFFF;
   box-shadow: 0 1px 2px rgba(18, 52, 78, 0.04) !important;
@@ -11956,17 +12028,17 @@ span:has(> svg:only-child) {
   width: 100%;
   margin: 0;
   background: #FFFFFF;
-  color: #2698D8;
+  color: var(--color-brand-400);
 }
 
 .ehr-mini-calendar {
   padding: 12px;
-  border-bottom: 1px solid #DDEAF3;
+  border-bottom: 1px solid var(--ehr-border);
 }
 
 .ehr-filter-group {
   padding: 12px;
-  border-bottom: 1px solid #DDEAF3;
+  border-bottom: 1px solid var(--ehr-border);
 }
 
 .ehr-filter-group + .ehr-filter-group {
@@ -11982,7 +12054,7 @@ span:has(> svg:only-child) {
 }
 
 .ehr-filter-group > label:first-child {
-  color: #102A43;
+  color: var(--ehr-text-title);
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -11991,12 +12063,12 @@ span:has(> svg:only-child) {
 .ehr-filter-group label,
 .ehr-side-card label {
   align-items: center;
-  color: #39536B;
+  color: var(--ehr-text-body);
 }
 
 .ehr-filter-group input,
 .ehr-side-card input {
-  accent-color: #21A67A;
+  accent-color: var(--color-success-500);
 }
 
 .ehr-center-panel {
@@ -12005,7 +12077,7 @@ span:has(> svg:only-child) {
 }
 
 .ehr-appointment-list {
-  border-bottom: 1px solid #DDEAF3;
+  border-bottom: 1px solid var(--ehr-border);
   overflow: hidden auto;
 }
 
@@ -12013,7 +12085,7 @@ span:has(> svg:only-child) {
    (header row + divider + list), not two stacked cards with a gap. */
 .ehr-daybar {
   background: #FFFFFF;
-  border: 1px solid #DDEAF3;
+  border: 1px solid var(--ehr-border);
   border-radius: 16px 16px 0 0;
   box-shadow: 0 1px 2px rgba(18, 52, 78, 0.04) !important;
 }
@@ -12029,37 +12101,37 @@ span:has(> svg:only-child) {
 }
 
 .ehr-department-pill.emergency {
-  background: #F9E9E5;
-  color: #9D352A;
+  background: var(--ehr-danger-bg);
+  color: var(--ehr-danger-text);
 }
 
 .ehr-department-pill.maternity {
-  background: #E4F5ED;
-  color: #15805F;
+  background: var(--ehr-success-bg);
+  color: var(--ehr-success-text);
 }
 
 .ehr-department-pill.pediatrics,
 .ehr-department-pill.surgery,
 .ehr-department-pill.lab,
 .ehr-department-pill.opd {
-  background: #EEF4F8;
-  color: #49627A;
+  background: var(--ehr-info-bg);
+  color: var(--ehr-text-body);
 }
 
 .ehr-worklist-status.active {
-  background: #E2F4EE;
-  color: #15795C;
+  background: var(--ehr-success-bg);
+  color: var(--ehr-success-text);
 }
 
 .ehr-worklist-status.ready,
 .ehr-worklist-status.scheduled {
-  background: #FFF2DA;
-  color: #B87516;
+  background: var(--ehr-warning-bg);
+  color: var(--ehr-warning-text);
 }
 
 .ehr-worklist-status.done {
-  background: #EEF2F5;
-  color: #607489;
+  background: var(--ehr-soft);
+  color: var(--ehr-neutral-text);
 }
 
 /* Final EHR dashboard alignment audit. Keep the current typography and copy,
@@ -12067,7 +12139,7 @@ span:has(> svg:only-child) {
 .ehr-workspace-grid,
 .ehr-workspace-grid.is-dashboard {
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .ehr-left-rail,
@@ -12085,7 +12157,7 @@ span:has(> svg:only-child) {
   flex-direction: column;
   border: 0;
   background: transparent;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .ehr-right-rail {
@@ -12098,7 +12170,7 @@ span:has(> svg:only-child) {
 .ehr-appointment-list,
 .ehr-worklist-panel,
 .ehr-side-card {
-  border: 1px solid #DDEAF3;
+  border: 1px solid var(--ehr-border);
   border-radius: 16px;
   background: #FFFFFF;
   box-shadow: 0 1px 2px rgba(18, 52, 78, 0.04) !important;
@@ -12150,13 +12222,13 @@ span:has(> svg:only-child) {
 }
 
 .ehr-appointment-list {
-  flex: 0 0 auto;
+  flex: 1 1 0%;
   min-height: 0;
-  max-height: 360px;
+  max-height: none;
 }
 
 .ehr-appointment-list:has(.ehr-empty-state) {
-  min-height: 220px;
+  min-height: clamp(320px, calc(100svh - var(--ehr-top-rail-height) - 420px), 500px);
 }
 
 .ehr-center-panel > .ehr-clinical-strip {
@@ -12171,8 +12243,16 @@ span:has(> svg:only-child) {
   margin: 0;
 }
 
+.ehr-workspace-grid.is-dashboard .ehr-worklist-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .ehr-worklist-table {
-  overflow-x: auto;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
 }
 
 .ehr-outstanding-chips button,
@@ -12182,41 +12262,41 @@ span:has(> svg:only-child) {
 
 .ehr-filter-group input,
 .ehr-side-card input {
-  accent-color: #21A67A;
+  accent-color: var(--color-success-500);
 }
 
 .ehr-department-pill.emergency {
-  background: #F8E8E4;
-  color: #9D372C;
+  background: var(--ehr-danger-bg);
+  color: var(--ehr-danger-text);
 }
 
 .ehr-department-pill.maternity {
-  background: #E4F4ED;
-  color: #147E5D;
+  background: var(--ehr-success-bg);
+  color: var(--ehr-success-text);
 }
 
 .ehr-department-pill.pediatrics,
 .ehr-department-pill.surgery,
 .ehr-department-pill.lab,
 .ehr-department-pill.opd {
-  background: #EDF3F7;
-  color: #496174;
+  background: var(--ehr-info-bg);
+  color: var(--ehr-text-body);
 }
 
 .ehr-worklist-status.active {
-  background: #E1F3EC;
-  color: #157A5D;
+  background: var(--ehr-success-bg);
+  color: var(--ehr-success-text);
 }
 
 .ehr-worklist-status.ready,
 .ehr-worklist-status.scheduled {
-  background: #FFF1D9;
-  color: #B87316;
+  background: var(--ehr-warning-bg);
+  color: var(--ehr-warning-text);
 }
 
 .ehr-worklist-status.done {
-  background: #EEF2F5;
-  color: #5F7285;
+  background: var(--ehr-soft);
+  color: var(--ehr-neutral-text);
 }
 
 /* Only the plain dose/frequency span (Medications row) gets JetBrains Mono —

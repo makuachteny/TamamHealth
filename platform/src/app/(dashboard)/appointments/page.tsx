@@ -920,7 +920,7 @@ function Modal({ children, onClose, title, titleColor, icon, size = 'md', nav }:
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {nav}
-            <button onClick={onClose} style={{
+            <button onClick={onClose} aria-label="Close" style={{
               background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer',
               width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: 'var(--text-muted)', transition: 'background 0.15s',

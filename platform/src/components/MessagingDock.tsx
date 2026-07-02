@@ -14,6 +14,7 @@ import { useUsers } from '@/lib/hooks/useUsers';
 import { useMessagingDock } from '@/lib/messaging-dock-context';
 import { getRoleConfig } from '@/lib/permissions';
 import { ROLE_LABEL } from '@/lib/role-display';
+import { BRAND_PRIMARY, BRAND_SECONDARY } from '@/lib/theme-colors';
 import type { ConversationDoc, UserRole } from '@/lib/db-types';
 import {
   MessageSquare, Minus, Plus, Search, Send, ArrowLeft, Users as UsersIcon,
@@ -32,16 +33,16 @@ const AVAILABILITY_LABELS: Record<string, string> = {
   away: 'Away',
 };
 const AVAILABILITY_COLORS: Record<string, string> = {
-  available:    '#059669',
-  busy:         '#D97706',
+  available:    'var(--color-success-600)',
+  busy:         'var(--color-warning-600)',
   in_procedure: 'var(--accent-primary)',
   in_emergency: '#DC2626',
   in_theatre:   '#0E7490',
   on_rounds:    '#0369A1',
-  away:         '#64748B',
+  away:         'var(--text-muted)',
 };
 
-const AVATAR_PALETTE = ['var(--accent-primary)', '#015697', '#0EA5E9', '#0891B2', '#1D4ED8', '#0369A1', '#1E40AF', '#475569'];
+const AVATAR_PALETTE = ['var(--accent-primary)', BRAND_SECONDARY, '#0EA5E9', '#0891B2', '#1D4ED8', '#0369A1', '#1E40AF', '#475569'];
 const NON_MESSAGEABLE_ROLES: UserRole[] = ['super_admin', 'government'];
 
 function colorFor(seed: string): string {
@@ -263,7 +264,7 @@ export default function MessagingDock() {
                 className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 hover:bg-[var(--overlay-subtle)]"
                 title={`Status: ${AVAILABILITY_LABELS[availability]}`}
               >
-                <span className="w-3 h-3 rounded-full" style={{ background: AVAILABILITY_COLORS[availability] || '#059669' }} />
+                <span className="w-3 h-3 rounded-full" style={{ background: AVAILABILITY_COLORS[availability] || 'var(--color-success-600)' }} />
               </button>
               {showAvailability && (
                 <div className="absolute right-0 top-full mt-1 z-50 py-1 rounded-xl shadow-xl min-w-[160px]" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)' }}>
@@ -367,7 +368,7 @@ export default function MessagingDock() {
             {phiWarning && (
               <div className="mx-2.5 mt-2.5 p-2.5 rounded-lg" style={{ background: 'rgba(217,119,6,0.12)', border: '1px solid rgba(217,119,6,0.3)' }}>
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: '#D97706' }} />
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-warning-600)' }} />
                   <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
                     This message may contain patient-identifiable information (PHI). Only share with authorized staff. Do you confirm?
                   </p>

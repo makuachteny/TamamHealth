@@ -82,7 +82,7 @@ const buildPaymentMethods = (bankDetails?: string): PaymentMethodDef[] => [
   { id: 'mtn', label: 'MTN Mobile Money', desc: 'Pay via MTN MoMo', icon: Smartphone, color: '#FFCB05', instructions: 'Dial *165# > Pay Bill\nMerchant Code: TamamHealth\nReference: Your Invoice #' },
   { id: 'airtel', label: 'Airtel Money', desc: 'Pay via Airtel Money', icon: Smartphone, color: '#ED1C24', instructions: 'Dial *185# > Pay Bill\nBusiness Name: TamamHealth HEALTH\nReference: Your Invoice #' },
   { id: 'card', label: 'Visa / Mastercard', desc: 'Secure card payment via Flutterwave', icon: CreditCard, color: '#6366f1', instructions: 'Click "Pay Now" to be redirected to our secure payment gateway powered by Flutterwave.' },
-  { id: 'bank', label: 'Bank Transfer', desc: 'Direct bank deposit', icon: Building2, color: '#2191D0', instructions: resolveBankInstructions(bankDetails) },
+  { id: 'bank', label: 'Bank Transfer', desc: 'Direct bank deposit', icon: Building2, color: 'var(--accent-primary)', instructions: resolveBankInstructions(bankDetails) },
 ];
 
 export default function PatientPortalPage() {
@@ -202,7 +202,7 @@ export default function PatientPortalPage() {
                 border: '1px solid rgba(255,255,255,0.15)', textAlign: 'center', minWidth: 110,
               }}>
                 <div style={{ fontSize: '0.625rem', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{t('billing.colBalanceDue')}</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: totalOwed > 0 ? '#E4A84B' : '#4ade80' }}>{formatMoney(totalOwed)}</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: totalOwed > 0 ? 'var(--color-warning-400)' : '#4ade80' }}>{formatMoney(totalOwed)}</div>
               </div>
               <div style={{
                 background: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: '14px 20px',
@@ -307,7 +307,7 @@ export default function PatientPortalPage() {
                             onClick={() => handlePayBill(bill)}
                             style={{
                               padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                              background: '#2191D0', color: '#fff',
+                              background: 'var(--accent-primary)', color: '#fff',
                               fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
                               transition: 'opacity 0.15s',
                             }}
@@ -662,7 +662,7 @@ export default function PatientPortalPage() {
                 onClick={resetPayment}
                 style={{
                   padding: '12px 32px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                  background: '#2191D0', color: '#fff',
+                  background: 'var(--accent-primary)', color: '#fff',
                   fontSize: '0.875rem', fontWeight: 700,
                 }}
               >

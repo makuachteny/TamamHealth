@@ -233,7 +233,7 @@ function ModalOverlay({ open, onClose, title, children }: {
       <div className="modal-panel modal-panel--lg">
         <div className="flex items-center justify-between p-4 sticky top-0 z-10" style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border-light)' }}>
           <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:opacity-80" style={{ background: 'var(--bg-secondary)' }}>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg transition-colors hover:opacity-80" style={{ background: 'var(--bg-secondary)' }}>
             <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
           </button>
         </div>
@@ -730,7 +730,7 @@ export default function DashboardPage() {
                     <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-platform)' }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'var(--font-platform)' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
                     <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'var(--font-platform)', paddingTop: 2 }} />
-                    <Bar dataKey="inpatient" name="Inpatient" fill="#2191D0" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="inpatient" name="Inpatient" fill="var(--accent-primary)" radius={[3, 3, 0, 0]} />
                     <Bar dataKey="outpatient" name="Outpatient" fill="#FF7F00" radius={[3, 3, 0, 0]} />
                   </BarChart>
                 ) : reviewsChartType === 'area' ? (
@@ -740,7 +740,7 @@ export default function DashboardPage() {
                     <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-platform)' }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'var(--font-platform)' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
                     <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'var(--font-platform)', paddingTop: 2 }} />
-                    <Area type="monotone" dataKey="inpatient" name="Inpatient" stroke="#2191D0" strokeWidth={2} fill="#2191D0" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
+                    <Area type="monotone" dataKey="inpatient" name="Inpatient" stroke="var(--accent-primary)" strokeWidth={2} fill="var(--accent-primary)" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
                     <Area type="monotone" dataKey="outpatient" name="Outpatient" stroke="#FF7F00" strokeWidth={2} fill="#FF7F00" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
                   </AreaChart>
                 ) : (
@@ -750,7 +750,7 @@ export default function DashboardPage() {
                     <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-platform)' }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'var(--font-platform)' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
                     <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'var(--font-platform)', paddingTop: 2 }} />
-                    <Line type="monotone" dataKey="inpatient" name="Inpatient" stroke="#2191D0" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                    <Line type="monotone" dataKey="inpatient" name="Inpatient" stroke="var(--accent-primary)" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
                     <Line type="monotone" dataKey="outpatient" name="Outpatient" stroke="#FF7F00" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
                   </LineChart>
                 )}
@@ -942,8 +942,8 @@ export default function DashboardPage() {
                           size={28}
                           color={
                             p.triagePriority === 'RED' ? '#DC2626' :
-                            p.triagePriority === 'YELLOW' ? '#D97706' :
-                            p.triagePriority === 'GREEN' ? '#059669' :
+                            p.triagePriority === 'YELLOW' ? 'var(--color-warning-600)' :
+                            p.triagePriority === 'GREEN' ? 'var(--color-success-600)' :
                             undefined
                           }
                         />
@@ -1114,9 +1114,9 @@ export default function DashboardPage() {
                     }}
                   >
                     <span className="flex items-center justify-center rounded-xl flex-shrink-0" style={{ width: 34, height: 34 }}>
-                      <a.icon className="w-[17px] h-[17px]" style={{ color: '#2191D0' }} />
+                      <a.icon className="w-[17px] h-[17px]" style={{ color: 'var(--accent-primary)' }} />
                     </span>
-                    <span className="text-xs font-semibold leading-tight" style={{ color: '#2191D0' }}>{a.label}</span>
+                    <span className="text-xs font-semibold leading-tight" style={{ color: 'var(--accent-primary)' }}>{a.label}</span>
                   </button>
                 ))}
               </div>
@@ -1671,7 +1671,7 @@ export default function DashboardPage() {
           {referralDone ? (
             <div className="flex flex-col items-center gap-3 py-6">
               <div className="w-12 h-12 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6" style={{ color: '#059669' }} />
+                <CheckCircle2 className="w-6 h-6" style={{ color: 'var(--color-success-600)' }} />
               </div>
               <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Referral submitted</p>
               <button className="btn btn-primary btn-sm" onClick={() => setNewReferralOpen(false)}>Done</button>
@@ -1712,7 +1712,7 @@ export default function DashboardPage() {
           {apptDone ? (
             <div className="flex flex-col items-center gap-3 py-6">
               <div className="w-12 h-12 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6" style={{ color: '#059669' }} />
+                <CheckCircle2 className="w-6 h-6" style={{ color: 'var(--color-success-600)' }} />
               </div>
               <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Appointment booked</p>
               <button className="btn btn-primary btn-sm" onClick={() => setBookApptOpen(false)}>Done</button>
@@ -1785,7 +1785,7 @@ export default function DashboardPage() {
           {admitDone ? (
             <div className="flex flex-col items-center gap-3 py-6">
               <div className="w-12 h-12 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6" style={{ color: '#059669' }} />
+                <CheckCircle2 className="w-6 h-6" style={{ color: 'var(--color-success-600)' }} />
               </div>
               <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Patient admitted</p>
               <button className="btn btn-primary btn-sm" onClick={() => setWardAdmitOpen(false)}>Done</button>

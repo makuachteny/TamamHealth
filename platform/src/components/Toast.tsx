@@ -3,6 +3,7 @@
 import { useState, useCallback, createContext, useContext, ReactNode } from 'react';
 import { CheckCircle2, AlertTriangle, X } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { DANGER, DANGER_STRONG, SUCCESS, SUCCESS_STRONG, WHITE } from '@/lib/theme-colors';
 
 interface Toast {
   id: number;
@@ -52,9 +53,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             role="alert"
             className="flex items-center gap-3 px-4 py-3 shadow-lg animate-fadeInUp"
             style={{
-              background: toast.type === 'success' ? 'var(--color-success)' : 'var(--color-danger)',
-              color: 'white',
-              border: `1px solid ${toast.type === 'success' ? '#15B8A6' : '#F87171'}`,
+              background: toast.type === 'success' ? SUCCESS : DANGER,
+              color: WHITE,
+              border: `1px solid ${toast.type === 'success' ? SUCCESS_STRONG : DANGER_STRONG}`,
               borderRadius: 'var(--card-radius)',
             }}
           >

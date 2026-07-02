@@ -407,7 +407,7 @@ export default function PatientsPage() {
                 )}
               </div>
             </div>
-            <div className="show-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="show-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
               <table className="w-full" style={{ tableLayout: 'fixed', minWidth: 880 }}>
                 <colgroup>
                   {columns.map(c => (
@@ -470,7 +470,7 @@ export default function PatientsPage() {
               </table>
             </div>
             {hasMore && (
-              <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   {t('patients.showingOf', { shown: visible.length.toLocaleString(), total: filtered.length.toLocaleString() })}
                 </span>

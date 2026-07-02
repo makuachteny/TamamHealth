@@ -184,18 +184,18 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
     } finally { setLoading(false); }
   };
 
-  const BLUE = '#2191D0';
+  const BLUE = 'var(--accent-primary)';
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '12px 14px', fontSize: 15,
     border: '1px solid var(--border-medium)', borderRadius: 4,
     background: 'var(--bg-card-solid)', color: 'var(--text-primary)',
     outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
-    fontFamily: "'DM Sans', Arial, sans-serif",
+    fontFamily: "var(--font-platform)",
   };
   const labelStyle: React.CSSProperties = {
     display: 'block', fontSize: 13, fontWeight: 600,
     color: 'var(--text-secondary)', marginBottom: 6,
-    fontFamily: "'DM Sans', Arial, sans-serif",
+    fontFamily: "var(--font-platform)",
   };
 
   return (
@@ -216,8 +216,8 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
               </p>
             </div>
             <div className="pp-form-card">
-            <h2 className="text-[15px] font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: "'DM Sans', Arial, sans-serif", letterSpacing: '-0.01em' }}>{t('patientPortal.signInTitle')}</h2>
-            <p className="text-[13px] mb-6" style={{ color: 'var(--text-muted)', fontFamily: "'DM Sans', Arial, sans-serif" }}>{t('patientPortal.signInSubtitle')}</p>
+            <h2 className="text-[15px] font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: "var(--font-platform)", letterSpacing: '-0.01em' }}>{t('patientPortal.signInTitle')}</h2>
+            <p className="text-[13px] mb-6" style={{ color: 'var(--text-muted)', fontFamily: "var(--font-platform)" }}>{t('patientPortal.signInSubtitle')}</p>
 
             {!dbReady && (
               <div className="mb-4 p-3 rounded-lg text-center" style={{
@@ -297,7 +297,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
               <button type="submit" disabled={loading || !dbReady}
                 className="w-full flex items-center justify-center gap-2 text-[15px] font-semibold text-white transition-all duration-200 mt-3"
                 style={{
-                  fontFamily: "'DM Sans', Arial, sans-serif",
+                  fontFamily: "var(--font-platform)",
                   background: BLUE, padding: '14px 20px', borderRadius: 4,
                   border: 'none', cursor: loading ? 'wait' : 'pointer',
                   opacity: loading || !dbReady ? 0.6 : 1,
@@ -434,7 +434,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         }
         .pp-logo-img { width: 42px; height: 42px; }
         .pp-heading {
-          font-family: 'DM Sans', Arial, sans-serif;
+          font-family: var(--font-platform);
           font-size: clamp(28px, 3.2vw, 36px);
           font-weight: 700;
           letter-spacing: -0.02em;
@@ -464,7 +464,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           position: absolute;
           top: 0; left: 0; right: 0;
           height: 3px;
-          background: linear-gradient(90deg, #3b82f6 0%, #3B82F6 50%, #E4A84B 100%);
+          background: linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-primary) 50%, var(--color-warning-400) 100%);
         }
 
         .pp-form-footer {
@@ -541,7 +541,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           padding: 48px 0;
         }
         .pp-image-title {
-          font-family: 'DM Sans', Arial, sans-serif;
+          font-family: var(--font-platform);
           font-size: clamp(32px, 3.6vw, 48px);
           font-weight: 700;
           line-height: 1.08;
@@ -573,7 +573,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: #E4A84B;
+          background: var(--color-warning-400);
           flex-shrink: 0;
           box-shadow: 0 0 0 3px rgba(228,168,75,0.18);
         }
@@ -996,7 +996,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                 style={{
                   padding: '10px 14px', borderRadius: 8, border: 'none',
                   cursor: chatSending || !chatInput.trim() ? 'not-allowed' : 'pointer',
-                  background: '#2191D0', color: '#fff',
+                  background: 'var(--accent-primary)', color: '#fff',
                   display: 'flex', alignItems: 'center',
                   opacity: chatSending || !chatInput.trim() ? 0.6 : 1,
                 }}
@@ -1112,7 +1112,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                             <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{apt.reason || apt.appointmentType}</p>
                             <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('patientPortal.drPrefix')} {apt.providerName} &middot; {apt.department}</p>
                           </div>
-                          {i === 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#2191D0', color: '#fff', textTransform: 'uppercase', flexShrink: 0 }}>{t('patientPortal.next')}</span>}
+                          {i === 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: 'var(--accent-primary)', color: '#fff', textTransform: 'uppercase', flexShrink: 0 }}>{t('patientPortal.next')}</span>}
                         </div>
                       </div>
                     ))}
@@ -1126,7 +1126,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 0' }}>
                     <Calendar size={44} style={{ color: 'var(--text-muted)', opacity: 0.3, marginBottom: 8 }} />
                     <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>{t('patientPortal.noUpcomingAppointments')}</p>
-                    <button onClick={() => setShowBooking(true)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#2191D0', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button onClick={() => setShowBooking(true)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Plus size={12} />{t('patientPortal.bookAppointment')}
                     </button>
                   </div>
@@ -1176,7 +1176,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   <AlertRow color="#EF4444" text={t('patientPortal.allergiesList', { list: patient.allergies.join(', ') })} />
                 )}
                 {(patient.chronicConditions || []).map((c, i) => (
-                  <AlertRow key={i} color="#D97706" text={c} />
+                  <AlertRow key={i} color="var(--color-warning-600)" text={c} />
                 ))}
                 {pendingLabs > 0 && (
                   <AlertRow color="var(--accent-primary)" text={t('patientPortal.pendingLabResults', { count: pendingLabs })} />
@@ -1673,7 +1673,7 @@ function InsuranceTab({}: { patient: PatientDoc }) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.insuranceInformation')}</h2>
-        <button onClick={() => setShowAddForm(!showAddForm)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 14px', borderRadius: 8, background: '#2191D0', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button onClick={() => setShowAddForm(!showAddForm)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 14px', borderRadius: 8, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
           <Plus size={13} /> {t('patientPortal.addInsurance')}
         </button>
       </div>
@@ -1814,7 +1814,7 @@ function FormsTab() {
                 {form.date && <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('patientPortal.completedDate', { date: form.date })}</p>}
               </div>
               {form.status !== 'completed' ? (
-                <button style={{ fontSize: 11, fontWeight: 600, padding: '6px 12px', borderRadius: 6, background: '#2191D0', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                <button style={{ fontSize: 11, fontWeight: 600, padding: '6px 12px', borderRadius: 6, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>
                   {form.status === 'pending' ? t('patientPortal.complete') : t('patientPortal.fillOut')}
                 </button>
               ) : (
@@ -1954,7 +1954,7 @@ function StatementsTab() {
                   <Download size={12} /> {t('patientPortal.downloadPdf')}
                 </button>
                 {balance > 0 && (
-                  <button style={{ fontSize: 11, fontWeight: 600, padding: '6px 14px', borderRadius: 6, background: '#2191D0', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                  <button style={{ fontSize: 11, fontWeight: 600, padding: '6px 14px', borderRadius: 6, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>
                     {t('patientPortal.payNow')}
                   </button>
                 )}
@@ -2060,7 +2060,7 @@ function ProfileTab({ patient }: { patient: PatientDoc }) {
             {(patient.chronicConditions || []).length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {patient.chronicConditions.map((c, i) => (
-                  <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'rgba(217,119,6,0.08)', color: '#D97706', border: '1px solid rgba(217,119,6,0.15)' }}>{c}</span>
+                  <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'rgba(217,119,6,0.08)', color: 'var(--color-warning-600)', border: '1px solid rgba(217,119,6,0.15)' }}>{c}</span>
                 ))}
               </div>
             ) : (
@@ -2403,7 +2403,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
               </div>
             )}
           </div>
-          <button onClick={() => { setStep('bills'); setSelectedBills([]); setPayMethod(null); setLastPayment(null); }} style={{ fontSize: 13, fontWeight: 600, padding: '10px 24px', borderRadius: 8, background: '#2191D0', color: '#fff', border: 'none', cursor: 'pointer' }}>{t('patientPortal.done')}</button>
+          <button onClick={() => { setStep('bills'); setSelectedBills([]); setPayMethod(null); setLastPayment(null); }} style={{ fontSize: 13, fontWeight: 600, padding: '10px 24px', borderRadius: 8, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>{t('patientPortal.done')}</button>
         </div>
       </div>
     );
@@ -2661,7 +2661,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
                   <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>{t('portal.amountToPay')}</p>
                   <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--accent-primary)' }}>{selectedTotal.toLocaleString()} <span style={{ fontSize: 12 }}>SSP</span></p>
                 </div>
-                <button onClick={() => setStep('method')} style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: '#2191D0', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                <button onClick={() => setStep('method')} style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: 'var(--accent-primary)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                   {t('patientPortal.proceedToPay')}
                 </button>
               </>
@@ -2723,7 +2723,7 @@ function SH({ icon: Icon, title }: { icon: typeof User; title: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
       <Icon size={14} style={{ color: 'var(--accent-primary)' }} />
-      <span style={{ fontFamily: "'DM Sans', Arial, sans-serif", fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</span>
+      <span style={{ fontFamily: "var(--font-platform)", fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</span>
     </div>
   );
 }
@@ -2766,12 +2766,12 @@ function Empty({ icon: Icon, text, action, onAction }: { icon: typeof User; text
    ═══════════════════════════════════════════════════════════════ */
 const patientPortalCSS = `
 .pp-title {
-  font-family: 'DM Sans', Arial, sans-serif;
+  font-family: var(--font-platform);
   font-size: 32px; font-weight: 700; color: var(--text-primary);
   letter-spacing: -0.02em; margin-bottom: 8px; line-height: 1.2;
 }
 .pp-subtitle {
-  font-family: 'DM Sans', Arial, sans-serif;
+  font-family: var(--font-platform);
   font-size: 16px; color: var(--text-secondary); line-height: 1.6;
   max-width: 380px; margin: 0 auto;
 }
@@ -2785,7 +2785,7 @@ const patientPortalCSS = `
   background: var(--bg-secondary);
 }
 .pp-toggle__btn {
-  flex: 1; padding: 14px 0; font-family: 'DM Sans', Arial, sans-serif;
+  flex: 1; padding: 14px 0; font-family: var(--font-platform);
   font-size: 14px; font-weight: 700; border: none; cursor: pointer;
   background: transparent; color: var(--text-secondary); transition: all 0.2s ease;
   border-radius: 7px; margin: 2px;
@@ -2796,14 +2796,14 @@ const patientPortalCSS = `
 }
 .pp-field { margin-bottom: 20px; }
 .pp-label {
-  display: block; font-family: 'DM Sans', Arial, sans-serif;
+  display: block; font-family: var(--font-platform);
   font-size: 14px; font-weight: 600; color: var(--text-primary);
   margin-bottom: 8px; letter-spacing: 0;
   text-transform: none;
 }
 .pp-input {
   width: 100%; padding: 14px 16px; border-radius: 8px;
-  border: 1px solid var(--border-medium); font-family: 'DM Sans', Arial, sans-serif;
+  border: 1px solid var(--border-medium); font-family: var(--font-platform);
   font-size: 16px; color: var(--text-primary); background: var(--bg-card-solid);
   transition: border-color 0.2s, box-shadow 0.2s; outline: none;
 }
@@ -2812,7 +2812,7 @@ const patientPortalCSS = `
 .pp-btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
   gap: 10px; padding: 16px 28px; border-radius: 8px;
-  font-family: 'DM Sans', Arial, sans-serif; font-size: 16px;
+  font-family: var(--font-platform); font-size: 16px;
   font-weight: 700; cursor: pointer; border: none;
   background: var(--accent-primary); color: #fff; transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(0,119,215,0.2);
