@@ -17,6 +17,8 @@ import {
 import { findByType } from './db-query';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
+import type { DataScope } from './data-scope';
+import { filterByScope } from './data-scope';
 
 /** Statuses where the clinician has handed off and is waiting on a parallel order. */
 export const RESUMABLE_STATUSES: EncounterStatus[] = [
@@ -31,6 +33,12 @@ export async function getEncounter(id: string): Promise<EncounterDoc | null> {
   } catch {
     return null;
   }
+}
+
+export async function getAllEncounters(scope?: DataScope): Promise<EncounterDoc[]> {
+  const rows = await findByType<EncounterDoc>(encountersDB(), 'clinical_encounter', {}, { indexFields: ['type'] });
+  rows.sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+  return scope ? filterByScope(rows, scope) : rows;
 }
 
 /** Open (non-closed) encounters a clinician can resume, newest first. */

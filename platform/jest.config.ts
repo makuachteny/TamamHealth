@@ -19,7 +19,7 @@ const config: Config = {
   coverageProvider: 'v8',
 };
 
-export default async () => {
+const createConfig = async () => {
   const jestConfig = await createJestConfig(config as unknown as Parameters<typeof createJestConfig>[0])();
   jestConfig.transformIgnorePatterns = [
     '/node_modules/(?!(jose|uuid|pouchdb-adapter-memory)/).*\\.js$',
@@ -35,3 +35,5 @@ export default async () => {
   ];
   return jestConfig;
 };
+
+export default createConfig;

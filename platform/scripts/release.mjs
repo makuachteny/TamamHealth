@@ -33,7 +33,6 @@ const version = versionIndex !== -1
   : packageJson.version || '0.1.0';
 
 const archiveName = `tamamhealth-platform-${version}`;
-const stagingDir = join(DIST, archiveName);
 
 console.log(`\n  Packaging TamamHealth Platform v${version}...\n`);
 

@@ -40,7 +40,7 @@ export default function TodaysAppointmentsCard({ className = '' }: { className?:
           </div>
           <div className="relative z-[1] flex items-center gap-4" style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
             <span className="inline-flex items-center gap-1.5">
-              <span className="rounded-full" style={{ width: 10, height: 10, background: '#34D399' }} /> {arrived} checked in
+              <span className="rounded-full" style={{ width: 10, height: 10, background: 'var(--color-success)' }} /> {arrived} checked in
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="rounded-full" style={{ width: 10, height: 10, background: 'rgba(255,255,255,0.7)' }} /> {waiting} waiting

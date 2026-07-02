@@ -339,7 +339,7 @@ export default function SurveillancePage() {
     sunday.setUTCDate(sunday.getUTCDate() + 6);
     const fmt = (dt: Date) => `${dt.toLocaleString('en', { month: 'short' })} ${dt.getUTCDate()}`;
     return `W${w.week} ${w.year} (${fmt(monday)}-${fmt(sunday)})`;
-  }, [diseaseAlerts]);
+  }, [diseaseAlerts, t]);
 
   /**
    * Export the current IDSR report as a JSON blob the user can download.

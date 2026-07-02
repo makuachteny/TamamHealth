@@ -40,7 +40,7 @@ import { useApp } from '@/lib/context';
 import { isProviderRole, isClinicalAuthorRole } from '@/lib/clinical-roles';
 import type { SuperbillPreview } from '@/lib/services/superbill-service';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { patientAgeLabel, patientFullName } from '@/lib/patient-utils';
+import { patientAgeLabel, patientFullName, patientInitials } from '@/lib/patient-utils';
 import { formatMoney } from '@/lib/format-utils';
 import { Icon as DuotoneInfoIcon } from '@/components/icons';
 import { useToast } from '@/components/Toast';
@@ -220,6 +220,7 @@ export default function ConsultationPage() {
           followUpDate: string; followUpReason: string;
           addReferral: boolean; referralHospital: string;
           referralUrgency: string; referralReason: string;
+          visitDisposition: 'checkout' | 'referred' | 'admitted';
         }>;
         skipNextAutosave.current = true;
         setEncounterId(enc._id);
@@ -242,6 +243,7 @@ export default function ConsultationPage() {
         if (s.referralHospital != null) setReferralHospital(s.referralHospital);
         if (s.referralUrgency != null) setReferralUrgency(s.referralUrgency);
         if (s.referralReason != null) setReferralReason(s.referralReason);
+        if (s.visitDisposition) setVisitDisposition(s.visitDisposition);
         // Open the Investigations section so returned results are visible.
         setOpenSections(prev => { const next = [...prev]; next[6] = true; return next; });
         if (enc.labOrderIds?.length) {
@@ -256,7 +258,7 @@ export default function ConsultationPage() {
         console.error('Failed to resume encounter', err);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [searchParams]);
 
   // Look for an existing draft for this patient on mount/patient-change.
@@ -280,7 +282,7 @@ export default function ConsultationPage() {
       }
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [selectedPatient, draftRestored]);
 
   // Chief Complaint
@@ -409,6 +411,7 @@ export default function ConsultationPage() {
   const [referralHospital, setReferralHospital] = useState('');
   const [referralUrgency, setReferralUrgency] = useState('routine');
   const [referralReason, setReferralReason] = useState('');
+  const [visitDisposition, setVisitDisposition] = useState<'checkout' | 'referred' | 'admitted'>('checkout');
 
   // Medical records hook
   const { create: createRecord, records: patientRecords } = useMedicalRecords(selectedPatient || undefined);
@@ -624,6 +627,7 @@ export default function ConsultationPage() {
         referralHospital,
         referralUrgency,
         referralReason,
+        visitDisposition,
       };
       // saveDraft is async (Web Crypto). Fire-and-forget — failure is
       // already silent inside the module, and we don't want to block typing.
@@ -638,7 +642,7 @@ export default function ConsultationPage() {
   }, [
     selectedPatient, chiefComplaint, vitals, physExam, diagnoses, prescriptions,
     labOrders, treatmentPlan, followUpDate, followUpReason, addReferral,
-    referralHospital, referralUrgency, referralReason,
+    referralHospital, referralUrgency, referralReason, visitDisposition,
   ]);
 
   const toggleSection = (index: number) => {
@@ -903,7 +907,7 @@ export default function ConsultationPage() {
     consultationStartedAt, chiefComplaint, complaints, vitals, physExam,
     history, ros, diagnoses, prescriptions, labOrders, treatmentPlan,
     followUpDate, followUpReason, addReferral, referralHospital,
-    referralUrgency, referralReason,
+    referralUrgency, referralReason, visitDisposition,
   });
 
   // Ensure exactly one EncounterDoc exists for this visit. Created lazily on the
@@ -1146,7 +1150,7 @@ export default function ConsultationPage() {
     // If the clinician opted to attach a referral, the destination + reason
     // are required. Catching this on submit (rather than silently dropping
     // the referral) prevents emergency hand-offs from being lost.
-    if (addReferral) {
+    if (addReferral || visitDisposition === 'referred') {
       if (!referralHospital) {
         showToast(t('consultation.selectReferralHospital'), 'error');
         return;
@@ -1301,6 +1305,7 @@ export default function ConsultationPage() {
         consultedAt: now,
         startedAt: consultationStartedAt,
         visitType: 'outpatient',
+        visitDisposition,
         providerName: currentUser?.name || '',
         providerRole: currentUser?.role || 'doctor',
         department: 'Outpatient',
@@ -1457,7 +1462,7 @@ export default function ConsultationPage() {
       //      gets the patient's history, current consultation, and any
       //      attachments. Previously this checkbox collected data but never
       //      created the referral — emergency hand-offs were silently dropped.
-      if (addReferral && referralHospital && referralReason.trim()) {
+      if ((addReferral || visitDisposition === 'referred') && referralHospital && referralReason.trim()) {
         try {
           const destHospital = hospitals.find(h => h._id === referralHospital);
           await createReferralWithTransfer(
@@ -1489,7 +1494,9 @@ export default function ConsultationPage() {
         }
       }
 
-      // 7. Auto-assign doctor on triage: update triage handoff for this patient
+      // 7. Update the active triage route. Normal outpatient completion stays
+      // open for front-desk checkout; admission/referral hand off to their own
+      // downstream modules.
       try {
         const { updateTriage } = await import('@/lib/services/triage-service');
         const todayStr = now.slice(0, 10);
@@ -1499,25 +1506,32 @@ export default function ConsultationPage() {
           (t.status === 'pending' || t.status === 'seen')
         );
         if (patientTriage) {
+          const finalTriageStatus =
+            visitDisposition === 'admitted' ? 'admitted'
+              : visitDisposition === 'referred' ? 'referred'
+                : 'seen';
           await updateTriage(patientTriage._id, {
-            status: 'seen',
+            status: finalTriageStatus,
             handoffTo: currentUser?._id,
             handoffToName: currentUser?.name,
             handoffAt: now,
           });
         }
       } catch (e) {
-        console.warn('Could not update triage handoff', e);
-        postWarnings.push('triage hand-off was not recorded');
+        console.warn('Could not update visit disposition', e);
+        postWarnings.push('visit disposition was not recorded');
       }
 
-      // Close the encounter out: move it to clinic checkout and link the
-      //    medical record that finalises the visit, so it leaves any worklist.
-      //    Runs for every visit now (the encounter is always created above).
+      // Close the encounter out according to the clinician's selected route.
       if (activeEncounterId) {
         try {
-          await moveEncounter(activeEncounterId, 'ready_for_clinic_checkout', {
+          const finalEncounterStatus =
+            visitDisposition === 'admitted' ? 'admitted'
+              : visitDisposition === 'referred' ? 'referred_out'
+                : 'ready_for_clinic_checkout';
+          await moveEncounter(activeEncounterId, finalEncounterStatus, {
             medicalRecordId: savedRecord?._id,
+            snapshot: buildEncounterSnapshot(),
             actorId: currentUser?._id,
           });
           // Close the result-review loop: finalising the visit means the
@@ -1530,7 +1544,7 @@ export default function ConsultationPage() {
           }
         } catch (e) {
           console.warn('Could not finalise the resumed encounter', e);
-          postWarnings.push('the visit could not be closed to checkout');
+          postWarnings.push('the visit could not be closed to the selected disposition');
         }
       }
 
@@ -1547,7 +1561,14 @@ export default function ConsultationPage() {
       } else {
         showToast(t('consultation.savedSuccess'), 'success');
       }
-      router.push(`/patients/${selectedPatient}`);
+      if (visitDisposition === 'admitted') {
+        const admittingDiagnosis = diagnoses[0]?.name || chiefComplaint;
+        router.push(`/wards?admitPatientId=${encodeURIComponent(selectedPatient)}&diagnosis=${encodeURIComponent(admittingDiagnosis)}`);
+      } else if (visitDisposition === 'referred') {
+        router.push('/referrals?tab=outgoing');
+      } else {
+        router.push(`/patients/${selectedPatient}`);
+      }
     } catch (err) {
       console.error('Failed to save consultation:', err);
       // The form keeps all its data and the orders already written are tracked,
@@ -1578,6 +1599,7 @@ export default function ConsultationPage() {
         referralHospital?: string;
         referralUrgency?: string;
         referralReason?: string;
+        visitDisposition?: 'checkout' | 'referred' | 'admitted';
       }>(key);
       if (!parsed) {
         setRestorePromptFor(null);
@@ -1599,6 +1621,7 @@ export default function ConsultationPage() {
       if (parsed.referralHospital != null) setReferralHospital(parsed.referralHospital);
       if (parsed.referralUrgency != null) setReferralUrgency(parsed.referralUrgency);
       if (parsed.referralReason != null) setReferralReason(parsed.referralReason);
+      if (parsed.visitDisposition) setVisitDisposition(parsed.visitDisposition);
       setDraftSavedAt(parsed.savedAt || null);
       showToast(t('consultation.draftRestored'), 'success');
     } catch {
@@ -1833,6 +1856,7 @@ export default function ConsultationPage() {
     consultAttachments.length > 0 ||
     followUpDate !== '' ||
     followUpReason.trim().length > 0 ||
+    visitDisposition !== 'checkout' ||
     (addReferral && (referralHospital !== '' || referralReason.trim().length > 0))
   );
   const intakeReady = () => hasChiefComplaint() && (hasVitalsInput() || !!todaysTriage);
@@ -1914,19 +1938,6 @@ export default function ConsultationPage() {
     : i === WORKFLOW_PANEL.plan ? hasPlanInput()
     : consultationReadyForSummary()
   );
-  const sectionFilled = (i: number): boolean => (
-    i === 0 ? hasHistoryInput()
-    : i === 1 ? intakeReady()
-    : i === 2 ? hasExamInput()
-    : i === 3 ? consultationReadyForSummary()
-    : i === 4 ? diagnoses.length > 0
-    : i === 5 ? prescriptions.length > 0
-    : i === 6 ? Object.values(labOrders).some(Boolean)
-    : i === 7 ? treatmentPlan.trim().length > 0
-    : i === 8 ? consultAttachments.length > 0
-    : i === 9 ? followUpDate !== '' || followUpReason.trim().length > 0
-    : addReferral && referralHospital !== '' && referralReason.trim() !== ''
-  );
   // A stage counts as done when at least one of its sections has data; the first
   // not-yet-started stage is the "current" one. (Plan & checkout is optional.)
   const stageDone = (sections: number[]) => sections.some(s => workflowPanelFilled(s));
@@ -2007,8 +2018,12 @@ export default function ConsultationPage() {
                 { icon: 'patient', value: `${patientAgeLabel(selectedPatientData)} · ${selectedPatientData.gender || '—'}`, accent: 'var(--accent-primary)' },
                 ...(selectedPatientData.state ? [{ icon: 'mapPin' as const, value: selectedPatientData.state, accent: '#1F9D6F' }] : []),
               ];
+              const allergyList = (selectedPatientData.allergies || []).filter(
+                a => a && !/^none\b|^no known|^nkda$/i.test(a.trim())
+              );
               return (
               <div className="ehr-consult-patient-summary">
+                <div className="ehr-consult-patient-avatar" aria-hidden="true">{patientInitials(selectedPatientData)}</div>
                 <div className="ehr-consult-patient-identity">
                   <button
                     onClick={() => router.push(`/patients/${selectedPatientData._id}`)}
@@ -2035,6 +2050,14 @@ export default function ConsultationPage() {
                     ))}
                   </div>
                 </div>
+                {allergyList.length > 0 && (
+                  <span className="ehr-consult-chip ehr-consult-chip--danger" title={allergyList.join(', ')}>
+                    <AlertTriangle size={13} />
+                    <span className="truncate" style={{ fontSize: 12, fontWeight: 700 }}>
+                      {allergyList.join(', ')}
+                    </span>
+                  </span>
+                )}
                 <div className="ehr-consult-visit-controls">
                   <label>
                     Assigned to
@@ -3321,7 +3344,10 @@ export default function ConsultationPage() {
                     <input
                       type="checkbox"
                       checked={addReferral}
-                      onChange={e => setAddReferral(e.target.checked)}
+                      onChange={e => {
+                        setAddReferral(e.target.checked);
+                        if (!e.target.checked && visitDisposition === 'referred') setVisitDisposition('checkout');
+                      }}
                       className="w-4 h-4 rounded"
                       style={{ accentColor: 'var(--accent-primary)' }}
                     />
@@ -3381,6 +3407,44 @@ export default function ConsultationPage() {
 
             {/* Visit charges (fee ticket) review — shown before completing so the
                 clinician sees what will be billed (P2.3 consultation checkout). */}
+            {isLastStep && (
+              <div className="rounded-xl p-4 mb-2" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                <div className="mb-3">
+                  <h4 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Visit disposition</h4>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Choose the next station after this clinical note is completed.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  {[
+                    { value: 'checkout', label: 'Checkout / pharmacy', note: 'Send to desk, billing, pharmacy, then dismissal' },
+                    { value: 'referred', label: 'Refer / transfer', note: 'Create outbound transfer package' },
+                    { value: 'admitted', label: 'Admit to ward', note: 'Open ward admission and bed assignment' },
+                  ].map(option => {
+                    const selected = visitDisposition === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          const value = option.value as 'checkout' | 'referred' | 'admitted';
+                          setVisitDisposition(value);
+                          if (value === 'referred') setAddReferral(true);
+                        }}
+                        className="text-left rounded-lg px-3 py-2"
+                        style={{
+                          border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--border-light)',
+                          background: selected ? 'rgba(41,149,213,0.10)' : 'var(--surface-card)',
+                          color: 'var(--text-primary)',
+                        }}
+                      >
+                        <span className="block text-xs font-semibold">{option.label}</span>
+                        <span className="block text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{option.note}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {isLastStep && chargePreview && chargePreview.lines.length > 0 && (
               <div className="rounded-xl p-4 mb-2" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                 <div className="flex items-center justify-between mb-2">

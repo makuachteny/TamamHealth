@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Fragment } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
 import EmptyState from '@/components/EmptyState';
@@ -10,7 +11,7 @@ import {
   ArrowRightLeft, Plus, Send, CheckCircle2,
   AlertTriangle, ChevronDown, ChevronUp, X,
   Stethoscope, Package, FileText, Image as ImageIcon,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   User, Activity, FlaskConical, Paperclip, XCircle, MessageSquarePlus,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ClipboardCheck, Bell, RotateCcw,
@@ -49,6 +50,7 @@ const DISPOSITION_OPTIONS: ReferralDisposition[] = [
 
 export default function ReferralsPage() {
   const { t } = useTranslation();
+  const searchParams = useSearchParams();
   const { referrals, createWithTransfer, accept, updateStatus, updateNotes, completeWithOutcome } = useReferrals();
   const { showToast } = useToast();
   const { hospitals } = useHospitals();
@@ -67,6 +69,11 @@ export default function ReferralsPage() {
   const [colFilters, setColFilters] = useState<ReferralFilterState>({ patient: '', route: '', department: '', urgency: '', status: '' });
   const setColFilter = (k: keyof ReferralFilterState, v: string) => setColFilters(f => ({ ...f, [k]: v }));
   const clearColFilters = () => setColFilters({ patient: '', route: '', department: '', urgency: '', status: '' });
+
+  useEffect(() => {
+    const tab = searchParams?.get('tab');
+    if (tab === 'incoming' || tab === 'outgoing') setActiveTab(tab);
+  }, [searchParams]);
 
   // New referral form state
   const [formPatient, setFormPatient] = useState('');
@@ -125,7 +132,7 @@ export default function ReferralsPage() {
   // For each receiving facility, count how many referrals we sent there
   // and what fraction were accepted (status sent → received → seen → completed).
   // New incoming referrals (status 'sent') for notification badge
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const newIncomingCount = incomingReferrals.filter(r => r.status === 'sent' && !viewedReferralIds.has(r._id)).length;
 
   // Auto-mark as 'received' when user expands an incoming referral with status 'sent'

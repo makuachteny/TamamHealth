@@ -63,6 +63,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitIntent, setSubmitIntent] = useState<'profile' | 'check-in' | null>(null);
   // Fingerprint templates captured during registration (consent-gated inside
   // the component). Persisted AFTER the patient doc exists, in handleSubmit.
   const [fingerprints, setFingerprints] = useState<CapturedFingerprint[]>([]);
@@ -153,7 +154,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
     setStep(step + 1);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (nextAction: 'profile' | 'check-in' = 'profile') => {
     // Validate all steps before submitting
     const allErrors = { ...validateStep(0), ...validateStep(1), ...validateStep(2) };
     if (Object.keys(allErrors).length > 0) {
@@ -163,6 +164,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
     }
 
     setSubmitting(true);
+    setSubmitIntent(nextAction);
     try {
       const nowIso = new Date().toISOString();
       const today = nowIso.split('T')[0];
@@ -262,6 +264,8 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
       showToast(`${t('patientNew.toastRegistered', { firstName: form.firstName, surname: form.surname })}${result?.hospitalNumber ? ` — Hospital No. ${result.hospitalNumber}` : ''}`, 'success');
       if (onRegistered) {
         onRegistered();
+      } else if (nextAction === 'check-in' && result?._id) {
+        router.push(`/check-in?patientId=${result._id}`);
       } else {
         router.push('/patients');
       }
@@ -276,6 +280,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
       }
     } finally {
       setSubmitting(false);
+      setSubmitIntent(null);
     }
   };
 
@@ -771,10 +776,19 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                 <button onClick={goNext} className="btn btn-primary">
                   {t('patientNew.next')} <ArrowRight className="w-4 h-4" />
                 </button>
-              ) : (
-                <button onClick={handleSubmit} disabled={submitting} className="btn btn-success" style={{ opacity: submitting ? 0.7 : 1 }}>
+              ) : onRegistered ? (
+                <button onClick={() => handleSubmit('profile')} disabled={submitting} className="btn btn-success" style={{ opacity: submitting ? 0.7 : 1 }}>
                   {submitting ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('patientNew.saving')}</> : <><Check className="w-4 h-4" /> {t('patientNew.registerPatient')}</>}
                 </button>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <button onClick={() => handleSubmit('profile')} disabled={submitting} className="btn btn-secondary" style={{ opacity: submitting ? 0.7 : 1 }}>
+                    {submitting && submitIntent === 'profile' ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full" /> {t('patientNew.saving')}</> : t('patientNew.registerPatient')}
+                  </button>
+                  <button onClick={() => handleSubmit('check-in')} disabled={submitting} className="btn btn-success" style={{ opacity: submitting ? 0.7 : 1 }}>
+                    {submitting && submitIntent === 'check-in' ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('patientNew.saving')}</> : <><Check className="w-4 h-4" /> Register & Check In</>}
+                  </button>
+                </div>
               )}
             </div>
             </div>

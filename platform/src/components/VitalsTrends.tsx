@@ -307,7 +307,7 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
     'var(--color-success-bg)';
   const statusColor =
     status === 'danger' ? 'var(--color-danger)' :
-    status === 'warning' ? 'var(--color-warning-700)' :
+    status === 'warning' ? 'var(--color-warning-text)' :
     'var(--color-success-text)';
   // The whole trend card picks up a tinted surface when a vital is off —
   // matches the Latest Vitals grid so readers never miss a red card.
@@ -341,7 +341,7 @@ function MetricCard({ metric }: { metric: MetricSummary }) {
             {title}
           </p>
           <div className="flex items-baseline gap-2 mt-0.5">
-            <span className="text-2xl font-bold" style={{ color: status === 'danger' ? statusColor : 'var(--text-primary)' }}>
+            <span className="text-2xl font-bold" style={{ color: status === 'danger' ? statusColor : 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
               {latestDisplay}
             </span>
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{unit}</span>

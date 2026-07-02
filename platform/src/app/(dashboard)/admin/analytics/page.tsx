@@ -14,7 +14,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, CartesianGrid, Legend
 } from 'recharts';
-import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick, AreaGradients } from '@/components/ChartCard';
+import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick } from '@/components/ChartCard';
 
 interface OrgDataPoint {
   name: string;

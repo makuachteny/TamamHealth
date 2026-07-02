@@ -28,13 +28,6 @@ function Counter({ end, suffix = "", prefix = "" }: { end: number; suffix?: stri
 
 // ─── DATA ───────────────────────────────────────────────────────
 
-const HERO_STATS = [
-  { value: 90, suffix: "+", label: "product.stat.featuresLabel", sub: "product.stat.featuresSub" },
-  { value: 11, suffix: ".4M", label: "product.stat.peopleLabel", sub: "product.stat.peopleSub" },
-  { value: 8, suffix: "+", label: "product.stat.modulesLabel", sub: "product.stat.modulesSub" },
-  { value: 4, suffix: "+", label: "product.stat.releasesLabel", sub: "product.stat.releasesSub" },
-];
-
 const FEATURE_CATEGORIES = [
   {
     title: "product.feature.configurableTitle",

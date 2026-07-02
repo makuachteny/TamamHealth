@@ -53,9 +53,9 @@ export default function DashboardHero({
           {facility && (
             <span
               className="inline-flex items-center gap-1.5 rounded-full"
-              style={{ height: 26, padding: '0 10px 0 6px', background: 'transparent', border: '0.5px solid #FEFFF9', fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 12, color: '#fff' }}
+              style={{ height: 26, padding: '0 10px 0 6px', background: 'transparent', border: '0.5px solid rgba(255,255,255,0.5)', fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 12, color: '#fff' }}
             >
-              <span className="rounded-full flex-shrink-0" style={{ width: 20, height: 20, background: '#90F489' }} />
+              <span className="rounded-full flex-shrink-0" style={{ width: 20, height: 20, background: 'var(--color-success)' }} />
               {facility}
             </span>
           )}

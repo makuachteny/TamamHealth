@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { AppointmentDoc, AppointmentStatus } from '@/lib/db-types';
 import {
@@ -15,9 +15,18 @@ import {
   Search,
   SendHorizontal,
   Stethoscope,
-  User,
   X,
 } from '@/components/icons/lucide';
+
+function initials(name: string) {
+  return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || '?';
+}
+
+function appointmentTriage(priority: AppointmentDoc['priority']) {
+  if (priority === 'emergency') return 'RED';
+  if (priority === 'urgent') return 'YELLOW';
+  return 'GREEN';
+}
 
 type WorklistPatient = {
   _id: string;
@@ -114,6 +123,16 @@ function statusTone(status: AppointmentStatus) {
   return 'scheduled';
 }
 
+function departmentTone(value?: string) {
+  const department = (value || '').toLowerCase();
+  if (department.includes('emergency')) return 'emergency';
+  if (department.includes('maternity')) return 'maternity';
+  if (department.includes('pediatric')) return 'pediatrics';
+  if (department.includes('surgery')) return 'surgery';
+  if (department.includes('lab')) return 'lab';
+  return 'opd';
+}
+
 export default function EhrClinicalDashboard({
   clinicianName,
   facilityName,
@@ -135,6 +154,7 @@ export default function EhrClinicalDashboard({
   const searchParams = useSearchParams();
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
   const [view, setView] = useState<'dashboard' | 'calendar'>('dashboard');
+  const [railOpen, setRailOpen] = useState(false);
   const [appointmentLane, setAppointmentLane] = useState<'scheduled' | 'in_office' | 'finished'>('scheduled');
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [openAppointment, setOpenAppointment] = useState<AppointmentDoc | null>(null);
@@ -174,10 +194,10 @@ export default function EhrClinicalDashboard({
     setView(searchParams.get('view') === 'calendar' ? 'calendar' : 'dashboard');
   }, [searchParams]);
 
-  const matchesProviderFilter = (appointment: AppointmentDoc) => {
+  const matchesProviderFilter = useCallback((appointment: AppointmentDoc) => {
     if (providerOptions.length === 0 || providerFilter.length === 0) return true;
     return providerFilter.includes(appointment.providerName || clinicianName);
-  };
+  }, [clinicianName, providerFilter, providerOptions.length]);
 
   const appointmentCounts = useMemo(() => {
     return appointments.reduce<Map<string, number>>((counts, appointment) => {
@@ -186,7 +206,7 @@ export default function EhrClinicalDashboard({
       counts.set(appointment.appointmentDate, (counts.get(appointment.appointmentDate) || 0) + 1);
       return counts;
     }, new Map());
-  }, [appointments, locationFilter, providerFilter, providerOptions.length]);
+  }, [appointments, locationFilter, matchesProviderFilter]);
 
   const calendarCells = useMemo(() => {
     const monthStart = startOfMonth(calendarMonth);
@@ -212,7 +232,7 @@ export default function EhrClinicalDashboard({
       .filter(matchesProviderFilter)
       .sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || ''))
       .slice(0, 12);
-  }, [appointments, locationFilter, providerFilter, providerOptions.length, selectedDate]);
+  }, [appointments, locationFilter, matchesProviderFilter, selectedDate]);
 
   const scheduledCount = selectedAppointmentsForDay.filter(appointment => ['scheduled', 'confirmed', 'requested'].includes(appointment.status)).length;
   const inOfficeCount = selectedAppointmentsForDay.filter(appointment => ['checked_in', 'in_progress'].includes(appointment.status)).length;
@@ -253,6 +273,17 @@ export default function EhrClinicalDashboard({
           </div>
         </div>
         <div className="ehr-schedule-actions">
+          {view === 'dashboard' && outstanding.length > 0 && (
+            <button
+              type="button"
+              className={`ehr-rail-toggle ${outstanding.some(item => item.tone === 'danger') ? 'danger' : outstanding.some(item => item.tone === 'warning') ? 'warning' : ''}`}
+              aria-label="Toggle outstanding items panel"
+              aria-expanded={railOpen}
+              onClick={() => setRailOpen(open => !open)}
+            >
+              <ClipboardList className="w-4 h-4" /> Outstanding <b>{outstanding.reduce((sum, item) => sum + item.count, 0)}</b>
+            </button>
+          )}
           <button type="button" aria-label="Print"><Printer className="w-4 h-4" /> Print</button>
           <button type="button" aria-label="Find available appointment" onClick={() => router.push('/appointments')}>
             <Calendar className="w-4 h-4" /> Find available appointment
@@ -402,6 +433,7 @@ export default function EhrClinicalDashboard({
                   <article
                     key={appointment._id}
                     className="ehr-appointment-row"
+                    data-triage={appointmentTriage(appointment.priority)}
                     role="button"
                     tabIndex={0}
                     onClick={() => {
@@ -416,7 +448,11 @@ export default function EhrClinicalDashboard({
                       }
                     }}
                   >
-                    <div className="ehr-patient-icon"><User className="w-5 h-5" /></div>
+                    <div className="ehr-patient-icon">{initials(appointment.patientName)}</div>
+                    <div className="ehr-appointment-time">
+                      <strong>{appointment.appointmentTime}</strong>
+                      <span>{typeLabel(appointment.priority)}</span>
+                    </div>
                     <div className="ehr-appointment-main">
                       <button type="button" onClick={(event) => {
                         event.stopPropagation();
@@ -424,10 +460,7 @@ export default function EhrClinicalDashboard({
                       }}>
                         {appointment.patientName}
                       </button>
-                      <p>
-                        {appointment.appointmentTime} · {typeLabel(appointment.appointmentType)} · {appointment.facilityName || facilityName || 'Tamam facility'} · {appointment.providerName}
-                      </p>
-                      <span>{appointment.reason || 'General review'}</span>
+                      <p>{appointment.reason || 'General review'} · {appointment.department || typeLabel(appointment.appointmentType)}</p>
                     </div>
                     <div className="ehr-status-menu">
                       <select
@@ -460,8 +493,18 @@ export default function EhrClinicalDashboard({
 		              <section className="ehr-worklist-panel">
 		                <div>
 		                  <h3>Assigned patients</h3>
+                          <span>{patientRows.length} today</span>
 		                </div>
 		                <div className="ehr-worklist-table">
+                    {patientRows.length > 0 && (
+                      <div className="ehr-worklist-head">
+                        <span>Patient</span>
+                        <span>Room</span>
+                        <span>Department</span>
+                        <span>Care team</span>
+                        <span>Status</span>
+                      </div>
+                    )}
 	                  {patientRows.length === 0 && (
 	                    <div className="ehr-worklist-empty">
 	                      No patients are assigned to you right now.
@@ -469,16 +512,31 @@ export default function EhrClinicalDashboard({
                     </div>
                   )}
 	                  {patientRows.map(patient => (
-	                    <button key={patient._id} type="button" className="ehr-worklist-row" onClick={() => router.push(`/consultation?patientId=${patient._id}`)}>
-	                      <span><strong>{patient.name}</strong></span>
-	                      <span>{patient.age ? `${patient.age} yrs` : 'Not recorded'}</span>
-	                      <span>{patient.gender || 'Not recorded'}</span>
-	                      <span>{patient.id || 'Not recorded'}</span>
-	                      <span>{patient.ward || 'OPD'}</span>
-	                      <span>{patient.doctor || clinicianName || 'Not assigned'}</span>
-                      <span>{patient.nurse || 'Not assigned'}</span>
-                      <span>{patient.division || patient.ward?.split('-')[0] || 'Outpatient'}</span>
-                    </button>
+                      (() => {
+                        const matchingAppointment = selectedAppointmentsForDay.find(appointment => (
+                          appointment.patientId === patient._id || appointment.patientName === patient.name
+                        ));
+                        const status = matchingAppointment?.status || (patient.triagePriority === 'RED' ? 'checked_in' : 'scheduled');
+                        const department = patient.division || patient.ward?.split('-')[0] || matchingAppointment?.department || 'OPD';
+                        return (
+                          <button key={patient._id} type="button" className="ehr-worklist-row" data-triage={patient.triagePriority || 'GREEN'} onClick={() => router.push(`/consultation?patientId=${patient._id}`)}>
+                            <span className="ehr-worklist-name">
+                              <span className="ehr-patient-icon ehr-patient-icon--sm">{initials(patient.name)}</span>
+                              <span>
+                                <strong>{patient.name}</strong>
+                                <small>{patient.id || 'No ID'} · {patient.age ? `${patient.age}y` : 'Age unknown'} · {patient.gender || 'Not recorded'}</small>
+                              </span>
+                            </span>
+                            <span className="ehr-worklist-room">{patient.ward || matchingAppointment?.department || 'OPD-1'}</span>
+                            <span><b className={`ehr-department-pill ${departmentTone(department)}`}>{typeLabel(department)}</b></span>
+                            <span className="ehr-worklist-care">
+                              <strong>{patient.doctor || clinicianName || matchingAppointment?.providerName || 'Not assigned'}</strong>
+                              <small>{patient.nurse || 'Nursing team'}</small>
+                            </span>
+                            <span><b className={`ehr-worklist-status ${statusTone(status as AppointmentStatus)}`}>{statusLabel(status as AppointmentStatus)}</b></span>
+                          </button>
+                        );
+                      })()
                   ))}
                 </div>
               </section>
@@ -587,16 +645,24 @@ export default function EhrClinicalDashboard({
           )}
         </main>
 
+        {view === 'dashboard' && railOpen && (
+          <button type="button" className="ehr-rail-backdrop" aria-label="Close outstanding items panel" onClick={() => setRailOpen(false)} />
+        )}
         {view === 'dashboard' && (
-        <aside className="ehr-right-rail">
+        <aside className={`ehr-right-rail ${railOpen ? 'is-open' : ''}`}>
+          <button type="button" className="ehr-rail-close" aria-label="Close panel" onClick={() => setRailOpen(false)}>
+            <X className="w-4 h-4" />
+          </button>
 	          <section className="ehr-side-card ehr-outstanding-card">
 	            <h2>Outstanding items</h2>
-            {outstanding.map(item => (
-              <button key={item.label} type="button" onClick={() => item.href && router.push(item.href)} className={item.tone || 'neutral'}>
-                <span>{item.label}</span>
-                <b>{item.count}</b>
-              </button>
-            ))}
+            <div className="ehr-outstanding-chips">
+              {outstanding.map(item => (
+                <button key={item.label} type="button" onClick={() => item.href && router.push(item.href)} className={item.tone || 'neutral'}>
+                  <span>{item.label}</span>
+                  <b>{item.count}</b>
+                </button>
+              ))}
+            </div>
           </section>
 
           <section className="ehr-side-card">

@@ -212,6 +212,7 @@ export const Icon = forwardRef<SVGSVGElement, IconProps>(function Icon(
   },
   ref,
 ) {
+  void _flat;
   const Component = resolveLucide(name);
   return (
     <Component

@@ -667,9 +667,9 @@ export default function DashboardPage() {
                 {legacyCurrentUser.hospitalName && (
                   <span
                     className="inline-flex items-center gap-2"
-                    style={{ height: 26, padding: '0 12px 0 3px', background: 'transparent', border: '0.5px solid #FEFFF9', borderRadius: 9999, fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 12, color: '#fff' }}
+                    style={{ height: 26, padding: '0 12px 0 3px', background: 'transparent', border: '0.5px solid rgba(255,255,255,0.5)', borderRadius: 9999, fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 12, color: '#fff' }}
                   >
-                    <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#90F489', flexShrink: 0, display: 'block' }} />
+                    <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--color-success)', flexShrink: 0, display: 'block' }} />
                     {legacyCurrentUser.hospitalName}
                   </span>
                 )}

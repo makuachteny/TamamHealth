@@ -44,7 +44,6 @@ import {
   ShieldAlert,
   Eye,
   TrendingUp,
-  ChartNoAxesCombined,
 } from '@/components/icons/lucide';
 
 // Lenient shape so either lucide or our duotone wrappers type-check.

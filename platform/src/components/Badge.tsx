@@ -14,7 +14,7 @@ const TONE_STYLES: Record<BadgeTone, { bg: string; color: string }> = {
   neutral: { bg: 'var(--overlay-subtle)', color: 'var(--text-secondary)' },
   info: { bg: 'var(--color-info-bg)', color: 'var(--color-info-text)' },
   success: { bg: 'var(--color-success-bg)', color: 'var(--color-success-text)' },
-  warning: { bg: 'var(--color-warning-bg)', color: 'var(--color-warning)' },
+  warning: { bg: 'var(--color-warning-bg)', color: 'var(--color-warning-text)' },
   danger: { bg: 'var(--color-danger-bg)', color: 'var(--color-danger-text)' },
   accent: { bg: 'var(--accent-light)', color: 'var(--accent-primary)' },
 };

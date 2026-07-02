@@ -7,10 +7,13 @@ import {
   ChevronDown,
   LayoutDashboard,
   LogOut,
+  MessageSquare,
+  Plus,
   Search,
   Settings,
   User,
   UserPlus,
+  Users,
   X,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
@@ -70,7 +73,7 @@ export default function EhrTopRail() {
   }, [mobileSearchOpen]);
 
   const roleConfig = currentUser ? getRoleConfig(currentUser.role) : null;
-  const allowedRoutes = roleConfig?.allowedRoutes || [];
+  const allowedRoutes = useMemo(() => roleConfig?.allowedRoutes || [], [roleConfig]);
   const homeHref = roleConfig?.defaultDashboard || '/dashboard';
   const roleLabel = roleConfig?.label || currentUser?.role.replace(/_/g, ' ') || 'Workspace';
   const canSearchPatients = isHrefAllowed('/patients', allowedRoutes);
@@ -180,7 +183,17 @@ export default function EhrTopRail() {
     .slice(0, 2)
     .toUpperCase() || 'TH';
 
+  const isRouteActive = (href: string) => pathname === href || (href !== '/' && pathname?.startsWith(href + '/'));
+  const primaryCreateHref = ['/patient-intake', '/consultation', '/patients/new'].find(href => isHrefAllowed(href, allowedRoutes));
+  const mobileTabs = [
+    { href: homeHref, label: 'Dashboard', icon: LayoutDashboard },
+    ...(canSearchPatients ? [{ href: '/patients', label: 'Patients', icon: Users }] : []),
+    ...(isHrefAllowed('/appointments', allowedRoutes) ? [{ href: '/appointments', label: 'Calendar', icon: Calendar }] : []),
+    ...(isHrefAllowed('/messages', allowedRoutes) ? [{ href: '/messages', label: 'Inbox', icon: MessageSquare }] : []),
+  ];
+
   return (
+    <>
     <header className={`ehr-top-rail ${mobileSearchOpen ? 'is-searching' : ''}`}>
       <div className="ehr-top-brand" onClick={() => router.push(homeHref)} role="button" tabIndex={0}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -338,5 +351,38 @@ export default function EhrTopRail() {
       </div>
 
     </header>
+
+    {currentUser && mobileTabs.length > 0 && (
+      <nav className="ehr-mobile-tabbar" aria-label="Primary navigation">
+        {mobileTabs.slice(0, 2).map(tab => (
+          <button
+            key={tab.href}
+            type="button"
+            className={isRouteActive(tab.href) ? 'active' : ''}
+            onClick={() => router.push(tab.href)}
+          >
+            <tab.icon className="w-5 h-5" />
+            <span>{tab.label}</span>
+          </button>
+        ))}
+        {primaryCreateHref && (
+          <button type="button" className="ehr-mobile-tabbar-fab" aria-label="Quick create" onClick={() => router.push(primaryCreateHref)}>
+            <Plus className="w-6 h-6" />
+          </button>
+        )}
+        {mobileTabs.slice(2).map(tab => (
+          <button
+            key={tab.href}
+            type="button"
+            className={isRouteActive(tab.href) ? 'active' : ''}
+            onClick={() => router.push(tab.href)}
+          >
+            <tab.icon className="w-5 h-5" />
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </nav>
+    )}
+    </>
   );
 }

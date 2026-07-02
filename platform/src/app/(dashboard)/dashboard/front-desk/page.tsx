@@ -8,7 +8,7 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
-import type { AppointmentDoc } from '@/lib/db-types';
+import type { AppointmentDoc, EncounterDoc } from '@/lib/db-types';
 import { formatCompactDateTime, formatMoney } from '@/lib/format-utils';
 import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel } from '@/lib/patient-utils';
 import { priorityColor } from '@/lib/clinical/triage-display';
@@ -90,6 +90,7 @@ interface CheckoutTarget {
   patientId: string;
   patientName: string;
   hospitalNumber?: string;
+  encounterId?: string;
   /** Set when the queue entry came from an appointment. */
   appointmentId?: string;
   /** Set when the queue entry came from triage (walk-in). */
@@ -119,10 +120,41 @@ export default function FrontDeskDashboardPage() {
   const [checkInTarget, setCheckInTarget] = useState<AppointmentDoc | null>(null);
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [encounters, setEncounters] = useState<EncounterDoc[]>([]);
   const [roomDraft, setRoomDraft] = useState('');
   const [savingRoom, setSavingRoom] = useState(false);
 
   const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let cancelled = false;
+    let changes: { cancel: () => void } | null = null;
+    const load = async () => {
+      try {
+        const { getAllEncounters } = await import('@/lib/services/encounter-service');
+        const rows = await getAllEncounters({
+          orgId: currentUser.orgId,
+          hospitalId: currentUser.hospitalId || currentUser.hospital?._id,
+          role: currentUser.role,
+        });
+        if (!cancelled) setEncounters(rows);
+      } catch (err) {
+        console.warn('Failed to load front-desk encounter queue', err);
+      }
+    };
+    load();
+    import('@/lib/db').then(({ encountersDB }) => {
+      if (cancelled) return;
+      changes = encountersDB().changes({ since: 'now', live: true, include_docs: false })
+        .on('change', load)
+        .on('error', err => console.warn('Encounter queue subscription failed', err));
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+      try { changes?.cancel(); } catch { /* noop */ }
+    };
+  }, [currentUser, currentUser?.hospital?._id, currentUser?.hospitalId, currentUser?.orgId, currentUser?.role]);
 
   // ── Real today's appointments ──
   const todaysAppointments = useMemo(() =>
@@ -158,8 +190,9 @@ export default function FrontDeskDashboardPage() {
     date: string;
     time: string;
     calendarDate: string;
-    status: 'WAITING' | 'IN CONSULT' | 'DONE';
+    status: 'WAITING' | 'IN CONSULT' | 'DONE' | 'ADMITTED' | 'REFERRED';
     sourceId: string; // triage / appointment / patient ID
+    encounterId?: string;
     assignedRoom?: string; // OPD exam room/bay (walk-in/triage entries only)
     registeredAt?: string; // registration timestamp (registered entries only — for ordering)
   }
@@ -171,11 +204,33 @@ export default function FrontDeskDashboardPage() {
     const patientById = new Map(patients.map(p => [p._id, p]));
     const genderOf = (pid: string) => patientById.get(pid)?.gender || '—';
     const ageOf = (pid: string) => { const p = patientById.get(pid); return p ? patientAgeLabel(p) : '—'; };
+    const checkoutStatuses = new Set<EncounterDoc['status']>([
+      'ready_for_clinic_checkout',
+      'in_clinic_checkout',
+      'clinic_complete_awaiting_next_station',
+      'awaiting_facility_checkout',
+      'in_facility_checkout',
+    ]);
+    const checkoutEncounterByPatient = new Map<string, EncounterDoc>();
+    for (const enc of encounters) {
+      if (!checkoutStatuses.has(enc.status)) continue;
+      const dateKey = isoDateKey(enc.updatedAt || enc.closedAt || enc.startedAt || enc.createdAt);
+      if (dateKey !== today) continue;
+      const current = checkoutEncounterByPatient.get(enc.patientId);
+      if (!current || (enc.updatedAt || enc.createdAt || '').localeCompare(current.updatedAt || current.createdAt || '') > 0) {
+        checkoutEncounterByPatient.set(enc.patientId, enc);
+      }
+    }
 
     // Add triaged patients (walk-ins and triaged appointments)
     for (const t of todaysTriages) {
-      const status = t.status === 'pending' ? 'WAITING' :
-                     t.status === 'seen' || t.status === 'admitted' ? 'IN CONSULT' : 'DONE';
+      if (t.status === 'discharged') continue;
+      const checkoutEncounter = checkoutEncounterByPatient.get(t.patientId);
+      const status = checkoutEncounter ? 'DONE' :
+                     t.status === 'pending' ? 'WAITING' :
+                     t.status === 'seen' ? 'IN CONSULT' :
+                     t.status === 'admitted' ? 'ADMITTED' :
+                     t.status === 'referred' ? 'REFERRED' : 'DONE';
       items.push({
         id: `triage-${t._id}`,
         patientId: t.patientId,
@@ -190,6 +245,7 @@ export default function FrontDeskDashboardPage() {
         calendarDate: isoDateKey(t.triagedAt),
         status,
         sourceId: t._id,
+        encounterId: checkoutEncounter?._id,
         assignedRoom: t.assignedRoom,
       });
     }
@@ -203,7 +259,9 @@ export default function FrontDeskDashboardPage() {
     for (const a of todaysAppointments) {
       if (triagedPatientIds.has(a.patientId)) continue;
       if (!ARRIVED.has(a.status)) continue; // not checked in yet → not in the queue
-      const status = a.status === 'completed' ? 'DONE' :
+      const checkoutEncounter = checkoutEncounterByPatient.get(a.patientId);
+      const status = checkoutEncounter ? 'DONE' :
+                     a.status === 'completed' ? 'DONE' :
                      a.status === 'in_progress' ? 'IN CONSULT' : 'WAITING';
       items.push({
         id: `appt-${a._id}`,
@@ -220,12 +278,34 @@ export default function FrontDeskDashboardPage() {
         calendarDate: isoDateKey(a.appointmentDate),
         status,
         sourceId: a._id,
+        encounterId: checkoutEncounter?._id,
       });
     }
 
     // Add recent registrations not already in the queue (replaces the old
     // "Recent Registrations" card — every registered patient awaiting a visit).
     const queuedPatientIds = new Set(items.map(it => it.patientId));
+    for (const enc of checkoutEncounterByPatient.values()) {
+      if (queuedPatientIds.has(enc.patientId)) continue;
+      const patient = patientById.get(enc.patientId);
+      items.push({
+        id: `encounter-${enc._id}`,
+        patientId: enc.patientId,
+        patientName: enc.patientName || (patient ? patientFullName(patient) : 'Patient'),
+        type: 'walk-in',
+        priority: 'normal',
+        complaint: String(enc.snapshot?.chiefComplaint || 'Clinical checkout'),
+        department: 'Checkout',
+        gender: genderOf(enc.patientId),
+        age: ageOf(enc.patientId),
+        ...splitDateTime(enc.updatedAt || enc.closedAt || enc.startedAt),
+        calendarDate: isoDateKey(enc.updatedAt || enc.closedAt || enc.startedAt),
+        status: 'DONE',
+        sourceId: enc._id,
+        encounterId: enc._id,
+      });
+      queuedPatientIds.add(enc.patientId);
+    }
     const recent = [...patients].sort((a, b) =>
       patientRegisteredAt(b).localeCompare(patientRegisteredAt(a)));
     for (const p of recent) {
@@ -234,6 +314,7 @@ export default function FrontDeskDashboardPage() {
       // above — don't also list them as a generic "registered" walk-in.
       if (apptPatientIds.has(p._id)) continue;
       const registeredAt = patientRegisteredAt(p);
+      if (isoDateKey(registeredAt) !== today) continue;
       items.push({
         id: `patient-${p._id}`,
         patientId: p._id,
@@ -265,7 +346,7 @@ export default function FrontDeskDashboardPage() {
     });
 
     return items;
-  }, [todaysTriages, todaysAppointments, patients]);
+  }, [encounters, patients, today, todaysAppointments, todaysTriages]);
 
   const filteredQueue = useMemo(() => {
     let items = queueFilter === 'all' ? queue : queue.filter(q => q.type === queueFilter);
@@ -280,7 +361,7 @@ export default function FrontDeskDashboardPage() {
     }
 
     if (queueSort !== 'priority') {
-      const statusOrder: Record<string, number> = { 'WAITING': 0, 'IN CONSULT': 1, 'DONE': 2 };
+      const statusOrder: Record<string, number> = { 'WAITING': 0, 'IN CONSULT': 1, 'DONE': 2, 'ADMITTED': 3, 'REFERRED': 4 };
       items = [...items].sort((a, b) => {
         if (queueSort === 'name') return a.patientName.localeCompare(b.patientName);
         if (queueSort === 'time') return a.time.localeCompare(b.time);
@@ -341,9 +422,11 @@ export default function FrontDeskDashboardPage() {
       let gateNote = '';
       try {
         const {
-          getOpenEncounterForPatient, dischargeEncounter,
+          getEncounter, getOpenEncounterForPatient, dischargeEncounter,
         } = await import('@/lib/services/encounter-service');
-        const enc = await getOpenEncounterForPatient(target.patientId);
+        const enc = target.encounterId
+          ? await getEncounter(target.encounterId)
+          : await getOpenEncounterForPatient(target.patientId);
         if (enc) {
           const { getPrescriptionsByPatient } = await import('@/lib/services/prescription-service');
           const { getLabResultsByPatient } = await import('@/lib/services/lab-service');
@@ -501,8 +584,12 @@ export default function FrontDeskDashboardPage() {
         : entry.priority === 'YELLOW' ? t('appointments.priorityUrgent')
         : entry.priority === 'GREEN' ? t('appointments.priorityRoutine')
         : entry.type === 'registered' ? 'Registration' : t('lab.normal');
+      const activeForCare = entry.status === 'WAITING' || entry.status === 'IN CONSULT';
+      const checkoutReady = entry.status === 'DONE';
       const statusTone: EhrCareDashboardRow['statusTone'] = entry.status === 'DONE'
         ? 'done'
+        : entry.status === 'ADMITTED' || entry.status === 'REFERRED'
+          ? 'scheduled'
         : entry.status === 'IN CONSULT'
           ? 'active'
           : entry.priority === 'RED'
@@ -522,16 +609,21 @@ export default function FrontDeskDashboardPage() {
         room: entry.assignedRoom,
         date: entry.calendarDate,
         onClick: () => setSelectedPatientId(isOpen ? null : entry.patientId),
-        actionLabel: entry.status === 'DONE' ? t('frontDesk.checkout') : t('frontDesk.assign'),
+        actionLabel: checkoutReady ? t('frontDesk.checkout') : activeForCare ? t('frontDesk.assign') : 'Record',
         onAction: () => {
-          if (entry.status === 'DONE') {
+          if (checkoutReady) {
             setCheckoutTarget({
               patientId: entry.patientId,
               patientName: entry.patientName,
               hospitalNumber: patient?.hospitalNumber,
+              encounterId: entry.encounterId,
               appointmentId: entry.id.startsWith('appt-') ? entry.sourceId : undefined,
               triageId: entry.id.startsWith('triage-') ? entry.sourceId : undefined,
             });
+            return;
+          }
+          if (!activeForCare) {
+            router.push(`/patients/${entry.patientId}`);
             return;
           }
           setAssignTarget({
@@ -542,17 +634,17 @@ export default function FrontDeskDashboardPage() {
             currentDoctorId: patient?.assignedDoctor,
           });
         },
-        secondaryActionLabel: entry.status === 'DONE' && entry.id.startsWith('appt-')
+        secondaryActionLabel: checkoutReady && entry.id.startsWith('appt-')
           ? t('action.undo')
-          : canConsult && entry.status !== 'DONE'
+          : canConsult && activeForCare
             ? t('frontDesk.startConsultation')
             : 'Records',
         onSecondaryAction: () => {
-          if (entry.status === 'DONE' && entry.id.startsWith('appt-')) {
+          if (checkoutReady && entry.id.startsWith('appt-')) {
             handleUndoCheckout(entry.sourceId, entry.patientName);
             return;
           }
-          if (canConsult && entry.status !== 'DONE') {
+          if (canConsult && activeForCare) {
             router.push(`/consultation?patientId=${entry.patientId}`);
             return;
           }
@@ -965,8 +1057,10 @@ function CheckoutModal({
       }
       // Itemized fee ticket for this visit so the desk sees what was billed.
       try {
-        const { getOpenEncounterForPatient } = await import('@/lib/services/encounter-service');
-        const enc = await getOpenEncounterForPatient(target.patientId);
+        const { getEncounter, getOpenEncounterForPatient } = await import('@/lib/services/encounter-service');
+        const enc = target.encounterId
+          ? await getEncounter(target.encounterId)
+          : await getOpenEncounterForPatient(target.patientId);
         if (enc) {
           const { getChargesByEncounter } = await import('@/lib/services/payment-service');
           const ch = await getChargesByEncounter(enc._id);
@@ -975,7 +1069,7 @@ function CheckoutModal({
       } catch { /* non-fatal — balance still shows */ }
     })();
     return () => { cancelled = true; };
-  }, [target.patientId]);
+  }, [target.encounterId, target.patientId]);
 
   const owes = (balance ?? 0) > 0;
 

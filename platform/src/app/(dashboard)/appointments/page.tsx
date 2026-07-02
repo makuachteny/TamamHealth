@@ -7,7 +7,7 @@ import {
   AlertTriangle, RefreshCw,
   Video, Stethoscope, Syringe, HeartPulse, FlaskConical,
   X, UserPlus,
-  ChevronLeft, ChevronRight,
+  ChevronLeft,
 } from '@/components/icons/lucide';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -60,15 +60,32 @@ const statusConfig: Record<AppointmentStatus, { color: string; bg: string; label
   no_show:     { color: '#64748B', bg: 'rgba(100,116,139,0.10)', label: 'No Show' },
 };
 
-const priorityConfig: Record<AppointmentPriority, { color: string; label: string }> = {
-  routine: { color: 'var(--color-success)', label: 'Routine' },
-  urgent: { color: 'var(--color-warning)', label: 'Urgent' },
-  emergency: { color: 'var(--color-danger)', label: 'Emergency' },
-};
-
 const timeSlots = Array.from({ length: 24 }, (_, h) =>
   ['00', '30'].map(m => `${h.toString().padStart(2, '0')}:${m}`)
 ).flat().filter(t => { const h = parseInt(t.split(':')[0]); return h >= 7 && h <= 18; });
+
+// Translated label lookups for module-level config (which can't call t()).
+const TYPE_LABEL_KEY: Record<AppointmentType, string> = {
+  general: 'appointments.typeGeneral', follow_up: 'appointments.typeFollowUp',
+  specialist: 'appointments.typeSpecialist', anc: 'appointments.typeAnc',
+  immunization: 'appointments.typeImmunization', lab: 'appointments.typeLab',
+  telehealth: 'appointments.typeTelehealth', surgical: 'appointments.typeSurgical',
+  dental: 'appointments.typeDental', mental_health: 'appointments.typeMentalHealth',
+  walk_in: 'appointments.typeWalkIn',
+};
+
+const STATUS_LABEL_KEY: Record<AppointmentStatus, string> = {
+  requested: 'appointments.statusRequested',
+  scheduled: 'appointments.statusScheduled', confirmed: 'appointments.statusConfirmed',
+  checked_in: 'appointments.statusCheckedIn', in_progress: 'appointments.statusInProgress',
+  completed: 'appointments.statusCompleted', cancelled: 'appointments.statusCancelled',
+  no_show: 'appointments.statusNoShow',
+};
+
+const PRIORITY_LABEL_KEY: Record<AppointmentPriority, string> = {
+  routine: 'appointments.priorityRoutine', urgent: 'appointments.priorityUrgent',
+  emergency: 'appointments.priorityEmergency',
+};
 
 /* ─── Page ─── */
 export default function AppointmentsPage() {
@@ -79,27 +96,6 @@ export default function AppointmentsPage() {
   const { t } = useTranslation();
   const { departments: facilityDepartments } = useSettings();
   const departments = facilityDepartments.length ? facilityDepartments : FALLBACK_DEPARTMENTS;
-
-  // Translated label lookups for module-level config (which can't call t()).
-  const typeLabelKey: Record<AppointmentType, string> = {
-    general: 'appointments.typeGeneral', follow_up: 'appointments.typeFollowUp',
-    specialist: 'appointments.typeSpecialist', anc: 'appointments.typeAnc',
-    immunization: 'appointments.typeImmunization', lab: 'appointments.typeLab',
-    telehealth: 'appointments.typeTelehealth', surgical: 'appointments.typeSurgical',
-    dental: 'appointments.typeDental', mental_health: 'appointments.typeMentalHealth',
-    walk_in: 'appointments.typeWalkIn',
-  };
-  const statusLabelKey: Record<AppointmentStatus, string> = {
-    requested: 'appointments.statusRequested',
-    scheduled: 'appointments.statusScheduled', confirmed: 'appointments.statusConfirmed',
-    checked_in: 'appointments.statusCheckedIn', in_progress: 'appointments.statusInProgress',
-    completed: 'appointments.statusCompleted', cancelled: 'appointments.statusCancelled',
-    no_show: 'appointments.statusNoShow',
-  };
-  const priorityLabelKey: Record<AppointmentPriority, string> = {
-    routine: 'appointments.priorityRoutine', urgent: 'appointments.priorityUrgent',
-    emergency: 'appointments.priorityEmergency',
-  };
 
   const router = useRouter();
   const [calView, setCalView] = useState<'month' | 'week' | 'day'>('month');
@@ -249,9 +245,9 @@ export default function AppointmentsPage() {
   };
 
   const handleStatusChange = useCallback(async (id: string, status: AppointmentStatus) => {
-    try { await updateStatus(id, status); showToast(t('appointments.toastStatusChanged', { status: t(statusLabelKey[status]).toLowerCase() }), 'success'); }
+    try { await updateStatus(id, status); showToast(t('appointments.toastStatusChanged', { status: t(STATUS_LABEL_KEY[status]).toLowerCase() }), 'success'); }
     catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
-  }, [updateStatus, showToast, t, statusLabelKey]);
+  }, [updateStatus, showToast, t]);
 
   // Map a status to the step it can be reversed back to. Reversing reuses the
   // same updateAppointmentStatus path (which accepts any target status), so an
@@ -313,9 +309,9 @@ export default function AppointmentsPage() {
                 <AppointmentDetailSidebar
                   appointment={selectedAppointment}
                   patient={selectedPatient}
-                  statusLabel={t(statusLabelKey[selectedAppointment.status])}
-                  priorityLabel={t(priorityLabelKey[selectedAppointment.priority])}
-                  typeLabel={t(typeLabelKey[selectedAppointment.appointmentType])}
+                  statusLabel={t(STATUS_LABEL_KEY[selectedAppointment.status])}
+                  priorityLabel={t(PRIORITY_LABEL_KEY[selectedAppointment.priority])}
+                  typeLabel={t(TYPE_LABEL_KEY[selectedAppointment.appointmentType])}
                   onClose={() => setEventApt(null)}
                   onOpenPatient={() => {
                     const id = selectedAppointment.patientId;
@@ -376,7 +372,7 @@ export default function AppointmentsPage() {
                 <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</select></div>
+                <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(TYPE_LABEL_KEY[at.value])}</option>)}</select></div>
                 <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
@@ -428,7 +424,7 @@ export default function AppointmentsPage() {
                   <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                  <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</select></div>
+                  <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(TYPE_LABEL_KEY[at.value])}</option>)}</select></div>
                   <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>

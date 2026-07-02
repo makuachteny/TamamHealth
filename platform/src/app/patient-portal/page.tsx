@@ -2213,7 +2213,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
       }
     })();
     return () => { cancelled = true; };
-  }, [patient._id]);
+  }, [patient._id, t]);
 
   const safeBills = bills || [];
   const totalOwed = safeBills.reduce((s, b) => s + (b.amount - b.paid), 0);

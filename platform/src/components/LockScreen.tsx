@@ -77,7 +77,7 @@ export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, on
 
       return next;
     });
-  }, [busy, mode, setupPin, onVerifyPin, onSetPin, onUnlock]);
+  }, [busy, mode, setupPin, onVerifyPin, onSetPin, onUnlock, t]);
 
   const handleBackspace = useCallback(() => {
     setPin(prev => prev.slice(0, -1));

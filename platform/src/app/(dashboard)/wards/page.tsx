@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
 import PatientName from '@/components/PatientName';
@@ -20,6 +21,7 @@ const ADMISSION_GRID = 'minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 2fr) 96px 132p
 
 export default function WardsPage() {
   const { t } = useTranslation();
+  const searchParams = useSearchParams();
   const { currentUser } = useApp();
   const { patients } = usePatients();
   const { wards, activeAdmissions, totalBeds, occupiedBeds, availableBeds, occupancyRate, admit, discharge } = useWards();
@@ -42,6 +44,7 @@ export default function WardsPage() {
     bedNumber: '',
     isolationRequired: false,
   });
+  const admissionPrefillApplied = useRef(false);
 
   const [dischargeForm, setDischargeForm] = useState({
     dischargeType: 'normal' as NonNullable<AdmissionDoc['dischargeType']>,
@@ -54,6 +57,20 @@ export default function WardsPage() {
     () => facilityId ? wards.filter(w => w.facilityId === facilityId) : wards,
     [wards, facilityId],
   );
+
+  useEffect(() => {
+    if (admissionPrefillApplied.current) return;
+    const patientId = searchParams?.get('admitPatientId');
+    if (!patientId) return;
+    admissionPrefillApplied.current = true;
+    setAdmitForm(prev => ({
+      ...prev,
+      patientId,
+      admittingDiagnosis: searchParams?.get('diagnosis') || prev.admittingDiagnosis,
+      severity: (searchParams?.get('severity') as AdmissionDoc['severity']) || prev.severity,
+    }));
+    setAdmitOpen(true);
+  }, [searchParams]);
   const filteredAdmissions = useMemo(
     () => {
       const q = admissionSearch.trim().toLowerCase();

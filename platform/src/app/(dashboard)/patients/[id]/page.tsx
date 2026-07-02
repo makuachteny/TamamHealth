@@ -12,8 +12,9 @@ import {
   ShieldAlert, TestTubes, ChevronRight,
   CalendarClock, TrendingUp as TrendingUpIcon, ClipboardList,
   User as UserIcon, Building2, Search, X, Wallet, Syringe,
-  Heart, Printer,
+  Heart, Printer, History,
 } from '@/components/icons/lucide';
+import Badge from '@/components/Badge';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -1091,7 +1092,7 @@ export default function PatientDetailPage() {
                         className={activeAllergies.length ? 'ehr-allergy-box has-alert' : 'ehr-allergy-box'}
                         title="Open allergies"
                       >
-                        <span>ALLERGIES</span>
+                        <span>{activeAllergies.length > 0 && <AlertTriangle className="ehr-allergy-icon" aria-hidden />}ALLERGIES</span>
                         <strong>{allergySummary}</strong>
                       </button>
                     </div>
@@ -2752,7 +2753,7 @@ function PatientFacesheetView({
 
       {showPanel('medications') && (
       <section className="tebra-panel" onClick={() => onOpenTab('prescriptions')}>
-        <h2>Medications</h2>
+        <h2><Pill className="tebra-panel-icon" aria-hidden /> Medications</h2>
         {currentMeds.length ? (
           <div className="tebra-list">
             {currentMeds.map(rx => (
@@ -2768,13 +2769,16 @@ function PatientFacesheetView({
 
       {showPanel('problems') && (
       <section className="tebra-panel" onClick={() => onOpenTab('problems')}>
-        <h2>Problems</h2>
+        <h2><AlertTriangle className="tebra-panel-icon" aria-hidden /> Problems</h2>
         {activeProblems.length ? (
           <div className="tebra-list">
             {activeProblems.slice(0, 5).map(problem => (
               <div key={problem._id} className="tebra-list-row">
                 <strong>{problem.name}</strong>
-                <span>{[problem.icd10Code, problem.status].filter(Boolean).join(' · ')}</span>
+                <span className="tebra-list-row-meta">
+                  {problem.icd10Code && <span>{problem.icd10Code}</span>}
+                  <Badge tone={problem.status === 'chronic' ? 'warning' : 'success'}>{problem.status}</Badge>
+                </span>
               </div>
             ))}
           </div>
@@ -2782,23 +2786,28 @@ function PatientFacesheetView({
       </section>
       )}
 
-      {showPanel('vitals') && (
+      {showPanel('vitals') && (() => {
+        const bpElevated = !!(latestVitals?.systolic && latestVitals.systolic >= 140) || !!(latestVitals?.diastolic && latestVitals.diastolic >= 90);
+        const tempElevated = !!(latestVitals?.temperature && latestVitals.temperature >= 38);
+        const spo2Low = !!(latestVitals?.oxygenSaturation && latestVitals.oxygenSaturation < 94);
+        return (
       <section className="tebra-panel tebra-panel--highlight" onClick={() => onOpenTab('vitals')}>
-        <h2>Vitals</h2>
+        <h2><Activity className="tebra-panel-icon" aria-hidden /> Vitals</h2>
         {latestVitals ? (
           <div className="tebra-vitals">
-            <span>BP <strong>{latestVitals.systolic && latestVitals.diastolic ? `${latestVitals.systolic}/${latestVitals.diastolic}` : '-'}</strong></span>
+            <span className={bpElevated ? 'is-out-of-range' : ''}>BP <strong>{latestVitals.systolic && latestVitals.diastolic ? `${latestVitals.systolic}/${latestVitals.diastolic}` : '-'}</strong></span>
             <span>Pulse <strong>{latestVitals.pulse ?? '-'}</strong></span>
-            <span>Temp <strong>{latestVitals.temperature ?? '-'}</strong></span>
-            <span>SpO2 <strong>{latestVitals.oxygenSaturation ?? '-'}</strong></span>
+            <span className={tempElevated ? 'is-out-of-range' : ''}>Temp <strong>{latestVitals.temperature ?? '-'}</strong></span>
+            <span className={spo2Low ? 'is-out-of-range' : ''}>SpO2 <strong>{latestVitals.oxygenSaturation ?? '-'}</strong></span>
           </div>
         ) : <p className="tebra-none">(None documented)</p>}
       </section>
-      )}
+        );
+      })()}
 
       {showPanel('history') && (
       <section className="tebra-panel" onClick={() => onOpenTab('history')}>
-        <h2>History</h2>
+        <h2><History className="tebra-panel-icon" aria-hidden /> History</h2>
         {latestHistory ? (
           <div className="tebra-list-row">
             <strong>{latestHistory.chiefComplaint || 'Recent encounter'}</strong>
@@ -2810,15 +2819,27 @@ function PatientFacesheetView({
 
       {showPanel('labs') && (
       <section className="tebra-panel" onClick={() => onOpenTab('labs')}>
-        <h2>Labs/Studies</h2>
+        <h2><FlaskConical className="tebra-panel-icon" aria-hidden /> Labs/Studies</h2>
         {recentLabs.length ? (
           <div className="tebra-list">
-            {recentLabs.map(lab => (
-              <div key={lab._id} className="tebra-list-row">
-                <strong>{lab.testName}</strong>
-                <span>{[lab.result, lab.unit, lab.status].filter(Boolean).join(' · ')}</span>
-              </div>
-            ))}
+            {recentLabs.map(lab => {
+              const resultText = /positive|reactive|abnormal/i.test(lab.result || '') ? 'danger'
+                : /negative|non-reactive|normal/i.test(lab.result || '') ? 'success'
+                : null;
+              return (
+                <div key={lab._id} className="tebra-list-row">
+                  <strong>{lab.testName}</strong>
+                  <span className="tebra-list-row-meta">
+                    {lab.result && (
+                      <span className={resultText ? `tebra-lab-result is-${resultText}` : 'tebra-lab-result'}>
+                        {[lab.result, lab.unit].filter(Boolean).join(' ')}
+                      </span>
+                    )}
+                    {lab.status && <span>{lab.status}</span>}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         ) : <p className="tebra-none">(None documented)</p>}
       </section>
@@ -2826,7 +2847,7 @@ function PatientFacesheetView({
 
       {showPanel('recommendations') && (
       <section className="tebra-panel tebra-recommendations" onClick={() => onOpenTab('careChecklist')}>
-        <h2>Clinical Recommendations</h2>
+        <h2><ClipboardList className="tebra-panel-icon" aria-hidden /> Clinical Recommendations</h2>
         <div className="tebra-reco-list">
           {recommendations.map(item => (
             <div key={item.title} className="tebra-reco-row">

@@ -98,7 +98,7 @@ export default function PaymentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [scope]);
+  }, [scope, t]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -685,7 +685,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
       }
     })();
     return () => { cancelled = true; };
-  }, [line.patientId]);
+  }, [line.patientId, t]);
 
   const sortedPayments = [...payments].sort((a, b) => (b.processedAt || '').localeCompare(a.processedAt || ''));
   const owing = line.outstanding > 0;

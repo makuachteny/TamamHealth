@@ -7,12 +7,13 @@ import type { AllergyEntry } from '@/data/mock';
 import { AlertTriangle, Plus, Edit3, Trash2, X } from '@/components/icons/lucide';
 import { isNoAllergySentinel } from '@/lib/clinical-roles';
 import Modal from '@/components/Modal';
+import Badge, { type BadgeTone } from '@/components/Badge';
 
-const CRIT_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
-  severe:   { bg: 'var(--color-danger-bg, rgba(196,69,54,0.12))', fg: 'var(--color-danger)',  label: 'Severe'   },
-  moderate: { bg: 'rgba(217,119,6,0.12)',                         fg: '#B45309',              label: 'Moderate' },
-  mild:     { bg: 'rgba(21,121,92,0.12)',                         fg: 'var(--color-success)', label: 'Mild'     },
-  unknown:  { bg: 'var(--overlay-subtle)',                        fg: 'var(--text-muted)',    label: 'Unknown'  },
+const CRIT_STYLE: Record<string, { tone: BadgeTone; label: string }> = {
+  severe:   { tone: 'danger',  label: 'Severe'   },
+  moderate: { tone: 'warning', label: 'Moderate' },
+  mild:     { tone: 'success', label: 'Mild'     },
+  unknown:  { tone: 'neutral', label: 'Unknown'  },
 };
 
 const CLASSIFICATIONS: AllergyEntry['classification'][] = ['drug', 'food', 'environmental', 'biologic', 'other'];
@@ -95,13 +96,13 @@ export default function AllergyList({ patient, hideAddButton = false }: { patien
             return (
               <li key={a.id} className="flex items-center gap-2 py-2 min-w-0 overflow-hidden group">
                 <span className="text-[12px] font-semibold flex-shrink-0" style={{ color: 'var(--text-primary)' }}>{a.substance}</span>
-                <span className="text-[12px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{cs.label}</span>
+                <Badge tone={cs.tone} className="flex-shrink-0">{cs.label}</Badge>
                 {a.classification && <span className="text-[12px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>· {a.classification}</span>}
                 {a.reaction && <span className="text-[12px] truncate" style={{ color: 'var(--text-muted)' }}>· {a.reaction}</span>}
                 <span className="flex-1" />
                 {a.recordedAt && (
                   <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1 rounded transition-colors hover:bg-blue-50" disabled={busy} title="Edit" onClick={() => openEdit(a)} style={{ color: 'var(--color-primary)' }}>
+                    <button className="p-1 rounded transition-colors hover:bg-blue-50" disabled={busy} title="Edit" onClick={() => openEdit(a)} style={{ color: 'var(--accent-primary)' }}>
                       <Edit3 className="w-3 h-3" />
                     </button>
                     <button className="p-1 rounded transition-colors hover:bg-red-50" disabled={busy} title="Remove" onClick={() => openRemove(a)} style={{ color: 'var(--color-danger)' }}>

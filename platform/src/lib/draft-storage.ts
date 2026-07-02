@@ -111,7 +111,7 @@ let warnedAboutFallback = false;
 function warnFallbackOnce(): void {
   if (warnedAboutFallback) return;
   warnedAboutFallback = true;
-  // eslint-disable-next-line no-console
+   
   console.warn(
     '[draft-storage] crypto.subtle unavailable (insecure context?). ' +
       'Falling back to plaintext localStorage for drafts. ' +
