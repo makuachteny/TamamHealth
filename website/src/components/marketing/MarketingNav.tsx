@@ -4,26 +4,32 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DuoIcon } from "./DuoIcon";
+import { MarketingActionModalButton } from "./MarketingActionModal";
 
 /* ═══════════════════════════════════════════════════════════════════
-   TamamHealth Marketing — Navbar (Simplified)
-   Logo left, nav links center, CTA button right
-   No dropdowns — flat structure
+   TamamHealth Marketing — Navbar
+   Consolidated into two grouped dropdowns (Product, About Us) plus a
+   single "Book a Demo" CTA, matching the reference design. Every link
+   that used to be a separate top-level item still exists — Testimonials
+   and Pricing moved into the Product dropdown, Careers moved into the
+   About Us dropdown — just grouped rather than spread across the bar.
    ═══════════════════════════════════════════════════════════════════ */
 
 // Fundraising entry points are locked off for now. Flip to true to re-enable.
 const SHOW_FUNDRAISING = false;
 
-const PRODUCTS_LINKS = [
+const PRODUCT_LINKS = [
   { label: "Hospital Management System", href: "/products/hospital" },
   { label: "Clinic Management System", href: "/products/clinic" },
   { label: "Laboratory Information System", href: "/products/lab" },
   { label: "Radiology Information System", href: "/products/radiology" },
   { label: "Pharmacy Management System", href: "/products/pharmacy" },
   { label: "Patient Experience Platform", href: "/patient-experience" },
+  { label: "Testimonials", href: "/case-studies" },
+  { label: "Pricing", href: "/pricing" },
 ];
 
-const COMPANY_LINKS = [
+const ABOUT_LINKS = [
   { label: "Our Story", href: "/about" },
   { label: "Our Team", href: "/about/team" },
   { label: "Careers", href: "/about/careers" },
@@ -33,7 +39,6 @@ const COMPANY_LINKS = [
 const DISPLAY_PHONE = "(973) 566-4336";
 const PHONE_TEL = "tel:+19735664336";
 const CONTACT_FORM_HREF = "/about/contact";
-const PRICING_HREF = "/pricing";
 type NavScrollState = "top" | "hero" | "past";
 type NavTone = "home" | "platform" | "company" | "commerce" | "resource" | "clinical";
 
@@ -54,9 +59,11 @@ export default function MarketingNav() {
   const tone = getNavTone(pathname);
   const navClass = scrollState === "past"
     ? "mk-navbar--scrolled"
-    : lightHero
-      ? "mk-navbar--light-hero"
-      : "mk-navbar--hero-solid";
+    : tone === "home"
+      ? "mk-navbar--photo-hero"
+      : lightHero
+        ? "mk-navbar--light-hero"
+        : "mk-navbar--hero-solid";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -124,52 +131,49 @@ export default function MarketingNav() {
       {/* Main navbar */}
       <nav className={`mk-navbar ${navClass} mk-navbar--tone-${tone}`}>
         <div className="mk-container mk-navbar-inner">
-          {/* Logo */}
-          <Link href="/" className="mk-nav-logo" aria-label="Tamam Healthcare System — home">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/assets/logos/SVG/Tamam_Style_Guide-33.svg"
-              alt=""
-              className="mk-nav-logo-mark"
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/assets/logos/SVG/Tamam_Style_Guide-31.svg"
-              alt="Tamam Healthcare System"
-              className="mk-nav-logo-type"
-            />
-          </Link>
+          {/* Logo — omitted on the homepage's photo hero, which pushes the
+              nav links flush left instead (matches the reference design). */}
+          {tone !== "home" && (
+            <Link href="/" className="mk-nav-logo" aria-label="Tamam Healthcare System — home">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/assets/logos/SVG/Tamam_Style_Guide-33.svg"
+                alt=""
+                className="mk-nav-logo-mark"
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/assets/logos/SVG/Tamam_Style_Guide-31.svg"
+                alt="Tamam Healthcare System"
+                className="mk-nav-logo-type"
+              />
+            </Link>
+          )}
 
           {/* Desktop center nav links */}
           <div className="mk-nav-center desktop-only">
             <div className="mk-nav-item">
-              <Link href="/products" className="mk-nav-item-link">Products</Link>
+              <Link href="/products" className="mk-nav-item-link">Product</Link>
               <DuoIcon name="chevron-down" size={14} />
               <div className="mk-nav-dropdown">
-                {PRODUCTS_LINKS.map((item) => (
+                {PRODUCT_LINKS.map((item) => (
                   <Link key={item.href} href={item.href}>{item.label}</Link>
                 ))}
               </div>
             </div>
-            <Link href="/case-studies" className="mk-nav-item">Testimonials</Link>
             <div className="mk-nav-item">
-              <Link href="/about" className="mk-nav-item-link">Company</Link>
+              <Link href="/about" className="mk-nav-item-link">About Us</Link>
               <DuoIcon name="chevron-down" size={14} />
               <div className="mk-nav-dropdown">
-                {COMPANY_LINKS.map((item) => (
+                {ABOUT_LINKS.map((item) => (
                   <Link key={item.href} href={item.href}>{item.label}</Link>
                 ))}
               </div>
             </div>
-            <Link href="/about/careers" className="mk-nav-item">Careers</Link>
           </div>
 
           {/* Desktop right CTA actions */}
           <div className="mk-nav-actions desktop-only">
-            <a href={PHONE_TEL} className="mk-nav-phone">
-              <DuoIcon name="phone" size={17} strokeWidth={1.8} aria-hidden="true" />
-              {DISPLAY_PHONE}
-            </a>
             {SHOW_FUNDRAISING && (
               <>
                 <div style={{ width: 1, height: 20, background: "var(--tb-cream-300)" }} />
@@ -195,22 +199,24 @@ export default function MarketingNav() {
                 </Link>
               </>
             )}
-            <Link href={PRICING_HREF} className="mk-btn mk-btn-sm mk-nav-pricing">
-              Get pricing
-            </Link>
-            <Link href={CONTACT_FORM_HREF} className="mk-btn mk-btn-green mk-btn-sm mk-nav-demo">
-              Get in touch
-            </Link>
+            <MarketingActionModalButton
+              intent="demo"
+              className="mk-btn mk-btn-green mk-btn-sm mk-nav-demo"
+              source="nav-book-demo"
+            >
+              Book a Demo
+            </MarketingActionModalButton>
           </div>
 
           {/* Mobile hamburger */}
           <div className="mk-mobile-top-actions" aria-label="Mobile quick actions">
-            <Link href={PRICING_HREF} className="mk-mobile-top-pricing">
-              Get pricing
-            </Link>
-            <Link href={CONTACT_FORM_HREF} className="mk-mobile-top-demo">
-              Get in touch
-            </Link>
+            <MarketingActionModalButton
+              intent="demo"
+              className="mk-mobile-top-demo"
+              source="nav-mobile-book-demo"
+            >
+              Book a Demo
+            </MarketingActionModalButton>
           </div>
           <button
             type="button"
@@ -232,21 +238,21 @@ export default function MarketingNav() {
         {mobileOpen && (
           <div className="mk-mobile-menu">
             <div className="mk-mobile-menu-inner">
-              <Link href="/products" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                Products
-              </Link>
-              <Link href="/case-studies" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                Testimonials
-              </Link>
-              <Link href="/about/careers" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                Careers
-              </Link>
-              <Link href="/about" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                About
-              </Link>
-              <Link href="/about/contact" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                Contact
-              </Link>
+              <p className="mk-mobile-group-label">Product</p>
+              {PRODUCT_LINKS.map((item) => (
+                <Link key={item.href} href={item.href} className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                  {item.label}
+                </Link>
+              ))}
+
+              <div className="mk-mobile-menu-divider" />
+
+              <p className="mk-mobile-group-label">About Us</p>
+              {ABOUT_LINKS.map((item) => (
+                <Link key={item.href} href={item.href} className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                  {item.label}
+                </Link>
+              ))}
 
               <div className="mk-mobile-menu-divider" />
               <a href={PHONE_TEL} className="mk-mobile-phone" onClick={() => setMobileOpen(false)}>
@@ -270,20 +276,14 @@ export default function MarketingNav() {
                 </Link>
               )}
 
-              <Link
-                href={PRICING_HREF}
-                className="mk-btn mk-mobile-cta mk-mobile-pricing"
-                onClick={() => setMobileOpen(false)}
-              >
-                Get pricing
-              </Link>
-              <Link
-                href={CONTACT_FORM_HREF}
+              <MarketingActionModalButton
+                intent="demo"
                 className="mk-btn mk-btn-green mk-mobile-cta"
-                onClick={() => setMobileOpen(false)}
+                source="nav-mobile-menu-book-demo"
+                onOpen={() => setMobileOpen(false)}
               >
-                Get in touch
-              </Link>
+                Book a Demo
+              </MarketingActionModalButton>
             </div>
           </div>
         )}
@@ -302,6 +302,15 @@ export default function MarketingNav() {
 
         .mk-nav-item:hover {
           color: var(--tb-blue-700);
+        }
+
+        .mk-mobile-group-label {
+          margin: 4px 0 0;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--tb-text-muted);
         }
 
         .mk-mobile-toggle {

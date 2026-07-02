@@ -13339,3 +13339,467 @@ button.mk-mobile-top-demo {
     justify-content: center !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Home — Photo hero carousel
+   Full-bleed sliding image hero with a persistent brand block (wordmark +
+   tagline) bottom-left, rotating headline/stat content top-right, and a
+   dark statement strip directly beneath. Self-contained class names
+   (mk-photo-hero-*) so this doesn't inherit the legacy .mk-home-hero-*
+   cascade used by other hero variants.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.mk-photo-hero {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #202F39;
+}
+
+.mk-photo-hero-slides {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.mk-photo-hero-img {
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Content slider — the single background photo stays put; only the
+   headline/stat overlay cross-fades and slides in. */
+.mk-photo-hero-slider {
+  position: relative;
+  min-height: 260px;
+}
+
+.mk-photo-hero-slide-content {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+  pointer-events: none;
+}
+
+.mk-photo-hero-slide-content.is-active {
+  position: relative;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.mk-photo-hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(32, 47, 57, 0) 39.63%, #202F39 100%);
+  backdrop-filter: blur(10.6px);
+  -webkit-backdrop-filter: blur(10.6px);
+}
+
+.mk-photo-hero-content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-bottom: 40px;
+}
+
+/* The scrim's gradient only starts darkening at ~40% of the hero's height
+   and is fully solid by ~70% — so the headline/stat block needs to sit
+   inside that band (not up near the top, where the photo shows through
+   undarkened) to stay legible against any photo. */
+.mk-photo-hero-top {
+  display: flex;
+  justify-content: center;
+  margin-top: 42vh;
+}
+
+.mk-photo-hero-stat {
+  max-width: 620px;
+  text-align: center;
+  color: #fff;
+}
+
+/* All hero copy is centered, including the intro slide's headline/CTAs. */
+.mk-photo-hero-intro {
+  max-width: 748px;
+  text-align: center;
+  color: #fff;
+  margin: 0 auto;
+}
+
+/* Headline spec: DM Sans, ~748px wide, strong bold hierarchy. */
+.mk-photo-hero-title {
+  font-family: var(--AkkuratLL);
+  max-width: 748px;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: clamp(28px, 3.4vw, 40px);
+  font-weight: 700;
+  line-height: 1.15;
+  color: #fff;
+  margin-bottom: 14px;
+}
+
+/* Description spec: DM Sans, 460px wide, 400 weight, 20px, 0.8 opacity. */
+.mk-photo-hero-subtitle {
+  max-width: 460px;
+  margin-left: auto;
+  margin-right: auto;
+  font-family: var(--AkkuratLL);
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1.5;
+  color: #fff;
+  opacity: 0.8;
+  margin-bottom: 24px;
+}
+
+.mk-photo-hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* Primary CTA spec: 196×41px, 21px radius, solid #2191D0. */
+.mk-photo-hero-cta {
+  width: 196px !important;
+  height: 41px !important;
+  padding: 0 !important;
+  border-radius: 21px !important;
+  background: #2191D0 !important;
+  border-color: #2191D0 !important;
+  font-family: var(--AkkuratLL);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+/* Secondary CTA: outline pill, same footprint, contrasts with the solid
+   primary button instead of competing with it. */
+.mk-photo-hero-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 196px;
+  height: 41px;
+  border-radius: 21px;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  background: transparent;
+  font-family: var(--AkkuratLL);
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: none;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.mk-photo-hero-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #fff;
+}
+
+/* Eyebrow spec: All Round Gothic 700 (not a loaded web font — falls back to
+   DM Sans, the closest available bold display face), 32px, 100% line-height,
+   0 tracking, centered. Letter-spacing added for a crisper "label" feel. */
+.mk-photo-hero-stat-eyebrow {
+  font-family: "All Round Gothic", var(--AkkuratLL);
+  font-weight: 700;
+  font-style: normal;
+  font-size: clamp(14px, 1.4vw, 20px);
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-align: center;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+}
+
+/* Small centered divider between the eyebrow and the big stat value —
+   ties the two together as one labeled unit instead of two loose lines. */
+.mk-photo-hero-stat-rule {
+  display: block;
+  width: 48px;
+  height: 3px;
+  border-radius: 999px;
+  margin: 14px auto 18px;
+  background: #FF7F00;
+}
+
+/* Stat value spec: DM Sans 900 (Black), 128px, 100% line-height, 0 tracking,
+   centered, #FF7F00. Clamped so 128px is the ceiling at wide viewports
+   rather than a fixed size that would overflow on mobile. Always a single
+   line — longer values (see valueSize in HomeHero.tsx) get a smaller
+   ceiling instead of wrapping. */
+.mk-photo-hero-stat-value {
+  display: block;
+  font-family: var(--AkkuratLL);
+  font-size: clamp(56px, 9vw, 128px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;
+  color: #FF7F00;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  margin-bottom: 18px;
+}
+
+.mk-photo-hero-stat-body {
+  font-size: 16px;
+  line-height: 1.55;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0 auto;
+  max-width: 420px;
+}
+
+.mk-photo-hero-bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.mk-photo-hero-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mk-photo-hero-wordmark {
+  width: clamp(180px, 16vw, 240px);
+  height: auto;
+  filter: brightness(0) invert(1);
+}
+
+.mk-photo-hero-tagline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.mk-photo-hero-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--tb-blue-600);
+  flex-shrink: 0;
+}
+
+.mk-photo-hero-dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mk-photo-hero-dots button {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: background 0.2s ease, width 0.2s ease;
+}
+
+.mk-photo-hero-dots button.is-active {
+  width: 22px;
+  background: #fff;
+}
+
+.mk-photo-hero-statement {
+  position: relative;
+  z-index: 1;
+  background: #202F39;
+  padding: 56px var(--containerPadding);
+  text-align: center;
+  overflow: hidden;
+}
+
+/* Echoes the hero photo's fade-to-navy scrim so the gradient reads as one
+   continuous sweep across the hero/statement boundary, not two flat blocks. */
+.mk-photo-hero-statement::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 140px;
+  background: linear-gradient(180deg, rgba(78, 99, 112, 0.35) 0%, rgba(32, 47, 57, 0) 100%);
+  pointer-events: none;
+}
+
+.mk-photo-hero-statement p {
+  max-width: 760px;
+  margin: 0 auto;
+  font-family: var(--AkkuratLL);
+  font-size: clamp(20px, 2.6vw, 28px);
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.mk-photo-hero-statement-accent {
+  color: #ff8a3d;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .mk-photo-hero {
+    min-height: 640px;
+  }
+
+  .mk-photo-hero-top {
+    justify-content: center;
+    margin-top: 96px;
+  }
+
+  .mk-photo-hero-intro,
+  .mk-photo-hero-stat {
+    max-width: 100%;
+  }
+
+  .mk-photo-hero-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mk-photo-hero-statement {
+    padding: 40px 24px;
+  }
+}
+
+/* ── Nav overlay treatment for the photo hero (homepage only) ────── */
+.mk-navbar--photo-hero {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: transparent !important;
+  border-bottom-color: transparent !important;
+}
+
+.mk-navbar--photo-hero .mk-nav-logo-type,
+.mk-navbar--photo-hero .mk-nav-logo-mark {
+  filter: brightness(0) invert(1);
+}
+
+/* No logo on this variant (the reference design omits it), so switch the
+   3-column logo/links/actions grid to a simple flex row with everything —
+   nav links and "Book a Demo" — grouped together on the right. */
+.mk-navbar--photo-hero .mk-navbar-inner {
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(20px, 3vw, 40px);
+}
+
+.mk-navbar--photo-hero .mk-nav-center {
+  justify-content: flex-start;
+  justify-self: auto;
+}
+
+.mk-navbar--photo-hero .mk-nav-item,
+.mk-navbar--photo-hero .mk-nav-item-link,
+.mk-navbar--photo-hero .mk-nav-phone,
+.mk-navbar--photo-hero .mk-mobile-toggle {
+  color: #fff !important;
+}
+
+/* Nav item type spec: DM Sans, 600, 20px, 100% line-height, 0 tracking. */
+.mk-navbar--photo-hero .mk-nav-item {
+  font-family: var(--AkkuratLL) !important;
+  font-weight: 600 !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+}
+
+.mk-navbar--photo-hero .mk-nav-item:hover,
+.mk-navbar--photo-hero .mk-nav-phone:hover {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.mk-navbar--photo-hero .mk-nav-pricing {
+  color: #fff !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.55) !important;
+  background: transparent !important;
+}
+
+.mk-navbar--photo-hero .mk-nav-pricing:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Header "Book a Demo" CTA spec: DM Sans 600/20px, 167×34px, 37px radius,
+   solid #2191D0, white text. */
+.mk-navbar--photo-hero .mk-nav-demo {
+  width: 167px;
+  height: 34px;
+  padding: 0;
+  border-radius: 37px !important;
+  background: #2191D0 !important;
+  border-color: #2191D0 !important;
+  color: #fff !important;
+  font-family: var(--AkkuratLL) !important;
+  font-weight: 600 !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+}
+
+/* This nav variant overlays the hero via position:absolute (so the photo
+   shows through underneath), unlike the other hero variants which stay
+   sticky-in-flow. The mobile-only "Call sales" row would otherwise add
+   height to the absolutely-positioned box and collide with the hero copy
+   beneath it. The phone number stays reachable via the hamburger menu. */
+.mk-navbar--photo-hero .mk-mobile-sales-row {
+  display: none !important;
+}
+
+/* The site-wide mobile menu uses a translucent "frosted glass" background
+   (see the .mk-page :where(...) glass layer) that reads fine over the other,
+   lighter hero variants but is illegible over this hero's dark photo. Force
+   an opaque dark panel here instead — same content, just readable. */
+.mk-navbar--photo-hero .mk-mobile-menu {
+  background: #202F39 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.mk-navbar--photo-hero .mk-mobile-menu .mk-mobile-link,
+.mk-navbar--photo-hero .mk-mobile-menu .mk-mobile-group-label,
+.mk-navbar--photo-hero .mk-mobile-menu .mk-mobile-phone {
+  color: #fff !important;
+}
+
+.mk-navbar--photo-hero .mk-mobile-menu .mk-mobile-group-label {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.mk-navbar--photo-hero .mk-mobile-menu .mk-mobile-link:hover {
+  color: var(--tb-blue-600) !important;
+}
+
+.mk-navbar--photo-hero .mk-nav-dropdown {
+  background: #fff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}

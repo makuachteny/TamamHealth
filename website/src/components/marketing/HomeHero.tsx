@@ -1,302 +1,177 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, type FormEvent } from "react";
-import { ArrowRight, Calendar, Check } from "@/components/marketing/icons";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { MarketingActionModalButton } from "./MarketingActionModal";
 import { Reveal } from "./MarketingShared";
 
-const HERO_TITLE_LINES = [
-  "Remember",
-  "every",
-  "patient.",
-  "Unify every",
-  "workflow.",
-] as const;
-
-const HERO_RAILS = [
-  [
-    { src: "/assets/Dashboard.png", alt: "TamamHealth facility dashboard", label: "Facility dashboard" },
-    { src: "/assets/doctor-nurse-consultation.jpg", alt: "Clinical team reviewing patient information", label: "Clinical care" },
-    { src: "/assets/doctor-tablet-review.jpg", alt: "Doctor reviewing care data on a tablet", label: "Care review" },
-  ],
-  [
-    { src: "/assets/community-health-worker.jpg", alt: "Community health worker supporting patient care", label: "Patient experience" },
-    { src: "/assets/doctor-prescription.jpg", alt: "Doctor preparing a prescription", label: "Pharmacy and orders" },
-    { src: "/assets/health-data.jpg", alt: "Health data dashboard and reporting", label: "Reporting" },
-  ],
-] as const;
-
-type DemoFormData = {
-  name: string;
-  facility: string;
-  email: string;
-  phone: string;
-  location: string;
+type IntroContent = {
+  kind: "intro";
 };
 
-type DemoSlot = {
-  id: string;
-  label: string;
-  startTime: string;
-  schedulingUrl?: string;
-  source: "calendly" | "fallback";
+type StatContent = {
+  kind: "stat";
+  eyebrow: string;
+  value: string;
+  /** Longer values (e.g. "64 per 1,000") need a smaller ceiling than short
+   *  ones (e.g. "45-50%") to stay on a single line at the same container
+   *  width — this overrides the default clamp() per slide. */
+  valueSize?: string;
+  body: string;
 };
+
+type HeroContent = IntroContent | StatContent;
+
+// Single fixed background image — the content overlay is what slides, not
+// the photo. Existing asset only.
+const HERO_BACKGROUND = {
+  src: "/assets/landing-img.jpg",
+  alt: "TamamHealth field team of nurses outside a maternity tent in South Sudan",
+};
+
+const HERO_CONTENT: HeroContent[] = [
+  { kind: "intro" },
+  {
+    kind: "stat",
+    eyebrow: "South Sudan today",
+    value: "45-50%",
+    body: "of the population can physically reach a functioning health facility",
+  },
+  {
+    kind: "stat",
+    eyebrow: "South Sudan today",
+    value: "64 per 1,000",
+    valueSize: "clamp(36px, 6vw, 84px)",
+    body: "newborn deaths at live births",
+  },
+  {
+    kind: "stat",
+    eyebrow: "South Sudan today",
+    value: "2-3%",
+    body: "of annual government spending goes to health",
+  },
+];
+
+const SLIDE_DURATION_MS = 6000;
 
 export function HomeHero() {
-  const [step, setStep] = useState<"details" | "schedule" | "done">("details");
-  const [demoForm, setDemoForm] = useState<DemoFormData | null>(null);
-  const [selectedSlot, setSelectedSlot] = useState("");
-  const [slots, setSlots] = useState<DemoSlot[]>([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
-  const [bookingUrl, setBookingUrl] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState("");
+  const [active, setActive] = useState(0);
 
   useEffect(() => {
-    if (step !== "schedule") return;
-
-    let cancelled = false;
-    const controller = new AbortController();
-
-    async function loadAvailability() {
-      setSlotsLoading(true);
-      setFormError("");
-
-      try {
-        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
-        const res = await fetch(`/api/calendly/availability?timeZone=${encodeURIComponent(timeZone)}`, {
-          signal: controller.signal,
-        });
-        const data = await res.json().catch(() => ({ slots: [] }));
-
-        if (!res.ok) {
-          throw new Error(data.error || "Unable to load availability.");
-        }
-
-        if (!cancelled) {
-          setSlots(Array.isArray(data.slots) ? data.slots : []);
-        }
-      } catch (err) {
-        if (!cancelled && !(err instanceof DOMException && err.name === "AbortError")) {
-          setFormError("Unable to load live availability. Please choose a fallback time or open the calendar link after submitting.");
-          setSlots([]);
-        }
-      } finally {
-        if (!cancelled) setSlotsLoading(false);
-      }
-    }
-
-    loadAvailability();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [step]);
-
-  const handleDemoSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setFormError("");
-
-    if (step === "details") {
-      const data = new FormData(event.currentTarget);
-      setDemoForm({
-        name: String(data.get("name") || ""),
-        facility: String(data.get("facility") || ""),
-        email: String(data.get("email") || ""),
-        phone: String(data.get("phone") || ""),
-        location: String(data.get("location") || ""),
-      });
-      setStep("schedule");
-      return;
-    }
-
-    if (!demoForm || !selectedSlot) {
-      setFormError("Choose an available demo time.");
-      return;
-    }
-
-    setSubmitting(true);
-    const slot = slots.find((item) => item.id === selectedSlot);
-    try {
-      const res = await fetch("/api/appointments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: demoForm.name,
-          email: demoForm.email,
-          facility: demoForm.facility,
-          phone: demoForm.phone,
-          location: demoForm.location,
-          selectedSlot: slot?.label || selectedSlot,
-          selectedStartTime: slot?.startTime || selectedSlot,
-          calendlySchedulingUrl: slot?.schedulingUrl,
-          source: "home-hero-scheduler",
-          message: [
-            `Requested demo time: ${slot?.label || selectedSlot}`,
-            "",
-            "Submitted from the home page demo scheduler.",
-          ].filter(Boolean).join("\n"),
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: "Unable to confirm the demo time." }));
-        throw new Error(data.error || "Unable to confirm the demo time.");
-      }
-
-      const data = await res.json().catch(() => ({ schedulingUrl: "" }));
-      setBookingUrl(data.schedulingUrl || slot?.schedulingUrl || "");
-      setStep("done");
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Unable to confirm the demo time.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    const id = setInterval(() => {
+      setActive((current) => (current + 1) % HERO_CONTENT.length);
+    }, SLIDE_DURATION_MS);
+    return () => clearInterval(id);
+  }, []);
 
   return (
-    <section className="mk-hero mk-home-hero">
-      <div className="mk-home-union-field" aria-hidden="true">
-        {Array.from({ length: 33 }, (_, index) => (
-          <span key={index} />
-        ))}
+    <>
+    <section className="mk-photo-hero">
+      <div className="mk-photo-hero-slides" aria-hidden="true">
+        <Image
+          src={HERO_BACKGROUND.src}
+          alt={HERO_BACKGROUND.alt}
+          fill
+          priority
+          sizes="100vw"
+          className="mk-photo-hero-img"
+        />
+        <div className="mk-photo-hero-scrim" />
       </div>
-      <div className="mk-container">
-        <Reveal>
-          <div className="mk-home-hero-grid">
-            <div className="mk-home-hero-shell">
-              <p className="mk-home-hero-kicker">Offline-ready digital health infrastructure</p>
-              <h1 className="mk-h1 mk-home-hero-title">
-                <span className="mk-home-title-desktop">
-                  {HERO_TITLE_LINES.map((line) => (
-                    <span className="mk-home-hero-title-lead" key={`desktop-${line}`}>{line}</span>
-                  ))}
-                </span>
-                <span className="mk-home-title-mobile">
-                  {HERO_TITLE_LINES.map((line) => (
-                    <span className="mk-home-hero-title-lead" key={`mobile-${line}`}>{line}</span>
-                  ))}
-                </span>
-              </h1>
-              <p className="mk-home-hero-subtitle">
-                TamamHealth connects registration, clinical notes, pharmacy, lab, billing, referrals, and ministry reporting in one secure record built for real facilities and low-connectivity care.
-              </p>
-            </div>
 
-            <div className="mk-home-hero-visual" aria-label="TamamHealth product and care workflows">
-              <div className="mk-home-hero-rails" aria-hidden="true">
-                {HERO_RAILS.map((rail, railIndex) => (
-                  <div className={`mk-home-hero-rail mk-home-hero-rail-${railIndex + 1}`} key={`rail-${railIndex}`}>
-                    <div className="mk-home-hero-rail-track">
-                      {[...rail, ...rail].map((tile, index) => (
-                        <div className="mk-home-hero-tile" key={`${tile.label}-${index}`}>
-                          <Image
-                            src={tile.src}
-                            alt={tile.alt}
-                            fill
-                            sizes="(min-width: 1200px) 14vw, (min-width: 760px) 28vw, 86vw"
-                            priority={railIndex === 0 && index === 0}
-                          />
-                          <span>{tile.label}</span>
-                        </div>
-                      ))}
+      <div className="mk-photo-hero-content">
+        <div className={`mk-container mk-photo-hero-top mk-photo-hero-top--${HERO_CONTENT[active].kind}`}>
+          <Reveal>
+            <div className="mk-photo-hero-slider">
+              {HERO_CONTENT.map((content, index) => (
+                <div
+                  key={index}
+                  className={`mk-photo-hero-slide-content${index === active ? " is-active" : ""}`}
+                  aria-hidden={index !== active}
+                >
+                  {content.kind === "stat" ? (
+                    <div className="mk-photo-hero-stat" role="status" aria-live="polite">
+                      <p className="mk-photo-hero-stat-eyebrow">{content.eyebrow}</p>
+                      <span className="mk-photo-hero-stat-rule" aria-hidden="true" />
+                      <strong
+                        className="mk-photo-hero-stat-value"
+                        style={content.valueSize ? { fontSize: content.valueSize } : undefined}
+                      >
+                        {content.value}
+                      </strong>
+                      <p className="mk-photo-hero-stat-body">{content.body}</p>
                     </div>
-                  </div>
-                ))}
-              </div>
-
-              <form className="mk-home-hero-panel" onSubmit={handleDemoSubmit} aria-label="Request a TamamHealth demo">
-                {step === "details" && (
-                  <>
-                    <h2>Request a free demo</h2>
-                    <p>
-                      Share a few details and we will follow up with a walkthrough shaped around your facility.
-                    </p>
-                    <div className="mk-home-hero-form-fields">
-                      <label className="mk-home-hero-field">
-                        <span>Full name <b aria-hidden="true">*</b></span>
-                        <input name="name" autoComplete="name" placeholder="Jane Doe" defaultValue={demoForm?.name || ""} required />
-                      </label>
-                      <label className="mk-home-hero-field">
-                        <span>Facility name <b aria-hidden="true">*</b></span>
-                        <input name="facility" autoComplete="organization" placeholder="Clinic or hospital" defaultValue={demoForm?.facility || ""} required />
-                      </label>
-                      <label className="mk-home-hero-field">
-                        <span>Email <b aria-hidden="true">*</b></span>
-                        <input name="email" type="email" autoComplete="email" placeholder="name@example.com" defaultValue={demoForm?.email || ""} required />
-                      </label>
-                      <label className="mk-home-hero-field">
-                        <span>Phone <b aria-hidden="true">*</b></span>
-                        <input name="phone" type="tel" autoComplete="tel" placeholder="+1 973 566 4336" defaultValue={demoForm?.phone || ""} required />
-                      </label>
-                      <label className="mk-home-hero-field">
-                        <span>City or country</span>
-                        <input name="location" autoComplete="address-level2" placeholder="Juba, South Sudan" defaultValue={demoForm?.location || ""} />
-                      </label>
-                    </div>
-                    <button type="submit" className="mk-home-hero-panel-button">
-                      Next <ArrowRight size={16} strokeWidth={1.8} />
-                    </button>
-                  </>
-                )}
-
-                {step === "schedule" && (
-                  <>
-                    <div className="mk-home-hero-calendar-icon">
-                      <Calendar size={30} strokeWidth={1.8} aria-hidden="true" />
-                    </div>
-                    <h2>Choose a demo time</h2>
-                    <p>
-                      Select an available slot and we will send it to support.tamam@gmail.com and your inbox.
-                    </p>
-                    {slotsLoading && <p className="mk-home-hero-form-error" role="status">Loading availability...</p>}
-                    <div className="mk-home-hero-slot-grid" role="group" aria-label="Available demo times">
-                      {slots.map((slot) => (
-                        <button
-                          className={selectedSlot === slot.id ? "mk-home-hero-slot is-selected" : "mk-home-hero-slot"}
-                          key={slot.id}
-                          type="button"
-                          onClick={() => setSelectedSlot(slot.id)}
+                  ) : (
+                    <div className="mk-photo-hero-intro">
+                      <h1 className="mk-photo-hero-title">
+                        Many communities.
+                        <br />
+                        One system of care.
+                      </h1>
+                      <p className="mk-photo-hero-subtitle">
+                        Tamam brings patients, wards, pharmacy, lab, blood bank, maternal &amp; child health, and
+                        registration into a single platform for the whole facility — built to work in every corner
+                        of South Sudan, online or off.
+                      </p>
+                      <div className="mk-photo-hero-actions">
+                        <MarketingActionModalButton
+                          intent="demo"
+                          className="mk-btn mk-btn-green mk-photo-hero-cta"
+                          source="home-photo-hero"
                         >
-                          {slot.label}
-                        </button>
-                      ))}
+                          Book a Demo
+                        </MarketingActionModalButton>
+                        <Link href="/about/contact" className="mk-photo-hero-secondary">
+                          Get in Touch
+                        </Link>
+                      </div>
                     </div>
-                    {formError && <p className="mk-home-hero-form-error" role="alert">{formError}</p>}
-                    <div className="mk-home-hero-panel-actions">
-                      <button type="button" className="mk-home-hero-panel-back" onClick={() => setStep("details")}>
-                        Back
-                      </button>
-                      <button type="submit" className="mk-home-hero-panel-button" disabled={submitting || !selectedSlot}>
-                        {submitting ? "Sending..." : "Send request"} <ArrowRight size={16} strokeWidth={1.8} />
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {step === "done" && (
-                  <div className="mk-home-hero-done">
-                    <div className="mk-home-hero-calendar-icon">
-                      <Check size={30} strokeWidth={1.8} aria-hidden="true" />
-                    </div>
-                    <h2>Demo time requested</h2>
-                    <p>
-                      We received your request. Support has been notified and we sent the confirmation to {demoForm?.email}.
-                    </p>
-                    {bookingUrl && (
-                      <a className="mk-home-hero-calendar-link" href={bookingUrl} target="_blank" rel="noreferrer">
-                        Finish booking in Calendly
-                      </a>
-                    )}
-                  </div>
-                )}
-              </form>
+                  )}
+                </div>
+              ))}
             </div>
+          </Reveal>
+        </div>
 
+        <div className="mk-container mk-photo-hero-bottom">
+          <div className="mk-photo-hero-brand">
+            <Image
+              src="/assets/logos/SVG/Tamam_Style_Guide-31.svg"
+              alt="Tamam"
+              width={220}
+              height={45}
+              className="mk-photo-hero-wordmark"
+            />
+            <p className="mk-photo-hero-tagline">
+              <span className="mk-photo-hero-dot" aria-hidden="true" />
+              Offline-ready digital health infrastructure
+            </p>
           </div>
-        </Reveal>
+
+          <div className="mk-photo-hero-dots" role="tablist" aria-label="Hero slides">
+            {HERO_CONTENT.map((_, index) => (
+              <button
+                key={index}
+                type="button"
+                role="tab"
+                aria-selected={index === active}
+                aria-label={`Show slide ${index + 1}`}
+                className={index === active ? "is-active" : ""}
+                onClick={() => setActive(index)}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     </section>
+
+    <div className="mk-photo-hero-statement">
+      <p>
+        Starting in South Sudan &ndash; built to scale to every{" "}
+        <span className="mk-photo-hero-statement-accent">underserved</span> health system.
+      </p>
+    </div>
+    </>
   );
 }
