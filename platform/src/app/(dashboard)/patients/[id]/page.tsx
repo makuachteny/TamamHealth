@@ -2,18 +2,18 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Modal from '@/components/Modal';
-import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
+import { useParams, useRouter } from 'next/navigation';
 // Clean single-stroke Tailwind Labs Heroicons via the local compatibility shim.
 import {
-  ArrowLeft, Stethoscope, ArrowRightLeft,
+  ArrowLeft, ArrowRightLeft,
   AlertTriangle, FileText, FlaskConical,
   Pill, Activity, Brain, ChevronDown, ChevronUp,
   ShieldAlert, TestTubes, ChevronRight,
   CalendarClock, TrendingUp as TrendingUpIcon, ClipboardList,
   User as UserIcon, Building2, Search, X, Wallet, Syringe,
-  Heart, Printer,
+  Heart, Printer, History,
 } from '@/components/icons/lucide';
+import Badge from '@/components/Badge';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useMedicalRecords } from '@/lib/hooks/useMedicalRecords';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -32,7 +32,6 @@ const VitalsTrends = dynamic(() => import('@/components/VitalsTrends'), {
   loading: () => <div className="p-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading charts…</div>,
 });
 import PatientTimeline from '@/components/PatientTimeline';
-import VitalCard from '@/components/VitalCard';
 import { formatDateTime, formatDate } from '@/lib/format-utils';
 import { patientFullName, patientInitials, patientAgeLabel } from '@/lib/patient-utils';
 import { usePatientAppointments } from '@/lib/hooks/useAppointments';
@@ -55,7 +54,16 @@ import RemindersPanel from '@/components/patients/RemindersPanel';
 import DocumentsPanel from '@/components/patients/DocumentsPanel';
 import SuperbillPanel from '@/components/patients/SuperbillPanel';
 import { useProblems } from '@/lib/hooks/useProblems';
-import type { PatientNoteDoc } from '@/lib/db-types';
+import type {
+  AppointmentDoc,
+  ImmunizationDoc,
+  LabResultDoc,
+  MedicalRecordDoc,
+  PatientDoc,
+  PatientNoteDoc,
+  PrescriptionDoc,
+  ProblemDoc,
+} from '@/lib/db-types';
 import { isValidPhone, normalizePhone, formatPhoneDisplay } from '@/lib/field-formats';
 import { useApp } from '@/lib/context';
 import { OrderLabModal, PrescribeModal, ReferModal } from '@/components/patients/PatientActionModals';
@@ -64,13 +72,30 @@ import { OrderLabModal, PrescribeModal, ReferModal } from '@/components/patients
 // Receptionist) may see — the "minimum necessary" rule: contact details,
 // referral follow-up, and billing/scheduling, but NOT clinical notes, test
 // results, diagnoses, vitals, or medications.
-const ADMIN_TAB_IDS = ['overview', 'referrals', 'billing'];
+const ADMIN_TAB_IDS = ['overview', 'demographics', 'billing', 'documents', 'recall'];
+type FacesheetPanelId = 'medications' | 'problems' | 'vitals' | 'history' | 'labs' | 'recommendations';
 
-export default function PatientDetailPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+const FACESHEET_PANEL_OPTIONS: Array<{ id: FacesheetPanelId; label: string }> = [
+  { id: 'medications', label: 'Medications' },
+  { id: 'problems', label: 'Problems' },
+  { id: 'vitals', label: 'Vitals' },
+  { id: 'history', label: 'History' },
+  { id: 'labs', label: 'Labs/Studies' },
+  { id: 'recommendations', label: 'Clinical Recommendations' },
+];
+
+const DEFAULT_FACESHEET_PANELS = FACESHEET_PANEL_OPTIONS.map(panel => panel.id);
+
+export default function PatientDetailPage() {
+  const routeParams = useParams<{ id?: string | string[] }>();
+  const id = Array.isArray(routeParams?.id) ? routeParams.id[0] : routeParams?.id;
   const router = useRouter();
   const contentRef = useRef<HTMLElement>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [demographicsTab, setDemographicsTab] = useState('profile');
+  const [vitalsView, setVitalsView] = useState<'table' | 'flowsheet'>('table');
+  const [showCustomizeView, setShowCustomizeView] = useState(false);
+  const [facesheetPanels, setFacesheetPanels] = useState<Set<FacesheetPanelId>>(() => new Set(DEFAULT_FACESHEET_PANELS));
   // Keep the content area pinned to the top when switching tabs, so cards don't
   // appear to "jump" when a shorter/taller tab swaps in under a retained scroll
   // position. Instant (no smooth) so it's a fixed reset, not an animation.
@@ -81,7 +106,13 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
   const [encSearch, setEncSearch] = useState('');
   const [encFilter, setEncFilter] = useState('all');
   const [encSort, setEncSort] = useState<'newest' | 'oldest' | 'provider' | 'complaint'>('newest');
-  const [, setShowMessageModal] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [messageSubject, setMessageSubject] = useState('Follow-up from your care team');
+  const [messageBody, setMessageBody] = useState('');
+  const [messageChannel, setMessageChannel] = useState<'app' | 'sms' | 'both'>('app');
+  const [messageSending, setMessageSending] = useState(false);
+  const [messageError, setMessageError] = useState('');
+  const [messageSent, setMessageSent] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPaymentPanel, setShowPaymentPanel] = useState(false);
   const [showPlanWizard, setShowPlanWizard] = useState(false);
@@ -100,9 +131,18 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
   // Full History filters & expansion
   const [historySearch, setHistorySearch] = useState('');
-  const [historyRange, setHistoryRange] = useState<'all' | '30d' | '90d' | '1y'>('all');
-  const [historyVisitType, setHistoryVisitType] = useState<'all' | 'outpatient' | 'inpatient' | 'emergency'>('all');
   const [expandedEncounters, setExpandedEncounters] = useState<Set<string>>(new Set());
+  const toggleFacesheetPanel = (panelId: FacesheetPanelId) => {
+    setFacesheetPanels(prev => {
+      const next = new Set(prev);
+      if (next.has(panelId) && next.size > 1) {
+        next.delete(panelId);
+      } else {
+        next.add(panelId);
+      }
+      return next;
+    });
+  };
 
   const { t } = useTranslation();
   const { currentUser } = useApp();
@@ -190,6 +230,15 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
     setShowEditModal(true);
   };
 
+  const openPaymentFromHeader = () => {
+    setActiveTab('billing');
+    setShowPaymentPanel(true);
+  };
+
+  const openAllergiesFromHeader = () => {
+    setActiveTab(canViewClinical ? 'allergies' : 'overview');
+  };
+
   const handleEditSubmit = async () => {
     if (!patient) return;
     // Phone is optional — only block when a non-empty value is malformed.
@@ -227,43 +276,29 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
   // ── Filtered Full History ──────────────────────────────────────────────
   const filteredHistory = useMemo(() => {
-    const now = Date.now();
-    const cutoff = historyRange === '30d'
-      ? now - 30 * 86400_000
-      : historyRange === '90d'
-      ? now - 90 * 86400_000
-      : historyRange === '1y'
-      ? now - 365 * 86400_000
-      : 0;
     const q = historySearch.trim().toLowerCase();
     return records.filter(r => {
-      // Time filter
-      if (cutoff > 0) {
-        const ts = new Date(r.consultedAt || r.visitDate).getTime();
-        if (Number.isNaN(ts) || ts < cutoff) return false;
-      }
-      // Visit type filter
-      if (historyVisitType !== 'all' && r.visitType !== historyVisitType) return false;
-      // Search across complaint, history, diagnoses, provider, department
       if (q) {
         const haystack = [
+          JSON.stringify(r),
+          formatDateTime(r.consultedAt || r.visitDate),
           r.chiefComplaint,
           r.historyOfPresentIllness,
           r.providerName,
           r.department,
           r.hospitalName,
+          r.visitType,
           ...(r.diagnoses || []).map(d => `${d.icd10Code} ${d.name}`),
         ].join(' ').toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [records, historyRange, historyVisitType, historySearch]);
+  }, [records, historySearch]);
 
   if (loading || !patient) {
     return (
       <>
-        <TopBar title="Patient Record" hideSearch />
         <main className="page-container flex items-center justify-center">
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             {loading ? t('status.loading') : t('patient.notFound')}
@@ -274,6 +309,49 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
   }
 
   const regHospital = hospitals.find(h => h._id === patient.registrationHospital);
+
+  const sendPatientMessage = async () => {
+    if (!patient || !currentUser) return;
+    const body = messageBody.trim();
+    if (!body) {
+      setMessageError('Enter a message before sending.');
+      return;
+    }
+    if ((messageChannel === 'sms' || messageChannel === 'both') && !patient.phone) {
+      setMessageError('This patient does not have a phone number for SMS.');
+      return;
+    }
+    setMessageSending(true);
+    setMessageError('');
+    try {
+      const { createMessage } = await import('@/lib/services/message-service');
+      await createMessage({
+        patientId: patient._id,
+        patientName: patientFullName(patient),
+        patientPhone: patient.phone || '',
+        recipientType: 'patient',
+        direction: 'staff_to_patient',
+        fromDoctorId: currentUser._id,
+        fromDoctorName: currentUser.name || currentUser.username || 'Care team',
+        fromHospitalId: currentUser.hospitalId,
+        fromHospitalName: regHospital?.name || patient.registrationHospital || '',
+        subject: messageSubject.trim() || 'Patient message',
+        body,
+        channel: messageChannel,
+        sentAt: new Date().toISOString(),
+        orgId: currentUser.orgId,
+      });
+      setMessageSent(true);
+      setMessageBody('');
+      setMessageSubject('Follow-up from your care team');
+      setMessageChannel('app');
+    } catch (err) {
+      console.error(err);
+      setMessageError('Could not send this message. Please try again.');
+    } finally {
+      setMessageSending(false);
+    }
+  };
 
   // Last & next appointment (surfaced on the overview only when they exist).
   const apptTs = (a: { appointmentDate: string; appointmentTime?: string }) =>
@@ -286,18 +364,20 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
   const latestNote = patientNotes[0];
 
   const allTabs = [
-    { id: 'overview', label: t('tab.overview'), icon: Heart },
-    { id: 'sbar', label: 'SBAR Handoff', icon: FileText },
+    { id: 'overview', label: 'Facesheet', icon: Heart },
+    { id: 'history', label: 'History', icon: FileText },
     { id: 'problems', label: 'Problems', icon: AlertTriangle },
-    { id: 'timeline', label: 'Timeline', icon: ClipboardList },
-    { id: 'trends', label: 'Trends', icon: TrendingUpIcon },
-    { id: 'history', label: 'Full History', icon: FileText },
-    { id: 'vitals', label: t('tab.vitals'), icon: Activity },
-    { id: 'labs', label: t('tab.labResults'), icon: FlaskConical },
-    { id: 'prescriptions', label: t('tab.prescriptions'), icon: Pill },
+    { id: 'prescriptions', label: 'Medications', icon: Pill },
     { id: 'immunizations', label: 'Immunizations', icon: Syringe },
-    { id: 'referrals', label: t('tab.referrals'), icon: ArrowRightLeft },
-    { id: 'billing', label: 'Billing', icon: Wallet },
+    { id: 'allergies', label: 'Allergies', icon: ShieldAlert },
+    { id: 'vitals', label: 'Vitals', icon: Activity },
+    { id: 'notes', label: 'Notes', icon: FileText },
+    { id: 'labs', label: 'Labs/Studies', icon: FlaskConical },
+    { id: 'demographics', label: 'Demographics', icon: UserIcon },
+    { id: 'billing', label: 'Account', icon: Wallet },
+    { id: 'careChecklist', label: 'Care Checklist', icon: ClipboardList },
+    { id: 'documents', label: 'Documents', icon: FileText },
+    { id: 'recall', label: 'Recall', icon: CalendarClock },
   ];
   const tabs = canViewClinical ? allTabs : allTabs.filter(tb => ADMIN_TAB_IDS.includes(tb.id));
 
@@ -326,7 +406,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             color: #1a1a1a !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
-            font-family: 'Helvetica Neue', Arial, sans-serif !important;
+            font-family: var(--font-platform) !important;
             font-size: 9pt;
             line-height: 1.45;
           }
@@ -346,7 +426,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
           /* Reset everything inside the doc */
           .print-doc-root * {
-            font-family: 'Helvetica Neue', Arial, sans-serif !important;
+            font-family: var(--font-platform) !important;
             box-sizing: border-box;
             animation: none !important;
             transition: none !important;
@@ -527,8 +607,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
           .rx-page-break { page-break-before: always; }
         }
       ` }} />
-      <TopBar title="Patient Record" hideSearch />
-      <main ref={contentRef} className="page-container">
+      <main ref={contentRef} className="page-container ehr-chart-page">
           {/* ══════ PRINT-ONLY HOSPITAL DOCUMENT ══════ */}
           {printSigned && (() => {
             const activeAllergies = (patient.structuredAllergies || []).filter((a: { status: string }) => a.status === 'active');
@@ -549,7 +628,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   <div className="rx-header-left">
                     <div className="rx-logo-wrap">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/assets/tamamhealth-logo.svg" alt="TamamHealth" />
+                      <img src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="TamamHealth" />
                     </div>
                     <div>
                       <div className="rx-facility-name">{patient.registrationHospital || 'Juba Teaching Hospital'}</div>
@@ -833,10 +912,11 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             </Modal>
           )}
 
-          <button onClick={() => router.push('/patients')} className="flex items-center gap-1.5 text-sm mb-4 no-print" style={{ color: 'var(--tamamhealth-blue)' }}>
+          <button onClick={() => router.push('/patients')} className="ehr-chart-back flex items-center gap-1.5 text-sm mb-4 no-print" style={{ color: 'var(--tamamhealth-blue)' }}>
             <ArrowLeft className="w-4 h-4" /> {t('action.back')}
           </button>
 
+          <div className="ehr-chart-shell">
           {/* Patient Header — TamamHealth-style: avatar | name+pills+info-strip | action row */}
           {(() => {
             const initials = patientInitials(patient);
@@ -845,28 +925,30 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             const activeANC = patientANC.find(a => !a.linkedBirthId);
             const isPregnant = !!activeANC;
 
-            const infoBits: { icon: 'qr' | 'patient' | 'phone' | 'mapPin' | 'clock'; label: string; value: string; accent: string; mono?: boolean }[] = [
-              { icon: 'qr', label: 'Geocode', value: patient.geocodeId || patient.hospitalNumber, accent: '#1E3A8A', mono: true },
-              { icon: 'patient', label: 'Age / Sex', value: `${patientAgeLabel(patient)} · ${patient.gender || '—'}`, accent: 'var(--accent-primary)' },
-              ...(patient.phone ? [{ icon: 'phone' as const, label: 'Phone', value: patient.phone, accent: '#2191D0', mono: true }] : []),
-              { icon: 'clock', label: 'Last Visit', value: lastConsultedDisplay, accent: '#E4A84B' },
-            ];
+            const patientIdDisplay = patient.hospitalNumber || patient.geocodeId || '—';
+            const patientDemographicDisplay = `${patientAgeLabel(patient)} · ${patient.gender || '—'}`;
 
             const photoUrl = (patient as { photoUrl?: string }).photoUrl;
+            const activeAllergies = patient.structuredAllergies !== undefined
+              ? patient.structuredAllergies.filter(a => a.status === 'active')
+              : (patient.allergies || []).filter(a => a && a.toLowerCase() !== 'none known' && a.toLowerCase() !== 'none');
+            const allergySummary = activeAllergies.length
+              ? activeAllergies.map(a => typeof a === 'string' ? a : a.substance).slice(0, 2).join(', ')
+              : 'No known allergies documented';
 
             return (
-              <div className="card-elevated p-5 mb-5 relative overflow-hidden">
+              <div className="card-elevated ehr-patient-banner p-5 mb-5 relative overflow-hidden">
                 <div className="flex items-stretch gap-5">
                   {/* ID-card style patient photo on the left — auto-height to match right column */}
                   <div
-                    className="flex-shrink-0 relative overflow-hidden self-stretch"
+                    className="ehr-patient-photo flex-shrink-0 relative overflow-hidden self-stretch"
                     aria-hidden
                     style={{
                       width: 180, borderRadius: 14,
                       background: isFemale
-                        ? 'linear-gradient(135deg, #D96E59 0%, #9A2F27 100%)'
-                        : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                      boxShadow: '0 4px 14px rgba(26, 58, 58, 0.10), inset 0 0 0 1px rgba(255,255,255,0.08)',
+                        ? 'var(--accent-primary)'
+                        : 'var(--accent-primary)',
+                      boxShadow: 'none',
                     }}
                   >
                     {photoUrl ? (
@@ -889,26 +971,27 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                       style={{
                         position: 'absolute', left: 0, right: 0, bottom: 0,
                         padding: '12px 12px 10px',
-                        background: 'linear-gradient(to top, rgba(0,0,0,0.6), rgba(0,0,0,0))',
+                        background: 'var(--accent-primary)',
                         color: '#fff',
                       }}
                     >
                       <div style={{ fontSize: 9.5, letterSpacing: 0.6, opacity: 0.85, textTransform: 'uppercase' }}>Patient ID</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'JetBrains Mono, ui-monospace, monospace', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-platform-mono)', marginTop: 2 }}>
                         {patient.hospitalNumber || patient.geocodeId || '—'}
                       </div>
                     </div>
                   </div>
 
                   {/* Right column */}
-                  <div className="flex-1 min-w-0">
+                  <div className="ehr-patient-summary flex-1 min-w-0">
                     {/* Name + status pills */}
-                    <div className="flex items-center gap-2 flex-wrap mb-2">
-                      <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.4 }}>
-                        {patientFullName(patient)}
-                      </h1>
+                    <div className="ehr-patient-heading">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <h1 className="ehr-patient-name">
+                          {patientFullName(patient)}
+                        </h1>
                       {/* Triage warning icon — only shown when there is an active / recent triage */}
-                      {patientTriages.length > 0 && (() => {
+                        {patientTriages.length > 0 && (() => {
                         const latest = patientTriages[0];
                         const hoursOld = (Date.now() - new Date(latest.triagedAt).getTime()) / 3600000;
                         if (hoursOld > 24 && latest.status !== 'pending') return null;
@@ -935,7 +1018,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                                 <div className="fixed inset-0 z-40" onClick={() => setShowTriagePopup(false)} />
                                 <div
                                   className="absolute left-0 top-10 z-50 rounded-2xl overflow-hidden"
-                                  style={{ width: 340, background: 'var(--bg-card-solid)', border: `1px solid ${color}40`, boxShadow: '0 16px 48px rgba(0,0,0,0.18)' }}
+                                  style={{ width: 340, background: 'var(--bg-card-solid)', border: `1px solid ${color}40`, boxShadow: 'none' }}
                                 >
                                   {/* Header strip */}
                                   <div className="flex items-center gap-3 px-4 py-3" style={{ background: bg, borderBottom: `1px solid ${color}30` }}>
@@ -974,88 +1057,84 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                             )}
                           </div>
                         );
-                      })()}
-                      {isPregnant && (
-                        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-bold" style={{
-                          background: 'rgba(217, 110, 89, 0.12)', color: '#C44536', border: '1px solid rgba(217, 110, 89, 0.32)', letterSpacing: 0.2,
-                        }}>
-                          <DuotoneInfoIcon name="pregnant" size={11} color="#C44536" accent="#C44536" />
-                          Pregnant{activeANC?.gestationalAge ? ` · ${activeANC.gestationalAge} wk` : ''}
-                        </span>
-                      )}
+                        })()}
+                        {isPregnant && (
+                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-bold" style={{
+                            background: 'rgba(217, 110, 89, 0.12)', color: '#C44536', border: '1px solid rgba(217, 110, 89, 0.32)', letterSpacing: 0.2,
+                          }}>
+                            <DuotoneInfoIcon name="pregnant" size={11} color="#C44536" accent="#C44536" />
+                            Pregnant{activeANC?.gestationalAge ? ` · ${activeANC.gestationalAge} wk` : ''}
+                          </span>
+                        )}
+                      </div>
+                      <div className="ehr-patient-meta-line">
+                        <span>{patientIdDisplay}</span>
+                        <span>{patientDemographicDisplay}</span>
+                      </div>
+                      <div className="ehr-patient-meta-line ehr-patient-meta-line--subtle">
+                        <span>{lastConsultedDisplay}</span>
+                      </div>
                     </div>
 
-                    {/* Inline info strip */}
-                    <div
-                      className="grid mb-5"
-                      style={{ gridTemplateColumns: `repeat(${infoBits.length}, minmax(0, 1fr))`, gap: 16, rowGap: 12 }}
-                    >
-                      {infoBits.map(bit => (
-                        <div key={bit.label} className="flex items-center gap-2.5 min-w-0">
-                          <DuotoneInfoIcon name={bit.icon} size={22} color={bit.accent} accent={bit.accent} />
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--text-muted)', lineHeight: 1.2 }}>
-                              {bit.label}
-                            </div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: bit.mono ? 'JetBrains Mono, ui-monospace, monospace' : 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
-                              {bit.value}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="ehr-patient-strip">
+                      <button type="button" onClick={openPaymentFromHeader} title="Collect payment for this patient">
+                        <span>Collect Payment</span>
+                        <strong style={{ color: patientBalance > 0 ? 'var(--color-danger)' : 'var(--ehr-muted)' }}>
+                          ${patientBalance.toFixed(2)} due
+                        </strong>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openAllergiesFromHeader}
+                        className={activeAllergies.length ? 'ehr-allergy-box has-alert' : 'ehr-allergy-box'}
+                        title="Open allergies"
+                      >
+                        <span>{activeAllergies.length > 0 && <AlertTriangle className="ehr-allergy-icon" aria-hidden />}ALLERGIES</span>
+                        <strong>{allergySummary}</strong>
+                      </button>
                     </div>
 
-                    {/* Action row */}
-                    <div className="flex items-center justify-between gap-3 flex-wrap no-print">
-                      <div className="flex items-center gap-2 flex-wrap flex-1">
-                        {canConsult && (
-                          <button onClick={() => router.push(`/consultation?patientId=${patient._id}`)} className="btn btn-primary">
-                            <Stethoscope className="w-4 h-4" /> Start Consultation
-                          </button>
-                        )}
-                        {canOrderLabs && (
-                          <button onClick={() => setShowOrderLabModal(true)} className="btn btn-secondary">
-                            <FlaskConical className="w-4 h-4" style={{ color: '#E4A84B' }} /> Order Lab
-                          </button>
-                        )}
-                        {canPrescribe && (
-                          <button onClick={() => setShowPrescribeModal(true)} className="btn btn-secondary">
-                            <Pill className="w-4 h-4" /> Prescribe
-                          </button>
-                        )}
-                        {canViewClinical && (
-                          <button onClick={() => setShowReferModal(true)} className="btn btn-secondary">
-                            <ArrowRightLeft className="w-4 h-4" /> Refer
-                          </button>
-                        )}
-                        <button onClick={() => setShowMessageModal(true)} className="btn btn-secondary">
-                          <MessageSquare className="w-4 h-4" style={{ color: '#1E3A8A' }} /> Message
-                        </button>
-                      </div>
-
-                      {/* Meta actions */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button onClick={openEditModal} className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors" title="Edit demographics" style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>
-                          <DuotoneInfoIcon name="edit" size={15} />
-                        </button>
-                        <button onClick={() => { setPrintSignature(currentUser?.name || ''); setPrintSigned(false); setShowPrintModal(true); }} className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors" title="Sign & Print patient record" style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>
-                          <Printer className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (typeof window === 'undefined') return;
-                            const snapshot = { patient, latestRecord: records[0] || null, latestVitals, records, referrals: patientReferrals || [], labResults: (allLabResults || []).filter(l => l.patientId === patient._id), exportedAt: new Date().toISOString() };
-                            const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a'); a.href = url; a.download = `patient-${patient.hospitalNumber || patient._id}-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url);
-                          }}
-                          className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
-                          title="Download patient record (JSON)"
-                          style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)' }}
-                        >
-                          <DuotoneInfoIcon name="download" size={15} />
-                        </button>
-                      </div>
+                    <div className="ehr-chart-actions no-print" aria-label="Patient chart actions">
+                      <button type="button" onClick={() => setShowMessageModal(true)} title="Patient message">
+                        <MessageSquare className="w-4 h-4" />
+                        <span>Pt. Msg</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setPrintSignature(currentUser?.name || ''); setPrintSigned(false); setShowPrintModal(true); }}
+                        title="Print patient record"
+                      >
+                        <Printer className="w-4 h-4" />
+                        <span>Print</span>
+                      </button>
+                      <button type="button" onClick={() => setActiveTab('documents')} title="Patient education and documents">
+                        <FileText className="w-4 h-4" />
+                        <span>Pt. Ed.</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => canConsult ? router.push(`/consultation?patientId=${patient._id}`) : setActiveTab('notes')}
+                        title="Create note"
+                      >
+                        <ClipboardList className="w-4 h-4" />
+                        <span>+ Note</span>
+                      </button>
+                      <button type="button" onClick={() => canPrescribe ? setShowPrescribeModal(true) : setActiveTab('prescriptions')} title="Scripts">
+                        <Pill className="w-4 h-4" />
+                        <span>Scripts</span>
+                      </button>
+                      <button type="button" onClick={() => canOrderLabs ? setShowOrderLabModal(true) : setActiveTab('labs')} title="Orders">
+                        <FlaskConical className="w-4 h-4" />
+                        <span>Orders</span>
+                      </button>
+                      <button type="button" onClick={() => canViewClinical ? setShowReferModal(true) : setActiveTab('recall')} title="Exchange">
+                        <ArrowRightLeft className="w-4 h-4" />
+                        <span>Exchange</span>
+                      </button>
+                      <button type="button" onClick={openEditModal} title="Edit profile">
+                        <DuotoneInfoIcon name="edit" size={15} />
+                        <span>Edit</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1063,9 +1142,10 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             );
           })()}
 
-          {/* Tabs — underlined text+icon tabs, spread evenly across full width */}
+          <div className="ehr-chart-layout">
+          {/* Chart navigation — left rail, like the EHR reference screens */}
           <div
-            className="flex mb-5 no-print overflow-x-auto"
+            className="ehr-chart-nav flex mb-5 no-print overflow-x-auto"
             style={{ borderBottom: '1px solid var(--border-light)' }}
           >
             {tabs.map(tab => {
@@ -1075,17 +1155,12 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   onMouseDown={(e) => e.preventDefault()}
-                  className="flex items-center justify-center gap-1.5 whitespace-nowrap flex-1"
-                  style={{
-                    padding: '10px 8px',
-                    marginBottom: -1,
-                    fontSize: 12,
-                    fontWeight: 600,
+                              className={isActive ? 'ehr-chart-nav-button is-active' : 'ehr-chart-nav-button'}
+                              style={{
                     background: 'transparent',
                     color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
                     borderBottom: `2px solid ${isActive ? 'var(--accent-primary)' : 'transparent'}`,
                     cursor: 'pointer',
-                    minWidth: 0,
                   }}
                 >
                   <tab.icon className="w-3.5 h-3.5 flex-shrink-0" />
@@ -1094,9 +1169,29 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
               );
             })}
           </div>
+          <section className="ehr-chart-content">
+
+          {activeTab === 'overview' && (
+            <PatientFacesheetView
+              patient={patient}
+              latestVitals={latestVitals}
+              problems={patientProblems}
+              prescriptions={(allPrescriptions || []).filter(rx => rx.patientId === patient._id)}
+              labResults={(allLabResults || []).filter(lab => lab.patientId === patient._id)}
+              immunizations={(allImmunizations || []).filter(imm => imm.patientId === patient._id)}
+              records={records}
+              canViewClinical={canViewClinical}
+              onOpenTab={setActiveTab}
+              visiblePanelIds={facesheetPanels}
+              customizeOpen={showCustomizeView}
+              onToggleCustomize={() => setShowCustomizeView(open => !open)}
+              onTogglePanel={toggleFacesheetPanel}
+              onResetPanels={() => setFacesheetPanels(new Set(DEFAULT_FACESHEET_PANELS))}
+            />
+          )}
 
           {/* Overview Tab — full clinical overview (clinical roles only) */}
-          {activeTab === 'overview' && canViewClinical && (
+          {activeTab === '__legacy_overview' && canViewClinical && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
                 {/* Chart-permanent care alerts — patient-safety banner shown
                     on every visit (Centricity care alert). */}
@@ -1111,8 +1206,8 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                 />
 
                 {/* Latest Vitals */}
-                <div className="card-elevated lg:col-span-2 lg:order-2 flex flex-col">
-                  <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="card-elevated ehr-vitals-panel lg:col-span-2 lg:order-2">
+                  <div className="ehr-vitals-header px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
                     <div className="flex items-center gap-2.5">
                       <div className="icon-box-sm">
                         <Activity className="w-4 h-4" style={{ color: '#C44536' }} />
@@ -1127,27 +1222,35 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                       </div>
                     </div>
                     <button
-                      onClick={() => setActiveTab('trends')}
+                      onClick={() => { setActiveTab('vitals'); setVitalsView('flowsheet'); }}
                       className="text-xs font-semibold inline-flex items-center gap-1 px-2.5 py-1 rounded-md"
                       style={{ color: 'var(--tamamhealth-blue)', background: 'rgba(33, 145, 208, 0.08)' }}
                     >
                       <TrendingUpIcon className="w-3.5 h-3.5" /> View Trends
                     </button>
                   </div>
-                  <div className="p-5 flex-1 flex flex-col">
+                  <div className="ehr-vitals-body">
                     {latestVitals ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 flex-1 auto-rows-fr">
-                        <VitalCard className="h-full" vitalKey="pulse"            icon="heart"          label={t('vitals.pulse')}          value={latestVitals.pulse}          unit="bpm" />
-                        <VitalCard className="h-full" vitalKey="bp"               icon="bloodPressure"  label={t('vitals.bloodPressure')}  value={`${latestVitals.systolic}/${latestVitals.diastolic}`} systolic={latestVitals.systolic} diastolic={latestVitals.diastolic} unit="mmHg" />
-                        <VitalCard className="h-full" vitalKey="temperature"      icon="thermometer"    label={t('vitals.temperature')}    value={latestVitals.temperature}    unit="°C" />
-                        <VitalCard className="h-full" vitalKey="oxygenSaturation" icon="oxygen"         label={t('vitals.spo2')}           value={latestVitals.oxygenSaturation} unit="%" />
-                        <VitalCard className="h-full" vitalKey="respiratoryRate"  icon="lungs"          label={t('vitals.respRate')}       value={latestVitals.respiratoryRate} unit="/min" />
-                        <VitalCard className="h-full" vitalKey="bmi"              icon="weight"         label={t('vitals.bmi')}            value={latestVitals.bmi}            unit="kg/m²" />
-                        <VitalCard className="h-full" vitalKey="none"             icon="weight"         label={t('vitals.weight')}         value={latestVitals.weight}         unit="kg" />
-                        <VitalCard className="h-full" vitalKey="none"             icon="patient"        label={t('vitals.height')}         value={latestVitals.height}         unit="cm" />
+                      <div className="ehr-vitals-grid">
+                        {[
+                          { label: t('vitals.pulse'), value: latestVitals.pulse, unit: 'bpm' },
+                          { label: t('vitals.bloodPressure'), value: latestVitals.systolic && latestVitals.diastolic ? `${latestVitals.systolic}/${latestVitals.diastolic}` : null, unit: 'mmHg' },
+                          { label: t('vitals.temperature'), value: latestVitals.temperature, unit: '°C' },
+                          { label: t('vitals.spo2'), value: latestVitals.oxygenSaturation, unit: '%' },
+                          { label: t('vitals.respRate'), value: latestVitals.respiratoryRate, unit: '/min' },
+                          { label: t('vitals.bmi'), value: latestVitals.bmi, unit: 'kg/m²' },
+                          { label: t('vitals.weight'), value: latestVitals.weight, unit: 'kg' },
+                          { label: t('vitals.height'), value: latestVitals.height, unit: 'cm' },
+                        ].map(item => (
+                          <div className="ehr-vital-row" key={item.label}>
+                            <span className="ehr-vital-label">{item.label}</span>
+                            <strong>{item.value ?? '—'}</strong>
+                            {item.value != null && <span className="ehr-vital-unit">{item.unit}</span>}
+                          </div>
+                        ))}
                       </div>
                     ) : (
-                      <div className="flex-1 flex items-center justify-center p-6 text-center rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                      <div className="ehr-vitals-empty flex items-center justify-center text-center rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
                         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No vitals recorded yet for this patient.</p>
                       </div>
                     )}
@@ -1385,7 +1488,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
           {/* Overview Tab — administrative-only summary (non-clinical roles, e.g. Medical Receptionist).
               Minimum-necessary: contact + registration + next of kin, with shortcuts to the
               admin tabs. No clinical notes, diagnoses, vitals, labs, or medications. */}
-          {activeTab === 'overview' && !canViewClinical && (
+          {activeTab === '__legacy_overview_admin' && !canViewClinical && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <div className="card-elevated">
                 <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
@@ -1457,6 +1560,175 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
             </div>
           )}
 
+          {activeTab === 'allergies' && patient && (
+            <div className="space-y-4">
+              <div className="card-elevated p-5">
+                <AllergyList patient={patient} />
+              </div>
+              <div className="card-elevated p-5">
+                <DirectiveList patient={patient} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notes' && patient && (
+            <div className="space-y-4">
+              <div className="card-elevated p-5">
+                <PhoneNotes patient={patient} />
+              </div>
+              <div className="card-elevated overflow-hidden">
+                <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
+                  <div>
+                    <h3 className="font-semibold text-sm">Clinical Notes</h3>
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Encounter notes and signed chart records.</p>
+                  </div>
+                  {canConsult && (
+                    <button onClick={() => router.push(`/consultation?patientId=${patient._id}`)} className="btn btn-primary btn-sm">
+                      <ClipboardList className="w-4 h-4" /> Create Note
+                    </button>
+                  )}
+                </div>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Chief Complaint</th>
+                      <th>Provider</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
+                          No clinical notes recorded yet.
+                        </td>
+                      </tr>
+                    ) : records.map(rec => (
+                      <tr key={rec._id}>
+                        <td className="font-mono text-xs">{formatDateTime(rec.consultedAt || rec.visitDate)}</td>
+                        <td className="text-xs uppercase">{rec.visitType || 'SOAP'}</td>
+                        <td className="font-medium text-sm">{rec.chiefComplaint || 'Clinical encounter'}</td>
+                        <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{rec.providerName || '—'}</td>
+                        <td><span className="badge badge-normal text-[10px]">Open</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'demographics' && patient && (
+            <PatientDemographicsView
+              patient={patient}
+              activeTab={demographicsTab}
+              onTabChange={setDemographicsTab}
+              onEdit={openEditModal}
+              appointments={patientAppointments}
+              regHospitalName={regHospital?.name || patient.registrationHospital || ''}
+            />
+          )}
+
+          {activeTab === '__legacy_demographics' && patient && (
+            <div className="card-elevated overflow-hidden">
+              <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
+                <div>
+                  <h3 className="font-semibold text-sm">{t('patient.demographics')}</h3>
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Identity, contact, registration, and next-of-kin information.</p>
+                </div>
+                <button onClick={openEditModal} className="btn btn-secondary btn-sm">
+                  <DuotoneInfoIcon name="edit" size={14} /> Edit
+                </button>
+              </div>
+              <div className="ehr-demo-grid p-5">
+                {[
+                  { l: 'Legal Name', v: patientFullName(patient) },
+                  { l: 'Hospital No.', v: patient.hospitalNumber },
+                  { l: 'Geocode ID', v: patient.geocodeId },
+                  { l: 'Date of Birth', v: patient.dateOfBirth ? formatDate(patient.dateOfBirth) : null },
+                  { l: 'Sex', v: patient.gender },
+                  { l: 'Blood Type', v: patient.bloodType },
+                  { l: 'Primary Phone', v: patient.phone ? formatPhoneDisplay(patient.phone) : null },
+                  { l: 'National ID', v: patient.nationalId },
+                  { l: 'State', v: patient.state },
+                  { l: 'County', v: patient.county },
+                  { l: 'Tribe', v: patient.tribe },
+                  { l: 'Language', v: patient.primaryLanguage },
+                  { l: 'Registered', v: (patient.registrationDate || patient.registeredAt) ? formatDate(patient.registrationDate || patient.registeredAt) : null },
+                  { l: 'Facility', v: regHospital?.name || patient.registrationHospital },
+                  { l: 'Next of Kin', v: patient.nokName ? `${patient.nokName}${patient.nokRelationship ? ` (${patient.nokRelationship})` : ''}` : null },
+                  { l: 'NOK Phone', v: patient.nokPhone ? formatPhoneDisplay(patient.nokPhone) : null },
+                ].map(item => (
+                  <div className="ehr-demo-row" key={item.l}>
+                    <span>{item.l}</span>
+                    <strong>{item.v || '—'}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'careChecklist' && patient && (
+            <div className="space-y-4">
+              <ScreeningsPanel patient={patient} />
+              <RemindersPanel patient={patient} />
+              <div className="card-elevated p-5">
+                <AssessmentsPanel patient={patient} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'documents' && patient && (
+            <div className="space-y-4">
+              <DocumentsPanel patient={patient} />
+              <div className="card-elevated p-5">
+                <AssessmentsPanel patient={patient} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'recall' && patient && (
+            <div className="space-y-4">
+              <RemindersPanel patient={patient} />
+              <div className="card-elevated overflow-hidden">
+                <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                  <h3 className="font-semibold text-sm">Recall</h3>
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Upcoming and prior appointments for follow-up planning.</p>
+                </div>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Time</th>
+                      <th>Provider</th>
+                      <th>Reason</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {patientAppointments.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
+                          No appointments recorded for this patient.
+                        </td>
+                      </tr>
+                    ) : patientAppointments.map(appt => (
+                      <tr key={appt._id}>
+                        <td className="font-mono text-xs">{formatDate(appt.appointmentDate)}</td>
+                        <td>{appt.appointmentTime || '—'}</td>
+                        <td>{appt.providerName || '—'}</td>
+                        <td>{appt.reason || appt.department || 'Follow-up'}</td>
+                        <td><span className="badge badge-normal text-[10px]">{appt.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Timeline Tab */}
           {activeTab === 'timeline' && patient && (
             <PatientTimeline
@@ -1468,25 +1740,6 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
               appointments={patientAppointments}
               triages={patientTriages}
             />
-          )}
-
-          {/* Trends Tab */}
-          {activeTab === 'trends' && (
-            <div className="card-elevated p-5 space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <div>
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <TrendingUpIcon className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
-                    Vital Sign Trends
-                  </h3>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    Chronological trends across all recorded visits. Colored badges flag
-                    readings outside the normal range or moving quickly.
-                  </p>
-                </div>
-              </div>
-              <VitalsTrends records={records} />
-            </div>
           )}
 
           {/* Medical History Tab */}
@@ -1521,18 +1774,17 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
               {/* Filter bar */}
               {records.length > 0 && (
                 <div
-                  className="px-5 py-3 border-b flex items-center gap-2 flex-wrap"
+                  className="px-5 py-3 border-b"
                   style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}
                 >
-                  {/* Search */}
                   <div
-                    className="flex items-center gap-2 flex-1 min-w-[220px] px-3 py-1.5 rounded-lg"
+                    className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg"
                     style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}
                   >
                     <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
                     <input
                       type="text"
-                      placeholder="Search by complaint, diagnosis, ICD-10, or provider…"
+                      placeholder="Search all encounters by complaint, diagnosis, ICD-10, provider, visit type, date, notes, or recorded details…"
                       value={historySearch}
                       onChange={e => setHistorySearch(e.target.value)}
                       className="flex-1 bg-transparent text-xs outline-none"
@@ -1548,72 +1800,23 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                       </button>
                     )}
                   </div>
-
-                  {/* Time range */}
-                  <div className="flex items-center gap-1 p-0.5 rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-                    {([
-                      { v: 'all', l: 'All time' },
-                      { v: '1y', l: 'Past year' },
-                      { v: '90d', l: '90 days' },
-                      { v: '30d', l: '30 days' },
-                    ] as const).map(opt => (
-                      <button
-                        key={opt.v}
-                        onClick={() => setHistoryRange(opt.v)}
-                        className="text-[10px] font-semibold px-2.5 py-1 rounded-md transition-colors"
-                        style={{
-                          background: historyRange === opt.v ? 'var(--accent-light)' : 'transparent',
-                          color: historyRange === opt.v ? 'var(--tamamhealth-blue)' : 'var(--text-muted)',
-                        }}
-                      >
-                        {opt.l}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Visit type */}
-                  <select
-                    value={historyVisitType}
-                    onChange={e => setHistoryVisitType(e.target.value as typeof historyVisitType)}
-                    className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg outline-none"
-                    style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border-light)',
-                      color: 'var(--text-primary)',
-                    }}
-                  >
-                    <option value="all">All visit types</option>
-                    <option value="outpatient">Outpatient</option>
-                    <option value="inpatient">Inpatient</option>
-                    <option value="emergency">Emergency</option>
-                  </select>
-
-                  {(historySearch || historyRange !== 'all' || historyVisitType !== 'all') && (
-                    <button
-                      onClick={() => { setHistorySearch(''); setHistoryRange('all'); setHistoryVisitType('all'); }}
-                      className="text-[10px] font-semibold px-2.5 py-1 rounded-md transition-colors"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
-                      Clear filters
-                    </button>
-                  )}
                 </div>
               )}
               {records.length === 0 ? (
-                <div className="p-10 text-center">
+                <div className="px-6 py-7 text-center">
                   <FileText className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
                   <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No encounters recorded yet.</p>
                 </div>
               ) : filteredHistory.length === 0 ? (
-                <div className="p-10 text-center">
+                <div className="px-6 py-7 text-center">
                   <Search className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No encounters match the current filters.</p>
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No encounters match the current search.</p>
                   <button
-                    onClick={() => { setHistorySearch(''); setHistoryRange('all'); setHistoryVisitType('all'); }}
+                    onClick={() => setHistorySearch('')}
                     className="text-xs font-semibold mt-2"
                     style={{ color: 'var(--tamamhealth-blue)' }}
                   >
-                    Clear filters
+                    Clear search
                   </button>
                 </div>
               ) : (
@@ -1623,7 +1826,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                   className="absolute top-5 bottom-5 w-0.5"
                   style={{
                     left: 32,
-                    background: 'linear-gradient(180deg, var(--accent-border) 0%, var(--border-light) 100%)',
+                    background: 'var(--accent-primary)',
                   }}
                 />
                 {filteredHistory.map((rec) => {
@@ -1671,11 +1874,11 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
 
                     {/* Encounter card */}
                     <div
-                      className="rounded-xl transition-all hover:shadow-md"
+                      className="ehr-encounter-card rounded-xl transition-all hover:shadow-md"
                       style={{
                         border: '1px solid var(--border-light)',
                         background: 'var(--bg-card)',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        boxShadow: 'none',
                         overflow: 'hidden',
                       }}
                     >
@@ -1685,7 +1888,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                         tabIndex={0}
                         onClick={toggleExpand}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(); } }}
-                        className="px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 cursor-pointer hover:bg-[var(--accent-light)] transition-colors"
+                        className="ehr-encounter-card__head px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 cursor-pointer hover:bg-[var(--accent-light)] transition-colors"
                         style={{
                           background: 'var(--overlay-subtle)',
                           borderBottom: '1px solid var(--border-light)',
@@ -1725,7 +1928,7 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
                       </div>
 
                       {/* Body */}
-                      <div className="p-4">
+                      <div className="ehr-encounter-card__body p-4">
                         <p className="text-sm font-semibold leading-snug mb-1" style={{ color: 'var(--text-primary)' }}>
                           {rec.chiefComplaint}
                         </p>
@@ -2032,48 +2235,91 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
           {/* Vitals Tab */}
           {activeTab === 'vitals' && (
             <div className="card-elevated overflow-hidden">
-              <div className="overflow-x-auto" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
-              <table className="data-table" style={{ minWidth: 1080 }}>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Temp (°C)</th>
-                    <th>BP (mmHg)</th>
-                    <th>Pulse</th>
-                    <th>Resp Rate</th>
-                    <th>SpO₂</th>
-                    <th>Weight (kg)</th>
-                    <th>BMI</th>
-                    <th>Facility</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.every(rec => !rec.vitalSigns) && (
-                    <tr>
-                      <td colSpan={9} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
-                        No vitals recorded yet for this patient.
-                      </td>
-                    </tr>
-                  )}
-                  {records.filter(rec => rec.vitalSigns).map(rec => {
-                    const v = rec.vitalSigns;
-                    return (
-                      <tr key={rec._id}>
-                        <td className="font-mono text-xs">{rec.visitDate}</td>
-                        <td style={{ color: v.temperature > 37.5 ? 'var(--color-danger)' : 'inherit', fontWeight: v.temperature > 37.5 ? 600 : 400 }}>{v.temperature}</td>
-                        <td style={{ color: v.systolic > 140 ? 'var(--color-danger)' : 'inherit', fontWeight: v.systolic > 140 ? 600 : 400 }}>{v.systolic}/{v.diastolic}</td>
-                        <td style={{ color: v.pulse > 100 ? 'var(--color-danger)' : 'inherit' }}>{v.pulse}</td>
-                        <td>{v.respiratoryRate}</td>
-                        <td style={{ color: v.oxygenSaturation < 95 ? 'var(--color-danger)' : 'inherit' }}>{v.oxygenSaturation}%</td>
-                        <td>{v.weight}</td>
-                        <td>{v.bmi}</td>
-                        <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{(rec.hospitalName || '').replace(' Hospital', '').replace(' Teaching', '')}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="px-5 py-3 border-b flex items-center justify-between flex-wrap gap-3" style={{ borderColor: 'var(--border-light)' }}>
+                <div>
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    {vitalsView === 'flowsheet' ? (
+                      <TrendingUpIcon className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
+                    ) : (
+                      <Activity className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
+                    )}
+                    {vitalsView === 'flowsheet' ? 'Vital Sign Flowsheet' : 'Vitals'}
+                  </h3>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {vitalsView === 'flowsheet'
+                      ? 'Chronological trends across all recorded visits.'
+                      : 'Recorded vital signs from patient encounters.'}
+                  </p>
+                </div>
+                <div className="ehr-chart-subtabs" role="tablist" aria-label="Vitals view">
+                  <button
+                    type="button"
+                    className={vitalsView === 'table' ? 'is-active' : ''}
+                    onClick={() => setVitalsView('table')}
+                    role="tab"
+                    aria-selected={vitalsView === 'table'}
+                  >
+                    Vitals
+                  </button>
+                  <button
+                    type="button"
+                    className={vitalsView === 'flowsheet' ? 'is-active' : ''}
+                    onClick={() => setVitalsView('flowsheet')}
+                    role="tab"
+                    aria-selected={vitalsView === 'flowsheet'}
+                  >
+                    Flowsheet
+                  </button>
+                </div>
               </div>
+              {vitalsView === 'flowsheet' ? (
+                <div className="p-5">
+                  <VitalsTrends records={records} />
+                </div>
+              ) : (
+                <div className="overflow-x-auto" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
+                <table className="data-table" style={{ minWidth: 1080 }}>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Temp (°C)</th>
+                      <th>BP (mmHg)</th>
+                      <th>Pulse</th>
+                      <th>Resp Rate</th>
+                      <th>SpO₂</th>
+                      <th>Weight (kg)</th>
+                      <th>BMI</th>
+                      <th>Facility</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.every(rec => !rec.vitalSigns) && (
+                      <tr>
+                        <td colSpan={9} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
+                          No vitals recorded yet for this patient.
+                        </td>
+                      </tr>
+                    )}
+                    {records.filter(rec => rec.vitalSigns).map(rec => {
+                      const v = rec.vitalSigns;
+                      return (
+                        <tr key={rec._id}>
+                          <td className="font-mono text-xs">{rec.visitDate}</td>
+                          <td style={{ color: v.temperature > 37.5 ? 'var(--color-danger)' : 'inherit', fontWeight: v.temperature > 37.5 ? 600 : 400 }}>{v.temperature}</td>
+                          <td style={{ color: v.systolic > 140 ? 'var(--color-danger)' : 'inherit', fontWeight: v.systolic > 140 ? 600 : 400 }}>{v.systolic}/{v.diastolic}</td>
+                          <td style={{ color: v.pulse > 100 ? 'var(--color-danger)' : 'inherit' }}>{v.pulse}</td>
+                          <td>{v.respiratoryRate}</td>
+                          <td style={{ color: v.oxygenSaturation < 95 ? 'var(--color-danger)' : 'inherit' }}>{v.oxygenSaturation}%</td>
+                          <td>{v.weight}</td>
+                          <td>{v.bmi}</td>
+                          <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{(rec.hospitalName || '').replace(' Hospital', '').replace(' Teaching', '')}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -2243,7 +2489,91 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
               />
             </div>
           )}
+          </section>
+          </div>
+          </div>
       </main>
+
+      {/* Edit Demographics Modal */}
+      {showMessageModal && patient && (
+        <Modal onClose={() => !messageSending && setShowMessageModal(false)} width={500} labelledBy="patient-message-title">
+          <div className="modal-content card-elevated p-5 w-full" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 id="patient-message-title" className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Message patient
+                </h3>
+                <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {patientFullName(patient)}{patient.phone ? ` · ${formatPhoneDisplay(patient.phone)}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMessageModal(false)}
+                className="p-1.5 rounded-lg"
+                disabled={messageSending}
+                style={{ background: 'var(--overlay-subtle)' }}
+                aria-label="Close patient message"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Channel</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['app', 'sms', 'both'] as const).map(channel => (
+                    <button
+                      key={channel}
+                      type="button"
+                      onClick={() => { setMessageChannel(channel); setMessageError(''); setMessageSent(false); }}
+                      className="btn btn-sm"
+                      style={{
+                        background: messageChannel === channel ? 'var(--tamamhealth-blue)' : 'var(--bg-secondary)',
+                        color: messageChannel === channel ? '#fff' : 'var(--text-primary)',
+                        border: '1px solid var(--border-light)',
+                      }}
+                    >
+                      {channel === 'app' ? 'App' : channel === 'sms' ? 'SMS' : 'App + SMS'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Subject</label>
+                <input
+                  value={messageSubject}
+                  onChange={e => { setMessageSubject(e.target.value); setMessageSent(false); }}
+                  className="w-full p-2.5 rounded-md text-[13px]"
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Message</label>
+                <textarea
+                  autoFocus
+                  value={messageBody}
+                  onChange={e => { setMessageBody(e.target.value); setMessageError(''); setMessageSent(false); }}
+                  rows={4}
+                  placeholder="Write a clear patient instruction or follow-up message."
+                  className="w-full p-2.5 rounded-md text-[13px]"
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+                />
+              </div>
+              {messageError && <p className="text-[12px]" role="alert" style={{ color: 'var(--color-danger)' }}>{messageError}</p>}
+              {messageSent && <p className="text-[12px] font-semibold" role="status" style={{ color: 'var(--color-success)' }}>Message saved and queued.</p>}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setShowMessageModal(false)} className="btn btn-sm btn-secondary" disabled={messageSending}>Close</button>
+              <button type="button" onClick={sendPatientMessage} className="btn btn-sm btn-primary" disabled={messageSending || !messageBody.trim()}>
+                <MessageSquare className="w-3.5 h-3.5" /> {messageSending ? 'Sending...' : 'Send message'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Edit Demographics Modal */}
       {showEditModal && patient && (
@@ -2330,4 +2660,378 @@ export default function PatientDetailPage({ params }: { params: { id: string } }
       />
     </>
   );
+}
+
+function PatientFacesheetView({
+  patient,
+  latestVitals,
+  problems,
+  prescriptions,
+  labResults,
+  immunizations,
+  records,
+  canViewClinical,
+  onOpenTab,
+  visiblePanelIds,
+  customizeOpen,
+  onToggleCustomize,
+  onTogglePanel,
+  onResetPanels,
+}: {
+  patient: PatientDoc;
+  latestVitals?: MedicalRecordDoc['vitalSigns'];
+  problems: ProblemDoc[];
+  prescriptions: PrescriptionDoc[];
+  labResults: LabResultDoc[];
+  immunizations: ImmunizationDoc[];
+  records: MedicalRecordDoc[];
+  canViewClinical: boolean;
+  onOpenTab: (tab: string) => void;
+  visiblePanelIds: Set<FacesheetPanelId>;
+  customizeOpen: boolean;
+  onToggleCustomize: () => void;
+  onTogglePanel: (panelId: FacesheetPanelId) => void;
+  onResetPanels: () => void;
+}) {
+  const activeProblems = problems.filter(problem => problem.status === 'active' || problem.status === 'chronic');
+  const currentMeds = prescriptions.filter(rx => rx.status !== 'dispensed').slice(0, 4);
+  const recentLabs = [...labResults]
+    .sort((a, b) => (b.completedAt || b.createdAt || '').localeCompare(a.completedAt || a.createdAt || ''))
+    .slice(0, 4);
+  const latestHistory = records[0];
+  const recommendations = buildClinicalRecommendations(patient, immunizations, activeProblems);
+  const showPanel = (panelId: FacesheetPanelId) => visiblePanelIds.has(panelId);
+
+  if (!canViewClinical) {
+    return (
+      <div className="tebra-facesheet">
+        <section className="tebra-panel tebra-panel--wide">
+          <div className="tebra-panel__head">
+            <h2>Facesheet</h2>
+          </div>
+          <div className="tebra-empty">
+            Clinical information is restricted for your role. Use Demographics, Account, Documents, and Recall for administrative work.
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tebra-facesheet">
+      <div className="tebra-section-title">
+        <h1>Facesheet</h1>
+        <button type="button" onClick={onToggleCustomize}>
+          {customizeOpen ? 'Done' : 'Customize View'}
+        </button>
+      </div>
+
+      {customizeOpen && (
+        <div className="tebra-customize-panel" role="group" aria-label="Customize facesheet panels">
+          <div className="tebra-customize-panel__head">
+            <strong>Show on Facesheet</strong>
+            <button type="button" onClick={onResetPanels}>Reset</button>
+          </div>
+          <div className="tebra-customize-panel__grid">
+            {FACESHEET_PANEL_OPTIONS.map(panel => (
+              <label key={panel.id}>
+                <input
+                  type="checkbox"
+                  checked={visiblePanelIds.has(panel.id)}
+                  onChange={() => onTogglePanel(panel.id)}
+                  disabled={visiblePanelIds.has(panel.id) && visiblePanelIds.size === 1}
+                />
+                <span>{panel.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showPanel('medications') && (
+      <section className="tebra-panel" onClick={() => onOpenTab('prescriptions')}>
+        <h2><Pill className="tebra-panel-icon" aria-hidden /> Medications</h2>
+        {currentMeds.length ? (
+          <div className="tebra-list">
+            {currentMeds.map(rx => (
+              <div key={rx._id} className="tebra-list-row">
+                <strong>{rx.medication}</strong>
+                <span>{[rx.dose, rx.frequency, rx.duration].filter(Boolean).join(' · ')}</span>
+              </div>
+            ))}
+          </div>
+        ) : <p className="tebra-none">(None documented)</p>}
+      </section>
+      )}
+
+      {showPanel('problems') && (
+      <section className="tebra-panel" onClick={() => onOpenTab('problems')}>
+        <h2><AlertTriangle className="tebra-panel-icon" aria-hidden /> Problems</h2>
+        {activeProblems.length ? (
+          <div className="tebra-list">
+            {activeProblems.slice(0, 5).map(problem => (
+              <div key={problem._id} className="tebra-list-row">
+                <strong>{problem.name}</strong>
+                <span className="tebra-list-row-meta">
+                  {problem.icd10Code && <span>{problem.icd10Code}</span>}
+                  <Badge tone={problem.status === 'chronic' ? 'warning' : 'success'}>{problem.status}</Badge>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : <p className="tebra-none">(None documented)</p>}
+      </section>
+      )}
+
+      {showPanel('vitals') && (() => {
+        const bpElevated = !!(latestVitals?.systolic && latestVitals.systolic >= 140) || !!(latestVitals?.diastolic && latestVitals.diastolic >= 90);
+        const tempElevated = !!(latestVitals?.temperature && latestVitals.temperature >= 38);
+        const spo2Low = !!(latestVitals?.oxygenSaturation && latestVitals.oxygenSaturation < 94);
+        return (
+      <section className="tebra-panel tebra-panel--highlight" onClick={() => onOpenTab('vitals')}>
+        <h2><Activity className="tebra-panel-icon" aria-hidden /> Vitals</h2>
+        {latestVitals ? (
+          <div className="tebra-vitals">
+            <span className={bpElevated ? 'is-out-of-range' : ''}>BP <strong>{latestVitals.systolic && latestVitals.diastolic ? `${latestVitals.systolic}/${latestVitals.diastolic}` : '-'}</strong></span>
+            <span>Pulse <strong>{latestVitals.pulse ?? '-'}</strong></span>
+            <span className={tempElevated ? 'is-out-of-range' : ''}>Temp <strong>{latestVitals.temperature ?? '-'}</strong></span>
+            <span className={spo2Low ? 'is-out-of-range' : ''}>SpO2 <strong>{latestVitals.oxygenSaturation ?? '-'}</strong></span>
+          </div>
+        ) : <p className="tebra-none">(None documented)</p>}
+      </section>
+        );
+      })()}
+
+      {showPanel('history') && (
+      <section className="tebra-panel" onClick={() => onOpenTab('history')}>
+        <h2><History className="tebra-panel-icon" aria-hidden /> History</h2>
+        {latestHistory ? (
+          <div className="tebra-list-row">
+            <strong>{latestHistory.chiefComplaint || 'Recent encounter'}</strong>
+            <span>{formatDateTime(latestHistory.consultedAt || latestHistory.visitDate)} · {latestHistory.providerName || 'Provider not listed'}</span>
+          </div>
+        ) : <p className="tebra-none">(None Documented)</p>}
+      </section>
+      )}
+
+      {showPanel('labs') && (
+      <section className="tebra-panel" onClick={() => onOpenTab('labs')}>
+        <h2><FlaskConical className="tebra-panel-icon" aria-hidden /> Labs/Studies</h2>
+        {recentLabs.length ? (
+          <div className="tebra-list">
+            {recentLabs.map(lab => {
+              const resultText = /positive|reactive|abnormal/i.test(lab.result || '') ? 'danger'
+                : /negative|non-reactive|normal/i.test(lab.result || '') ? 'success'
+                : null;
+              return (
+                <div key={lab._id} className="tebra-list-row">
+                  <strong>{lab.testName}</strong>
+                  <span className="tebra-list-row-meta">
+                    {lab.result && (
+                      <span className={resultText ? `tebra-lab-result is-${resultText}` : 'tebra-lab-result'}>
+                        {[lab.result, lab.unit].filter(Boolean).join(' ')}
+                      </span>
+                    )}
+                    {lab.status && <span>{lab.status}</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : <p className="tebra-none">(None documented)</p>}
+      </section>
+      )}
+
+      {showPanel('recommendations') && (
+      <section className="tebra-panel tebra-recommendations" onClick={() => onOpenTab('careChecklist')}>
+        <h2><ClipboardList className="tebra-panel-icon" aria-hidden /> Clinical Recommendations</h2>
+        <div className="tebra-reco-list">
+          {recommendations.map(item => (
+            <div key={item.title} className="tebra-reco-row">
+              <span className={item.grade === 'A' ? 'tebra-reco-grade is-rec' : 'tebra-reco-grade is-info'}>{item.grade}</span>
+              <div>
+                <small>{item.category}</small>
+                <strong>{item.title}</strong>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+      )}
+    </div>
+  );
+}
+
+function PatientDemographicsView({
+  patient,
+  activeTab,
+  onTabChange,
+  onEdit,
+  appointments,
+  regHospitalName,
+}: {
+  patient: PatientDoc;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  onEdit: () => void;
+  appointments: AppointmentDoc[];
+  regHospitalName: string;
+}) {
+  const tabs = [
+    ['profile', 'Profile'],
+    ['additional', 'Additional Info'],
+    ['contacts', 'Contacts'],
+    ['upcoming', 'Upcoming Appointments'],
+    ['past', 'Past Appointments'],
+    ['portal', 'Patient Portal'],
+  ];
+  const upcoming = appointments
+    .filter(appt => new Date(`${appt.appointmentDate}T${appt.appointmentTime || '00:00'}:00`).getTime() >= Date.now())
+    .sort((a, b) => `${a.appointmentDate}${a.appointmentTime}`.localeCompare(`${b.appointmentDate}${b.appointmentTime}`));
+  const past = appointments
+    .filter(appt => new Date(`${appt.appointmentDate}T${appt.appointmentTime || '00:00'}:00`).getTime() < Date.now())
+    .sort((a, b) => `${b.appointmentDate}${b.appointmentTime}`.localeCompare(`${a.appointmentDate}${a.appointmentTime}`));
+
+  return (
+    <div className="tebra-demographics">
+      <div className="tebra-demo-title">
+        <h1>Demographics</h1>
+      </div>
+      <div className="tebra-demo-tabs" role="tablist" aria-label="Demographics sections">
+        {tabs.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={activeTab === id ? 'active' : ''}
+            onClick={() => onTabChange(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'profile' && (
+        <section className="tebra-demo-panel">
+          <button type="button" className="tebra-demo-edit" onClick={onEdit}>Edit</button>
+          <div className="tebra-demo-person">
+            <div className="tebra-demo-avatar">{patientInitials(patient)}</div>
+            <h2>{patientFullName(patient)}</h2>
+            <span>Active</span>
+          </div>
+          <div className="tebra-demo-columns">
+            <DemoField label="Legal Name" value={patientFullName(patient)} />
+            <DemoField label="Pronoun" value="-" />
+            <DemoField label="MRN" value={patient.hospitalNumber || '-'} />
+            <DemoField label="Preferred Name" value={patient.firstName || '-'} />
+            <DemoField label="Sex" value={patient.gender || '-'} />
+            <DemoField label="Tamam Patient ID" value={patient.geocodeId || patient.hospitalNumber || '-'} />
+            <DemoField label="Date of Birth" value={patient.dateOfBirth ? `${formatDate(patient.dateOfBirth)} (${patientAgeLabel(patient)})` : '-'} />
+            <DemoField label="Gender Identity" value={patient.gender || '-'} />
+            <DemoField label="National ID" value={patient.nationalId || '-'} />
+            <DemoField label="Previous Full Name" value={patient.maidenName || '-'} />
+            <DemoField label="Sexual Orientation" value="Choose not to disclose" />
+            <DemoField label="Facility" value={regHospitalName || '-'} />
+            <DemoField label="Marital Status" value="Unknown" />
+            <DemoField label="Blood Type" value={patient.bloodType || '-'} />
+            <DemoField label="Primary Language" value={patient.primaryLanguage || '-'} />
+          </div>
+
+          <div className="tebra-demo-section">
+            <h3>Contact Information:</h3>
+            <div className="tebra-demo-columns">
+              <DemoField label="Home Address" value={[patient.address, patient.boma, patient.payam, patient.county, patient.state].filter(Boolean).join(', ') || '-'} wide />
+              <DemoField label="Mobile Phone" value={patient.phone ? `${formatPhoneDisplay(patient.phone)} Primary` : '-'} />
+              <DemoField label="Personal Email" value="-" />
+              <DemoField label="Mailing Address" value={patient.address || '-'} wide />
+              <DemoField label="Home Phone" value="-" />
+              <DemoField label="Work Email" value="-" />
+              <DemoField label="Previous Address" value="-" wide />
+              <DemoField label="Other Phone" value={patient.altPhone ? formatPhoneDisplay(patient.altPhone) : '-'} />
+              <DemoField label="Preferred Communication" value="Unknown" />
+              <DemoField label="Driver's License" value="-" />
+              <DemoField label="Send Reminders by" value={patient.whatsapp ? 'Phone(Text Message), WhatsApp' : 'Phone(Text Message)'} wide />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'additional' && (
+        <section className="tebra-demo-panel">
+          <div className="tebra-demo-columns">
+            <DemoField label="State" value={patient.state || '-'} />
+            <DemoField label="County" value={patient.county || '-'} />
+            <DemoField label="Payam" value={patient.payam || '-'} />
+            <DemoField label="Boma" value={patient.boma || '-'} />
+            <DemoField label="Tribe" value={patient.tribe || '-'} />
+            <DemoField label="Registered" value={(patient.registrationDate || patient.registeredAt) ? formatDate(patient.registrationDate || patient.registeredAt) : '-'} />
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'contacts' && (
+        <section className="tebra-demo-panel">
+          <div className="tebra-demo-columns">
+            <DemoField label="Primary Contact" value={patient.nokName || '-'} />
+            <DemoField label="Relationship" value={patient.nokRelationship || '-'} />
+            <DemoField label="Phone" value={patient.nokPhone ? formatPhoneDisplay(patient.nokPhone) : '-'} />
+            <DemoField label="Address" value={patient.nokAddress || '-'} wide />
+          </div>
+        </section>
+      )}
+
+      {(activeTab === 'upcoming' || activeTab === 'past') && (
+        <section className="tebra-demo-panel">
+          <table className="tebra-demo-table">
+            <thead><tr><th>Date</th><th>Time</th><th>Provider</th><th>Reason</th><th>Status</th></tr></thead>
+            <tbody>
+              {(activeTab === 'upcoming' ? upcoming : past).length ? (activeTab === 'upcoming' ? upcoming : past).map(appt => (
+                <tr key={appt._id}>
+                  <td>{formatDate(appt.appointmentDate)}</td>
+                  <td>{appt.appointmentTime || '-'}</td>
+                  <td>{appt.providerName || '-'}</td>
+                  <td>{appt.reason || appt.department || '-'}</td>
+                  <td>{appt.status}</td>
+                </tr>
+              )) : (
+                <tr><td colSpan={5}>No appointments documented.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {activeTab === 'portal' && (
+        <section className="tebra-demo-panel">
+          <div className="tebra-demo-columns">
+            <DemoField label="Portal Status" value="Not invited" />
+            <DemoField label="Patient Intake" value="Not sent" />
+            <DemoField label="Reminder Channel" value={patient.whatsapp ? 'SMS / WhatsApp' : 'SMS'} />
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function DemoField({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={wide ? 'tebra-demo-field tebra-demo-field--wide' : 'tebra-demo-field'}>
+      <dt>{label}:</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function buildClinicalRecommendations(patient: PatientDoc, immunizations: ImmunizationDoc[], problems: ProblemDoc[]) {
+  const hasInfluenza = immunizations.some(imm => /influenza|flu/i.test(imm.vaccine || ''));
+  const hasHivScreen = problems.some(problem => /hiv/i.test(problem.name));
+  const ageText = patientAgeLabel(patient);
+  const adult = !ageText.includes('mo') && !ageText.includes('day') && !ageText.includes('week');
+  return [
+    { grade: 'i', category: 'Preventive Care and Screening:', title: 'Colorectal Cancer Screening' },
+    { grade: 'i', category: 'Documentation of Current Medications in the Medical Record:', title: 'Maintain current medication list' },
+    { grade: 'i', category: 'Preventive Care and Screening:', title: hasInfluenza ? 'Influenza immunization documented' : 'Influenza Immunizations' },
+    { grade: 'A', category: 'Colorectal Cancer: Screening', title: 'Colorectal Cancer: Screening - Adults aged 50 to 75 years' },
+    { grade: 'A', category: 'Human Immunodeficiency Virus (HIV) Infection: Screening', title: hasHivScreen || adult ? 'HIV Infection: Screening - Adolescents and adults aged 15 to 65 years' : 'HIV Infection: Screening' },
+  ];
 }

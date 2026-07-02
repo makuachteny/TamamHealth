@@ -264,7 +264,7 @@ export default function PatientsPage() {
               <div className="flex items-end justify-between gap-3 mb-3">
                 <span
                   style={{
-                    fontFamily: "'DM Sans', sans-serif",
+                    fontFamily: "var(--font-platform)",
                     fontWeight: 500,
                     fontSize: 24,
                     lineHeight: '100%',

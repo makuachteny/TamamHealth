@@ -1,8 +1,6 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
@@ -10,10 +8,14 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Pill, FileText, BedDouble, AlertTriangle,
   Syringe, HeartPulse, Users, SendHorizontal,
+  ClipboardCheck, Calendar, FlaskConical,
 } from '@/components/icons/lucide';
-import QuickActionsCard from '@/components/dashboard/QuickActionsCard';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
+import { useWards } from '@/lib/hooks/useWards';
+import { patientAgeLabel, patientFullName, patientGenderAge } from '@/lib/patient-utils';
+import { getRoleConfig } from '@/lib/permissions';
+import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import WardWorkflow from './WardWorkflow';
 import { EMPTY_WARD_FILTERS, type WardFilterState } from './WardFilters';
 import MarWorkflow from './MarWorkflow';
@@ -28,6 +30,7 @@ export default function NurseDashboard() {
   const router = useRouter();
   const { patients } = usePatients();
   const { triages } = useTriage();
+  const { activeAdmissions } = useWards();
   const today = new Date().toISOString().slice(0, 10);
   const triageToday = triages.filter(tr => (tr.triagedAt || '').startsWith(today));
   const criticalTriage = triageToday.filter(tr => tr.priority === 'RED').length;
@@ -42,62 +45,175 @@ export default function NurseDashboard() {
   // reads the same state to narrow its list.
   const [wardFilters, setWardFilters] = useState<WardFilterState>(EMPTY_WARD_FILTERS);
 
-  if (!currentUser) return null;
-
-  const stationLabel: Record<StationTab, string> = {
+  const stationLabel = useMemo<Record<StationTab, string>>(() => ({
     ward: t('nurse.tabWard'),
     mar: t('nurse.tabMar'),
     triage: t('nurse.tabTriage'),
     handoff: t('nurse.shiftHandoff'),
-  };
+  }), [t]);
+
+  const roleConfig = currentUser ? getRoleConfig(currentUser.role) : null;
+  const allowedRoutes = useMemo(() => roleConfig?.allowedRoutes ?? [], [roleConfig]);
+  const canUseRoute = useCallback((href: string) => allowedRoutes.includes(href), [allowedRoutes]);
+
+  const stationTabs = useMemo(() => {
+    const tabs: { key: StationTab; label: string; count: number }[] = [];
+    if (currentUser?.role === 'triage_nurse') {
+      tabs.push({ key: 'triage', label: stationLabel.triage, count: triageToday.length });
+      tabs.push({ key: 'ward', label: stationLabel.ward, count: patients.length });
+      return tabs;
+    }
+    if (currentUser?.role === 'rooming_nurse') {
+      tabs.push({ key: 'ward', label: 'Rooming', count: patients.length });
+      tabs.push({ key: 'triage', label: stationLabel.triage, count: triageToday.length });
+      return tabs;
+    }
+    tabs.push({ key: 'ward', label: stationLabel.ward, count: activeAdmissions.length || patients.length });
+    tabs.push({ key: 'mar', label: stationLabel.mar, count: activeAdmissions.length });
+    tabs.push({ key: 'triage', label: stationLabel.triage, count: triageToday.length });
+    tabs.push({ key: 'handoff', label: stationLabel.handoff, count: 0 });
+    return tabs;
+  }, [activeAdmissions.length, currentUser?.role, patients.length, stationLabel.handoff, stationLabel.mar, stationLabel.triage, stationLabel.ward, triageToday.length]);
+
+  useEffect(() => {
+    if (!stationTabs.some(tab => tab.key === activeTab) && stationTabs[0]) {
+      setActiveTab(stationTabs[0].key);
+    }
+  }, [activeTab, stationTabs]);
+
+  const actions = useMemo<EhrCareDashboardAction[]>(() => {
+    const stationActions: EhrCareDashboardAction[] = stationTabs.map(tab => ({
+      label: tab.label,
+      icon: tab.key === 'ward' ? BedDouble : tab.key === 'mar' ? Pill : tab.key === 'triage' ? AlertTriangle : FileText,
+      onClick: () => setActiveTab(tab.key),
+      active: activeTab === tab.key,
+      tone: activeTab === tab.key ? 'primary' : 'neutral',
+    }));
+    const routeActions: EhrCareDashboardAction[] = [
+      ...(canUseRoute('/patients') ? [{ label: t('dashboard.newPatient'), icon: Users, onClick: () => router.push('/patients/new') }] : []),
+      ...(canUseRoute('/patient-intake') ? [{ label: 'Patient intake', icon: ClipboardCheck, onClick: () => router.push('/patient-intake') }] : []),
+      ...(canUseRoute('/immunizations') ? [{ label: t('dashboard.immunization'), icon: Syringe, onClick: () => router.push('/immunizations') }] : []),
+      ...(canUseRoute('/anc') ? [{ label: t('dashboard.ancVisit'), icon: HeartPulse, onClick: () => router.push('/anc') }] : []),
+      ...(canUseRoute('/referrals') ? [{ label: t('nav.referrals'), icon: SendHorizontal, onClick: () => router.push('/referrals') }] : []),
+      ...(canUseRoute('/appointments') ? [{ label: t('nav.appointments'), icon: Calendar, onClick: () => router.push('/appointments') }] : []),
+      ...(canUseRoute('/lab') ? [{ label: 'Lab results', icon: FlaskConical, onClick: () => router.push('/lab') }] : []),
+    ];
+    return [...stationActions, ...routeActions];
+  }, [activeTab, canUseRoute, router, stationTabs, t]);
+
+  const rows = useMemo<EhrCareDashboardRow[]>(() => {
+    if (activeTab === 'triage') {
+      return triageToday.slice(0, 10).map(triage => ({
+        id: triage._id,
+        title: triage.patientName,
+        subtitle: triage.chiefComplaint || 'ETAT assessment',
+        meta: `${triage.modeOfArrival || 'walk-in'} · ${triage.triagedAt ? new Date(triage.triagedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : 'No time'}`,
+        status: triage.status,
+        statusTone: triage.priority === 'RED' ? 'danger' : triage.priority === 'YELLOW' ? 'warning' : 'ready',
+        priority: triage.priority,
+        room: triage.assignedRoom,
+        date: (triage.triagedAt || today).slice(0, 10),
+        onClick: () => router.push(`/patients/${triage.patientId}`),
+        actionLabel: 'Open',
+        onAction: () => router.push(`/patients/${triage.patientId}`),
+      }));
+    }
+
+    if (activeTab === 'mar') {
+      return activeAdmissions.slice(0, 10).map(admission => ({
+        id: admission._id,
+        title: admission.patientName,
+        subtitle: `${admission.wardName}${admission.bedNumber ? ` · Bed ${admission.bedNumber}` : ''}`,
+        meta: `${admission.hospitalNumber || 'No MRN'} · ${admission.admittingDiagnosis || 'No diagnosis'} · ${admission.attendingPhysicianName || 'No physician'}`,
+        status: 'admitted',
+        statusTone: admission.severity === 'critical' ? 'danger' : admission.severity === 'severe' ? 'warning' : 'ready',
+        priority: admission.severity,
+        room: admission.nurseAssignedName,
+        date: (admission.admissionDate || today).slice(0, 10),
+        onClick: () => router.push(`/wards/mar/${admission._id}`),
+        actionLabel: 'MAR',
+        onAction: () => router.push(`/wards/mar/${admission._id}`),
+      }));
+    }
+
+    return patients.slice(0, 10).map(patient => ({
+      id: patient._id,
+      title: patientFullName(patient),
+      subtitle: patientGenderAge(patient),
+      meta: `${patient.hospitalNumber || 'No MRN'} · ${patient.phone || 'No phone'} · ${patient.county || 'No location'}`,
+      status: patient.assignedDoctor ? 'assigned' : 'needs routing',
+      statusTone: patient.assignedDoctor ? 'ready' : 'warning',
+      priority: patientAgeLabel(patient),
+      room: patient.assignedDoctorName,
+      date: (patient.registeredAt || patient.registrationDate || today).slice(0, 10),
+      onClick: () => router.push(`/patients/${patient._id}`),
+      actionLabel: 'Open',
+      onAction: () => router.push(`/patients/${patient._id}`),
+    }));
+  }, [activeAdmissions, activeTab, patients, router, today, triageToday]);
+
+  const dateLabel = useMemo(() => (
+    new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date())
+  ), []);
+
+  const metrics = useMemo(() => ([
+    { label: 'Patients', value: patients.length },
+    { label: 'Active admissions', value: activeAdmissions.length },
+    { label: 'Triage today', value: triageToday.length },
+    { label: 'Critical', value: criticalTriage, tone: criticalTriage > 0 ? 'danger' as const : 'neutral' as const },
+    { label: 'Active station', value: stationLabel[activeTab] },
+  ]), [activeAdmissions.length, activeTab, criticalTriage, patients.length, stationLabel, triageToday.length]);
+
+  const checklist = useMemo(() => ([
+    { label: 'Review assigned patients', done: patients.length === 0, onClick: () => setActiveTab('ward') },
+    { label: 'Complete triage queue', done: triageToday.length === 0, onClick: () => setActiveTab('triage') },
+    { label: 'Medication administration', done: activeTab === 'mar', onClick: () => setActiveTab('mar') },
+    { label: 'Shift handoff', done: activeTab === 'handoff', onClick: () => setActiveTab('handoff') },
+  ].filter(item => stationTabs.some(tab => item.label === 'Review assigned patients' && tab.key === 'ward' || item.label === 'Complete triage queue' && tab.key === 'triage' || item.label === 'Medication administration' && tab.key === 'mar' || item.label === 'Shift handoff' && tab.key === 'handoff'))), [activeTab, patients.length, stationTabs, triageToday.length]);
+
+  if (!currentUser) return null;
 
   return (
     <>
-      {/* Free-text search + ward filters now live inline in the ward list
-          (WardWorkflow), so the platform-wide top search bar is hidden here. */}
       <TopBar title={t('nurse.title')} hideSearch />
       <main className="page-container page-enter">
-        <div className="flex flex-col gap-5 h-full min-h-0">
-
-          <DashboardHero
-            className="flex-shrink-0"
-            stats={[
-              { label: 'Patients', value: patients.length },
-              { label: 'Triage Today', value: triageToday.length },
-              { label: 'Critical', value: criticalTriage },
-            ]}
-          />
-
-          {/* ═══ QUICK ACTIONS — stations (active-highlighted) + common nav ═══ */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 flex-shrink-0">
-            <QuickActionsCard
-              className="lg:col-span-2"
-              actions={[
-                { label: stationLabel.ward, icon: BedDouble, action: () => setActiveTab('ward'), color: 'var(--accent-primary)', active: activeTab === 'ward' },
-                { label: stationLabel.mar, icon: Pill, action: () => setActiveTab('mar'), color: '#0D9488', active: activeTab === 'mar' },
-                { label: stationLabel.triage, icon: AlertTriangle, action: () => setActiveTab('triage'), color: '#F59E0B', active: activeTab === 'triage' },
-                { label: stationLabel.handoff, icon: FileText, action: () => setActiveTab('handoff'), color: 'var(--accent-primary)', active: activeTab === 'handoff' },
-                { label: t('dashboard.newPatient'), icon: Users, action: () => router.push('/patients/new'), color: 'var(--accent-primary)' },
-                { label: t('dashboard.immunization'), icon: Syringe, action: () => router.push('/immunizations'), color: '#059669' },
-                { label: t('dashboard.ancVisit'), icon: HeartPulse, action: () => router.push('/anc'), color: '#EC4899' },
-                { label: t('nav.referrals'), icon: SendHorizontal, action: () => router.push('/referrals'), color: '#F59E0B' },
-              ]}
-            />
-            <SpotlightCard className="lg:col-span-1" title="Critical Triage" value={criticalTriage} caption={`${triageToday.length} triaged today`} href="/dashboard/nurse/triage" />
-          </div>
-
-          {/* ═══ ACTIVE STATION BODY ═══ */}
-          {/* Each workflow renders its own titled card (full station name +
-              controls + table), so we don't wrap it in a second card/header —
-              that just duplicated the title and pushed the table down. */}
-          <div className="flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+        <EhrCareDashboard
+          title={currentUser.role === 'triage_nurse' ? 'Triage station' : currentUser.role === 'rooming_nurse' ? 'Rooming station' : t('nurse.title')}
+          eyebrow={roleConfig?.label || 'Nursing'}
+          greetingName={currentUser.name || 'nurse'}
+          dateLabel={dateLabel}
+          tabs={stationTabs}
+          activeTab={activeTab}
+          onTabChange={(tab) => setActiveTab(tab as StationTab)}
+          filters={stationTabs.map(tab => ({
+            label: tab.label,
+            value: tab.count,
+            active: activeTab === tab.key,
+            onClick: () => setActiveTab(tab.key),
+          }))}
+          actions={actions}
+          rows={rows}
+          metrics={metrics}
+          checklist={checklist}
+          calendarEventDates={[
+            ...triageToday.map(triage => (triage.triagedAt || today).slice(0, 10)),
+            ...activeAdmissions.map(admission => (admission.admissionDate || today).slice(0, 10)),
+          ]}
+          metricsTitle="Nursing station"
+          checklistTitle="Nursing checklist"
+          checklistDescription="Ward care, triage, medications, and handoff."
+          missionTitle="Bedside care"
+          missionDescription="Keep assigned patients, urgent triage, and medication work visible."
+          showMissionCard={false}
+          emptyTitle="No patients in this station"
+        >
+          <div className="flex flex-col" style={{ minHeight: 0 }}>
             {activeTab === 'ward' && <WardWorkflow filters={wardFilters} setFilters={setWardFilters} />}
             {activeTab === 'mar' && <MarWorkflow />}
             {activeTab === 'triage' && <TriageWorkflow />}
             {activeTab === 'handoff' && <HandoffWorkflow variant="page" />}
           </div>
-
-        </div>
+        </EhrCareDashboard>
       </main>
     </>
   );

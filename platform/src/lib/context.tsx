@@ -199,8 +199,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Register service worker with a cache-busting version tag so a new
     // deploy forces the browser to fetch and install the new worker instead
-    // of serving stale assets from the previous CACHE_NAME.
-    if ('serviceWorker' in navigator) {
+    // of serving stale assets from the previous CACHE_NAME. Skipped in local
+    // dev — its cache-first strategy for /_next/static/ otherwise serves
+    // stale CSS/JS across reloads and fights the dev server's hot-reload.
+    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       const buildId = process.env.NEXT_PUBLIC_BUILD_ID || 'dev';
       navigator.serviceWorker.register(`/sw.js?v=${buildId}`).catch(() => {});
     }

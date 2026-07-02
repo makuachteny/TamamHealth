@@ -40,9 +40,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['Untitled Sans', 'Arial', 'sans-serif'],
-        display: ['Untitled Sans', 'Arial', 'sans-serif'],
-        mono: ['Fragment Mono', 'monospace'],
+        sans: ['DM Sans', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        display: ['DM Sans', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        mono: ['JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
       },
       borderRadius: {
         'none': '0px',

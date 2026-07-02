@@ -3,7 +3,6 @@
 import { useState, useEffect, Fragment } from 'react';
 import Link from 'next/link';
 import Modal from '@/components/Modal';
-import TopBar from '@/components/TopBar';
 import EmptyState from '@/components/EmptyState';
 import Badge, { toneForStatus } from '@/components/Badge';
 import {
@@ -579,7 +578,6 @@ export default function ReferralsPage() {
 
   return (
     <>
-      <TopBar title={t('nav.referrals')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
@@ -591,7 +589,7 @@ export default function ReferralsPage() {
                 <button
                   onClick={() => setActiveTab('incoming')}
                   className="transition-colors focus:outline-none"
-                  style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'incoming' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                  style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'incoming' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                 >
                   {t('referrals.incoming')}
                   {newIncomingCount > 0 && (
@@ -603,7 +601,7 @@ export default function ReferralsPage() {
                 <button
                   onClick={() => setActiveTab('outgoing')}
                   className="transition-colors focus:outline-none"
-                  style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'outgoing' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                  style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'outgoing' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                 >
                   {t('referrals.outgoing')}
                 </button>

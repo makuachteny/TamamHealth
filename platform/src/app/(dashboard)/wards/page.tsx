@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useRef } from 'react';
 import Modal from '@/components/Modal';
-import TopBar from '@/components/TopBar';
 import PatientName from '@/components/PatientName';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -135,7 +134,6 @@ export default function WardsPage() {
 
   return (
     <>
-      <TopBar title={t('ward.topBarTitle')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
@@ -143,7 +141,7 @@ export default function WardsPage() {
           <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
             {/* Title + bed stats */}
             <div className="flex items-end justify-between gap-3 mb-3">
-              <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
+              <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
                 {t('ward.currentAdmissions')}
               </span>
               <div className="flex items-center gap-3 flex-shrink-0 pb-0.5">

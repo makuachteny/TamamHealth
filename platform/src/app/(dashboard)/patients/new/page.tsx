@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { Check, ArrowLeft, ArrowRight, Trash2 } from '@/components/icons/lucide';
 import FingerprintCapture, { type CapturedFingerprint } from '@/components/FingerprintCapture';
 import { statesAndCounties, states, tribes, languages } from '@/data/mock';
@@ -219,7 +218,6 @@ export default function NewPatientPage() {
 
   return (
     <>
-      <TopBar title={t('patientNew.topBarTitle')} />
       <main className="page-container page-enter">
           <button onClick={() => router.push('/patients')} className="flex items-center gap-1.5 text-sm mb-4" style={{ color: 'var(--tamamhealth-blue)' }}>
             <ArrowLeft className="w-4 h-4" /> {t('patientNew.backToPatients')}
