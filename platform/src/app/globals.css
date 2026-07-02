@@ -3089,10 +3089,27 @@ thead th {
   color: var(--ehr-text) !important;
 }
 
+.ehr-avatar--labeled {
+  width: auto !important;
+  min-width: 0;
+  height: 40px !important;
+  padding: 3px 14px 3px 3px !important;
+}
+
 .ehr-avatar:hover,
 .ehr-avatar.active {
   background: #F2F9FD !important;
   border-color: var(--ehr-border) !important;
+}
+
+.ehr-avatar-role {
+  color: var(--ehr-text);
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ehr-avatar-mark {
@@ -3153,41 +3170,6 @@ thead th {
   color: var(--ehr-text);
   box-shadow: none;
   z-index: 80;
-}
-
-.ehr-user-menu-head {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  padding: 12px;
-  border-bottom: 1px solid var(--ehr-border);
-  background: #F7FBFD;
-}
-
-.ehr-user-menu-head .ehr-avatar-mark {
-  width: 34px;
-  height: 34px;
-}
-
-.ehr-user-menu-head strong,
-.ehr-user-menu-head small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ehr-user-menu-head strong {
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.ehr-user-menu-head small {
-  margin-top: 3px;
-  color: var(--ehr-muted);
-  font-size: 11px;
-  font-weight: 700;
 }
 
 .ehr-user-menu > button {
@@ -4913,6 +4895,7 @@ thead th {
   }
 
   .ehr-avatar-text,
+  .ehr-avatar-role,
   .ehr-avatar > svg {
     display: none;
   }
@@ -9486,6 +9469,11 @@ span:has(> svg:only-child) {
   width: 34px !important;
   min-width: 34px;
   height: 34px !important;
+  padding: 0 !important;
+}
+
+.ehr-avatar-role {
+  display: none;
 }
 
 .ehr-avatar-mark {
@@ -9726,6 +9714,11 @@ span:has(> svg:only-child) {
     min-width: 32px;
     width: 32px !important;
     height: 32px !important;
+    padding: 0 !important;
+  }
+
+  .ehr-avatar-role {
+    display: none;
   }
 
   .ehr-avatar-mark {

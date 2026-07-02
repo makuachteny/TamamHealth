@@ -315,24 +315,18 @@ export default function EhrTopRail() {
         <div className="ehr-user-menu-wrap" ref={userRef}>
           <button
             type="button"
-            className={`ehr-avatar ${userOpen ? 'active' : ''}`}
+            className={`ehr-avatar ehr-avatar--labeled ${userOpen ? 'active' : ''}`}
             title={currentUser?.name || 'Tamam user'}
             onClick={() => setUserOpen(value => !value)}
             aria-expanded={userOpen}
             aria-haspopup="menu"
           >
-            <span className="ehr-avatar-mark">{initials}</span>
+            <span className="ehr-avatar-mark" style={roleConfig?.color ? { background: roleConfig.color } : undefined}>{initials}</span>
+            <span className="ehr-avatar-role">{roleConfig?.badgeLabel || roleLabel}</span>
           </button>
 
           {userOpen && (
             <div className="ehr-user-menu" role="menu">
-              <div className="ehr-user-menu-head">
-                <span className="ehr-avatar-mark">{initials}</span>
-              <div>
-                <strong>{currentUser?.name || 'Tamam user'}</strong>
-                <small>{currentUser?.role.replace(/_/g, ' ') || 'Clinical user'}</small>
-              </div>
-              </div>
               <button type="button" role="menuitem" onClick={openProfilePage}>
                 <User className="w-4 h-4" />
                 <span>Profile</span>
