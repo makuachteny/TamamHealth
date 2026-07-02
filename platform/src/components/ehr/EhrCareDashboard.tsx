@@ -46,6 +46,10 @@ export type EhrCareDashboardRow = {
   id: string;
   title: string;
   subtitle: string;
+  /** Bold standalone time (e.g. "08:20") shown in its own column, matching
+   *  the clinical-officer appointment row. Omit for rows with no clock time
+   *  (e.g. a plain registry entry) and the column collapses away. */
+  time?: string;
   meta?: string;
   compactMeta?: string;
   status?: string;

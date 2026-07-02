@@ -658,7 +658,7 @@ export default function DashboardPage() {
                 Welcome{legacyCurrentUser.name ? `, ${legacyCurrentUser.name}` : ''}
               </h2>
               <div className="flex items-center gap-2.5 mt-2.5 flex-wrap">
-                <span style={{ fontFamily: "var(--font-platform)", fontWeight: 300, fontSize: 14, lineHeight: 1, letterSpacing: 0, color: 'rgba(255,255,255,0.9)' }}>
+                <span style={{ fontFamily: "var(--font-platform)", fontWeight: 400, fontSize: 14, lineHeight: 1, letterSpacing: 0, color: 'rgba(255,255,255,0.9)' }}>
                   {heroDate}
                 </span>
                 {legacyCurrentUser.hospitalName && (

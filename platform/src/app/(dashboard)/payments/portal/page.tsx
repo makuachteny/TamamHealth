@@ -270,7 +270,7 @@ export default function PatientPortalPage() {
                             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{bill.description}</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono, monospace)' }}>{bill.id}</span>
+                            <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'var(--font-platform-mono)' }}>{bill.id}</span>
                             <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{new Date(bill.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                           </div>
                         </div>
@@ -548,7 +548,7 @@ export default function PatientPortalPage() {
                     </div>
                     <div style={{ textAlign: 'center', padding: '16px 0' }}>
                       <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{t('portal.amount')}</div>
-                      <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)' }}>{formatMoney(Number(paymentAmount))}</div>
+                      <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)' }}>{formatMoney(Number(paymentAmount))}</div>
                     </div>
                   </div>
 
@@ -564,7 +564,7 @@ export default function PatientPortalPage() {
                       {method.instructions.split('\n').map((line, i) => (
                         <div key={i} style={{
                           fontSize: '0.8125rem', color: 'var(--text-primary)', lineHeight: 1.8,
-                          fontFamily: line.includes(':') ? 'var(--font-mono, monospace)' : 'inherit',
+                          fontFamily: line.includes(':') ? 'var(--font-platform-mono)' : 'inherit',
                         }}>
                           {line}
                         </div>
@@ -580,7 +580,7 @@ export default function PatientPortalPage() {
                     }}>
                       <div>
                         <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginBottom: 2 }}>{t('lab.reference')}</div>
-                        <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono, monospace)' }}>
+                        <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-platform-mono)' }}>
                           {selectedBill.id}
                         </div>
                       </div>
@@ -644,7 +644,7 @@ export default function PatientPortalPage() {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('lab.reference')}</span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono, monospace)' }}>{selectedBill?.id}</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-platform-mono)' }}>{selectedBill?.id}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('portal.amount')}</span>

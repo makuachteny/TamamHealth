@@ -56,7 +56,7 @@ export function generateReceiptHTML(receipt: ReceiptData): string {
 <style>
   @page { margin: 10mm; size: 80mm auto; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', -apple-system, sans-serif; color: #1A2C2A; background: #fff; max-width: 320px; margin: 0 auto; padding: 16px; }
+  body { font-family: system-ui, sans-serif; color: #1A2C2A; background: #fff; max-width: 320px; margin: 0 auto; padding: 16px; }
   .header { text-align: center; padding-bottom: 12px; border-bottom: 2px dashed #ccc; margin-bottom: 12px; }
   .header h1 { font-size: 16px; font-weight: 800; color: #1E3A8A; letter-spacing: 0.5px; }
   .header p { font-size: 11px; color: #64748b; margin-top: 2px; }

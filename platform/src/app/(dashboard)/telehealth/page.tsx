@@ -523,7 +523,7 @@ function Detail({ l, v, mono, color, badge }: { l: string; v: string; mono?: boo
   return (
     <div>
       <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{l}</div>
-      <div style={{ fontSize: 12, color: color || 'var(--text-primary)', fontFamily: mono ? 'monospace' : undefined, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ fontSize: 12, color: color || 'var(--text-primary)', fontFamily: mono ? 'var(--font-platform-mono)' : undefined, display: 'flex', alignItems: 'center', gap: 6 }}>
         {v}
         {badge && <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 3, color: badge.color, background: `${badge.color}12` }}>{badge.label}</span>}
       </div>

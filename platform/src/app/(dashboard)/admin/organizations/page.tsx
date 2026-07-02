@@ -416,7 +416,7 @@ export default function AdminOrganizationsPage() {
                         <input type="color" value={form[c.key]} onChange={e => setForm(p => ({ ...p, [c.key]: e.target.value }))}
                           className="w-10 h-10 rounded-lg cursor-pointer border-0" />
                         <input type="text" value={form[c.key]} onChange={e => setForm(p => ({ ...p, [c.key]: e.target.value }))}
-                          style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '12px' }} />
+                          style={{ ...inputStyle, fontFamily: 'var(--font-platform-mono)', fontSize: '12px' }} />
                       </div>
                     </div>
                   ))}

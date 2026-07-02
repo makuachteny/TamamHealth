@@ -737,7 +737,7 @@ function EquipmentTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
                 {a.model && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.manufacturer} · {a.model}</div>}
               </td>
               <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{a.category.replace(/_/g, ' ')}</td>
-              <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{a.assetTag}</td>
+              <td style={{ fontFamily: 'var(--font-platform-mono)', fontSize: 11 }}>{a.assetTag}</td>
               <td>
                 <span style={{
                   fontSize: 11, fontWeight: 600,
@@ -828,7 +828,7 @@ function InventoryTab({ scope, hospitalId }: { scope: DataScope | undefined; hos
                   </span>
                 </td>
                 <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{i.expiryDate || '—'}</td>
-                <td style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--text-muted)' }}>{i.batchNumber}</td>
+                <td style={{ fontSize: 11, fontFamily: 'var(--font-platform-mono)', color: 'var(--text-muted)' }}>{i.batchNumber}</td>
               </tr>
             );
           })}
@@ -915,7 +915,7 @@ function SchedulesTab({ hospitalId }: { hospitalId: string }) {
                     {s.shiftType.replace('_', ' ')}
                   </span>
                 </td>
-                <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{s.startTime} – {s.endTime}</td>
+                <td style={{ fontFamily: 'var(--font-platform-mono)', fontSize: 11 }}>{s.startTime} – {s.endTime}</td>
                 <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.department || '—'}</td>
                 <td style={{ fontSize: 11 }}>{s.status}</td>
               </tr>

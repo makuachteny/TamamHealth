@@ -527,7 +527,7 @@ export default function AppointmentsPage() {
                           <div className="truncate">{apt.reason || '—'}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'monospace' }}>{apt.appointmentDate}</div>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-platform-mono)' }}>{apt.appointmentDate}</div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{apt.appointmentTime} · {apt.duration}min</div>
                         </td>
                         <td className="px-4 py-3">

@@ -5,7 +5,7 @@ export default function NotFound() {
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: '100vh',
-      fontFamily: "'DM Sans', Arial, sans-serif",
+      fontFamily: "var(--font-platform)",
     }}>
       <div style={{ textAlign: 'center' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.5rem' }}>404</h1>

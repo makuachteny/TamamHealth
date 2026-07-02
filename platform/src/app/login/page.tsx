@@ -406,7 +406,7 @@ const sharedStyles = (
     }
     .tl-brand { display: flex; align-items: center; gap: 9px; }
     .tl-brand-logo { height: 30px; width: auto; }
-    .tl-title { font-family: 'DM Sans', Arial, sans-serif; font-size: 28px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); margin: 0; }
+    .tl-title { font-family: var(--font-platform); font-size: 28px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); margin: 0; }
     .tl-subtitle { font-size: 13.5px; color: var(--text-muted); margin: 6px 0 0; }
     .tl-db-banner { margin: 14px 0 0; padding: 8px 12px; font-size: 11.5px; color: ${ACCENT_DEEP}; background: var(--accent-light); border: 1px solid var(--accent-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 

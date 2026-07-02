@@ -8,9 +8,11 @@ import {
   LayoutDashboard,
   LogOut,
   MessageSquare,
+  Moon,
   Plus,
   Search,
   Settings,
+  Sun,
   User,
   UserPlus,
   Users,
@@ -26,6 +28,7 @@ import { formatPhoneDisplay } from '@/lib/field-formats';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import EhrModuleMenu from './EhrModuleMenu';
 import EhrTopActions from './EhrTopActions';
+import QuickActions from '@/components/QuickActions';
 import {
   getPrimaryShortcutItems,
   groupNavItemsBySection,
@@ -37,7 +40,7 @@ export default function EhrTopRail() {
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useTranslation();
-  const { currentUser, logout } = useApp();
+  const { currentUser, logout, theme, toggleTheme } = useApp();
   const { canRegisterPatients } = usePermissions();
   const { patients } = usePatients();
   const [query, setQuery] = useState('');
@@ -312,6 +315,15 @@ export default function EhrTopRail() {
           </button>
         )}
         <EhrTopActions items={quickActionItems.slice(4, 6)} navLabel={navLabel} onOpenModule={openModule} />
+        <QuickActions />
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+        >
+          {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+        </button>
         <div className="ehr-user-menu-wrap" ref={userRef}>
           <button
             type="button"

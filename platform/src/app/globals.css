@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,450;0,500;0,600;0,700;0,800&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -37,7 +35,7 @@
   margin: 0;
   color: var(--ehr-text);
   font-size: 22px;
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1;
   letter-spacing: 0;
 }
@@ -488,7 +486,7 @@
   margin-right: 8px;
   color: var(--text-primary);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .ti-compare-row em {
@@ -496,7 +494,7 @@
   margin-left: 0;
   color: var(--ehr-blue);
   font-style: normal;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ti-review-panel > footer,
@@ -723,7 +721,7 @@
 .ti-form-option strong {
   color: var(--ehr-blue);
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1.2;
 }
 
@@ -748,7 +746,7 @@
   gap: 8px;
   text-align: center;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 700;
   border: 0;
   border-radius: 0;
   background: white;
@@ -794,7 +792,7 @@
   color: var(--color-white);
   box-shadow: none;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 @media (max-width: 980px) {
@@ -916,8 +914,8 @@
   --input-radius: 10px;
   --sidebar-width: 220px;
   --sidebar-collapsed: 72px;
-  --font-platform: var(--font-dm-sans), 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-platform-mono: var(--font-jetbrains-mono), 'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-platform: var(--font-dm-sans), 'DM Sans', system-ui, sans-serif;
+  --font-platform-mono: var(--font-jetbrains-mono), 'JetBrains Mono', system-ui, sans-serif;
   --font-mono: var(--font-platform-mono);
 
   /* ============ Typography tokens ============
@@ -931,9 +929,9 @@
   --type-size-caption: 0.8125rem; /* ~12px */
   --type-size-label: 0.6875rem; /* ~10px */
   --type-size-kpi: 1.6rem; /* ~24px */
-  --type-weight-regular: 450;
-  --type-weight-medium: 600;
-  --type-weight-semibold: 700;
+  --type-weight-regular: 400;
+  --type-weight-medium: 500;
+  --type-weight-semibold: 600;
   --type-weight-bold: 800;
   --type-leading-tight: 1.15;
   --type-leading-title: 1.25;
@@ -1011,6 +1009,12 @@
   --accent-text:     var(--color-brand-700);
   --accent-light:    rgba(33, 145, 208, 0.12);
   --accent-border:   var(--color-brand-500);
+
+  /* Legacy aliases — many components reference these names directly instead
+     of the canonical tokens above. Keep them pointed at the same values so
+     both naming schemes stay in sync. */
+  --tamamhealth-blue: var(--accent-primary);
+  --tamamhealth-red:  var(--color-danger);
 
   /* ── Text (WCAG AA on #FEFFF9) ── */
   --text-primary:   var(--color-slate-900);
@@ -1124,6 +1128,9 @@
   --accent-text: var(--color-brand-300);
   --accent-light: rgba(33, 145, 208, 0.22);
   --accent-border: var(--color-brand-500);
+
+  --tamamhealth-blue: var(--accent-primary);
+  --tamamhealth-red:  var(--color-danger);
 
   --icon-color: #93a9d6;
   --link-color: var(--color-brand-400);
@@ -1267,7 +1274,7 @@ body {
   overscroll-behavior: none;
   font-size: 15px;
   line-height: 1.55;
-  font-weight: 450;
+  font-weight: 400;
 }
 
 /* ============ Smooth transitions baseline ============
@@ -1618,7 +1625,7 @@ select,
 textarea {
   font-family: var(--font-platform);
   font-size: 0.85rem;
-  font-weight: 450;
+  font-weight: 400;
   border: 1px solid var(--border-medium);
   border-radius: var(--input-radius);
   padding: 10px 16px;
@@ -1653,7 +1660,7 @@ select:hover:not(:focus):not(:disabled) {
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: none;
+  box-shadow: 0 0 0 3px var(--accent-light) !important;
   background: var(--bg-card-solid);
 }
 
@@ -1708,7 +1715,7 @@ small,
   padding: 10px 22px;
   border-radius: var(--btn-radius);
   font-size: 0.82rem;
-  font-weight: 650;
+  font-weight: 600;
   font-family: var(--font-platform);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -2749,7 +2756,7 @@ thead th {
     align-items: center;
     justify-content: center;
     margin-top: -14px;
-    box-shadow: 0 10px 20px -8px rgba(33, 145, 208, 0.7) !important;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.22) !important;
   }
 }
 
@@ -2902,7 +2909,7 @@ thead th {
 .ehr-module-menu-head strong {
   color: var(--ehr-text);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ehr-module-menu-head span {
@@ -3011,7 +3018,7 @@ thead th {
   background: transparent;
   color: var(--ehr-text);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ehr-top-search input::placeholder {
@@ -3122,7 +3129,7 @@ thead th {
   background: var(--ehr-blue);
   color: white;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
@@ -3145,7 +3152,7 @@ thead th {
 .ehr-avatar-text strong {
   color: var(--ehr-text);
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .ehr-avatar-text small {
@@ -3697,7 +3704,10 @@ thead th {
   max-height: none;
   overflow-x: hidden;
   overflow-y: auto;
-  border-bottom: 1px solid var(--ehr-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
 }
 
 .ehr-workspace-grid.is-calendar .ehr-appointment-list {
@@ -3721,7 +3731,7 @@ thead th {
 .ehr-empty-state strong {
   color: var(--ehr-text);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ehr-empty-state span,
@@ -3743,45 +3753,40 @@ thead th {
 
 .ehr-appointment-row {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 150px;
+  grid-template-columns: 42px minmax(0, 1fr) max-content;
+  align-items: center;
   gap: 12px;
-  padding: 10px 14px 10px 11px;
-  border-bottom: 1px solid var(--ehr-border);
-  border-left: 3px solid transparent;
+  min-height: 102px;
+  padding: 12px 16px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   cursor: pointer;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .ehr-appointment-row:hover {
-  background: #F5FBFE;
-}
-
-.ehr-appointment-row[data-triage="RED"] {
-  border-left-color: var(--color-danger);
-}
-
-.ehr-appointment-row[data-triage="YELLOW"] {
-  border-left-color: var(--color-warning);
-}
-
-.ehr-appointment-row[data-triage="GREEN"] {
-  border-left-color: var(--color-success);
+  border-color: var(--ehr-border-soft, var(--ehr-border));
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
 
 .ehr-patient-icon {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: 12px;
   background: #E7EDF2;
   color: var(--ehr-blue);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .ehr-patient-icon--sm {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   font-size: 10px;
   flex-shrink: 0;
 }
@@ -3805,18 +3810,28 @@ thead th {
 }
 
 .ehr-appointment-main {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: center;
   min-width: 0;
 }
 
 .ehr-appointment-main button {
+  grid-column: 2;
+  grid-row: 1;
   border: 0;
   background: transparent;
   color: var(--ehr-blue);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 800;
+  line-height: 1.15;
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
+  text-align: left;
 }
 
 .ehr-appointment-main p,
@@ -3825,27 +3840,48 @@ thead th {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: var(--ehr-text);
+  color: var(--ehr-muted);
   font-size: 13px;
 }
 
+.ehr-appointment-main p {
+  grid-column: 2;
+  grid-row: 2;
+  margin: 0;
+}
+
 .ehr-appointment-main span {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  justify-self: end;
+  align-self: center;
   width: fit-content;
-  margin-top: 5px;
-  padding: 3px 8px;
+  margin-top: 0;
+  padding: 6px 12px;
   border-radius: 999px;
-  background: var(--ehr-table-head);
-  color: #315F6A;
+  background: var(--accent-light);
+  color: var(--accent-primary);
   font-size: 12px;
   font-weight: 700;
 }
 
+.ehr-appointment-main .ehr-row-meta {
+  display: none;
+}
+
+.ehr-row-compact-time {
+  display: block !important;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: #1F334A;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
 .ehr-status-menu {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 0;
+  display: none;
 }
 
 .ehr-status-menu select {
@@ -3920,7 +3956,7 @@ thead th {
 
 .ehr-worklist-panel h3 {
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ehr-worklist-panel p {
@@ -3964,7 +4000,7 @@ thead th {
   background: #fbfdff;
   color: #72839a;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -3994,7 +4030,7 @@ thead th {
   margin-top: 2px;
   color: var(--ehr-muted);
   font-size: 11px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .ehr-worklist-name {
@@ -4051,7 +4087,7 @@ thead th {
   margin-bottom: 12px;
   color: var(--ehr-text);
   font-size: 19px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
@@ -4196,7 +4232,7 @@ thead th {
   margin: 0;
   color: var(--ehr-muted);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .ehr-care-greeting {
@@ -4259,7 +4295,7 @@ thead th {
   margin: 2px 0 0;
   color: var(--ehr-muted);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .ehr-care-dashboard .ehr-segmented,
@@ -4326,7 +4362,7 @@ thead th {
   background: transparent;
   color: var(--ehr-text);
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 700;
   text-align: left;
 }
 
@@ -4389,7 +4425,7 @@ thead th {
   margin-top: 2px;
   color: var(--ehr-muted);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .ehr-row-compact-time {
@@ -4400,7 +4436,9 @@ thead th {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: 6px;
+  margin-top: 0;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .ehr-care-badges span,
@@ -4414,7 +4452,11 @@ thead th {
   background: var(--ehr-table-head);
   color: #315F6A;
   font-size: 11px;
-  font-weight: 850;
+  font-weight: 800;
+}
+
+.ehr-care-dashboard .ehr-care-badges span:not(.ehr-care-status) {
+  display: none;
 }
 
 .ehr-care-status.ready {
@@ -4443,7 +4485,12 @@ thead th {
 }
 
 .ehr-care-row-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
   gap: 6px;
+  min-width: 124px;
 }
 
 .ehr-care-action {
@@ -4455,7 +4502,7 @@ thead th {
   background: #fff;
   color: var(--ehr-blue);
   font-size: 11px;
-  font-weight: 850;
+  font-weight: 800;
   padding: 0 10px;
 }
 
@@ -4484,13 +4531,13 @@ thead th {
 .ehr-care-detail strong {
   color: var(--ehr-text);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ehr-care-detail span {
   color: var(--ehr-muted);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .ehr-care-detail dl {
@@ -4502,7 +4549,7 @@ thead th {
 .ehr-care-detail dt {
   color: var(--ehr-muted);
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -4511,7 +4558,7 @@ thead th {
   margin-top: 3px;
   color: var(--ehr-text);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .ehr-care-alert {
@@ -4638,7 +4685,7 @@ thead th {
   margin: 0;
   color: var(--ehr-text);
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ehr-checkin-dialog-header p {
@@ -4775,7 +4822,7 @@ thead th {
     margin-top: 2px;
     color: var(--ehr-muted);
     font-size: 12px;
-    font-weight: 850;
+    font-weight: 800;
   }
 
   .ehr-care-dashboard .ehr-care-row-actions {
@@ -4976,7 +5023,7 @@ thead th {
     margin-top: 2px;
     color: var(--ehr-muted);
     font-size: 12px;
-    font-weight: 850;
+    font-weight: 800;
   }
 
   .ehr-care-dashboard .ehr-appointment-main button {
@@ -5309,7 +5356,7 @@ thead th {
   background: transparent;
   color: var(--ehr-text);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.1;
   text-align: left;
   text-overflow: ellipsis;
@@ -5369,7 +5416,7 @@ thead th {
   gap: 1px;
   color: var(--ehr-muted);
   font-size: 9px;
-  font-weight: 900;
+  font-weight: 800;
   text-transform: uppercase;
   line-height: 1;
 }
@@ -5393,7 +5440,7 @@ thead th {
   background: var(--ehr-panel);
   color: var(--ehr-text);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ehr-consult-change-btn:hover {
@@ -5420,7 +5467,7 @@ thead th {
   gap: 3px;
   color: var(--ehr-muted);
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -5444,7 +5491,7 @@ thead th {
   background: white;
   color: var(--ehr-blue);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ehr-consult-meta-strip button.active {
@@ -5643,7 +5690,7 @@ thead th {
   margin-bottom: 5px;
   color: var(--ehr-muted) !important;
   font-size: 11px !important;
-  font-weight: 900 !important;
+  font-weight: 800 !important;
   text-transform: uppercase;
   letter-spacing: 0;
 }
@@ -5797,7 +5844,7 @@ thead th {
 .ehr-patient-meta-line--subtle {
   color: var(--ehr-muted);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ehr-patient-summary {
@@ -5900,7 +5947,7 @@ thead th {
   background: transparent;
   color: var(--ehr-blue);
   font-size: 10px;
-  font-weight: 750;
+  font-weight: 700;
   line-height: 1;
   cursor: pointer;
 }
@@ -5957,7 +6004,7 @@ thead th {
   border-radius: 0 !important;
   color: var(--ehr-muted) !important;
   font-size: 15px !important;
-  font-weight: 650 !important;
+  font-weight: 600 !important;
   text-align: left;
 }
 
@@ -6065,7 +6112,7 @@ thead th {
   background: #eef5f7 !important;
   color: #63758a !important;
   font-size: 11px !important;
-  font-weight: 900 !important;
+  font-weight: 800 !important;
   letter-spacing: 0.03em !important;
   text-transform: uppercase !important;
   white-space: nowrap;
@@ -6162,7 +6209,7 @@ thead th {
   min-width: 0;
   color: var(--ehr-text);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6238,7 +6285,7 @@ thead th {
 .ehr-vital-row strong {
   color: var(--ehr-text);
   font-size: 15px;
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -6305,7 +6352,7 @@ thead th {
   margin: 0;
   color: #111827;
   font-size: 25px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0;
   line-height: 1.15;
 }
@@ -6360,7 +6407,7 @@ thead th {
   margin: 0 0 22px;
   color: var(--color-brand-700) !important;
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.1;
 }
 
@@ -6389,7 +6436,7 @@ thead th {
   overflow: hidden;
   color: #111827;
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6401,7 +6448,7 @@ thead th {
   margin-top: 0;
   color: #5F6F73;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -6427,7 +6474,7 @@ thead th {
   margin-top: 3px;
   color: #111827;
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
@@ -6481,7 +6528,7 @@ thead th {
   display: block;
   color: #374151;
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1.25;
 }
 
@@ -6489,7 +6536,7 @@ thead th {
   display: block;
   color: #5A7A78;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 700;
   line-height: 1.3;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -6527,7 +6574,7 @@ thead th {
   background: #fff;
   color: #69807E;
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -6574,20 +6621,20 @@ thead th {
   background: #E7EAEC;
   color: #7D8A90;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .tebra-demo-person h2 {
   margin: 0;
   color: #111827;
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .tebra-demo-person span {
   color: #45A248;
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .tebra-demo-columns {
@@ -6611,7 +6658,7 @@ thead th {
 .tebra-demo-field dt {
   color: #4B5563;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .tebra-demo-field dd {
@@ -6619,7 +6666,7 @@ thead th {
   margin: 0;
   color: #111827;
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -6634,7 +6681,7 @@ thead th {
   margin: 0 0 18px;
   color: #111827 !important;
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .tebra-demo-table {
@@ -6653,7 +6700,7 @@ thead th {
 
 .tebra-demo-table th {
   color: #5F6F73;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 @media (max-width: 1024px) {
@@ -6958,7 +7005,7 @@ thead th {
 
 .ehr-chart-page .card-elevated h3,
 .ehr-chart-page .card-elevated .font-semibold.text-sm {
-  font-weight: 850 !important;
+  font-weight: 800 !important;
 }
 
 .ehr-chart-content .data-table,
@@ -6974,7 +7021,7 @@ thead th {
   background: var(--ehr-table-head-strong) !important;
   color: #385d76 !important;
   font-size: 10px !important;
-  font-weight: 900 !important;
+  font-weight: 800 !important;
   letter-spacing: 0 !important;
   text-transform: none !important;
 }
@@ -7026,7 +7073,7 @@ thead th {
   gap: 9px;
   margin: 0;
   font-size: 14px;
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1.25;
 }
 
@@ -7163,7 +7210,7 @@ thead th {
 .ehr-chart-page .badge {
   border: 1px solid currentColor !important;
   background: #ffffff !important;
-  font-weight: 850 !important;
+  font-weight: 800 !important;
 }
 
 .ehr-encounter-card {
@@ -8041,7 +8088,7 @@ thead th {
   background: var(--ehr-table-head) !important;
   color: var(--ehr-text) !important;
   font-size: 11px !important;
-  font-weight: 900 !important;
+  font-weight: 800 !important;
   letter-spacing: 0 !important;
   text-transform: none !important;
 }
@@ -9223,7 +9270,7 @@ span:has(> svg:only-child) {
   margin: 0;
   color: var(--color-white);
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.15;
   letter-spacing: 0;
 }
@@ -9248,7 +9295,7 @@ span:has(> svg:only-child) {
   margin: 10px 0 0;
   color: var(--color-white);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.15;
 }
 
@@ -9280,7 +9327,7 @@ span:has(> svg:only-child) {
   border: 1px solid currentColor;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1;
 }
 
@@ -9315,7 +9362,7 @@ span:has(> svg:only-child) {
   background: transparent;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -9371,7 +9418,7 @@ span:has(> svg:only-child) {
   padding: 0 14px;
   border-radius: 7px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .appointment-detail-sidebar__actions .danger {
@@ -10362,7 +10409,7 @@ span:has(> svg:only-child) {
 
   .ehr-clinical-dashboard-header .ehr-schedule-actions > button::after {
     font-size: 10px;
-    font-weight: 850;
+    font-weight: 800;
     line-height: 1;
   }
 
@@ -10433,7 +10480,7 @@ span:has(> svg:only-child) {
 
   .ehr-day-tabs .ehr-mobile-day-check b {
     color: var(--ehr-blue);
-    font-weight: 900;
+    font-weight: 800;
   }
 
   .ehr-day-tabs .ehr-mobile-day-check.warning b {
@@ -10541,7 +10588,7 @@ span:has(> svg:only-child) {
     background: #f8fafc;
     color: var(--ehr-muted);
     font-size: 8.5px;
-    font-weight: 850;
+    font-weight: 800;
     letter-spacing: 0;
   }
 
@@ -10576,7 +10623,7 @@ span:has(> svg:only-child) {
     background: transparent;
     color: var(--ehr-text);
     font-size: 10.5px;
-    font-weight: 850;
+    font-weight: 800;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -11076,7 +11123,7 @@ span:has(> svg:only-child) {
    Facesheet visual-QA pass: the token/refactor pass above retargeted
    existing hardcoded colors but never added several mockup-only visual
    treatments (icon+title card headers, colored status pills on Problems,
-   monospace/out-of-range vitals, colored lab result text, and a red
+   JetBrains Mono/out-of-range vitals, colored lab result text, and a red
    allergy chip). These rules are additive chrome only — no layout,
    data, or behavior changes.
    --------------------------------------------------------------------- */
@@ -11119,7 +11166,7 @@ span:has(> svg:only-child) {
   color: var(--color-success-text, var(--color-success));
 }
 
-/* Vitals: monospace numerals + amber tile for an out-of-range reading,
+/* Vitals: JetBrains Mono numerals + amber tile for an out-of-range reading,
    matching the mockup's elevated-BP tile treatment. */
 .tebra-vitals strong {
   font-family: var(--font-platform-mono);
@@ -11499,7 +11546,7 @@ span:has(> svg:only-child) {
 
 /* Provider dashboard: typography and information arrangement only. */
 .ehr-schedule-shell {
-  font-family: var(--font-platform), Inter, system-ui, sans-serif;
+  font-family: var(--font-platform);
 }
 
 .ehr-appointment-row {
@@ -11514,9 +11561,9 @@ span:has(> svg:only-child) {
 .ehr-appointment-time strong {
   display: block;
   color: var(--ehr-text);
-  font-family: var(--font-platform-mono), ui-monospace, monospace;
+  font-family: var(--font-platform-mono);
   font-size: 15px;
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1.1;
 }
 
@@ -11525,7 +11572,7 @@ span:has(> svg:only-child) {
   margin-top: 3px;
   color: var(--ehr-muted);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.1;
 }
 
@@ -11574,8 +11621,8 @@ span:has(> svg:only-child) {
 }
 
 .ehr-worklist-room {
-  font-family: var(--font-platform-mono), ui-monospace, monospace;
-  font-weight: 750;
+  font-family: var(--font-platform-mono);
+  font-weight: 700;
 }
 
 .ehr-department-pill,
@@ -11627,14 +11674,14 @@ span:has(> svg:only-child) {
 .ehr-worklist-panel h3 {
   color: #132C44;
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
 .ehr-worklist-panel > div:first-child > span {
   color: #8395A8;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ehr-worklist-table {
@@ -11656,7 +11703,7 @@ span:has(> svg:only-child) {
   background: #F7FAFC;
   color: #8496A8;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0.06em;
 }
 
@@ -11685,7 +11732,7 @@ span:has(> svg:only-child) {
 .ehr-worklist-row strong {
   color: #102A43;
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.1;
   letter-spacing: -0.01em;
 }
@@ -11693,9 +11740,9 @@ span:has(> svg:only-child) {
 .ehr-worklist-row small {
   margin-top: 4px;
   color: #8295A8;
-  font-family: var(--font-platform-mono), ui-monospace, monospace;
+  font-family: var(--font-platform-mono);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.1;
 }
 
@@ -11704,7 +11751,7 @@ span:has(> svg:only-child) {
   height: 42px;
   border-radius: 10px;
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ehr-worklist-row[data-triage="RED"] .ehr-patient-icon {
@@ -11730,23 +11777,23 @@ span:has(> svg:only-child) {
 
 .ehr-worklist-room {
   color: #39536B;
-  font-family: var(--font-platform-mono), ui-monospace, monospace;
+  font-family: var(--font-platform-mono);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0.01em;
 }
 
 .ehr-worklist-care strong {
   color: #39536B;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ehr-worklist-care small {
   color: #8295A8;
   font-family: var(--font-platform);
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .ehr-department-pill,
@@ -11755,7 +11802,7 @@ span:has(> svg:only-child) {
   padding: 0 11px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ehr-department-pill.emergency {
@@ -11808,7 +11855,7 @@ span:has(> svg:only-child) {
   margin-bottom: 14px;
   color: #132C44;
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ehr-side-card p {
@@ -11827,7 +11874,7 @@ span:has(> svg:only-child) {
   border-bottom: 1px solid #E7EEF5;
   color: #3E5870;
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ehr-outstanding-chips button:last-child {
@@ -11839,9 +11886,9 @@ span:has(> svg:only-child) {
   height: auto;
   background: transparent;
   color: #8395A8;
-  font-family: var(--font-platform-mono), ui-monospace, monospace;
+  font-family: var(--font-platform-mono);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ehr-outstanding-chips button.warning b,
@@ -11858,7 +11905,7 @@ span:has(> svg:only-child) {
   min-height: 28px;
   color: #3E5870;
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ehr-side-card input {
@@ -11936,7 +11983,7 @@ span:has(> svg:only-child) {
 
 .ehr-filter-group > label:first-child {
   color: #102A43;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -12172,10 +12219,10 @@ span:has(> svg:only-child) {
   color: #5F7285;
 }
 
-/* Only the plain dose/frequency span (Medications row) gets monospace —
+/* Only the plain dose/frequency span (Medications row) gets JetBrains Mono —
    .tebra-list-row-meta wraps status Badges/ICD codes for Problems/Labs and
    must stay in the regular sans font; .tebra-lab-result (the actual numeric
-   lab value nested inside that meta wrapper) still wants monospace. */
+   lab value nested inside that meta wrapper) still wants JetBrains Mono. */
 .tebra-list-row > span:not(.tebra-list-row-meta) {
   font-family: var(--font-platform-mono) !important;
 }
