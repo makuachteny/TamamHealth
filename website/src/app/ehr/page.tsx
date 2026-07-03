@@ -432,12 +432,6 @@ export default function EHRPage() {
             href: "/telehealth",
             tone: "blue",
           },
-          {
-            title: "Analytics & Reporting",
-            body: "Real-time population health dashboards, automated DHIS2 reporting, and clinical outcome tracking. Identify disease trends, monitor facility performance, and generate ministry-ready reports without manual data entry.",
-            href: "/analytics",
-            tone: "green",
-          },
         ]}
       />
 

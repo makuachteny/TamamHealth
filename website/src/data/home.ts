@@ -1,3 +1,39 @@
+export const HOME_PROBLEM_STATS = [
+  {
+    value: "67%",
+    label: "of health facilities don't report into the national health information system",
+  },
+  {
+    value: "15k+",
+    label: "health workers currently track patients on paper, or not at all",
+  },
+  {
+    value: "2,400+",
+    label: "Boma health units operating without any shared digital record",
+  },
+] as const;
+
+export const HOME_AUDIENCES = [
+  {
+    title: "Health workers",
+    body: "Register, triage, consult, and prescribe from one screen — even when the connection drops. Nothing to re-key when it comes back.",
+    href: "/products",
+    image: "/assets/doctor-tablet-review.jpg",
+  },
+  {
+    title: "Facility leaders",
+    body: "See beds, stock, staffing, and patient flow across every department in one place, without chasing a single paper register.",
+    href: "/products",
+    image: "/assets/doctor-nurse-consultation.jpg",
+  },
+  {
+    title: "Ministries & partners",
+    body: "Get facility-level reporting that's ready for national systems from day one — not months into a rollout.",
+    href: "/installation",
+    image: "/assets/community-health-worker.jpg",
+  },
+] as const;
+
 export const HOME_PRINCIPLES = [
   {
     number: "01",
@@ -24,7 +60,7 @@ export const HOME_PRINCIPLES = [
     number: "04",
     title: "Facility data to national insight",
     body: "Clean clinical records become facility dashboards, surveillance signals, DHIS2-ready reports, and better national health planning.",
-    href: "/analytics",
+    href: "/products",
     icon: "network",
   },
 ] as const;

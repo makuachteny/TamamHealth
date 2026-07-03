@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
+import { ProductsHero } from "@/components/marketing/ProductsHero";
 import { ProductListing } from "@/components/marketing/ProductListing";
+import { PlatformExplorer } from "@/components/marketing/PlatformExplorer";
 
 export const metadata: Metadata = {
   title: "Platform · TamamHealth Digital Health",
@@ -10,21 +11,9 @@ export const metadata: Metadata = {
 export default function ProductsPage() {
   return (
     <main className="mk-main">
-      <MarketingHero
-        variant="split"
-        eyebrow="OUR PLATFORM"
-        title="Connected tools for clinical care and facility operations"
-        subtitle="Pick what fits the kind of facility you run; every service shares the same patient record, offline sync, billing traceability, and DHIS2-ready reporting."
-        primaryCta={{ label: "Request a demo", href: "/about/contact?intent=demo#contact-form" }}
-        secondaryCta={{ label: "Browse services", href: "#products-grid" }}
-        stats={[
-          { value: "6", label: "services on one record" },
-          { value: "Offline", label: "sync by design" },
-          { value: "Pilot", label: "facilities welcome" },
-        ]}
-        className="mk-hero-products"
-      />
+      <ProductsHero />
       <ProductListing />
+      <PlatformExplorer />
     </main>
   );
 }

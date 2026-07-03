@@ -38,6 +38,34 @@ export default function CaseStudiesIndex() {
                 <h2 className="mk-h2">Cases</h2>
               </div>
             </Reveal>
+            {CASE_STUDIES.length === 0 ? (
+              <Reveal>
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "48px 24px",
+                    borderRadius: 16,
+                    border: "1px solid var(--tb-cream-300)",
+                    background: "var(--tb-cream-50)",
+                  }}
+                >
+                  <p style={{ fontSize: 17, fontWeight: 700, color: "var(--tb-text-pri)", margin: "0 0 8px" }}>
+                    No case studies yet
+                  </p>
+                  <p style={{ fontSize: 14, color: "var(--tb-text-sec)", maxWidth: 480, margin: "0 auto 20px" }}>
+                    TamamHealth is pre-launch — we don&apos;t have deployment stories to share yet. Talk to our team
+                    about becoming a pilot partner.
+                  </p>
+                  <Link
+                    href="/about/contact#contact-form"
+                    style={{ fontSize: 14, fontWeight: 700, color: "var(--tb-blue-700)", display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}
+                  >
+                    Talk to our team
+                    <ArrowRight size={14} strokeWidth={1.8} />
+                  </Link>
+                </div>
+              </Reveal>
+            ) : (
             <div
               style={{
                 display: "grid",
@@ -137,6 +165,7 @@ export default function CaseStudiesIndex() {
                 </Reveal>
               ))}
             </div>
+            )}
           </div>
         </section>
 

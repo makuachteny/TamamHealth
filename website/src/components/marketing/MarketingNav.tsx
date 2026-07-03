@@ -8,37 +8,12 @@ import { MarketingActionModalButton } from "./MarketingActionModal";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Marketing — Navbar
-   Two grouped dropdowns (Product, About Us) for the deeper page lists,
-   plus top-level links for the pages people look for directly —
-   Case Studies, Pricing, Resources — and a "Book a Demo" CTA.
+   Flat top-level links only — Product, Installation, Pricing, About Us —
+   plus a "Book a Demo" CTA. No dropdowns.
    ═══════════════════════════════════════════════════════════════════ */
 
 // Fundraising entry points are locked off for now. Flip to true to re-enable.
 const SHOW_FUNDRAISING = false;
-
-const PRODUCT_LINKS = [
-  { label: "Hospital Management System", href: "/products/hospital" },
-  { label: "Clinic Management System", href: "/products/clinic" },
-  { label: "Laboratory Information System", href: "/products/lab" },
-  { label: "Radiology Information System", href: "/products/radiology" },
-  { label: "Pharmacy Management System", href: "/products/pharmacy" },
-  { label: "Patient Experience Platform", href: "/patient-experience" },
-  { label: "Telehealth", href: "/telehealth" },
-  { label: "EHR", href: "/ehr" },
-];
-
-const RESOURCES_LINKS = [
-  { label: "Case Studies", href: "/case-studies" },
-  { label: "Download", href: "/download" },
-  { label: "Analytics", href: "/analytics" },
-];
-
-const ABOUT_LINKS = [
-  { label: "Our Story", href: "/about" },
-  { label: "Our Team", href: "/about/team" },
-  { label: "Careers", href: "/about/careers" },
-  { label: "Contact", href: "/about/contact" },
-];
 
 const DISPLAY_PHONE = "(973) 566-4336";
 const PHONE_TEL = "tel:+19735664336";
@@ -61,12 +36,14 @@ export default function MarketingNav() {
   const [lightHero, setLightHero] = useState(false);
   const pathname = usePathname();
   const tone = getNavTone(pathname);
-  // Homepage hero is the dark-blue theme, so its nav just toggles between
-  // fully transparent (floating over the hero at the very top) and the
-  // matching solid dark-blue bar (as soon as you scroll at all, including
-  // past the hero) — it never switches to the generic light "scrolled" bar.
+  // Homepage hero is the deep-blue theme, so its nav matches that solid
+  // color while you're within the hero, then switches to the standard
+  // light "scrolled" bar once you scroll past the hero into the rest of
+  // the page. (The nav is position:sticky, not overlapping the hero, so a
+  // "transparent at top" state would just show the plain white page behind
+  // it rather than the hero — solid is the reliable choice here.)
   const navClass = tone === "home"
-    ? (scrollState === "top" ? "mk-navbar--hero" : "mk-navbar--hero-solid")
+    ? (scrollState === "past" ? "mk-navbar--scrolled" : "mk-navbar--hero-solid")
     : scrollState === "past"
       ? "mk-navbar--scrolled"
       : lightHero
@@ -83,6 +60,7 @@ export default function MarketingNav() {
           ".mk-home-split-hero",
           ".mk-mod-hero",
           ".mk-product-hero",
+          ".mk-products-hero",
           ".mk-subpage-hero",
           ".mk-case-hero",
           ".mk-hero-split",
@@ -157,34 +135,10 @@ export default function MarketingNav() {
 
           {/* Desktop center nav links */}
           <div className="mk-nav-center desktop-only">
-            <div className="mk-nav-item">
-              <Link href="/products" className="mk-nav-item-link">Product</Link>
-              <DuoIcon name="chevron-down" size={14} />
-              <div className="mk-nav-dropdown">
-                {PRODUCT_LINKS.map((item) => (
-                  <Link key={item.href} href={item.href}>{item.label}</Link>
-                ))}
-              </div>
-            </div>
-            <div className="mk-nav-item">
-              <Link href="/case-studies" className="mk-nav-item-link">Resources</Link>
-              <DuoIcon name="chevron-down" size={14} />
-              <div className="mk-nav-dropdown">
-                {RESOURCES_LINKS.map((item) => (
-                  <Link key={item.href} href={item.href}>{item.label}</Link>
-                ))}
-              </div>
-            </div>
+            <Link href="/products" className="mk-nav-item mk-nav-item-link">Product</Link>
+            <Link href="/installation" className="mk-nav-item mk-nav-item-link">Installation</Link>
             <Link href="/pricing" className="mk-nav-item mk-nav-item-link">Pricing</Link>
-            <div className="mk-nav-item">
-              <Link href="/about" className="mk-nav-item-link">About Us</Link>
-              <DuoIcon name="chevron-down" size={14} />
-              <div className="mk-nav-dropdown">
-                {ABOUT_LINKS.map((item) => (
-                  <Link key={item.href} href={item.href}>{item.label}</Link>
-                ))}
-              </div>
-            </div>
+            <Link href="/about" className="mk-nav-item mk-nav-item-link">About Us</Link>
           </div>
 
           {/* Desktop right CTA actions */}
@@ -253,33 +207,18 @@ export default function MarketingNav() {
         {mobileOpen && (
           <div className="mk-mobile-menu">
             <div className="mk-mobile-menu-inner">
-              <p className="mk-mobile-group-label">Product</p>
-              {PRODUCT_LINKS.map((item) => (
-                <Link key={item.href} href={item.href} className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                  {item.label}
-                </Link>
-              ))}
-
-              <div className="mk-mobile-menu-divider" />
-
-              <p className="mk-mobile-group-label">Resources</p>
-              {RESOURCES_LINKS.map((item) => (
-                <Link key={item.href} href={item.href} className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                  {item.label}
-                </Link>
-              ))}
+              <Link href="/products" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                Product
+              </Link>
+              <Link href="/installation" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                Installation
+              </Link>
               <Link href="/pricing" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
                 Pricing
               </Link>
-
-              <div className="mk-mobile-menu-divider" />
-
-              <p className="mk-mobile-group-label">About Us</p>
-              {ABOUT_LINKS.map((item) => (
-                <Link key={item.href} href={item.href} className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                  {item.label}
-                </Link>
-              ))}
+              <Link href="/about" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+                About Us
+              </Link>
 
               <div className="mk-mobile-menu-divider" />
               <a href={PHONE_TEL} className="mk-mobile-phone" onClick={() => setMobileOpen(false)}>

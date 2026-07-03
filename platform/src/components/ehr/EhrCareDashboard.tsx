@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, CheckCircle2, ChevronRight, ClipboardList, Search, Stethoscope, type LucideIcon } from '@/components/icons/lucide';
+import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import EhrMiniCalendar, { formatDateTitle, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { initials } from '@/lib/patient-utils';
 
@@ -150,6 +150,11 @@ export default function EhrCareDashboard({
   const effectiveView = onViewChange ? activeView : internalView;
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
+  // Clicking a row opens a right-side detail slider where the actions live,
+  // keeping the row itself clean (avatar · time · name).
+  const [openRow, setOpenRow] = useState<EhrCareDashboardRow | null>(null);
+  const [detailTab, setDetailTab] = useState<'visit' | 'financial'>('visit');
+  const openDetail = (row: EhrCareDashboardRow) => { setDetailTab('visit'); setOpenRow(row); };
   const rowEventDates = useMemo(() => rows.map(row => row.date).filter((date): date is string => Boolean(date)), [rows]);
   const eventDates = calendarEventDates || rowEventDates;
   const visibleRows = useMemo(() => {
@@ -293,26 +298,21 @@ export default function EhrCareDashboard({
               </div>
             ) : visibleRows.map(row => (
               <div key={row.id}>
-                <div className={`ehr-appointment-row ehr-care-row ${row.statusTone || 'scheduled'}`} onClick={row.onClick}>
+                <div
+                  className={`ehr-appointment-row ehr-care-row ${row.statusTone || 'scheduled'}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDetail(row)}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetail(row); } }}
+                >
                   <div className="ehr-patient-icon">{initials(row.title)}</div>
-                  <div className="ehr-appointment-main">
-                    <button type="button" onClick={(event) => { event.stopPropagation(); row.onClick?.(); }}>{row.title}</button>
-                    <p>{row.subtitle}</p>
-                    {row.meta && <small className="ehr-row-meta">{row.meta}</small>}
-                    {(row.compactMeta || row.meta) && <small className="ehr-row-compact-time">{row.compactMeta || row.meta}</small>}
-                    <div className="ehr-care-badges">
-                      {row.status && <span className={`ehr-care-status ${row.statusTone || 'scheduled'}`}>{titleCase(row.status)}</span>}
-                      {row.priority && <span>{row.priority}</span>}
-                      {row.room && <span>{row.room}</span>}
-                    </div>
+                  <div className="ehr-appointment-time">
+                    <strong>{row.time || row.compactMeta || '—'}</strong>
+                    {(row.priority || row.status) && <span>{row.priority || (row.status ? titleCase(row.status) : '')}</span>}
                   </div>
-                  <div className="ehr-status-menu ehr-care-row-actions" onClick={(event) => event.stopPropagation()}>
-                    {row.actionLabel && row.onAction && (
-                      <button type="button" className="ehr-care-action primary" onClick={row.onAction}>{row.actionLabel}</button>
-                    )}
-                    {row.secondaryActionLabel && row.onSecondaryAction && (
-                      <button type="button" className="ehr-care-action" onClick={row.onSecondaryAction}>{row.secondaryActionLabel}</button>
-                    )}
+                  <div className="ehr-appointment-main">
+                    <button type="button" onClick={(event) => { event.stopPropagation(); openDetail(row); }}>{row.title}</button>
+                    <p>{row.subtitle}{row.room ? ` · ${row.room}` : ''}</p>
                   </div>
                 </div>
                 {row.detail}
@@ -391,6 +391,105 @@ export default function EhrCareDashboard({
         </aside>
         )}
       </div>
+
+      {openRow && (
+        <>
+          <button
+            type="button"
+            className="appointment-detail-backdrop"
+            aria-label="Close details"
+            onClick={() => setOpenRow(null)}
+          />
+          <aside className="appointment-detail-sidebar" role="dialog" aria-modal="true" aria-label="Details">
+            <div className="appointment-detail-sidebar__header">
+              <button type="button" className="appointment-detail-sidebar__back" onClick={() => setOpenRow(null)} aria-label="Close">
+                <ChevronLeft size={22} />
+              </button>
+              <div className="appointment-detail-sidebar__title">
+                <h2>{openRow.title}</h2>
+                {(openRow.time || openRow.compactMeta) && (
+                  <p className="appointment-detail-sidebar__time">{openRow.time || openRow.compactMeta}</p>
+                )}
+                {openRow.subtitle && <p>{openRow.subtitle}</p>}
+              </div>
+              <button type="button" className="appointment-detail-sidebar__close" onClick={() => setOpenRow(null)} aria-label="Close">
+                <X size={16} />
+              </button>
+              {(openRow.status || openRow.priority) && (
+                <div className="appointment-detail-sidebar__status">
+                  {openRow.status && <span>{titleCase(openRow.status)}</span>}
+                  {openRow.priority && <span>{openRow.priority}</span>}
+                </div>
+              )}
+            </div>
+
+            <div className="appointment-detail-sidebar__tabs" role="tablist" aria-label="Detail sections">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={detailTab === 'visit'}
+                className={detailTab === 'visit' ? 'active' : undefined}
+                onClick={() => setDetailTab('visit')}
+              >
+                Visit Information
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={detailTab === 'financial'}
+                className={detailTab === 'financial' ? 'active' : undefined}
+                onClick={() => setDetailTab('financial')}
+              >
+                Financial Information
+              </button>
+            </div>
+
+            <div className="appointment-detail-sidebar__body" role="tabpanel">
+              {(detailTab === 'visit'
+                ? [
+                    { label: 'Time', value: openRow.time || openRow.compactMeta },
+                    { label: 'Reason', value: openRow.subtitle },
+                    { label: 'Priority', value: openRow.priority },
+                    { label: 'Status', value: openRow.status ? titleCase(openRow.status) : undefined },
+                    { label: 'Room', value: openRow.room },
+                    { label: 'Details', value: openRow.meta },
+                  ]
+                : [
+                    { label: 'Balance', value: '—' },
+                    { label: 'Charge', value: 'Not started' },
+                    { label: 'Payment Responsibility', value: 'Not recorded' },
+                    { label: 'Insurance', value: 'Not recorded' },
+                    { label: 'Claim Status', value: 'Not started' },
+                  ]
+              ).filter((item): item is { label: string; value: string } => Boolean(item.value))
+                .map(item => (
+                  <div className="appointment-detail-row" key={item.label}>
+                    <dt>{item.label}</dt>
+                    <dd>{item.value}</dd>
+                  </div>
+                ))}
+            </div>
+
+            <div className="appointment-detail-sidebar__actions">
+              {openRow.actionLabel && openRow.onAction && (
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => { openRow.onAction?.(); setOpenRow(null); }}>
+                  {openRow.actionLabel}
+                </button>
+              )}
+              {openRow.secondaryActionLabel && openRow.onSecondaryAction && (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { openRow.onSecondaryAction?.(); setOpenRow(null); }}>
+                  {openRow.secondaryActionLabel}
+                </button>
+              )}
+              {openRow.onClick && (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { openRow.onClick?.(); setOpenRow(null); }}>
+                  Open record
+                </button>
+              )}
+            </div>
+          </aside>
+        </>
+      )}
     </div>
   );
 }

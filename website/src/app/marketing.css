@@ -12998,7 +12998,7 @@ button.mk-mobile-top-demo {
    (see .mk-home-split-hero), so its nav tone matches the default dark
    treatment below instead of the old light-cream hero's colors. */
 .mk-navbar--tone-home {
-  --mk-nav-hero-bg: linear-gradient(135deg, #10195A 0%, #015697 58%, #2191D0 100%);
+  --mk-nav-hero-bg: #10195A;
   --mk-nav-hero-text: rgba(255,255,255,0.96);
   --mk-nav-logo-filter: brightness(0) invert(1);
   --mk-nav-pricing-bg: rgba(255,255,255,0.08);
@@ -13845,13 +13845,30 @@ button.mk-mobile-top-demo {
 .mk-platform-connects-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  gap: 20px;
 }
 
+/* Flat clinical card — mirrors the platform app's dash-card recipe:
+   solid white panel, hairline border, 14px radius, whisper shadow,
+   and a gentle lift on hover. */
 .mk-platform-card {
   display: block;
-  padding: 32px 40px;
+  padding: 28px 30px;
   text-decoration: none;
   color: inherit;
+  background: #fff;
+  border: 1px solid var(--tb-cream-300);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 42, 67, 0.05);
+  transition: border-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mk-platform-card:hover {
+  border-color: var(--tb-blue-200, #BFDBFE);
+  box-shadow: 0 10px 24px -16px rgba(16, 42, 67, 0.22);
+  transform: translateY(-2px);
 }
 
 .mk-platform-card h3 {
@@ -13869,31 +13886,16 @@ button.mk-mobile-top-demo {
   margin: 0;
 }
 
-.mk-platform-connects-cards > .mk-platform-card:nth-child(2) {
-  border-left: 1px solid var(--tb-cream-300);
-}
-.mk-platform-connects-cards > .mk-platform-card:nth-child(3) {
-  border-top: 1px solid var(--tb-cream-300);
-}
-.mk-platform-connects-cards > .mk-platform-card:nth-child(4) {
-  border-top: 1px solid var(--tb-cream-300);
-  border-left: 1px solid var(--tb-cream-300);
-}
-.mk-platform-connects-cards > .mk-platform-card:nth-child(5) {
-  border-top: 1px solid var(--tb-cream-300);
-}
-.mk-platform-connects-cards > .mk-platform-card:nth-child(6) {
-  border-top: 1px solid var(--tb-cream-300);
-  border-left: 1px solid var(--tb-cream-300);
-}
-
 .mk-platform-card--featured {
   grid-column: 1;
   grid-row: 1;
   background: var(--tb-blue-700);
-  border-radius: 20px;
+  border-color: var(--tb-blue-700);
   padding: 32px 32px 28px;
-  margin: 0 24px 24px 0;
+}
+
+.mk-platform-card--featured:hover {
+  border-color: var(--tb-blue-700);
 }
 
 .mk-platform-card-mark {
@@ -13948,18 +13950,155 @@ button.mk-mobile-top-demo {
 @media (max-width: 639.98px) {
   .mk-platform-connects-cards {
     grid-template-columns: 1fr;
-  }
-  .mk-platform-connects-cards > .mk-platform-card:nth-child(n) {
-    border-left: none;
-  }
-  .mk-platform-connects-cards > .mk-platform-card:nth-child(n+2) {
-    border-top: 1px solid var(--tb-cream-300);
-  }
-  .mk-platform-card--featured {
-    margin: 0 0 8px;
+    gap: 14px;
   }
   .mk-platform-card {
-    padding: 24px 4px;
+    padding: 22px 20px;
+  }
+}
+
+/* ── Products page hero: navy field, headline + photo collage ────
+   Same fixed-attachment gradient as .mk-navbar--hero-solid so the nav
+   and hero read as one continuous navy surface while at the top. */
+.mk-products-hero {
+  background: linear-gradient(135deg, #10195A 0%, #015697 58%, #2191D0 100%);
+  background-attachment: fixed;
+  padding: clamp(48px, 7vw, 96px) 0 clamp(40px, 5vw, 72px);
+}
+
+.mk-products-hero-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+}
+
+.mk-products-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(40px, 6vw, 96px);
+}
+
+.mk-products-hero-title {
+  font-family: var(--AkkuratLL);
+  font-size: clamp(36px, 4.6vw, 64px);
+  font-weight: 300;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  color: #fff;
+  margin: 0;
+}
+
+/* Circular scroll cue below the headline. */
+.mk-products-hero-scroll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.mk-products-hero-scroll:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* Photo collage — rounded tiles on a 3-column grid. The middle column
+   is the anchor image; the outer columns carry smaller companion tiles. */
+.mk-products-hero-collage {
+  display: grid;
+  grid-template-columns: 0.75fr 1.5fr 0.75fr;
+  grid-template-rows: 1.5fr 1fr;
+  gap: 14px;
+  aspect-ratio: 4 / 3;
+}
+
+.mk-products-hero-tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.mk-products-hero-tile--a { grid-column: 1; grid-row: 1; }
+.mk-products-hero-tile--b { grid-column: 1; grid-row: 2; }
+.mk-products-hero-tile--c { grid-column: 2; grid-row: 1 / span 2; }
+.mk-products-hero-tile--d { grid-column: 3; grid-row: 1; }
+.mk-products-hero-tile--e { grid-column: 3; grid-row: 2; }
+
+/* Stats band — thin bracket rules framing each figure. */
+.mk-products-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(24px, 4vw, 56px);
+  margin-top: clamp(56px, 8vw, 120px);
+}
+
+.mk-products-hero-stat {
+  position: relative;
+  padding: 10px 0 22px 28px;
+  border-left: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom-left-radius: 26px;
+}
+
+/* End-caps on the bracket rule — a dot at the top of the vertical run
+   and another where the bottom run stops. */
+.mk-products-hero-stat::before,
+.mk-products-hero-stat::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.mk-products-hero-stat::before {
+  top: -3px;
+  left: -4px;
+}
+
+.mk-products-hero-stat::after {
+  bottom: -4px;
+  right: -3px;
+}
+
+.mk-products-hero-stat strong {
+  display: block;
+  font-family: var(--AkkuratLL);
+  font-size: clamp(44px, 5vw, 68px);
+  font-weight: 300;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+.mk-products-hero-stat span {
+  display: block;
+  margin-top: 12px;
+  font-size: clamp(15px, 1.4vw, 19px);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@media (max-width: 959.98px) {
+  .mk-products-hero-top {
+    grid-template-columns: 1fr;
+  }
+  .mk-products-hero-copy {
+    gap: 32px;
+  }
+  .mk-products-hero-collage {
+    aspect-ratio: 16 / 10;
+  }
+  .mk-products-hero-stats {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    margin-top: 56px;
   }
 }
 
@@ -13967,15 +14106,14 @@ button.mk-mobile-top-demo {
 .mk-home-split-hero {
   position: relative;
   isolation: isolate;
-  background:
-    radial-gradient(circle at 12% 18%, rgba(33,145,208,0.42), transparent 34%),
-    radial-gradient(circle at 84% 78%, rgba(221,242,251,0.20), transparent 36%),
-    linear-gradient(135deg, #10195A 0%, #015697 58%, #2191D0 100%);
-  background-attachment: scroll, scroll, fixed;
+  background: linear-gradient(180deg, #10195A 0%, #10195A 85%, #202F39 100%);
   color: #fff;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding: clamp(24px, 3vw, 40px) 0 clamp(28px, 3vw, 40px);
+  justify-content: center;
+  padding: clamp(20px, 2.5vw, 32px) 0;
   overflow: hidden;
 }
 
@@ -13984,9 +14122,12 @@ button.mk-mobile-top-demo {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background-image: url("/assets/logos/PNG/Tamam_Style_Guide-34.png");
-  background-size: min(56%, 560px) auto;
-  background-position: -6% 96%;
+  background-image:
+    url("/assets/logos/PNG/Tamam_Style_Guide-34.png"),
+    url("/assets/logos/PNG/Tamam_Style_Guide-34.png"),
+    url("/assets/logos/PNG/Tamam_Style_Guide-34.png");
+  background-size: 220px auto, 140px auto, 300px auto;
+  background-position: -4% 88%, 18% 62%, 96% 6%;
   background-repeat: no-repeat;
   opacity: 0.18;
   pointer-events: none;
@@ -14145,4 +14286,262 @@ button.mk-mobile-top-demo {
   .mk-home-split-hero-image {
     border-radius: 20px;
   }
+}
+
+/* ── Products page: interactive platform explorer ────────────────── */
+.mk-platform-explorer-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin: 0 0 48px;
+}
+
+.mk-platform-explorer-tab {
+  padding: 10px 20px;
+  border: 1.5px solid var(--tb-cream-300);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--tb-text-sec);
+  font-family: var(--AkkuratLL);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.mk-platform-explorer-tab:hover {
+  border-color: var(--tab-accent, var(--tb-blue-700));
+  color: var(--tab-accent, var(--tb-blue-700));
+}
+
+.mk-platform-explorer-tab.is-active {
+  border-color: var(--tab-accent, var(--tb-blue-700));
+  background: var(--tab-accent, var(--tb-blue-700));
+  color: #fff;
+}
+
+.mk-platform-explorer-panel {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.75fr) 1.25fr;
+  gap: clamp(32px, 4vw, 56px);
+  align-items: start;
+}
+
+.mk-platform-explorer-intro .mk-h3 {
+  margin: 10px 0 14px;
+}
+
+.mk-platform-explorer-intro .mk-body {
+  margin: 0 0 18px;
+}
+
+.mk-platform-explorer-link {
+  display: inline-block;
+  font-family: var(--AkkuratLL);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.mk-platform-explorer-link:hover {
+  text-decoration: underline;
+}
+
+.mk-platform-explorer-illustration {
+  margin-top: 28px;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.mk-platform-explorer-content {
+  display: grid;
+  gap: 32px;
+}
+
+.mk-platform-explorer-modules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.mk-platform-explorer-module {
+  padding: 16px 18px;
+  border: 1px solid var(--tb-cream-300);
+  border-radius: 14px;
+  background: var(--tb-cream-50);
+}
+
+.mk-platform-explorer-module strong {
+  display: block;
+  font-family: var(--AkkuratLL);
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--tb-text-pri);
+  margin-bottom: 6px;
+}
+
+.mk-platform-explorer-module p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--tb-text-sec);
+}
+
+.mk-platform-explorer-benefits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 18px;
+  padding-top: 24px;
+  border-top: 1px solid var(--tb-cream-300);
+}
+
+.mk-platform-explorer-benefit {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mk-platform-explorer-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  margin-top: 2px;
+}
+
+.mk-platform-explorer-benefit strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tb-text-pri);
+  margin-bottom: 3px;
+}
+
+.mk-platform-explorer-benefit p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--tb-text-sec);
+}
+
+@media (max-width: 900px) {
+  .mk-platform-explorer-panel {
+    grid-template-columns: 1fr;
+  }
+  .mk-platform-explorer-modules {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Installation page ───────────────────────────────────────────── */
+.mk-install-stages {
+  display: grid;
+  gap: 20px;
+}
+
+.mk-install-stage {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 20px;
+  align-items: start;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--tb-cream-300);
+}
+
+.mk-install-stage:last-child {
+  border-bottom: none;
+}
+
+.mk-install-stage-number {
+  font-family: var(--Lora);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--tb-blue-700);
+}
+
+.mk-install-stage h3 {
+  margin: 0 0 8px;
+  font-family: var(--AkkuratLL);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--tb-text-pri);
+}
+
+.mk-install-stage p {
+  margin: 0;
+  max-width: 640px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--tb-text-sec);
+}
+
+.mk-install-architecture {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 24px;
+}
+
+.mk-install-tier {
+  padding: 28px 24px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid var(--tb-cream-300);
+}
+
+.mk-install-tier h3 {
+  margin: 0 0 10px;
+  font-family: var(--AkkuratLL);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--tb-text-pri);
+}
+
+.mk-install-tier p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--tb-text-sec);
+}
+
+.mk-install-safeguards {
+  display: grid;
+  gap: 14px;
+  max-width: 680px;
+  margin: 0 0 28px;
+  padding: 0;
+  list-style: none;
+}
+
+.mk-install-safeguards li {
+  position: relative;
+  padding-left: 28px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--tb-text-sec);
+}
+
+.mk-install-safeguards li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tb-blue-700);
+}
+
+.mk-install-cta-text {
+  font-size: 15px;
+  color: var(--tb-text-sec);
+}
+
+.mk-install-cta-text a {
+  color: var(--tb-blue-700);
+  font-weight: 700;
 }

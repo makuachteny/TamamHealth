@@ -256,9 +256,6 @@ export function ProductIllustration({
       <div className="mk-product-photo-main">
         <Image src={visual.primary} alt={visual.label} fill sizes="(max-width: 900px) 100vw, 48vw" />
       </div>
-      <div className="mk-product-photo-secondary" aria-hidden="true">
-        <Image src={visual.secondary} alt="" fill sizes="(max-width: 900px) 42vw, 18vw" />
-      </div>
       <div className="mk-product-photo-caption">
         <span>{visual.label}</span>
         <strong>{visual.detail}</strong>

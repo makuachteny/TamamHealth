@@ -104,7 +104,6 @@ export default function MarketingFooter() {
               <Link href="/ehr">EHR &amp; Clinical</Link>
               <Link href="/billing">Billing &amp; Payments</Link>
               <Link href="/telehealth">Telehealth</Link>
-              <Link href="/analytics">Analytics</Link>
               <Link href="/pharmacy-lab">Pharmacy &amp; Lab</Link>
               <Link href="/pricing#packages">Pricing</Link>
             </nav>

@@ -382,12 +382,6 @@ export default function PharmacyLabPage() {
             href: "/billing",
             tone: "gold",
           },
-          {
-            title: "Analytics & Reporting",
-            body: "Track medication error trends, lab turnaround times, and inventory levels. Identify training needs and process improvements with real-time dashboards.",
-            href: "/analytics",
-            tone: "green",
-          },
         ]}
       />
 

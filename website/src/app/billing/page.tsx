@@ -397,12 +397,6 @@ export default function BillingPage() {
             href: "/patient-experience",
             tone: "gold",
           },
-          {
-            title: "Analytics & Reporting",
-            body: "Real-time financial dashboards, denial trend analysis, and cash flow forecasting. See exactly where money is and why.",
-            href: "/analytics",
-            tone: "green",
-          },
         ]}
       />
 

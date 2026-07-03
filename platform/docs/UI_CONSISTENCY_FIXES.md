@@ -94,9 +94,29 @@ Root cause of the faint text: the dashboard shell **surfaces hardcoded `backgrou
 
 ---
 
-# Pass 5 — Care-row patient avatar
+# Pass 5 — Care rows now mirror the reference appointment row
 
-The queue/appointment rows in `EhrCareDashboard` (nurse, triage, reception, clerk) rendered a generic `<User>` outline icon in the avatar slot, unlike the reference Clinical Officer rows and the "Recently registered" table, which show initials. Changed the `.ehr-patient-icon` to render the patient's **initials** (via the shared `initials()` helper), so it matches the rest of the platform. The row container already uses the reference `.ehr-appointment-row` styling (same border/radius/shadow), so the cards now read the same as the reference rows. `tsc` passes.
+The queue/appointment rows in `EhrCareDashboard` (nurse, triage, reception, clerk) didn't match the reference Clinical Officer row. Two changes:
+
+1. **Avatar** — replaced the generic `<User>` outline icon with the patient's **initials** (shared `initials()` helper), matching the reference rows and the "Recently registered" table.
+2. **Row layout** — restructured the row to the reference's four-part shape: **avatar → time + priority → bold name + subtitle → action(s) on the right.** Dropped the old inline status badge and verbose meta line. Added a `.ehr-appointment-time` column (bold mono time + small priority/status) and made the name/subtitle a clean flex stack (no indent). New CSS is scoped to `@media (min-width: 640px)` so the existing ≤639px compact/mobile treatment is untouched.
+
+Verified: PostCSS parses `globals.css`; `tsc --noEmit` passes.
+
+---
+
+# Pass 6 — Appointment detail drawer + clean care rows
+
+## Detail drawer (`.appointment-detail-sidebar`)
+- Narrowed from `460px` to **`min(300px, 100vw)`** (calendar-rail width).
+- Restyled for the narrower width: header status chips wrap onto their own row under the title, smaller title, and the detail rows now **stack label-over-value** (uppercase micro-label + bold value) instead of a cramped two-column grid.
+
+## Care rows — actions moved into a click-to-open slider
+- Removed the inline **Check in / Record / Assign / Records** buttons from the rows. Rows are now clean: **avatar · time/priority · name + subtitle**, with the name left-aligned right after the time.
+- Clicking a row (or its name) now opens a **right-side detail slider** (same styled `.appointment-detail-sidebar`) showing the visit details and the action buttons (primary action, secondary action, and "Open record") — so the user decides there.
+- Realigned the tablet/phone breakpoints to the new avatar|time|name structure (they previously depended on removed elements).
+
+Verified: PostCSS parses; `tsc --noEmit` passes.
 
 ## Not yet done (larger, tracked in the audit's Phase 3)
 - Migrating System-B/C dashboards (lab, pharmacy, data-entry, nutrition, radiology, state, superintendent, facility-management) onto `EhrCareDashboard`.
