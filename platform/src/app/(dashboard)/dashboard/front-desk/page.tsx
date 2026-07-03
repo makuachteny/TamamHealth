@@ -554,6 +554,15 @@ export default function FrontDeskDashboardPage() {
     ...(canUseRoute('/appointments') ? [{ label: t('nav.appointments'), icon: Calendar, onClick: () => router.push('/appointments') }] : []),
   ]), [canUseRoute, router, t]);
 
+  // Quick-navigation strip mirroring the Clinical Officer dashboard's clinical
+  // strip. Route-guarded so a clinic clerk never sees a shortcut they can't open.
+  const actionStrip = useMemo<EhrCareDashboardAction[]>(() => ([
+    ...(canUseRoute('/patients') ? [{ label: 'Patient registry', icon: ClipboardList, onClick: () => router.push('/patients') }] : []),
+    ...(canUseRoute('/appointments') ? [{ label: 'Appointments', icon: Calendar, onClick: () => router.push('/appointments') }] : []),
+    ...(canUseRoute('/referrals') ? [{ label: 'Referrals', icon: ArrowRightLeft, onClick: () => router.push('/referrals') }] : []),
+    ...(canUseRoute('/check-in') ? [{ label: 'Check-in queue', icon: ClipboardCheck, onClick: () => setCheckInOpen(true) }] : []),
+  ]), [canUseRoute, router]);
+
   const frontDeskRows = useMemo<EhrCareDashboardRow[]>(() => {
     const appointmentRows: EhrCareDashboardRow[] = visiblePendingAppointments.map(appointment => ({
       id: `pending-appt-${appointment._id}`,
@@ -838,6 +847,7 @@ export default function FrontDeskDashboardPage() {
             { label: 'Completed', value: queue.filter(item => item.status === 'DONE').length, onClick: () => { setQueueFilter('all'); setPanelView('queue'); } },
           ]}
           actions={actions}
+          actionStrip={actionStrip}
           rows={frontDeskRows}
           metrics={metrics}
           checklist={checklist}
@@ -849,7 +859,7 @@ export default function FrontDeskDashboardPage() {
           checklistDescription="Registration, arrivals, routing, and checkout."
           missionTitle="Keep the desk moving"
           missionDescription="Show the next action clearly so reception can register, check in, route, and close visits."
-          showMissionCard={false}
+          showMissionCard
           footerContent={(
             <section className="ehr-worklist-panel" style={{ minWidth: 0 }}>
               <div>

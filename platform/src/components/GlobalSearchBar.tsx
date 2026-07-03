@@ -24,7 +24,10 @@ import { formatPhoneDisplay } from '@/lib/field-formats';
 // `splitActions` lays the row out on the same 2-column grid the dashboard cards
 // use (search + trailing in the left column, actions right-aligned in the right
 // column), so the search bar lines up edge-to-edge with the cards below it.
-export default function GlobalSearchBar({ actions, searchTrailing, splitActions }: { actions?: ReactNode; searchTrailing?: ReactNode; splitActions?: boolean } = {}) {
+// `hideInput` drops the text search field (and its quick-jump dropdown) while
+// keeping the actions/trailing row — used on pages that already have the
+// platform header search and don't want a duplicate search box (e.g. payments).
+export default function GlobalSearchBar({ actions, searchTrailing, splitActions, hideInput }: { actions?: ReactNode; searchTrailing?: ReactNode; splitActions?: boolean; hideInput?: boolean } = {}) {
   const { t } = useTranslation();
   const { globalSearch, setGlobalSearch } = useApp();
   const [localSearch, setLocalSearch] = useState(globalSearch);
@@ -94,6 +97,7 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
       {/* In split mode this groups search + trailing into the left grid column;
           otherwise `contents` makes them plain flex children as before. */}
       <div className={split ? 'flex items-center gap-3 min-w-0' : 'contents'}>
+      {!hideInput && (
       <div className={split ? 'relative flex-1 min-w-0' : 'relative flex-1 min-w-[220px] max-w-2xl'} ref={searchContainerRef}>
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px]" color="var(--text-muted)" />
         <input
@@ -181,6 +185,7 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
           </button>
         )}
       </div>
+      )}
 
       {/* Compact control docked directly beside the search input (e.g. a filter
           icon), as opposed to the page actions pushed to the row's end. */}

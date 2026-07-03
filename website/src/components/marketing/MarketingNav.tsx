@@ -61,11 +61,17 @@ export default function MarketingNav() {
   const [lightHero, setLightHero] = useState(false);
   const pathname = usePathname();
   const tone = getNavTone(pathname);
-  const navClass = scrollState === "past"
-    ? "mk-navbar--scrolled"
-    : lightHero
-      ? "mk-navbar--light-hero"
-      : "mk-navbar--hero-solid";
+  // Homepage hero is the dark-blue theme, so its nav just toggles between
+  // fully transparent (floating over the hero at the very top) and the
+  // matching solid dark-blue bar (as soon as you scroll at all, including
+  // past the hero) — it never switches to the generic light "scrolled" bar.
+  const navClass = tone === "home"
+    ? (scrollState === "top" ? "mk-navbar--hero" : "mk-navbar--hero-solid")
+    : scrollState === "past"
+      ? "mk-navbar--scrolled"
+      : lightHero
+        ? "mk-navbar--light-hero"
+        : "mk-navbar--hero-solid";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -99,7 +105,6 @@ export default function MarketingNav() {
       const nextLightHero = Boolean(
         hero?.matches([
           ".mk-home-hero",
-          ".mk-home-split-hero",
           ".mk-mod-hero--showcase",
           ".mk-mod-hero--data",
           ".mk-mod-hero--legal",
@@ -170,7 +175,7 @@ export default function MarketingNav() {
                 ))}
               </div>
             </div>
-            <Link href="/pricing" className="mk-nav-item-link">Pricing</Link>
+            <Link href="/pricing" className="mk-nav-item mk-nav-item-link">Pricing</Link>
             <div className="mk-nav-item">
               <Link href="/about" className="mk-nav-item-link">About Us</Link>
               <DuoIcon name="chevron-down" size={14} />

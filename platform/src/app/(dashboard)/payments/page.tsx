@@ -270,7 +270,7 @@ export default function PaymentsPage() {
   if (loading) {
     return (
       <>
-        <TopBar title={t('payments.title')} />
+        <TopBar title={t('payments.title')} hideSearchInput />
         <main className="page-container page-enter">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320, color: 'var(--text-muted)' }}>
             <Activity size={44} style={{ marginRight: 8, animation: 'spin 1s linear infinite' }} />
@@ -283,17 +283,7 @@ export default function PaymentsPage() {
 
   return (
     <>
-      <TopBar title={t('payments.title')} searchTrailing={
-            <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
-              <FilterMenu.Field label="All Accounts">
-                <select className="w-full text-sm" value={balanceFilter} onChange={e => setBalanceFilter(e.target.value)}>
-                  <option value="all">All Accounts</option>
-                  <option value="outstanding">Has Balance</option>
-                  <option value="paid">Paid Up</option>
-                </select>
-              </FilterMenu.Field>
-            </FilterMenu>
-          } actions={
+      <TopBar title={t('payments.title')} hideSearch titleActions={
             <button onClick={() => { setCollectSearch(''); setCollectPickerOpen(true); }} className="btn btn-primary">
               <Banknote className="w-4 h-4" /> {t('billing.collectPayment')}
             </button>
@@ -301,7 +291,7 @@ export default function PaymentsPage() {
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {error && (
           <div style={{
-            background: 'rgba(196, 69, 54, 0.08)', borderLeft: '4px solid var(--color-danger-500)',
+            background: 'var(--color-danger-bg)', borderLeft: '4px solid var(--color-danger-500)',
             borderRadius: 'var(--card-radius)', padding: '14px 18px', marginBottom: 20,
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
@@ -716,7 +706,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
                 <h2 id="billing-detail-name" className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{line.patientName}</h2>
               </button>
               {line.hospitalNumber && (
-                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.10)', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'var(--overlay-light)', color: 'var(--accent-primary)', fontWeight: 600 }}>
                   {line.hospitalNumber}
                 </span>
               )}

@@ -84,6 +84,7 @@ export default function EhrCareDashboard({
   onSearchChange,
   filters,
   actions,
+  actionStrip,
   rows,
   metrics,
   checklist,
@@ -118,6 +119,10 @@ export default function EhrCareDashboard({
   onSearchChange?: (value: string) => void;
   filters: EhrCareDashboardFilter[];
   actions: EhrCareDashboardAction[];
+  /** Quick-navigation strip shown under the work list, matching the
+   *  Clinical Officer dashboard's clinical strip. Kept separate from header
+   *  `actions` so nothing is duplicated between the header and the strip. */
+  actionStrip?: EhrCareDashboardAction[];
   rows: EhrCareDashboardRow[];
   metrics: EhrCareDashboardMetric[];
   checklist: EhrCareDashboardChecklistItem[];
@@ -316,7 +321,17 @@ export default function EhrCareDashboard({
             ))}
           </div>
 
-          {showActionStrip && (
+          {actionStrip && actionStrip.length > 0 && (
+            <div className="ehr-clinical-strip">
+              {actionStrip.map(action => (
+                <button key={action.label} type="button" className={action.active ? 'primary' : ''} onClick={action.onClick}>
+                  <action.icon className="w-4 h-4" />{action.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {showActionStrip && !actionStrip && (
             <div className="ehr-clinical-strip">
               {actions.map(action => (
                 <button key={action.label} type="button" className={action.active ? 'primary' : ''} onClick={action.onClick}>

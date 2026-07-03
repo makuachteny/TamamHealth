@@ -12432,3 +12432,81 @@ span:has(> svg:only-child) {
 .ehr-worklist-row small {
   font-size: 10.5px !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK MODE — EHR shell token overrides
+   The --ehr-* tokens drive the clinical dashboards (schedule shell, side cards,
+   worklists, mini-calendar, care rows). They were only defined in :root (light),
+   so the dashboards never darkened. These give them dark values. Additive and
+   scoped to [data-theme="dark"] — light mode is untouched.
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  --ehr-page-bg: var(--color-slate-950);
+  --ehr-panel: var(--color-dark-surface);
+  --ehr-panel-soft: rgba(54, 159, 218, 0.10);
+  --ehr-table-head: rgba(54, 159, 218, 0.14);
+  --ehr-table-head-strong: rgba(54, 159, 218, 0.22);
+  --ehr-border: var(--color-dark-border);
+  --ehr-border-soft: var(--color-dark-border);
+  --ehr-text: #F1F5F9;
+  --ehr-text-body: #CBD5E1;
+  --ehr-text-title: #F1F5F9;
+  --ehr-muted: #94A3B8;
+  --ehr-neutral-text: #CBD5E1;
+  --ehr-hover: var(--color-dark-surface-hover);
+  --ehr-head: var(--color-dark-surface);
+  --ehr-soft: var(--color-dark-surface-hover);
+  --ehr-info-soft: rgba(54, 159, 218, 0.18);
+  --ehr-info-bg: rgba(54, 159, 218, 0.12);
+  --ehr-danger-bg: rgba(220, 38, 38, 0.18);
+  --ehr-danger-text: #F87171;
+  --ehr-warning-bg: rgba(251, 191, 36, 0.16);
+  --ehr-warning-text: #FBBF24;
+  --ehr-warning: rgba(251, 191, 36, 0.16);
+  --ehr-success-bg: rgba(52, 211, 153, 0.16);
+  --ehr-success-text: #34D399;
+  --ehr-blue: var(--color-brand-400);
+  --ehr-blue-strong: var(--color-brand-300);
+  --ehr-blue-light: rgba(54, 159, 218, 0.16);
+  --ehr-coral: #F0846F;
+  --ehr-conflict: rgba(220, 38, 38, 0.16);
+  --ehr-conflict-text: #F87171;
+  --ehr-good: #34D399;
+  --ehr-focus-ring: rgba(54, 159, 218, 0.28);
+  --ehr-mission-bg: var(--color-brand-700);
+}
+
+/* Dashboard shell surfaces that hardcoded #fff/white instead of --ehr-panel, so
+   they stayed light. Re-point them at the tokens in dark mode only. Kept off
+   any .active / .primary / tonal states (those keep their own colours), and
+   inputs/selects are already handled by the global dark input rule. */
+[data-theme="dark"] .ehr-appointment-row,
+[data-theme="dark"] .ehr-worklist-row,
+[data-theme="dark"] .ehr-care-detail,
+[data-theme="dark"] .ehr-care-search,
+[data-theme="dark"] .ehr-checkin-section,
+[data-theme="dark"] .ehr-care-filter:not(.active),
+[data-theme="dark"] .ehr-care-rail-action:not(.active),
+[data-theme="dark"] .ehr-worklist-empty button {
+  background: var(--ehr-panel);
+  border-color: var(--ehr-border);
+}
+[data-theme="dark"] .ehr-worklist-row { border-bottom-color: var(--ehr-border); }
+
+/* Patient chart re-declares --ehr-* under its own class, so it needs the same
+   dark values or it renders blinding-white in dark mode. */
+[data-theme="dark"] .ehr-chart-page {
+  --ehr-page-bg: var(--color-slate-950);
+  --ehr-panel: var(--color-dark-surface);
+  --ehr-panel-soft: rgba(54, 159, 218, 0.10);
+  --ehr-table-head: rgba(54, 159, 218, 0.14);
+  --ehr-table-head-strong: rgba(54, 159, 218, 0.22);
+  --ehr-border: var(--color-dark-border);
+  --ehr-border-soft: var(--color-dark-border);
+  --ehr-text: #F1F5F9;
+  --ehr-muted: #94A3B8;
+  --ehr-blue: var(--color-brand-400);
+  --ehr-blue-strong: var(--color-brand-300);
+  --ehr-blue-light: rgba(54, 159, 218, 0.16);
+  --ehr-focus-ring: rgba(54, 159, 218, 0.28);
+}

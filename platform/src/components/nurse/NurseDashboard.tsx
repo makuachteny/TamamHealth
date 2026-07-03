@@ -190,6 +190,12 @@ export default function NurseDashboard() {
             onClick: () => setActiveTab(tab.key),
           }))}
           actions={actions}
+          actionStrip={[
+            { label: 'Patient search', icon: Users, onClick: () => router.push('/patients') },
+            { label: 'Wards', icon: BedDouble, onClick: () => router.push('/wards') },
+            { label: 'Immunizations', icon: Syringe, onClick: () => router.push('/immunizations') },
+            { label: 'Appointments', icon: Calendar, onClick: () => router.push('/appointments') },
+          ]}
           rows={rows}
           metrics={metrics}
           checklist={checklist}
@@ -202,7 +208,7 @@ export default function NurseDashboard() {
           checklistDescription="Ward care, triage, medications, and handoff."
           missionTitle="Bedside care"
           missionDescription="Keep assigned patients, urgent triage, and medication work visible."
-          showMissionCard={false}
+          showMissionCard
           emptyTitle="No patients in this station"
         >
           <div className="flex flex-col" style={{ minHeight: 0 }}>

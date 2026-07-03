@@ -13952,26 +13952,49 @@ button.mk-mobile-top-demo {
 
 /* ── Homepage split hero: text left, large image right ──────────── */
 .mk-home-split-hero {
-  background: var(--tb-cream-50);
-  min-height: 720px;
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(33,145,208,0.42), transparent 34%),
+    radial-gradient(circle at 84% 78%, rgba(221,242,251,0.20), transparent 36%),
+    linear-gradient(135deg, #10195A 0%, #015697 58%, #2191D0 100%);
+  color: #fff;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: clamp(72px, 10vw, 120px) 0 clamp(32px, 4vw, 48px);
+  padding-top: clamp(24px, 3vw, 40px);
   overflow: hidden;
+}
+
+.mk-home-split-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url("/assets/logos/PNG/Tamam_Style_Guide-34.png");
+  background-size: min(56%, 560px) auto;
+  background-position: -6% 96%;
+  background-repeat: no-repeat;
+  opacity: 0.18;
+  pointer-events: none;
 }
 
 .mk-home-split-hero-body {
   display: flex;
   align-items: center;
-  flex: 1;
+}
+
+.mk-home-split-hero-footer {
+  margin-top: auto;
+  padding-bottom: clamp(20px, 3vw, 32px);
 }
 
 .mk-home-split-hero-grid {
   width: 100%;
   display: grid;
   grid-template-columns: minmax(280px, 1fr) 1fr;
-  gap: clamp(32px, 5vw, 72px);
+  gap: clamp(20px, 2.5vw, 36px);
   align-items: center;
 }
 
@@ -13979,15 +14002,15 @@ button.mk-mobile-top-demo {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 40px 0 0;
-  padding-top: 24px;
-  border-top: 1px solid var(--tb-cream-300);
+  margin: 0;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
   font-family: var(--AkkuratMonoLL);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--tb-text-muted);
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .mk-home-split-hero-eyebrow-dot {
@@ -14000,11 +14023,13 @@ button.mk-mobile-top-demo {
 
 .mk-home-split-hero-title {
   margin: 0 0 24px;
+  color: #fff;
 }
 
 .mk-home-split-hero-subtitle {
   margin: 0 0 32px;
   max-width: 460px;
+  color: rgba(255, 255, 255, 0.86);
 }
 
 .mk-home-split-hero-actions {
@@ -14017,13 +14042,9 @@ button.mk-mobile-top-demo {
 .mk-home-split-hero-visual {
   position: relative;
   width: 100%;
-  max-width: 560px;
+  max-width: 640px;
   aspect-ratio: 1 / 1;
   margin-left: auto;
-}
-
-.mk-home-split-hero-visual--sm {
-  max-width: 500px;
 }
 
 .mk-home-split-hero-glow {
@@ -14088,9 +14109,6 @@ button.mk-mobile-top-demo {
 }
 
 @media (max-width: 900px) {
-  .mk-home-split-hero {
-    min-height: 0;
-  }
   .mk-home-split-hero-grid {
     grid-template-columns: 1fr;
   }

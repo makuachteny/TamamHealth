@@ -272,20 +272,7 @@ export default function ClaimsPage() {
 
   return (
     <>
-      <TopBar title={t('claims.title')} searchTrailing={
-        <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
-          <FilterMenu.Field label={t('claims.filterAll')}>
-            <select className="w-full text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-              <option value="all">{t('claims.filterAll')}</option>
-              <option value="draft">{t('claims.status_draft')}</option>
-              <option value="submitted">{t('claims.status_submitted')}</option>
-              <option value="accepted">{t('claims.status_accepted')}</option>
-              <option value="denied">{t('claims.status_denied')}</option>
-              <option value="paid">{t('claims.status_paid')}</option>
-            </select>
-          </FilterMenu.Field>
-        </FilterMenu>
-      } />
+      <TopBar title={t('claims.title')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
       {/* KPI Cards */}

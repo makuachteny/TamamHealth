@@ -18,31 +18,46 @@ export default function TopBar({
   title,
   titleIcon,
   hideSearch,
+  hideSearchInput,
   actions,
+  titleActions,
   searchTrailing,
   splitActions,
 }: {
   title?: string;
   titleIcon?: ReactNode;
   hideSearch?: boolean;
+  /** Keep the actions/filter row but drop the search input (page already has
+   *  the platform header search — avoids a duplicate search box). */
+  hideSearchInput?: boolean;
   actions?: ReactNode;
+  /** Actions rendered inline on the title row (right-aligned). Use with
+   *  `hideSearch` for a clean "title + primary action" header, no search row. */
+  titleActions?: ReactNode;
   searchTrailing?: ReactNode;
   splitActions?: boolean;
 }) {
   return (
     <>
-      {title && (
-        <div className="flex items-center gap-2 min-w-0 flex-shrink-0" style={{ margin: '10px 10px 0 10px' }}>
+      {(title || titleActions) && (
+        <div className="flex items-center gap-2 min-w-0" style={{ margin: '10px 10px 0 10px' }}>
           {titleIcon}
-          <h1 className="text-base font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-            {title}
-          </h1>
+          {title && (
+            <h1 className="text-base font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+              {title}
+            </h1>
+          )}
+          {titleActions && (
+            <div className="ml-auto flex-shrink-0 flex items-center gap-2">
+              {titleActions}
+            </div>
+          )}
         </div>
       )}
 
       {/* Platform-wide search bar — sits directly below the title, above each
           page's greeting/title block. Single search entry point for the app. */}
-      {!hideSearch && <GlobalSearchBar actions={actions} searchTrailing={searchTrailing} splitActions={splitActions} />}
+      {!hideSearch && <GlobalSearchBar actions={actions} searchTrailing={searchTrailing} splitActions={splitActions} hideInput={hideSearchInput} />}
     </>
   );
 }

@@ -71,7 +71,7 @@ export function HomeHero() {
                 >
                   Book a Demo
                 </MarketingActionModalButton>
-                <Link href="/about/contact" className="mk-btn mk-btn-outline">
+                <Link href="/about/contact" className="mk-btn mk-btn-outline-white">
                   Get in Touch
                 </Link>
               </div>
@@ -79,7 +79,7 @@ export function HomeHero() {
           </Reveal>
 
           <Reveal delay={0.1}>
-            <div className="mk-home-split-hero-visual mk-home-split-hero-visual--sm">
+            <div className="mk-home-split-hero-visual">
               <span className="mk-home-split-hero-glow" aria-hidden="true" />
               <div className="mk-home-split-hero-image" role="group" aria-label="Photos illustrating the problem Tamam solves">
                 {HERO_SLIDES.map((slide, index) => (
@@ -113,7 +113,7 @@ export function HomeHero() {
         </div>
       </div>
 
-      <div className="mk-container">
+      <div className="mk-container mk-home-split-hero-footer">
         <p className="mk-home-split-hero-eyebrow">
           <span className="mk-home-split-hero-eyebrow-dot" aria-hidden="true" />
           Offline-ready digital health infrastructure

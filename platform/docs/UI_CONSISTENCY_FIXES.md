@@ -25,6 +25,79 @@ Companion to `UI_CONSISTENCY_AUDIT.md`. These are the safe, verifiable fixes app
 - `npx tsc --noEmit` → exit 0 (no type errors).
 - No remaining local `function initials` in the five edited files.
 
+---
+
+# Pass 2 — Align care dashboards to the Clinical Officer reference
+
+Decisions taken with you: keep role data but present it in the reference's slots; restyle the biller (don't restructure it); align the care dashboards first (keep two components for now, unify next pass). `npx tsc --noEmit` passes with **0 errors**.
+
+## Shared care shell (`components/ehr/EhrCareDashboard.tsx`)
+- Added an explicit **`actionStrip`** prop rendered in the same `ehr-clinical-strip` slot the Clinical Officer uses (the row of quick-nav buttons under the work list). It is kept separate from the header `actions` so nothing is duplicated between the header and the strip.
+
+## Nurse / Triage / Rooming (`components/nurse/NurseDashboard.tsx`)
+- **Mission card now shown** (`showMissionCard` was `false`) — the right rail now has all three cards like the reference (stats + checklist + mission).
+- Added a route-safe **action strip**: Patient search, Wards, Immunizations, Appointments.
+- Role data unchanged — "Nursing station" stats and "Nursing checklist" stay in the reference's metrics/checklist slots.
+
+## Reception / Clinic Clerk (`app/(dashboard)/dashboard/front-desk/page.tsx`)
+- **Mission card now shown** (was `false`).
+- Added a **route-guarded action strip** (Patient registry, Appointments, Referrals, Check-in queue) — each item respects `canUseRoute`, so a clinic clerk never sees a shortcut they can't open.
+- "Reception today" stats and "Front desk checklist" stay in the reference's slots.
+
+## Biller / Payments (`app/(dashboard)/payments/page.tsx`) — restyle only
+- Layout kept (it already uses the shared `TopBar` + `dash-card` + tokens).
+- Replaced two hardcoded tint backgrounds with tokens: error banner → `var(--color-danger-bg)`, accent chip → `var(--overlay-light)`.
+
+## Result
+All appointment/queue dashboards (Clinical Officer, Doctor, Clinician, Nurse, Triage, Rooming, Midwife, Reception, Clinic Clerk) now share the **same three-region structure**: header (segmented Dashboard/Calendar + greeting + actions) → left rail (Go to today + calendar + filters) → center (daybar + list + **clinical strip**) → right rail (**stats + checklist + mission**, three cards).
+
+## Still divergent (Phase 3 — bigger, next pass)
+- The System-B/C dashboards that don't use the shared shell at all: lab, pharmacy, data-entry, nutrition, radiology, state, government, superintendent, facility-management. These need migrating onto the shared shell.
+- Merging `EhrClinicalDashboard` + `EhrCareDashboard` into one component (agreed for a later pass) to remove the remaining structural duplication.
+
+---
+
+# Pass 3 — Duplicate payments search + dark mode
+
+## Removed the duplicate in-page search on the biller/cashier payments screen
+The payments page rendered the shared `GlobalSearchBar` (which also carries the Filters + Collect Payment buttons) even though the platform header already has a search.
+- Added a `hideInput` option to `GlobalSearchBar` and a `hideSearchInput` pass-through on `TopBar` (reusable by any page).
+- Set `hideSearchInput` on the payments page (both the main and loading states). The search box is gone; **Filters and Collect Payment stay.**
+- Note: the header search is a patient quick-jump (it opens a patient record), whereas the removed box text-filtered the bills list. Filters still narrows by balance status. If you'd rather keep list text-filtering, I can wire the header search to narrow the current page instead.
+
+## Fixed dark mode
+Root cause: the `--ehr-*` design tokens that drive every clinical dashboard (shell, side cards, worklists, calendar, care rows) were defined **only** in `:root` (light) and never in the `[data-theme="dark"]` block — so the entire dashboard body stayed light even though the theme toggle worked and the older `dash-card` components did darken.
+- Added a full set of **dark `--ehr-*` token overrides** in `globals.css` (mapped to the existing dark palette).
+- Re-pointed the dashboard shell surfaces that hardcoded `#fff`/`white` (appointment rows, worklist rows, care detail, search wrapper, check-in section, left-rail filter pills, empty-state button) at the tokens **in dark mode only** — kept off `.active`/`.primary`/tonal states so they keep their colours; inputs/selects were already handled by the existing global dark rule.
+- Added a scoped dark override for the patient chart (`.ehr-chart-page`), which re-declares the same tokens, so it doesn't render blinding-white.
+- All changes are additive `[data-theme="dark"]` rules, so **light mode is untouched**. Verified: PostCSS parses `globals.css` cleanly; `tsc --noEmit` passes.
+
+Remaining dark-mode polish (smaller, next pass if you want): the patient-chart sub-components and a handful of feature pages still contain hardcoded light colours in their component markup (per the audit's hex inventory) that need converting to tokens for a fully polished dark theme.
+
+---
+
+# Pass 4 — Bills/Claims headers + dark-mode contrast correction
+
+## Bills (payments) header
+- Removed the **Filters** control; the **Bills** title and **Collect Payment** button now sit on the **same line** (added a reusable `titleActions` slot to `TopBar`, used with `hideSearch`).
+
+## Claims header
+- Removed **both** the in-page search and the Filters control (`<TopBar hideSearch />`).
+- Cleaned up the now-unused `FilterMenu` imports and `activeFilterCount`/`clearFilters` in both pages.
+
+## Dark-mode contrast fix (the washed-out / invisible-text look)
+Root cause of the faint text: the dashboard shell **surfaces hardcoded `background: #FFFFFF`** (`.ehr-side-card`, `.ehr-worklist-panel`, `.ehr-worklist-table`, the left-rail `today`/calendar/filter groups, appointment/worklist rows, etc.) instead of using `--ehr-panel`. Pass 3 correctly made the **text** light, so the result was near-white text on still-white cards.
+- Broadened the `[data-theme="dark"]` surface override to re-point **all** those hardcoded-white shell surfaces at `var(--ehr-panel)` with `--ehr-border`/`--ehr-text`.
+- Excluded the blue **mission card** (`.ehr-side-card:not(.ehr-mission-card)`) so it keeps its brand background.
+- Pinned card headings/labels to the light text tokens, and darkened the calendar day-cell hover.
+- Still additive `[data-theme="dark"]` only → light mode untouched. Verified: PostCSS parses, `tsc --noEmit` passes.
+
+---
+
+# Pass 5 — Care-row patient avatar
+
+The queue/appointment rows in `EhrCareDashboard` (nurse, triage, reception, clerk) rendered a generic `<User>` outline icon in the avatar slot, unlike the reference Clinical Officer rows and the "Recently registered" table, which show initials. Changed the `.ehr-patient-icon` to render the patient's **initials** (via the shared `initials()` helper), so it matches the rest of the platform. The row container already uses the reference `.ehr-appointment-row` styling (same border/radius/shadow), so the cards now read the same as the reference rows. `tsc` passes.
+
 ## Not yet done (larger, tracked in the audit's Phase 3)
 - Migrating System-B/C dashboards (lab, pharmacy, data-entry, nutrition, radiology, state, superintendent, facility-management) onto `EhrCareDashboard`.
 - Category tokens for the appointment/disease/pharmacy color maps.
