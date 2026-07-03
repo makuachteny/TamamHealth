@@ -413,7 +413,7 @@ export default function DataEntryDashboard() {
                   { label: t('dataEntry.generalBeds'), occupied: latest.occupiedBeds, total: latest.totalBeds, color: 'var(--accent-primary)' },
                   { label: t('dashboard.bedIcu'), occupied: latest.icuOccupied, total: latest.icuBeds, color: 'var(--color-danger)' },
                   { label: t('dashboard.bedMaternity'), occupied: latest.maternityOccupied, total: latest.maternityBeds, color: '#EC4899' },
-                  { label: t('dashboard.bedPediatric'), occupied: latest.pediatricOccupied, total: latest.pediatricBeds, color: '#2191D0' },
+                  { label: t('dashboard.bedPediatric'), occupied: latest.pediatricOccupied, total: latest.pediatricBeds, color: 'var(--color-brand-500)' },
                 ].map(bed => {
                   const pct = bed.total > 0 ? Math.round((bed.occupied / bed.total) * 100) : 0;
                   return (
@@ -637,7 +637,7 @@ export default function DataEntryDashboard() {
                 {textField(t('dataEntry.stockOutItems'), 'stockOutItems', t('dataEntry.stockOutItemsPlaceholder'))}
 
                 {/* 6. Infection Control */}
-                {sectionHeader(ShieldCheck, t('dataEntry.infectionControl'), '#2191D0')}
+                {sectionHeader(ShieldCheck, t('dataEntry.infectionControl'), 'var(--color-brand-500)')}
                 <div className="grid grid-cols-2 gap-3">
                   {numField(t('dataEntry.handwashStations'), 'handwashStations')}
                   {numField(t('dataEntry.functionalStations'), 'handwashFunctional')}

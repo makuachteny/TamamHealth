@@ -24,26 +24,43 @@
   --tb-blue-100: #DDF2FB;
   --tb-blue-50:  #EFF8FD;
 
-  /* ─ Legacy accent aliases kept for compatibility, mapped to platform blue ─ */
-  --tb-green:       var(--tb-blue-700);
-  --tb-green-dark:  var(--tb-blue-800);
-  --tb-green-light: var(--tb-blue-100);
+  /* ─ Ward-color accents. The platform color-codes care (triage bands,
+     department pills); the site borrows that language for cards, washes,
+     and labels. Blue stays the only color for buttons and links. ─ */
 
-  /* ─ Legacy warm aliases kept for compatibility, mapped to platform blue ─ */
-  --tb-gold:       var(--tb-blue-600);
-  --tb-gold-dark:  var(--tb-blue-800);
-  --tb-gold-light: var(--tb-blue-100);
+  /* Clinic green — pharmacy, stable, confirmations */
+  --tb-green:       #1E8A5E;
+  --tb-green-dark:  #14663F;
+  --tb-green-light: #CDE9DA;
 
-  /* ─ Alert: Soft Red (errors, warnings) ─ */
+  /* Brass gold — stat numbers on navy, warm washes, donate accents */
+  --tb-gold:       #DFA83A;
+  --tb-gold-dark:  #9A6B1F;
+  --tb-gold-light: #F1E0B8;
+
+  /* Coral red — emergency, alerts, the problem */
   --tb-red:        #C44536;
   --tb-red-dark:   #7A2020;
   --tb-red-light:  #FADCDC;
 
-  /* ─ Tint backgrounds (light washes for icon containers) ─ */
+  /* Rose — maternity, community care */
+  --tb-rose:       #B23A66;
+  --tb-rose-dark:  #8E2C50;
+  --tb-rose-light: #F2D4E0;
+
+  /* Iris — lab, data, builders */
+  --tb-iris:       #5B4BA8;
+  --tb-iris-dark:  #46388A;
+  --tb-iris-light: #DED8F3;
+
+  /* ─ Tint backgrounds (flat washes for cards and icon containers) ─ */
   --tb-tint-blue:  rgba(33, 145, 208, 0.10);
-  --tb-tint-green: rgba(33, 145, 208, 0.10);
-  --tb-tint-gold:  rgba(33, 145, 208, 0.10);
-  --tb-green-50:   var(--tb-blue-50);
+  --tb-tint-green: #E9F6EE;
+  --tb-tint-gold:  #FBF3DD;
+  --tb-tint-red:   #FCEEEA;
+  --tb-tint-rose:  #FBEDF3;
+  --tb-tint-iris:  #F0EDFA;
+  --tb-green-50:   #F2FAF5;
 
   /* ─ Platform app canvas + surfaces ─ */
   --tb-cream-50:  #FEFFF9;
@@ -3255,12 +3272,13 @@ body,
 }
 .mk-btn-outline:hover { background: var(--tb-text); color: var(--tb-text-inv); }
 
+/* CTA buttons stay platform blue — ward colors never sit on actions. */
 .mk-btn-outline-green {
   background: transparent;
-  color: var(--tb-green);
-  border: 1.5px solid var(--tb-green);
+  color: var(--tb-blue-700);
+  border: 1.5px solid var(--tb-blue-700);
 }
-.mk-btn-outline-green:hover { background: var(--tb-green); color: var(--tb-text-inv); }
+.mk-btn-outline-green:hover { background: var(--tb-blue-700); color: var(--tb-text-inv); }
 
 .mk-btn-outline-white {
   background: transparent;
@@ -3270,11 +3288,11 @@ body,
 .mk-btn-outline-white:hover { background: var(--tb-cream-50); color: var(--tb-blue-900); }
 
 .mk-btn-green {
-  background: var(--tb-green);
+  background: var(--tb-blue-700);
   color: #fff;
-  border: 1.5px solid var(--tb-green);
+  border: 1.5px solid var(--tb-blue-700);
 }
-.mk-btn-green:hover { background: var(--tb-green-dark); border-color: var(--tb-green-dark); }
+.mk-btn-green:hover { background: var(--tb-blue-800); border-color: var(--tb-blue-800); }
 
 .mk-btn-gold {
   background: var(--tb-gold);
@@ -4448,7 +4466,7 @@ body,
 }
 .mk-testimonial-tab.active {
   color: var(--tb-text);
-  border-bottom-color: var(--tb-green);
+  border-bottom-color: var(--tb-blue-700);
   font-weight: 600;
 }
 .mk-testimonials-grid {
@@ -4669,6 +4687,9 @@ body,
 .mk-section-cream { background: var(--tb-cream-100); }
 .mk-section-white { background: var(--tb-cream-50); }
 .mk-section-teal  { background: var(--tb-blue-900); color: var(--tb-text-inv); }
+/* Headings keep their own navy color, which vanishes on the navy section. */
+.mk-section-teal .mk-h2,
+.mk-section-teal .mk-h3 { color: var(--tb-text-inv); }
 
 /* ── Split (Tebra: 2-col, 64px gap, center aligned) ─────────── */
 .mk-split {
@@ -5784,7 +5805,7 @@ body,
   display: block;
   width: 60px;
   height: 3px;
-  background: linear-gradient(90deg, var(--tb-green), var(--tb-gold));
+  background: var(--tb-gold);
   margin-top: 16px;
   border-radius: 2px;
   transition: width 0.4s var(--tb-ease-out);
@@ -5792,10 +5813,14 @@ body,
 .mk-h2:hover::after {
   width: 100px;
 }
-/* Center the underline when text is centered */
+/* Center the underline when text is centered. React emits inline styles
+   without a space after the colon ("text-align:center"), so match both. */
+[style*="text-align:center"] .mk-h2::after,
 [style*="text-align: center"] .mk-h2::after,
-[style*="textAlign"] .mk-h2::after,
-.mk-h2[style*="text-align: center"]::after {
+.mk-h2[style*="text-align:center"]::after,
+.mk-h2[style*="text-align: center"]::after,
+.mk-section-heading .mk-h2::after,
+.mk-faq-title::after {
   margin-left: auto;
   margin-right: auto;
 }
@@ -14887,4 +14912,92 @@ button.mk-mobile-top-demo {
 .mk-navbar.mk-navbar--light-hero .mk-nav-demo:hover,
 .mk-navbar.mk-navbar--light-hero .mk-mobile-top-demo:hover {
   background: rgba(16, 25, 90, 0.06) !important;
+}
+
+/* ── Ward-color accents (homepage) ──────────────────────────────
+   The platform color-codes care (triage bands, department pills), and
+   the homepage borrows that language: the problem wears triage-alarm
+   tints, the navy solution answers in brass, and each audience gets
+   its own ward color. Flat washes with same-hue hairline borders and
+   navy text; blue stays reserved for buttons and links. */
+
+/* Hero kicker picks up the brass thread that runs down the page. */
+.mk-home-photo-hero-kicker {
+  color: var(--tb-gold);
+}
+
+/* The problem — alarm tints under the missing-data stats. */
+.mk-home-problem-intro .mk-label {
+  color: var(--tb-red);
+}
+
+.mk-home-problem-stats > div:nth-child(1) .mk-home-problem-stat {
+  background: var(--tb-tint-red);
+  border-color: var(--tb-red-light);
+}
+.mk-home-problem-stats > div:nth-child(1) .mk-home-problem-stat strong {
+  color: var(--tb-red);
+}
+
+.mk-home-problem-stats > div:nth-child(2) .mk-home-problem-stat {
+  background: var(--tb-tint-gold);
+  border-color: var(--tb-gold-light);
+}
+.mk-home-problem-stats > div:nth-child(2) .mk-home-problem-stat strong {
+  color: var(--tb-gold-dark);
+}
+
+.mk-home-problem-stats > div:nth-child(3) .mk-home-problem-stat {
+  background: var(--tb-tint-rose);
+  border-color: var(--tb-rose-light);
+}
+.mk-home-problem-stats > div:nth-child(3) .mk-home-problem-stat strong {
+  color: var(--tb-rose);
+}
+
+/* The solution — brass eyebrow on navy; outcomes keyed by ward color. */
+.mk-home-platform-flow .mk-label {
+  color: var(--tb-gold);
+}
+
+.mk-home-platform-outcome::before {
+  content: "";
+  display: block;
+  width: 30px;
+  height: 3px;
+  border-radius: 2px;
+  margin-bottom: 14px;
+}
+.mk-home-platform-outcome:nth-child(1)::before { background: var(--tb-green-light); }
+.mk-home-platform-outcome:nth-child(2)::before { background: var(--tb-gold-light); }
+.mk-home-platform-outcome:nth-child(3)::before { background: var(--tb-rose-light); }
+
+/* Audiences — each group keeps its ward color on the card label. */
+.mk-related-links-grid > .mk-related-links-card:nth-child(1) .mk-related-links-label { color: var(--tb-green); }
+.mk-related-links-grid > .mk-related-links-card:nth-child(2) .mk-related-links-label { color: var(--tb-gold-dark); }
+.mk-related-links-grid > .mk-related-links-card:nth-child(3) .mk-related-links-label { color: var(--tb-iris); }
+
+/* Learn more — one tinted card per audience. */
+#learn .mk-section-heading .mk-label {
+  color: var(--tb-iris);
+}
+
+/* !important: the glassmorphic audit layer forces card backgrounds with
+   !important; these flat tints must out-cascade it in all states. */
+.mk-home-learn-grid > div:nth-child(1) .mk-home-learn-card {
+  background: var(--tb-tint-green) !important;
+  border: 1px solid var(--tb-green-light) !important;
+}
+.mk-home-learn-grid > div:nth-child(2) .mk-home-learn-card {
+  background: var(--tb-tint-gold) !important;
+  border: 1px solid var(--tb-gold-light) !important;
+}
+.mk-home-learn-grid > div:nth-child(3) .mk-home-learn-card {
+  background: var(--tb-tint-iris) !important;
+  border: 1px solid var(--tb-iris-light) !important;
+}
+
+/* Close the page warm instead of repeating cream. */
+.mk-home-final-cta {
+  background: var(--tb-tint-gold);
 }

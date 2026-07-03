@@ -1,8 +1,8 @@
 export const THEME_COLORS = {
-  brandPrimary: '#2191D0',
+  brandPrimary: '#10195A',
   brandSecondary: '#015697',
   brandDarker: '#10195A',
-  info: '#2191D0',
+  info: '#10195A',
   infoLight: '#DDF2FB',
   success: '#1B9E77',
   successStrong: '#15795C',

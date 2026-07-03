@@ -96,7 +96,7 @@ export default function StateDashboardPage() {
           actions={[
             { label: 'Hospitals', icon: Building2, href: '/hospitals' },
             { label: 'MCH Analytics', icon: HeartPulse, href: '/mch-analytics', color: '#EC4899' },
-            { label: 'Surveillance', icon: Activity, href: '/surveillance', color: '#C44536' },
+            { label: 'Surveillance', icon: Activity, href: '/surveillance', color: 'var(--color-danger-500)' },
             { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
           ]}
           secondaryCard={<SpotlightCard title="ANC-1 Coverage" value={`${anc1Rate}%`} caption={`${facilitiesInState.length} facilities in state`} href="/mch-analytics" />}

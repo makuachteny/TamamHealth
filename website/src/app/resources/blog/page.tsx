@@ -20,8 +20,8 @@ export default function BlogPage() {
   const blogPosts = [
     {
       id: 1,
-      title: "From Filing Cabinets to Cloud: A Clinic&apos;s 2-Week Migration Story",
-      excerpt: "One clinic&apos;s journey from paper records to a fully digital system in just 14 days. See how staff adoption, training, and implementation went smoothly—and what they learned along the way.",
+      title: "From Filing Cabinets to Cloud: A Clinic's 2-Week Migration Story",
+      excerpt: "One clinic's journey from paper records to a fully digital system in just 14 days. See how staff adoption, training, and implementation went smoothly—and what they learned along the way.",
       category: "Digital Health",
       date: "March 15, 2025",
       image: "doctor-writing-notes.jpg",
@@ -97,8 +97,8 @@ export default function BlogPage() {
     },
     {
       id: 8,
-      title: "Government Reporting That Doesn&apos;t Slow You Down",
-      excerpt: "Ministry of Health compliance and DHIS2 integration doesn&apos;t have to be a bottleneck. Learn how modern EHRs can automate reporting while staying clinically focused.",
+      title: "Government Reporting That Doesn't Slow You Down",
+      excerpt: "Ministry of Health compliance and DHIS2 integration doesn't have to be a bottleneck. Learn how modern EHRs can automate reporting while staying clinically focused.",
       category: "Policy",
       date: "March 18, 2025",
       image: "doctor-nurse-consultation.jpg",
@@ -108,8 +108,8 @@ export default function BlogPage() {
     },
     {
       id: 9,
-      title: "12,000 Records in 14 Days: Malakal&apos;s Digital Leap",
-      excerpt: "One of South Sudan&apos;s largest clinics migrated over 12,000 paper patient records to a digital system in two weeks. Here&apos;s how the team managed data quality, staff training, and minimal downtime.",
+      title: "12,000 Records in 14 Days: Malakal's Digital Leap",
+      excerpt: "One of South Sudan's largest clinics migrated over 12,000 paper patient records to a digital system in two weeks. Here's how the team managed data quality, staff training, and minimal downtime.",
       category: "Case Studies",
       date: "March 10, 2025",
       image: "community-health-worker.jpg",
@@ -397,7 +397,7 @@ export default function BlogPage() {
                 className="mk-body-lg"
                 style={{
                   marginBottom: 32,
-                  color: "var(--tb-text-sec)",
+                  color: "var(--tb-text-inv-m)",
                 }}
               >
                 Get the latest healthcare insights, EHR best practices, and digital transformation tips delivered to your inbox.

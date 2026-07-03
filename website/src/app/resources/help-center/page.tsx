@@ -99,19 +99,19 @@ export default function HelpCenterPage() {
           <Reveal>
             <div className="mk-stat-row">
               <div className="mk-stat-badge">
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--tb-text-pri)", marginBottom: 4 }}>Phone</div>
-                <strong style={{ color: "var(--tb-blue-700)", fontSize: 18 }}>+1 (973) 566-4336</strong>
-                <span style={{ fontSize: 12, color: "var(--tb-text-sec)", marginTop: 4, display: "block" }}>Mon-Fri, 9am-6pm</span>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--tb-text-inv)", marginBottom: 4 }}>Phone</div>
+                <strong style={{ fontSize: 18 }}>+1 (973) 566-4336</strong>
+                <span style={{ fontSize: 12, marginTop: 4, display: "block" }}>Mon-Fri, 9am-6pm</span>
               </div>
               <div className="mk-stat-badge">
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--tb-text-pri)", marginBottom: 4 }}>Email</div>
-                <strong style={{ color: "var(--tb-blue-700)", fontSize: 16 }}>support.tamam@gmail.com</strong>
-                <span style={{ fontSize: 12, color: "var(--tb-text-sec)", marginTop: 4, display: "block" }}>2-hour response</span>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--tb-text-inv)", marginBottom: 4 }}>Email</div>
+                <strong style={{ fontSize: 16 }}>support.tamam@gmail.com</strong>
+                <span style={{ fontSize: 12, marginTop: 4, display: "block" }}>2-hour response</span>
               </div>
               <div className="mk-stat-badge">
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--tb-text-pri)", marginBottom: 4 }}>In-App Chat</div>
-                <strong style={{ color: "var(--tb-green)", fontSize: 16 }}>24/7 Support</strong>
-                <span style={{ fontSize: 12, color: "var(--tb-text-sec)", marginTop: 4, display: "block" }}>Instant help</span>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--tb-text-inv)", marginBottom: 4 }}>In-App Chat</div>
+                <strong style={{ fontSize: 16 }}>24/7 Support</strong>
+                <span style={{ fontSize: 12, marginTop: 4, display: "block" }}>Instant help</span>
               </div>
             </div>
           </Reveal>

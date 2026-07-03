@@ -24,7 +24,7 @@ import {
 import { formatMoney } from '@/lib/format-utils';
 import type { MessageDoc } from '@/lib/db-types';
 
-const TEAL = '#369FDA';
+const TEAL = 'var(--color-brand-400)';
 const PURPLE = 'var(--accent-primary)';
 const CORAL = '#FB923C';
 

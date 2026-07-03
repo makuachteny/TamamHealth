@@ -136,6 +136,7 @@ export default function EhrClinicalDashboard({
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
   const [locationFilter, setLocationFilter] = useState('all');
   const [providerFilter, setProviderFilter] = useState<string[]>([]);
+  const [worklistSearch, setWorklistSearch] = useState('');
 
   const openPatientRecord = (appointment: AppointmentDoc) => {
     const patientId = appointment.patientId || patients.find(patient => patient.name === appointment.patientName)?._id;
@@ -215,7 +216,12 @@ export default function EhrClinicalDashboard({
     if (appointmentLane === 'in_office') return ['checked_in', 'in_progress'].includes(appointment.status);
     return appointment.status === 'completed';
   });
-  const patientRows = patients.slice(0, 6);
+  const worklistQuery = worklistSearch.trim().toLowerCase();
+  const patientRows = (worklistQuery
+    ? patients.filter(patient => [patient.name, patient.id, patient.ward, patient.division, patient.doctor, patient.nurse]
+        .some(value => value?.toLowerCase().includes(worklistQuery)))
+    : patients
+  ).slice(0, 6);
   const workflowChecklist = [
     { label: 'Patient intake', done: (outstanding.find(item => item.label === 'Patient intake')?.count || 0) === 0, href: '/patient-intake' },
     { label: 'Clinical note', done: (outstanding.find(item => item.label === 'Documents to sign')?.count || 0) === 0, href: '/consultation' },
@@ -463,7 +469,17 @@ export default function EhrClinicalDashboard({
 		              <section className="ehr-worklist-panel">
 		                <div>
 		                  <h3>Assigned patients</h3>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <label className="ehr-care-search ehr-worklist-search">
+                            <Search className="w-4 h-4" />
+                            <input
+                              type="search"
+                              value={worklistSearch}
+                              onChange={event => setWorklistSearch(event.target.value)}
+                              placeholder="Search patient, ID, room, or care team"
+                              aria-label="Search assigned patients"
+                            />
+                          </label>
+                          <div className="ehr-worklist-meta">
                             <AvatarLegend />
                             <span>{patientRows.length} today</span>
                           </div>
@@ -480,8 +496,12 @@ export default function EhrClinicalDashboard({
                     )}
 	                  {patientRows.length === 0 && (
 	                    <div className="ehr-worklist-empty">
-	                      No patients are assigned to you right now.
-                      <button type="button" onClick={() => router.push('/patients')}>Open patient registry</button>
+	                      {worklistQuery ? 'No assigned patients match your search.' : 'No patients are assigned to you right now.'}
+                      {worklistQuery ? (
+                        <button type="button" onClick={() => setWorklistSearch('')}>Clear search</button>
+                      ) : (
+                        <button type="button" onClick={() => router.push('/patients')}>Open patient registry</button>
+                      )}
                     </div>
                   )}
 	                  {patientRows.map(patient => (
