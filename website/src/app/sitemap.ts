@@ -30,7 +30,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/ehr', priority: 0.8, changeFrequency: 'monthly' },
     { path: '/billing', priority: 0.8, changeFrequency: 'monthly' },
     { path: '/telehealth', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/analytics', priority: 0.8, changeFrequency: 'monthly' },
     { path: '/pharmacy-lab', priority: 0.8, changeFrequency: 'monthly' },
     { path: '/patient-experience', priority: 0.7, changeFrequency: 'monthly' },
     { path: '/pricing', priority: 0.9, changeFrequency: 'monthly' },

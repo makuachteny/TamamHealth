@@ -33,7 +33,7 @@ const VitalsTrends = dynamic(() => import('@/components/VitalsTrends'), {
 });
 import PatientTimeline from '@/components/PatientTimeline';
 import { formatDateTime, formatDate } from '@/lib/format-utils';
-import { patientFullName, patientInitials, patientAgeLabel } from '@/lib/patient-utils';
+import { patientFullName, patientInitials, patientAgeLabel, avatarColor } from '@/lib/patient-utils';
 import { usePatientAppointments } from '@/lib/hooks/useAppointments';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useTriage } from '@/lib/hooks/useTriage';
@@ -920,7 +920,6 @@ export default function PatientDetailPage() {
           {/* Patient Header — TamamHealth-style: avatar | name+pills+info-strip | action row */}
           {(() => {
             const initials = patientInitials(patient);
-            const isFemale = patient.gender === 'Female';
             const patientANC = (allANCVisits || []).filter(a => a.patientId === patient._id);
             const activeANC = patientANC.find(a => !a.linkedBirthId);
             const isPregnant = !!activeANC;
@@ -945,9 +944,7 @@ export default function PatientDetailPage() {
                     aria-hidden
                     style={{
                       width: 180, borderRadius: 14,
-                      background: isFemale
-                        ? 'var(--accent-primary)'
-                        : 'var(--accent-primary)',
+                      background: avatarColor(patientFullName(patient)),
                       boxShadow: 'none',
                     }}
                   >

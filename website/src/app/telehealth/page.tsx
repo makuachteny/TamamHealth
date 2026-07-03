@@ -3,6 +3,7 @@ import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
   CheckItem,
+  SplitFeatureBlock,
 } from "@/components/marketing/MarketingShared";
 import {
   FeatureFAQSection,
@@ -139,36 +140,20 @@ export default function TelehealthPage() {
       </section>
 
       {/* ── FEATURE 1: HD Video Consultations ────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-split">
-              <div className="mk-split-content">
-                <h2 className="mk-h2">HD video consultations for every bandwidth</h2>
-                <p className="mk-body">
-                  Crystal-clear 1080p video on good connections, graceful degradation to 240p on 2G/3G networks. Built-in noise cancellation, real-time bitrate optimization, and support for both 1:1 consultations and multi-party group visits.
-                </p>
-                <ul className="mk-check-list">
-                  <CheckItem>Auto noise cancellation and echo reduction</CheckItem>
-                  <CheckItem>Real-time quality optimization on any connection</CheckItem>
-                  <CheckItem>Works reliably on 2G/3G starting at 240p</CheckItem>
-                  <CheckItem>1:1 consultations and multi-party video support</CheckItem>
-                </ul>
-              </div>
-              <div className="mk-split-image">
-                <Image
-                  src="/assets/doctor-tablet-smiling.jpg"
-                  alt="Healthcare provider conducting video consultation with patient"
-                  width={600}
-                  height={400}
-                  style={{ width: "100%", height: "auto" }}
-                  priority
-                />
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <SplitFeatureBlock
+        eyebrow="Video visits"
+        title="HD video consultations for every bandwidth"
+        body="Crystal-clear 1080p video on good connections, graceful degradation to 240p on 2G/3G networks. Built-in noise cancellation, real-time bitrate optimization, and support for both 1:1 consultations and multi-party group visits."
+        checks={[
+          "Auto noise cancellation and echo reduction",
+          "Real-time quality optimization on any connection",
+          "Works reliably on 2G/3G starting at 240p",
+          "1:1 consultations and multi-party video support",
+        ]}
+        image="/assets/doctor-tablet-smiling.jpg"
+        imageAlt="Healthcare provider conducting video consultation with patient"
+        tone="navy"
+      />
 
       {/* ── FEATURE 2: Virtual Waiting Rooms ─────────────────────────────── */}
       <section className="mk-section mk-section-white">
@@ -337,9 +322,8 @@ export default function TelehealthPage() {
 
       <FeatureTestimonialSection
         testimonial={{
-          quote: "Before TamamHealth Telehealth, patients either didn't see specialists or spent weeks traveling and a month's wages getting to Juba. Now we do 30-40 consultations per week across our health posts. The video quality on 3G is excellent, and specialists can review patient images in real-time. We've increased specialist access 4x, and patient outcomes have improved dramatically.",
-          name: "Dr. Amir Hassan",
-          role: "Regional Health Director, Eastern Equatoria State",
+          quote: "TamamHealth is pre-launch, and Telehealth exists because too many patients either never see a specialist or spend a month's wages and a week of travel to reach one in Juba. It's built to bring that consultation to the health post instead — video that holds up on 2G/3G, so distance stops being the reason care doesn't happen.",
+          attribution: "Why we built Telehealth",
         }}
       />
 
@@ -375,19 +359,19 @@ export default function TelehealthPage() {
             title: "EHR Module",
             body: "Telehealth consultations auto-document to patient EHR. Complete specialist recommendations available to local clinician immediately.",
             href: "/ehr",
-            tone: "blue",
+            image: "/assets/doctor-tablet-review.jpg",
           },
           {
             title: "Pharmacy & Lab Module",
             body: "Share lab results and imaging with specialists during video calls. Order prescriptions from consultation recommendations instantly.",
             href: "/pharmacy-lab",
-            tone: "gold",
+            image: "/assets/doctor-nurse-consultation.jpg",
           },
           {
             title: "Patient Experience",
             body: "Patients book appointments, receive reminders, and access consultation notes via secure portal. Multi-language support included.",
             href: "/patient-experience",
-            tone: "green",
+            image: "/assets/doctor-tablet-smiling.jpg",
           },
         ]}
       />

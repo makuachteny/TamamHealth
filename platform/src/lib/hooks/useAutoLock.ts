@@ -22,6 +22,10 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll'] as const;
 
+/** Disables auto-lock entirely — for local development only. Leave unset in
+ *  production; this is a security feature for shared clinical devices. */
+const AUTO_LOCK_DISABLED = process.env.NEXT_PUBLIC_AUTO_LOCK_DISABLED === 'true';
+
 /** Fired when the lock PIN is set/cleared so a mounted useAutoLock can update
  *  its `hasPin` state immediately (otherwise it'd be stale until remount). */
 export const PIN_CHANGED_EVENT = 'tamamhealth:pin-changed';
@@ -114,7 +118,7 @@ export function useAutoLock(isAuthenticated: boolean, orgLockTimeoutMinutes?: nu
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || AUTO_LOCK_DISABLED) return;
 
     timerRef.current = setTimeout(() => {
       setIsLocked(true);
@@ -122,6 +126,7 @@ export function useAutoLock(isAuthenticated: boolean, orgLockTimeoutMinutes?: nu
   }, [isAuthenticated, getTimeout]);
 
   const lock = useCallback(() => {
+    if (AUTO_LOCK_DISABLED) return;
     setIsLocked(true);
     if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
@@ -160,7 +165,7 @@ export function useAutoLock(isAuthenticated: boolean, orgLockTimeoutMinutes?: nu
 
   // Activity listeners + visibility change
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || AUTO_LOCK_DISABLED) {
       setIsLocked(false);
       return;
     }

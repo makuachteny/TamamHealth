@@ -100,6 +100,7 @@ export function SplitFeatureBlock({
   eyebrow,
   title,
   body,
+  checks,
   href,
   linkLabel = "Learn more",
   image,
@@ -110,6 +111,7 @@ export function SplitFeatureBlock({
   eyebrow: string;
   title: string;
   body: string;
+  checks?: string[];
   href?: string;
   linkLabel?: string;
   image: string;
@@ -123,6 +125,13 @@ export function SplitFeatureBlock({
         <p className="mk-label mk-feature-split-eyebrow">{eyebrow}</p>
         <h2 className="mk-h2 mk-feature-split-title">{title}</h2>
         <p className="mk-feature-split-body">{body}</p>
+        {checks && (
+          <ul className="mk-check-list mk-feature-split-checks">
+            {checks.map((item) => (
+              <CheckItem key={item}>{item}</CheckItem>
+            ))}
+          </ul>
+        )}
         {href && (
           <Link href={href} className="mk-feature-split-link">
             {linkLabel} <span aria-hidden="true">→</span>
@@ -137,34 +146,47 @@ export function SplitFeatureBlock({
 }
 
 /* ── Related Links Grid ───────────────────────────────────────
-   Three photo cards in a row, each linking to a related page —
-   used to hand a reader somewhere else once a section's single
-   idea has landed.
+   Photo cards in a row, Merck "Explore our stories" style. Pass
+   `href` on an item to make it a link to another page; omit it to
+   render a plain, non-navigating info card (e.g. an in-page product
+   summary that doesn't send the reader anywhere else).
 */
 export function RelatedLinksGrid({
   heading,
   items,
 }: {
   heading?: string;
-  items: { label: string; title: string; body?: string; href: string; image: string }[];
+  items: { label: string; title: string; body?: string; href?: string; image: string }[];
 }) {
   return (
     <section className="mk-related-links">
       <div className="mk-container">
         {heading && <h3 className="mk-related-links-heading">{heading}</h3>}
         <div className="mk-related-links-grid">
-          {items.map((item) => (
-            <Link key={item.href} href={item.href} className="mk-related-links-card">
-              <div className="mk-related-links-image">
-                <Image src={item.image} alt="" fill sizes="(max-width: 900px) 100vw, 33vw" style={{ objectFit: "cover" }} />
+          {items.map((item) => {
+            const content = (
+              <>
+                <div className="mk-related-links-image">
+                  <Image src={item.image} alt="" fill sizes="(max-width: 900px) 100vw, 33vw" style={{ objectFit: "cover" }} />
+                </div>
+                <span className="mk-related-links-label">{item.label}</span>
+                <span className="mk-related-links-title">
+                  {item.title} {item.href && <span aria-hidden="true">→</span>}
+                </span>
+                {item.body && <p className="mk-related-links-body">{item.body}</p>}
+              </>
+            );
+
+            return item.href ? (
+              <Link key={item.title} href={item.href} className="mk-related-links-card">
+                {content}
+              </Link>
+            ) : (
+              <div key={item.title} className="mk-related-links-card mk-related-links-card--static">
+                {content}
               </div>
-              <span className="mk-related-links-label">{item.label}</span>
-              <span className="mk-related-links-title">
-                {item.title} <span aria-hidden="true">→</span>
-              </span>
-              {item.body && <p className="mk-related-links-body">{item.body}</p>}
-            </Link>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

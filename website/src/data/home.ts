@@ -29,39 +29,8 @@ export const HOME_AUDIENCES = [
   {
     title: "Ministries & partners",
     body: "Get facility-level reporting that's ready for national systems from day one — not months into a rollout.",
-    href: "/installation",
+    href: "/about/contact",
     image: "/assets/community-health-worker.jpg",
-  },
-] as const;
-
-export const HOME_PRINCIPLES = [
-  {
-    number: "01",
-    title: "One record across every visit",
-    body: "Registration, triage, consultation, lab, pharmacy, referral, billing, and reporting stay connected to the same patient story.",
-    href: "/ehr",
-    icon: "record",
-  },
-  {
-    number: "02",
-    title: "Care that keeps working offline",
-    body: "Clinics keep working through unreliable internet, power interruptions, and paper-heavy workflows, then sync safely when connection returns.",
-    href: "/products",
-    icon: "offline",
-  },
-  {
-    number: "03",
-    title: "Accountable Data",
-    body: "Facility and country layers protect sensitive health records while making encounter-level reporting easier to trust.",
-    href: "/resources/api-docs",
-    icon: "shield",
-  },
-  {
-    number: "04",
-    title: "Facility data to national insight",
-    body: "Clean clinical records become facility dashboards, surveillance signals, DHIS2-ready reports, and better national health planning.",
-    href: "/products",
-    icon: "network",
   },
 ] as const;
 

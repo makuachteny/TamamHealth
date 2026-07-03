@@ -116,7 +116,7 @@ export default function CaseStudiesIndex() {
                         />
                         <div style={{
                           position: "absolute", inset: 0,
-                          background: `linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.5) 100%)`,
+                          background: "transparent",
                         }} />
                       </div>
 

@@ -3,6 +3,7 @@ import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
   CheckItem,
+  SplitFeatureBlock,
 } from "@/components/marketing/MarketingShared";
 import {
   FeatureFAQSection,
@@ -144,36 +145,20 @@ export default function BillingPage() {
       <div className="mk-divider"></div>
 
       {/* ── FEATURE 1: Claims Scrubbing & Automation ─────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-split">
-              <div className="mk-split-content">
-                <h2 className="mk-h2">Claims scrubbing & automation</h2>
-                <p className="mk-body">
-                  Pre-submission validation catches errors before they reach insurers. Our AI flags diagnosis-code mismatches, procedure-code conflicts, missing modifiers, and invalid combinations — reducing denials from 12% to under 5%.
-                </p>
-                <ul className="mk-check-list">
-                  <CheckItem>AI-powered diagnosis and procedure code validation</CheckItem>
-                  <CheckItem>Automatic modifier suggestion and error flagging</CheckItem>
-                  <CheckItem>Pre-submission compliance checking</CheckItem>
-                  <CheckItem>Reduces claim denials from 12% to under 5%</CheckItem>
-                </ul>
-              </div>
-              <div className="mk-split-image">
-                <Image
-                  src="/assets/doctor-nurse-consultation.jpg"
-                  alt="Healthcare team reviewing claims dashboard"
-                  width={600}
-                  height={400}
-                  style={{ width: "100%", height: "auto" }}
-                  priority
-                />
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <SplitFeatureBlock
+        eyebrow="Claims"
+        title="Claims scrubbing & automation"
+        body="Pre-submission validation catches errors before they reach insurers. Our AI flags diagnosis-code mismatches, procedure-code conflicts, missing modifiers, and invalid combinations — reducing denials from 12% to under 5%."
+        checks={[
+          "AI-powered diagnosis and procedure code validation",
+          "Automatic modifier suggestion and error flagging",
+          "Pre-submission compliance checking",
+          "Reduces claim denials from 12% to under 5%",
+        ]}
+        image="/assets/doctor-nurse-consultation.jpg"
+        imageAlt="Healthcare team reviewing claims dashboard"
+        tone="navy"
+      />
 
       <div className="mk-divider"></div>
 
@@ -351,9 +336,8 @@ export default function BillingPage() {
 
       <FeatureTestimonialSection
         testimonial={{
-          quote: "Before TamamHealth, we spent 3 days a month manually reconciling M-Pesa payments against patient bills. Now it's automatic. We've cut claim denials from 14% to 3%, collections went up 38%, and our Days Sales Outstanding dropped from 35 days to 12 days. The system basically paid for itself in the first month.",
-          name: "Sarah Malik",
-          role: "Finance Director, Kampala Medical Clinic",
+          quote: "TamamHealth is pre-launch, and Billing & Payments exists because we kept hearing the same story: finance teams losing days every month reconciling mobile money payments against patient bills by hand. It's built so that reconciliation happens automatically, and a facility can see its true collection position without a spreadsheet.",
+          attribution: "Why we built Billing & Payments",
         }}
       />
 
@@ -389,13 +373,13 @@ export default function BillingPage() {
             title: "EHR Module",
             body: "Accurate clinical coding starts with complete documentation. TamamHealth EHR feeds clean data to billing and reduces denials.",
             href: "/ehr",
-            tone: "blue",
+            image: "/assets/doctor-tablet-review.jpg",
           },
           {
             title: "Patient Experience",
             body: "Patient portal and automated billing reminders increase collection rates. Patients pay faster when given easy options.",
             href: "/patient-experience",
-            tone: "gold",
+            image: "/assets/doctor-tablet-smiling.jpg",
           },
         ]}
       />

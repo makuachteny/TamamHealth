@@ -3,6 +3,7 @@ import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
   CheckItem,
+  SplitFeatureBlock,
 } from "@/components/marketing/MarketingShared";
 import {
   FeatureFAQSection,
@@ -139,36 +140,20 @@ export default function PatientExperiencePage() {
       </section>
 
       {/* ── FEATURE 1: 24/7 Online Scheduling ────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-split">
-              <div className="mk-split-content">
-                <h2 className="mk-h2">24/7 online scheduling</h2>
-                <p className="mk-body">
-                  Let patients book appointments anytime via web, mobile app, or SMS. Your calendar syncs in real-time with provider schedules, while configurable reminder rules reduce no-shows and keep your day running smoothly.
-                </p>
-                <ul className="mk-check-list">
-                  <CheckItem>Web, mobile, and SMS booking options</CheckItem>
-                  <CheckItem>Real-time calendar synchronization</CheckItem>
-                  <CheckItem>Configurable reminder rules</CheckItem>
-                  <CheckItem>No-show reduction and rescheduling</CheckItem>
-                </ul>
-              </div>
-              <div className="mk-split-image">
-                <Image
-                  src="/assets/doctor-tablet-smiling.jpg"
-                  alt="Doctor using patient scheduling on tablet"
-                  width={600}
-                  height={400}
-                  style={{ width: "100%", height: "auto" }}
-                  priority
-                />
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <SplitFeatureBlock
+        eyebrow="Scheduling"
+        title="24/7 online scheduling"
+        body="Let patients book appointments anytime via web, mobile app, or SMS. Your calendar syncs in real-time with provider schedules, while configurable reminder rules reduce no-shows and keep your day running smoothly."
+        checks={[
+          "Web, mobile, and SMS booking options",
+          "Real-time calendar synchronization",
+          "Configurable reminder rules",
+          "No-show reduction and rescheduling",
+        ]}
+        image="/assets/doctor-tablet-smiling.jpg"
+        imageAlt="Doctor using patient scheduling on tablet"
+        tone="navy"
+      />
 
       {/* ── FEATURE 2: Digital Intake & E-Signatures ────────────────── */}
       <section className="mk-section mk-section-white">
@@ -337,9 +322,8 @@ export default function PatientExperiencePage() {
 
       <FeatureTestimonialSection
         testimonial={{
-          quote: "TamamHealth changed our clinic from chaotic to smooth. Patients book via SMS without calling. Our receptionist used to spend 6 hours a day entering forms; now it takes 30 minutes. No-shows dropped 38%. Patients love checking their results on the portal instead of calling us. Our team is happier because they're doing healthcare work, not paperwork. It's the best investment we made.",
-          name: "Dr. Amira Hassan",
-          role: "Chief of Patient Services, Kosti Health Clinic",
+          quote: "TamamHealth is pre-launch, and Patient Experience exists because we kept seeing the same bottleneck: a receptionist spending hours a day re-entering forms by hand while patients wait on hold just to book a visit. It's built so booking, reminders, and results happen without a phone call — freeing staff to do healthcare work, not paperwork.",
+          attribution: "Why we built Patient Experience",
         }}
       />
 
@@ -375,19 +359,19 @@ export default function PatientExperiencePage() {
             title: "EHR Module",
             body: "Patient portal integrates with EHR. Patients see visit notes, medications, and test results. Providers document faster without paper.",
             href: "/ehr",
-            tone: "blue",
+            image: "/assets/doctor-tablet-review.jpg",
           },
           {
             title: "Billing & Payments",
             body: "Patient portal shows bills and payment history. Automated reminders reduce collection follow-up. Patients pay via M-Pesa.",
             href: "/billing",
-            tone: "gold",
+            image: "/assets/doctor-writing-notes.jpg",
           },
           {
             title: "Telehealth Module",
             body: "Patients book telehealth appointments from patient portal. Reminders sent via SMS. Consultation notes appear in portal after visit.",
             href: "/telehealth",
-            tone: "green",
+            image: "/assets/african-nurse.jpg",
           },
         ]}
       />

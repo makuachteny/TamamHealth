@@ -228,7 +228,7 @@ export default function EhrTopRail() {
           />
         )}
 
-        <EhrTopActions items={quickActionItems.slice(0, 4)} navLabel={navLabel} onOpenModule={openModule} />
+        <EhrTopActions items={quickActionItems.slice(0, 6)} navLabel={navLabel} onOpenModule={openModule} />
       </nav>
 
       {hospitalName ? (
@@ -314,7 +314,6 @@ export default function EhrTopRail() {
             <UserPlus className="w-4 h-4" />
           </button>
         )}
-        <EhrTopActions items={quickActionItems.slice(4, 6)} navLabel={navLabel} onOpenModule={openModule} />
         <QuickActions />
         <button
           type="button"

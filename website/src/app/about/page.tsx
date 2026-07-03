@@ -2,8 +2,7 @@
 
 import Image from "next/image";
 import { MarketingHero } from "@/components/marketing/MarketingHero";
-import { Reveal } from "@/components/marketing/MarketingShared";
-import { CloudOff, Heart, Lightbulb, Code2 } from "@/components/marketing/icons";
+import { Reveal, RelatedLinksGrid, SplitFeatureBlock } from "@/components/marketing/MarketingShared";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth About — Our Story
@@ -25,60 +24,26 @@ export default function AboutPage() {
       />
 
       {/* ── THE ORIGIN STORY ────────────────────────────────────────── */}
-      <section className="mk-section mk-section-cream">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-split" style={{ gap: 48, alignItems: "center" }}>
-              <div className="mk-split-content" style={{ flex: "1 1 55%" }}>
-                <h2 className="mk-h2">Where it all started</h2>
-                <p className="mk-body" style={{ marginTop: 20, lineHeight: 1.7 }}>
-                  In Kakuma Refugee Camp, Kenya, healthcare meant handwritten notes on scraps of paper, filing cabinets that couldn&apos;t survive the rainy season, and patients whose medical histories vanished between visits. Teny Makuach grew up watching this and started TamamHealth so health workers would not have to rely on systems that forget patients.
-                </p>
-                <p className="mk-body" style={{ marginTop: 16, lineHeight: 1.7 }}>
-                  At Tufts University, that beginning became a shared team mission. We are building TamamHealth together across product, engineering, research, partnerships, and implementation so clinics, hospitals, communities, and governments can keep every patient story connected.
-                </p>
-              </div>
-              <div style={{ flex: "1 1 40%" }}>
-                <div className="mk-split-image" style={{ borderRadius: 14, overflow: "hidden", aspectRatio: "4 / 3", position: "relative" }}>
-                  <Image
-                    src="/assets/village-community.jpg"
-                    alt="Village community in East Africa"
-                    fill
-                    style={{ objectFit: "cover" }}
-                  />
-                </div>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <SplitFeatureBlock
+        eyebrow="Where it all started"
+        title="Built from scraps of paper in Kakuma Refugee Camp"
+        body="In Kakuma Refugee Camp, Kenya, healthcare meant handwritten notes on scraps of paper, filing cabinets that couldn't survive the rainy season, and patients whose medical histories vanished between visits. Teny Makuach grew up watching this and started TamamHealth so health workers would not have to rely on systems that forget patients. At Tufts University, that beginning became a shared team mission across product, engineering, research, partnerships, and implementation."
+        image="/assets/village-community.jpg"
+        imageAlt="Village community in East Africa"
+        tone="navy"
+        imageSide="right"
+      />
 
       {/* ── TUFTS NEW VENTURES WIN ──────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-split" style={{ gap: 48, alignItems: "center" }}>
-              <div style={{ flex: "1 1 45%" }}>
-                <div className="mk-split-image" style={{ borderRadius: 14, overflow: "hidden", aspectRatio: "4 / 3", position: "relative" }}>
-                  <Image
-                    src="/assets/team-tufts-win.jpg"
-                    alt="TamamHealth team winning $10,000 at Tufts New Ventures Competition 2026"
-                    fill
-                    style={{ objectFit: "cover" }}
-                  />
-                </div>
-              </div>
-              <div className="mk-split-content" style={{ flex: "1 1 50%" }}>
-                <p className="mk-label" style={{ color: "var(--tb-gold-dark)" }}>APRIL 2026</p>
-                <h2 className="mk-h2" style={{ marginTop: 8 }}>$10,000 Healthcare Track Winner</h2>
-                <p className="mk-body" style={{ marginTop: 16, lineHeight: 1.7, color: "var(--tb-text-sec)" }}>
-                  Selected from over 300 startups, TamamHealth won the Healthcare Track at the Tufts $100K New Ventures Competition — validation from one of the nation&apos;s most respected university venture programs.
-                </p>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <SplitFeatureBlock
+        eyebrow="April 2026"
+        title="$10,000 Healthcare Track winner"
+        body="Selected from over 300 startups, TamamHealth won the Healthcare Track at the Tufts $100K New Ventures Competition — validation from one of the nation's most respected university venture programs."
+        image="/assets/team-tufts-win.jpg"
+        imageAlt="TamamHealth team winning $10,000 at Tufts New Ventures Competition 2026"
+        tone="cream"
+        imageSide="left"
+      />
 
       {/* ── MEET THE TEAM ───────────────────────────────────────── */}
       <section className="mk-section mk-section-white">
@@ -135,52 +100,6 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── VALUES SECTION ──────────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 72 }}>What we believe</h2>
-            <div className="mk-about-values-grid">
-              <ValueCard
-                title="Offline-first, always"
-                description="Across much of Africa, internet isn't guaranteed — it's a luxury. TamamHealth works without connectivity and syncs seamlessly when networks return. Healthcare can't wait for a signal bar."
-                icon={<CloudOff size={34} strokeWidth={1.65} />}
-              />
-              <ValueCard
-                title="Shared mission"
-                description="TamamHealth started from lived experience, and the work now belongs to a team committed to building with the people and health systems the platform is meant to serve."
-                icon={<Heart size={34} strokeWidth={1.65} />}
-              />
-              <ValueCard
-                title="Radical simplicity"
-                description="Healthcare workers across Africa are brilliant and overstretched. Every feature we ship must be learnable in minutes — not months. If it's confusing, we haven't finished designing it."
-                icon={<Lightbulb size={34} strokeWidth={1.65} />}
-              />
-              <ValueCard
-                title="Open standards"
-                description="TamamHealth integrates with DHIS2, supports HL7/FHIR, and works with national and regional health information systems across Africa. We don&apos;t build data silos — we break them."
-                icon={<Code2 size={34} strokeWidth={1.65} />}
-              />
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── IMPACT STATS ────────────────────────────────────────────── */}
-      <section className="mk-section mk-section-teal" style={{ borderTop: "4px solid var(--tb-gold)" }}>
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 80, color: "white" }}>Built for the real world</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 40, maxWidth: 1000, margin: "0 auto" }}>
-              <ImpactCard number="Six" label="Integrated modules (EHR, billing, telehealth, pharmacy, lab, analytics)" highlight />
-              <ImpactCard number="100%" label="Offline capability — Works without internet, syncs when connected" />
-              <ImpactCard number="$10K" label="Competition winner — Tufts $100K New Ventures Healthcare Track" highlight />
-              <ImpactCard number="6" label="Team members across product, engineering, research, partnerships, and implementation" />
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
       {/* ── TIMELINE ────────────────────────────────────────────────── */}
       <section className="mk-section mk-section-white">
         <div className="mk-container">
@@ -212,6 +131,33 @@ export default function AboutPage() {
         </div>
       </section>
 
+      <RelatedLinksGrid
+        heading="Where to go next"
+        items={[
+          {
+            label: "Platform",
+            title: "Explore the products",
+            body: "See how registration, triage, pharmacy, lab, billing, and telehealth connect into one record.",
+            href: "/products",
+            image: "/assets/doctor-tablet-review.jpg",
+          },
+          {
+            label: "Pricing",
+            title: "Pricing shaped around your facility",
+            body: "Book a walkthrough and we'll scope the right modules, rollout path, and commercial terms.",
+            href: "/pricing",
+            image: "/assets/doctor-nurse-consultation.jpg",
+          },
+          {
+            label: "Get involved",
+            title: "Talk to our team",
+            body: "Become a pilot partner or ask us anything about bringing TamamHealth to your facility.",
+            href: "/about/contact",
+            image: "/assets/team-derby-center.jpg",
+          },
+        ]}
+      />
+
     </>
   );
 }
@@ -242,18 +188,6 @@ function FounderCard({ name, role, image, initials }: { name: string; role: stri
   );
 }
 
-function ValueCard({ title, description, icon }: { title: string; description: string; icon: React.ReactNode }) {
-  return (
-    <div className="mk-value-card">
-      <div className="mk-value-card-icon">
-        {icon}
-      </div>
-      <h3 className="mk-h3" style={{ fontSize: "1.15rem", marginTop: 20, marginBottom: 8, fontWeight: 700 }}><strong>{title}</strong></h3>
-      <p className="mk-body" style={{ color: "var(--tb-text-sec)", margin: 0, fontSize: 15 }}>{description}</p>
-    </div>
-  );
-}
-
 function TimelineItem({ year, title, description }: { year: string; title: string; description: string }) {
   return (
     <div className="mk-timeline-item">
@@ -261,20 +195,6 @@ function TimelineItem({ year, title, description }: { year: string; title: strin
       <span className="mk-timeline-year">{year}</span>
       <h4 className="mk-h4" style={{ fontSize: "1.15rem" }}>{title}</h4>
       <p className="mk-body" style={{ color: "var(--tb-text-sec)", marginTop: 8 }}>{description}</p>
-    </div>
-  );
-}
-
-function ImpactCard({ number, label, highlight = false }: { number: string; label: string; highlight?: boolean }) {
-  const className = highlight ? "mk-stat-card mk-stat-card--highlight" : "mk-stat-card";
-  return (
-    <div className={className}>
-      <div style={{ fontSize: "2.5rem", fontFamily: "var(--tb-serif)", fontWeight: 700, marginBottom: 12 }}>
-        <strong>{number}</strong>
-      </div>
-      <p style={{ fontSize: 15, margin: 0, lineHeight: 1.5, fontWeight: 500 }}>
-        {label}
-      </p>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
   CheckItem,
+  SplitFeatureBlock,
 } from "@/components/marketing/MarketingShared";
 import {
   FeatureFAQSection,
@@ -138,36 +139,20 @@ export default function PharmacyLabPage() {
       </section>
 
       {/* ── FEATURE 1: E-Prescribing with Drug Interaction Checking ──── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-split">
-              <div className="mk-split-content">
-                <h2 className="mk-h2">E-Prescribing with drug interaction checking</h2>
-                <p className="mk-body">
-                  Prescribe electronically with real-time drug interaction checking against your patient&apos;s full medication list. TamamHealth automatically checks for contraindications, allergy conflicts, and controlled substance protocols to reduce medication errors by 48%.
-                </p>
-                <ul className="mk-check-list">
-                  <CheckItem>Real-time drug interaction alerts against full med list</CheckItem>
-                  <CheckItem>Alternative medication suggestions for conflicts</CheckItem>
-                  <CheckItem>Controlled substance workflow and audit trail</CheckItem>
-                  <CheckItem>Dose validation and frequency checking</CheckItem>
-                </ul>
-              </div>
-              <div className="mk-split-image">
-                <Image
-                  src="/assets/doctor-prescription.jpg"
-                  alt="Doctor writing electronic prescription"
-                  width={600}
-                  height={400}
-                  style={{ width: "100%", height: "auto" }}
-                  priority
-                />
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <SplitFeatureBlock
+        eyebrow="E-Prescribing"
+        title="E-Prescribing with drug interaction checking"
+        body="Prescribe electronically with real-time drug interaction checking against your patient's full medication list. TamamHealth automatically checks for contraindications, allergy conflicts, and controlled substance protocols to reduce medication errors by 48%."
+        checks={[
+          "Real-time drug interaction alerts against full med list",
+          "Alternative medication suggestions for conflicts",
+          "Controlled substance workflow and audit trail",
+          "Dose validation and frequency checking",
+        ]}
+        image="/assets/doctor-prescription.jpg"
+        imageAlt="Doctor writing electronic prescription"
+        tone="navy"
+      />
 
       {/* ── FEATURE 2: Integrated Formulary & Drug Database ────────────── */}
       <section className="mk-section mk-section-white">
@@ -336,9 +321,8 @@ export default function PharmacyLabPage() {
 
       <FeatureTestimonialSection
         testimonial={{
-          quote: "Before TamamHealth, we had no way to catch medication errors until after patients took the wrong drugs. Now we're stopping dangerous interactions before prescriptions leave the clinic. Lab results come back in 24 hours instead of 2 weeks, and we don't lose orders anymore. Our pharmacy team is seeing fewer patient harms and our confidence is way up.",
-          name: "Sister Maria Lucia",
-          role: "Pharmacy Director, Bentiu Health Centre",
+          quote: "TamamHealth is pre-launch, and Pharmacy & Lab exists because too many facilities have no way to catch a dangerous drug interaction until after a patient has already taken the wrong medication. It's built to stop that before a prescription leaves the clinic, and to turn a two-week wait for lab results into hours, not days.",
+          attribution: "Why we built Pharmacy & Lab",
         }}
       />
 
@@ -374,13 +358,13 @@ export default function PharmacyLabPage() {
             title: "EHR Module",
             body: "Pharmacy & Lab integrates seamlessly with TamamHealth EHR. E-prescriptions appear in patient charts. Lab orders route from clinical notes. Results auto-populate.",
             href: "/ehr",
-            tone: "blue",
+            image: "/assets/doctor-tablet-review.jpg",
           },
           {
             title: "Billing & Payments",
             body: "Lab test orders and pharmacy charges automatically flow to billing. No more manual invoice creation. Clean claims and faster reimbursement.",
             href: "/billing",
-            tone: "gold",
+            image: "/assets/doctor-writing-notes.jpg",
           },
         ]}
       />

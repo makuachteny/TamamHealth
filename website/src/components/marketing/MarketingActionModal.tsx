@@ -145,6 +145,17 @@ export function MarketingActionModalButton({
     }
   };
 
+  // "Book a Demo" is a navigation, not a popup: it routes to the pricing
+  // page, where booking a walkthrough and learning about pricing live
+  // together. Other intents (pricing/contact) keep the inline modal.
+  if (intent === "demo") {
+    return (
+      <Link href="/pricing" className={className} data-source={source}>
+        {children}
+      </Link>
+    );
+  }
+
   return (
     <>
       <button type="button" className={className} onClick={handleOpen}>

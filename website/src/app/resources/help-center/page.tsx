@@ -253,7 +253,7 @@ export default function HelpCenterPage() {
               margin: "0 auto",
               textAlign: "center",
               padding: "48px 32px",
-              background: "linear-gradient(135deg, var(--tb-blue-50) 0%, var(--tb-cream-50) 100%)",
+              background: "var(--tb-blue-50)",
               borderRadius: 12,
               border: "1px solid var(--tb-cream-300)",
             }}>

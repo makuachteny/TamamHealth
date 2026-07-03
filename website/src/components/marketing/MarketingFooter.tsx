@@ -64,7 +64,6 @@ const FOOTER_GROUPS = [
     heading: "Company",
     links: [
       { label: "Our Story", body: "Why we're building for South Sudan first.", href: "/about" },
-      { label: "Installation", body: "How a facility goes from paper to TamamHealth.", href: "/installation" },
       { label: "Pricing", body: "Straightforward packages for facilities of every size.", href: "/pricing#packages" },
       { label: "Case Studies", body: "Scenarios showing what changes when a facility goes digital.", href: "/case-studies" },
     ],

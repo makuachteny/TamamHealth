@@ -9,7 +9,7 @@ import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
 import type { AppointmentDoc, EncounterDoc } from '@/lib/db-types';
 import { formatCompactDateTime, formatMoney } from '@/lib/format-utils';
-import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel, initials } from '@/lib/patient-utils';
+import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel, initials, avatarColor } from '@/lib/patient-utils';
 import { priorityColor } from '@/lib/clinical/triage-display';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import Modal from '@/components/Modal';
@@ -885,7 +885,7 @@ export default function FrontDeskDashboardPage() {
                 {recentPatients.map(patient => (
                   <button key={patient._id} type="button" className="ehr-worklist-row" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr)', minWidth: 0 }} onClick={() => router.push(`/patients/${patient._id}`)}>
                     <span className="ehr-worklist-name">
-                      <span className="ehr-patient-icon ehr-patient-icon--sm">{initials(patientFullName(patient))}</span>
+                      <span className="ehr-patient-icon ehr-patient-icon--sm" style={{ background: avatarColor(patientFullName(patient)), color: '#fff' }}>{initials(patientFullName(patient))}</span>
                       <span>
                         <strong>{patientFullName(patient)}</strong>
                         <small>{patient.hospitalNumber || 'No hospital number'} · {patientGenderAge(patient)}</small>

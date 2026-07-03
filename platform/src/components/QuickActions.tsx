@@ -7,7 +7,7 @@
  * rather than declaring their own circular/bordered look.
  */
 import { useState, useRef, useEffect } from 'react';
-import { Megaphone, Bell, Calendar } from '@/components/icons/lucide';
+import { Megaphone, Bell, ClipboardCheck } from '@/components/icons/lucide';
 import AnnouncementsPanel from '@/components/AnnouncementsPanel';
 import NotificationsPanel from '@/components/NotificationsPanel';
 import TasksPanel from '@/components/TasksPanel';
@@ -43,9 +43,9 @@ export default function QuickActions() {
         title="My tasks"
         className="relative"
       >
-        <Calendar className="w-5 h-5" />
+        <ClipboardCheck className="w-5 h-5" />
         {openTasks.length > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: 'var(--accent-primary)' }}>
+          <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-[3px] rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: 'var(--accent-primary)', boxShadow: '0 0 0 1.5px var(--bg-card)' }}>
             {openTasks.length > 99 ? '99+' : openTasks.length}
           </span>
         )}
@@ -62,8 +62,8 @@ export default function QuickActions() {
       >
         <Bell className="w-5 h-5" />
         {notifCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#E05A3A' }}>
-            {notifCount > 99 ? '99+' : `${notifCount}+`}
+          <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-[3px] rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: '#E05A3A', boxShadow: '0 0 0 1.5px var(--bg-card)' }}>
+            {notifCount > 99 ? '99+' : notifCount}
           </span>
         )}
       </button>

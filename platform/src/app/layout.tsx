@@ -1,6 +1,21 @@
 import type { Metadata, Viewport } from "next";
+import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/lib/context";
+
+// Platform typeface. `--font-dm-sans` / `--font-jetbrains-mono` are consumed by
+// `--font-platform` / `--font-platform-mono` in globals.css. Self-hosted by
+// next/font at build time, so they work offline (offline-first requirement).
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  display: "swap",
+});
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 import { ToastProvider } from "@/components/Toast";
 import TextareaAutoResize from "@/components/TextareaAutoResize";
 import BootIntegrityGuard from "@/components/BootIntegrityGuard";
@@ -37,7 +52,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning>
+    <html lang="en" data-theme="light" className={`${dmSans.variable} ${jetBrainsMono.variable}`} suppressHydrationWarning>
       <head>
         <link rel="icon" type="image/svg+xml" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />
         <link rel="apple-touch-icon" sizes="192x192" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />

@@ -3,6 +3,7 @@ import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
   CheckItem,
+  SplitFeatureBlock,
 } from "@/components/marketing/MarketingShared";
 import {
   FeatureFAQSection,
@@ -155,36 +156,20 @@ export default function EHRPage() {
       <div className="mk-divider"></div>
 
       {/* ── FEATURE 1: Flexible Charting ────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <div className="mk-split">
-              <div className="mk-split-content">
-                <h2 className="mk-h2" style={{ fontWeight: 700 }}><strong>Flexible charting for every specialty</strong></h2>
-                <p className="mk-body">
-                  <strong>Build and customize clinical templates</strong> for every specialty. SOAP notes, progress notes, and procedure documentation — <strong>all configurable to your healthcare standards</strong> with intelligent autocomplete.
-                </p>
-                <ul className="mk-check-list">
-                  <CheckItem>Customizable SOAP note templates</CheckItem>
-                  <CheckItem>Clinical decision support alerts</CheckItem>
-                  <CheckItem>Voice-to-text documentation</CheckItem>
-                  <CheckItem>Smart autofill and shortcuts</CheckItem>
-                </ul>
-              </div>
-              <div className="mk-split-image">
-                <Image
-                  src="/assets/doctor-tablet-review.jpg"
-                  alt="Doctor reviewing patient records on tablet with TamamHealth EHR"
-                  width={600}
-                  height={400}
-                  style={{ width: "100%", height: "auto" }}
-                  priority
-                />
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <SplitFeatureBlock
+        eyebrow="Charting"
+        title="Flexible charting for every specialty"
+        body="Build and customize clinical templates for every specialty. SOAP notes, progress notes, and procedure documentation — all configurable to your healthcare standards with intelligent autocomplete."
+        checks={[
+          "Customizable SOAP note templates",
+          "Clinical decision support alerts",
+          "Voice-to-text documentation",
+          "Smart autofill and shortcuts",
+        ]}
+        image="/assets/doctor-tablet-review.jpg"
+        imageAlt="Doctor reviewing patient records on tablet with TamamHealth EHR"
+        tone="navy"
+      />
 
       {/* ── DIVIDER ─────────────────────────────────────────────────── */}
       <div className="mk-divider"></div>
@@ -382,9 +367,8 @@ export default function EHRPage() {
 
       <FeatureTestimonialSection
         testimonial={{
-          quote: "We went from four filing cabinets of paper records to a fully digital clinic in 12 days. The offline capability was the deciding factor - our electricity cuts out three to four times a day, and TamamHealth never skips a beat. Our clinicians document faster, our lab results come back same-day, and we finally have data we can trust for DHIS2 reporting.",
-          name: "Dr. Sarah Achol",
-          role: "Medical Director, Juba Teaching Hospital",
+          quote: "TamamHealth is pre-launch, and EHR is built for exactly the conditions we saw firsthand: filing cabinets that can't survive a rainy season, electricity that cuts out three or four times a day, and clinicians who lose time re-writing charts instead of seeing patients. Offline-first charting and same-day lab results aren't aspirational features here — they're the baseline a facility like that needs on day one.",
+          attribution: "Why we built TamamHealth EHR",
           variant: "cream",
         }}
       />
@@ -424,13 +408,13 @@ export default function EHRPage() {
             title: "Pharmacy & Lab Module",
             body: "Integrated e-prescribing, drug interaction checking, and lab ordering that connects directly to your clinical workflow. Manage inventory, track prescription fulfillment, and coordinate with partner pharmacies - all from one dashboard.",
             href: "/pharmacy-lab",
-            tone: "gold",
+            image: "/assets/doctor-nurse-consultation.jpg",
           },
           {
             title: "Telehealth Module",
             body: "Bring specialist expertise to remote clinics with video optimized for low bandwidth connectivity.",
             href: "/telehealth",
-            tone: "blue",
+            image: "/assets/african-nurse.jpg",
           },
         ]}
       />

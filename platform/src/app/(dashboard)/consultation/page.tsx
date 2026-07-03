@@ -39,7 +39,7 @@ import { useApp } from '@/lib/context';
 import { isProviderRole, isClinicalAuthorRole } from '@/lib/clinical-roles';
 import type { SuperbillPreview } from '@/lib/services/superbill-service';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { patientAgeLabel, patientFullName, patientInitials } from '@/lib/patient-utils';
+import { patientAgeLabel, patientFullName, patientInitials, avatarColor } from '@/lib/patient-utils';
 import { formatMoney } from '@/lib/format-utils';
 import { Icon as DuotoneInfoIcon } from '@/components/icons';
 import { useToast } from '@/components/Toast';
@@ -2020,7 +2020,7 @@ export default function ConsultationPage() {
               );
               return (
               <div className="ehr-consult-patient-summary">
-                <div className="ehr-consult-patient-avatar" aria-hidden="true">{patientInitials(selectedPatientData)}</div>
+                <div className="ehr-consult-patient-avatar" aria-hidden="true" style={{ background: avatarColor(patientFullName(selectedPatientData)), color: '#fff' }}>{patientInitials(selectedPatientData)}</div>
                 <div className="ehr-consult-patient-identity">
                   <button
                     onClick={() => router.push(`/patients/${selectedPatientData._id}`)}

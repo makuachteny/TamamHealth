@@ -5,7 +5,6 @@ import {
   HomeLearnSection,
   HomeMissionBand,
   HomePlatformSection,
-  HomePrinciplesSection,
   HomeProblemSection,
 } from "@/components/marketing/HomeSections";
 
@@ -16,7 +15,6 @@ export default function MarketingHome() {
       <HomeProblemSection />
       <HomePlatformSection />
       <HomeMissionBand />
-      <HomePrinciplesSection />
       <HomeAudienceSection />
       <HomeLearnSection />
       <HomeFinalCta />

@@ -17,7 +17,8 @@ import {
   Stethoscope,
   X,
 } from '@/components/icons/lucide';
-import { initials } from '@/lib/patient-utils';
+import { initials, stateColor } from '@/lib/patient-utils';
+import AvatarLegend from '@/components/patients/AvatarLegend';
 import {
   toIsoDate,
   parseIsoDate,
@@ -256,9 +257,6 @@ export default function EhrClinicalDashboard({
             </button>
           )}
           <button type="button" aria-label="Print"><Printer className="w-4 h-4" /> Print</button>
-          <button type="button" aria-label="Find available appointment" onClick={() => router.push('/appointments')}>
-            <Calendar className="w-4 h-4" /> Find available appointment
-          </button>
           <button type="button" className="primary" aria-label="Send intake" onClick={() => router.push('/patient-intake')}>
             <SendHorizontal className="w-4 h-4" /> Send intake
           </button>
@@ -419,7 +417,7 @@ export default function EhrClinicalDashboard({
                       }
                     }}
                   >
-                    <div className="ehr-patient-icon">{initials(appointment.patientName)}</div>
+                    <div className="ehr-patient-icon" style={{ background: stateColor(appointmentTriage(appointment.priority)), color: '#fff' }}>{initials(appointment.patientName)}</div>
                     <div className="ehr-appointment-time">
                       <strong>{appointment.appointmentTime}</strong>
                       <span>{typeLabel(appointment.priority)}</span>
@@ -464,7 +462,10 @@ export default function EhrClinicalDashboard({
 		              <section className="ehr-worklist-panel">
 		                <div>
 		                  <h3>Assigned patients</h3>
-                          <span>{patientRows.length} today</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <AvatarLegend />
+                            <span>{patientRows.length} today</span>
+                          </div>
 		                </div>
 		                <div className="ehr-worklist-table">
                     {patientRows.length > 0 && (
@@ -492,7 +493,7 @@ export default function EhrClinicalDashboard({
                         return (
                           <button key={patient._id} type="button" className="ehr-worklist-row" data-triage={patient.triagePriority || 'GREEN'} onClick={() => router.push(`/consultation?patientId=${patient._id}`)}>
                             <span className="ehr-worklist-name">
-                              <span className="ehr-patient-icon ehr-patient-icon--sm">{initials(patient.name)}</span>
+                              <span className="ehr-patient-icon ehr-patient-icon--sm" style={{ background: stateColor(patient.triagePriority), color: '#fff' }}>{initials(patient.name)}</span>
                               <span>
                                 <strong>{patient.name}</strong>
                                 <small>{patient.id || 'No ID'} · {patient.age ? `${patient.age}y` : 'Age unknown'} · {patient.gender || 'Not recorded'}</small>

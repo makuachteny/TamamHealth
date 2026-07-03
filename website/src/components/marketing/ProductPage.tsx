@@ -271,7 +271,7 @@ function MockVitals({ accent }: { accent: string }) {
     <>
       {/* Patient card */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, background: "var(--tb-cream-50)", borderRadius: 8, border: "1px solid var(--tb-cream-300)" }}>
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #D96E59 0%, #C44536 100%)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 10 }}>AD</div>
+        <div style={{ width: 28, height: 28, borderRadius: 8, background: "#C44536", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 10 }}>AD</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: "var(--tb-blue-900)" }}>Achol M. Deng</div>
           <div style={{ fontSize: 8.5, color: "var(--tb-text-ter)" }}>28 y · F · BOMA-KJ-HH1024</div>
@@ -323,7 +323,7 @@ function MockClinic({ accent }: { accent: string }) {
           { name: "Stella Wani", id: "JTH-0245", status: "Pharmacy", color: accent },
         ].map((p) => (
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: 5, background: "var(--tb-cream-50)", borderRadius: 5, border: "1px solid var(--tb-cream-200)" }}>
-            <div style={{ width: 18, height: 18, borderRadius: 4, background: `linear-gradient(135deg, ${accent} 0%, var(--tb-blue-800) 100%)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 7 }}>{p.name.split(" ").map(n => n[0]).join("")}</div>
+            <div style={{ width: 18, height: 18, borderRadius: 4, background: accent, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 7 }}>{p.name.split(" ").map(n => n[0]).join("")}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 8.5, fontWeight: 700, color: "var(--tb-blue-900)" }}>{p.name}</div>
               <div style={{ fontSize: 7, color: "var(--tb-text-ter)" }}>{p.id}</div>
@@ -389,7 +389,7 @@ function MockImaging({ accent }: { accent: string }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, flex: 1 }}>
         {[0, 1, 2].map((i) => (
           <div key={i} style={{
-            background: "linear-gradient(135deg, var(--tb-blue-800) 0%, var(--tb-blue-900) 100%)",
+            background: "var(--tb-blue-900)",
             borderRadius: 4,
             position: "relative",
             overflow: "hidden",

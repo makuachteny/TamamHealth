@@ -4,7 +4,8 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import EhrMiniCalendar, { formatDateTitle, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
-import { initials } from '@/lib/patient-utils';
+import { initials, stateColor } from '@/lib/patient-utils';
+import AvatarLegend from '@/components/patients/AvatarLegend';
 
 export type EhrCareDashboardAction = {
   label: string;
@@ -287,6 +288,8 @@ export default function EhrCareDashboard({
             </div>
           </div>
 
+          <AvatarLegend style={{ padding: '6px 12px 0' }} />
+
           <div className="ehr-appointment-list ehr-care-list">
             {visibleRows.length === 0 ? (
               <div className="ehr-empty-state">
@@ -305,7 +308,7 @@ export default function EhrCareDashboard({
                   onClick={() => openDetail(row)}
                   onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetail(row); } }}
                 >
-                  <div className="ehr-patient-icon">{initials(row.title)}</div>
+                  <div className="ehr-patient-icon" style={{ background: stateColor(row.statusTone === 'danger' ? 'red' : row.statusTone === 'warning' ? 'yellow' : row.priority), color: '#fff' }}>{initials(row.title)}</div>
                   <div className="ehr-appointment-time">
                     <strong>{row.time || row.compactMeta || '—'}</strong>
                     {(row.priority || row.status) && <span>{row.priority || (row.status ? titleCase(row.status) : '')}</span>}

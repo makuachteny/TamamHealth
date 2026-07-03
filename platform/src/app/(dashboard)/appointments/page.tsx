@@ -365,6 +365,7 @@ export default function AppointmentsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <TopBar
+          hideSearchInput
           searchTrailing={
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* Calendar / List view toggle */}

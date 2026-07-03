@@ -8,8 +8,9 @@ import { MarketingActionModalButton } from "./MarketingActionModal";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Marketing — Navbar
-   Flat top-level links only — Product, Installation, Pricing, About Us —
-   plus a "Book a Demo" CTA. No dropdowns.
+   Flat top-level links only — Product, About Us — plus a "Get in touch"
+   CTA that routes to /pricing (booking + pricing live together there;
+   no popup). No dropdowns.
    ═══════════════════════════════════════════════════════════════════ */
 
 // Fundraising entry points are locked off for now. Flip to true to re-enable.
@@ -57,7 +58,7 @@ export default function MarketingNav() {
       const hero = document.querySelector<HTMLElement>(
         [
           ".mk-home-hero",
-          ".mk-home-split-hero",
+          ".mk-home-photo-hero",
           ".mk-mod-hero",
           ".mk-product-hero",
           ".mk-products-hero",
@@ -133,16 +134,10 @@ export default function MarketingNav() {
             />
           </Link>
 
-          {/* Desktop center nav links */}
-          <div className="mk-nav-center desktop-only">
-            <Link href="/products" className="mk-nav-item mk-nav-item-link">Product</Link>
-            <Link href="/installation" className="mk-nav-item mk-nav-item-link">Installation</Link>
-            <Link href="/pricing" className="mk-nav-item mk-nav-item-link">Pricing</Link>
-            <Link href="/about" className="mk-nav-item mk-nav-item-link">About Us</Link>
-          </div>
-
-          {/* Desktop right CTA actions */}
+          {/* Desktop right: nav links grouped with the CTA */}
           <div className="mk-nav-actions desktop-only">
+            <Link href="/products" className="mk-nav-item mk-nav-item-link">Product</Link>
+            <Link href="/about" className="mk-nav-item mk-nav-item-link">About Us</Link>
             {SHOW_FUNDRAISING && (
               <>
                 <div style={{ width: 1, height: 20, background: "var(--tb-cream-300)" }} />
@@ -173,7 +168,7 @@ export default function MarketingNav() {
               className="mk-btn mk-btn-green mk-btn-sm mk-nav-demo"
               source="nav-book-demo"
             >
-              Book a Demo
+              Get in touch
             </MarketingActionModalButton>
           </div>
 
@@ -184,7 +179,7 @@ export default function MarketingNav() {
               className="mk-mobile-top-demo"
               source="nav-mobile-book-demo"
             >
-              Book a Demo
+              Get in touch
             </MarketingActionModalButton>
           </div>
           <button
@@ -209,12 +204,6 @@ export default function MarketingNav() {
             <div className="mk-mobile-menu-inner">
               <Link href="/products" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
                 Product
-              </Link>
-              <Link href="/installation" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                Installation
-              </Link>
-              <Link href="/pricing" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                Pricing
               </Link>
               <Link href="/about" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
                 About Us
@@ -248,7 +237,7 @@ export default function MarketingNav() {
                 source="nav-mobile-menu-book-demo"
                 onOpen={() => setMobileOpen(false)}
               >
-                Book a Demo
+                Get in touch
               </MarketingActionModalButton>
             </div>
           </div>

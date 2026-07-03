@@ -327,12 +327,9 @@ export default function PricingPage() {
               <div className="mk-testimonial-quote">
                 <span className="mk-quote-mark">&ldquo;</span>
                 <blockquote>
-                  TamamHealth transformed how we manage patient care. Administrative time is down 40%, claim denials have dropped significantly, and our team can finally focus on what matters most — our patients.
+                  TamamHealth is pre-launch — every package is scoped with you, not sold off a shelf. We&apos;d rather understand your facility for thirty minutes than guess at a price that doesn&apos;t fit how you actually work.
                 </blockquote>
-                <cite>
-                  <strong>Dr. Amina Hassan</strong>
-                  <span>Primary Care Physician, Khartoum Medical Center</span>
-                </cite>
+                <cite>The TamamHealth team</cite>
               </div>
             </div>
           </Reveal>

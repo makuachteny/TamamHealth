@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import { comparePatients, patientFullName, patientAgeLabel, patientAge } from '@/lib/patient-utils';
 import PatientAvatar from '@/components/patients/PatientAvatar';
+import AvatarLegend from '@/components/patients/AvatarLegend';
 import { UserPlus, Users, ScanLine, Hash, X, ArrowRight, Stethoscope, Filter, ChevronRight } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
@@ -289,6 +290,7 @@ export default function PatientsPage() {
                   </span>
                 </div>
               </div>
+              <AvatarLegend style={{ marginBottom: 10 }} />
               {/* Search + filter row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {/* Search wrapper — flex:1 so it fills remaining space; input inside uses width:100% from global CSS */}

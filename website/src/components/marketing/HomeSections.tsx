@@ -2,17 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { HOME_AUDIENCES, HOME_LEARN_MORE, HOME_PRINCIPLES, HOME_PROBLEM_STATS } from "@/data/home";
-import { ArrowRight, FileText, HeartPulse, Network, ShieldCheck } from "@/components/marketing/icons";
+import { HOME_AUDIENCES, HOME_LEARN_MORE, HOME_PROBLEM_STATS } from "@/data/home";
+import { ArrowRight } from "@/components/marketing/icons";
 import { Reveal, RelatedLinksGrid, SplitFeatureBlock } from "@/components/marketing/MarketingShared";
 import { MarketingActionModalButton } from "@/components/marketing/MarketingActionModal";
-
-const PRINCIPLE_ICONS = {
-  record: <FileText size={48} strokeWidth={1.7} />,
-  offline: <HeartPulse size={48} strokeWidth={1.7} />,
-  shield: <ShieldCheck size={48} strokeWidth={1.7} />,
-  network: <Network size={48} strokeWidth={1.7} />,
-} as const;
 
 const PLATFORM_WORKFLOW_STEPS = [
   "Register",
@@ -126,41 +119,6 @@ export function HomeFinalCta() {
             </Link>
           </div>
         </Reveal>
-      </div>
-    </section>
-  );
-}
-
-export function HomePrinciplesSection() {
-  return (
-    <section className="mk-products-section">
-      <div className="mk-container">
-        <Reveal>
-          <div className="mk-products-header">
-            <p className="mk-label">why it matters</p>
-            <h2 className="mk-h2">The value shows up on day one, not after a rollout.</h2>
-          </div>
-        </Reveal>
-
-        <div className="mk-products-grid mk-home-numbered-grid">
-          {HOME_PRINCIPLES.map((item, index) => (
-            <Reveal key={item.title} delay={index * 0.05}>
-              <Link href={item.href} className="mk-home-card-link">
-                <div className="mk-product-card mk-home-numbered-card">
-                  <span>{item.number}</span>
-                  <div className="mk-product-card-icon">
-                    {PRINCIPLE_ICONS[item.icon]}
-                  </div>
-                  <h3>{item.title}</h3>
-                  <p>{item.body}</p>
-                  <span className="mk-product-card-link">
-                    Learn more <ArrowRight size={14} strokeWidth={1.8} />
-                  </span>
-                </div>
-              </Link>
-            </Reveal>
-          ))}
-        </div>
       </div>
     </section>
   );

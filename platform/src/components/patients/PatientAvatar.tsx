@@ -1,6 +1,7 @@
 'use client';
 
 import type { Patient } from '@/data/mock';
+import { avatarColor } from '@/lib/patient-utils';
 
 // Coverage type → circle colour (fill). Muted, accessible palette — all pass
 // WCAG AA against white text (#fff) at these sizes.
@@ -47,7 +48,9 @@ interface Props {
 
 export default function PatientAvatar({ patient, size = 32, color: colorProp }: Props) {
   const coverage = getCoverage(patient);
-  const color = colorProp ?? COVERAGE_COLOR[coverage] ?? COVERAGE_COLOR.unknown;
+  // Round colour-coded patient avatar: red/orange/green, deterministic per name,
+  // unless an explicit colour is passed (e.g. acuity colour in worklists).
+  const color = colorProp ?? avatarColor(`${patient.firstName || ''} ${patient.surname || ''}`.trim() || 'patient');
   const label = COVERAGE_LABEL[coverage] || 'Unknown';
   const initials = getInitials(patient);
   const fontSize = Math.round(size * 0.36);

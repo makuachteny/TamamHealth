@@ -195,7 +195,7 @@ export default function ContactPage() {
               <div style={{
                 padding: "22px 24px",
                 borderRadius: 14,
-                background: "linear-gradient(135deg, var(--tb-blue-900) 0%, var(--tb-blue-800) 100%)",
+                background: "var(--tb-blue-900)",
                 color: "#fff",
                 borderLeft: "4px solid var(--tb-gold)",
                 display: "flex",

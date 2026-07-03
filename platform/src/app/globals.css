@@ -1380,7 +1380,7 @@ svg.lucide:not([style*="color"]) {
 }
 
 .ehr-top-rail svg.lucide {
-  color: var(--text-secondary) !important;
+  color: rgba(255, 255, 255, 0.86) !important;
   stroke: currentColor !important;
 }
 
@@ -1390,8 +1390,17 @@ svg.lucide:not([style*="color"]) {
   color: currentColor !important;
 }
 
+/* Icons sitting on white surfaces inside the navy header (search bar, user
+   menu) keep their own dark/accent ink instead of the white bar colour. */
+.ehr-top-search > svg.lucide,
+.ehr-top-search button svg.lucide,
+.ehr-user-menu svg.lucide {
+  color: currentColor !important;
+}
+
 .ehr-top-brand img {
-  filter: none !important;
+  /* White wordmark on the navy header. */
+  filter: brightness(0) invert(1) !important;
   opacity: 1 !important;
 }
 
@@ -2729,7 +2738,7 @@ thead th {
 }
 
 .tamam-ehr-app {
-  --ehr-top-rail-height: 54px;
+  --ehr-top-rail-height: 56px;
   background: var(--ehr-page-bg) !important;
 }
 
@@ -2806,9 +2815,10 @@ thead th {
   align-items: center;
   gap: 12px;
   padding: 0 12px;
-  background: var(--bg-card);
-  color: var(--color-brand-700);
-  border-bottom: 1px solid var(--ehr-border);
+  /* Deep navy — matches the marketing hero (.mk-mod-hero #10195A). */
+  background: #10195A;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: none;
 }
 
@@ -2849,8 +2859,8 @@ thead th {
 
 .ehr-top-calendar-button {
   display: none;
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   align-items: center;
   justify-content: center;
   justify-self: end;
@@ -2869,7 +2879,7 @@ thead th {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-brand-700);
+  color: #fff;
   font-size: 14px;
   font-weight: 800;
   letter-spacing: 0;
@@ -2885,17 +2895,28 @@ thead th {
 
 .ehr-top-modules button,
 .ehr-top-actions button {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.86);
   border-color: transparent;
   transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* Uniform, crisp header icons across the whole top rail — left module shortcuts,
+   right action cluster, calendar, and search all share one 18px glyph so the
+   header reads as a single consistent set. The dropdown chevron stays small. */
+.ehr-top-modules button svg.lucide:not(.ehr-module-chevron),
+.ehr-top-actions button svg.lucide,
+.ehr-top-calendar-button svg.lucide,
+.ehr-top-search > svg.lucide {
+  width: 20px;
+  height: 20px;
 }
 
 .ehr-top-modules button:hover,
@@ -2903,8 +2924,8 @@ thead th {
 .ehr-top-calendar-button:hover,
 .ehr-top-modules button.active {
   border-color: transparent;
-  background: var(--accent-light);
-  color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
 }
 
 .ehr-module-trigger {
@@ -3426,24 +3447,45 @@ thead th {
 }
 
 .ehr-clinical-dashboard-header {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
+  /* Columns match the workspace grid below: toggle over the calendar rail,
+     greeting over the centre panel, actions at the far right. Centred so the
+     toggle, greeting, and actions all sit on one line. */
+  grid-template-columns: minmax(230px, 260px) minmax(0, 1fr) auto;
+  align-items: center;
   gap: 12px;
 }
 
 .ehr-clinical-dashboard-tabs {
-  padding-top: 4px;
+  padding-top: 0;
+}
+
+/* The Dashboard/Calendar toggle fills the rail column so it lines up edge-to-edge
+   with the mini-calendar beneath it. */
+.ehr-clinical-dashboard-tabs .ehr-segmented {
+  width: 100%;
+}
+
+.ehr-clinical-dashboard-tabs .ehr-segmented button {
+  flex: 1;
+  justify-content: center;
 }
 
 .ehr-clinical-dashboard-header-main {
   justify-content: flex-start;
   gap: 12px;
-  padding-top: 4px;
+  padding-top: 0;
 }
 
 .ehr-clinical-dashboard-header .ehr-schedule-actions {
   justify-content: flex-end;
-  padding-top: 8px;
+  padding-top: 0;
+}
+
+/* Greeting-row icons (Dashboard/Calendar toggle, Outstanding, Print, Send intake). */
+.ehr-clinical-dashboard-header .ehr-segmented button svg,
+.ehr-clinical-dashboard-header .ehr-schedule-actions button svg {
+  width: 20px;
+  height: 20px;
 }
 
 .ehr-segmented,
@@ -3840,6 +3882,7 @@ thead th {
   color: var(--ehr-blue);
   font-size: 12px;
   font-weight: 800;
+  flex-shrink: 0;
 }
 
 .ehr-patient-icon--sm {
@@ -4304,8 +4347,11 @@ thead th {
 .ehr-care-greeting {
   margin: 4px 0 0;
   color: var(--ehr-blue);
-  font-size: 14px;
-  font-weight: 800;
+  font-family: var(--font-platform);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .ehr-care-greeting-inline {
@@ -4319,8 +4365,11 @@ thead th {
   min-height: 36px;
   display: flex;
   align-items: center;
-  font-size: 16px;
-  line-height: 1.2;
+  font-family: var(--font-platform);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .ehr-clinical-dashboard-header .ehr-greeting-row {
@@ -9651,7 +9700,7 @@ span:has(> svg:only-child) {
 }
 
 .ehr-care-greeting {
-  font-size: 13px;
+  font-size: 18px;
 }
 
 .ehr-workspace-grid,
@@ -9984,7 +10033,7 @@ span:has(> svg:only-child) {
   }
 
   .ehr-care-greeting {
-    font-size: 12px;
+    font-size: 18px;
   }
 
   .ehr-schedule-header {
@@ -10455,8 +10504,8 @@ span:has(> svg:only-child) {
     margin: 0;
     overflow: hidden;
     color: var(--ehr-blue);
-    font-size: 13px;
-    line-height: 1.2;
+    font-size: 18px;
+    line-height: 1.1;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
