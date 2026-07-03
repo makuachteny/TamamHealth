@@ -173,7 +173,7 @@ export default function HRDashboardPage() {
                   const initials = r.userName.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
                   return (
                     <Link key={r._id} href="/hr?tab=leave" className="data-row data-row--warning">
-                      <div className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)' }}>{initials || '?'}</div>
+                      <div className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white" style={{ background: 'linear-gradient(135deg, #2191D0 0%, #015697 100%)' }}>{initials || '?'}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2 flex-wrap">
                           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{r.userName}</span>
@@ -201,7 +201,7 @@ export default function HRDashboardPage() {
               <div className="p-4 space-y-2">
                 <ShiftRow label={t('hr.shiftMorning')} count={morningStaff} accent="#15795C" />
                 <ShiftRow label={t('hr.shiftAfternoon')} count={schedules.filter(s => s.shiftType === 'afternoon').length} accent="#E4A84B" />
-                <ShiftRow label={t('hr.shiftNight')} count={nightStaff} accent="#1E3A8A" />
+                <ShiftRow label={t('hr.shiftNight')} count={nightStaff} accent="#015697" />
                 <ShiftRow label={t('hr.shiftOnCall')} count={onCallToday} accent="#2191D0" />
               </div>
             </div>

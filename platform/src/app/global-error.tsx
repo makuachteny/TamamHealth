@@ -20,7 +20,7 @@ export default function GlobalError({
     muted: '#94A3B8',
     dangerBg: 'rgba(229,46,66,0.12)',
     dangerBorder: 'rgba(229,46,66,0.25)',
-    primary: '#2563EB',
+    primary: '#2191D0',
     white: '#FFFFFF',
     secondaryBorder: 'rgba(255,255,255,0.18)',
     secondaryText: '#CBD5E1',

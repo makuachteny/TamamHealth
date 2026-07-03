@@ -181,7 +181,7 @@ function FacilityOverview() {
                 disabled={submitting || (!!submittedAt && !hasPendingChanges)}
                 className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  background: submitting ? 'var(--text-muted)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
+                  background: submitting ? 'var(--text-muted)' : 'linear-gradient(135deg, #2191D0, #015697)',
                   boxShadow: '0 2px 8px rgba(0,119,215,0.3)',
                 }}
               >

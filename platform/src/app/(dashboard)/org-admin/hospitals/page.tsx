@@ -135,7 +135,7 @@ export default function OrgHospitalsPage() {
       state_hospital: 'var(--accent-primary)',
       county_hospital: 'var(--accent-primary)',
       phcc: 'var(--accent-primary)',
-      phcu: '#06B6D4',
+      phcu: '#369FDA',
     };
     return map[ft] || '#6B7280';
   };

@@ -37,13 +37,13 @@ const AppointmentsCalendar = dynamic(() => import('./_AppointmentsCalendar'), {
 const appointmentTypes: { value: AppointmentType; label: string; icon: typeof Calendar; color: string; bg: string }[] = [
   { value: 'general',      label: 'General Consultation', icon: Stethoscope,   color: '#2191D0', bg: 'rgba(33,145,208,0.10)' },
   { value: 'follow_up',    label: 'Follow-Up',            icon: RefreshCw,     color: '#015697', bg: 'rgba(1,86,151,0.10)' },
-  { value: 'specialist',   label: 'Specialist',           icon: User,          color: '#0369A1', bg: 'rgba(3,105,161,0.10)' },
+  { value: 'specialist',   label: 'Specialist',           icon: User,          color: '#015697', bg: 'rgba(3,105,161,0.10)' },
   { value: 'anc',          label: 'Antenatal Care',       icon: HeartPulse,    color: '#047857', bg: 'rgba(4,120,87,0.10)' },
   { value: 'immunization', label: 'Immunization',         icon: Syringe,       color: '#059669', bg: 'rgba(5,150,105,0.10)' },
-  { value: 'lab',          label: 'Laboratory',           icon: FlaskConical,  color: '#0891B2', bg: 'rgba(8,145,178,0.10)' },
-  { value: 'telehealth',   label: 'Telehealth',           icon: Video,         color: '#0E7490', bg: 'rgba(14,116,144,0.10)' },
+  { value: 'lab',          label: 'Laboratory',           icon: FlaskConical,  color: '#2191D0', bg: 'rgba(8,145,178,0.10)' },
+  { value: 'telehealth',   label: 'Telehealth',           icon: Video,         color: '#015697', bg: 'rgba(14,116,144,0.10)' },
   { value: 'surgical',     label: 'Surgical',             icon: Stethoscope,   color: '#DC2626', bg: 'rgba(220,38,38,0.10)' },
-  { value: 'dental',       label: 'Dental',               icon: Stethoscope,   color: '#1D4ED8', bg: 'rgba(29,78,216,0.10)' },
+  { value: 'dental',       label: 'Dental',               icon: Stethoscope,   color: '#015697', bg: 'rgba(29,78,216,0.10)' },
   { value: 'mental_health',label: 'Mental Health',        icon: HeartPulse,    color: '#D97706', bg: 'rgba(217,119,6,0.10)' },
   { value: 'walk_in',      label: 'Walk-In',              icon: UserPlus,      color: '#2191D0', bg: 'rgba(33,145,208,0.10)' },
 ];

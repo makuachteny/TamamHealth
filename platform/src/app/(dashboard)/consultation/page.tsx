@@ -2011,7 +2011,7 @@ export default function ConsultationPage() {
             <div className="flex items-center gap-3">
             {selectedPatientData ? (() => {
               const demoBits: { icon: 'qr' | 'patient' | 'mapPin'; value: string; accent: string; mono?: boolean }[] = [
-                ...(selectedPatientData.hospitalNumber ? [{ icon: 'qr' as const, value: selectedPatientData.hospitalNumber, accent: '#1E3A8A', mono: true }] : []),
+                ...(selectedPatientData.hospitalNumber ? [{ icon: 'qr' as const, value: selectedPatientData.hospitalNumber, accent: '#015697', mono: true }] : []),
                 { icon: 'patient', value: `${patientAgeLabel(selectedPatientData)} · ${selectedPatientData.gender || '—'}`, accent: 'var(--accent-primary)' },
                 ...(selectedPatientData.state ? [{ icon: 'mapPin' as const, value: selectedPatientData.state, accent: '#1F9D6F' }] : []),
               ];
@@ -3596,7 +3596,7 @@ export default function ConsultationPage() {
                               border: `1px solid ${filled || active ? 'var(--accent-primary)' : 'var(--border-light)'}`,
                             }}>
                               {filled ? (
-                                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="#2191D0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                               ) : (
                                 <Icon className="w-4 h-4" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
                               )}

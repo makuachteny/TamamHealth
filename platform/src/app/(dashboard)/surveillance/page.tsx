@@ -34,7 +34,7 @@ const COLORS = {
   malaria: 'var(--accent-primary)',
   cholera: 'var(--color-danger)',
   measles: 'var(--color-warning)',
-  pneumonia: '#2563EB',
+  pneumonia: '#2191D0',
   diarrhea: 'var(--color-success)',
   tb: '#D4A843',
   hiv: 'var(--accent-primary)',
@@ -400,7 +400,7 @@ export default function SurveillancePage() {
             <div className="flex items-center gap-8">
               <div className="flex items-center gap-2">
                 <div className="icon-box-sm">
-                  <Activity className="w-3.5 h-3.5" style={{ color: '#2563EB' }} />
+                  <Activity className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
                 </div>
                 <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('surveillance.totalCasesThisWeek')}</span>
                 <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{totalCases.toLocaleString()}</span>

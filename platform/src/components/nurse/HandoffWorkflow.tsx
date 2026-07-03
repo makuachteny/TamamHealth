@@ -204,7 +204,7 @@ export default function HandoffWorkflow({
 
   // Real KPI strip — only counts we actually have.
   const stats = [
-    { icon: BedDouble, label: t('nurse.totalPatients'), value: totalPatients, color: '#2563EB', bg: 'rgba(37,99,235,0.12)' },
+    { icon: BedDouble, label: t('nurse.totalPatients'), value: totalPatients, color: '#2191D0', bg: 'rgba(37,99,235,0.12)' },
     { icon: AlertCircle, label: t('nurse.criticalPatients'), value: criticalCount, color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.12)' },
     { icon: Pill, label: t('nurse.medicationsOverdue'), value: overdueMarCount, color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.12)' },
     { icon: Pill, label: t('nurse.medicationsDueNow'), value: dueMarCount, color: 'var(--color-warning)', bg: 'rgba(228,168,75,0.12)' },

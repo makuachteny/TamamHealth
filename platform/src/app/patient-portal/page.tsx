@@ -342,7 +342,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
             <span style={{ background: '#E52E42' }} />
             <span style={{ background: '#ffffff', border: '1px solid var(--border-medium)' }} />
             <span style={{ background: '#10B944' }} />
-            <span style={{ background: '#0F4C81' }} />
+            <span style={{ background: '#015697' }} />
             <span style={{ background: '#FCD34D' }} />
           </div>
           <p className="pp-form-footer-text">
@@ -400,9 +400,9 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           font-weight: 700;
           letter-spacing: 0.18em;
           text-transform: uppercase;
-          color: var(--accent-primary, #3b82f6);
+          color: var(--accent-primary, #2191D0);
           padding: 5px 12px;
-          border: 1px solid var(--accent-primary, #3b82f6);
+          border: 1px solid var(--accent-primary, #2191D0);
           border-radius: 999px;
           background: var(--accent-light, rgba(33, 145, 208, 0.08));
           margin-bottom: 18px;
@@ -1040,7 +1040,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
 
           {/* ── Welcome Banner ── */}
           <div style={{
-            background: 'linear-gradient(135deg, #1E40AF 0%, #3b82f6 60%, #60A5FA 100%)',
+            background: 'linear-gradient(135deg, #015697 0%, #2191D0 60%, #369FDA 100%)',
             borderRadius: 14, padding: '22px 24px', color: '#fff', position: 'relative', overflow: 'hidden',
           }}>
             <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
@@ -1148,7 +1148,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   { key: 'heartRate', label: t('patientPortal.heartRate'), icon: Activity, unit: 'bpm', color: '#EC4899' },
                   { key: 'temperature', label: t('patientPortal.temperature'), icon: Thermometer, unit: '°C', color: '#F59E0B' },
                   { key: 'weight', label: t('patientPortal.weight'), icon: Weight, unit: 'kg', color: '#6366F1' },
-                  { key: 'respiratoryRate', label: t('patientPortal.respRate'), icon: Droplets, unit: '/min', color: '#06B6D4' },
+                  { key: 'respiratoryRate', label: t('patientPortal.respRate'), icon: Droplets, unit: '/min', color: '#369FDA' },
                   { key: 'oxygenSaturation', label: 'SpO₂', icon: Eye, unit: '%', color: '#1F9D6F' },
                 ].filter(v => vitals[v.key]).map(v => (
                   <div key={v.key} style={{ padding: '12px 14px', borderRadius: 10, background: `${v.color}08`, border: `1px solid ${v.color}15`, textAlign: 'center' }}>
@@ -1250,7 +1250,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             </div>
 
             {/* Quick Actions */}
-            <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #1e3a8a 100%)', border: 'none', display: 'flex', flexDirection: 'column' }}>
+            <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #015697 100%)', border: 'none', display: 'flex', flexDirection: 'column' }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{t('patientPortal.quickActions')}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
                 {[
@@ -2235,7 +2235,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
     { key: 'mpesa', name: 'M-Pesa', icon: Phone, desc: t('patientPortal.payViaMpesa'), color: '#4CAF50' },
     { key: 'mtn', name: 'MTN Mobile Money', icon: Phone, desc: t('patientPortal.payViaMtn'), color: '#FFC107' },
     { key: 'airtel', name: 'Airtel Money', icon: Phone, desc: t('patientPortal.payViaAirtel'), color: '#E53935' },
-    { key: 'card', name: t('patientPortal.cardPayment'), icon: CreditCard, desc: t('patientPortal.payViaCard'), color: '#5C6BC0' },
+    { key: 'card', name: t('patientPortal.cardPayment'), icon: CreditCard, desc: t('patientPortal.payViaCard'), color: '#2191D0' },
     { key: 'bank', name: t('patientPortal.bankTransfer'), icon: Banknote, desc: t('patientPortal.payViaBank'), color: '#00897B' },
   ];
 
@@ -2541,7 +2541,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
     return (
       <div>
         <div style={{
-          background: 'linear-gradient(135deg, #1E40AF 0%, #3b82f6 60%, #60A5FA 100%)',
+          background: 'linear-gradient(135deg, #015697 0%, #2191D0 60%, #369FDA 100%)',
           borderRadius: 14, padding: '20px 24px', color: '#fff', marginBottom: 16, position: 'relative', overflow: 'hidden',
         }}>
           <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 4 }}>{t('patientPortal.accountSummary')}</p>
@@ -2562,7 +2562,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
     <div>
       {/* Balance banner */}
       <div style={{
-        background: 'linear-gradient(135deg, #1E40AF 0%, #3b82f6 60%, #60A5FA 100%)',
+        background: 'linear-gradient(135deg, #015697 0%, #2191D0 60%, #369FDA 100%)',
         borderRadius: 14, padding: '20px 24px', color: '#fff', marginBottom: 16, position: 'relative', overflow: 'hidden',
       }}>
         <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
@@ -2691,7 +2691,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
           </div>
 
           {/* Payment history summary */}
-          <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #1e3a8a 100%)', border: 'none' }}>
+          <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #015697 100%)', border: 'none' }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>{t('patientPortal.paymentSummary')}</p>
             {[
               { label: t('patientPortal.totalBilled'), value: formatMoney(safeBills.reduce((s, b) => s + b.amount, 0)) },

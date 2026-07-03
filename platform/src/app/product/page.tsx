@@ -46,14 +46,14 @@ const FEATURE_CATEGORIES = [
   {
     title: "product.feature.documentationTitle",
     icon: FileText,
-    color: "#1d4ed8",
+    color: "#015697",
     desc: "product.feature.documentationDesc",
     highlights: ["product.feature.documentationH1", "product.feature.documentationH2", "product.feature.documentationH3", "product.feature.documentationH4"],
   },
   {
     title: "product.feature.registrationTitle",
     icon: Calendar,
-    color: "#1E3A8A",
+    color: "#015697",
     desc: "product.feature.registrationDesc",
     highlights: ["product.feature.registrationH1", "product.feature.registrationH2", "product.feature.registrationH3", "product.feature.registrationH4"],
   },
@@ -67,14 +67,14 @@ const FEATURE_CATEGORIES = [
   {
     title: "product.feature.privilegesTitle",
     icon: Lock,
-    color: "#1d4ed8",
+    color: "#015697",
     desc: "product.feature.privilegesDesc",
     highlights: ["product.feature.privilegesH1", "product.feature.privilegesH2", "product.feature.privilegesH3", "product.feature.privilegesH4"],
   },
   {
     title: "product.feature.translationTitle",
     icon: Languages,
-    color: "#1E3A8A",
+    color: "#015697",
     desc: "product.feature.translationDesc",
     highlights: ["product.feature.translationH1", "product.feature.translationH2", "product.feature.translationH3", "product.feature.translationH4"],
   },
@@ -88,7 +88,7 @@ const FEATURE_CATEGORIES = [
   {
     title: "product.feature.aiTitle",
     icon: Brain,
-    color: "#1d4ed8",
+    color: "#015697",
     desc: "product.feature.aiDesc",
     highlights: ["product.feature.aiH1", "product.feature.aiH2", "product.feature.aiH3", "product.feature.aiH4"],
   },
@@ -111,7 +111,7 @@ const SHOWCASE_SECTIONS = [
     cta: "product.showcase.roadmapCta",
     ctaId: "roadmap",
     visual: "roadmap",
-    color: "#1d4ed8",
+    color: "#015697",
   },
   {
     eyebrow: "product.showcase.releasesEyebrow",
@@ -120,7 +120,7 @@ const SHOWCASE_SECTIONS = [
     cta: "product.showcase.releasesCta",
     ctaId: "releases",
     visual: "releases",
-    color: "#1E3A8A",
+    color: "#015697",
   },
   {
     eyebrow: "product.showcase.deployEyebrow",
@@ -826,14 +826,14 @@ const productCSS = `
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&family=IBM+Plex+Serif:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  --p-blue: #3b82f6;
-  --p-blue-hover: #1E40AF;
-  --p-blue-dark: #1E3A8A;
-  --p-blue-mid: #1d4ed8;
+  --p-blue: #2191D0;
+  --p-blue-hover: #015697;
+  --p-blue-dark: #015697;
+  --p-blue-mid: #015697;
   --p-blue-light: #E8F3FD;
   --p-blue-pale: #F5FAFF;
 
-  --p-text: #1E3A8A;
+  --p-text: #015697;
   --p-text-secondary: #334155;
   --p-text-muted: #64748b;
 

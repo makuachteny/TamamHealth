@@ -38,12 +38,12 @@ const AVAILABILITY_COLORS: Record<string, string> = {
   busy:         'var(--color-warning-600)',
   in_procedure: 'var(--accent-primary)',
   in_emergency: '#DC2626',
-  in_theatre:   '#0E7490',
-  on_rounds:    '#0369A1',
+  in_theatre:   '#015697',
+  on_rounds:    '#015697',
   away:         'var(--text-muted)',
 };
 
-const AVATAR_PALETTE = ['var(--accent-primary)', BRAND_SECONDARY, '#0EA5E9', '#0891B2', '#1D4ED8', '#0369A1', '#1E40AF', '#475569'];
+const AVATAR_PALETTE = ['var(--accent-primary)', BRAND_SECONDARY, '#369FDA', '#2191D0', '#015697', '#015697', '#015697', '#475569'];
 const NON_MESSAGEABLE_ROLES: UserRole[] = ['super_admin', 'government'];
 
 function colorFor(seed: string): string {

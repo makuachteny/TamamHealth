@@ -40,7 +40,7 @@ export default function MCHAnalyticsPage() {
 
   const gradeColors: Record<string, { bg: string; text: string }> = {
     A: { bg: 'rgba(74,222,128,0.12)', text: 'var(--color-success)' },
-    B: { bg: 'rgba(56,189,248,0.12)', text: '#2563EB' },
+    B: { bg: 'rgba(56,189,248,0.12)', text: '#2191D0' },
     C: { bg: 'rgba(251,191,36,0.12)', text: 'var(--color-warning)' },
     D: { bg: 'rgba(251,146,60,0.12)', text: '#FB923C' },
     F: { bg: 'rgba(248,113,113,0.12)', text: '#F87171' },
@@ -226,7 +226,7 @@ export default function MCHAnalyticsPage() {
             <div className="card-elevated">
               <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                 <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                  <Baby className="w-4 h-4" style={{ color: '#2563EB' }} />
+                  <Baby className="w-4 h-4" style={{ color: '#2191D0' }} />
                   {t('mch.childMortality')}
                 </h3>
               </div>
@@ -446,7 +446,7 @@ export default function MCHAnalyticsPage() {
                 <div className="space-y-3">
                   {Object.entries(birthOutcomes.byDeliveryType).map(([type, count]) => {
                     const pct = birthOutcomes.totalBirths > 0 ? Math.round((count / birthOutcomes.totalBirths) * 100) : 0;
-                    const color = type === 'normal' ? 'var(--color-success)' : type === 'caesarean' ? '#A855F7' : '#2563EB';
+                    const color = type === 'normal' ? 'var(--color-success)' : type === 'caesarean' ? '#A855F7' : '#2191D0';
                     return (
                       <div key={type}>
                         <div className="flex justify-between text-xs mb-1">
@@ -511,7 +511,7 @@ export default function MCHAnalyticsPage() {
                           <div className="w-full rounded-t-md" style={{
                             height: `${height}%`,
                             minHeight: m.births > 0 ? '4px' : '0',
-                            background: 'linear-gradient(180deg, #3b82f6, rgba(0,119,215,0.3))',
+                            background: 'linear-gradient(180deg, #2191D0, rgba(0,119,215,0.3))',
                           }} />
                         </div>
                         <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>{m.month}</span>
@@ -636,7 +636,7 @@ export default function MCHAnalyticsPage() {
               <div className="card-elevated">
                 <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
                   <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                    <Baby className="w-4 h-4" style={{ color: '#2563EB' }} />
+                    <Baby className="w-4 h-4" style={{ color: '#2191D0' }} />
                     {t('mch.childMortalityAnalysis')}
                   </h3>
                 </div>
@@ -646,7 +646,7 @@ export default function MCHAnalyticsPage() {
                     <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('mch.under5ByGender')}</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="p-3 rounded-md text-center" style={{ background: 'rgba(56,189,248,0.08)' }}>
-                        <p className="text-xl font-bold" style={{ color: '#2563EB' }}>{neonatalData.byGender?.Male || 0}</p>
+                        <p className="text-xl font-bold" style={{ color: '#2191D0' }}>{neonatalData.byGender?.Male || 0}</p>
                         <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('mch.male')}</p>
                       </div>
                       <div className="p-3 rounded-md text-center" style={{ background: 'rgba(236,72,153,0.08)' }}>

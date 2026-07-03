@@ -36,7 +36,7 @@ interface PatientSBARProps {
 const LETTER_COLORS = {
   S: { bg: 'rgba(196,69,54,0.12)',  fg: 'var(--tamamhealth-red)' },
   B: { bg: 'rgba(228,168,75,0.18)', fg: 'var(--color-warning)' },
-  A: { bg: 'rgba(33, 145, 208, 0.14)', fg: '#1E3A8A' },
+  A: { bg: 'rgba(33, 145, 208, 0.14)', fg: '#015697' },
   R: { bg: 'var(--accent-light)',   fg: 'var(--accent-primary)' },
 } as const;
 

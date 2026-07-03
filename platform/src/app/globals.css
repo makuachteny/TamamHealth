@@ -967,10 +967,19 @@
   --color-slate-700: #334155;
   --color-slate-900: #0F172A;
   --color-slate-950: #0A1A33;
-  --color-brand-300: #7ECEF5;
-  --color-brand-400: #369FDA;
-  --color-brand-500: #2191D0;
-  --color-brand-700: #015697;
+  /* Canonical brand blue scale — shared with the marketing site's
+     --tb-blue-* tokens. Every blue in the platform derives from these. */
+  --tb-blue-900: #10195A;  /* header navy — top rail, mission panels */
+  --tb-blue-800: #015697;  /* deep accent — hover states, links, dark buttons */
+  --tb-blue-700: #2191D0;  /* primary accent — CTAs, active tabs, highlights */
+  --tb-blue-600: #369FDA;  /* lighter accent — borders, secondary highlights */
+  --tb-blue-100: #DDF2FB;  /* pale tint — light backgrounds */
+  --tb-blue-50:  #EFF8FD;  /* palest tint — section washes */
+
+  --color-brand-300: var(--tb-blue-100);
+  --color-brand-400: var(--tb-blue-600);
+  --color-brand-500: var(--tb-blue-700);
+  --color-brand-700: var(--tb-blue-800);
   --color-brand-gradient: var(--color-brand-500);
   --color-success-500: #1B9E77;
   --color-success-600: #059669;
@@ -985,7 +994,7 @@
   --color-danger-700: #B91C1C;
   --color-danger-800: #8B2E24;
   --color-purple-500: #8B5CF6;
-  --color-blue-400: #60A5FA;
+  --color-blue-400: var(--tb-blue-600);
   --color-dark-surface: #11244D;
   --color-dark-surface-hover: #1A3160;
   --color-dark-border: #1E3A6B;
@@ -1098,7 +1107,7 @@
   --color-success-border: #15B8A6;
   --color-warning-border: #F59E0B;
   --color-danger-border: #F87171;
-  --color-info-border: #177FBE;
+  --color-info-border: var(--tb-blue-700);
 
   /* Chart colors — brand-aligned series */
   --color-chart-1: var(--color-brand-500);
@@ -1140,7 +1149,7 @@
   --ehr-success-bg: #DDF2E9;
   --ehr-success-text: #0E7155;
   --ehr-neutral-text: #4E6477;
-  --ehr-mission-bg: #115B91;
+  --ehr-mission-bg: var(--tb-blue-900);
 }
 
 /* ============ DARK THEME ============ */
@@ -2728,8 +2737,8 @@ thead th {
   --ehr-border: #D8E3EC;
   --ehr-text: #102634;
   --ehr-muted: #597386;
-  --ehr-blue: #177FBE;
-  --ehr-blue-light: rgba(23, 127, 190, 0.11);
+  --ehr-blue: var(--tb-blue-700);
+  --ehr-blue-light: rgba(33, 145, 208, 0.11);
   --ehr-coral: #E96D57;
   --ehr-conflict: #FFE9ED;
   --ehr-conflict-text: #A9354B;
@@ -2815,8 +2824,8 @@ thead th {
   align-items: center;
   gap: 12px;
   padding: 0 12px;
-  /* Deep navy — matches the marketing hero (.mk-mod-hero #10195A). */
-  background: #10195A;
+  /* Deep navy — --tb-blue-900, shared with the marketing site header. */
+  background: var(--tb-blue-900);
   color: #fff;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: none;
@@ -3412,6 +3421,18 @@ thead th {
   min-height: 0;
   overflow: hidden;
   color: var(--ehr-text);
+  /* Single source of truth for the left calendar-rail column width, shared by
+     the workspace grid and the header toggle so they always line up. Mirrors
+     the workspace grid's own breakpoints below. */
+  --rail-col: minmax(230px, 260px);
+}
+
+@media (max-width: 1280px) {
+  .ehr-schedule-shell { --rail-col: minmax(210px, 230px); }
+}
+
+@media (max-width: 640px) {
+  .ehr-schedule-shell { --rail-col: minmax(200px, 232px); }
 }
 
 .ehr-care-dashboard {
@@ -3450,17 +3471,20 @@ thead th {
   /* Columns match the workspace grid below: toggle over the calendar rail,
      greeting over the centre panel, actions at the far right. Centred so the
      toggle, greeting, and actions all sit on one line. */
-  grid-template-columns: minmax(230px, 260px) minmax(0, 1fr) auto;
+  /* First column is driven by the shared --rail-col variable, so it always
+     equals the workspace calendar column at every breakpoint. */
+  grid-template-columns: var(--rail-col, minmax(230px, 260px)) minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
 }
 
 .ehr-clinical-dashboard-tabs {
-  padding-top: 0;
+  /* Inset 12px each side to match the "Go to today" button beneath it. */
+  padding: 0 12px;
 }
 
-/* The Dashboard/Calendar toggle fills the rail column so it lines up edge-to-edge
-   with the mini-calendar beneath it. */
+/* The toggle spans the same width as the "Go to today" button, with the two
+   pills splitting it evenly. */
 .ehr-clinical-dashboard-tabs .ehr-segmented {
   width: 100%;
 }
@@ -3468,6 +3492,8 @@ thead th {
 .ehr-clinical-dashboard-tabs .ehr-segmented button {
   flex: 1;
   justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
 }
 
 .ehr-clinical-dashboard-header-main {
@@ -4198,6 +4224,30 @@ thead th {
   font-size: 19px;
   font-weight: 800;
   letter-spacing: 0;
+}
+
+/* Shared card header row — icon and title on one centered line. */
+.ehr-side-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ehr-side-card-head h2 {
+  margin: 0;
+  line-height: 1;
+}
+
+/* Sized to the title's cap height and nudged 1px so the glyph reads
+   optically centered on the text line, not the flex box. */
+.ehr-side-card-head svg {
+  display: block;
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  color: var(--accent-primary);
 }
 
 .ehr-side-card p {
@@ -7015,10 +7065,10 @@ thead th {
   --ehr-border-soft: #E5EDF4;
   --ehr-text: #102634;
   --ehr-muted: #5B7284;
-  --ehr-blue: #177FBE;
-  --ehr-blue-strong: #0B6FAE;
-  --ehr-blue-light: rgba(23, 127, 190, 0.10);
-  --ehr-focus-ring: rgba(23, 127, 190, 0.20);
+  --ehr-blue: var(--tb-blue-700);
+  --ehr-blue-strong: var(--tb-blue-800);
+  --ehr-blue-light: rgba(33, 145, 208, 0.10);
+  --ehr-focus-ring: rgba(33, 145, 208, 0.20);
   background: var(--ehr-page-bg) !important;
 }
 
@@ -11926,7 +11976,7 @@ span:has(> svg:only-child) {
 .ehr-worklist-row[data-triage="GREEN"] .ehr-patient-icon[aria-hidden],
 .ehr-worklist-row[data-triage="GREEN"] .ehr-patient-icon.ehr-patient-icon--sm {
   background: var(--ehr-info-soft);
-  color: #177FBE;
+  color: var(--tb-blue-700);
 }
 
 .ehr-worklist-room {
@@ -12636,4 +12686,17 @@ span:has(> svg:only-child) {
     text-align: left;
     padding: 0;
   }
+}
+
+/* ── Mission card header: white title + icon on the solid blue card ──
+   Placed last so it wins over the later generic .ehr-side-card h2 color
+   rules; the icon needs `stroke` because the icon set hardcodes a
+   stroke attribute that plain `color` can't override. */
+.ehr-side-card.ehr-mission-card h2 {
+  color: #fff;
+}
+
+.ehr-side-card.ehr-mission-card .ehr-side-card-head svg {
+  stroke: #fff;
+  color: #fff;
 }

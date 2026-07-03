@@ -229,7 +229,7 @@ export default function RadiologyDashboard() {
                       </p>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{
-                      background: study.status === 'completed' ? '#05966915' : study.status === 'in_progress' ? '#3b82f615' : '#D9770615',
+                      background: study.status === 'completed' ? '#05966915' : study.status === 'in_progress' ? '#2191D015' : '#D9770615',
                       color: study.status === 'completed' ? 'var(--color-success)' : study.status === 'in_progress' ? 'var(--accent-primary)' : 'var(--color-warning)',
                     }}>{t(`radiology.status_${study.status}`)}</span>
                   </div>

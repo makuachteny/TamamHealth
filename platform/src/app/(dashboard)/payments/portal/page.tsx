@@ -181,7 +181,7 @@ export default function PatientPortalPage() {
 
         {/* ── Welcome Banner ───────────────────────────────── */}
         <div style={{
-          background: 'linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #3b82f6 100%)',
+          background: 'linear-gradient(135deg, #015697 0%, #015697 50%, #2191D0 100%)',
           borderRadius: 'var(--card-radius)', padding: '28px 32px', marginBottom: 24,
           position: 'relative', overflow: 'hidden',
         }}>
@@ -354,7 +354,7 @@ export default function PatientPortalPage() {
                     }}
                     style={{
                       width: '100%', padding: '12px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: 'linear-gradient(135deg, #3b82f6, #3FA9C9)', color: '#fff',
+                      background: 'linear-gradient(135deg, #2191D0, #369FDA)', color: '#fff',
                       fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                   >
@@ -501,7 +501,7 @@ export default function PatientPortalPage() {
               disabled={!paymentMethod || !paymentAmount}
               style={{
                 width: '100%', padding: '14px 24px', borderRadius: 10, border: 'none', cursor: paymentMethod ? 'pointer' : 'not-allowed',
-                background: paymentMethod ? 'linear-gradient(135deg, #3b82f6, #3FA9C9)' : 'var(--border-light)',
+                background: paymentMethod ? 'linear-gradient(135deg, #2191D0, #369FDA)' : 'var(--border-light)',
                 color: paymentMethod ? '#fff' : 'var(--text-muted)',
                 fontSize: '0.9375rem', fontWeight: 700, transition: 'all 0.15s',
               }}

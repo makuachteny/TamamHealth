@@ -434,15 +434,15 @@ function ExpandButton({ onClick }: { onClick: () => void }) {
 
 /* ═══════════════════════════════════════════════════════════════════ */
 
-const FACILITY_COLORS = ['var(--color-success)', '#2563EB', '#A855F7', 'var(--color-warning)', 'var(--text-muted)'];
+const FACILITY_COLORS = ['var(--color-success)', '#2191D0', '#A855F7', 'var(--color-warning)', 'var(--text-muted)'];
 
 const DISEASE_COLORS: Record<string, string> = {
   malaria: '#E52E42', cholera: 'var(--color-success-500)', measles: '#A855F7',
-  pneumonia: '#FCD34D', diarrhea: '#2563EB', tb: '#F97316', hiv: '#EC4899',
+  pneumonia: '#FCD34D', diarrhea: '#2191D0', tb: '#F97316', hiv: '#EC4899',
   'Malaria': '#E52E42', 'Cholera': 'var(--color-success-500)', 'Measles': '#A855F7',
-  'Pneumonia': '#FCD34D', 'Diarrhea': '#2563EB', 'Tuberculosis': '#F97316',
-  'HIV/AIDS': '#EC4899', 'Acute Watery Diarrhea': '#2563EB',
-  'Meningitis': '#06B6D4', 'Kala-azar': 'var(--color-purple-500)', 'Hepatitis E': '#F43F5E',
+  'Pneumonia': '#FCD34D', 'Diarrhea': '#2191D0', 'Tuberculosis': '#F97316',
+  'HIV/AIDS': '#EC4899', 'Acute Watery Diarrhea': '#2191D0',
+  'Meningitis': '#369FDA', 'Kala-azar': 'var(--color-purple-500)', 'Hepatitis E': '#F43F5E',
 };
 
 // Master list of all diseases collected across the system
@@ -629,7 +629,7 @@ export default function GovernmentDashboardPage() {
   }, [filteredHospitals, sdMetric]);
 
   const staffPieData = useMemo(() => [
-    { name: 'Doctors', value: totalDoctors, color: '#2563EB' },
+    { name: 'Doctors', value: totalDoctors, color: '#2191D0' },
     { name: 'Nurses', value: totalNurses, color: 'var(--color-success-500)' },
     { name: 'Clinical Officers', value: totalCOs, color: '#A855F7' },
   ], [totalDoctors, totalNurses, totalCOs]);
@@ -866,7 +866,7 @@ export default function GovernmentDashboardPage() {
   // Health Visits
   const renderVisits = () => {
     const activeVisits = hvSelectedSeries;
-    const visitColors: Record<string, string> = { 'OPD Visits': '#2563EB', 'ANC Visits': '#EC4899', 'Immunizations': '#A855F7' };
+    const visitColors: Record<string, string> = { 'OPD Visits': '#2191D0', 'ANC Visits': '#EC4899', 'Immunizations': '#A855F7' };
     const commonProps = { data: opdTrendData, margin: { top: 5, right: 15, left: 0, bottom: 5 } };
     const xProps = { dataKey: 'month' as const, tick: { fontSize: 10, fill: 'var(--text-muted)' }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false };
     const yProps = { tick: { fontSize: 10, fill: 'var(--text-muted)' }, axisLine: { stroke: 'var(--border-light)' }, tickLine: false };
@@ -900,7 +900,7 @@ export default function GovernmentDashboardPage() {
 
   // Staff
   const renderStaff = () => {
-    const staffColors: Record<string, string> = { Doctors: '#2563EB', Nurses: 'var(--color-success-500)', 'Clinical Officers': '#A855F7' };
+    const staffColors: Record<string, string> = { Doctors: '#2191D0', Nurses: 'var(--color-success-500)', 'Clinical Officers': '#A855F7' };
     const activeRoles = sdSelectedRoles;
 
     if (sdChartType === 'stacked') {
@@ -979,7 +979,7 @@ export default function GovernmentDashboardPage() {
     }
     return (
       <div className="p-3 grid grid-cols-2 gap-2">
-        <CircularGauge value={avgReporting} label={t('government.metricReporting')} color="#2563EB" size={96} strokeWidth={5} />
+        <CircularGauge value={avgReporting} label={t('government.metricReporting')} color="#2191D0" size={96} strokeWidth={5} />
         <CircularGauge value={avgReadiness} label={t('government.metricReadiness')} color="var(--accent-primary)" size={96} strokeWidth={5} />
         <CircularGauge value={avgImmCoverage} label={t('government.metricEpiCoverage')} color="#A855F7" size={96} strokeWidth={5} />
         <CircularGauge value={functionalPct} label={t('government.metricFunctional')} color="#FCD34D" size={96} strokeWidth={5} />
@@ -1050,10 +1050,10 @@ export default function GovernmentDashboardPage() {
         {/* ═══ National snapshot — distinct colour-tinted chips, spread across ═══ */}
         <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5 mb-4">
           {[
-            { label: t('government.kpiHospitals'), value: totalHospitals.toString(), icon: Building2, color: '#2563EB', bg: 'rgba(37,99,235,0.10)', href: '/hospitals' },
-            { label: t('government.kpiPatients'), value: totalPatients.toLocaleString(), icon: Users, color: '#0E7490', bg: 'rgba(14,116,144,0.10)', href: '/hospitals' },
+            { label: t('government.kpiHospitals'), value: totalHospitals.toString(), icon: Building2, color: '#2191D0', bg: 'rgba(37,99,235,0.10)', href: '/hospitals' },
+            { label: t('government.kpiPatients'), value: totalPatients.toLocaleString(), icon: Users, color: '#015697', bg: 'rgba(14,116,144,0.10)', href: '/hospitals' },
             { label: t('government.kpiBeds'), value: totalBeds.toLocaleString(), icon: BedDouble, color: 'var(--accent-primary)', bg: 'rgba(124,58,237,0.10)', href: '/hospitals' },
-            { label: t('government.kpiStaff'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: '#0891B2', bg: 'rgba(8,145,178,0.10)', href: '/hospitals' },
+            { label: t('government.kpiStaff'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: '#2191D0', bg: 'rgba(8,145,178,0.10)', href: '/hospitals' },
             { label: t('government.kpiOnline'), value: onlineHospitals.toString(), icon: Wifi, color: '#15803D', bg: 'rgba(21,128,61,0.10)', href: '/hospitals' },
             { label: t('government.kpiOffline'), value: offlineHospitals.toString(), icon: WifiOff, color: 'var(--text-muted)', bg: 'rgba(100,116,139,0.12)', href: '/hospitals' },
             { label: t('government.kpiAlerts'), value: activeAlerts.toString(), icon: AlertTriangle, color: 'var(--color-danger-500)', bg: 'rgba(196,69,54,0.10)', href: '/surveillance' },
@@ -1304,7 +1304,7 @@ export default function GovernmentDashboardPage() {
               <TableauMultiSelect
                 label={t('government.metrics')}
                 options={[
-                  { value: 'OPD Visits', label: t('government.opdVisits'), color: '#2563EB' },
+                  { value: 'OPD Visits', label: t('government.opdVisits'), color: '#2191D0' },
                   { value: 'ANC Visits', label: t('government.ancVisits'), color: '#EC4899' },
                   { value: 'Immunizations', label: t('government.immunizations'), color: '#A855F7' },
                 ]}
@@ -1355,7 +1355,7 @@ export default function GovernmentDashboardPage() {
               <TableauMultiSelect
                 label={t('government.roles')}
                 options={[
-                  { value: 'Doctors', label: t('government.roleDoctors'), color: '#2563EB' },
+                  { value: 'Doctors', label: t('government.roleDoctors'), color: '#2191D0' },
                   { value: 'Nurses', label: t('government.roleNurses'), color: 'var(--color-success-500)' },
                   { value: 'Clinical Officers', label: t('government.roleClinicalOfficers'), color: '#A855F7' },
                 ]}
@@ -1528,7 +1528,7 @@ export default function GovernmentDashboardPage() {
                     <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{alert.disease}</span>
                     <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
                       background: alert.alertLevel === 'emergency' ? 'rgba(229,46,66,0.15)' : alert.alertLevel === 'warning' ? 'rgba(252,211,77,0.15)' : 'rgba(56,189,248,0.15)',
-                      color: alert.alertLevel === 'emergency' ? 'var(--color-danger)' : alert.alertLevel === 'warning' ? 'var(--color-warning)' : '#2563EB',
+                      color: alert.alertLevel === 'emergency' ? 'var(--color-danger)' : alert.alertLevel === 'warning' ? 'var(--color-warning)' : '#2191D0',
                     }}>{alert.alertLevel.toUpperCase()}</span>
                   </div>
                   <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.alertCasesDeaths', { state: alert.state, cases: alert.cases, deaths: alert.deaths })}</p>

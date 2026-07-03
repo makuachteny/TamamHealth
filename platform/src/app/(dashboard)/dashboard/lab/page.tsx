@@ -83,16 +83,16 @@ const FLAG_COLORS = {
 const LAB_LIVE_FEED_ENABLED = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 const LAB_EVENT_TYPES = [
-  { label: 'Specimen Received', color: '#06B6D4', icon: Droplets },
+  { label: 'Specimen Received', color: '#369FDA', icon: Droplets },
   { label: 'Centrifuge Started', color: '#A855F7', icon: Loader2 },
   { label: 'Malaria RDT Completed', color: 'var(--color-success)', icon: Microscope },
   { label: 'Critical Hemoglobin Flagged', color: '#F87171', icon: AlertTriangle },
-  { label: 'CBC Analysis Running', color: '#2563EB', icon: Activity },
+  { label: 'CBC Analysis Running', color: '#2191D0', icon: Activity },
   { label: 'Urinalysis Complete', color: 'var(--color-warning)', icon: Beaker },
   { label: 'Blood Culture Incubated', color: '#EC4899', icon: Thermometer },
   { label: 'Result Validated', color: 'var(--accent-primary)', icon: CheckCircle2 },
   { label: 'Specimen Rejected - Hemolyzed', color: 'var(--color-danger)', icon: AlertTriangle },
-  { label: 'Glucose Result Ready', color: '#2563EB', icon: FlaskConical },
+  { label: 'Glucose Result Ready', color: '#2191D0', icon: FlaskConical },
 ];
 
 interface LiveEvent {
@@ -445,7 +445,7 @@ export default function LabDashboardPage() {
     { label: t('lab.acceptOrder'), icon: FileText, color: 'var(--color-success)', onClick: () => {} },
     { label: t('lab.enterResult'), icon: Microscope, color: ACCENT, onClick: () => setShowResultModal(true) },
     { label: t('lab.batchEntry'), icon: Table, color: '#A855F7', onClick: () => { setEntryMode('batch'); setShowResultModal(true); } },
-    { label: t('lab.message'), icon: MessageSquare, color: '#2563EB', onClick: () => {} },
+    { label: t('lab.message'), icon: MessageSquare, color: '#2191D0', onClick: () => {} },
   ];
 
   return (
@@ -741,7 +741,7 @@ export default function LabDashboardPage() {
         <div className="dash-card rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <div className="flex items-center gap-2">
-              <Timer className="w-4 h-4" style={{ color: '#2563EB' }} />
+              <Timer className="w-4 h-4" style={{ color: '#2191D0' }} />
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.tatDashboard')}</span>
             </div>
             <div className="flex items-center gap-3">

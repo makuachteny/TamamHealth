@@ -1559,7 +1559,7 @@ export default function DashboardPage() {
                         className="flex items-center gap-3 p-2.5 rounded-xl text-left transition-all"
                         style={{
                           background: isSelected ? 'rgba(33, 145, 208, 0.08)' : 'var(--bg-secondary)',
-                          border: isSelected ? '2px solid #3b82f6' : '1px solid var(--border-light)',
+                          border: isSelected ? '2px solid #2191D0' : '1px solid var(--border-light)',
                         }}
                       >
                         <div

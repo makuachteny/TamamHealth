@@ -22,13 +22,13 @@ const ACCENT = 'var(--accent-primary)';
 const PHARMACY_LIVE_FEED_ENABLED = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 const EVENT_TYPES = [
-  { type: 'rx_received', label: 'Prescription Received', color: '#2563EB', icon: ClipboardList },
+  { type: 'rx_received', label: 'Prescription Received', color: '#2191D0', icon: ClipboardList },
   { type: 'dispensed', label: 'Medication Dispensed', color: 'var(--color-success)', icon: CheckCircle2 },
   { type: 'stock_alert', label: 'Stock Alert Triggered', color: '#F87171', icon: AlertTriangle },
   { type: 'controlled', label: 'Controlled Substance Logged', color: '#A855F7', icon: ShieldCheck },
   { type: 'expired', label: 'Expired Item Flagged', color: 'var(--color-danger)', icon: XCircle },
   { type: 'pickup', label: 'Awaiting Patient Pickup', color: ACCENT, icon: Clock },
-  { type: 'restock', label: 'Restock Order Placed', color: '#2563EB', icon: Package },
+  { type: 'restock', label: 'Restock Order Placed', color: '#2191D0', icon: Package },
   { type: 'message', label: 'Pharmacist Message', color: '#EC4899', icon: MessageSquare },
 ];
 
@@ -63,7 +63,7 @@ const DRUG_INTERACTIONS: DrugInteraction[] = [
 const INTERACTION_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   HIGH: { bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)', text: 'var(--color-danger)' },
   MODERATE: { bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)', text: 'var(--color-warning)' },
-  LOW: { bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.3)', text: '#2563EB' },
+  LOW: { bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.3)', text: '#2191D0' },
 };
 
 function checkDrugInteractions(medication: string, patientMedications: string[]): DrugInteraction[] {
@@ -525,7 +525,7 @@ export default function PharmacyDashboardPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { label: t('pharmacy.dispense'), icon: Pill, color: ACCENT },
-              { label: t('pharmacy.checkStock'), icon: Search, href: '/pharmacy', color: '#2563EB' },
+              { label: t('pharmacy.checkStock'), icon: Search, href: '/pharmacy', color: '#2191D0' },
               { label: t('pharmacy.message'), icon: Send, href: '/messages', color: '#EC4899' },
               { label: t('pharmacy.inventory'), icon: Package, href: '/pharmacy', color: 'var(--color-success)' },
             ].map(action => (
@@ -555,7 +555,7 @@ export default function PharmacyDashboardPage() {
                 { key: 'received', label: t('pharmacy.stageReceived'), icon: ClipboardList, color: ACCENT, count: prescriptionQueue.length },
                 { key: 'pending', label: t('pharmacy.pending'), icon: Clock, color: 'var(--color-warning)', count: pendingRx },
                 { key: 'dispensed', label: t('pharmacy.kpiDispensed'), icon: CheckCircle2, color: 'var(--color-success)', count: dispensedToday },
-                { key: 'pickup', label: t('pharmacy.kpiPickup'), icon: Send, color: '#2563EB', count: awaitingPickup },
+                { key: 'pickup', label: t('pharmacy.kpiPickup'), icon: Send, color: '#2191D0', count: awaitingPickup },
                 { key: 'reorder', label: t('pharmacy.reorderNeeded'), icon: AlertTriangle, color: 'var(--color-danger)', count: criticalCount + lowStockCount },
               ].map((stage, idx, arr) => (
                 <div key={stage.key} className="flex items-center flex-1">
@@ -631,7 +631,7 @@ export default function PharmacyDashboardPage() {
                           { key: 'all', label: t('pharmacy.viewAll'), count: prescriptionQueue.length, color: 'var(--text-secondary)' },
                           { key: 'pending', label: t('pharmacy.kpiPendingRx'), count: pendingRx, color: ACCENT },
                           { key: 'dispensed', label: t('pharmacy.kpiDispensed'), count: dispensedToday, color: 'var(--color-success)' },
-                          { key: 'awaiting_pickup', label: t('pharmacy.kpiPickup'), count: awaitingPickup, color: '#2563EB' },
+                          { key: 'awaiting_pickup', label: t('pharmacy.kpiPickup'), count: awaitingPickup, color: '#2191D0' },
                           { key: 'controlled', label: t('pharmacy.kpiControlled'), count: controlledCount, color: '#A855F7' },
                         ] as const).map(chip => {
                           const active = queueFilter === chip.key;
@@ -682,7 +682,7 @@ export default function PharmacyDashboardPage() {
                       background: rx.status === 'dispensed' ? 'rgba(74,222,128,0.15)' :
                         rx.status === 'awaiting_pickup' ? 'rgba(56,189,248,0.15)' : `${ACCENT}15`,
                       color: rx.status === 'dispensed' ? 'var(--color-success)' :
-                        rx.status === 'awaiting_pickup' ? '#2563EB' : ACCENT,
+                        rx.status === 'awaiting_pickup' ? '#2191D0' : ACCENT,
                     }}>{rx.status === 'awaiting_pickup' ? t('pharmacy.statusPickup') : t(`pharmacy.status_${rx.status}`)}</span>
                     {rx.priority === 'urgent' && (
                       <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{

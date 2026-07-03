@@ -624,7 +624,7 @@ export default function PaymentPanel({
           }}>{t('action.cancel')}</button>
           <button onClick={handleSubmit} disabled={processing} style={{
             flex: 2, padding: '13px 0', borderRadius: 11, border: 'none',
-            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover, #1e3a8a))',
+            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover, #015697))',
             color: '#fff', fontSize: 14, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer',
             opacity: processing ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
             boxShadow: '0 4px 14px var(--accent-glow, rgba(33,145,208,0.3))',

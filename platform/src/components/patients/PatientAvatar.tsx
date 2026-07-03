@@ -8,8 +8,8 @@ import { avatarColor } from '@/lib/patient-utils';
 const COVERAGE_COLOR: Record<string, string> = {
   'out-of-pocket': '#C2410C',   // muted orange — self-pay
   'program':       'var(--color-success-700)',   // clinical green — government/programme
-  'exemption':     '#1D4ED8',   // mid-blue — fee waiver / exemption
-  'ngo':           '#0E7490',   // teal — NGO covered
+  'exemption':     '#015697',   // mid-blue — fee waiver / exemption
+  'ngo':           '#015697',   // teal — NGO covered
   'unknown':       'var(--color-slate-500)',   // slate — no info
 };
 

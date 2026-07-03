@@ -407,7 +407,7 @@ export default function ReferralsPage() {
           <div className="p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2 mb-3">
               <div className="icon-box-sm">
-                <Stethoscope className="w-4 h-4" style={{ color: '#2563EB' }} />
+                <Stethoscope className="w-4 h-4" style={{ color: '#2191D0' }} />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{t('referrals.medicalRecords', { count: pkg.medicalRecords.length })}</span>
             </div>

@@ -2012,7 +2012,7 @@ export default function PatientDetailPage() {
                             {(rec.prescriptions || []).length > 0 && (
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                                  <Pill className="w-3 h-3" style={{ color: '#3B82F6' }} />
+                                  <Pill className="w-3 h-3" style={{ color: '#2191D0' }} />
                                   Prescriptions ({rec.prescriptions!.length})
                                 </p>
                                 <ul className="space-y-1">
@@ -2170,7 +2170,7 @@ export default function PatientDetailPage() {
               <div className="flex items-center justify-between px-1 mb-1">
                 <div className="flex items-center gap-2">
                   <div className="icon-box-sm">
-                    <Pill className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
+                    <Pill className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Prescriptions</span>
                 </div>
@@ -2181,7 +2181,7 @@ export default function PatientDetailPage() {
               {patient.preferredPharmacy && (
                 <div className="card-elevated px-5 py-3 flex items-center gap-3">
                   <div className="icon-box-sm flex-shrink-0">
-                    <Building2 className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
+                    <Building2 className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Preferred Pharmacy</p>

@@ -256,7 +256,7 @@ export default function ANCPage() {
               ] as const).map((step, i) => {
                 const pct = stats.totalMothers > 0 ? Math.round((step.count / stats.totalMothers) * 100) : 0;
                 const dropoff = i > 0 ? Math.max(0, ([stats.continuum.anc1, stats.continuum.anc2, stats.continuum.anc3, stats.continuum.anc4, stats.continuum.anc5plus][i - 1]) - step.count) : 0;
-                const barColor = step.key === 'anc4' ? 'var(--accent-primary)' : pct >= 50 ? '#1E3A8A' : pct >= 25 ? 'var(--color-warning)' : 'var(--color-danger)';
+                const barColor = step.key === 'anc4' ? 'var(--accent-primary)' : pct >= 50 ? '#015697' : pct >= 25 ? 'var(--color-warning)' : 'var(--color-danger)';
                 return (
                   <div key={step.key} className="flex items-center gap-3">
                     <span className="text-xs font-medium w-44 text-right" style={{ color: 'var(--text-secondary)' }}>{step.label}</span>

@@ -7,6 +7,7 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   ClipboardList,
   FlaskConical,
   LayoutDashboard,
@@ -626,7 +627,10 @@ export default function EhrClinicalDashboard({
             <X className="w-4 h-4" />
           </button>
 	          <section className="ehr-side-card ehr-outstanding-card">
-	            <h2>Outstanding items</h2>
+	            <div className="ehr-side-card-head">
+	              <ClipboardList className="w-5 h-5" />
+	              <h2>Outstanding items</h2>
+	            </div>
             <div className="ehr-outstanding-chips">
               {outstanding.map(item => (
                 <button key={item.label} type="button" onClick={() => item.href && router.push(item.href)} className={item.tone || 'neutral'}>
@@ -638,7 +642,10 @@ export default function EhrClinicalDashboard({
           </section>
 
           <section className="ehr-side-card">
-            <h2>Tamam checklist</h2>
+            <div className="ehr-side-card-head">
+              <ClipboardCheck className="w-5 h-5" />
+              <h2>Tamam checklist</h2>
+            </div>
             <p>Core workflow coverage for South Sudan facility teams.</p>
             {workflowChecklist.map(item => (
               <label key={item.label} onClick={() => router.push(item.href)}>
@@ -649,7 +656,7 @@ export default function EhrClinicalDashboard({
           </section>
 
           <section className="ehr-side-card ehr-mission-card">
-            <div className="ehr-mission-head">
+            <div className="ehr-side-card-head ehr-mission-head">
               <Stethoscope className="w-5 h-5" />
               <h2>Direct care first</h2>
             </div>

@@ -86,7 +86,7 @@ export default function InsuranceSnapshot({ patientId, editable, onAddInsurance,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 13 }}>
-          <span className="icon-box-sm" style={{ color: 'var(--teal, #3B82F6)' }}>
+          <span className="icon-box-sm" style={{ color: 'var(--teal, #2191D0)' }}>
             <Shield size={16} />
           </span>
           {t('insuranceSnapshot.noInsuranceSelfPay')}
@@ -113,7 +113,7 @@ export default function InsuranceSnapshot({ patientId, editable, onAddInsurance,
           border: `1px solid ${policy.isPrimary ? 'var(--accent)' : 'var(--border-medium)'}`,
           display: 'flex', alignItems: 'center', gap: 12,
         }}>
-          <span className="icon-box-sm" style={{ color: 'var(--teal, #3B82F6)', flexShrink: 0 }}>
+          <span className="icon-box-sm" style={{ color: 'var(--teal, #2191D0)', flexShrink: 0 }}>
             <Building2 size={44} />
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
