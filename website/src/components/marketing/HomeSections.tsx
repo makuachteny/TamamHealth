@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { HOME_AUDIENCES, HOME_LEARN_MORE, HOME_PRINCIPLES, HOME_PROBLEM_STATS } from "@/data/home";
 import { ArrowRight, FileText, HeartPulse, Network, ShieldCheck } from "@/components/marketing/icons";
-import { Reveal } from "@/components/marketing/MarketingShared";
+import { Reveal, RelatedLinksGrid, SplitFeatureBlock } from "@/components/marketing/MarketingShared";
 import { MarketingActionModalButton } from "@/components/marketing/MarketingActionModal";
 
 const PRINCIPLE_ICONS = {
@@ -72,55 +72,31 @@ export function HomeProblemSection() {
 
 export function HomeMissionBand() {
   return (
-    <section className="mk-home-mission-band">
-      <div className="mk-container mk-home-mission-band-inner">
-        <Reveal>
-          <p className="mk-label mk-home-mission-band-label">Our mission</p>
-        </Reveal>
-        <Reveal>
-          <h2 className="mk-h2 mk-home-mission-band-title">
-            Every patient&apos;s story should follow them — from a village health post to the Ministry of
-            Health — no matter what the network is doing.
-          </h2>
-        </Reveal>
-        <Reveal>
-          <Link href="/products#products-grid" className="mk-home-mission-band-link">
-            See how the platform delivers on it →
-          </Link>
-        </Reveal>
-      </div>
-    </section>
+    <SplitFeatureBlock
+      eyebrow="Our mission"
+      title="Every patient's story should follow them — from a village health post to the Ministry of Health."
+      body="No matter what the network is doing, the record a health worker starts should still be the record a facility leader sees, and the record a Ministry analyst reports on — the same story, not three different ones."
+      href="/products#products-grid"
+      linkLabel="See how the platform delivers on it"
+      image="/assets/village-community.jpg"
+      imageAlt="A village community gathered near a health post in South Sudan"
+      tone="navy"
+    />
   );
 }
 
 export function HomeAudienceSection() {
   return (
-    <section className="mk-section mk-section-white">
-      <div className="mk-container">
-        <Reveal>
-          <div className="mk-section-heading">
-            <p className="mk-label">Who it&apos;s for</p>
-            <h2 className="mk-h2">Built around the people who keep a facility running</h2>
-          </div>
-        </Reveal>
-
-        <div className="mk-home-audience-grid">
-          {HOME_AUDIENCES.map((item, index) => (
-            <Reveal key={item.title} delay={index * 0.06}>
-              <Link href={item.href} className="mk-home-card-link">
-                <div className="mk-home-audience-card">
-                  <div className="mk-home-audience-image">
-                    <Image src={item.image} alt="" fill sizes="(max-width: 900px) 100vw, 33vw" style={{ objectFit: "cover" }} />
-                  </div>
-                  <h3>{item.title}</h3>
-                  <p>{item.body}</p>
-                </div>
-              </Link>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
+    <RelatedLinksGrid
+      heading="Built around the people who keep a facility running"
+      items={HOME_AUDIENCES.map((item) => ({
+        label: "Who it's for",
+        title: item.title,
+        body: item.body,
+        href: item.href,
+        image: item.image,
+      }))}
+    />
   );
 }
 
@@ -196,7 +172,7 @@ export function HomePlatformSection() {
       <div className="mk-container">
         <Reveal>
           <div className="mk-home-platform-flow">
-            <p className="mk-label">The FLOW</p>
+            <p className="mk-label">The solution</p>
             <div className="mk-home-platform-flow-line" aria-label="TamamHealth workflow from registration to reporting">
               {PLATFORM_WORKFLOW_STEPS.map((step) => (
                 <span key={step}>{step}</span>
@@ -218,10 +194,10 @@ export function HomePlatformSection() {
             </div>
             <div className="mk-split-content">
               <h2 className="mk-h2 mk-home-platform-heading">
-                <span>Workflow</span>
+                <span>One workflow, start to finish</span>
               </h2>
               <p>
-                From the front desk to the ward, every step in TamamHealth links back to the same patient encounter. Clinicians, facility teams, and health leaders can work from cleaner records without duplicating data.
+                TamamHealth links every step — registration through reporting — back to the same patient encounter, so the record a nurse starts is the same one a Ministry analyst sees later. No re-entry, no separate systems to reconcile.
               </p>
               <div className="mk-home-platform-checks">
                 <span>Patient history</span>

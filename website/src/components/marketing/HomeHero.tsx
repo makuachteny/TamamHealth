@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MarketingActionModalButton } from "./MarketingActionModal";
 import { Reveal } from "./MarketingShared";
@@ -53,10 +52,10 @@ export function HomeHero() {
         <div className="mk-container mk-home-split-hero-grid">
           <Reveal>
             <div className="mk-home-split-hero-copy">
+              <p className="mk-home-split-hero-kicker">Our mission</p>
               <h1 className="mk-h1 mk-home-split-hero-title">
-                Many communities.
-                <br />
-                One system of care.
+                We aspire to give every health facility in South Sudan one connected
+                patient record — no matter what the network is doing.
               </h1>
               <p className="mk-body-lg mk-home-split-hero-subtitle">
                 Tamam brings patients, wards, pharmacy, lab, blood bank, maternal &amp; child health, and
@@ -71,9 +70,6 @@ export function HomeHero() {
                 >
                   Book a Demo
                 </MarketingActionModalButton>
-                <Link href="/about/contact" className="mk-btn mk-btn-outline-white">
-                  Get in Touch
-                </Link>
               </div>
             </div>
           </Reveal>

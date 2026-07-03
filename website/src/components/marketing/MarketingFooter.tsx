@@ -50,6 +50,27 @@ const SOCIAL_LINKS = [
   },
 ];
 
+const FOOTER_GROUPS = [
+  {
+    heading: "Platform",
+    links: [
+      { label: "EHR & Clinical", body: "Registration, triage, consultation, and the record that ties them together.", href: "/ehr" },
+      { label: "Pharmacy & Lab", body: "Stock, dispensing, orders, and results without leaving the chart.", href: "/pharmacy-lab" },
+      { label: "Billing & Payments", body: "Charge capture and mobile money, reconciled automatically.", href: "/billing" },
+      { label: "Telehealth", body: "Bring specialist care to facilities that can't staff it locally.", href: "/telehealth" },
+    ],
+  },
+  {
+    heading: "Company",
+    links: [
+      { label: "Our Story", body: "Why we're building for South Sudan first.", href: "/about" },
+      { label: "Installation", body: "How a facility goes from paper to TamamHealth.", href: "/installation" },
+      { label: "Pricing", body: "Straightforward packages for facilities of every size.", href: "/pricing#packages" },
+      { label: "Case Studies", body: "Scenarios showing what changes when a facility goes digital.", href: "/case-studies" },
+    ],
+  },
+] as const;
+
 export default function MarketingFooter() {
   return (
     <footer className="mk-footer">
@@ -63,7 +84,23 @@ export default function MarketingFooter() {
             Book a demo
           </Link>
         </div>
+      </div>
 
+      {/* Social band */}
+      <div className="mk-footer-social-band">
+        <div className="mk-container mk-footer-social-band-inner">
+          <span>Connect with us</span>
+          <div className="mk-footer-socials">
+            {SOCIAL_LINKS.map((social) => (
+              <a key={social.label} href={social.href} target="_blank" rel="noopener noreferrer" className="mk-footer-social-link" aria-label={social.label}>
+                {social.icon}
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mk-container">
         {/* Main footer content */}
         <div className="mk-footer-inner">
           {/* Brand column */}
@@ -87,41 +124,24 @@ export default function MarketingFooter() {
               Digital health infrastructure for connected care. Offline-first, secure, and built for real facilities.
             </p>
 
-            {/* Social links */}
-            <div className="mk-footer-socials">
-              {SOCIAL_LINKS.map((social) => (
-                <a key={social.label} href={social.href} target="_blank" rel="noopener noreferrer" className="mk-footer-social-link" aria-label={social.label}>
-                  {social.icon}
-                </a>
-              ))}
+            {SHOW_FUNDRAISING && (
+              <Link href="/donate" style={{ color: "var(--tb-gold)", fontWeight: 600, fontSize: 14 }}>Fund Our Pilot</Link>
+            )}
+          </div>
+
+          {FOOTER_GROUPS.map((group) => (
+            <div className="mk-footer-links-column" key={group.heading}>
+              <h5 className="mk-footer-column-heading">{group.heading}</h5>
+              <nav className="mk-footer-nav mk-footer-nav-rich">
+                {group.links.map((link) => (
+                  <Link key={link.href} href={link.href} className="mk-footer-nav-rich-link">
+                    <strong>{link.label}</strong>
+                    <span>{link.body}</span>
+                  </Link>
+                ))}
+              </nav>
             </div>
-          </div>
-
-          {/* Platform column */}
-          <div className="mk-footer-links-column">
-            <h5 className="mk-footer-column-heading">Platform</h5>
-            <nav className="mk-footer-nav">
-              <Link href="/ehr">EHR &amp; Clinical</Link>
-              <Link href="/billing">Billing &amp; Payments</Link>
-              <Link href="/telehealth">Telehealth</Link>
-              <Link href="/pharmacy-lab">Pharmacy &amp; Lab</Link>
-              <Link href="/pricing#packages">Pricing</Link>
-            </nav>
-          </div>
-
-          {/* Company column */}
-          <div className="mk-footer-links-column">
-            <h5 className="mk-footer-column-heading">Company</h5>
-            <nav className="mk-footer-nav">
-              <Link href="/about">Our Story</Link>
-              <Link href="/about/team">Team</Link>
-              <Link href="/about/contact#contact-form">Contact</Link>
-              {SHOW_FUNDRAISING && (
-                <Link href="/donate" style={{ color: "var(--tb-gold)", fontWeight: 600 }}>Fund Our Pilot</Link>
-              )}
-              <Link href="/case-studies">Case Studies</Link>
-            </nav>
-          </div>
+          ))}
 
           {/* Email column */}
           <div className="mk-footer-contact">
