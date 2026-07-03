@@ -9,7 +9,7 @@ import {
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { SearchInput, FilterMenu } from '@/components/filters';
+import { SearchInput } from '@/components/filters';
 import { computePlanKpis } from '@/components/payments/PlanKpiCards';
 import DataTile from '@/components/DataTile';
 import Modal from '@/components/Modal';
@@ -52,9 +52,9 @@ export default function PaymentsPage() {
   const [error, setError] = useState('');
   // Text search comes from the shared global search bar (TopBar).
   const search = globalSearch;
-  const [balanceFilter, setBalanceFilter] = useState('all');
-  const activeFilterCount = balanceFilter !== 'all' ? 1 : 0;
-  const clearFilters = () => setBalanceFilter('all');
+  // Balance filter retained for the bills list logic; the header filter UI was
+  // removed, so it stays at 'all'.
+  const [balanceFilter] = useState('all');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [payingLine, setPayingLine] = useState<PatientLine | null>(null);
   // Inline "Collect payment" launcher: a header button opens a patient picker,

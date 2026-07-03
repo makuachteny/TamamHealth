@@ -2,8 +2,9 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, CheckCircle2, ChevronRight, ClipboardList, Search, Stethoscope, User, type LucideIcon } from '@/components/icons/lucide';
+import { Calendar, CheckCircle2, ChevronRight, ClipboardList, Search, Stethoscope, type LucideIcon } from '@/components/icons/lucide';
 import EhrMiniCalendar, { formatDateTitle, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
+import { initials } from '@/lib/patient-utils';
 
 export type EhrCareDashboardAction = {
   label: string;
@@ -293,9 +294,7 @@ export default function EhrCareDashboard({
             ) : visibleRows.map(row => (
               <div key={row.id}>
                 <div className={`ehr-appointment-row ehr-care-row ${row.statusTone || 'scheduled'}`} onClick={row.onClick}>
-                  <div className="ehr-patient-icon">
-                    <User className="w-5 h-5" />
-                  </div>
+                  <div className="ehr-patient-icon">{initials(row.title)}</div>
                   <div className="ehr-appointment-main">
                     <button type="button" onClick={(event) => { event.stopPropagation(); row.onClick?.(); }}>{row.title}</button>
                     <p>{row.subtitle}</p>

@@ -8301,6 +8301,7 @@ body {
 /* ── Final home nav scroll states ────────────────────────────────── */
 .mk-navbar--hero-solid {
   background: linear-gradient(135deg, #10195A 0%, #015697 58%, #2191D0 100%) !important;
+  background-attachment: fixed !important;
   border-bottom-color: rgba(255,255,255,0.12) !important;
 }
 
@@ -12993,17 +12994,20 @@ button.mk-mobile-top-demo {
 }
 
 /* ── Final page-matched header tones ───────────────────────────── */
+/* Home now uses the same dark-blue hero theme as the rest of the site
+   (see .mk-home-split-hero), so its nav tone matches the default dark
+   treatment below instead of the old light-cream hero's colors. */
 .mk-navbar--tone-home {
-  --mk-nav-hero-bg: linear-gradient(135deg, #FEFFF9 0%, #F7FBF8 52%, #EFF8FD 100%);
-  --mk-nav-hero-text: #014d55;
-  --mk-nav-logo-filter: none;
-  --mk-nav-pricing-bg: rgba(254,255,249,0.9);
-  --mk-nav-pricing-border: #014d55;
-  --mk-nav-pricing-color: #014d55;
-  --mk-nav-demo-bg: #015697;
-  --mk-nav-demo-border: #015697;
-  --mk-nav-demo-color: #fff;
-  --mk-nav-sales-bg: rgba(254,255,249,0.84);
+  --mk-nav-hero-bg: linear-gradient(135deg, #10195A 0%, #015697 58%, #2191D0 100%);
+  --mk-nav-hero-text: rgba(255,255,255,0.96);
+  --mk-nav-logo-filter: brightness(0) invert(1);
+  --mk-nav-pricing-bg: rgba(255,255,255,0.08);
+  --mk-nav-pricing-border: rgba(255,255,255,0.92);
+  --mk-nav-pricing-color: #fff;
+  --mk-nav-demo-bg: #fff;
+  --mk-nav-demo-border: #fff;
+  --mk-nav-demo-color: #015697;
+  --mk-nav-sales-bg: rgba(255,255,255,0.08);
 }
 
 .mk-navbar--tone-platform {
@@ -13038,9 +13042,14 @@ button.mk-mobile-top-demo {
   --mk-nav-sales-bg: rgba(255,255,255,0.08);
 }
 
-.mk-navbar.mk-navbar--hero-solid,
 .mk-navbar.mk-navbar--hero {
   background: transparent !important;
+  border-bottom-color: color-mix(in srgb, var(--mk-nav-hero-text) 16%, transparent) !important;
+  color: var(--mk-nav-hero-text) !important;
+}
+
+.mk-navbar.mk-navbar--hero-solid {
+  background: var(--mk-nav-hero-bg) fixed !important;
   border-bottom-color: color-mix(in srgb, var(--mk-nav-hero-text) 16%, transparent) !important;
   color: var(--mk-nav-hero-text) !important;
 }
@@ -13098,15 +13107,19 @@ button.mk-mobile-top-demo {
 
 /* ── Final transparent hero header behavior ────────────────────── */
 .mk-navbar.mk-navbar--hero,
-.mk-navbar.mk-navbar--hero-solid,
 .mk-navbar.mk-navbar--light-hero {
   background: transparent !important;
   border-bottom-color: transparent !important;
   color: var(--mk-nav-hero-text) !important;
 }
 
+.mk-navbar.mk-navbar--hero-solid {
+  background: var(--mk-nav-hero-bg) fixed !important;
+  border-bottom-color: color-mix(in srgb, var(--mk-nav-hero-text) 16%, transparent) !important;
+  color: var(--mk-nav-hero-text) !important;
+}
+
 .mk-navbar.mk-navbar--hero::before,
-.mk-navbar.mk-navbar--hero-solid::before,
 .mk-navbar.mk-navbar--light-hero::before {
   display: none !important;
 }
@@ -13958,12 +13971,11 @@ button.mk-mobile-top-demo {
     radial-gradient(circle at 12% 18%, rgba(33,145,208,0.42), transparent 34%),
     radial-gradient(circle at 84% 78%, rgba(221,242,251,0.20), transparent 36%),
     linear-gradient(135deg, #10195A 0%, #015697 58%, #2191D0 100%);
+  background-attachment: scroll, scroll, fixed;
   color: #fff;
-  min-height: 100vh;
-  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding-top: clamp(24px, 3vw, 40px);
+  padding: clamp(24px, 3vw, 40px) 0 clamp(28px, 3vw, 40px);
   overflow: hidden;
 }
 
@@ -13986,8 +13998,7 @@ button.mk-mobile-top-demo {
 }
 
 .mk-home-split-hero-footer {
-  margin-top: auto;
-  padding-bottom: clamp(20px, 3vw, 32px);
+  margin-top: 32px;
 }
 
 .mk-home-split-hero-grid {

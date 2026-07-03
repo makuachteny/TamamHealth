@@ -9,7 +9,6 @@ import {
 import RowActionsMenu from '@/components/RowActionsMenu';
 import TopBar from '@/components/TopBar';
 import DataTile from '@/components/DataTile';
-import { FilterMenu } from '@/components/filters';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { ClaimDoc, ClaimStatus, PayerType } from '@/lib/db-types-payments';
@@ -74,9 +73,9 @@ export default function ClaimsPage() {
   });
   // Text search comes from the shared global search bar (TopBar).
   const searchQuery = globalSearch;
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const activeFilterCount = statusFilter !== 'all' ? 1 : 0;
-  const clearFilters = () => setStatusFilter('all');
+  // Status filter retained for the claims list logic; the header filter UI was
+  // removed, so it stays at 'all'.
+  const [statusFilter] = useState<string>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adjForm, setAdjForm] = useState<AdjudicationForm | null>(null);
   const [loading, setLoading] = useState(true);

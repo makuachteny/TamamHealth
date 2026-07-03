@@ -12480,18 +12480,36 @@ span:has(> svg:only-child) {
    they stayed light. Re-point them at the tokens in dark mode only. Kept off
    any .active / .primary / tonal states (those keep their own colours), and
    inputs/selects are already handled by the global dark input rule. */
+[data-theme="dark"] .ehr-side-card:not(.ehr-mission-card),
+[data-theme="dark"] .ehr-worklist-panel,
+[data-theme="dark"] .ehr-worklist-table,
+[data-theme="dark"] .ehr-appointment-list,
 [data-theme="dark"] .ehr-appointment-row,
 [data-theme="dark"] .ehr-worklist-row,
+[data-theme="dark"] .ehr-today-button,
+[data-theme="dark"] .ehr-mini-calendar,
+[data-theme="dark"] .ehr-filter-group,
 [data-theme="dark"] .ehr-care-detail,
 [data-theme="dark"] .ehr-care-search,
 [data-theme="dark"] .ehr-checkin-section,
+[data-theme="dark"] .ehr-encounter-card,
+[data-theme="dark"] .ehr-encounter-card__body,
 [data-theme="dark"] .ehr-care-filter:not(.active),
 [data-theme="dark"] .ehr-care-rail-action:not(.active),
+[data-theme="dark"] .ehr-empty-state button,
 [data-theme="dark"] .ehr-worklist-empty button {
   background: var(--ehr-panel);
   border-color: var(--ehr-border);
+  color: var(--ehr-text);
 }
 [data-theme="dark"] .ehr-worklist-row { border-bottom-color: var(--ehr-border); }
+/* Calendar day cells hardcode a pale blue on hover — darken them. */
+[data-theme="dark"] .ehr-mini-calendar-grid button:not(.selected):hover { background: var(--ehr-hover); }
+/* Card headings/labels use the (now light) text tokens for contrast on dark. */
+[data-theme="dark"] .ehr-side-card h2,
+[data-theme="dark"] .ehr-worklist-panel h3 { color: var(--ehr-text-title); }
+[data-theme="dark"] .ehr-side-card p,
+[data-theme="dark"] .ehr-worklist-panel p { color: var(--ehr-muted); }
 
 /* Patient chart re-declares --ehr-* under its own class, so it needs the same
    dark values or it renders blinding-white in dark mode. */
