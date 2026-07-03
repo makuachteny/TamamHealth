@@ -154,12 +154,14 @@ export function SplitFeatureBlock({
 export function RelatedLinksGrid({
   heading,
   items,
+  className,
 }: {
   heading?: string;
   items: { label: string; title: string; body?: string; href?: string; image: string }[];
+  className?: string;
 }) {
   return (
-    <section className="mk-related-links">
+    <section className={className ? `mk-related-links ${className}` : "mk-related-links"}>
       <div className="mk-container">
         {heading && <h3 className="mk-related-links-heading">{heading}</h3>}
         <div className="mk-related-links-grid">

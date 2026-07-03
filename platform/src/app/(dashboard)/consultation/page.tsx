@@ -124,6 +124,11 @@ export default function ConsultationPage() {
   const { triages } = useTriage();
   const [historySearch, setHistorySearch] = useState('');
   const [pmhSearch, setPmhSearch] = useState('');
+  // "Edit history" popup: one modal holding every history field, filtered by
+  // its own search bar so the clinician can jump straight to a field (and
+  // free-type anything that isn't on the chart yet).
+  const [historyEditOpen, setHistoryEditOpen] = useState(false);
+  const [historyEditSearch, setHistoryEditSearch] = useState('');
 
   // Section collapse state (11 sections — includes AI section at index 3 and Attachments at index 8)
   // In the stepped wizard every section is expanded; the active step controls
@@ -160,8 +165,6 @@ export default function ConsultationPage() {
   });
   const [ros, setRos] = useState<Record<string, { status: 'negative' | 'positive'; findings: string }>>({});
   const [customLab, setCustomLab] = useState('');
-  const hpiRef = useRef<HTMLTextAreaElement | null>(null);
-  const familyHistoryRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Patient selector
   const [patientSearch, setPatientSearch] = useState('');
@@ -420,34 +423,64 @@ export default function ConsultationPage() {
     [patients, selectedPatient]
   );
   const latestRecord = patientRecords?.[0] || null;
-  const filteredPmhConditions = useMemo(
-    () => CHRONIC_CONDITIONS.filter(c => c.toLowerCase().includes(pmhSearch.trim().toLowerCase())),
-    [pmhSearch]
-  );
+  // Chart history summary shows the working values for this visit (edited via
+  // the "Edit history" popup), falling back to the prior record / patient
+  // registration data for anything not touched yet.
   const chartHistorySummary = useMemo(() => {
     const entries = [
-      { key: 'hpi', label: 'HPI', value: latestRecord?.historyOfPresentIllness || '' },
-      { key: 'pmh', label: 'Past medical history', value: latestRecord?.pastMedicalHistory?.chronicConditions?.join(', ') || selectedPatientData?.chronicConditions?.join(', ') || '' },
-      { key: 'surgeries', label: 'Past surgeries', value: latestRecord?.pastMedicalHistory?.pastSurgeries || '' },
-      { key: 'admissions', label: 'Prior admissions', value: latestRecord?.pastMedicalHistory?.pastAdmissions || '' },
-      { key: 'transfusion', label: 'Blood transfusion', value: latestRecord?.pastMedicalHistory?.bloodTransfusion ? 'Yes' : '' },
-      { key: 'family', label: 'Family history', value: latestRecord?.familyHistory || '' },
-      { key: 'smoking', label: 'Smoking', value: latestRecord?.socialHistory?.smoking || '' },
-      { key: 'alcohol', label: 'Alcohol', value: latestRecord?.socialHistory?.alcohol || '' },
-      { key: 'substance', label: 'Substance use', value: latestRecord?.socialHistory?.substanceUse || '' },
-      { key: 'occupation', label: 'Occupation', value: latestRecord?.socialHistory?.occupation || '' },
-      { key: 'insurance', label: 'Insurance', value: latestRecord?.socialHistory?.hasHealthInsurance ? 'Yes' : '' },
-      { key: 'provider', label: 'Insurance provider', value: latestRecord?.socialHistory?.insuranceProvider || '' },
-      { key: 'ses', label: 'Socioeconomic status', value: latestRecord?.socialHistory?.socioeconomicStatus || '' },
-      { key: 'medications', label: 'Current chronic medications', value: latestRecord?.drugHistory?.chronicMedications || '' },
-      { key: 'allergies', label: 'Drug allergies', value: latestRecord?.drugHistory?.noKnownAllergies ? 'No known drug allergies' : latestRecord?.drugHistory?.allergies?.join(', ') || selectedPatientData?.allergies?.join(', ') || '' },
+      { key: 'hpi', label: 'HPI', value: history.hpi || latestRecord?.historyOfPresentIllness || '' },
+      { key: 'pmh', label: 'Past medical history', value: history.pmhConditions.join(', ') || latestRecord?.pastMedicalHistory?.chronicConditions?.join(', ') || selectedPatientData?.chronicConditions?.join(', ') || '' },
+      { key: 'surgeries', label: 'Past surgeries', value: history.pmhSurgeries || latestRecord?.pastMedicalHistory?.pastSurgeries || '' },
+      { key: 'admissions', label: 'Prior admissions', value: history.pmhAdmissions || latestRecord?.pastMedicalHistory?.pastAdmissions || '' },
+      { key: 'transfusion', label: 'Blood transfusion', value: history.pmhTransfusion || latestRecord?.pastMedicalHistory?.bloodTransfusion ? 'Yes' : '' },
+      { key: 'family', label: 'Family history', value: history.familyHistory || latestRecord?.familyHistory || '' },
+      { key: 'smoking', label: 'Smoking', value: history.shSmoking || latestRecord?.socialHistory?.smoking || '' },
+      { key: 'alcohol', label: 'Alcohol', value: history.shAlcohol || latestRecord?.socialHistory?.alcohol || '' },
+      { key: 'substance', label: 'Substance use', value: history.shSubstance || latestRecord?.socialHistory?.substanceUse || '' },
+      { key: 'occupation', label: 'Occupation', value: history.shOccupation || latestRecord?.socialHistory?.occupation || '' },
+      { key: 'insurance', label: 'Insurance', value: history.shInsurance || latestRecord?.socialHistory?.hasHealthInsurance ? 'Yes' : '' },
+      { key: 'provider', label: 'Insurance provider', value: history.shInsuranceProvider || latestRecord?.socialHistory?.insuranceProvider || '' },
+      { key: 'ses', label: 'Socioeconomic status', value: history.shSES || latestRecord?.socialHistory?.socioeconomicStatus || '' },
+      { key: 'medications', label: 'Current chronic medications', value: history.dhChronicMeds || latestRecord?.drugHistory?.chronicMedications || '' },
+      { key: 'allergies', label: 'Drug allergies', value: history.dhNKDA ? 'No known drug allergies' : history.dhAllergies || (latestRecord?.drugHistory?.noKnownAllergies ? 'No known drug allergies' : latestRecord?.drugHistory?.allergies?.join(', ') || selectedPatientData?.allergies?.join(', ') || '') },
     ].filter(item => {
       const q = historySearch.trim().toLowerCase();
       if (!q) return true;
       return `${item.label} ${item.value}`.toLowerCase().includes(q);
     });
     return entries;
-  }, [latestRecord, selectedPatientData, historySearch]);
+  }, [history, latestRecord, selectedPatientData, historySearch]);
+
+  // Filters the fields shown inside the "Edit history" popup. Each group
+  // matches on its labels and current values, so searching "penicillin" or
+  // "smoking" jumps straight to the right field.
+  const historyFieldMatches = (...terms: string[]) => {
+    const q = historyEditSearch.trim().toLowerCase();
+    if (!q) return true;
+    return terms.join(' ').toLowerCase().includes(q);
+  };
+  const historyFieldVis = {
+    hpi: historyFieldMatches('history of present illness hpi oldcarts complaint', history.hpi),
+    pmh: historyFieldMatches(
+      'past medical history chronic condition surgeries admissions blood transfusion',
+      CHRONIC_CONDITIONS.join(' '),
+      history.pmhConditions.join(' '),
+      history.pmhSurgeries,
+      history.pmhAdmissions,
+    ),
+    family: historyFieldMatches('family history relatives', history.familyHistory),
+    social: historyFieldMatches(
+      'social history smoking alcohol occupation substance use socioeconomic status health insurance',
+      history.shOccupation,
+      history.shSubstance,
+      history.shInsuranceProvider,
+    ),
+    drug: historyFieldMatches(
+      'drug history allergies chronic medications no known drug allergies nkda',
+      history.dhChronicMeds,
+      history.dhAllergies,
+    ),
+  };
 
   // Pre-fill the Past Medical History (and known drug allergies) from the
   // patient's own record + their most recent visit, instead of starting from a
@@ -2214,12 +2247,21 @@ export default function ConsultationPage() {
                           Capture the full history here before moving on to the rest of the note.
                         </div>
                       </div>
-                      <SearchInput
-                        value={historySearch}
-                        onChange={setHistorySearch}
-                        placeholder="Search chart history"
-                        className="max-w-[320px]"
-                      />
+                      <div className="flex items-center gap-2">
+                        <SearchInput
+                          value={historySearch}
+                          onChange={setHistorySearch}
+                          placeholder="Search chart history"
+                          className="max-w-[320px]"
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => { setHistoryEditSearch(''); setHistoryEditOpen(true); }}
+                        >
+                          Edit
+                        </button>
+                      </div>
                     </div>
 
                     <div className="ehr-consult-history-summary">
@@ -2227,7 +2269,7 @@ export default function ConsultationPage() {
                         <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
                           <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Chart history</div>
                           <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Prior history appears here first. Blank items below still need input.
+                            Prior history appears here first. Use Edit to fill in anything marked “Needs input”.
                           </div>
                         </div>
                         <div className="p-4">
@@ -2254,184 +2296,169 @@ export default function ConsultationPage() {
 
                     </div>
 
-                    <div className="ehr-consult-history-grid mt-4">
-                      <div className="space-y-4 ehr-consult-history-column">
-                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--hpi" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                          <div className="ehr-consult-card-head ehr-consult-card-head--align-end">
+                    {historyEditOpen && (
+                      <Modal onClose={() => setHistoryEditOpen(false)} width={760} align="top" labelledBy="history-edit-title">
+                        <div className="p-5">
+                          <div className="flex items-start justify-between gap-3 mb-4">
                             <div>
-                              <label>History of present illness</label>
-                              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>OLDCARTS structure. Edit directly in the note below.</div>
+                              <h3 id="history-edit-title" className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Edit history</h3>
+                              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                Search for a field or condition. Anything not on the chart yet can be typed in directly.
+                              </p>
                             </div>
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => {
-                                hpiRef.current?.focus();
-                                const len = hpiRef.current?.value.length ?? 0;
-                                hpiRef.current?.setSelectionRange(len, len);
-                              }}
-                            >
-                              Edit
-                            </button>
+                            <button type="button" className="btn btn-primary btn-sm" onClick={() => setHistoryEditOpen(false)}>Done</button>
                           </div>
-                          <textarea
-                            ref={hpiRef}
-                            value={history.hpi}
-                            onChange={e => setHistory(h => ({ ...h, hpi: e.target.value }))}
-                            rows={5}
-                            className="mt-3"
-                            placeholder="Onset, location, duration, character, aggravating/relieving, radiation, timing, severity."
-                          />
-                        </div>
 
-                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--pmh" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                          <div className="ehr-consult-card-head">
-                          <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Past medical history</label>
-                          <div className="w-full max-w-[320px] ehr-consult-card-search">
-                            <SearchAddField
-                              placeholder="Search or add a condition"
-                              options={CHRONIC_CONDITIONS}
-                              value={pmhSearch}
-                              onChange={setPmhSearch}
-                              onPick={addPmhCondition}
-                              onAdd={addPmhCondition}
-                            />
-                          </div>
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {filteredPmhConditions.length > 0 ? filteredPmhConditions.slice(0, 8).map(c => {
-                              const on = history.pmhConditions.includes(c);
-                              return (
-                                <button
-                                  key={c}
-                                  type="button"
-                                  onClick={() => addPmhCondition(c)}
-                                  className="text-[12px] font-medium px-2.5 py-1 rounded-full"
-                                  style={{ border: `1px solid ${on ? 'var(--accent-primary)' : 'var(--border-medium)'}`, background: on ? 'var(--accent-light)' : 'transparent', color: on ? 'var(--accent-text)' : 'var(--text-secondary)' }}
-                                >
-                                  {c}
-                                </button>
-                              );
-                            }) : (
-                              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>No matching chronic condition.</div>
+                          <SearchInput
+                            value={historyEditSearch}
+                            onChange={setHistoryEditSearch}
+                            placeholder="Search history (e.g. allergies, smoking, surgeries)"
+                          />
+
+                          <div className="mt-4 space-y-4 max-h-[62vh] overflow-y-auto pr-1">
+                            {historyFieldVis.hpi && (
+                              <div className="rounded-2xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                                <label>History of present illness</label>
+                                <div className="text-xs" style={{ color: 'var(--text-muted)' }}>OLDCARTS structure — onset, location, duration, character, aggravating/relieving, radiation, timing, severity.</div>
+                                <textarea
+                                  value={history.hpi}
+                                  onChange={e => setHistory(h => ({ ...h, hpi: e.target.value }))}
+                                  rows={4}
+                                  className="mt-2"
+                                  placeholder="Onset, location, duration, character, aggravating/relieving, radiation, timing, severity."
+                                />
+                              </div>
+                            )}
+
+                            {historyFieldVis.pmh && (
+                              <div className="rounded-2xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                                <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Past medical history</label>
+                                <div className="mt-2">
+                                  <SearchAddField
+                                    placeholder="Search or add a condition"
+                                    options={CHRONIC_CONDITIONS}
+                                    value={pmhSearch}
+                                    onChange={setPmhSearch}
+                                    onPick={addPmhCondition}
+                                    onAdd={addPmhCondition}
+                                  />
+                                </div>
+                                {history.pmhConditions.length > 0 && (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {history.pmhConditions.map(c => (
+                                      <button
+                                        key={c}
+                                        type="button"
+                                        title="Remove condition"
+                                        onClick={() => setHistory(h => ({ ...h, pmhConditions: h.pmhConditions.filter(x => x !== c) }))}
+                                        className="text-[12px] font-medium px-2.5 py-1 rounded-full"
+                                        style={{ border: '1px solid var(--accent-primary)', background: 'var(--accent-light)', color: 'var(--accent-text)' }}
+                                      >
+                                        {c} ×
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                                  <div>
+                                    <label>Past surgeries</label>
+                                    <input value={history.pmhSurgeries} list="surgeries-list" onChange={e => setHistory(h => ({ ...h, pmhSurgeries: e.target.value }))} placeholder="e.g. appendectomy 2019" />
+                                  </div>
+                                  <div>
+                                    <label>Prior admissions</label>
+                                    <input value={history.pmhAdmissions} list="admissions-list" onChange={e => setHistory(h => ({ ...h, pmhAdmissions: e.target.value }))} placeholder="e.g. severe malaria 2024" />
+                                  </div>
+                                </div>
+                                <label className="flex items-center gap-2 mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                  <input type="checkbox" checked={history.pmhTransfusion} onChange={e => setHistory(h => ({ ...h, pmhTransfusion: e.target.checked }))} style={{ width: 'auto' }} />
+                                  Previous blood transfusion
+                                </label>
+                              </div>
+                            )}
+
+                            {historyFieldVis.family && (
+                              <div className="rounded-2xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                                <label>Family history</label>
+                                <textarea value={history.familyHistory} onChange={e => setHistory(h => ({ ...h, familyHistory: e.target.value }))} rows={3} className="mt-2" placeholder="Relevant conditions in close family" />
+                              </div>
+                            )}
+
+                            {historyFieldVis.social && (
+                              <div className="rounded-2xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                                <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Social history</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                                  <div><label>Smoking</label><select value={history.shSmoking} onChange={e => setHistory(h => ({ ...h, shSmoking: e.target.value as typeof h.shSmoking }))}>{SMOKING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+                                  <div><label>Alcohol</label><select value={history.shAlcohol} onChange={e => setHistory(h => ({ ...h, shAlcohol: e.target.value as typeof h.shAlcohol }))}>{ALCOHOL_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+                                  <div><label>Occupation</label><input value={history.shOccupation} list="occupation-list" onChange={e => setHistory(h => ({ ...h, shOccupation: e.target.value }))} /></div>
+                                  <div><label>Substance use</label><input value={history.shSubstance} list="substance-list" onChange={e => setHistory(h => ({ ...h, shSubstance: e.target.value }))} placeholder="None / details" /></div>
+                                  <div>
+                                    <label>Socioeconomic status</label>
+                                    <select value={history.shSES} onChange={e => setHistory(h => ({ ...h, shSES: e.target.value as typeof h.shSES }))}>
+                                      <option value="">Not assessed</option>
+                                      {SES_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label>Health insurance</label>
+                                    <div className="mt-1 space-y-2">
+                                      <label
+                                        className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors"
+                                        style={{
+                                          background: history.shInsurance ? 'var(--accent-light)' : 'var(--overlay-subtle)',
+                                          border: `1px solid ${history.shInsurance ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+                                        }}
+                                      >
+                                        <span className="text-sm font-medium" style={{ color: history.shInsurance ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
+                                          {history.shInsurance ? 'Insured' : 'Not insured'}
+                                        </span>
+                                        <input
+                                          type="checkbox"
+                                          checked={history.shInsurance}
+                                          onChange={e => setHistory(h => ({ ...h, shInsurance: e.target.checked, shInsuranceProvider: e.target.checked ? h.shInsuranceProvider : '' }))}
+                                          style={{ width: 'auto', accentColor: 'var(--accent-primary)' }}
+                                        />
+                                      </label>
+                                      {history.shInsurance && (
+                                        <input
+                                          value={history.shInsuranceProvider}
+                                          list="insurance-provider-list"
+                                          onChange={e => setHistory(h => ({ ...h, shInsuranceProvider: e.target.value }))}
+                                          placeholder="Insurance provider / scheme"
+                                        />
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {historyFieldVis.drug && (
+                              <div className="rounded-2xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
+                                <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Drug history &amp; allergies</label>
+                                <div className="mt-3">
+                                  <label>Current chronic medications</label>
+                                  <input value={history.dhChronicMeds} list="medication-list" onChange={e => setHistory(h => ({ ...h, dhChronicMeds: e.target.value }))} placeholder="e.g. metformin, amlodipine" />
+                                </div>
+                                <div className="mt-3">
+                                  <label>Drug allergies (comma separated)</label>
+                                  <input value={history.dhAllergies} list="allergy-list" disabled={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhAllergies: e.target.value }))} placeholder="e.g. penicillin, sulfa" />
+                                </div>
+                                <label className="flex items-center gap-2 mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                  <input type="checkbox" checked={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhNKDA: e.target.checked, dhAllergies: e.target.checked ? '' : h.dhAllergies }))} style={{ width: 'auto' }} />
+                                  No known drug allergies
+                                </label>
+                              </div>
+                            )}
+
+                            {!historyFieldVis.hpi && !historyFieldVis.pmh && !historyFieldVis.family && !historyFieldVis.social && !historyFieldVis.drug && (
+                              <div className="rounded-xl border border-dashed px-4 py-6 text-sm" style={{ color: 'var(--text-muted)', borderColor: 'var(--border-light)' }}>
+                                No history field matches “{historyEditSearch}”. Clear the search to see every field.
+                              </div>
                             )}
                           </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {history.pmhConditions.map(c => (
-                              <button
-                                key={c}
-                                type="button"
-                                onClick={() => setHistory(h => ({ ...h, pmhConditions: h.pmhConditions.filter(x => x !== c) }))}
-                                className="text-[12px] font-medium px-2.5 py-1 rounded-full"
-                                style={{ border: '1px solid var(--accent-primary)', background: 'var(--accent-light)', color: 'var(--accent-text)' }}
-                              >
-                                {c}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-                            <div>
-                              <label>Past surgeries</label>
-                              <input value={history.pmhSurgeries} list="surgeries-list" onChange={e => setHistory(h => ({ ...h, pmhSurgeries: e.target.value }))} placeholder="e.g. appendectomy 2019" />
-                            </div>
-                            <div>
-                              <label>Prior admissions</label>
-                              <input value={history.pmhAdmissions} list="admissions-list" onChange={e => setHistory(h => ({ ...h, pmhAdmissions: e.target.value }))} placeholder="e.g. severe malaria 2024" />
-                            </div>
-                          </div>
-                          <label className="flex items-center gap-2 mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                            <input type="checkbox" checked={history.pmhTransfusion} onChange={e => setHistory(h => ({ ...h, pmhTransfusion: e.target.checked }))} style={{ width: 'auto' }} />
-                            Previous blood transfusion
-                          </label>
                         </div>
-                      </div>
-
-                      <div className="space-y-4 ehr-consult-history-column">
-                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--family" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                          <div className="ehr-consult-card-head">
-	                            <div>
-	                              <label>Family history</label>
-	                              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Capture the relevant family history directly below.</div>
-	                            </div>
-	                            <button
-	                              type="button"
-	                              className="btn btn-secondary btn-sm"
-	                              onClick={() => {
-	                                familyHistoryRef.current?.focus();
-	                                const len = familyHistoryRef.current?.value.length ?? 0;
-	                                familyHistoryRef.current?.setSelectionRange(len, len);
-	                              }}
-	                            >
-	                              Edit
-	                            </button>
-                          </div>
-                          <textarea ref={familyHistoryRef} value={history.familyHistory} onChange={e => setHistory(h => ({ ...h, familyHistory: e.target.value }))} rows={3} className="mt-3" placeholder="Relevant conditions in close family" />
-                        </div>
-
-                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--social" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                          <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Social history</label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 ehr-consult-social-grid">
-                            <div><label>Smoking</label><select value={history.shSmoking} onChange={e => setHistory(h => ({ ...h, shSmoking: e.target.value as typeof h.shSmoking }))}>{SMOKING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
-                            <div><label>Alcohol</label><select value={history.shAlcohol} onChange={e => setHistory(h => ({ ...h, shAlcohol: e.target.value as typeof h.shAlcohol }))}>{ALCOHOL_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
-                            <div><label>Occupation</label><input value={history.shOccupation} list="occupation-list" onChange={e => setHistory(h => ({ ...h, shOccupation: e.target.value }))} /></div>
-                            <div><label>Substance use</label><input value={history.shSubstance} list="substance-list" onChange={e => setHistory(h => ({ ...h, shSubstance: e.target.value }))} placeholder="None / details" /></div>
-                            <div>
-                              <label>Socioeconomic status</label>
-                              <select value={history.shSES} onChange={e => setHistory(h => ({ ...h, shSES: e.target.value as typeof h.shSES }))}>
-                                <option value="">Not assessed</option>
-                                {SES_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                              </select>
-                            </div>
-                            <div>
-                              <label>Health insurance</label>
-                              <div className="mt-1 space-y-2">
-                                <label
-                                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors"
-                                  style={{
-                                    background: history.shInsurance ? 'var(--accent-light)' : 'var(--overlay-subtle)',
-                                    border: `1px solid ${history.shInsurance ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                                  }}
-                                >
-                                  <span className="text-sm font-medium" style={{ color: history.shInsurance ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
-                                    {history.shInsurance ? 'Insured' : 'Not insured'}
-                                  </span>
-                                  <input
-                                    type="checkbox"
-                                    checked={history.shInsurance}
-                                    onChange={e => setHistory(h => ({ ...h, shInsurance: e.target.checked, shInsuranceProvider: e.target.checked ? h.shInsuranceProvider : '' }))}
-                                    style={{ width: 'auto', accentColor: 'var(--accent-primary)' }}
-                                  />
-                                </label>
-                                {history.shInsurance && (
-                                  <input
-                                    value={history.shInsuranceProvider}
-                                    list="insurance-provider-list"
-                                    onChange={e => setHistory(h => ({ ...h, shInsuranceProvider: e.target.value }))}
-                                    placeholder="Insurance provider / scheme"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--drug" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                          <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Drug history &amp; allergies</label>
-                          <div className="mt-3">
-                            <label>Current chronic medications</label>
-                            <input value={history.dhChronicMeds} list="medication-list" onChange={e => setHistory(h => ({ ...h, dhChronicMeds: e.target.value }))} placeholder="e.g. metformin, amlodipine" />
-                          </div>
-                          <div className="mt-3">
-                            <label>Drug allergies (comma separated)</label>
-                            <input value={history.dhAllergies} list="allergy-list" disabled={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhAllergies: e.target.value }))} placeholder="e.g. penicillin, sulfa" />
-                          </div>
-                          <label className="flex items-center gap-2 mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                            <input type="checkbox" checked={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhNKDA: e.target.checked, dhAllergies: e.target.checked ? '' : h.dhAllergies }))} style={{ width: 'auto' }} />
-                            No known drug allergies
-                          </label>
-                        </div>
-                      </div>
-                    </div>
+                      </Modal>
+                    )}
                   </div>
                 </div>
               )}

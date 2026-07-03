@@ -1140,7 +1140,7 @@ export default function PatientDetailPage() {
           })()}
 
           <div className="ehr-chart-layout">
-          {/* Chart navigation — left rail, like the EHR reference screens */}
+          {/* Chart navigation — horizontal tab bar directly below the patient header */}
           <div
             className="ehr-chart-nav flex mb-5 no-print overflow-x-auto"
             style={{ borderBottom: '1px solid var(--border-light)' }}

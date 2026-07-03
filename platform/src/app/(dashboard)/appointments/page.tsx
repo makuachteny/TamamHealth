@@ -3,7 +3,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import AvailabilityModal from '@/components/AvailabilityModal';
 import {
   Calendar, Plus, Clock, CheckCircle2, User,
@@ -14,6 +13,7 @@ import {
 } from '@/components/icons/lucide';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { useInsuredPatientIds } from '@/lib/hooks/usePayments';
 import { useApp } from '@/lib/context';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -108,6 +108,11 @@ export default function AppointmentsPage() {
     emergency: 'appointments.priorityEmergency',
   };
 
+  // Insurance coverage lives in separate insurance_policy docs (not on the
+  // appointment); the hook exposes the set of covered patient ids so each
+  // appointment can be badged Insured / Not insured.
+  const insuredIds = useInsuredPatientIds();
+
   const router = useRouter();
   const [calView, setCalView] = useState<'month' | 'week' | 'day'>('month');
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
@@ -119,9 +124,6 @@ export default function AppointmentsPage() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [showWalkIn, setShowWalkIn] = useState(false);
   const [showAvailability, setShowAvailability] = useState(false);
-  // Providers publish their own bookable windows ("Schedule"). This used to be a
-  // sidebar tab; it now lives on the appointments page where it belongs.
-  const canSetAvailability = ['doctor', 'clinical_officer', 'clinician', 'medical_superintendent', 'nurse', 'midwife'].includes(currentUser?.role ?? '');
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [editingApt, setEditingApt] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -364,72 +366,6 @@ export default function AppointmentsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <TopBar
-          hideSearchInput
-          searchTrailing={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* Calendar / List view toggle */}
-              <div style={{ display: 'flex', flexShrink: 0, borderRadius: 10, border: '1px solid var(--border-medium)', overflow: 'hidden', height: 36 }}>
-                <button
-                  onClick={() => setViewMode('calendar')}
-                  style={{ padding: '0 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === 'calendar' ? 'var(--accent-primary)' : 'var(--bg-card-solid)', color: viewMode === 'calendar' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}
-                >
-                  <Calendar size={13} /> Calendar
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  style={{ padding: '0 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', borderLeft: '1px solid var(--border-medium)', background: viewMode === 'list' ? 'var(--accent-primary)' : 'var(--bg-card-solid)', color: viewMode === 'list' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}
-                >
-                  <Filter size={13} /> List
-                </button>
-              </div>
-              {/* Calendar granularity — only when in calendar mode */}
-              {viewMode === 'calendar' && (
-                <select
-                  value={calView}
-                  onChange={(e) => setCalView(e.target.value as 'month' | 'week' | 'day')}
-                  aria-label={t('appointments.viewCalendar')}
-                  className="text-[13px] font-medium cursor-pointer"
-                  style={{ height: 36, padding: '0 10px', borderRadius: 'var(--input-radius)', border: '1px solid var(--border-medium)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)' }}
-                >
-                  <option value="day">Day</option>
-                  <option value="week">Week</option>
-                  <option value="month">Month</option>
-                </select>
-              )}
-              {viewMode === 'calendar' && (
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`btn btn-secondary btn-filter${(selectedDate || filterStatus !== 'all') ? ' is-active' : ''}`}
-                  aria-pressed={showFilters}
-                  style={{ gap: 6 }}
-                >
-                  <Filter size={14} /> {t('appointments.filters')}
-                </button>
-              )}
-            </div>
-          }
-          actions={
-            (canSetAvailability || canBookAppointments) ? (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {canSetAvailability && (
-                  <button onClick={() => setShowAvailability(true)} className="btn btn-secondary" style={{ gap: 6 }}>
-                    <Clock size={16} /> {t('appointments.schedule')}
-                  </button>
-                )}
-                {canBookAppointments && (
-                  <>
-                    <button onClick={() => setShowWalkIn(true)} className="btn btn-secondary" style={{ gap: 6, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }}>
-                      <UserPlus size={16} /> {t('appointments.walkIn')}
-                    </button>
-                    <button onClick={() => setShowNewForm(true)} className="btn btn-primary" style={{ gap: 6 }}>
-                      <Plus size={16} /> {t('appointments.bookAppointment')}
-                    </button>
-                  </>
-                )}
-              </div>
-            ) : undefined
-          } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {/* View toggle + Filters live beside the search bar above (TopBar
             searchTrailing); the list/calendar body renders directly here. */}
@@ -498,17 +434,17 @@ export default function AppointmentsPage() {
 
             {/* Table */}
             <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-              <table className="data-table" style={{ minWidth: 760 }}>
+              <table className="data-table" style={{ minWidth: 860 }}>
                 <thead>
                   <tr>
-                    {['Patient', 'Reason', 'Date & Time', 'Type', 'Priority', 'Status', 'Actions'].map(h => (
+                    {['Patient', 'Reason', 'Date & Time', 'Type', 'Priority', 'Insurance', 'Status', 'Actions'].map(h => (
                       <th key={h} className="text-left px-4 py-2.5" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {listAppointments.length === 0 ? (
-                    <tr><td colSpan={7} className="px-4 py-12 text-center" style={{ color: 'var(--text-muted)', fontSize: 13 }}>No appointments match your search.</td></tr>
+                    <tr><td colSpan={8} className="px-4 py-12 text-center" style={{ color: 'var(--text-muted)', fontSize: 13 }}>No appointments match your search.</td></tr>
                   ) : listAppointments.map(apt => {
                     const sc = statusConfig[apt.status];
                     const pc = priorityConfig[apt.priority];
@@ -538,6 +474,9 @@ export default function AppointmentsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <span style={{ fontSize: 11, fontWeight: 700, color: pc.color, background: `${pc.color}15`, borderRadius: 6, padding: '2px 8px' }}>{t(priorityLabelKey[apt.priority])}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <InsuranceBadge insured={insuredIds.has(apt.patientId)} />
                         </td>
                         <td className="px-4 py-3">
                           <span style={{ fontSize: 11, fontWeight: 700, color: sc.color, background: sc.bg, borderRadius: 6, padding: '2px 8px' }}>{t(statusLabelKey[apt.status])}</span>
@@ -713,6 +652,7 @@ export default function AppointmentsPage() {
                 <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 999, color: priorityConfig[eventApt.priority].color, background: `${priorityConfig[eventApt.priority].color}14` }}>
                   {t(priorityLabelKey[eventApt.priority])}
                 </span>
+                <InsuranceBadge insured={insuredIds.has(eventApt.patientId)} pill />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 18 }}>
                 <Detail label="Date" value={new Date(eventApt.appointmentDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} icon={<Calendar size={14} />} />
@@ -728,6 +668,11 @@ export default function AppointmentsPage() {
                 </div>
               )}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {eventApt.appointmentType === 'telehealth' && eventApt.status !== 'cancelled' && eventApt.status !== 'completed' && (
+                  <button onClick={() => { const id = eventApt._id; setEventApt(null); router.push(`/telehealth/visit/${encodeURIComponent(id)}`); }} className="btn btn-primary btn-sm" style={{ gap: 6, background: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
+                    <Video size={14} /> Join session
+                  </button>
+                )}
                 <button onClick={() => { const id = eventApt.patientId; setEventApt(null); router.push(`/patients/${id}`); }} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
                   <User size={14} /> Open patient record
                 </button>
@@ -778,6 +723,11 @@ export default function AppointmentsPage() {
                 <button className="btn btn-secondary btn-sm" style={{ gap: 4, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }} onClick={() => { setShowDayPopup(false); setShowWalkIn(true); }}>
                   <UserPlus size={14} /> {t('appointments.walkIn')}
                 </button>
+                {/* Telehealth lives on this calendar now — "New Session" books a
+                    telehealth appointment via the same form, pre-typed. */}
+                <button className="btn btn-secondary btn-sm" style={{ gap: 4, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }} onClick={() => { setShowDayPopup(false); setFormDate(selectedDate); setFormType('telehealth'); setShowNewForm(true); }}>
+                  <Video size={14} /> New Session
+                </button>
               </div>
             )}
 
@@ -827,6 +777,7 @@ export default function AppointmentsPage() {
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{apt.reason.slice(0, 40)}{apt.reason.length > 40 ? '...' : ''}</div>
                         </div>
+                        <InsuranceBadge insured={insuredIds.has(apt.patientId)} compact />
                         <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, color: pc.color, background: `${pc.color}12` }}>{t(priorityLabelKey[apt.priority])}</span>
                         <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4, color: sc.color, background: sc.bg }}>{t(statusLabelKey[apt.status])}</span>
                         {/* Action buttons */}
@@ -946,6 +897,21 @@ function ModalActions({ onCancel, onConfirm, confirmLabel, confirmColor, cancelL
         opacity: disabled ? 0.6 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
       }}>{confirmLabel}</button>
     </div>
+  );
+}
+
+function InsuranceBadge({ insured, compact, pill }: { insured: boolean; compact?: boolean; pill?: boolean }) {
+  const color = insured ? '#047857' : '#64748B';
+  return (
+    <span style={{
+      fontSize: compact ? 9 : 11, fontWeight: 700, whiteSpace: 'nowrap',
+      padding: pill ? '3px 10px' : compact ? '2px 6px' : '2px 8px',
+      borderRadius: pill ? 999 : compact ? 4 : 6,
+      textTransform: pill ? 'uppercase' : undefined, letterSpacing: pill ? '0.04em' : undefined,
+      color, background: insured ? 'rgba(4,120,87,0.10)' : 'rgba(100,116,139,0.10)',
+    }}>
+      {insured ? 'Insured' : 'Not insured'}
+    </span>
   );
 }
 

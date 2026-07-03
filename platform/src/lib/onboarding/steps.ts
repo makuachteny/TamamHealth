@@ -58,7 +58,6 @@ const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: number }> 
   '/referrals': { verb: 'Create a referral', desc: 'Refer a patient to another facility and track the referral chain.', est: 2 },
   '/messages': { verb: 'Send a secure message', desc: 'Message colleagues about a patient without leaving the platform.', est: 1 },
   '/appointments': { verb: 'Book an appointment', desc: 'Schedule a visit and see the day’s calendar at a glance.', est: 2 },
-  '/telehealth': { verb: 'Start a telehealth visit', desc: 'Run a secure video consultation with a remote patient.', est: 2 },
   '/lab': { verb: 'Work with the lab', desc: 'Place lab orders, then enter and review results.', est: 2 },
   '/pharmacy': { verb: 'Dispense from the pharmacy', desc: 'Fill prescriptions and keep stock levels up to date.', est: 2 },
   '/immunizations': { verb: 'Record an immunization', desc: 'Log a vaccine dose against the schedule and flag what’s due.', est: 2 },

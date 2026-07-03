@@ -34,7 +34,7 @@ export default function CaseStudiesIndex() {
         <section id="case-studies-grid" className="mk-section mk-section-after-hero mk-section-white">
           <div className="mk-container">
             <Reveal>
-              <div className="mk-section-heading">
+              <div className="mk-section-heading" style={{ marginBottom: 40 }}>
                 <h2 className="mk-h2">Cases</h2>
               </div>
             </Reveal>
@@ -45,8 +45,10 @@ export default function CaseStudiesIndex() {
                     textAlign: "center",
                     padding: "48px 24px",
                     borderRadius: 16,
-                    border: "1px solid var(--tb-cream-300)",
-                    background: "var(--tb-cream-50)",
+                    border: "1px solid var(--tb-gold-light)",
+                    background: "var(--tb-tint-gold)",
+                    maxWidth: 640,
+                    margin: "0 auto",
                   }}
                 >
                   <p style={{ fontSize: 17, fontWeight: 700, color: "var(--tb-text-pri)", margin: "0 0 8px" }}>

@@ -8,7 +8,6 @@ import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { FilterMenu } from '@/components/filters';
 import {
   Baby, Plus, X, ChevronDown, ChevronUp,
 } from '@/components/icons/lucide';
@@ -22,9 +21,6 @@ export default function BirthsPage() {
   const { t } = useTranslation();
   // Text search comes from the shared global search bar (TopBar).
   const search = globalSearch;
-  const [deliveryFilter, setDeliveryFilter] = useState('all');
-  const activeFilterCount = (deliveryFilter !== 'all' ? 1 : 0);
-  const clearFilters = () => { setDeliveryFilter('all'); };
   const [showForm, setShowForm] = useState(false);
   const [expandedBirth, setExpandedBirth] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -37,7 +33,6 @@ export default function BirthsPage() {
   });
 
   const filtered = (births || []).filter(b =>
-    (deliveryFilter === 'all' || b.deliveryType === deliveryFilter) &&
     (!search || `${b.childFirstName} ${b.childSurname}`.toLowerCase().includes(search.toLowerCase()) ||
     (b.motherName || '').toLowerCase().includes(search.toLowerCase()) || (b.certificateNumber || '').toLowerCase().includes(search.toLowerCase()))
   );
@@ -64,22 +59,7 @@ export default function BirthsPage() {
 
   return (
     <>
-      <TopBar title={t('nav.births')} searchTrailing={
-              <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
-                <FilterMenu.Field label="Delivery type">
-                  <select
-                    className="w-full text-sm"
-                    value={deliveryFilter}
-                    onChange={e => setDeliveryFilter(e.target.value)}
-                  >
-                    <option value="all">All deliveries</option>
-                    <option value="normal">Normal</option>
-                    <option value="caesarean">Caesarean</option>
-                    <option value="assisted">Assisted</option>
-                  </select>
-                </FilterMenu.Field>
-              </FilterMenu>
-          } actions={
+      <TopBar title={t('nav.births')} actions={
             canRecordVitalEvents && (
               <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
                 <Plus className="w-4 h-4" /> {t('births.registerBirth')}

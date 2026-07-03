@@ -100,6 +100,10 @@ export const DATABASE_SYNC_CONFIGS: DatabaseSyncConfig[] = [
   // device computes the same patient balance. Unlike the audit/controlled logs
   // (write-only trails), the ledger is read at the point of care.
   { localName: 'tamamhealth_ledger',                direction: 'both', orgScoped: true },
+  // A form submitted at the patient portal (or by front desk on the
+  // patient's behalf) needs to reach whichever facility device reviews it,
+  // and a merge decision needs to sync back — bidirectional like referrals.
+  { localName: 'tamamhealth_intake_forms',          direction: 'both', orgScoped: true },
 ];
 
 /** Build the full CouchDB remote URL for a given database name */

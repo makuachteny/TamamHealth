@@ -2,6 +2,7 @@
 import DashboardHero from '@/components/dashboard/DashboardHero';
 import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import TodaysAppointmentsCard from '@/components/dashboard/TodaysAppointmentsCard';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -165,6 +166,8 @@ export default function FacilityManagementDashboard() {
       <TopBar title="Dashboard" />
       <main className="page-container page-enter">
         <div className="flex flex-col gap-5">
+
+          <DashboardGreetingHeader />
 
           <DashboardHero
             stats={[

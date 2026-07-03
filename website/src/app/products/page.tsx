@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { ProductsHero } from "@/components/marketing/ProductsHero";
 import { ProductListing } from "@/components/marketing/ProductListing";
 import { PlatformExplorer } from "@/components/marketing/PlatformExplorer";
 
@@ -11,9 +10,8 @@ export const metadata: Metadata = {
 export default function ProductsPage() {
   return (
     <main className="mk-main">
-      <ProductsHero />
-      <ProductListing />
       <PlatformExplorer />
+      <ProductListing />
     </main>
   );
 }

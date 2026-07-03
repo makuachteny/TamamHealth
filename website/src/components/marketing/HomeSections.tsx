@@ -2,20 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { HOME_AUDIENCES, HOME_LEARN_MORE, HOME_PROBLEM_STATS } from "@/data/home";
-import { ArrowRight } from "@/components/marketing/icons";
-import { Reveal, RelatedLinksGrid, SplitFeatureBlock } from "@/components/marketing/MarketingShared";
-import { MarketingActionModalButton } from "@/components/marketing/MarketingActionModal";
-
-const PLATFORM_WORKFLOW_STEPS = [
-  "Register",
-  "Triage",
-  "Consult",
-  "Order",
-  "Dispense",
-  "Bill",
-  "Report",
-] as const;
+import { HOME_AUDIENCES, HOME_PROBLEM_STATS } from "@/data/home";
+import { Reveal, RelatedLinksGrid } from "@/components/marketing/MarketingShared";
 
 const PLATFORM_OUTCOMES = [
   {
@@ -63,24 +51,10 @@ export function HomeProblemSection() {
   );
 }
 
-export function HomeMissionBand() {
-  return (
-    <SplitFeatureBlock
-      eyebrow="Our mission"
-      title="Every patient's story should follow them — from a village health post to the Ministry of Health."
-      body="No matter what the network is doing, the record a health worker starts should still be the record a facility leader sees, and the record a Ministry analyst reports on — the same story, not three different ones."
-      href="/products#products-grid"
-      linkLabel="See how the platform delivers on it"
-      image="/assets/village-community.jpg"
-      imageAlt="A village community gathered near a health post in South Sudan"
-      tone="navy"
-    />
-  );
-}
-
 export function HomeAudienceSection() {
   return (
     <RelatedLinksGrid
+      className="mk-home-audiences"
       heading="Built around the people who keep a facility running"
       items={HOME_AUDIENCES.map((item) => ({
         label: "Who it's for",
@@ -93,52 +67,10 @@ export function HomeAudienceSection() {
   );
 }
 
-export function HomeFinalCta() {
-  return (
-    <section className="mk-home-final-cta">
-      <div className="mk-container mk-home-final-cta-inner">
-        <Reveal>
-          <h2 className="mk-h2">Ready to bring one record to your facility?</h2>
-        </Reveal>
-        <Reveal>
-          <p className="mk-body-lg">
-            We&apos;re taking on pilot partners across South Sudan. Let&apos;s talk about what your facility needs.
-          </p>
-        </Reveal>
-        <Reveal>
-          <div className="mk-home-final-cta-actions">
-            <MarketingActionModalButton
-              intent="demo"
-              className="mk-btn mk-btn-green"
-              source="home-final-cta"
-            >
-              Book a Demo
-            </MarketingActionModalButton>
-            <Link href="/about/contact" className="mk-btn mk-btn-outline">
-              Talk to our team
-            </Link>
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
 export function HomePlatformSection() {
   return (
     <section className="mk-section mk-section-white mk-home-platform-section">
       <div className="mk-container">
-        <Reveal>
-          <div className="mk-home-platform-flow">
-            <p className="mk-label">The solution</p>
-            <div className="mk-home-platform-flow-line" aria-label="TamamHealth workflow from registration to reporting">
-              {PLATFORM_WORKFLOW_STEPS.map((step) => (
-                <span key={step}>{step}</span>
-              ))}
-            </div>
-          </div>
-        </Reveal>
-
         <Reveal>
           <div className="mk-split mk-home-platform-split">
             <div className="mk-split-image mk-dashboard-showcase">
@@ -151,8 +83,9 @@ export function HomePlatformSection() {
               />
             </div>
             <div className="mk-split-content">
+              <p className="mk-label">The solution</p>
               <h2 className="mk-h2 mk-home-platform-heading">
-                <span>One workflow, start to finish</span>
+                <span>One workflow</span>
               </h2>
               <p>
                 TamamHealth links every step — registration through reporting — back to the same patient encounter, so the record a nurse starts is the same one a Ministry analyst sees later. No re-entry, no separate systems to reconcile.
@@ -179,37 +112,6 @@ export function HomePlatformSection() {
             ))}
           </div>
         </Reveal>
-      </div>
-    </section>
-  );
-}
-
-export function HomeLearnSection() {
-  return (
-    <section className="mk-section mk-section-cream" id="learn">
-      <div className="mk-container">
-        <Reveal>
-          <div className="mk-section-heading">
-            <p className="mk-label">learn more</p>
-            <h2 className="mk-h2">Find your place in the mission.</h2>
-          </div>
-        </Reveal>
-
-        <div className="mk-home-learn-grid">
-          {HOME_LEARN_MORE.map((item, index) => (
-            <Reveal key={item.title} delay={index * 0.05}>
-              <Link href={item.href} className="mk-home-card-link">
-                <div className="mk-value-card mk-home-learn-card">
-                  <h3>{item.title}</h3>
-                  <p>{item.body}</p>
-                  <span className="mk-product-card-link">
-                    Learn more <ArrowRight size={14} strokeWidth={1.8} />
-                  </span>
-                </div>
-              </Link>
-            </Reveal>
-          ))}
-        </div>
       </div>
     </section>
   );

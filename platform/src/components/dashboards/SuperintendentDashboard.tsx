@@ -2,6 +2,7 @@
 import DashboardHero from '@/components/dashboard/DashboardHero';
 import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import SpotlightCard from '@/components/dashboard/SpotlightCard';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 
 // Admin-oriented landing for the Medical Superintendent — the clinical
 // administrator who runs the hospital. Unlike the doctor/clinical-officer
@@ -17,7 +18,7 @@ import TopBar from '@/components/TopBar';
 import {
   Users, Stethoscope, HeartPulse, BedDouble, Wallet, Package,
   ClipboardCheck, BarChart3, Activity, AlertTriangle, SendHorizontal,
-  ChevronRight, ArrowRight, Building2,
+  ChevronRight, ArrowRight,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -54,7 +55,6 @@ export default function SuperintendentDashboard() {
   const [leave, setLeave] = useState<LeaveRequestDoc[]>([]);
 
   const facilityId = currentUser?.hospitalId;
-  const facilityName = currentUser?.hospitalName || currentUser?.hospital?.name || t('common.facility');
   const today = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
@@ -104,6 +104,8 @@ export default function SuperintendentDashboard() {
     <>
       <TopBar title={t('superintendent.topBarTitle')} />
       <main className="page-container page-enter">
+        <DashboardGreetingHeader />
+
         <DashboardHero
           className="mb-5"
           stats={[
@@ -119,20 +121,6 @@ export default function SuperintendentDashboard() {
           actions={QUICK_ACTIONS.slice(0, 4).map(a => ({ label: t(a.labelKey), icon: a.Icon, href: a.href }))}
           secondaryCard={<SpotlightCard title="Active Alerts" value={activeAlerts.length} caption={`${pendingReferrals.length} pending referrals`} href="/surveillance" />}
         />
-        <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>
-              {facilityName}
-            </h1>
-            <p className="text-[12px]" style={{ color: 'var(--text-muted)', marginTop: 2 }}>
-              {t('superintendent.roleLine', { name: currentUser?.name || '' })}
-            </p>
-          </div>
-          <button onClick={() => router.push('/my-facility')} className="btn btn-secondary">
-            <Building2 className="w-4 h-4" /> {t('breadcrumb.myFacility')}
-          </button>
-        </div>
-
         {/* ═══ KPI ROW ═══ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
           {kpis.map(k => (

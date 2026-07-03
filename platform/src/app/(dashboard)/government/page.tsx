@@ -24,6 +24,7 @@ import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import EmptyState from '@/components/EmptyState';
 import PatientName from '@/components/PatientName';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import type { HospitalDoc, DiseaseAlertDoc } from '@/lib/db-types';
 
 /**
@@ -1046,6 +1047,8 @@ export default function GovernmentDashboardPage() {
     <>
       <TopBar title={t('government.nationalDashboard')} />
       <main className="page-container page-enter">
+
+        <DashboardGreetingHeader />
 
         {/* ═══ National snapshot — distinct colour-tinted chips, spread across ═══ */}
         <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5 mb-4">

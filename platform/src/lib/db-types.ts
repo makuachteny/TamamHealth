@@ -224,6 +224,40 @@ export interface ReferralDoc extends BaseDoc, Omit<Referral, 'id'> {
   orgId?: string;
 }
 
+/** Status of a patient-submitted intake form as it moves through the
+ *  front-desk review queue: a request is sent to the patient, they either
+ *  submit it (pending_review) or don't (not_submitted), and staff review a
+ *  submitted form and merge its data into the patient's chart (merged). */
+export type IntakeFormStatus = 'pending_review' | 'not_submitted' | 'merged' | 'rejected';
+
+export interface IntakeFormField {
+  label: string;
+  value: string;
+}
+
+export interface PatientIntakeFormDoc extends BaseDoc {
+  type: 'patient_intake_form';
+  /** Matched patient record, once one exists (may be unset if the patient
+   *  hasn't been registered yet and this form is their first contact). */
+  patientId?: string;
+  patientName: string;
+  hospitalNumber?: string;
+  providerId?: string;
+  providerName?: string;
+  status: IntakeFormStatus;
+  /** When the intake request/link was sent to the patient. */
+  requestedAt: string;
+  /** When the patient submitted the form. Unset while status is not_submitted. */
+  receivedAt?: string;
+  mergedAt?: string;
+  mergedBy?: string;
+  /** Submitted form answers, shown to staff during review. Free-form
+   *  label/value pairs so the form can evolve without a schema migration. */
+  fields: IntakeFormField[];
+  hospitalId?: string;
+  orgId?: string;
+}
+
 export interface LabResultDoc extends BaseDoc {
   type: 'lab_result';
   patientId: string;

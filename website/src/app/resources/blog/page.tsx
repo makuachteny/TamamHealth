@@ -425,7 +425,7 @@ export default function BlogPage() {
               >
                 Schedule a personalized demo to explore how TamamHealth transforms healthcare operations.
               </p>
-              <Link href="/ehr" className="mk-btn mk-btn-green mk-btn-lg">
+              <Link href="/products" className="mk-btn mk-btn-green mk-btn-lg">
                 Schedule a demo
               </Link>
             </div>

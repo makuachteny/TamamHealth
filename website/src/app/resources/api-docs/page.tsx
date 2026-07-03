@@ -474,7 +474,7 @@ export default function APIDocs() {
               <p style={{ marginBottom: 32, color: "var(--tb-text-sec)", fontSize: 16, lineHeight: 1.6 }}>
                 Get your API credentials and start building integrations today. Our developer team is here to help.
               </p>
-              <Link href="/ehr" className="mk-btn mk-btn-green mk-btn-lg">
+              <Link href="/products" className="mk-btn mk-btn-green mk-btn-lg">
                 Get API access
               </Link>
             </div>

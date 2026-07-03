@@ -2,6 +2,7 @@
 import DashboardHero from '@/components/dashboard/DashboardHero';
 import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import SpotlightCard from '@/components/dashboard/SpotlightCard';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 
 import { useMemo } from 'react';
 import TopBar from '@/components/TopBar';
@@ -84,6 +85,8 @@ export default function NutritionDashboard() {
       <TopBar title={t('nutrition.title')} />
       <main className="page-container page-enter">
 
+        <DashboardGreetingHeader />
+
         <DashboardHero
           className="mb-5"
           stats={[
@@ -106,21 +109,6 @@ export default function NutritionDashboard() {
         />
 
         {IS_DEMO && <DemoModeBanner />}
-
-        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
-        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
-              <Utensils className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('nutrition.title')}</h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {currentUser.hospitalName || currentUser.hospital?.name || ''}
-              </p>
-            </div>
-          </div>
-        </div>
 
         {/* KPI tiles */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">

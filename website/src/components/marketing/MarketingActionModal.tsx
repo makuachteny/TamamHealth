@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRight, Check, X } from "@/components/marketing/icons";
 
-type MarketingIntent = "demo" | "pricing" | "contact";
+type MarketingIntent = "demo" | "contact";
 
 type ModalConfig = {
   eyebrow: string;
@@ -29,17 +29,6 @@ const MODAL_CONFIG: Record<MarketingIntent, ModalConfig> = {
     successBody: "We received your request and will follow up with the right next step.",
     fullPageHref: "/about/contact?intent=demo#contact-form",
     fullPageLabel: "Open the full contact page",
-  },
-  pricing: {
-    eyebrow: "Get pricing",
-    title: "Request pricing for your facility",
-    description: "Tell us the facility type, location, and modules you care about so the pricing conversation starts with the right context.",
-    subject: "Pricing request",
-    submitLabel: "Request pricing",
-    successTitle: "Pricing request received",
-    successBody: "We will review your facility details and follow up with a practical pricing path.",
-    fullPageHref: "/pricing#packages",
-    fullPageLabel: "View pricing details",
   },
   contact: {
     eyebrow: "Contact TamamHealth",
@@ -145,12 +134,11 @@ export function MarketingActionModalButton({
     }
   };
 
-  // "Book a Demo" is a navigation, not a popup: it routes to the pricing
-  // page, where booking a walkthrough and learning about pricing live
-  // together. Other intents (pricing/contact) keep the inline modal.
+  // "Book a Demo" is a navigation, not a popup: it routes straight to the
+  // contact page's form. The "contact" intent keeps the inline modal.
   if (intent === "demo") {
     return (
-      <Link href="/pricing" className={className} data-source={source}>
+      <Link href="/about/contact?intent=demo#contact-form" className={className} data-source={source}>
         {children}
       </Link>
     );
@@ -263,10 +251,6 @@ export function MarketingActionModalButton({
 
 export function getMarketingIntentFromCta(label: string, href: string): MarketingIntent | null {
   const text = `${label} ${href}`.toLowerCase();
-
-  if (href === "/pricing" || text.includes("pricing") || text.includes("quote")) {
-    return "pricing";
-  }
 
   if (href === "/about/contact") {
     if (text.includes("demo") || text.includes("walkthrough")) {

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import TopBar from '@/components/TopBar';
 import EmptyState from '@/components/EmptyState';
 import Badge, { type BadgeTone } from '@/components/Badge';
-import { FilterMenu } from '@/components/filters';
 import { useANC } from '@/lib/hooks/useANC';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { patientAge } from '@/lib/patient-utils';
@@ -43,9 +42,6 @@ export default function ANCPage() {
   const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
   // Text search comes from the shared global search bar (TopBar).
   const search = globalSearch;
-  const [riskFilter, setRiskFilter] = useState<string>('all');
-  const activeFilterCount = (riskFilter !== 'all' ? 1 : 0);
-  const clearFilters = () => { setRiskFilter('all'); };
   const [showModal, setShowModal] = useState(false);
   // Edit/correct affordance for a saved ANC visit. Visits are corrected via
   // updateANCVisit (audit/sync preserved), not hard-deleted from the UI.
@@ -121,11 +117,8 @@ export default function ANCPage() {
       const q = search.toLowerCase();
       result = result.filter(m => m.latest.motherName.toLowerCase().includes(q));
     }
-    if (riskFilter !== 'all') {
-      result = result.filter(m => m.latest.riskLevel === riskFilter);
-    }
     return result;
-  }, [motherSummaries, search, riskFilter]);
+  }, [motherSummaries, search]);
 
   const selectedMotherVisits = useMemo(() => {
     if (!selectedMother) return [];
@@ -215,18 +208,7 @@ export default function ANCPage() {
 
   return (
     <>
-      <TopBar title={t('anc.title')} searchTrailing={
-          <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
-            <FilterMenu.Field label={t('anc.allRiskLevels')}>
-              <select value={riskFilter} onChange={e => setRiskFilter(e.target.value)} className="w-full text-sm">
-                <option value="all">{t('anc.allRiskLevels')}</option>
-                <option value="high">{t('anc.riskHigh')}</option>
-                <option value="moderate">{t('anc.riskModerate')}</option>
-                <option value="low">{t('anc.riskLow')}</option>
-              </select>
-            </FilterMenu.Field>
-          </FilterMenu>
-      } actions={
+      <TopBar title={t('anc.title')} actions={
         canRecordVitalEvents && (
           <button onClick={() => setShowModal(true)} className="btn btn-primary">
             <Plus className="w-4 h-4" /> {t('anc.registerVisit')}

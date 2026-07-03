@@ -51,7 +51,7 @@ export function usePermissions() {
   // Specialized roles
   const canDispense = role === 'pharmacist';
   const canEnterLabResults = role === 'lab_tech';
-  const canDoTelehealth = role === 'doctor' || isClinician || isMedSupt;
+  const canDoTelehealth = role === 'doctor' || role === 'clinical_officer' || isClinician || isMedSupt;
 
   // Referrals — clinical staff + front desk + supervisors + midwife (obstetric)
   const canManageReferrals = role === 'doctor' || role === 'clinical_officer' || isClinician || isMidwife || isRegistrationClerk || role === 'front_desk' || isSuperAdmin;

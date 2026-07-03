@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
 import {
   Reveal,
   FAQItem,
@@ -124,21 +123,8 @@ export default function ContactPage() {
 
   return (
     <>
-      <MarketingHero
-        variant="showcase"
-        eyebrow="GET IN TOUCH"
-        title="Let's talk."
-        subtitle="Whether you run a clinic, lead a health system, work in public health, or care about South Sudan's future, we want to hear from you."
-        primaryCta={{ label: "Send us a message", href: "#contact-form" }}
-        stats={[{ value: "Pilot", label: "facility conversations" }, { value: "Partner", label: "health system alliances" }]}
-        image="/assets/community-health-worker.jpg"
-        imageAlt="Community health worker at an African clinic"
-        imagePriority
-        className="mk-hero-contact"
-      />
-
-      {/* ── REACH US DIRECTLY ─────────────────────────────────────────── */}
-      <section className="mk-section mk-section-cream">
+      {/* ── REACH US DIRECTLY (hero) ─────────────────────────────────── */}
+      <section className="mk-section mk-section-cream mk-hero-contact">
         <div className="mk-container">
           <Reveal>
             <div style={{ textAlign: "center", maxWidth: 640, margin: "0 auto 56px" }}>

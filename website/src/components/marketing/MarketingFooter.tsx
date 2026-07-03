@@ -52,19 +52,9 @@ const SOCIAL_LINKS = [
 
 const FOOTER_GROUPS = [
   {
-    heading: "Platform",
-    links: [
-      { label: "EHR & Clinical", body: "Registration, triage, consultation, and the record that ties them together.", href: "/ehr" },
-      { label: "Pharmacy & Lab", body: "Stock, dispensing, orders, and results without leaving the chart.", href: "/pharmacy-lab" },
-      { label: "Billing & Payments", body: "Charge capture and mobile money, reconciled automatically.", href: "/billing" },
-      { label: "Telehealth", body: "Bring specialist care to facilities that can't staff it locally.", href: "/telehealth" },
-    ],
-  },
-  {
     heading: "Company",
     links: [
       { label: "Our Story", body: "Why we're building for South Sudan first.", href: "/about" },
-      { label: "Pricing", body: "Straightforward packages for facilities of every size.", href: "/pricing#packages" },
       { label: "Case Studies", body: "Scenarios showing what changes when a facility goes digital.", href: "/case-studies" },
     ],
   },

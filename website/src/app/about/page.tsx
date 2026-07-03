@@ -142,13 +142,6 @@ export default function AboutPage() {
             image: "/assets/doctor-tablet-review.jpg",
           },
           {
-            label: "Pricing",
-            title: "Pricing shaped around your facility",
-            body: "Book a walkthrough and we'll scope the right modules, rollout path, and commercial terms.",
-            href: "/pricing",
-            image: "/assets/doctor-nurse-consultation.jpg",
-          },
-          {
             label: "Get involved",
             title: "Talk to our team",
             body: "Become a pilot partner or ask us anything about bringing TamamHealth to your facility.",

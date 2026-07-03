@@ -115,13 +115,13 @@ export default function DownloadPage() {
           </Reveal>
           <div style={{ maxWidth: 720, margin: "0 auto" }}>
             <Reveal>
-              <div style={{ display: "grid", gap: 14 }}>
+              <ul className="mk-check-list" style={{ display: "grid", gap: 14 }}>
                 <CheckItem><strong>1. Get access.</strong> Your facility administrator (or the Ministry) creates your account and gives you a username and a temporary password.</CheckItem>
                 <CheckItem><strong>2. Install the app.</strong> Use any method above — web install is fastest and works on the devices you already have.</CheckItem>
                 <CheckItem><strong>3. Sign in &amp; set your password.</strong> First login asks you to choose a new password. Set a screen-lock PIN when prompted.</CheckItem>
                 <CheckItem><strong>4. Pick your role view.</strong> The app shows the right workspace for your role — reception, nurse, clinical officer, doctor, lab, pharmacy, records.</CheckItem>
                 <CheckItem><strong>5. Work offline.</strong> Register and chart patients with or without internet. The app syncs to the server automatically whenever you reconnect.</CheckItem>
-              </div>
+              </ul>
             </Reveal>
           </div>
         </div>

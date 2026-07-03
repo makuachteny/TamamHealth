@@ -230,6 +230,9 @@ export const savedPaymentMethodsDB = () => getDB('tamamhealth_saved_payment_meth
 export const paymentPlansDB = () => getDB('tamamhealth_payment_plans');
 export const invoicesDB = () => getDB('tamamhealth_invoices');
 export const ledgerDB = () => getDB('tamamhealth_ledger');
+// Patient-submitted intake forms awaiting front-desk review and merge into
+// the matching patient's chart.
+export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
 
 // Bump this version to force a re-seed (destroys all data and re-creates).
 // Bumped to 34: v2 demo deployment flipped to demo mode — force browsers that
@@ -311,7 +314,7 @@ export async function resetAllDatabases(): Promise<void> {
     'tamamhealth_leave_requests', 'tamamhealth_payroll_entries',
     'tamamhealth_clinical_favorites', 'tamamhealth_consultation_templates',
     'tamamhealth_clinician_tasks', 'tamamhealth_patient_documents',
-    'tamamhealth_patient_reminders',
+    'tamamhealth_patient_reminders', 'tamamhealth_intake_forms',
     // NOTE: 'tamamhealth_controlled_substance_log' is deliberately NOT reset
     // here — it is an append-only regulatory audit trail and resetAllDatabases()
     // runs on production seed-version bumps (see seedProduction).

@@ -7,7 +7,6 @@ import {
 } from "@/components/marketing/MarketingShared";
 import {
   FeatureFAQSection,
-  FeatureRelatedProductsSection,
   FeatureStatsBand,
   FeatureTestimonialSection,
 } from "@/components/marketing/FeatureSections";
@@ -348,30 +347,6 @@ export default function PatientExperiencePage() {
           {
             question: "How does the Patient Experience module integrate with TamamHealth EHR?",
             answer: "Integration is seamless. Digital intake data flows directly into the EHR, appointment bookings sync with provider calendars, portal messages appear in patient charts, and lab results automatically populate the portal. One unified system, zero manual data entry.",
-          },
-        ]}
-      />
-
-      <FeatureRelatedProductsSection
-        heading="Complete patient experience with TamamHealth modules"
-        products={[
-          {
-            title: "EHR Module",
-            body: "Patient portal integrates with EHR. Patients see visit notes, medications, and test results. Providers document faster without paper.",
-            href: "/ehr",
-            image: "/assets/doctor-tablet-review.jpg",
-          },
-          {
-            title: "Billing & Payments",
-            body: "Patient portal shows bills and payment history. Automated reminders reduce collection follow-up. Patients pay via M-Pesa.",
-            href: "/billing",
-            image: "/assets/doctor-writing-notes.jpg",
-          },
-          {
-            title: "Telehealth Module",
-            body: "Patients book telehealth appointments from patient portal. Reminders sent via SMS. Consultation notes appear in portal after visit.",
-            href: "/telehealth",
-            image: "/assets/african-nurse.jpg",
           },
         ]}
       />

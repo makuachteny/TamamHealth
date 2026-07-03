@@ -73,7 +73,6 @@ function titleCase(value: string): string {
 
 export default function EhrCareDashboard({
   title,
-  eyebrow,
   greetingName,
   dateLabel,
   activeView = 'dashboard',
@@ -170,7 +169,6 @@ export default function EhrCareDashboard({
   const headerActions = actions.slice(0, 3);
   const railActions = actions.slice(3);
   const headerTitle = greetingName ? `Welcome, ${greetingName}` : title;
-  const headerSubtitle = greetingName ? title : dateLabel;
 
   return (
     <div className="ehr-schedule-shell ehr-care-dashboard">
@@ -189,9 +187,9 @@ export default function EhrCareDashboard({
         <div className="ehr-schedule-primary-controls ehr-clinical-dashboard-header-main">
           <div className="ehr-greeting-row">
             <div className="ehr-care-header-copy">
-              {eyebrow && <p className="ehr-care-eyebrow">{eyebrow}</p>}
+              {/* Only the "Welcome, {name}" greeting — no eyebrow/subtitle — so
+                  every role matches the Clinical Officer header exactly. */}
               <p className="ehr-care-greeting">{headerTitle}</p>
-              {headerSubtitle && <p className="ehr-care-header-subtitle">{headerSubtitle}</p>}
             </div>
           </div>
         </div>
@@ -288,8 +286,6 @@ export default function EhrCareDashboard({
             </div>
           </div>
 
-          <AvatarLegend style={{ padding: '6px 12px 0' }} />
-
           <div className="ehr-appointment-list ehr-care-list">
             {visibleRows.length === 0 ? (
               <div className="ehr-empty-state">
@@ -309,13 +305,13 @@ export default function EhrCareDashboard({
                   onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetail(row); } }}
                 >
                   <div className="ehr-patient-icon" style={{ background: stateColor(row.statusTone === 'danger' ? 'red' : row.statusTone === 'warning' ? 'yellow' : row.priority), color: '#fff' }}>{initials(row.title)}</div>
-                  <div className="ehr-appointment-time">
-                    <strong>{row.time || row.compactMeta || '—'}</strong>
-                    {(row.priority || row.status) && <span>{row.priority || (row.status ? titleCase(row.status) : '')}</span>}
-                  </div>
                   <div className="ehr-appointment-main">
                     <button type="button" onClick={(event) => { event.stopPropagation(); openDetail(row); }}>{row.title}</button>
                     <p>{row.subtitle}{row.room ? ` · ${row.room}` : ''}</p>
+                  </div>
+                  <div className="ehr-appointment-time">
+                    <strong>{row.time || row.compactMeta || '—'}</strong>
+                    {(row.priority || row.status) && <span>{row.priority || (row.status ? titleCase(row.status) : '')}</span>}
                   </div>
                 </div>
                 {row.detail}
@@ -350,9 +346,12 @@ export default function EhrCareDashboard({
           )}
 
           {children && (
-            <div className={`ehr-worklist-panel ehr-care-workflow ${effectiveView === 'calendar' ? 'is-calendar' : ''}`}>
-              {children}
-            </div>
+            <>
+              <AvatarLegend style={{ padding: '10px 12px 2px' }} />
+              <div className={`ehr-worklist-panel ehr-care-workflow ${effectiveView === 'calendar' ? 'is-calendar' : ''}`}>
+                {children}
+              </div>
+            </>
           )}
         </section>
 

@@ -43,23 +43,25 @@
   --tb-red-dark:   #7A2020;
   --tb-red-light:  #FADCDC;
 
-  /* Rose — maternity, community care */
-  --tb-rose:       #B23A66;
-  --tb-rose-dark:  #8E2C50;
-  --tb-rose-light: #F2D4E0;
+  /* Rose + Iris consolidated into the brand blue so the UI uses a single
+     accent family (brand blue) plus the three semantic colours (green, gold,
+     red). Kept as aliases so existing rules keep working; use the raw hexes
+     only for illustration if ever needed. */
+  --tb-rose:       var(--tb-blue-800);
+  --tb-rose-dark:  var(--tb-blue-900);
+  --tb-rose-light: var(--tb-blue-100);
 
-  /* Iris — lab, data, builders */
-  --tb-iris:       #5B4BA8;
-  --tb-iris-dark:  #46388A;
-  --tb-iris-light: #DED8F3;
+  --tb-iris:       var(--tb-blue-800);
+  --tb-iris-dark:  var(--tb-blue-900);
+  --tb-iris-light: var(--tb-blue-100);
 
   /* ─ Tint backgrounds (flat washes for cards and icon containers) ─ */
   --tb-tint-blue:  rgba(33, 145, 208, 0.10);
   --tb-tint-green: #E9F6EE;
   --tb-tint-gold:  #FBF3DD;
   --tb-tint-red:   #FCEEEA;
-  --tb-tint-rose:  #FBEDF3;
-  --tb-tint-iris:  #F0EDFA;
+  --tb-tint-rose:  var(--tb-tint-blue);
+  --tb-tint-iris:  var(--tb-tint-blue);
   --tb-green-50:   #F2FAF5;
 
   /* ─ Platform app canvas + surfaces ─ */
@@ -77,8 +79,8 @@
   --tb-text:       #10195A;
   --tb-text-pri:   #10195A;
   --tb-text-sec:   #26336F;
-  --tb-text-ter:   #64748B;
-  --tb-text-muted: #64748B;
+  --tb-text-ter:   #475569;
+  --tb-text-muted: #475569;
   --tb-text-inv:   #FFFFFF;
   --tb-text-inv-m: #DBEAFE;
 
@@ -2421,7 +2423,7 @@ body {
 
 .mk-home-hero-panel-label {
   margin: 0 0 12px;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   font-family: var(--AkkuratMonoLL);
   font-size: 11px;
   font-weight: 700;
@@ -2454,7 +2456,7 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  background: var(--tb-blue-700);
+  background: var(--tb-blue-800);
   color: #fff;
   text-decoration: none;
   font-size: 15px;
@@ -3096,7 +3098,7 @@ body,
   line-height: 1;
   outline: none;
 }
-.mk-nav-item:hover { color: var(--tb-blue-700); }
+.mk-nav-item:hover { color: var(--tb-blue-800); }
 .mk-nav-item svg { width: 12px; height: 12px; transition: transform 0.2s; }
 .mk-nav-item-link {
   color: inherit;
@@ -3105,7 +3107,7 @@ body,
 }
 
 .mk-navbar--hero .mk-nav-logo img {
-  filter: brightness(0) invert(1);
+  filter: none;
 }
 
 .mk-navbar--hero .mk-nav-item,
@@ -3126,8 +3128,8 @@ body,
 }
 
 .mk-navbar--light-hero .mk-btn-green {
-  background: var(--tb-blue-700);
-  border-color: var(--tb-blue-700);
+  background: var(--tb-blue-800);
+  border-color: var(--tb-blue-800);
   color: var(--tb-text-inv);
 }
 
@@ -3142,8 +3144,8 @@ body,
 }
 
 .mk-navbar--scrolled .mk-btn-green {
-  background: var(--tb-blue-700);
-  border-color: var(--tb-blue-700);
+  background: var(--tb-blue-800);
+  border-color: var(--tb-blue-800);
   color: var(--tb-text-inv);
 }
 
@@ -3193,8 +3195,8 @@ body,
   width: 100%;
   min-height: 54px;
   margin-top: 6px;
-  background: var(--tb-blue-700) !important;
-  border-color: var(--tb-blue-700) !important;
+  background: var(--tb-blue-800) !important;
+  border-color: var(--tb-blue-800) !important;
   color: var(--tb-text-inv) !important;
 }
 
@@ -3219,7 +3221,7 @@ body,
   opacity: 0;
   visibility: hidden;
   transform: translateY(8px);
-  transition: all 0.2s;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
   z-index: 200;
 }
 .mk-nav-item:hover .mk-nav-dropdown,
@@ -3241,7 +3243,7 @@ body,
 }
 .mk-nav-dropdown a:hover {
   background: var(--tb-cream-100);
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
 }
 
 /* ── Buttons (Tebra: pill shape, 15px font, 600 weight) ──────── */
@@ -3257,7 +3259,7 @@ body,
   line-height: 1;
   border-radius: 999px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
+  transition: color 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), background-color 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), border-color 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
   text-decoration: none;
   border: none;
   white-space: nowrap;
@@ -3275,10 +3277,10 @@ body,
 /* CTA buttons stay platform blue — ward colors never sit on actions. */
 .mk-btn-outline-green {
   background: transparent;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   border: 1.5px solid var(--tb-blue-700);
 }
-.mk-btn-outline-green:hover { background: var(--tb-blue-700); color: var(--tb-text-inv); }
+.mk-btn-outline-green:hover { background: var(--tb-blue-800); color: var(--tb-text-inv); }
 
 .mk-btn-outline-white {
   background: transparent;
@@ -3288,7 +3290,7 @@ body,
 .mk-btn-outline-white:hover { background: var(--tb-cream-50); color: var(--tb-blue-900); }
 
 .mk-btn-green {
-  background: var(--tb-blue-700);
+  background: var(--tb-blue-800);
   color: #fff;
   border: 1.5px solid var(--tb-blue-700);
 }
@@ -3662,8 +3664,8 @@ body,
 }
 
 .mk-mod-hero--showcase .mk-mod-hero-primary {
-  background: var(--tb-blue-700);
-  border-color: var(--tb-blue-700);
+  background: var(--tb-blue-800);
+  border-color: var(--tb-blue-800);
   color: #fff;
 }
 
@@ -3808,8 +3810,8 @@ body,
 }
 
 .mk-mod-hero--data .mk-mod-hero-primary {
-  background: var(--tb-blue-700);
-  border-color: var(--tb-blue-700);
+  background: var(--tb-blue-800);
+  border-color: var(--tb-blue-800);
   color: #fff;
 }
 
@@ -3846,10 +3848,6 @@ body,
   filter: saturate(0.85) contrast(0.96);
 }
 
-.mk-hero-pricing .mk-mod-hero-visual-img {
-  object-position: center 24%;
-}
-
 .mk-hero-case-index {
   background: #FEFFF9;
 }
@@ -3868,27 +3866,6 @@ body,
 
 .mk-hero-patient-experience .mk-mod-hero-visual-img {
   object-position: center 34%;
-}
-
-.mk-hero-pricing .mk-mod-hero-inner {
-  grid-template-columns: minmax(0, 960px) !important;
-  justify-content: center !important;
-  text-align: center !important;
-}
-
-.mk-hero-pricing .mk-mod-hero-copy {
-  max-width: 960px !important;
-  margin-inline: auto !important;
-}
-
-.mk-hero-pricing .mk-mod-hero-title,
-.mk-hero-pricing .mk-mod-hero-subtitle {
-  margin-inline: auto !important;
-}
-
-.mk-hero-pricing .mk-mod-hero-actions,
-.mk-hero-pricing .mk-mod-hero-stats {
-  justify-content: center !important;
 }
 
 .mk-hero-contact .mk-mod-hero-visual-img,
@@ -4420,7 +4397,7 @@ body,
 .mk-product-card-link {
   font-size: 14px;
   font-weight: 600;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -4459,14 +4436,14 @@ body,
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 .mk-testimonial-tab:hover {
   color: var(--tb-text);
 }
 .mk-testimonial-tab.active {
   color: var(--tb-text);
-  border-bottom-color: var(--tb-blue-700);
+  border-bottom-color: var(--tb-blue-800);
   font-weight: 600;
 }
 .mk-testimonials-grid {
@@ -4526,7 +4503,7 @@ body,
   margin-bottom: 64px;
 }
 .mk-steps-header .mk-h2 { color: #fff; }
-.mk-steps-header .mk-label { color: var(--tb-gold); }
+.mk-steps-header .mk-label { color: var(--tb-gold-dark); }
 .mk-steps-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -4647,7 +4624,7 @@ body,
 .mk-form-input::placeholder { color: #9ca3af; }
 .mk-form-input:focus {
   outline: none;
-  border-color: var(--tb-blue-700);
+  border-color: var(--tb-blue-800);
   box-shadow: 0 0 0 3px rgba(33,145,208,0.16);
 }
 .mk-form-submit {
@@ -4673,7 +4650,7 @@ body,
   flex-shrink: 0;
   width: 20px;
   height: 20px;
-  color: var(--tb-green);
+  color: var(--tb-green-dark);
   margin-top: 2px;
 }
 
@@ -4794,8 +4771,11 @@ body,
 .mk-feature-split-reverse > * {
   direction: ltr;
 }
+/* Deep-accent blue (tb-blue-800) rather than the header navy, so the
+   mission band reads as its own moment instead of merging with the nav
+   and hero surfaces. */
 .mk-feature-split-navy {
-  background: var(--tb-blue-900);
+  background: var(--tb-blue-800);
   color: var(--tb-text-inv);
 }
 .mk-feature-split-cream {
@@ -4853,7 +4833,7 @@ body,
   color: #fff;
 }
 .mk-feature-split-cream .mk-feature-split-link {
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
 }
 .mk-feature-split-media {
   position: relative;
@@ -4920,7 +4900,7 @@ body,
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   margin-bottom: 8px;
 }
 .mk-related-links-title {
@@ -4933,7 +4913,7 @@ body,
   gap: 8px;
 }
 .mk-related-links-card:hover .mk-related-links-title {
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
 }
 .mk-related-links-card--static:hover .mk-related-links-title {
   color: var(--tb-text-pri);
@@ -4970,7 +4950,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
 }
 .mk-feature-ring-icon svg { width: 28px; height: 28px; }
 .mk-feature-ring-item h4 {
@@ -5094,7 +5074,7 @@ body,
   flex-shrink: 0;
   width: 20px;
   height: 20px;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   transition: transform 0.3s;
 }
 .mk-faq-trigger[aria-expanded="true"] svg {
@@ -5316,7 +5296,7 @@ body,
   color: var(--tb-text-sec);
 }
 .mk-footer-nav-rich-link:hover strong {
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
 }
 .mk-footer-inner {
   display: grid;
@@ -5425,7 +5405,7 @@ body,
 /* ── Show More ────────────────────────────────────────────────── */
 .mk-show-more { display: flex; justify-content: center; margin-top: 32px; }
 
-/* ── Module Grid (pricing page) ───────────────────────────────── */
+/* ── Module Grid ───────────────────────────────────────────────── */
 .mk-module-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -5433,45 +5413,6 @@ body,
 }
 @media (max-width:959.98px) { .mk-module-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width:639.98px) { .mk-module-grid { grid-template-columns: 1fr; } }
-.mk-module-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 28px;
-  border: 1px solid var(--tb-cream-300);
-  transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-.mk-module-card:hover {
-  box-shadow: var(--tb-shadow-md);
-  transform: translateY(-2px);
-}
-.mk-module-card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-}
-.mk-module-card h4 { margin: 0 0 8px; }
-.mk-module-card p { font-size: 14px; color: var(--tb-text-sec); margin: 0; line-height: 1.6; }
-.mk-module-card ul { list-style: none; padding: 0; margin: 12px 0 0; }
-.mk-module-card ul li {
-  font-size: 13px;
-  color: var(--tb-text-sec);
-  padding: 4px 0 4px 16px;
-  position: relative;
-}
-.mk-module-card ul li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 11px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--tb-green);
-}
 
 /* ── Stat Counter Badges ──────────────────────────────────────── */
 .mk-stat-row {
@@ -5491,7 +5432,7 @@ body,
   display: block;
   font-size: 36px;
   font-weight: 700;
-  color: var(--tb-gold);
+  color: var(--tb-gold-dark);
   margin-bottom: 6px;
   font-family: var(--Lora);
 }
@@ -5570,7 +5511,7 @@ body,
   font-size: 20px;
 }
 .mk-hero-photo-bg .mk-label {
-  color: var(--tb-gold);
+  color: var(--tb-gold-dark);
   font-size: 14px;
   letter-spacing: 0.15em;
 }
@@ -5610,7 +5551,7 @@ body,
   display: block;
   font-size: 40px;
   font-weight: 700;
-  color: var(--tb-gold);
+  color: var(--tb-gold-dark);
   margin-bottom: 8px;
   font-family: var(--Lora);
   line-height: 1;
@@ -5646,7 +5587,7 @@ body,
   justify-content: center;
   margin-bottom: 16px;
   background: var(--tb-tint-blue);
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
 }
 .mk-value-card h4 {
   font-size: 17px;
@@ -5824,6 +5765,11 @@ body,
   margin-left: auto;
   margin-right: auto;
 }
+/* Tailwind preflight zeroes <p> margins, so a subtitle that relies on
+   defaults sits flush against the heading's underline. */
+.mk-section-heading .mk-h2 + p {
+  margin-top: 18px;
+}
 
 /* ── Smooth Image Reveal on Scroll ───────────────────────────────── */
 .mk-split-image img,
@@ -5948,7 +5894,7 @@ body,
   transition: color 0.3s var(--tb-ease);
 }
 .mk-stat-badge:hover span:first-child {
-  color: var(--tb-green) !important;
+  color: var(--tb-green-dark) !important;
 }
 
 /* ── Product Card Details slide-down ─────────────────────────────── */
@@ -6754,7 +6700,7 @@ body,
 .mk-home-suite-card > span:first-child {
   display: block;
   margin-bottom: 22px;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   font-size: clamp(46px, 5vw, 76px);
   line-height: 0.8;
   font-weight: 600;
@@ -6853,7 +6799,7 @@ body,
 .mk-home-numbered-card > span:first-child {
   display: block;
   margin-bottom: 22px;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   font-size: clamp(42px, 4.6vw, 68px);
   line-height: 0.86;
   font-weight: 600;
@@ -7357,7 +7303,7 @@ body,
   align-items: center;
   justify-content: flex-start;
   margin-bottom: 20px;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   background: transparent;
 }
 
@@ -7374,7 +7320,7 @@ body,
 }
 
 .mk-team-intro .mk-label {
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
 }
 
 .mk-team-intro p:not(.mk-label) {
@@ -7411,7 +7357,7 @@ body,
   inset: 0;
   display: grid;
   place-items: center;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   font-family: var(--AkkuratLL);
   font-size: clamp(54px, 6vw, 92px);
   font-weight: 700;
@@ -7442,7 +7388,7 @@ body,
 }
 
 .mk-team-mission-band .mk-label {
-  color: var(--tb-gold);
+  color: var(--tb-gold-dark);
 }
 
 .mk-team-mission-band .mk-h2,
@@ -7850,7 +7796,7 @@ body {
 }
 
 .mk-navbar--hero .mk-nav-logo img {
-  filter: brightness(0) invert(1) !important;
+  filter: none !important;
 }
 
 .mk-navbar--hero .mk-nav-item,
@@ -8502,7 +8448,7 @@ body {
 }
 
 .mk-navbar--hero-solid .mk-nav-logo img {
-  filter: brightness(0) invert(1) !important;
+  filter: none !important;
 }
 
 .mk-navbar--hero-solid .mk-nav-item,
@@ -8645,7 +8591,7 @@ body {
 
 .mk-home-hero-slot.is-selected {
   background: rgba(33,145,208,0.16) !important;
-  border-color: #2191D0 !important;
+  border-color: var(--tb-blue-800) !important;
   box-shadow: inset 0 0 0 1px #2191D0 !important;
 }
 
@@ -10377,7 +10323,7 @@ body,
 .mk-home-numbered-card > span:first-child {
   display: block !important;
   margin: 0 !important;
-  color: #2191D0 !important;
+  color: var(--tb-blue-800) !important;
   font-size: clamp(56px, 5vw, 70px) !important;
   font-weight: 800 !important;
   line-height: 0.9 !important;
@@ -10654,7 +10600,6 @@ body,
 .mk-hero-billing .mk-mod-hero-visual-img,
 .mk-hero-telehealth .mk-mod-hero-visual-img,
 .mk-hero-patient-experience .mk-mod-hero-visual-img,
-.mk-hero-pricing .mk-mod-hero-visual-img,
 .mk-hero-contact .mk-mod-hero-visual-img,
 .mk-hero-team .mk-mod-hero-visual-img,
 .mk-hero-careers .mk-mod-hero-visual-img,
@@ -10849,8 +10794,8 @@ body,
 }
 
 .mk-hero-patient-experience .mk-mod-hero-primary {
-  background: var(--tb-blue-700) !important;
-  border-color: var(--tb-blue-700) !important;
+  background: var(--tb-blue-800) !important;
+  border-color: var(--tb-blue-800) !important;
   color: #fff !important;
 }
 
@@ -10911,22 +10856,22 @@ body,
   }
 }
 
-/* ── Final full-screen text-only hero alignment ─────────────────── */
-.mk-mod-hero:not(.mk-home-hero),
+/* ── Final full-screen text-only hero alignment ───────────────────
+   Legal pages opt out: a full-viewport hero over two lines of text
+   reads as a broken page. */
+.mk-mod-hero:not(.mk-home-hero):not(.mk-mod-hero--legal),
 .mk-product-hero {
   min-height: 100svh !important;
 }
 
 .mk-hero-products,
-.mk-hero-case-index,
-.mk-hero-pricing {
+.mk-hero-case-index {
   display: flex !important;
   align-items: center !important;
 }
 
 .mk-hero-products .mk-mod-hero-inner,
-.mk-hero-case-index .mk-mod-hero-inner,
-.mk-hero-pricing .mk-mod-hero-inner {
+.mk-hero-case-index .mk-mod-hero-inner {
   min-height: calc(100svh - var(--navbar-height) - clamp(96px, 12vw, 180px)) !important;
   grid-template-columns: minmax(0, 980px) !important;
   justify-content: center !important;
@@ -10935,8 +10880,7 @@ body,
 }
 
 .mk-hero-products .mk-mod-hero-copy,
-.mk-hero-case-index .mk-mod-hero-copy,
-.mk-hero-pricing .mk-mod-hero-copy {
+.mk-hero-case-index .mk-mod-hero-copy {
   max-width: 980px !important;
   margin-inline: auto !important;
 }
@@ -10944,25 +10888,20 @@ body,
 .mk-hero-products .mk-mod-hero-title,
 .mk-hero-products .mk-mod-hero-subtitle,
 .mk-hero-case-index .mk-mod-hero-title,
-.mk-hero-case-index .mk-mod-hero-subtitle,
-.mk-hero-pricing .mk-mod-hero-title,
-.mk-hero-pricing .mk-mod-hero-subtitle {
+.mk-hero-case-index .mk-mod-hero-subtitle {
   margin-inline: auto !important;
 }
 
 .mk-hero-products .mk-mod-hero-actions,
 .mk-hero-products .mk-mod-hero-stats,
 .mk-hero-case-index .mk-mod-hero-actions,
-.mk-hero-case-index .mk-mod-hero-stats,
-.mk-hero-pricing .mk-mod-hero-actions,
-.mk-hero-pricing .mk-mod-hero-stats {
+.mk-hero-case-index .mk-mod-hero-stats {
   justify-content: center !important;
 }
 
 @media (max-width: 759.98px) {
   .mk-hero-products .mk-mod-hero-inner,
-  .mk-hero-case-index .mk-mod-hero-inner,
-  .mk-hero-pricing .mk-mod-hero-inner {
+  .mk-hero-case-index .mk-mod-hero-inner {
     min-height: calc(100svh - var(--navbar-height) - 68px) !important;
   }
 }
@@ -11323,7 +11262,7 @@ body,
 
 .mk-action-modal-eyebrow {
   margin: 0 0 10px;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   font-family: var(--tb-mono);
   font-size: 12px;
   font-weight: 700;
@@ -11406,7 +11345,7 @@ body,
 .mk-action-modal-field input:focus,
 .mk-action-modal-field textarea:focus,
 .mk-newsletter-field input:focus {
-  border-color: var(--tb-blue-700);
+  border-color: var(--tb-blue-800);
   box-shadow: 0 0 0 3px rgba(33, 145, 208, 0.16);
 }
 
@@ -11452,7 +11391,7 @@ body,
   height: 64px;
   margin-bottom: 18px;
   border-radius: 999px;
-  background: var(--tb-blue-700);
+  background: var(--tb-blue-800);
   color: #fff;
 }
 
@@ -11761,8 +11700,10 @@ button.mk-mobile-top-demo {
     line-height: 1.1 !important;
   }
 
+  /* The homepage platform section is navy with white text — forcing the
+     light mobile background would make its copy invisible. */
   .mk-products-section,
-  .mk-section-white,
+  .mk-section-white:not(.mk-home-platform-section),
   .mk-section-cream {
     background: #F7F7F4 !important;
   }
@@ -12268,7 +12209,7 @@ button.mk-mobile-top-demo {
     align-items: center !important;
     justify-content: center !important;
     justify-self: end !important;
-    color: #2191D0 !important;
+    color: var(--tb-blue-800) !important;
   }
 
   .mk-mobile-sales-row {
@@ -13127,8 +13068,8 @@ button.mk-mobile-top-demo {
 .mk-home-platform-heading {
   display: grid !important;
   gap: 0.06em !important;
-  font-size: clamp(44px, 4.7vw, 82px) !important;
-  line-height: 1.04 !important;
+  font-size: clamp(30px, 3.2vw, 46px) !important;
+  line-height: 1.1 !important;
 }
 
 .mk-home-platform-heading span {
@@ -13138,7 +13079,7 @@ button.mk-mobile-top-demo {
 
 @media (max-width: 760px) {
   .mk-home-platform-heading {
-    font-size: clamp(34px, 10vw, 54px) !important;
+    font-size: clamp(26px, 7vw, 36px) !important;
   }
 }
 
@@ -13163,8 +13104,9 @@ button.mk-mobile-top-demo {
   --mk-nav-hero-bg: #10195A;
 }
 
+/* Product pages: header matches the explorer's active-tab blue. */
 .mk-navbar--tone-clinical {
-  --mk-nav-hero-bg: #10195A;
+  --mk-nav-hero-bg: var(--tb-blue-700);
 }
 
 .mk-navbar--tone-company {
@@ -13426,8 +13368,7 @@ button.mk-mobile-top-demo {
 .mk-mod-hero--center .mk-mod-hero-inner,
 .mk-mod-hero--legal .mk-mod-hero-inner,
 .mk-mod-hero--data .mk-mod-hero-inner,
-.mk-mod-hero--showcase .mk-mod-hero-inner,
-.mk-hero-pricing .mk-mod-hero-inner {
+.mk-mod-hero--showcase .mk-mod-hero-inner {
   display: flex !important;
   flex-direction: column !important;
   justify-content: center !important;
@@ -13439,8 +13380,7 @@ button.mk-mobile-top-demo {
 .mk-mod-hero--center .mk-mod-hero-copy,
 .mk-mod-hero--legal .mk-mod-hero-copy,
 .mk-mod-hero--data .mk-mod-hero-copy,
-.mk-mod-hero--showcase .mk-mod-hero-copy,
-.mk-hero-pricing .mk-mod-hero-copy {
+.mk-mod-hero--showcase .mk-mod-hero-copy {
   max-width: min(980px, 100%) !important;
   margin-inline: auto !important;
   text-align: center !important;
@@ -13460,10 +13400,7 @@ button.mk-mobile-top-demo {
 .mk-mod-hero--data .mk-mod-hero-subtitle,
 .mk-mod-hero--showcase .mk-mod-hero-eyebrow,
 .mk-mod-hero--showcase .mk-mod-hero-title,
-.mk-mod-hero--showcase .mk-mod-hero-subtitle,
-.mk-hero-pricing .mk-mod-hero-eyebrow,
-.mk-hero-pricing .mk-mod-hero-title,
-.mk-hero-pricing .mk-mod-hero-subtitle {
+.mk-mod-hero--showcase .mk-mod-hero-subtitle {
   margin-left: auto !important;
   margin-right: auto !important;
 }
@@ -13477,9 +13414,7 @@ button.mk-mobile-top-demo {
 .mk-mod-hero--data .mk-mod-hero-actions,
 .mk-mod-hero--data .mk-mod-hero-stats,
 .mk-mod-hero--showcase .mk-mod-hero-actions,
-.mk-mod-hero--showcase .mk-mod-hero-stats,
-.mk-hero-pricing .mk-mod-hero-actions,
-.mk-hero-pricing .mk-mod-hero-stats {
+.mk-mod-hero--showcase .mk-mod-hero-stats {
   justify-content: center !important;
 }
 
@@ -13639,8 +13574,8 @@ button.mk-mobile-top-demo {
   height: 41px !important;
   padding: 0 !important;
   border-radius: 21px !important;
-  background: #2191D0 !important;
-  border-color: #2191D0 !important;
+  background: var(--tb-blue-800) !important;
+  border-color: var(--tb-blue-800) !important;
   font-family: var(--AkkuratLL);
   font-weight: 600;
   font-size: 15px;
@@ -13874,8 +13809,8 @@ button.mk-mobile-top-demo {
   height: 34px;
   padding: 0;
   border-radius: 37px !important;
-  background: #2191D0 !important;
-  border-color: #2191D0 !important;
+  background: var(--tb-blue-800) !important;
+  border-color: var(--tb-blue-800) !important;
   color: #fff !important;
   font-family: var(--AkkuratLL) !important;
   font-weight: 600 !important;
@@ -13995,13 +13930,13 @@ button.mk-mobile-top-demo {
 .mk-platform-card--featured {
   grid-column: 1;
   grid-row: 1;
-  background: var(--tb-blue-700);
-  border-color: var(--tb-blue-700);
+  background: var(--tb-blue-800);
+  border-color: var(--tb-blue-800);
   padding: 32px 32px 28px;
 }
 
 .mk-platform-card--featured:hover {
-  border-color: var(--tb-blue-700);
+  border-color: var(--tb-blue-800);
 }
 
 .mk-platform-card-mark {
@@ -14297,6 +14232,26 @@ button.mk-mobile-top-demo {
 }
 
 /* ── Products page: interactive platform explorer ────────────────── */
+/* Acts as the page's hero — filled to the viewport so the nav sits
+   directly on its cream background with nothing showing above it. */
+/* First section on /products — sits right under the nav with the whole
+   explorer visible without scrolling, instead of centering inside a
+   full-viewport band. */
+.mk-platform-explorer {
+  min-height: calc(100svh - var(--navbar-height));
+  display: flex;
+  align-items: flex-start;
+  padding: 44px 0 64px;
+}
+
+.mk-platform-explorer .mk-section-heading {
+  margin-bottom: 44px;
+}
+
+.mk-platform-explorer > .mk-container {
+  width: 100%;
+}
+
 .mk-platform-explorer-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -14333,7 +14288,9 @@ button.mk-mobile-top-demo {
   display: grid;
   grid-template-columns: minmax(240px, 0.75fr) 1.25fr;
   gap: clamp(32px, 4vw, 56px);
-  align-items: start;
+  /* Stretch both columns so the workflow player matches the intro
+     column's height (screenshot included). */
+  align-items: stretch;
 }
 
 .mk-platform-explorer-intro .mk-h3 {
@@ -14344,16 +14301,19 @@ button.mk-mobile-top-demo {
   margin: 0 0 18px;
 }
 
-.mk-platform-explorer-link {
-  display: inline-block;
-  font-family: var(--AkkuratLL);
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: none;
+/* System screenshot filling the intro column below the copy. */
+.mk-platform-explorer-shot {
+  margin-top: 22px;
+  border: 1px solid var(--tb-cream-300);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
 }
 
-.mk-platform-explorer-link:hover {
-  text-decoration: underline;
+.mk-platform-explorer-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .mk-platform-explorer-illustration {
@@ -14363,8 +14323,8 @@ button.mk-mobile-top-demo {
 }
 
 .mk-platform-explorer-content {
-  display: grid;
-  gap: 32px;
+  display: flex;
+  flex-direction: column;
 }
 
 .mk-platform-explorer-modules {
@@ -14469,7 +14429,7 @@ button.mk-mobile-top-demo {
   font-family: var(--Lora);
   font-size: 28px;
   font-weight: 600;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
 }
 
 .mk-install-stage h3 {
@@ -14541,7 +14501,7 @@ button.mk-mobile-top-demo {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--tb-blue-700);
+  background: var(--tb-blue-800);
 }
 
 .mk-install-cta-text {
@@ -14550,7 +14510,7 @@ button.mk-mobile-top-demo {
 }
 
 .mk-install-cta-text a {
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   font-weight: 700;
 }
 
@@ -14584,7 +14544,7 @@ button.mk-mobile-top-demo {
   font-family: var(--Lora);
   font-size: clamp(32px, 4vw, 44px);
   font-weight: 600;
-  color: var(--tb-blue-700);
+  color: var(--tb-blue-800);
   margin-bottom: 10px;
 }
 
@@ -14701,6 +14661,9 @@ button.mk-mobile-top-demo {
    accent comes in via --wf-accent from the active product tab. */
 .mk-workflow-player {
   grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
 }
 
 .mk-workflow-player-hint {
@@ -14773,6 +14736,9 @@ button.mk-mobile-top-demo {
 
 /* The mock platform window. */
 .mk-workflow-screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
   background: #fff;
   border: 1px solid var(--tb-cream-300);
   border-radius: 14px;
@@ -14803,6 +14769,10 @@ button.mk-mobile-top-demo {
 }
 
 .mk-workflow-screen-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
   padding: 6px 18px;
 }
 
@@ -14923,7 +14893,7 @@ button.mk-mobile-top-demo {
 
 /* Hero kicker picks up the brass thread that runs down the page. */
 .mk-home-photo-hero-kicker {
-  color: var(--tb-gold);
+  color: var(--tb-gold-dark);
 }
 
 /* The problem — alarm tints under the missing-data stats. */
@@ -14931,33 +14901,17 @@ button.mk-mobile-top-demo {
   color: var(--tb-red);
 }
 
-.mk-home-problem-stats > div:nth-child(1) .mk-home-problem-stat {
-  background: var(--tb-tint-red);
-  border-color: var(--tb-red-light);
-}
-.mk-home-problem-stats > div:nth-child(1) .mk-home-problem-stat strong {
-  color: var(--tb-red);
+/* Stat cards stay uniform: white cards, one number color for all three. */
+.mk-home-problem-stat {
+  background: #fff;
 }
 
-.mk-home-problem-stats > div:nth-child(2) .mk-home-problem-stat {
-  background: var(--tb-tint-gold);
-  border-color: var(--tb-gold-light);
-}
-.mk-home-problem-stats > div:nth-child(2) .mk-home-problem-stat strong {
-  color: var(--tb-gold-dark);
-}
-
-.mk-home-problem-stats > div:nth-child(3) .mk-home-problem-stat {
-  background: var(--tb-tint-rose);
-  border-color: var(--tb-rose-light);
-}
-.mk-home-problem-stats > div:nth-child(3) .mk-home-problem-stat strong {
-  color: var(--tb-rose);
-}
-
-/* The solution — brass eyebrow on navy; outcomes keyed by ward color. */
-.mk-home-platform-flow .mk-label {
+/* The solution — brass eyebrow on navy; outcomes keyed by ward color.
+   Extra class in the selector to out-rank the section's white body-text
+   rule (.mk-home-platform-split .mk-split-content p). */
+.mk-home-platform-section .mk-split-content p.mk-label {
   color: var(--tb-gold);
+  margin-bottom: 0;
 }
 
 .mk-home-platform-outcome::before {
@@ -14972,32 +14926,120 @@ button.mk-mobile-top-demo {
 .mk-home-platform-outcome:nth-child(2)::before { background: var(--tb-gold-light); }
 .mk-home-platform-outcome:nth-child(3)::before { background: var(--tb-rose-light); }
 
+/* Products "Learn more" grid gets a pale blue wash to stand apart from
+   the cream sections around it. Scoped so other related-links grids
+   keep their default background. */
+#products-grid .mk-related-links {
+  background: var(--tb-blue-50);
+}
+
 /* Audiences — each group keeps its ward color on the card label. */
-.mk-related-links-grid > .mk-related-links-card:nth-child(1) .mk-related-links-label { color: var(--tb-green); }
+.mk-related-links-grid > .mk-related-links-card:nth-child(1) .mk-related-links-label { color: var(--tb-green-dark); }
 .mk-related-links-grid > .mk-related-links-card:nth-child(2) .mk-related-links-label { color: var(--tb-gold-dark); }
 .mk-related-links-grid > .mk-related-links-card:nth-child(3) .mk-related-links-label { color: var(--tb-iris); }
+.mk-related-links-grid > .mk-related-links-card:nth-child(4) .mk-related-links-label { color: var(--tb-rose); }
+.mk-related-links-grid > .mk-related-links-card:nth-child(5) .mk-related-links-label { color: var(--tb-red); }
 
-/* Learn more — one tinted card per audience. */
-#learn .mk-section-heading .mk-label {
-  color: var(--tb-iris);
+/* ─── Accessibility: guaranteed visible keyboard focus (WCAG 2.4.7) ───
+   Several components set `outline: none` on :focus (fine for mouse users but
+   removes the ring for keyboard users). This restores a clear, on-brand focus
+   ring for keyboard navigation only (:focus-visible), across every interactive
+   element, without showing rings on mouse click. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible,
+[role="button"]:focus-visible,
+[role="link"]:focus-visible,
+[role="tab"]:focus-visible {
+  outline: 2px solid var(--tb-blue-800) !important;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-/* !important: the glassmorphic audit layer forces card backgrounds with
-   !important; these flat tints must out-cascade it in all states. */
-.mk-home-learn-grid > div:nth-child(1) .mk-home-learn-card {
-  background: var(--tb-tint-green) !important;
-  border: 1px solid var(--tb-green-light) !important;
-}
-.mk-home-learn-grid > div:nth-child(2) .mk-home-learn-card {
-  background: var(--tb-tint-gold) !important;
-  border: 1px solid var(--tb-gold-light) !important;
-}
-.mk-home-learn-grid > div:nth-child(3) .mk-home-learn-card {
-  background: var(--tb-tint-iris) !important;
-  border: 1px solid var(--tb-iris-light) !important;
+/* On dark/navy surfaces, use a light ring so it stays visible. */
+.mk-mod-hero :focus-visible,
+.mk-navbar--hero :focus-visible,
+[data-theme="dark"] :focus-visible {
+  outline-color: var(--tb-white) !important;
 }
 
-/* Close the page warm instead of repeating cream. */
-.mk-home-final-cta {
-  background: var(--tb-tint-gold);
+/* ── Full-screen homepage sections ────────────────────────────────
+   Each homepage section fills one viewport with its content centered.
+   min-height (not height) so content that outgrows small or landscape
+   screens simply extends the section and scrolls — nothing clips. The
+   navbar is sticky, so sections size against the space below it. */
+.mk-home-photo-hero {
+  min-height: calc(100vh - var(--navbar-height));
+  min-height: calc(100svh - var(--navbar-height));
+}
+
+.mk-home-problem,
+.mk-home-platform-section,
+.mk-related-links.mk-home-audiences {
+  display: flex;
+  align-items: stretch;
+  min-height: calc(100vh - var(--navbar-height));
+  min-height: calc(100svh - var(--navbar-height));
+}
+
+/* Spread each section's blocks across the full height: the leftover
+   room becomes even breathing space between them instead of pooling
+   above and below a centered clump. On small screens there is no
+   leftover room, so this collapses to normal flow. */
+.mk-home-problem > .mk-container,
+.mk-home-platform-section > .mk-container,
+.mk-related-links.mk-home-audiences > .mk-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: clamp(32px, 4vh, 56px);
+}
+
+.mk-home-problem-intro {
+  margin-bottom: 0;
+}
+
+.mk-related-links.mk-home-audiences .mk-related-links-heading {
+  margin-bottom: 0;
+}
+
+/* ── Product pages: header in the explorer's active-tab blue ──────
+   tone-clinical pages (/products…) paint the top bar with the same
+   blue as the active "Hospital" pill, with white logo/links/CTA.
+   Scrolling past still swaps to the standard light bar. */
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--light-hero,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--hero-solid,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--hero {
+  background: var(--tb-blue-700) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--light-hero .mk-nav-item,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--light-hero .mk-nav-item-link,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--light-hero .mk-mobile-toggle,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--hero-solid .mk-nav-item,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--hero-solid .mk-nav-item-link {
+  color: #fff !important;
+}
+
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--light-hero .mk-nav-logo-type,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--light-hero .mk-nav-logo-mark,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--hero-solid .mk-nav-logo-type,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--hero-solid .mk-nav-logo-mark {
+  filter: brightness(0) invert(1) !important;
+  opacity: 1 !important;
+}
+
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--light-hero .mk-nav-demo,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--light-hero .mk-mobile-top-demo,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--hero-solid .mk-nav-demo,
+.mk-navbar.mk-navbar--tone-clinical.mk-navbar--hero-solid .mk-mobile-top-demo {
+  border-color: rgba(255, 255, 255, 0.85) !important;
+  color: #fff !important;
+  background: transparent !important;
 }

@@ -2,6 +2,7 @@
 import DashboardHero from '@/components/dashboard/DashboardHero';
 import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import SpotlightCard from '@/components/dashboard/SpotlightCard';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -257,6 +258,8 @@ export default function DataEntryDashboard() {
       <TopBar title={t('dataEntry.title')} />
       <main className="page-container page-enter">
 
+        <DashboardGreetingHeader />
+
         <DashboardHero
           className="mb-5"
           stats={[
@@ -277,21 +280,6 @@ export default function DataEntryDashboard() {
           ]}
           secondaryCard={<SpotlightCard title="Profile Completeness" value={`${facilityStats?.pct ?? 0}%`} caption="facility profile filled" href="/my-facility" />}
         />
-
-        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
-        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
-              <ClipboardCheck className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.title')}</h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {myHospital?.name || currentUser.hospitalName || ''}{myHospital?.state ? ` · ${myHospital.state}` : ''}
-              </p>
-            </div>
-          </div>
-        </div>
 
         {/* Facility banner */}
         {myHospital && (

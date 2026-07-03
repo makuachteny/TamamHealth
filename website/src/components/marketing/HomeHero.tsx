@@ -32,8 +32,8 @@ export function HomeHero() {
         <div className="mk-home-photo-hero-card">
           <p className="mk-home-photo-hero-kicker">Our mission</p>
           <h1 className="mk-home-photo-hero-title">
-            We aspire to give every health facility in South Sudan one
-            connected patient record.
+            We aspire to connect every health facility in South Sudan
+            through a unified patient record.
           </h1>
           <MarketingActionModalButton
             intent="demo"

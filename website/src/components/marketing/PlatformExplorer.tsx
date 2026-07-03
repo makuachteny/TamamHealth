@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Image from "next/image";
 import { Reveal } from "./MarketingShared";
 import { PlatformWorkflowPlayer } from "./PlatformWorkflowPlayer";
 
@@ -103,13 +103,14 @@ export function PlatformExplorer() {
               <p className="mk-label" style={{ color: active.accent }}>{active.eyebrow}</p>
               <h3 className="mk-h3">{active.title}</h3>
               <p className="mk-body">{active.subtitle}</p>
-              <Link
-                href={`/products/${active.slug}`}
-                className="mk-platform-explorer-link"
-                style={{ color: active.accent }}
-              >
-                See full details →
-              </Link>
+              <div className="mk-platform-explorer-shot">
+                <Image
+                  src="/assets/Dashboard.png"
+                  alt="TamamHealth system dashboard"
+                  width={1280}
+                  height={740}
+                />
+              </div>
             </div>
 
             <div className="mk-platform-explorer-content">

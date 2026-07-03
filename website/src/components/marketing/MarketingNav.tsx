@@ -4,13 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DuoIcon } from "./DuoIcon";
-import { MarketingActionModalButton } from "./MarketingActionModal";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Marketing — Navbar
    Flat top-level links only — Product, About Us — plus a "Get in touch"
-   CTA that routes to /pricing (booking + pricing live together there;
-   no popup). No dropdowns.
+   CTA that routes to the contact page. No dropdowns.
    ═══════════════════════════════════════════════════════════════════ */
 
 // Fundraising entry points are locked off for now. Flip to true to re-enable.
@@ -24,10 +22,10 @@ type NavTone = "home" | "platform" | "company" | "commerce" | "resource" | "clin
 
 function getNavTone(pathname: string): NavTone {
   if (pathname === "/") return "home";
-  if (pathname === "/billing" || pathname === "/pricing" || pathname === "/donate") return "commerce";
+  if (pathname === "/donate") return "commerce";
   if (pathname.startsWith("/about")) return "company";
   if (pathname === "/download" || pathname.startsWith("/resources") || pathname.startsWith("/case-studies")) return "resource";
-  if (pathname.startsWith("/products") || pathname === "/ehr" || pathname === "/pharmacy-lab") return "clinical";
+  if (pathname.startsWith("/products")) return "clinical";
   return "platform";
 }
 
@@ -51,6 +49,17 @@ export default function MarketingNav() {
         ? "mk-navbar--light-hero"
         : "mk-navbar--hero-solid";
 
+  // The nav sits on the deep-navy hero (`--hero-solid`), where a navy logo
+  // would be invisible. Serve natively-white logo assets on that state
+  // instead of relying on a CSS filter (which renders unreliably).
+  const onDarkNav = navClass === "mk-navbar--hero-solid";
+  const logoMark = onDarkNav
+    ? "/assets/logos/SVG/Tamam_Style_Guide-33-white.svg"
+    : "/assets/logos/SVG/Tamam_Style_Guide-33.svg";
+  const logoType = onDarkNav
+    ? "/assets/logos/SVG/Tamam_Style_Guide-31-white.svg"
+    : "/assets/logos/SVG/Tamam_Style_Guide-31.svg";
+
   useEffect(() => {
     const handleScroll = () => {
       const scrollY = window.scrollY;
@@ -62,16 +71,14 @@ export default function MarketingNav() {
           ".mk-mod-hero",
           ".mk-product-hero",
           ".mk-products-hero",
+          ".mk-platform-explorer",
           ".mk-subpage-hero",
           ".mk-case-hero",
           ".mk-hero-split",
           ".mk-hero-donate",
           ".mk-hero-team",
-          ".mk-hero-billing",
-          ".mk-hero-telehealth",
           ".mk-hero-download",
           ".mk-hero-careers",
-          ".mk-hero-pricing",
           ".mk-hero-contact",
           ".mk-hero-case-index",
           ".mk-hero-patient-experience",
@@ -88,9 +95,9 @@ export default function MarketingNav() {
           ".mk-mod-hero--data",
           ".mk-mod-hero--legal",
           ".mk-hero-contact",
-          ".mk-hero-pricing",
           ".mk-hero-case-index",
           ".mk-hero-patient-experience",
+          ".mk-platform-explorer",
         ].join(", "))
       );
 
@@ -122,13 +129,13 @@ export default function MarketingNav() {
           <Link href="/" className="mk-nav-logo" aria-label="Tamam Healthcare System — home">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/assets/logos/SVG/Tamam_Style_Guide-33.svg"
+              src={logoMark}
               alt=""
               className="mk-nav-logo-mark"
             />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/assets/logos/SVG/Tamam_Style_Guide-31.svg"
+              src={logoType}
               alt="Tamam Healthcare System"
               className="mk-nav-logo-type"
             />
@@ -163,24 +170,16 @@ export default function MarketingNav() {
                 </Link>
               </>
             )}
-            <MarketingActionModalButton
-              intent="demo"
-              className="mk-btn mk-btn-green mk-btn-sm mk-nav-demo"
-              source="nav-book-demo"
-            >
+            <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-sm mk-nav-demo">
               Get in touch
-            </MarketingActionModalButton>
+            </Link>
           </div>
 
           {/* Mobile hamburger */}
           <div className="mk-mobile-top-actions" aria-label="Mobile quick actions">
-            <MarketingActionModalButton
-              intent="demo"
-              className="mk-mobile-top-demo"
-              source="nav-mobile-book-demo"
-            >
+            <Link href="/about/contact" className="mk-mobile-top-demo">
               Get in touch
-            </MarketingActionModalButton>
+            </Link>
           </div>
           <button
             type="button"
@@ -231,14 +230,13 @@ export default function MarketingNav() {
                 </Link>
               )}
 
-              <MarketingActionModalButton
-                intent="demo"
+              <Link
+                href="/about/contact"
                 className="mk-btn mk-btn-green mk-mobile-cta"
-                source="nav-mobile-menu-book-demo"
-                onOpen={() => setMobileOpen(false)}
+                onClick={() => setMobileOpen(false)}
               >
                 Get in touch
-              </MarketingActionModalButton>
+              </Link>
             </div>
           </div>
         )}

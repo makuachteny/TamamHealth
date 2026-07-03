@@ -22,9 +22,11 @@ import { getRoleConfig } from '@/lib/permissions';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardMetric, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import {
   Calendar, ClipboardCheck, ArrowRightLeft,
-  UserPlus, ClipboardList,
+  UserPlus, ClipboardList, Search,
   MapPin, LogOut, Wallet, CheckCircle, X, Maximize2,
+  SendHorizontal,
 } from '@/components/icons/lucide';
+import AvatarLegend from '@/components/patients/AvatarLegend';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 
 /**
@@ -382,11 +384,15 @@ export default function FrontDeskDashboardPage() {
     });
   }, [patients, queueSearch]);
 
-  const recentPatients = useMemo(() => (
-    [...patients]
-      .sort((a, b) => patientRegisteredAt(b).localeCompare(patientRegisteredAt(a)))
-      .slice(0, 6)
-  ), [patients]);
+  const [recentSearch, setRecentSearch] = useState('');
+  const recentPatients = useMemo(() => {
+    const q = recentSearch.trim().toLowerCase();
+    const sorted = [...patients].sort((a, b) => patientRegisteredAt(b).localeCompare(patientRegisteredAt(a)));
+    const filtered = q
+      ? sorted.filter(p => `${patientFullName(p)} ${p.hospitalNumber || ''} ${p.phone || ''} ${p.county || ''} ${p.state || ''}`.toLowerCase().includes(q))
+      : sorted;
+    return filtered.slice(0, q ? 25 : 6);
+  }, [patients, recentSearch]);
 
   // ── Selected patient previous visit info (from real records) ──
   const selectedPatient = useMemo(() =>
@@ -549,6 +555,7 @@ export default function FrontDeskDashboardPage() {
 
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
     ...(canUseRoute('/check-in') ? [{ label: 'Check in', icon: ClipboardCheck, onClick: () => setCheckInOpen(true), tone: 'primary' as const }] : []),
+    ...(canUseRoute('/patient-intake') ? [{ label: 'Send intake', icon: SendHorizontal, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patients') ? [{ label: t('frontDesk.registerNewPatient'), icon: UserPlus, onClick: () => setRegisterOpen(true) }] : []),
     ...(canUseRoute('/referrals') ? [{ label: t('frontDesk.viewReferrals'), icon: ArrowRightLeft, onClick: () => router.push('/referrals') }] : []),
     ...(canUseRoute('/appointments') ? [{ label: t('nav.appointments'), icon: Calendar, onClick: () => router.push('/appointments') }] : []),
@@ -864,7 +871,20 @@ export default function FrontDeskDashboardPage() {
             <section className="ehr-worklist-panel" style={{ minWidth: 0 }}>
               <div>
                 <h3>Recently registered</h3>
-                <span>{recentPatients.length} patients</span>
+                <label className="ehr-care-search ehr-worklist-search">
+                  <Search className="w-4 h-4" />
+                  <input
+                    type="search"
+                    value={recentSearch}
+                    onChange={(e) => setRecentSearch(e.target.value)}
+                    placeholder="Search patient, ID, phone, or location"
+                    aria-label="Search recently registered"
+                  />
+                </label>
+                <div className="ehr-worklist-meta">
+                  <AvatarLegend />
+                  <span>{recentPatients.length} patients</span>
+                </div>
               </div>
               <div className="ehr-worklist-table" style={{ minWidth: 0 }}>
                 {recentPatients.length > 0 && (

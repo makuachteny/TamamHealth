@@ -134,7 +134,6 @@ export default function EhrTopRail() {
   }, [navItems, pathname, quickActionItems]);
 
   const ActiveModuleIcon = activeModuleItem?.icon || LayoutDashboard;
-  const hospitalName = currentUser?.hospitalName || currentUser?.hospital?.name || '';
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -200,7 +199,7 @@ export default function EhrTopRail() {
     <header className={`ehr-top-rail ${mobileSearchOpen ? 'is-searching' : ''}`}>
       <div className="ehr-top-brand" onClick={() => router.push(homeHref)} role="button" tabIndex={0}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="ehr-top-brand-logo-full" src="/assets/logos/PNG/Tamam_Style_Guide-22.png" alt="Tamam Healthcare System" />
+        <img className="ehr-top-brand-logo-full" src="/assets/tamamhealth-logo-full-white.svg" alt="Tamam Healthcare System" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="ehr-top-brand-logo-icon" src="/assets/tamamhealth-logo-icon-white.svg" alt="" aria-hidden="true" />
       </div>
@@ -231,13 +230,9 @@ export default function EhrTopRail() {
         <EhrTopActions items={quickActionItems.slice(0, 6)} navLabel={navLabel} onOpenModule={openModule} />
       </nav>
 
-      {hospitalName ? (
-        <div className="ehr-top-hospital-name" aria-label="Hospital name">
-          <span>{hospitalName}</span>
-        </div>
-      ) : (
-        <div aria-hidden className="ehr-top-hospital-name" />
-      )}
+      {/* Hospital name intentionally not shown — this slot stays as a spacer
+          so the rail's centre column keeps the layout balanced. */}
+      <div aria-hidden className="ehr-top-hospital-name" />
 
       <button
         type="button"
