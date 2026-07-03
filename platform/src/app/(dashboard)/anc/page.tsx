@@ -280,6 +280,10 @@ export default function ANCPage() {
                 const risk = riskColors[latest.riskLevel] || riskColors.low;
                 const isSelected = selectedMother === latest.motherId;
                 const select = () => setSelectedMother(isSelected ? null : latest.motherId);
+                const hasRealPatientRecord = !!latest.motherId
+                  && !latest.motherId.startsWith('demo-')
+                  && !latest.motherId.startsWith('mother-new-')
+                  && !latest.motherId.includes('_demo');
                 return (
                   <div
                     key={latest.motherId}
@@ -291,7 +295,7 @@ export default function ANCPage() {
                     style={{ background: isSelected ? 'var(--nav-active-bg)' : undefined }}
                   >
                     <div className="flex-1 min-w-0">
-                      {latest.motherId && !latest.motherId.startsWith('demo-') && !latest.motherId.startsWith('mother-new-') && !latest.motherId.includes('_demo') ? (
+                      {hasRealPatientRecord ? (
                         <Link
                           href={`/patients/${latest.motherId}`}
                           onClick={(e) => e.stopPropagation()}
@@ -312,15 +316,17 @@ export default function ANCPage() {
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                         {visitCount} visit{visitCount !== 1 ? 's' : ''}
                       </span>
-                      <Link
-                        href={`/patients/${latest.motherId}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full transition-colors hover:bg-[var(--accent-light)]"
-                        style={{ color: 'var(--accent-primary)' }}
-                        title="View patient record"
-                      >
-                        View <ExternalLink className="w-3 h-3" />
-                      </Link>
+                      {hasRealPatientRecord && (
+                        <Link
+                          href={`/patients/${latest.motherId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full transition-colors hover:bg-[var(--accent-light)]"
+                          style={{ color: 'var(--accent-primary)' }}
+                          title="View patient record"
+                        >
+                          View <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      )}
                       <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
                     </div>
                   </div>

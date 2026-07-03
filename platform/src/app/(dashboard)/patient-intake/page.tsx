@@ -8,6 +8,7 @@ import { useToast } from '@/components/Toast';
 import { useIntakeForms } from '@/lib/hooks/useIntakeForms';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useUsers } from '@/lib/hooks/useUsers';
+import { isRouteAllowed } from '@/lib/permissions';
 import { patientFullName, patientGenderAge } from '@/lib/patient-utils';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 import type {
@@ -25,6 +26,9 @@ const TABS: { key: IntakeFormStatus; label: string }[] = [
 ];
 
 // Roles that can be the ordering/receiving provider for an intake request.
+// The list is additionally gated by route access below: a provider is only
+// assignable if their role can actually open /patient-intake to see the
+// queue (otherwise requests would route to someone who can never act).
 const PROVIDER_ROLES: UserRole[] = [
   'doctor',
   'clinical_officer',
@@ -119,7 +123,9 @@ export default function PatientIntakePage() {
   const [sending, setSending] = useState(false);
 
   const providerUsers = useMemo(
-    () => users.filter(u => PROVIDER_ROLES.includes(u.role)).sort((a, b) => a.name.localeCompare(b.name)),
+    () => users
+      .filter(u => PROVIDER_ROLES.includes(u.role) && isRouteAllowed(u.role, '/patient-intake'))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     [users],
   );
 

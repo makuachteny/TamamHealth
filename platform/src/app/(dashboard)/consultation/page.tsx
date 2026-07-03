@@ -58,7 +58,11 @@ import {
   COMMON_FOLLOWUP_REASONS,
   COMMON_REFERRAL_REASONS,
   COMMON_CHRONIC_MEDICATIONS,
+  LAB_PANELS,
+  ROUTE_OPTIONS,
+  FREQUENCY_OPTIONS,
 } from '@/lib/consultation-options';
+import { presetForMedication } from '@/lib/data/medication-presets';
 import { saveDraft, loadDraft, dropDraft } from '@/lib/draft-storage';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
@@ -84,14 +88,14 @@ interface PrescriptionEntry {
   urgency: 'immediate' | 'definitive';
 }
 
-const routeOptions = ['Oral', 'IV', 'IM', 'SC', 'Topical', 'Rectal', 'Inhaled'];
+const routeOptions = ROUTE_OPTIONS;
 // Basic panel = ordered broadly; special = doctor-selected targeted investigations.
 
 // Joins patient name parts and skips missing/empty pieces so legacy records
 // without a middleName don't render "Deng undefined Garang".
 const formatPatientName = (p: { firstName?: string; middleName?: string; surname?: string }) =>
   [p.firstName, p.middleName, p.surname].filter(Boolean).join(' ');
-const frequencyOptions = ['OD (Once daily)', 'BD (Twice daily)', 'TDS (Three times daily)', 'QDS (Four times daily)', 'PRN (As needed)', 'STAT (Immediately)', 'Nocte (At night)'];
+const frequencyOptions = FREQUENCY_OPTIONS;
 
 export default function ConsultationPage() {
   const router = useRouter();
@@ -815,12 +819,16 @@ export default function ConsultationPage() {
   };
 
   const addPrescription = (medName: string) => {
+    // Auto-fill the standard adult dose/route/frequency/duration for the drug
+    // so the clinician confirms rather than types. Unknown drugs fall back to
+    // blank fields. (Preset data is a coded, EML-aligned reference module.)
+    const preset = presetForMedication(medName);
     setPrescriptions(prev => [...prev, {
       medication: medName,
-      dose: '',
-      route: 'Oral',
-      frequency: '',
-      duration: '',
+      dose: preset?.dose ?? '',
+      route: preset?.route ?? 'Oral',
+      frequency: preset?.frequency ?? '',
+      duration: preset?.duration ?? '',
       instructions: '',
       urgency: 'definitive',
     }]);
@@ -876,6 +884,21 @@ export default function ConsultationPage() {
     if (!name) return;
     setLabOrders(prev => ({ ...prev, [name]: true }));
     setCustomLab('');
+  };
+
+  // One-tap lab panel: tick every test in the bundle, mapping each to the
+  // facility catalog name where it exists, else adding it as a custom order.
+  const applyLabPanel = (panel: { name: string; tests: string[] }) => {
+    setLabOrders(prev => {
+      const next = { ...prev };
+      for (const test of panel.tests) {
+        const key = test.toLowerCase();
+        const match = labTests.find(t => t.toLowerCase() === key)
+          || labTests.find(t => t.toLowerCase().includes(key) || key.includes(t.toLowerCase()));
+        next[match || test] = true;
+      }
+      return next;
+    });
   };
 
   // Apply a clinical protocol / order set: merge its labs, medications,
@@ -1381,7 +1404,9 @@ export default function ConsultationPage() {
           gcs: parseInt(vitals.gcs) || undefined,
           recordedAt: now,
         },
-        diagnoses: diagnoses.map(d => ({ icd10Code: d.code, name: d.name, type: d.type, certainty: d.certainty, severity: d.severity })),
+        // Codes come from the ICD-11 (MMS) reference module. Store `icd11Code`
+        // (correct system) and keep `icd10Code` populated for legacy readers.
+        diagnoses: diagnoses.map(d => ({ icd11Code: d.code, icd10Code: d.code, codeSystem: 'ICD-11-MMS', name: d.name, type: d.type, certainty: d.certainty, severity: d.severity })),
         prescriptions: prescriptions.map(rx => ({
           drugName: rx.medication,
           genericName: rx.medication,
@@ -2048,9 +2073,6 @@ export default function ConsultationPage() {
                 { icon: 'patient', value: `${patientAgeLabel(selectedPatientData)} · ${selectedPatientData.gender || '—'}`, accent: 'var(--accent-primary)' },
                 ...(selectedPatientData.state ? [{ icon: 'mapPin' as const, value: selectedPatientData.state, accent: '#1F9D6F' }] : []),
               ];
-              const allergyList = (selectedPatientData.allergies || []).filter(
-                a => a && !/^none\b|^no known|^nkda$/i.test(a.trim())
-              );
               return (
               <div className="ehr-consult-patient-summary">
                 <div className="ehr-consult-patient-avatar" aria-hidden="true" style={{ background: avatarColor(patientFullName(selectedPatientData)), color: '#fff' }}>{patientInitials(selectedPatientData)}</div>
@@ -2080,14 +2102,6 @@ export default function ConsultationPage() {
                     ))}
                   </div>
                 </div>
-                {allergyList.length > 0 && (
-                  <span className="ehr-consult-chip ehr-consult-chip--danger" title={allergyList.join(', ')}>
-                    <AlertTriangle size={13} />
-                    <span className="truncate" style={{ fontSize: 12, fontWeight: 700 }}>
-                      {allergyList.join(', ')}
-                    </span>
-                  </span>
-                )}
                 <div className="ehr-consult-visit-controls">
                   <label>
                     Assigned to
@@ -2727,6 +2741,13 @@ export default function ConsultationPage() {
                           <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Review of systems</div>
                           <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Summary of the ROS entries from this consultation.</div>
                         </div>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setRos(Object.fromEntries(ROS_SYSTEMS.map(s => [s.key, { status: 'negative' as const, findings: '' }])))}
+                        >
+                          All negative
+                        </button>
                       </div>
                       <div className="space-y-2">
                         {ROS_SYSTEMS.map(system => {
@@ -3216,6 +3237,24 @@ export default function ConsultationPage() {
                       </div>
                     </Modal>
                   )}
+
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Order a panel</div>
+                    <div className="flex flex-wrap gap-2">
+                      {LAB_PANELS.map(panel => (
+                        <button
+                          key={panel.name}
+                          type="button"
+                          onClick={() => applyLabPanel(panel)}
+                          className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-full transition-colors"
+                          style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                          title={panel.tests.join(', ')}
+                        >
+                          <FlaskConical className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /> {panel.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Basic panel</div>

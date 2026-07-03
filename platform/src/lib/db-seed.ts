@@ -230,7 +230,7 @@ async function fetchAdminCredential(): Promise<{ username: string; password: str
   }
 }
 
-const labOrders: Omit<LabResultDoc, '_rev' | 'createdBy'>[] = [
+export const labOrders: Omit<LabResultDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'lab-001', type: 'lab_result', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', hospitalNumber: 'JTH-000001', testName: 'Malaria RDT', specimen: 'Blood', status: 'completed', result: 'Positive (P. falciparum)', unit: '', referenceRange: 'Negative', abnormal: true, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T08:30:00Z', completedAt: '2026-02-09T09:15:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T08:30:00Z', updatedAt: '2026-02-09T09:15:00Z' },
   { _id: 'lab-002', type: 'lab_result', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', hospitalNumber: 'JTH-000005', testName: 'Full Blood Count', specimen: 'Blood (EDTA)', status: 'completed', result: 'Hb 7.2 g/dL, WBC 14.3\u00d710\u00b3/\u03bcL', unit: '', referenceRange: '', abnormal: true, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-09T07:45:00Z', completedAt: '2026-02-09T10:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T07:45:00Z', updatedAt: '2026-02-09T10:30:00Z' },
   { _id: 'lab-003', type: 'lab_result', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', hospitalNumber: 'JTH-000012', testName: 'CD4 Count', specimen: 'Blood (EDTA)', status: 'in_progress', result: '', unit: '', referenceRange: '500-1500 cells/\u03bcL', abnormal: false, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-09T09:00:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:00:00Z', updatedAt: '2026-02-09T09:00:00Z' },
@@ -243,7 +243,7 @@ const labOrders: Omit<LabResultDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'lab-010', type: 'lab_result', patientId: 'pat-00015', patientName: 'Tut Chuol Both', hospitalNumber: 'JTH-000015', testName: 'Renal Function', specimen: 'Blood', status: 'completed', result: 'Creatinine 1.8 mg/dL, BUN 45 mg/dL', unit: '', referenceRange: 'Cr 0.6-1.2, BUN 7-20', abnormal: true, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-08T14:00:00Z', completedAt: '2026-02-08T16:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-08T14:00:00Z', updatedAt: '2026-02-08T16:30:00Z' },
 ];
 
-const prescriptionQueue: Omit<PrescriptionDoc, '_rev' | 'createdBy'>[] = [
+export const prescriptionQueue: Omit<PrescriptionDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'rx-001', type: 'prescription', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', medication: 'Artemether-Lumefantrine (Coartem)', dose: '80/480mg BD x 3 days', route: 'Oral', frequency: 'BD', duration: '3 days', prescribedBy: 'Dr. James Wani Igga', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:15:00Z', updatedAt: '2026-02-09T09:15:00Z' },
   { _id: 'rx-002', type: 'prescription', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg OD x 30 days', route: 'Oral', frequency: 'OD', duration: '30 days', prescribedBy: 'Dr. Achol Mayen Deng', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:30:00Z', updatedAt: '2026-02-09T09:30:00Z' },
   { _id: 'rx-003', type: 'prescription', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', medication: 'TDF/3TC/DTG', dose: '300/300/50mg OD x 90 days', route: 'Oral', frequency: 'OD', duration: '90 days', prescribedBy: 'Dr. Achol Mayen Deng', status: 'dispensed', dispensedAt: '2026-02-09T10:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T10:00:00Z', updatedAt: '2026-02-09T10:30:00Z' },
@@ -252,7 +252,7 @@ const prescriptionQueue: Omit<PrescriptionDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'rx-006', type: 'prescription', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', medication: 'Amoxicillin', dose: '500mg TDS x 7 days', route: 'Oral', frequency: 'TDS', duration: '7 days', prescribedBy: 'Dr. James Wani Igga', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T11:00:00Z', updatedAt: '2026-02-09T11:00:00Z' },
 ];
 
-const seedMessages: Omit<MessageDoc, '_rev' | 'createdBy'>[] = [
+export const seedMessages: Omit<MessageDoc, '_rev' | 'createdBy'>[] = [
   {
     _id: 'msg-001', type: 'message', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678',
     fromDoctorId: 'user-dr.wani', fromDoctorName: 'Dr. James Wani Igga', fromHospitalName: 'Juba Teaching Hospital',
@@ -335,7 +335,7 @@ const seedFacilityAssessments: Omit<FacilityAssessmentDoc, '_rev' | 'createdBy'>
   { _id: 'assess-006', type: 'facility_assessment', facilityId: 'hosp-006', facilityName: 'Aweil State Hospital', assessmentDate: '2026-01-20', assessedBy: 'WHO Assessment Team', generalEquipmentScore: 38, diagnosticCapacityScore: 30, essentialMedicinesScore: 28, infectionControlScore: 35, hasCleanWater: false, hasSanitation: false, hasWasteManagement: false, hasEmergencyTransport: false, hasCommunication: false, powerReliabilityScore: 15, staffingScore: 30, hisStaffCount: 0, hisStaffTrained: 0, hasPatientRegisters: true, hasDHIS2Reporting: false, reportingCompleteness: 25, reportingTimeliness: 20, dataQualityScore: 22, overallScore: 28, state: 'Northern Bahr el Ghazal', recommendations: 'Critical infrastructure deficits. No HIS staff. No DHIS2. Needs immediate investment.', createdAt: '2026-01-20T10:00:00Z', updatedAt: '2026-01-20T10:00:00Z' },
 ];
 
-const seedImmunizations: Omit<ImmunizationDoc, '_rev' | 'createdBy'>[] = [
+export const seedImmunizations: Omit<ImmunizationDoc, '_rev' | 'createdBy'>[] = [
   // Child 1: Akon Deng (birth-001) — good coverage
   { _id: 'imm-001', type: 'immunization', patientId: 'pat-00051', patientName: 'Akon Deng', gender: 'Female', dateOfBirth: '2025-06-15', vaccine: 'BCG', doseNumber: 1, dateGiven: '2025-06-15', nextDueDate: '2025-08-15', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', state: 'Central Equatoria', administeredBy: 'Nurse Stella Keji Lemi', batchNumber: 'BCG-2025-JTH-044', site: 'left arm', adverseReaction: false, status: 'completed', createdAt: '2025-06-15T08:00:00Z', updatedAt: '2025-06-15T08:00:00Z' },
   { _id: 'imm-002', type: 'immunization', patientId: 'pat-00051', patientName: 'Akon Deng', gender: 'Female', dateOfBirth: '2025-06-15', vaccine: 'OPV', doseNumber: 0, dateGiven: '2025-06-15', nextDueDate: '2025-08-15', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', state: 'Central Equatoria', administeredBy: 'Nurse Stella Keji Lemi', batchNumber: 'OPV-2025-JTH-112', site: 'oral', adverseReaction: false, status: 'completed', createdAt: '2025-06-15T08:05:00Z', updatedAt: '2025-06-15T08:05:00Z' },
@@ -503,7 +503,7 @@ async function safePut(db: PouchDB.Database, doc: Record<string, unknown>): Prom
 // ═══ Payment & Billing Seed Data ══════════════════════════════════
 // 5 patients with diverse payment scenarios for workflow testing
 
-const seedCharges: Omit<ChargeDoc, '_rev' | 'createdBy'>[] = [
+export const seedCharges: Omit<ChargeDoc, '_rev' | 'createdBy'>[] = [
   // Patient 1 (pat-00001 Deng Mabior Garang) — Cash payment, fully paid
   { _id: 'chg-001', type: 'charge', encounterId: 'enc-pay-001', patientId: 'pat-00001', description: 'Outpatient Consultation', category: 'consultation', units: 1, billedAmount: 5000, status: 'approved', serviceDate: '2026-03-10', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', createdAt: '2026-03-10T08:00:00Z', updatedAt: '2026-03-10T08:00:00Z' },
   { _id: 'chg-002', type: 'charge', encounterId: 'enc-pay-001', patientId: 'pat-00001', description: 'Malaria RDT', category: 'laboratory', units: 1, billedAmount: 2000, status: 'approved', serviceDate: '2026-03-10', providerId: 'user-lab.gatluak', providerName: 'Lab Tech Gatluak Puok', facilityId: 'hosp-001', createdAt: '2026-03-10T08:30:00Z', updatedAt: '2026-03-10T08:30:00Z' },
@@ -531,7 +531,7 @@ const seedCharges: Omit<ChargeDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'chg-016', type: 'charge', encounterId: 'enc-pay-005', patientId: 'pat-00022', description: 'Hemoglobin Test', category: 'laboratory', units: 1, billedAmount: 2000, status: 'approved', serviceDate: '2026-03-01', providerId: 'user-lab.gatluak', providerName: 'Lab Tech Gatluak Puok', facilityId: 'hosp-001', createdAt: '2026-03-01T10:00:00Z', updatedAt: '2026-03-01T10:00:00Z' },
 ];
 
-const seedInsurancePolicies: Omit<InsurancePolicyDoc, '_rev' | 'createdBy'>[] = [
+export const seedInsurancePolicies: Omit<InsurancePolicyDoc, '_rev' | 'createdBy'>[] = [
   // Patient 3 — Donor-funded coverage (Health Pooled Fund)
   {
     _id: 'ins-001', type: 'insurance_policy', patientId: 'pat-00012',
@@ -575,7 +575,7 @@ const seedPatientNotes: Omit<PatientNoteDoc, '_rev'>[] = [
   },
 ];
 
-const seedClaims: Omit<ClaimDoc, '_rev' | 'createdBy'>[] = [
+export const seedClaims: Omit<ClaimDoc, '_rev' | 'createdBy'>[] = [
   // Patient 3 — Donor claim (paid in full)
   {
     _id: 'clm-001', type: 'claim', encounterId: 'enc-pay-003', patientId: 'pat-00012',
@@ -610,7 +610,7 @@ const seedClaims: Omit<ClaimDoc, '_rev' | 'createdBy'>[] = [
   },
 ];
 
-const seedPayments: Omit<PaymentDoc, '_rev' | 'createdBy'>[] = [
+export const seedPayments: Omit<PaymentDoc, '_rev' | 'createdBy'>[] = [
   // Patient 1 — Cash payment (fully paid)
   {
     _id: 'pay-001', type: 'payment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang',
@@ -708,7 +708,7 @@ const seedPayments: Omit<PaymentDoc, '_rev' | 'createdBy'>[] = [
   },
 ];
 
-const seedPaymentPlans: Omit<PaymentPlanDoc, '_rev' | 'createdBy'>[] = [
+export const seedPaymentPlans: Omit<PaymentPlanDoc, '_rev' | 'createdBy'>[] = [
   // Patient 4 — 3-month interest-free plan for emergency visit balance
   {
     _id: 'plan-001', type: 'payment_plan', patientId: 'pat-00018',
@@ -731,7 +731,7 @@ const seedPaymentPlans: Omit<PaymentPlanDoc, '_rev' | 'createdBy'>[] = [
   },
 ];
 
-const seedLedgerEntries: Omit<LedgerEntryDoc, '_rev' | 'createdBy'>[] = [
+export const seedLedgerEntries: Omit<LedgerEntryDoc, '_rev' | 'createdBy'>[] = [
   // ── Patient 1: Deng Mabior Garang — Fully paid (balance: 0) ──
   { _id: 'led-001', type: 'ledger_entry', patientId: 'pat-00001', encounterId: 'enc-pay-001', entryType: 'charge', amount: 10000, runningBalance: 10000, description: 'Consultation + Malaria RDT + Coartem', referenceId: 'chg-001', referenceType: 'charge', currency: 'SSP', facilityId: 'hosp-001', createdAt: '2026-03-10T09:00:00Z', updatedAt: '2026-03-10T09:00:00Z' },
   { _id: 'led-002', type: 'ledger_entry', patientId: 'pat-00001', encounterId: 'enc-pay-001', entryType: 'payment', amount: -10000, runningBalance: 0, description: 'Cash payment — RCT-20260310-001', referenceId: 'pay-001', referenceType: 'payment', method: 'cash', currency: 'SSP', facilityId: 'hosp-001', createdAt: '2026-03-10T09:30:00Z', updatedAt: '2026-03-10T09:30:00Z' },
@@ -759,7 +759,7 @@ const seedLedgerEntries: Omit<LedgerEntryDoc, '_rev' | 'createdBy'>[] = [
 // ═══ Appointments seed data ═══════════════════════════════════════
 // Scheduled across recent + upcoming days, mixed statuses, linked to
 // seeded patients and providers (user-<username>).
-const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
+export const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-1', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(1), appointmentTime: '09:00', endTime: '09:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Malaria treatment follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(1) },
   { _id: 'appointment-2', type: 'appointment', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', patientPhone: '+211912555005', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(2), appointmentTime: '10:00', endTime: '10:30', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Obstetrics & Gynecology', reason: 'Antenatal check-up', status: 'scheduled', reminderSent: false, isRecurring: true, recurrencePattern: 'monthly', bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(5), updatedAt: daysAgo(5) },
   { _id: 'appointment-3', type: 'appointment', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', patientPhone: '+211912555012', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(7), appointmentTime: '11:00', endTime: '11:30', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Internal Medicine', reason: 'HIV / CD4 review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(4), updatedAt: daysAgo(4) },

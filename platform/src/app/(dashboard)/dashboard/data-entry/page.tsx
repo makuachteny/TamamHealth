@@ -11,6 +11,7 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useToast } from '@/components/Toast';
+import { isPathAllowed } from '@/lib/role-routes';
 import {
   ClipboardCheck, Baby, Skull, Syringe, HeartPulse,
   Database, Building2, ArrowRight, CheckCircle2, AlertTriangle,
@@ -277,8 +278,10 @@ export default function DataEntryDashboard() {
             { label: 'All Patients', icon: Users, href: '/patients', color: '#0D9488' },
             { label: 'Data Quality', icon: ClipboardCheck, href: '/data-quality', color: 'var(--accent-primary)' },
             { label: 'Reports', icon: BarChart3, href: '/reports', color: '#F59E0B' },
-          ]}
-          secondaryCard={<SpotlightCard title="Profile Completeness" value={`${facilityStats?.pct ?? 0}%`} caption="facility profile filled" href="/my-facility" />}
+          ].filter(action => isPathAllowed(currentUser.role, action.href))}
+          secondaryCard={isPathAllowed(currentUser.role, '/my-facility') ? (
+            <SpotlightCard title="Profile Completeness" value={`${facilityStats?.pct ?? 0}%`} caption="facility profile filled" href="/my-facility" />
+          ) : undefined}
         />
 
         {/* Facility banner */}

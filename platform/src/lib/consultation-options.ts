@@ -146,3 +146,27 @@ export const COMMON_REFERRAL_REASONS = [
 ];
 
 export const COMMON_CHRONIC_MEDICATIONS = medications.slice(0, 24).map(m => m.name);
+
+// Prescribing controlled vocabularies (kept out of the consultation component
+// so nothing clinical is hardcoded inline). Route strings align with UCUM/EML
+// administration routes; frequency strings drive the MAR schedule expansion.
+export const ROUTE_OPTIONS = ['Oral', 'IV', 'IM', 'SC', 'Topical', 'Rectal', 'Inhaled'];
+export const FREQUENCY_OPTIONS = [
+  'OD (Once daily)', 'BD (Twice daily)', 'TDS (Three times daily)', 'QDS (Four times daily)',
+  'PRN (As needed)', 'STAT (Immediately)', 'Nocte (At night)',
+];
+
+// Lab order sets — one-tap bundles of the tests commonly ordered together for a
+// presentation, so the clinician selects a panel instead of ticking each box.
+// Test names are matched (case-insensitive) against the facility lab catalog;
+// any not in the catalog are added as custom investigations.
+export const LAB_PANELS: { name: string; tests: string[] }[] = [
+  { name: 'Fever work-up', tests: ['Malaria RDT', 'Full Blood Count', 'Blood Film', 'Widal Test', 'Urinalysis'] },
+  { name: 'Malaria', tests: ['Malaria RDT', 'Blood Film', 'Full Blood Count'] },
+  { name: 'ANC profile', tests: ['Full Blood Count', 'Blood Group & Rh', 'HIV Test', 'Hepatitis B', 'Syphilis (VDRL)', 'Urinalysis', 'Blood Glucose'] },
+  { name: 'Diabetes review', tests: ['Blood Glucose (Fasting)', 'HbA1c', 'Renal Function', 'Urinalysis'] },
+  { name: 'Renal / hypertension', tests: ['Renal Function', 'Electrolytes', 'Urinalysis', 'Full Blood Count'] },
+  { name: 'Liver panel', tests: ['Liver Function Test', 'Hepatitis B', 'Hepatitis C', 'Full Blood Count'] },
+  { name: 'HIV baseline', tests: ['HIV Test', 'CD4 Count', 'Full Blood Count', 'Liver Function Test', 'Renal Function'] },
+  { name: 'Anaemia work-up', tests: ['Full Blood Count', 'Blood Film', 'Sickling Test', 'Renal Function'] },
+];

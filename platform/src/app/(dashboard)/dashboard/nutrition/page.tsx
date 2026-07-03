@@ -10,6 +10,7 @@ import DemoModeBanner from '@/components/DemoModeBanner';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { isPathAllowed } from '@/lib/role-routes';
 import {
   AlertTriangle, CheckCircle2, TrendingDown,
   Baby, HeartPulse, BarChart3, Activity, Scale,
@@ -104,7 +105,7 @@ export default function NutritionDashboard() {
             { label: 'ANC Visits', icon: HeartPulse, href: '/anc', color: '#EC4899' },
             { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
             { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#0D9488' },
-          ]}
+          ].filter(action => isPathAllowed(currentUser.role, action.href))}
           secondaryCard={<SpotlightCard title="Acute Malnutrition (SAM)" value={stats.sam} caption={`${stats.mam} MAM · ${stats.atRisk} at risk`} />}
         />
 

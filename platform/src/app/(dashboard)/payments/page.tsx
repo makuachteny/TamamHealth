@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import {
@@ -204,6 +204,22 @@ export default function PaymentsPage() {
     () => (selectedPatientId ? patientLines.find(l => l.patientId === selectedPatientId) || null : null),
     [selectedPatientId, patientLines],
   );
+
+  // Deep link: front-desk checkout routes here with ?patientId= to open that
+  // patient's billing drawer directly instead of the unfiltered ledger.
+  const patientIdParamRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || patientIdParamRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const patientId = params.get('patientId');
+    if (!patientId) return;
+    if (!patientLines.some(l => l.patientId === patientId)) return;
+    patientIdParamRef.current = true;
+    setSelectedPatientId(patientId);
+    params.delete('patientId');
+    const qs = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
+  }, [patientLines]);
 
   // Record an installment against a payment plan (folded in from the old
   // standalone Plans page so the cashier manages plans from the same screen).

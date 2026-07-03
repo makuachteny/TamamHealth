@@ -5,7 +5,7 @@ import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
 import PatientName from '@/components/PatientName';
 import { Pill, AlertTriangle, Loader2, Plus, X, Printer, Calendar, Package, ShoppingCart, User, ChevronRight, AlertOctagon, Filter } from '@/components/icons/lucide';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
@@ -38,7 +38,15 @@ export default function PharmacyPage() {
   }, [openFilter]);
   // Patients tab — which patient's prescription view is open (patient _id)
   const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
-  const { globalSearch, currentUser } = useApp();
+  const { globalSearch, setGlobalSearch, currentUser } = useApp();
+  const searchParams = useSearchParams();
+  // Deep link from a patient chart: /pharmacy?patient=<name> pre-filters via
+  // the shared global search (the page's only free-text filter).
+  useEffect(() => {
+    const patientParam = searchParams?.get('patient');
+    if (patientParam) setGlobalSearch(patientParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const { canDispense } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();

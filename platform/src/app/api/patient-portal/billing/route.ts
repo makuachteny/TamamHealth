@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPatientToken } from '@/lib/patient-portal-auth';
+import { demoFallbackEnabled, getDemoBillingByPatient } from '@/lib/patient-portal-demo';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyPatientToken(req);
@@ -24,6 +25,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ payments, charges, plans, claims, policies, summary, balance, ledger, bills });
   } catch (err) {
+    if (demoFallbackEnabled()) {
+      console.warn('[patient-portal/billing] DB unreachable, using demo fallback', err);
+      return NextResponse.json(await getDemoBillingByPatient(auth.sub));
+    }
     console.error('[patient-portal/billing]', err);
     return NextResponse.json({ error: 'Failed to fetch billing data' }, { status: 500 });
   }

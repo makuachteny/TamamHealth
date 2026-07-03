@@ -2114,7 +2114,7 @@ export default function PatientDetailPage() {
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.title')}</span>
                 </div>
-                <button onClick={() => router.push('/lab')} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
+                <button onClick={() => router.push(`/lab?patient=${encodeURIComponent(patientFullName(patient))}`)} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
                   View in Lab Module <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -2174,7 +2174,7 @@ export default function PatientDetailPage() {
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Prescriptions</span>
                 </div>
-                <button onClick={() => router.push('/pharmacy')} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
+                <button onClick={() => router.push(`/pharmacy?patient=${encodeURIComponent(patientFullName(patient))}`)} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
                   View in Pharmacy <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -2397,7 +2397,7 @@ export default function PatientDetailPage() {
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referral.title')}</span>
                 </div>
-                <button onClick={() => router.push('/referrals')} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
+                <button onClick={() => router.push(`/referrals?patient=${encodeURIComponent(patientFullName(patient))}`)} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
                   View in Referrals <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>

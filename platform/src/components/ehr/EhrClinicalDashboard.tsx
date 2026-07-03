@@ -21,8 +21,9 @@ import {
   X,
 } from '@/components/icons/lucide';
 import { initials, stateColor } from '@/lib/patient-utils';
-import AvatarLegend from '@/components/patients/AvatarLegend';
+import { useToast } from '@/components/Toast';
 import { useInsuredPatientIds } from '@/lib/hooks/usePayments';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useWards } from '@/lib/hooks/useWards';
 import {
@@ -145,6 +146,9 @@ export default function EhrClinicalDashboard({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { showToast } = useToast();
+  // Gate the "Start consultation" action to roles that can actually consult.
+  const { canConsult } = usePermissions();
   // Coverage lives in insurance_policy docs, not on the appointment — one
   // bulk set of covered patient ids badges every row as Insured/Not insured.
   const insuredIds = useInsuredPatientIds();
@@ -189,7 +193,13 @@ export default function EhrClinicalDashboard({
 
   const openPatientRecord = (appointment: AppointmentDoc) => {
     const patientId = appointment.patientId || patients.find(patient => patient.name === appointment.patientName)?._id;
-    if (patientId) router.push(`/patients/${patientId}`);
+    if (patientId) {
+      router.push(`/patients/${patientId}`);
+    } else {
+      // Both the direct id and the name-match fallback failed — say so
+      // instead of silently doing nothing.
+      showToast(`No patient record found for ${appointment.patientName}`, 'error');
+    }
   };
 
   const isTelehealth = (appointment: AppointmentDoc) => appointment.appointmentType === 'telehealth';
@@ -700,7 +710,6 @@ export default function EhrClinicalDashboard({
                             />
                           </label>
                           <div className="ehr-worklist-meta">
-                            <AvatarLegend />
                             <span>{patientRows.length} today</span>
                           </div>
 		                </div>
@@ -777,8 +786,6 @@ export default function EhrClinicalDashboard({
                     >
                       Open patient record
                     </button>
-                    <p className="appointment-detail-sidebar__time">{appointmentTimeRange(openAppointment)}</p>
-                    <p>{formatAppointmentDate(openAppointment.appointmentDate)}</p>
                   </div>
                   <div className="appointment-detail-sidebar__status">
                     <span>{statusLabel(openAppointment.status)}</span>
@@ -857,13 +864,23 @@ export default function EhrClinicalDashboard({
                       <Video className="w-4 h-4" /> Join Telehealth Visit
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => openPatientRecord(openAppointment)}
-                  >
-                    {openAppointment.patientName}
-                  </button>
+                  {canConsult && openAppointment.patientId ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => router.push(`/consultation?patientId=${encodeURIComponent(openAppointment.patientId)}`)}
+                    >
+                      <Stethoscope className="w-4 h-4" /> Start consultation
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => openPatientRecord(openAppointment)}
+                    >
+                      Open patient record
+                    </button>
+                  )}
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => router.push(`/appointments?appointment=${openAppointment._id}`)}>
                     Open schedule
                   </button>

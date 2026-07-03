@@ -473,7 +473,6 @@ export default function LabDashboardPage() {
           eyebrow={t('nav.lab')}
           greetingName={currentUser?.name}
           dateLabel={dateLabel}
-          showCalendar={false}
           tabs={[
             { key: 'all', label: t('lab.viewAll'), count: results.length },
             { key: 'pending', label: t('lab.pending'), count: kpis.pending },

@@ -2,10 +2,9 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
+import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import EhrMiniCalendar, { formatDateTitle, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { initials, stateColor } from '@/lib/patient-utils';
-import AvatarLegend from '@/components/patients/AvatarLegend';
 
 export type EhrCareDashboardAction = {
   label: string;
@@ -301,12 +300,12 @@ export default function EhrCareDashboard({
                   className={`ehr-appointment-row ehr-care-row ${row.statusTone || 'scheduled'}`}
                   role="button"
                   tabIndex={0}
-                  onClick={() => openDetail(row)}
-                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetail(row); } }}
+                  onClick={() => (row.onClick ? row.onClick() : openDetail(row))}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); row.onClick ? row.onClick() : openDetail(row); } }}
                 >
                   <div className="ehr-patient-icon" style={{ background: stateColor(row.statusTone === 'danger' ? 'red' : row.statusTone === 'warning' ? 'yellow' : row.priority), color: '#fff' }}>{initials(row.title)}</div>
                   <div className="ehr-appointment-main">
-                    <button type="button" onClick={(event) => { event.stopPropagation(); openDetail(row); }}>{row.title}</button>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); row.onClick ? row.onClick() : openDetail(row); }}>{row.title}</button>
                     <p>{row.subtitle}{row.room ? ` · ${row.room}` : ''}</p>
                   </div>
                   <div className="ehr-appointment-time">
@@ -347,7 +346,6 @@ export default function EhrCareDashboard({
 
           {children && (
             <>
-              <AvatarLegend style={{ padding: '10px 12px 2px' }} />
               <div className={`ehr-worklist-panel ehr-care-workflow ${effectiveView === 'calendar' ? 'is-calendar' : ''}`}>
                 {children}
               </div>
@@ -358,7 +356,10 @@ export default function EhrCareDashboard({
         {effectiveView === 'dashboard' && (
         <aside className="ehr-right-rail">
           <div className="ehr-side-card">
-            <h2>{metricsTitle}</h2>
+            <div className="ehr-side-card-head">
+              <ClipboardList className="w-5 h-5" />
+              <h2>{metricsTitle}</h2>
+            </div>
             {metrics.map(metric => (
               <button
                 key={metric.label}
@@ -372,7 +373,10 @@ export default function EhrCareDashboard({
             ))}
           </div>
           <div className="ehr-side-card">
-            <h2>{checklistTitle}</h2>
+            <div className="ehr-side-card-head">
+              <ClipboardCheck className="w-5 h-5" />
+              <h2>{checklistTitle}</h2>
+            </div>
             {checklistDescription && <p>{checklistDescription}</p>}
             {checklist.map(item => (
               <button key={item.label} type="button" onClick={item.onClick || (item.href ? () => router.push(item.href as string) : undefined)}>
@@ -383,7 +387,7 @@ export default function EhrCareDashboard({
           </div>
           {showMissionCard && missionTitle && missionDescription && (
             <div className="ehr-side-card ehr-mission-card">
-              <div className="ehr-mission-head">
+              <div className="ehr-side-card-head ehr-mission-head">
                 <Stethoscope className="w-5 h-5" />
                 <h2>{missionTitle}</h2>
               </div>
@@ -481,11 +485,6 @@ export default function EhrCareDashboard({
               {openRow.secondaryActionLabel && openRow.onSecondaryAction && (
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => { openRow.onSecondaryAction?.(); setOpenRow(null); }}>
                   {openRow.secondaryActionLabel}
-                </button>
-              )}
-              {openRow.onClick && (
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { openRow.onClick?.(); setOpenRow(null); }}>
-                  Open record
                 </button>
               )}
             </div>

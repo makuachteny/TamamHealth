@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPatientToken } from '@/lib/patient-portal-auth';
+import { demoFallbackEnabled, getDemoPrescriptionsByPatient } from '@/lib/patient-portal-demo';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyPatientToken(req);
@@ -10,6 +11,10 @@ export async function GET(req: NextRequest) {
     const prescriptions = await getPrescriptionsByPatient(auth.sub);
     return NextResponse.json({ prescriptions });
   } catch (err) {
+    if (demoFallbackEnabled()) {
+      console.warn('[patient-portal/prescriptions] DB unreachable, using demo fallback', err);
+      return NextResponse.json({ prescriptions: await getDemoPrescriptionsByPatient(auth.sub) });
+    }
     console.error('[patient-portal/prescriptions]', err);
     return NextResponse.json({ error: 'Failed to fetch prescriptions' }, { status: 500 });
   }

@@ -16,6 +16,10 @@ export interface LabTestDef {
   name: string;
   tier: 'basic' | 'special';
   specimen: string;
+  /** LOINC code — the universal standard for lab tests/observations. Enables
+   *  interoperable, trendable results and DHIS2/FHIR export. Optional so custom
+   *  facility tests can exist without a code. */
+  loinc?: string;
 }
 
 /** Accepted payment method keys (kept as stable keys; labels live in the UI). */
@@ -98,22 +102,22 @@ export const DEFAULT_FACILITY_SETTINGS: FacilitySettings = {
   resultReviewSLA: { criticalHours: 24, routineHours: 168 },
   acuity: { timeAging: true, agingPerMinute: 0.1 },
   labCatalog: [
-    { name: 'Full Blood Count', tier: 'basic', specimen: 'Blood' },
-    { name: 'Urinalysis', tier: 'basic', specimen: 'Urine' },
-    { name: 'Blood Glucose', tier: 'basic', specimen: 'Blood' },
-    { name: 'Malaria RDT', tier: 'basic', specimen: 'Blood' },
-    { name: 'HIV Rapid Test', tier: 'special', specimen: 'Blood' },
-    { name: 'CD4 Count', tier: 'special', specimen: 'Blood' },
-    { name: 'Liver Function', tier: 'special', specimen: 'Blood' },
-    { name: 'Renal Function', tier: 'special', specimen: 'Blood' },
+    { name: 'Full Blood Count', tier: 'basic', specimen: 'Blood', loinc: '58410-2' },
+    { name: 'Urinalysis', tier: 'basic', specimen: 'Urine', loinc: '24357-6' },
+    { name: 'Blood Glucose', tier: 'basic', specimen: 'Blood', loinc: '2339-0' },
+    { name: 'Malaria RDT', tier: 'basic', specimen: 'Blood', loinc: '70564-7' },
+    { name: 'HIV Rapid Test', tier: 'special', specimen: 'Blood', loinc: '75622-1' },
+    { name: 'CD4 Count', tier: 'special', specimen: 'Blood', loinc: '24467-3' },
+    { name: 'Liver Function', tier: 'special', specimen: 'Blood', loinc: '24325-3' },
+    { name: 'Renal Function', tier: 'special', specimen: 'Blood', loinc: '24362-6' },
     { name: 'Typhoid (Widal)', tier: 'special', specimen: 'Blood' },
-    { name: 'Rheumatoid Factor', tier: 'special', specimen: 'Blood' },
-    { name: 'ANA (autoimmune screen)', tier: 'special', specimen: 'Blood' },
-    { name: 'Uric Acid', tier: 'special', specimen: 'Blood' },
-    { name: 'Vitamin D', tier: 'special', specimen: 'Blood' },
-    { name: 'Stool Culture', tier: 'special', specimen: 'Stool' },
-    { name: 'Blood Culture', tier: 'special', specimen: 'Blood' },
-    { name: 'Lipid Profile', tier: 'special', specimen: 'Blood' },
+    { name: 'Rheumatoid Factor', tier: 'special', specimen: 'Blood', loinc: '11572-5' },
+    { name: 'ANA (autoimmune screen)', tier: 'special', specimen: 'Blood', loinc: '5048-4' },
+    { name: 'Uric Acid', tier: 'special', specimen: 'Blood', loinc: '3084-1' },
+    { name: 'Vitamin D', tier: 'special', specimen: 'Blood', loinc: '35365-6' },
+    { name: 'Stool Culture', tier: 'special', specimen: 'Stool', loinc: '625-4' },
+    { name: 'Blood Culture', tier: 'special', specimen: 'Blood', loinc: '600-7' },
+    { name: 'Lipid Profile', tier: 'special', specimen: 'Blood', loinc: '57698-3' },
   ],
   rooms: ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5', 'Room 6', 'Bay A', 'Bay B', 'Bay C', 'Bay D'],
   departments: ['General Medicine', 'Maternity', 'Emergency', 'Pediatrics', 'Ophthalmology', 'Dental', 'Dermatology', 'OPD'],

@@ -13,7 +13,8 @@ export default function TelehealthVisitPage({ params }: { params: Promise<{ appo
   const { appointments, loading } = useAppointments();
 
   const appointment = appointments.find(a => a._id === decodeURIComponent(appointmentId));
-  const leave = () => router.push('/telehealth');
+  // /telehealth is itself a redirect to /appointments — go straight there.
+  const leave = () => router.push('/appointments');
 
   if (loading && !appointment) {
     return (
@@ -28,7 +29,7 @@ export default function TelehealthVisitPage({ params }: { params: Promise<{ appo
       <main className="page-container page-enter">
         <div className="th-room th-room--loading">
           <p>That visit could not be found.</p>
-          <button type="button" className="btn btn-secondary" onClick={() => router.push('/telehealth')}>Back to Telehealth</button>
+          <button type="button" className="btn btn-secondary" onClick={() => router.push('/appointments')}>Back to Appointments</button>
         </div>
       </main>
     );

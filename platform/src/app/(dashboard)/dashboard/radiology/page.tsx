@@ -11,6 +11,7 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useLabResults } from '@/lib/hooks/useLabResults';
+import { isPathAllowed } from '@/lib/role-routes';
 import {
   Scan, Upload, CheckCircle2, Clock, AlertTriangle,
   FileText, BarChart3, TrendingUp, Eye,
@@ -114,10 +115,10 @@ export default function RadiologyDashboard() {
           className="mb-5"
           actions={[
             { label: 'All Patients', icon: Users, href: '/patients' },
-            { label: 'Imaging Queue', icon: Scan, href: '/radiology', color: 'var(--accent-primary)' },
+            { label: 'Imaging Queue', icon: Scan, href: '/lab', color: 'var(--accent-primary)' },
             { label: 'Reports', icon: BarChart3, href: '/reports', color: '#0D9488' },
             { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#F59E0B' },
-          ]}
+          ].filter(action => isPathAllowed(currentUser.role, action.href))}
           secondaryCard={<SpotlightCard title="Urgent Studies" value={stats.urgent} caption={`${stats.pending} pending · ${stats.inProgress} in progress`} />}
         />
 

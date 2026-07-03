@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AvailabilityModal from '@/components/AvailabilityModal';
@@ -14,6 +14,7 @@ import {
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useInsuredPatientIds } from '@/lib/hooks/usePayments';
+import { patientFullName } from '@/lib/patient-utils';
 import { useApp } from '@/lib/context';
 import { useSettings } from '@/lib/settings/SettingsProvider';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -81,7 +82,7 @@ export default function AppointmentsPage() {
   const { appointments, create, updateStatus, reschedule, update } = useAppointments();
   const { patients } = usePatients();
   const { currentUser, globalSearch } = useApp();
-  const { canBookAppointments } = usePermissions();
+  const { canBookAppointments, canDoTelehealth } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();
   const { departments: facilityDepartments } = useSettings();
@@ -144,6 +145,45 @@ export default function AppointmentsPage() {
       window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
     }
   }, []);
+
+  // Deep link: a patient chart's "Appointments" quick action / front-desk
+  // checkout routes here with ?patientId= to land already filtered to that
+  // patient's appointments. Kept separate from the ?new=1 effect above since
+  // it depends on `patients` having loaded (retries via the dep array instead
+  // of running once on mount).
+  const patientIdParamRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || patientIdParamRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const patientId = params.get('patientId');
+    if (!patientId) return;
+    const patient = patients.find(p => p._id === patientId);
+    if (!patient) return;
+    patientIdParamRef.current = true;
+    setViewMode('list');
+    setListSearch(patientFullName(patient));
+    params.delete('patientId');
+    const qs = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
+  }, [patients]);
+
+  // Deep link: dashboard/consultation "Open schedule" pushes ?appointment= so
+  // the specific appointment's detail popup opens directly instead of the
+  // generic list. Depends on `appointments` having loaded.
+  const appointmentParamRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || appointmentParamRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const appointmentId = params.get('appointment');
+    if (!appointmentId) return;
+    const match = appointments.find(a => a._id === appointmentId);
+    if (!match) return;
+    appointmentParamRef.current = true;
+    setEventApt(match);
+    params.delete('appointment');
+    const qs = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
+  }, [appointments]);
 
   // Keyboard ← → to step through appointments while the detail modal is open.
   useEffect(() => {
@@ -668,7 +708,7 @@ export default function AppointmentsPage() {
                 </div>
               )}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {eventApt.appointmentType === 'telehealth' && eventApt.status !== 'cancelled' && eventApt.status !== 'completed' && (
+                {canDoTelehealth && eventApt.appointmentType === 'telehealth' && eventApt.status !== 'cancelled' && eventApt.status !== 'completed' && (
                   <button onClick={() => { const id = eventApt._id; setEventApt(null); router.push(`/telehealth/visit/${encodeURIComponent(id)}`); }} className="btn btn-primary btn-sm" style={{ gap: 6, background: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
                     <Video size={14} /> Join session
                   </button>

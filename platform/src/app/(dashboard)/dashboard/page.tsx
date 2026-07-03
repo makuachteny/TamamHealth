@@ -197,7 +197,7 @@ export default function DashboardPage() {
       : `${e.resultsReady} of ${e.resultsTotal} results back`,
     meta: shortDate(e.createdAt),
     tone: e.allResultsBack ? ('danger' as const) : ('neutral' as const),
-    href: e.allResultsBack ? '/consultation' : '/lab',
+    href: e.allResultsBack ? `/consultation?encounter=${e._id}` : '/lab',
   }));
 
   const outstandingItems = [

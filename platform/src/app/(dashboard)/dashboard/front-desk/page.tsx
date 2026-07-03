@@ -26,7 +26,6 @@ import {
   MapPin, LogOut, Wallet, CheckCircle, X, Maximize2,
   SendHorizontal,
 } from '@/components/icons/lucide';
-import AvatarLegend from '@/components/patients/AvatarLegend';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 
 /**
@@ -882,7 +881,6 @@ export default function FrontDeskDashboardPage() {
                   />
                 </label>
                 <div className="ehr-worklist-meta">
-                  <AvatarLegend />
                   <span>{recentPatients.length} patients</span>
                 </div>
               </div>

@@ -2484,42 +2484,6 @@ export const icd10Codes = [
 ];
 
 // Common medications for prescription
-export const medications = [
-  { name: 'Artemether-Lumefantrine (Coartem)', category: 'Antimalarial' },
-  { name: 'Artesunate IV', category: 'Antimalarial' },
-  { name: 'Quinine', category: 'Antimalarial' },
-  { name: 'Amoxicillin', category: 'Antibiotic' },
-  { name: 'Azithromycin', category: 'Antibiotic' },
-  { name: 'Ceftriaxone', category: 'Antibiotic' },
-  { name: 'Ciprofloxacin', category: 'Antibiotic' },
-  { name: 'Metronidazole', category: 'Antibiotic' },
-  { name: 'Doxycycline', category: 'Antibiotic' },
-  { name: 'Cotrimoxazole', category: 'Antibiotic' },
-  { name: 'RHZE (TB fixed-dose)', category: 'Anti-TB' },
-  { name: 'Isoniazid', category: 'Anti-TB' },
-  { name: 'TDF/3TC/DTG', category: 'ARV' },
-  { name: 'Paracetamol', category: 'Analgesic' },
-  { name: 'Ibuprofen', category: 'Analgesic/Anti-inflammatory' },
-  { name: 'Tramadol', category: 'Analgesic' },
-  { name: 'Diclofenac', category: 'Anti-inflammatory' },
-  { name: 'Amlodipine', category: 'Antihypertensive' },
-  { name: 'Enalapril', category: 'Antihypertensive' },
-  { name: 'Hydrochlorothiazide', category: 'Diuretic' },
-  { name: 'Metformin', category: 'Antidiabetic' },
-  { name: 'Glibenclamide', category: 'Antidiabetic' },
-  { name: 'Insulin (Regular)', category: 'Antidiabetic' },
-  { name: 'ORS (Oral Rehydration Salts)', category: 'Rehydration' },
-  { name: 'Zinc Sulfate', category: 'Supplement' },
-  { name: 'Ferrous Sulfate + Folic Acid', category: 'Supplement' },
-  { name: 'Vitamin A', category: 'Supplement' },
-  { name: 'Mebendazole', category: 'Anthelminthic' },
-  { name: 'Albendazole', category: 'Anthelminthic' },
-  { name: 'Phenobarbital', category: 'Anticonvulsant' },
-  { name: 'Carbamazepine', category: 'Anticonvulsant' },
-  { name: 'Salbutamol Inhaler', category: 'Bronchodilator' },
-  { name: 'Prednisolone', category: 'Corticosteroid' },
-  { name: 'Hydrocortisone', category: 'Corticosteroid' },
-  { name: 'Oxytocin', category: 'Obstetric' },
-  { name: 'Misoprostol', category: 'Obstetric' },
-  { name: 'Tetanus Toxoid', category: 'Vaccine' },
-];
+// Medications are sourced from the bundled WHO EML formulary (single source of
+// truth, ATC-coded) rather than hardcoded here.
+export { medications } from '@/lib/data/formulary';

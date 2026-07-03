@@ -475,7 +475,6 @@ export default function PharmacyDashboardPage() {
           eyebrow={t('nav.pharmacy')}
           greetingName={currentUser?.name}
           dateLabel={dateLabel}
-          showCalendar={false}
           tabs={[
             { key: 'all', label: t('pharmacy.viewAll'), count: prescriptionQueue.length },
             { key: 'pending', label: t('pharmacy.pending'), count: pendingRx },
@@ -497,7 +496,7 @@ export default function PharmacyDashboardPage() {
           actionStrip={[
             { label: t('pharmacy.inventory'), icon: Package, onClick: () => router.push('/pharmacy') },
             { label: t('pharmacy.checkStock'), icon: ClipboardList, onClick: () => router.push('/pharmacy') },
-            { label: t('reports.title'), icon: BarChart3, onClick: () => router.push('/reports') },
+            { label: t('nav.reports'), icon: BarChart3, onClick: () => router.push('/reports') },
             { label: t('nav.patients'), icon: Users, onClick: () => router.push('/patients') },
           ]}
           rows={visibleQueue.map((rx): EhrCareDashboardRow => ({

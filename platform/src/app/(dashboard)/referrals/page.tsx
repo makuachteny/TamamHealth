@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Fragment } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import Modal from '@/components/Modal';
 import EmptyState from '@/components/EmptyState';
 import Badge, { toneForStatus } from '@/components/Badge';
@@ -59,11 +60,21 @@ export default function ReferralsPage() {
   const departments = facilityDepartments.length ? facilityDepartments : FALLBACK_DEPARTMENTS;
   const OUR_HOSPITAL_ID = currentUser?.hospitalId || '';
 
-  const [activeTab, setActiveTab] = useState<'incoming' | 'outgoing'>('incoming');
+  const searchParams = useSearchParams();
+  // Deep link from consultation (?tab=outgoing) after a referral is created,
+  // so the clinician lands on the tab that actually shows what they just sent.
+  const [activeTab, setActiveTab] = useState<'incoming' | 'outgoing'>(() => (
+    searchParams?.get('tab') === 'outgoing' ? 'outgoing' : 'incoming'
+  ));
   const [showNewReferral, setShowNewReferral] = useState(false);
   const [expandedReferral, setExpandedReferral] = useState<string | null>(null);
   // Structured filters — surfaced in a popover beside the platform search bar.
   const [colFilters, setColFilters] = useState<ReferralFilterState>({ patient: '', route: '', department: '', urgency: '', status: '' });
+  // Deep link from a patient chart: /referrals?patient=<name> pre-filters.
+  useEffect(() => {
+    const patientParam = searchParams?.get('patient');
+    if (patientParam) setColFilters(f => ({ ...f, patient: patientParam }));
+  }, [searchParams]);
   const setColFilter = (k: keyof ReferralFilterState, v: string) => setColFilters(f => ({ ...f, [k]: v }));
   const clearColFilters = () => setColFilters({ patient: '', route: '', department: '', urgency: '', status: '' });
 

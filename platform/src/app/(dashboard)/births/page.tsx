@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import TopBar from '@/components/TopBar';
 import { useBirths } from '@/lib/hooks/useBirths';
+import { usePatients } from '@/lib/hooks/usePatients';
+import { patientFullName } from '@/lib/patient-utils';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -15,6 +18,19 @@ import {
 export default function BirthsPage() {
   const { births, loading, register } = useBirths();
   const { hospitals } = useHospitals();
+  const { patients } = usePatients();
+
+  // Birth records store the mother as free text only — link her name to a
+  // chart when a real registered patient matches it (same guard idea as ANC:
+  // never link demo/seed-only identities).
+  const motherChartId = useMemo(() => {
+    const byName = new Map<string, string>();
+    for (const p of patients) {
+      if (p._id.startsWith('demo-') || p._id.includes('_demo')) continue;
+      byName.set(patientFullName(p).trim().toLowerCase(), p._id);
+    }
+    return (name?: string) => (name ? byName.get(name.trim().toLowerCase()) : undefined);
+  }, [patients]);
   const { currentUser, globalSearch } = useApp();
   const { canRecordVitalEvents } = usePermissions();
   const { showToast } = useToast();
@@ -96,7 +112,20 @@ export default function BirthsPage() {
                     <td className="text-xs font-mono">{b.dateOfBirth}</td>
                     <td className="text-sm">{b.birthWeight}g</td>
                     <td className="text-xs capitalize">{b.deliveryType}</td>
-                    <td className="text-sm">{b.motherName}</td>
+                    <td className="text-sm">
+                      {motherChartId(b.motherName) ? (
+                        <Link
+                          href={`/patients/${motherChartId(b.motherName)}`}
+                          className="hover:underline"
+                          style={{ color: 'var(--accent-primary)', fontWeight: 600 }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          {b.motherName}
+                        </Link>
+                      ) : (
+                        b.motherName
+                      )}
+                    </td>
                     <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{(b.facilityName || '').replace(' Hospital', '').replace(' Teaching', '')}</td>
                     <td className="text-xs" style={{ color: 'var(--text-muted)' }}>
                       <div className="flex items-center gap-1">
