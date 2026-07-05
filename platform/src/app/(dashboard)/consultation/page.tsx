@@ -13,7 +13,7 @@ import {
   FlaskConical, Pill, Calendar, Building2, FileText,
   X, AlertTriangle, UserSearch, Brain,
   ShieldAlert, Paperclip,
-  Mic, Wallet,
+  Mic, Wallet, Plus,
 } from '@/components/icons/lucide';
 import { useFavorites } from '@/lib/hooks/useFavorites';
 import { FavoritesBar, FavoriteStar } from '@/components/consultation/FavoritesBar';
@@ -35,6 +35,8 @@ import { useTriage } from '@/lib/hooks/useTriage';
 import { useOrderSets } from '@/lib/hooks/useOrderSets';
 import { checkInteractions, checkAllergies, checkAllergiesStructured, findDuplicateMedications } from '@/lib/services/drug-interaction-service';
 import Modal from '@/components/Modal';
+import PopupSelect from '@/components/PopupSelect';
+import SymptomPicker from '@/components/SymptomPicker';
 import { useApp } from '@/lib/context';
 import { isProviderRole, isClinicalAuthorRole } from '@/lib/clinical-roles';
 import type { SuperbillPreview } from '@/lib/services/superbill-service';
@@ -52,8 +54,8 @@ import {
   COMMON_SUBSTANCE_USE,
   COMMON_INSURANCE,
   COMMON_ALLERGIES,
-  COMMON_CHIEF_COMPLAINTS,
-  PHYS_EXAM_QUICK_PICKS,
+  SYMPTOM_CATALOG,
+  EXAM_FINDINGS_CATALOG,
   COMMON_TREATMENT_PLANS,
   COMMON_FOLLOWUP_REASONS,
   COMMON_REFERRAL_REASONS,
@@ -137,7 +139,14 @@ export default function ConsultationPage() {
   // Section collapse state (11 sections — includes AI section at index 3 and Attachments at index 8)
   // In the stepped wizard every section is expanded; the active step controls
   // which section cards are visible (others are hidden), so sections start open.
-  const [openSections, setOpenSections] = useState<boolean[]>(() => Array(CONSULT_SECTION.referral + 1).fill(true));
+  // Exception: Prescriptions and Lab Orders render as centred popups, so they
+  // start closed — clicking their section header opens the popup.
+  const [openSections, setOpenSections] = useState<boolean[]>(() => {
+    const initial = Array(CONSULT_SECTION.referral + 1).fill(true);
+    initial[CONSULT_SECTION.prescriptions] = false;
+    initial[CONSULT_SECTION.labs] = false;
+    return initial;
+  });
   // Current wizard step (0..6), mapping to the workflow stages below.
   const [step, setStep] = useState(0);
 
@@ -293,10 +302,11 @@ export default function ConsultationPage() {
 
   // Chief Complaint
   const [chiefComplaint, setChiefComplaint] = useState('');
-  // Up to 3 distinct presenting complaints (the doctor's rule: "not more than three").
+  // Signs & symptoms popup for the chief complaint box.
+  const [symptomPickerOpen, setSymptomPickerOpen] = useState(false);
+  // Legacy list kept for drafts saved before the free-text complaint box.
   // `chiefComplaint` (string) stays the joined value used everywhere downstream.
   const [complaints, setComplaints] = useState<string[]>([]);
-  const [complaintInput, setComplaintInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   // Sign (attest + lock) the consultation note on completion — the Centricity
   // "provider signs their own encounter" step. Default on for clinicians.
@@ -330,6 +340,7 @@ export default function ConsultationPage() {
   });
 
   // Physical Examination
+  const [examPickerField, setExamPickerField] = useState<keyof typeof EXAM_FINDINGS_CATALOG | null>(null);
   const [physExam, setPhysExam] = useState({
     general: '',
     cardiovascular: '',
@@ -854,30 +865,6 @@ export default function ConsultationPage() {
     setPrescriptions(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
   };
 
-  const addComplaint = (value?: string) => {
-    const v = (value ?? complaintInput).trim();
-    if (!v || complaints.length >= 3) return;
-    const next = [...complaints, v];
-    setComplaints(next);
-    setChiefComplaint(next.join('; '));
-    setComplaintInput('');
-  };
-  const removeComplaint = (idx: number) => {
-    const next = complaints.filter((_, i) => i !== idx);
-    setComplaints(next);
-    setChiefComplaint(next.join('; '));
-  };
-  // Edit a complaint before the consultation is saved: pull it back into the
-  // input for amendment and drop the original from the list (re-added on save).
-  const editComplaint = (idx: number) => {
-    const value = complaints[idx];
-    if (value == null) return;
-    const next = complaints.filter((_, i) => i !== idx);
-    setComplaints(next);
-    setChiefComplaint(next.join('; '));
-    setComplaintInput(value);
-  };
-
   // Doctor-written specific investigation (per the "special lab" workflow).
   const addCustomLab = () => {
     const name = customLab.trim();
@@ -1364,7 +1351,7 @@ export default function ConsultationPage() {
         providerRole: currentUser?.role || 'doctor',
         department: 'Outpatient',
         chiefComplaint,
-        chiefComplaints: complaints.length > 0 ? complaints : (chiefComplaint ? [chiefComplaint] : []),
+        chiefComplaints: chiefComplaint ? chiefComplaint.split(/[,\n]/).map(c => c.trim()).filter(Boolean) : complaints,
         historyOfPresentIllness: history.hpi || chiefComplaint,
         reviewOfSystems: Object.fromEntries(Object.entries(ros).map(([k, v]) => [k, { status: v.status, findings: v.findings || undefined }])),
         pastMedicalHistory: {
@@ -1864,6 +1851,7 @@ export default function ConsultationPage() {
         onClick={() => toggleSection(index)}
         className="w-full flex items-center justify-between p-4 text-left"
         style={{ borderBottom: openSections[index] ? '1px solid var(--border-light)' : 'none' }}
+        data-tour={`consult-section-${index}`}
       >
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
@@ -1877,6 +1865,42 @@ export default function ConsultationPage() {
           <ChevronDown className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
         )}
       </button>
+    );
+  };
+
+  // Centred popup for the heavyweight order sections (Prescriptions, Lab
+  // Orders): the section header in the page is the trigger; the section's
+  // form renders in a modal whose body scrolls independently.
+  const SectionPopup = ({ index, children }: { index: number; children: React.ReactNode }) => {
+    const { icon: Icon, label } = sectionHeaders[index];
+    return (
+      <Modal onClose={() => toggleSection(index)} width={860}>
+        <div
+          className="modal-panel modal-panel--lg"
+          style={{ width: '100%', maxHeight: 'min(720px, calc(100vh - 64px))', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}
+        >
+          <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            <div className="flex items-center gap-3">
+              <Icon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</span>
+            </div>
+            <button
+              onClick={() => toggleSection(index)}
+              aria-label="Close"
+              style={{
+                background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer',
+                width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+            {children}
+          </div>
+        </div>
+      </Modal>
     );
   };
 
@@ -2105,13 +2129,13 @@ export default function ConsultationPage() {
                 <div className="ehr-consult-visit-controls">
                   <label>
                     Assigned to
-                    <select value={currentUser?.name || ''} onChange={() => undefined}>
+                    <select value={currentUser?.name || ''} onChange={() => undefined} aria-label="Assigned to">
                       <option>{currentUser?.name || 'Tamam clinician'}</option>
                     </select>
                   </label>
                   <label>
                     Note type
-                    <select value="SOAP" onChange={() => undefined}>
+                    <select value="SOAP" onChange={() => undefined} aria-label="Note type">
                       <option>SOAP</option>
                     </select>
                   </label>
@@ -2189,6 +2213,7 @@ export default function ConsultationPage() {
                         onClick={() => setStep(i)}
                         className="flex flex-col items-center flex-shrink-0"
                         title={stage.label}
+                        data-tour-stage={i}
                       >
                         <span className={`step-dot ${isCurrent ? 'step-dot-active' : done ? 'step-dot-completed' : ''}`}>
                           {done && !isCurrent
@@ -2401,16 +2426,13 @@ export default function ConsultationPage() {
                               <div className="rounded-2xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
                                 <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Social history</label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                                  <div><label>Smoking</label><select value={history.shSmoking} onChange={e => setHistory(h => ({ ...h, shSmoking: e.target.value as typeof h.shSmoking }))}>{SMOKING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
-                                  <div><label>Alcohol</label><select value={history.shAlcohol} onChange={e => setHistory(h => ({ ...h, shAlcohol: e.target.value as typeof h.shAlcohol }))}>{ALCOHOL_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+                                  <div><label>Smoking</label><PopupSelect label="Smoking" value={history.shSmoking} onChange={v => setHistory(h => ({ ...h, shSmoking: v as typeof h.shSmoking }))} options={[...SMOKING_OPTIONS]} /></div>
+                                  <div><label>Alcohol</label><PopupSelect label="Alcohol" value={history.shAlcohol} onChange={v => setHistory(h => ({ ...h, shAlcohol: v as typeof h.shAlcohol }))} options={[...ALCOHOL_OPTIONS]} /></div>
                                   <div><label>Occupation</label><input value={history.shOccupation} list="occupation-list" onChange={e => setHistory(h => ({ ...h, shOccupation: e.target.value }))} /></div>
                                   <div><label>Substance use</label><input value={history.shSubstance} list="substance-list" onChange={e => setHistory(h => ({ ...h, shSubstance: e.target.value }))} placeholder="None / details" /></div>
                                   <div>
                                     <label>Socioeconomic status</label>
-                                    <select value={history.shSES} onChange={e => setHistory(h => ({ ...h, shSES: e.target.value as typeof h.shSES }))}>
-                                      <option value="">Not assessed</option>
-                                      {SES_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <PopupSelect label="Socioeconomic status" value={history.shSES} onChange={v => setHistory(h => ({ ...h, shSES: v as typeof h.shSES }))} options={[{ value: '', label: 'Not assessed' }, ...SES_OPTIONS.map(o => ({ value: o, label: o }))]} placeholder="Not assessed" />
                                   </div>
                                   <div>
                                     <label>Health insurance</label>
@@ -2499,30 +2521,37 @@ export default function ConsultationPage() {
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Triaged today — vitals carried over below.</span>
                     </div>
                   )}
-                  <label>{t('consultation.chiefComplaintLabel')}</label>
-                  {complaints.length > 0 && (
-                    <div className="flex flex-col gap-2 mb-3">
-                      {complaints.map((c, i) => (
-                        <div key={i} className="flex items-center gap-2 p-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                          <span className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: 'var(--accent-light)', color: 'var(--accent-text)' }}>{i + 1}</span>
-                          <span className="flex-1 text-sm" style={{ color: 'var(--text-primary)' }}>{c}</span>
-                          <button type="button" aria-label={t('action.edit')} title={t('action.edit')} onClick={() => editComplaint(i)} className="text-[11px] font-semibold px-1.5 py-1 rounded" style={{ color: 'var(--accent-text)' }}>{t('action.edit')}</button>
-                          <button type="button" aria-label={t('action.remove')} title={t('action.remove')} onClick={() => removeComplaint(i)} className="p-1 rounded" style={{ color: 'var(--color-danger)' }}><X className="w-4 h-4" /></button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-	                  {complaints.length < 3 ? (
-	                    <SearchAddField
-	                      placeholder="Type or search a complaint"
-	                      options={COMMON_CHIEF_COMPLAINTS}
-	                      value={complaintInput}
-	                      onChange={setComplaintInput}
-	                      onPick={(value) => addComplaint(value)}
-	                      onAdd={(value) => addComplaint(value)}
-	                    />
-	                  ) : (
-                    <p className="text-[11px]" style={{ color: 'var(--color-warning)' }}>Maximum of 3 complaints reached.</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <label>{t('consultation.chiefComplaintLabel')}</label>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setSymptomPickerOpen(true)}
+                    >
+                      <Plus className="w-4 h-4" /> Add signs &amp; symptoms
+                    </button>
+                  </div>
+                  {/* One editable box — picked symptoms append here and can be
+                      reworded, reordered, or deleted freely. */}
+                  <textarea
+                    rows={3}
+                    value={chiefComplaint}
+                    onChange={e => setChiefComplaint(e.target.value)}
+                    placeholder="e.g. Fever, watery diarrhoea, vomiting — or pick from the symptom list"
+                  />
+                  {symptomPickerOpen && (
+                    <SymptomPicker
+                      groups={SYMPTOM_CATALOG}
+                      selected={chiefComplaint}
+                      onClose={() => setSymptomPickerOpen(false)}
+                      onPick={(symptom) => {
+                        setChiefComplaint(prev => {
+                          if (prev.toLowerCase().includes(symptom.toLowerCase())) return prev;
+                          const base = prev.trim().replace(/,\s*$/, '');
+                          return base ? `${base}, ${symptom}` : symptom;
+                        });
+                      }}
+                    />
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
@@ -2598,14 +2627,18 @@ export default function ConsultationPage() {
                         placeholder="e.g. 15" />
                     </div>
                   </div>
-                  {vitals.weight && vitals.height && (
-                    <div className="mt-3 p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                      <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('consultation.calculatedBmi')} </span>
+                  {/* Always visible — shows the value once weight & height are
+                      both entered, and a hint until then. */}
+                  <div className="mt-3 p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('consultation.calculatedBmi')} </span>
+                    {vitals.weight && vitals.height && parseFloat(vitals.height) > 0 ? (
                       <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                        {parseFloat(vitals.height) > 0 ? (parseFloat(vitals.weight) / ((parseFloat(vitals.height) / 100) ** 2)).toFixed(1) : 'N/A'}
+                        {(parseFloat(vitals.weight) / ((parseFloat(vitals.height) / 100) ** 2)).toFixed(1)}
                       </span>
-                    </div>
-                  )}
+                    ) : (
+                      <span className="text-sm" style={{ color: 'var(--text-muted)' }}>— enter weight &amp; height</span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -2622,23 +2655,31 @@ export default function ConsultationPage() {
                     { key: 'abdominal', label: t('consultation.examAbdominal'), placeholder: t('consultation.examAbdominalPlaceholder') },
                     { key: 'neurological', label: t('consultation.examNeurological'), placeholder: t('consultation.examNeurologicalPlaceholder') },
                   ] as const).map(field => (
-                    <div key={field.key} className="rounded-2xl border p-4" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-card)' }}>
-                      <SearchAddField
-                        label={field.label}
-                        placeholder="Type or search a finding"
-                        options={PHYS_EXAM_QUICK_PICKS[field.key]}
-                        onPick={value => appendExamFinding(field.key, value)}
-                        onAdd={value => appendExamFinding(field.key, value)}
-                      />
+                    <div key={field.key} className="rounded-2xl border p-4 ehr-exam-row" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-card)' }}>
+                      <div className="flex flex-col items-start gap-2">
+                        <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{field.label}</label>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setExamPickerField(field.key)}>
+                          <Plus className="w-4 h-4" /> Add findings
+                        </button>
+                      </div>
                       <textarea
                         value={physExam[field.key]}
                         onChange={e => setPhysExam(prev => ({ ...prev, [field.key]: e.target.value }))}
                         rows={3}
-                        className="mt-3"
                         placeholder={field.placeholder}
                       />
                     </div>
                   ))}
+                  {examPickerField && (
+                    <SymptomPicker
+                      title={`${examPickerField.charAt(0).toUpperCase()}${examPickerField.slice(1)} findings`}
+                      categoryHint="Choose an area"
+                      groups={EXAM_FINDINGS_CATALOG[examPickerField]}
+                      selected={physExam[examPickerField]}
+                      onPick={value => appendExamFinding(examPickerField, value)}
+                      onClose={() => setExamPickerField(null)}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -2708,33 +2749,7 @@ export default function ConsultationPage() {
                     </div>
                   </div>
 
-                  <div className="grid gap-4 xl:grid-cols-2 ehr-consult-summary-grid">
-                    <div className="rounded-2xl border p-4 ehr-consult-subcard" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                      <div className="flex items-center justify-between gap-3 mb-3">
-                        <div>
-                          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>History review</div>
-                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>What has been entered for this visit.</div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {[
-                          { label: 'HPI', value: history.hpi || 'Needs input' },
-                          { label: 'PMH', value: history.pmhConditions.length ? history.pmhConditions.join(', ') : 'Needs input' },
-                          { label: 'Family', value: history.familyHistory || 'Needs input' },
-                          { label: 'Social', value: [history.shSmoking, history.shAlcohol, history.shOccupation].filter(Boolean).join(' · ') || 'Needs input' },
-                          { label: 'Drugs', value: history.dhChronicMeds || 'Needs input' },
-                          { label: 'Allergies', value: history.dhNKDA ? 'No known drug allergies' : (history.dhAllergies || 'Needs input') },
-                        ].map(item => (
-                          <div key={item.label} className="rounded-xl border px-3 py-3" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
-                            <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{item.label}</div>
-                            <div className="mt-1 text-sm" style={{ color: item.value === 'Needs input' ? 'var(--text-muted)' : 'var(--text-primary)' }}>
-                              {item.value}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
+                  <div className="ehr-consult-summary-grid">
                     <div className="rounded-2xl border p-4 ehr-consult-subcard" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
                       <div className="flex items-center justify-between gap-3 mb-3">
                         <div>
@@ -2911,34 +2926,9 @@ export default function ConsultationPage() {
                         <div key={i} className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
                           <span className="font-mono text-xs px-2 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(59, 130, 246,0.10)', color: 'var(--accent-primary)' }}>{d.code}</span>
                           <span className="text-sm font-medium flex-1 min-w-0 truncate">{d.name}</span>
-                          <select
-                            value={d.type}
-                            onChange={e => updateDiagnosis(i, 'type', e.target.value)}
-                            className="text-xs"
-                            style={{ width: '120px', padding: '6px 30px 6px 10px', fontSize: '0.75rem' }}
-                          >
-                            <option value="primary">{t('consultation.diagPrimary')}</option>
-                            <option value="secondary">{t('consultation.diagSecondary')}</option>
-                          </select>
-                          <select
-                            value={d.certainty}
-                            onChange={e => updateDiagnosis(i, 'certainty', e.target.value)}
-                            className="text-xs"
-                            style={{ width: '120px', padding: '6px 30px 6px 10px', fontSize: '0.75rem' }}
-                          >
-                            <option value="confirmed">{t('consultation.diagConfirmed')}</option>
-                            <option value="suspected">{t('consultation.diagSuspected')}</option>
-                          </select>
-                          <select
-                            value={d.severity}
-                            onChange={e => updateDiagnosis(i, 'severity', e.target.value)}
-                            className="text-xs"
-                            style={{ width: '110px', padding: '6px 30px 6px 10px', fontSize: '0.75rem' }}
-                          >
-                            <option value="mild">{t('consultation.diagMild')}</option>
-                            <option value="moderate">{t('consultation.diagModerate')}</option>
-                            <option value="severe">{t('consultation.diagSevere')}</option>
-                          </select>
+                          <PopupSelect compact label={t('consultation.diagPrimary') + ' / ' + t('consultation.diagSecondary')} value={d.type} onChange={v => updateDiagnosis(i, 'type', v)} triggerStyle={{ width: 120 }} options={[{ value: 'primary', label: t('consultation.diagPrimary') }, { value: 'secondary', label: t('consultation.diagSecondary') }]} />
+                          <PopupSelect compact label="Certainty" value={d.certainty} onChange={v => updateDiagnosis(i, 'certainty', v)} triggerStyle={{ width: 120 }} options={[{ value: 'confirmed', label: t('consultation.diagConfirmed') }, { value: 'suspected', label: t('consultation.diagSuspected') }]} />
+                          <PopupSelect compact label="Severity" value={d.severity} onChange={v => updateDiagnosis(i, 'severity', v)} triggerStyle={{ width: 110 }} options={[{ value: 'mild', label: t('consultation.diagMild') }, { value: 'moderate', label: t('consultation.diagModerate') }, { value: 'severe', label: t('consultation.diagSevere') }]} />
                           <FavoriteStar
                             active={favDx.isFav(d.code)}
                             onToggle={() => favDx.toggle({ kind: 'diagnosis', code: d.code, label: d.name, userName: currentUser?.name, orgId: currentUser?.orgId, hospitalId: currentUser?.hospitalId })}
@@ -2956,10 +2946,13 @@ export default function ConsultationPage() {
               )}
             </div>
 
-            {/* Section 5: Prescriptions */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(4) ? undefined : 'none' }}>
+            {/* Orders launchers — Prescriptions + Lab Orders share one row of
+                compact cards; each opens its centred popup. */}
+            <div className="ehr-order-launchers flex gap-3" style={{ display: stepHas(4) ? 'flex' : 'none' }}>
+            <div className="card-elevated overflow-hidden flex-1 min-w-0">
               <SectionHeader index={5} />
               {openSections[5] && (
+                <SectionPopup index={5}>
                 <div className="p-5">
                   {/* Prescribing safety advisories (CDS): allergy, interaction, duplicate */}
                   {hasRxWarnings && (
@@ -3071,16 +3064,11 @@ export default function ConsultationPage() {
                             </div>
                             <div>
                               <label>{t('consultation.rxRoute')}</label>
-                              <select value={rx.route} onChange={e => updatePrescription(i, 'route', e.target.value)}>
-                                {routeOptions.map(r => <option key={r} value={r}>{r}</option>)}
-                              </select>
+                              <PopupSelect label={t('consultation.rxRoute')} value={rx.route} onChange={v => updatePrescription(i, 'route', v)} options={[...routeOptions]} />
                             </div>
                             <div>
                               <label>{t('consultation.rxFrequency')}</label>
-                              <select value={rx.frequency} onChange={e => updatePrescription(i, 'frequency', e.target.value)}>
-                                <option value="">{t('consultation.rxSelectFrequency')}</option>
-                                {frequencyOptions.map(f => <option key={f} value={f}>{f}</option>)}
-                              </select>
+                              <PopupSelect label={t('consultation.rxFrequency')} value={rx.frequency} onChange={v => updatePrescription(i, 'frequency', v)} placeholder={t('consultation.rxSelectFrequency')} options={[...frequencyOptions]} />
                             </div>
                             <div>
                               <label>{t('consultation.rxDuration')}</label>
@@ -3135,13 +3123,14 @@ export default function ConsultationPage() {
                     <p className="text-sm py-3" style={{ color: 'var(--text-muted)' }}>{t('consultation.noPrescriptions')}</p>
                   )}
                 </div>
+                </SectionPopup>
               )}
             </div>
 
-            {/* Section 6: Lab Orders */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(4) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden flex-1 min-w-0">
               <SectionHeader index={6} />
               {openSections[6] && (
+                <SectionPopup index={6}>
                 <div className="p-5 space-y-5">
                   {/* Returned results for a resumed visit, shown inline so the
                       clinician can act on them before finalising. */}
@@ -3326,7 +3315,9 @@ export default function ConsultationPage() {
                     </>
                   )}
                 </div>
+                </SectionPopup>
               )}
+            </div>
             </div>
 
             {/* Section 7: Treatment Plan */}
@@ -3422,20 +3413,23 @@ export default function ConsultationPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label>{t('consultation.referralHospital')}</label>
-                          <select value={referralHospital} onChange={e => setReferralHospital(e.target.value)}>
-                            <option value="">{t('consultation.selectHospital')}</option>
-                            {hospitals.map(h => (
-                              <option key={h._id} value={h._id}>{h.name} ({h.state})</option>
-                            ))}
-                          </select>
+                          <PopupSelect
+                            label={t('consultation.referralHospital')}
+                            value={referralHospital}
+                            onChange={setReferralHospital}
+                            placeholder={t('consultation.selectHospital')}
+                            groups={Object.entries(
+                              hospitals.reduce<Record<string, { value: string; label: string }[]>>((acc, h) => {
+                                const state = h.state || 'Other';
+                                (acc[state] = acc[state] || []).push({ value: h._id, label: h.name });
+                                return acc;
+                              }, {}),
+                            ).sort(([a], [b]) => a.localeCompare(b)).map(([state, options]) => ({ label: state, options }))}
+                          />
                         </div>
                         <div>
                           <label>{t('consultation.urgency')}</label>
-                          <select value={referralUrgency} onChange={e => setReferralUrgency(e.target.value)}>
-                            <option value="routine">{t('consultation.urgencyRoutine')}</option>
-                            <option value="urgent">{t('consultation.urgencyUrgent')}</option>
-                            <option value="emergency">{t('consultation.urgencyEmergency')}</option>
-                          </select>
+                          <PopupSelect label={t('consultation.urgency')} value={referralUrgency} onChange={setReferralUrgency} options={[{ value: 'routine', label: t('consultation.urgencyRoutine') }, { value: 'urgent', label: t('consultation.urgencyUrgent') }, { value: 'emergency', label: t('consultation.urgencyEmergency') }]} />
                         </div>
                       </div>
                       <div>
@@ -3536,7 +3530,7 @@ export default function ConsultationPage() {
             )}
 
             {/* Step navigation — Back / Next, with Complete on the final step */}
-            <div className="flex items-center justify-between pt-4 pb-8 border-t" style={{ borderColor: 'var(--border-light)' }}>
+            <div className="flex items-center justify-between pt-3 pb-4 border-t" style={{ borderColor: 'var(--border-light)' }}>
               <button onClick={() => step > 0 ? goBack() : router.push('/patients')} className="btn btn-secondary">
                 <ArrowLeft className="w-4 h-4" /> {step === 0 ? t('action.cancel') : t('patientNew.previous')}
               </button>
@@ -3676,6 +3670,65 @@ export default function ConsultationPage() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Visit notes — running summary of everything recorded so
+                      far. Appears once the clinician moves past History and
+                      accumulates step by step; the rail scrolls to hold it. */}
+                  {step > 0 && (() => {
+                    const vitalNotes = [
+                      vitals.temperature && `Temp ${vitals.temperature}°C`,
+                      (vitals.systolic || vitals.diastolic) && `BP ${vitals.systolic || '—'}/${vitals.diastolic || '—'}`,
+                      vitals.pulse && `HR ${vitals.pulse}`,
+                      vitals.respRate && `RR ${vitals.respRate}`,
+                      vitals.o2Sat && `SpO₂ ${vitals.o2Sat}%`,
+                      vitals.weight && `Wt ${vitals.weight} kg`,
+                      vitals.height && `Ht ${vitals.height} cm`,
+                      vitals.muac && `MUAC ${vitals.muac}`,
+                      vitals.painScore && `Pain ${vitals.painScore}/10`,
+                      vitals.bloodGlucose && `Glucose ${vitals.bloodGlucose} mmol/L`,
+                      vitals.gcs && `GCS ${vitals.gcs}`,
+                    ].filter(Boolean) as string[];
+                    const examNotes = Object.entries(physExam)
+                      .filter(([, value]) => value.trim())
+                      .map(([system, value]) => `${system[0].toUpperCase()}${system.slice(1)}: ${value}`);
+                    const orderedTests = Object.entries(labOrders).filter(([, on]) => on).map(([name]) => name);
+                    const noteGroups = [
+                      { title: 'History', items: [chiefComplaint && `CC: ${chiefComplaint}`, ...complaints].filter(Boolean) as string[] },
+                      { title: 'Intake', items: vitalNotes },
+                      { title: 'Examination', items: examNotes },
+                      { title: 'Assessment', items: diagnoses.map(d => `${d.name} (${d.type} · ${d.certainty})`) },
+                      { title: 'Prescriptions', items: prescriptions.map(rx => `${rx.medication} ${rx.dose} · ${rx.frequency}${rx.duration ? ` · ${rx.duration}` : ''}`) },
+                      { title: 'Lab orders', items: orderedTests },
+                      { title: 'Plan', items: [
+                        treatmentPlan,
+                        followUpDate && `Follow-up ${followUpDate}${followUpReason ? ` — ${followUpReason}` : ''}`,
+                        addReferral && referralHospital && `Referral → ${referralHospital} (${referralUrgency})`,
+                      ].filter(Boolean) as string[] },
+                    ].filter(group => group.items.length > 0);
+                    return (
+                      <div className="card-elevated p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Visit notes</p>
+                        {noteGroups.length === 0 ? (
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            Recorded data will appear here as you work through the steps.
+                          </p>
+                        ) : (
+                          <div className="space-y-3">
+                            {noteGroups.map(group => (
+                              <div key={group.title}>
+                                <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent-primary)' }}>{group.title}</p>
+                                <ul className="space-y-1">
+                                  {group.items.map((item, i) => (
+                                    <li key={i} className="text-xs leading-snug" style={{ color: 'var(--text-secondary)' }}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                 </>
               ) : (

@@ -7,6 +7,24 @@ const scriptSrc = isProd
   : "script-src 'self' 'unsafe-eval' 'unsafe-inline'";
 
 const nextConfig = {
+  // One-page site: the old routes now live on / as anchored sections. Keep
+  // bookmarks, search results, and external links working with redirects.
+  async redirects() {
+    return [
+      { source: '/products', destination: '/#products', permanent: true },
+      { source: '/products/:path*', destination: '/#products', permanent: true },
+      { source: '/about/contact', destination: '/#contact', permanent: true },
+      { source: '/about/:path*', destination: '/#about', permanent: true },
+      { source: '/about', destination: '/#about', permanent: true },
+      { source: '/download', destination: '/#download', permanent: true },
+      { source: '/resources/:path*', destination: '/', permanent: true },
+      { source: '/case-studies/:path*', destination: '/', permanent: true },
+      { source: '/case-studies', destination: '/', permanent: true },
+      { source: '/patient-experience', destination: '/', permanent: true },
+      { source: '/donate', destination: '/#contact', permanent: true },
+      { source: '/pricing', destination: '/#contact', permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

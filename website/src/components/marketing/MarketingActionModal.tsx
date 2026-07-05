@@ -27,7 +27,7 @@ const MODAL_CONFIG: Record<MarketingIntent, ModalConfig> = {
     submitLabel: "Request demo",
     successTitle: "Demo request received",
     successBody: "We received your request and will follow up with the right next step.",
-    fullPageHref: "/about/contact?intent=demo#contact-form",
+    fullPageHref: "/?intent=demo#contact-form",
     fullPageLabel: "Open the full contact page",
   },
   contact: {
@@ -38,7 +38,7 @@ const MODAL_CONFIG: Record<MarketingIntent, ModalConfig> = {
     submitLabel: "Send message",
     successTitle: "Message received",
     successBody: "We received your message and will route it to the right person.",
-    fullPageHref: "/about/contact#contact-form",
+    fullPageHref: "/#contact-form",
     fullPageLabel: "Open the full contact page",
   },
 };
@@ -138,7 +138,7 @@ export function MarketingActionModalButton({
   // contact page's form. The "contact" intent keeps the inline modal.
   if (intent === "demo") {
     return (
-      <Link href="/about/contact?intent=demo#contact-form" className={className} data-source={source}>
+      <Link href="/?intent=demo#contact-form" className={className} data-source={source}>
         {children}
       </Link>
     );
@@ -252,7 +252,7 @@ export function MarketingActionModalButton({
 export function getMarketingIntentFromCta(label: string, href: string): MarketingIntent | null {
   const text = `${label} ${href}`.toLowerCase();
 
-  if (href === "/about/contact") {
+  if (href === "/#contact") {
     if (text.includes("demo") || text.includes("walkthrough")) {
       return "demo";
     }

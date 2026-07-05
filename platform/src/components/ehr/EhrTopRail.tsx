@@ -5,20 +5,20 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Calendar,
   ChevronDown,
+  HelpCircle,
   LayoutDashboard,
   LogOut,
   MessageSquare,
-  Moon,
   Plus,
   Search,
   Settings,
-  Sun,
   User,
   UserPlus,
   Users,
   X,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
+import { useTourContext } from '@/lib/tour/tour-context';
 import { getRoleConfig } from '@/lib/permissions';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { NavItem } from '@/lib/permissions';
@@ -40,8 +40,9 @@ export default function EhrTopRail() {
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useTranslation();
-  const { currentUser, logout, theme, toggleTheme } = useApp();
+  const { currentUser, logout } = useApp();
   const { canRegisterPatients } = usePermissions();
+  const { available: tourAvailable, start: startTour } = useTourContext();
   const { patients } = usePatients();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -310,14 +311,6 @@ export default function EhrTopRail() {
           </button>
         )}
         <QuickActions />
-        <button
-          type="button"
-          onClick={toggleTheme}
-          aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-        >
-          {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-        </button>
         <div className="ehr-user-menu-wrap" ref={userRef}>
           <button
             type="button"
@@ -341,6 +334,12 @@ export default function EhrTopRail() {
                 <Settings className="w-4 h-4" />
                 <span>Settings</span>
               </button>
+              {tourAvailable && (
+                <button type="button" role="menuitem" onClick={() => { setUserOpen(false); startTour(); }}>
+                  <HelpCircle className="w-4 h-4" />
+                  <span>Take a tour</span>
+                </button>
+              )}
               <button type="button" role="menuitem" className="danger" onClick={logout}>
                 <LogOut className="w-4 h-4" />
                 <span>Log out</span>

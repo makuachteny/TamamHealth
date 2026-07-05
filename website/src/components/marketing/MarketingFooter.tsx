@@ -9,7 +9,6 @@ import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact";
    ═══════════════════════════════════════════════════════════════════ */
 
 // Fundraising entry points are locked off for now. Flip to true to re-enable.
-const SHOW_FUNDRAISING = false;
 
 const SOCIAL_LINKS = [
   {
@@ -52,10 +51,11 @@ const SOCIAL_LINKS = [
 
 const FOOTER_GROUPS = [
   {
-    heading: "Company",
+    heading: "Explore",
     links: [
-      { label: "Our Story", body: "Why we're building for South Sudan first.", href: "/about" },
-      { label: "Case Studies", body: "Scenarios showing what changes when a facility goes digital.", href: "/case-studies" },
+      { label: "Platform", body: "Clinical care, operations, and reporting in one system.", href: "/#products" },
+      { label: "Our Story", body: "Why we're building for South Sudan first.", href: "/#about" },
+      { label: "Download", body: "Get TamamHealth on any device.", href: "/#download" },
     ],
   },
 ] as const;
@@ -69,7 +69,7 @@ export default function MarketingFooter() {
             <p>Ready to build connected care?</p>
             <h2>See how TamamHealth can support clinical care, facility operations, and national reporting from one connected platform.</h2>
           </div>
-          <Link href="/about/contact?intent=demo#contact-form" className="mk-footer-cta-button">
+          <Link href="/?intent=demo#contact-form" className="mk-footer-cta-button">
             Book a demo
           </Link>
         </div>
@@ -113,9 +113,6 @@ export default function MarketingFooter() {
               Digital health infrastructure for connected care. Offline-first, secure, and built for real facilities.
             </p>
 
-            {SHOW_FUNDRAISING && (
-              <Link href="/donate" style={{ color: "var(--tb-gold)", fontWeight: 600, fontSize: 14 }}>Fund Our Pilot</Link>
-            )}
           </div>
 
           {FOOTER_GROUPS.map((group) => (

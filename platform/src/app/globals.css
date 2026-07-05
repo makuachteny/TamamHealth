@@ -969,7 +969,7 @@
   --color-slate-950: #0A1A33;
   /* Canonical brand blue scale — shared with the marketing site's
      --tb-blue-* tokens. Every blue in the platform derives from these. */
-  --tb-blue-900: #10195A;  /* header navy — top rail, mission panels */
+  --tb-blue-900: #2191D0;  /* header blue — top rail, mission panels (was navy #10195A) */
   --tb-blue-800: #015697;  /* deep accent — hover states, links, dark buttons */
   --tb-blue-700: #2191D0;  /* primary accent — CTAs, active tabs, highlights */
   --tb-blue-600: #369FDA;  /* lighter accent — borders, secondary highlights */
@@ -2185,16 +2185,15 @@ thead th {
 /* Wizard-style stepper (matches the consultation flow): large numbered
    circles with labels beneath, joined by connector lines; the active step
    sits in an outlined ring, completed steps show a check. */
+/* Bare progress row — no card chrome behind the steps. */
 .patient-registration-stepper {
   display: flex;
   align-items: flex-start;
   width: 100%;
-  max-width: 1160px;
-  margin: 0 auto 16px;
-  padding: 18px 16px 14px;
-  border: 1px solid var(--border-light);
-  border-radius: var(--card-radius);
-  background: var(--bg-card-solid);
+  margin: 0 auto 18px;
+  padding: 8px 4px 4px;
+  border: 0;
+  background: transparent;
 }
 
 .patient-registration-step {
@@ -2254,25 +2253,10 @@ thead th {
   z-index: 1;
 }
 
-/* Outlined ring hugging the active step's circle + label, like the
-   consultation wizard's current-step highlight. */
-.patient-registration-step.is-active::before {
-  content: "";
-  position: absolute;
-  top: -8px;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(100%, 132px);
-  border: 2px solid var(--accent-primary);
-  border-radius: 14px;
-  pointer-events: none;
-}
 
 .patient-registration-shell {
   overflow: hidden;
   width: 100%;
-  max-width: 1160px;
   margin: 0 auto;
   /* Tall, centred card — the form breathes instead of hugging its rows. */
   min-height: min(640px, calc(100svh - 260px));
@@ -2282,8 +2266,17 @@ thead th {
   background: var(--bg-card-solid);
 }
 
+/* Step content at the top, Cancel/Next pinned to the card's bottom edge —
+   the tall card's spare space sits between them, not below the buttons. */
 .patient-registration-shell .patient-registration-card-body {
   flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.patient-registration-shell .patient-registration-actions {
+  margin-top: auto;
+  padding-top: 18px;
 }
 
 .patient-registration-card-header {
@@ -2354,7 +2347,7 @@ thead th {
 .registration-section {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 22px;
 }
 
 .registration-section-header {
@@ -2381,7 +2374,7 @@ thead th {
 
 .registration-field-grid {
   display: grid;
-  gap: 14px;
+  gap: 20px 24px;
 }
 
 .registration-field-grid--three {
@@ -2532,7 +2525,6 @@ thead th {
   justify-content: space-between;
   gap: 12px;
   margin-top: 22px;
-  padding-right: 74px;
   padding-top: 18px;
   border-top: 1px solid var(--border-light);
 }
@@ -5544,11 +5536,17 @@ thead th {
 }
 
 /* ============ EHR Consultation / Chart / Intake Surfaces ============ */
-.ehr-consultation-page {
-  min-height: calc(100dvh - 106px);
+/* Fixed-viewport workspace: the page fills the app frame exactly (the frame
+   is h-screen with overflow hidden), so the toolbar, patient banner, and
+   step indicator physically cannot scroll away — only .ehr-soap-scroll (the
+   step's data cards) scrolls beneath them. ≤860px reverts to normal page
+   scrolling (see the media query below). */
+.ehr-consultation-page,
+.tamam-ehr-app .page-container.ehr-consultation-page {
+  flex: 1 1 0%;
   height: auto;
-  overflow-y: auto;
-  overflow-x: hidden;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .ehr-consultation-page > .flex.items-center.justify-between {
@@ -5794,10 +5792,13 @@ thead th {
 .ehr-soap-scroll {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  overflow: visible;
-  padding-right: 0;
-  padding-bottom: 20px;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  padding-bottom: 14px;
 }
 
 .ehr-soap-scroll .card-elevated > button,
@@ -5808,14 +5809,14 @@ thead th {
 }
 
 .ehr-soap-scroll .card-elevated > button {
-  min-height: 52px;
-  padding: 14px 16px !important;
+  min-height: 44px;
+  padding: 10px 14px !important;
 }
 
 .ehr-soap-scroll .card-elevated > .p-5,
 .ehr-soap-scroll .card-elevated > .p-4,
 .ehr-soap-scroll .card-elevated > .p-3 {
-  padding: 16px !important;
+  padding: 13px 14px !important;
 }
 
 .ehr-soap-scroll .grid {
@@ -5847,7 +5848,7 @@ thead th {
 
 .ehr-consult-history-grid {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
 }
@@ -5856,7 +5857,7 @@ thead th {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .ehr-consult-card-head {
@@ -5922,7 +5923,7 @@ thead th {
 .ehr-consult-progress-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .ehr-consult-progress-card {
@@ -5930,12 +5931,12 @@ thead th {
 }
 
 .ehr-consult-progress-row {
-  min-height: 44px;
+  min-height: 38px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 12px;
+  padding: 7px 12px;
   border: 1px solid var(--ehr-border);
   border-radius: 6px;
 }
@@ -8392,8 +8393,11 @@ thead th {
 }
 
 @media (max-width: 860px) {
-  .ehr-consultation-page {
+  .ehr-consultation-page,
+  .tamam-ehr-app .page-container.ehr-consultation-page {
+    flex: none;
     height: auto;
+    min-height: 0;
     overflow: visible !important;
   }
 
@@ -13482,4 +13486,286 @@ span:has(> svg:only-child) {
 
 .ehr-appointment-row:not(.ehr-care-row) {
   padding-inline: 9px;
+}
+
+/* ── PopupSelect: popup-based dropdown replacement ─────────────────
+   Trigger mimics the app's selects; the popup shows ten 44px rows
+   before scrolling, with search on long lists and back/step header
+   in two-step (grouped) mode. */
+.popup-select-trigger {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-secondary, var(--bg-card-solid));
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.popup-select-trigger--compact {
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.popup-select-trigger:hover {
+  border-color: var(--accent-primary);
+}
+
+.popup-select-trigger .popup-select-placeholder {
+  color: var(--text-muted);
+}
+
+.popup-select-trigger span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popup-select-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.popup-select-head {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.popup-select-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--accent-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.popup-select-title {
+  text-align: center;
+  min-width: 0;
+}
+
+.popup-select-title strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popup-select-title span {
+  display: block;
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.popup-select-close {
+  justify-self: end;
+  display: inline-flex;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--overlay-subtle);
+  color: var(--text-muted);
+}
+
+.popup-select-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 14px 0;
+  padding: 0 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  color: var(--text-muted);
+}
+
+.popup-select-search input {
+  flex: 1;
+  min-height: 36px;
+  border: 0 !important;
+  background: transparent !important;
+  font-size: 13px;
+  outline: none;
+}
+
+.popup-select-list {
+  /* Exactly ten rows visible before scrolling. */
+  max-height: calc(10 * 44px);
+  overflow-y: auto;
+  padding: 10px 8px 12px;
+}
+
+.popup-select-row {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.popup-select-row:hover {
+  background: var(--overlay-subtle);
+}
+
+.popup-select-row.is-selected {
+  background: var(--accent-light);
+  color: var(--accent-primary);
+}
+
+.popup-select-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popup-select-row-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.popup-select-empty {
+  padding: 18px 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ── Consultation examination: label/search inline with findings ── */
+.ehr-exam-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.ehr-exam-row textarea {
+  margin-top: 0 !important;
+}
+
+@media (max-width: 899.98px) {
+  .ehr-exam-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+.popup-select-row--add {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.popup-select-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-light);
+}
+
+/* ── Consultation screen lock (final layer) ──
+   Must sit after the base .page-container rule (~L8849), whose
+   overflow-y: auto otherwise wins by source order and lets the whole page
+   scroll. Desktop: the chrome (toolbar, patient banner, step indicator)
+   is fixed; the flex chain below stretches to the bottom of the viewport
+   and only .ehr-soap-scroll — the step's data cards — scrolls. ≤860px
+   keeps the normal full-page scroll. */
+@media (min-width: 861px) {
+  .tamam-ehr-app .page-container.ehr-consultation-page {
+    flex: 1 1 0%;
+    height: auto;
+    min-height: 0;
+    padding-bottom: 8px;
+    overflow: hidden;
+  }
+
+  /* basis 0 (not auto) so these fill the free space instead of sizing to
+     their content — this is what stretches the form area to the bottom. */
+  .ehr-consult-workspace {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+
+  .ehr-consult-workspace > .flex-1 {
+    min-height: 0;
+  }
+
+  .ehr-soap-scroll {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+/* Orders step: the Prescriptions / Lab Orders launcher cards sit side by
+   side as one compact row; their section headers shrink to match. */
+.ehr-order-launchers .card-elevated > button {
+  min-height: 0;
+  padding: 9px 12px !important;
+}
+
+.ehr-order-launchers .card-elevated > button .w-8 {
+  width: 26px;
+  height: 26px;
+}
+
+/* ── Consultation step cards: only the card body scrolls ──
+   The cards are flex children of .ehr-soap-scroll with overflow:hidden,
+   which zeroes their automatic flex minimum — so a tall body (chart
+   history, exam rows, plan cards) was clipped at the viewport edge with
+   no way to reach it. Clamp each card to the workspace and hand the
+   overflow to the card body: the section header bar stays put and just
+   the contents scroll. ≤860px keeps normal page scrolling. */
+@media (min-width: 861px) {
+  .ehr-soap-scroll > .card-elevated {
+    flex: 0 1 auto;
+    min-height: 0;
+  }
+
+  .ehr-soap-scroll > .card-elevated > button,
+  .ehr-soap-scroll > .card-elevated > .glass-section-header {
+    flex: 0 0 auto;
+  }
+
+  .ehr-soap-scroll > .card-elevated > div:not(:first-child) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* Consultation right rail: scrolls independently so the running "Visit
+   notes" summary can grow while the page itself stays locked. */
+@media (min-width: 861px) {
+  .ehr-consult-workspace > .ehr-chart-details {
+    align-self: stretch;
+    min-height: 0;
+    overflow-y: auto;
+  }
 }

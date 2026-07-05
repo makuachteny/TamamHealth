@@ -16,14 +16,25 @@ export const DEFAULT_BRANDING: OrgBranding = {
   accentColor: BRAND_PRIMARY,
 };
 
+/* Orgs saved before the 2026-07 rebrand stored the old header navy as their
+   primary/accent color. These runtime branding vars override --accent-primary
+   on the root element, so a stale stored navy would repaint the whole accent
+   system (buttons, floating message dock, …) even after the CSS tokens moved
+   to the new blue. Treat the legacy navy as "unset" so those installations
+   pick up the current brand color. */
+const LEGACY_NAVY = '#10195a';
+function modernizeColor(color?: string): string | undefined {
+  return color && color.toLowerCase() !== LEGACY_NAVY ? color : undefined;
+}
+
 export function getOrgBranding(org?: OrganizationDoc | null): OrgBranding {
   if (!org) return DEFAULT_BRANDING;
   return {
     name: org.name,
     logoUrl: org.logoUrl,
-    primaryColor: org.primaryColor || DEFAULT_BRANDING.primaryColor,
+    primaryColor: modernizeColor(org.primaryColor) || DEFAULT_BRANDING.primaryColor,
     secondaryColor: org.secondaryColor || DEFAULT_BRANDING.secondaryColor,
-    accentColor: org.accentColor || DEFAULT_BRANDING.accentColor,
+    accentColor: modernizeColor(org.accentColor) || DEFAULT_BRANDING.accentColor,
   };
 }
 

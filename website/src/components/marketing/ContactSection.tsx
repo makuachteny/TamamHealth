@@ -53,7 +53,7 @@ function defaultSubjectForIntent(intent: Intent) {
   }
 }
 
-export default function ContactPage() {
+export function ContactSection() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -122,7 +122,7 @@ export default function ContactPage() {
   };
 
   return (
-    <>
+    <div id="contact">
       {/* ── REACH US DIRECTLY (hero) ─────────────────────────────────── */}
       <section className="mk-section mk-section-cream mk-hero-contact">
         <div className="mk-container">
@@ -400,7 +400,7 @@ export default function ContactPage() {
           transform: translateY(-2px);
         }
       `}</style>
-    </>
+    </div>
   );
 }
 

@@ -318,26 +318,6 @@ export default function EhrCareDashboard({
             ))}
           </div>
 
-          {actionStrip && actionStrip.length > 0 && (
-            <div className="ehr-clinical-strip">
-              {actionStrip.map(action => (
-                <button key={action.label} type="button" className={action.active ? 'primary' : ''} onClick={action.onClick}>
-                  <action.icon className="w-4 h-4" />{action.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {showActionStrip && !actionStrip && (
-            <div className="ehr-clinical-strip">
-              {actions.map(action => (
-                <button key={action.label} type="button" className={action.active ? 'primary' : ''} onClick={action.onClick}>
-                  <action.icon className="w-4 h-4" />{action.label}
-                </button>
-              ))}
-            </div>
-          )}
-
           {footerContent && (
             <div className="ehr-care-footer">
               {footerContent}

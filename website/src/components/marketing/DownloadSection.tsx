@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { Reveal, CheckItem, FAQItem } from "@/components/marketing/MarketingShared";
 import { ShieldCheck } from "@/components/marketing/icons";
 
@@ -17,30 +16,11 @@ import { ShieldCheck } from "@/components/marketing/icons";
 const APP_URL = "https://app.tamamhealth.org";
 const ANDROID_APK_URL = "https://github.com/tamamhealth/tamamhealth/releases/latest";
 
-export default function DownloadPage() {
+export function DownloadSection() {
   return (
-    <>
-      <MarketingHero
-        variant="console"
-        eyebrow="DOWNLOAD & SET UP"
-        title="Get TamamHealth on any device."
-        subtitle="TamamHealth is offline-first. Install it once and it keeps working through power cuts and connectivity gaps, syncing automatically when you're back online."
-        primaryCta={{ label: "Open the web app", href: APP_URL }}
-        secondaryCta={{ label: "Download for Android", href: ANDROID_APK_URL }}
-        stats={[
-          { value: "100%", label: "offline capable" },
-          { value: "Any", label: "phone, tablet, desktop" },
-          { value: "Local", label: "data can stay in-country" },
-        ]}
-        media={(
-          <div className="mk-dashboard-crop">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/Dashboard.png" alt="TamamHealth running on a device" loading="eager" />
-          </div>
-        )}
-        className="mk-hero-download"
-      />
-
+    <div id="download">
+      {/* The console hero that used to open this section now leads the whole
+          one-pager (see HomeHero); this section starts at the install guide. */}
       {/* ── THREE WAYS TO INSTALL ────────────────────────────── */}
       <section className="mk-section mk-section-cream">
         <div className="mk-container">
@@ -94,7 +74,7 @@ export default function DownloadPage() {
                   <li>Set your domain + secrets, run the deploy script (Docker + auto-TLS).</li>
                   <li>Facilities point their app at your server and sync to it.</li>
                 </ol>
-                <Link href="/about/contact?intent=partnership#contact-form" className="mk-btn mk-btn-outline mk-btn-sm" style={{ marginTop: 16 }}>
+                <Link href="/?intent=partnership#contact-form" className="mk-btn mk-btn-outline mk-btn-sm" style={{ marginTop: 16 }}>
                   Get the deployment guide
                 </Link>
               </div>
@@ -175,6 +155,6 @@ export default function DownloadPage() {
           </Reveal>
         </div>
       </section>
-    </>
+    </div>
   );
 }

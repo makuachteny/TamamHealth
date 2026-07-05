@@ -19,23 +19,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // is not interpreted uniformly — we keep the home page at 1.0 and the
   // legal pages at 0.3, with everything else in between.
   const routes: Array<{ path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }> = [
+    // One-page site: everything lives on / as anchored sections; only the
+    // legal pages remain as separate routes.
     { path: '/', priority: 1.0, changeFrequency: 'weekly' },
-    { path: '/products', priority: 0.9, changeFrequency: 'monthly' },
-    { path: '/products/hospital', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/products/clinic', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/products/lab', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/products/pharmacy', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/products/radiology', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/products/feedback', priority: 0.7, changeFrequency: 'monthly' },
-    { path: '/patient-experience', priority: 0.7, changeFrequency: 'monthly' },
-    { path: '/case-studies', priority: 0.7, changeFrequency: 'monthly' },
-    { path: '/about', priority: 0.7, changeFrequency: 'monthly' },
-    { path: '/about/team', priority: 0.6, changeFrequency: 'monthly' },
-    { path: '/about/careers', priority: 0.6, changeFrequency: 'monthly' },
-    { path: '/about/contact', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/resources/blog', priority: 0.6, changeFrequency: 'weekly' },
-    { path: '/resources/help-center', priority: 0.5, changeFrequency: 'monthly' },
-    { path: '/resources/api-docs', priority: 0.4, changeFrequency: 'monthly' },
     { path: '/privacy', priority: 0.3, changeFrequency: 'yearly' },
     { path: '/terms', priority: 0.3, changeFrequency: 'yearly' },
   ];

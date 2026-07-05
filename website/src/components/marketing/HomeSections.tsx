@@ -95,7 +95,7 @@ export function HomePlatformSection() {
                 <span>Facility operations</span>
                 <span>National reporting</span>
               </div>
-              <Link href="/products#products-grid" className="mk-btn mk-btn-outline-green mk-home-platform-cta">
+              <Link href="/#products" className="mk-btn mk-btn-outline-green mk-home-platform-cta">
                 Explore the platform
               </Link>
             </div>

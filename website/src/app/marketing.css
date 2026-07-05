@@ -5,7 +5,7 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Google Fonts (Lora = Tebra serif, DM Sans ≈ AkkuratLL) ───── */
-@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&family=DM+Mono:wght@400;500&family=Comfortaa:wght@400;500;600;700&display=swap');
 
 /* ── CSS Custom Properties — TamamHealth Platform Palette ────── */
 :root {
@@ -17,7 +17,7 @@
   --navbar-height:      80px;
 
   /* ─ Platform blues — shared with the app theme ─ */
-  --tb-blue-900: #10195A;
+  --tb-blue-900: #2191D0;
   --tb-blue-800: #015697;
   --tb-blue-700: #2191D0;
   --tb-blue-600: #369FDA;
@@ -192,7 +192,7 @@ body {
   align-items: stretch;
   overflow: hidden;
   color: #fff;
-  background: #10195A !important;
+  background: #2191D0 !important;
 }
 
 .mk-home-hero::before {
@@ -595,7 +595,7 @@ body {
 
 /* ── Final hero atmosphere + feature strip polish ────────────────── */
 .mk-home-hero {
-  background: #10195A !important;
+  background: #2191D0 !important;
 }
 
 .mk-home-hero::before {
@@ -741,7 +741,7 @@ body {
 
 /* ── Restore home hero blue logo atmosphere ──────────────────────── */
 .mk-home-hero {
-  background: #10195A !important;
+  background: #2191D0 !important;
 }
 
 .mk-home-hero::before {
@@ -1090,7 +1090,7 @@ body {
   justify-content: center;
   gap: 10px;
   background: #FF7F00 !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   cursor: pointer;
   font: inherit;
   font-size: 17px;
@@ -1547,7 +1547,7 @@ body {
   justify-content: center;
   gap: 10px;
   background: #FF7F00 !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   cursor: pointer;
   font: inherit;
   font-size: 17px;
@@ -2033,7 +2033,7 @@ body {
   justify-content: center;
   gap: 10px;
   background: #FF7F00;
-  color: #10195A;
+  color: #2191D0;
   cursor: pointer;
   font: inherit;
   font-size: 17px;
@@ -3403,7 +3403,7 @@ body,
   margin-top: calc(-1 * var(--navbar-height));
   padding: calc(var(--navbar-height) + clamp(64px, 7vw, 104px)) 0 clamp(64px, 7vw, 104px);
   color: #fff;
-  background: #10195A;
+  background: #2191D0;
 }
 
 .mk-mod-hero::before {
@@ -3554,12 +3554,12 @@ body,
 }
 
 .mk-mod-hero--product {
-  background: #10195A;
+  background: #2191D0;
 }
 
 .mk-mod-hero--photo {
   text-align: center;
-  background: #10195A;
+  background: #2191D0;
 }
 
 .mk-mod-hero--photo .mk-mod-hero-bg-img {
@@ -3572,9 +3572,17 @@ body,
 }
 
 .mk-mod-hero--photo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
   z-index: -3;
-  background: rgba(16, 25, 90, 0.85);
+  background: linear-gradient(to bottom, transparent 0%, transparent 40%, rgba(4,24,40,0.82) 100%);
   opacity: 1;
+  pointer-events: none;
+}
+
+.mk-mod-hero--photo::after {
+  content: none;
 }
 
 .mk-mod-hero--photo .mk-mod-hero-inner,
@@ -3602,7 +3610,7 @@ body,
 .mk-mod-hero--console {
   background:
     radial-gradient(72% 80% at 88% 18%, rgba(54,159,218,0.28), transparent 60%),
-    linear-gradient(135deg, #071142 0%, #10195A 54%, #015697 100%);
+    linear-gradient(135deg, #071142 0%, #2191D0 54%, #015697 100%);
 }
 
 .mk-mod-hero--console .mk-mod-hero-visual {
@@ -3613,7 +3621,7 @@ body,
 }
 
 .mk-mod-hero--portal {
-  background: #10195A;
+  background: #2191D0;
 }
 
 .mk-mod-hero--showcase {
@@ -3702,7 +3710,7 @@ body,
 }
 
 .mk-mod-hero--mosaic {
-  background: #10195A;
+  background: #2191D0;
 }
 
 .mk-mod-hero--mosaic .mk-mod-hero-inner {
@@ -3878,7 +3886,7 @@ body,
 }
 
 .mk-hero-telehealth {
-  background: #10195A;
+  background: #2191D0;
 }
 
 .mk-hero-telehealth .mk-mod-hero-visual-img {
@@ -3886,7 +3894,7 @@ body,
 }
 
 .mk-hero-billing {
-  background: #10195A;
+  background: #2191D0;
 }
 
 .mk-hero-billing .mk-mod-hero-visual-img {
@@ -3898,11 +3906,11 @@ body,
 }
 
 .mk-hero-download {
-  background: #10195A;
+  background: #2191D0;
 }
 
 .mk-hero-api-docs {
-  background: #10195A;
+  background: #2191D0;
 }
 
 .mk-hero-api-docs .mk-mod-hero-visual {
@@ -4663,6 +4671,9 @@ body,
 }
 .mk-section-cream { background: var(--tb-cream-100); }
 .mk-section-white { background: var(--tb-cream-50); }
+/* Platform explorer band — pale brand blue so the section reads as its own
+   chapter between the white/cream sections around it. */
+.mk-section-explore { background: var(--tb-blue-100); }
 .mk-section-teal  { background: var(--tb-blue-900); color: var(--tb-text-inv); }
 /* Headings keep their own navy color, which vanishes on the navy section. */
 .mk-section-teal .mk-h2,
@@ -5235,8 +5246,8 @@ body,
 .mk-footer-social-band-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-end;
+  gap: clamp(16px, 2.5vw, 36px);
   /* padding-block only — shorthand `padding: 20px 0` would wipe out the
      .mk-container horizontal gutter and pin the content to the edges. */
   padding-block: 20px;
@@ -6262,7 +6273,7 @@ body,
   align-items: center;
   overflow: hidden;
   color: #fff;
-  background: #10195A;
+  background: #2191D0;
 }
 
 .mk-home-hero::before {
@@ -6849,7 +6860,7 @@ body,
 .mk-home-platform-section {
   position: relative;
   isolation: isolate;
-  background: #10195A;
+  background: #2191D0;
   overflow: hidden;
   padding-top: clamp(72px, 7vw, 104px);
   padding-bottom: clamp(72px, 7vw, 104px);
@@ -7460,7 +7471,7 @@ body,
   margin-bottom: 72px;
   padding: clamp(34px, 4vw, 56px);
   border-radius: 28px;
-  background: #10195A;
+  background: #2191D0;
 }
 
 .mk-footer-cta::before {
@@ -7677,7 +7688,7 @@ body,
 
 /* ── Final hero background restore ───────────────────────────────── */
 .mk-home-hero {
-  background: #10195A !important;
+  background: #2191D0 !important;
 }
 
 .mk-home-hero::before {
@@ -7814,7 +7825,7 @@ body {
 .mk-navbar--hero .mk-nav-demo {
   background: #FF7F00 !important;
   border-color: #FF7F00 !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
 }
 
 .mk-home-hero-grid {
@@ -8350,7 +8361,7 @@ body {
 .mk-home-hero-slot.is-selected {
   border-color: #FF7F00;
   background: rgba(255,127,0,0.10);
-  color: #10195A;
+  color: #2191D0;
   box-shadow: inset 0 0 0 1px #FF7F00;
 }
 
@@ -8442,7 +8453,7 @@ body {
 
 /* ── Final home nav scroll states ────────────────────────────────── */
 .mk-navbar--hero-solid {
-  background: #10195A !important;
+  background: #2191D0 !important;
   background-attachment: fixed !important;
   border-bottom-color: rgba(255,255,255,0.12) !important;
 }
@@ -8543,7 +8554,7 @@ body {
 /* ── Final image rail label blend ────────────────────────────────── */
 .mk-home-hero-tile span {
   background: rgba(239, 248, 253, 0.84) !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   border: 1px solid rgba(255,255,255,0.42) !important;
   box-shadow: 0 10px 22px rgba(8, 27, 73, 0.12) !important;
   backdrop-filter: blur(10px) saturate(1.1);
@@ -8562,7 +8573,7 @@ body {
 }
 
 .mk-home-hero-panel h2 {
-  color: #10195A !important;
+  color: #2191D0 !important;
 }
 
 .mk-home-hero-panel p {
@@ -8574,7 +8585,7 @@ body {
 .mk-home-hero-panel-back {
   background: rgba(255,255,255,0.74) !important;
   border-color: rgba(1,86,151,0.30) !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.58) !important;
 }
 
@@ -8653,7 +8664,7 @@ body {
 .mk-home-hero-panel-button {
   background: #FF6247 !important;
   border-color: #FF6247 !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   font-weight: 800 !important;
 }
 
@@ -8674,7 +8685,7 @@ body {
 .mk-navbar--scrolled .mk-nav-phone:focus-visible,
 .mk-navbar--scrolled .mk-nav-pricing:focus-visible,
 .mk-navbar--scrolled .mk-nav-demo:focus-visible {
-  outline-color: #10195A !important;
+  outline-color: #2191D0 !important;
   box-shadow: 0 0 0 6px rgba(33,145,208,0.18) !important;
 }
 
@@ -8737,7 +8748,7 @@ body {
   min-height: 30px !important;
   padding: 0 14px !important;
   background: rgba(249, 252, 255, 0.94) !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   border-color: rgba(16,25,90,0.18) !important;
   font-size: 9px !important;
   line-height: 1.1 !important;
@@ -8755,7 +8766,7 @@ body {
 }
 
 .mk-home-hero-panel h2 {
-  color: #10195A !important;
+  color: #2191D0 !important;
   font-size: clamp(24px, 1.9vw, 28px) !important;
   letter-spacing: 0 !important;
 }
@@ -8775,7 +8786,7 @@ body {
 }
 
 .mk-home-hero-field span {
-  color: #10195A;
+  color: #2191D0;
   font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
@@ -8791,7 +8802,7 @@ body {
   padding: 0 15px !important;
   background: rgba(255,255,255,0.88) !important;
   border: 1px solid rgba(1,86,151,0.40) !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   font-size: 15px !important;
 }
 
@@ -9958,7 +9969,7 @@ body,
 
 /* ── Final homepage hero platform-white background ──────────────── */
 .mk-home-hero {
-  color: #10195A !important;
+  color: #2191D0 !important;
   background:
     radial-gradient(circle at 78% 18%, rgba(33,145,208,0.13), transparent 32%),
     radial-gradient(circle at 12% 86%, rgba(221,242,251,0.88), transparent 34%),
@@ -9986,7 +9997,7 @@ body,
 .mk-home-hero .mk-h1,
 .mk-home-hero-kicker,
 .mk-home-hero-subtitle {
-  color: #10195A !important;
+  color: #2191D0 !important;
   text-shadow: none !important;
 }
 
@@ -10337,7 +10348,7 @@ body,
 .mk-home-numbered-card h3 {
   min-height: 64px !important;
   margin: 0 !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   font-size: clamp(22px, 1.7vw, 27px) !important;
   font-weight: 800 !important;
   line-height: 1.14 !important;
@@ -10442,7 +10453,7 @@ body,
 }
 
 .mk-mission-panel-copy p {
-  color: #10195A !important;
+  color: #2191D0 !important;
 }
 
 /* ── Final shared hero alignment and real-image visual pass ─────── */
@@ -10573,7 +10584,7 @@ body,
   border: 1px solid rgba(255, 255, 255, 0.36);
   border-radius: 16px;
   background: rgba(254, 255, 249, 0.78);
-  color: #10195A;
+  color: #2191D0;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
@@ -10591,7 +10602,7 @@ body,
 
 .mk-product-photo-caption strong {
   display: block;
-  color: #10195A;
+  color: #2191D0;
   font-size: clamp(18px, 1.5vw, 24px);
   font-weight: 700;
   line-height: 1.18;
@@ -10931,7 +10942,7 @@ body,
   border: 1px solid rgba(33, 145, 208, 0.22) !important;
   border-radius: 14px !important;
   background: rgba(254, 255, 249, 0.72) !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   box-shadow: none !important;
   backdrop-filter: blur(14px) !important;
   -webkit-backdrop-filter: blur(14px) !important;
@@ -10954,7 +10965,7 @@ body,
 .mk-benefit-card .mk-h3,
 .mk-benefit-card h3 {
   margin: 0 0 8px !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   font-family: var(--AkkuratLL) !important;
   font-size: clamp(20px, 1.55vw, 25px) !important;
   font-weight: 700 !important;
@@ -11004,7 +11015,7 @@ body,
   border-radius: 16px !important;
   background: rgba(254, 255, 249, 0.78) !important;
   box-shadow: none !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
 }
@@ -11017,7 +11028,7 @@ body,
 .mk-job-card .mk-h3,
 .mk-job-card h3 {
   margin: 0 !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
   font-family: var(--AkkuratLL) !important;
   font-size: clamp(23px, 1.85vw, 30px) !important;
   font-weight: 700 !important;
@@ -12237,7 +12248,7 @@ button.mk-mobile-top-demo {
   .mk-home-hero {
     background:
       radial-gradient(circle at center, rgba(255,255,255,0.08) 0 1px, transparent 1px 100%),
-      #10195A !important;
+      #2191D0 !important;
     background-size: 42px 42px, auto !important;
     color: #fff !important;
   }
@@ -12783,7 +12794,7 @@ button.mk-mobile-top-demo {
 /* ── Final testimonial polish ───────────────────────────────────── */
 .mk-testimonial.mk-section-teal {
   padding-block: clamp(72px, 8vw, 112px) !important;
-  background: #10195A !important;
+  background: #2191D0 !important;
 }
 
 .mk-testimonial .mk-testimonial-inner {
@@ -13010,7 +13021,7 @@ button.mk-mobile-top-demo {
 /* ── Final restore: whitish landing hero ───────────────────────── */
 .mk-home-hero {
   background: #FEFFF9 !important;
-  color: #10195A !important;
+  color: #2191D0 !important;
 }
 
 .mk-home-hero::before {
@@ -13033,7 +13044,7 @@ button.mk-mobile-top-demo {
 .mk-home-hero .mk-h1,
 .mk-home-hero-title,
 .mk-home-hero-title-lead {
-  color: #10195A !important;
+  color: #2191D0 !important;
 }
 
 .mk-home-hero-subtitle {
@@ -13088,7 +13099,7 @@ button.mk-mobile-top-demo {
    (see .mk-home-split-hero), so its nav tone matches the default dark
    treatment below instead of the old light-cream hero's colors. */
 .mk-navbar--tone-home {
-  --mk-nav-hero-bg: #10195A;
+  --mk-nav-hero-bg: #2191D0;
   --mk-nav-hero-text: rgba(255,255,255,0.96);
   --mk-nav-logo-filter: brightness(0) invert(1);
   --mk-nav-pricing-bg: rgba(255,255,255,0.08);
@@ -13101,7 +13112,7 @@ button.mk-mobile-top-demo {
 }
 
 .mk-navbar--tone-platform {
-  --mk-nav-hero-bg: #10195A;
+  --mk-nav-hero-bg: #2191D0;
 }
 
 /* Product pages: header matches the explorer's active-tab blue. */
@@ -13110,15 +13121,15 @@ button.mk-mobile-top-demo {
 }
 
 .mk-navbar--tone-company {
-  --mk-nav-hero-bg: #10195A;
+  --mk-nav-hero-bg: #2191D0;
 }
 
 .mk-navbar--tone-commerce {
-  --mk-nav-hero-bg: #10195A;
+  --mk-nav-hero-bg: #2191D0;
 }
 
 .mk-navbar--tone-resource {
-  --mk-nav-hero-bg: #10195A;
+  --mk-nav-hero-bg: #2191D0;
 }
 
 .mk-navbar:not(.mk-navbar--tone-home) {
@@ -13324,7 +13335,7 @@ button.mk-mobile-top-demo {
 }
 
 .mk-hero-contact .mk-mod-hero-stats strong {
-  color: #10195A !important;
+  color: #2191D0 !important;
 }
 
 .mk-hero-contact .mk-mod-hero-stats span {
@@ -14002,7 +14013,7 @@ button.mk-mobile-top-demo {
    Same fixed-attachment gradient as .mk-navbar--hero-solid so the nav
    and hero read as one continuous navy surface while at the top. */
 .mk-products-hero {
-  background: #10195A;
+  background: #2191D0;
   background-attachment: fixed;
   padding: clamp(48px, 7vw, 96px) 0 clamp(40px, 5vw, 72px);
 }
@@ -14562,7 +14573,7 @@ button.mk-mobile-top-demo {
 
 /* ── Homepage: mission band ──────────────────────────────────────── */
 .mk-home-mission-band {
-  background: #10195A;
+  background: #2191D0;
   padding: clamp(64px, 8vw, 100px) 0;
 }
 
@@ -14779,8 +14790,8 @@ button.mk-mobile-top-demo {
 .mk-workflow-row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-end;
+  gap: clamp(16px, 2.5vw, 36px);
   padding: 11px 0;
 }
 
@@ -15042,4 +15053,575 @@ summary:focus-visible,
   border-color: rgba(255, 255, 255, 0.85) !important;
   color: #fff !important;
   background: transparent !important;
+}
+
+/* ── Landing redesign: full-bleed street photo, floating nav ──────
+   The photo fills the whole viewport and runs behind the sticky nav
+   (negative top margin), the nav floats transparent on top, and the
+   promise sits low-left over a navy fade — headline in the rounded
+   brand face, supporting copy to its right. */
+.mk-home-photo-hero {
+  min-height: 100vh;
+  min-height: 100svh;
+  margin-top: calc(-1 * var(--navbar-height));
+  align-items: flex-end;
+}
+
+.mk-home-photo-hero-scrim {
+  display: block;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(11, 17, 64, 0) 34%,
+    rgba(11, 17, 64, 0.55) 68%,
+    rgba(11, 17, 64, 0.96) 100%
+  );
+}
+
+.mk-home-photo-hero-container {
+  padding-bottom: clamp(48px, 7vw, 96px);
+}
+
+.mk-home-photo-hero-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: clamp(28px, 5vw, 72px);
+}
+
+/* Licensed display face for the headline — drop the .woff2 files into
+   website/public/assets/fonts/ and this activates automatically; until
+   then Quicksand (closest free match to All Round Gothic) renders. */
+@font-face {
+  font-family: 'All Round Gothic';
+  src: url('/assets/fonts/AllRoundGothic-Medium.woff2') format('woff2'),
+       url('/assets/fonts/AllRoundGothic-Medium.woff') format('woff');
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Figma spec: All Round Gothic Medium, 72px, line-height 100%,
+   letter-spacing 0%, 730px frame. Scales down only below desktop. */
+.mk-home-photo-hero-title {
+  font-family: 'All Round Gothic', 'Quicksand', 'Comfortaa', var(--AkkuratLL);
+  font-size: 72px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #fff;
+  margin: 0;
+  max-width: 730px;
+}
+
+@media (max-width: 1023.98px) {
+  .mk-home-photo-hero-title {
+    font-size: clamp(34px, 6.5vw, 56px);
+  }
+}
+
+/* Figma spec: DM Sans Regular 400, 20px, line-height 100%, tracking 0,
+   460px frame, #FCFEF3 at 80% opacity. */
+.mk-home-photo-hero-copy {
+  font-family: var(--AkkuratLL);
+  font-size: 20px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #FCFEF3;
+  opacity: 0.8;
+  max-width: 460px;
+  margin: 0 0 8px;
+}
+
+@media (max-width: 639.98px) {
+  .mk-home-photo-hero-row {
+    gap: 20px;
+  }
+  .mk-home-photo-hero-copy {
+    margin-bottom: 0;
+  }
+}
+
+/* Transparent nav floating on the landing photo. White links and a
+   solid white pill CTA so everything reads against the image; the
+   standard light bar takes over once you scroll past the hero. */
+.mk-navbar--overlay {
+  background: transparent !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+.mk-navbar--overlay .mk-nav-item-link {
+  color: #fff;
+}
+
+.mk-navbar--overlay .mk-nav-item-link:hover {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.mk-navbar--overlay .mk-nav-demo {
+  background: #fff !important;
+  color: var(--tb-blue-900) !important;
+  border: 1.5px solid var(--tb-blue-700) !important;
+  border-radius: 999px !important;
+}
+
+.mk-navbar--overlay .mk-nav-demo:hover {
+  background: var(--tb-blue-50) !important;
+}
+
+.mk-navbar--overlay .mk-mobile-toggle,
+.mk-navbar--overlay .mk-mobile-top-demo {
+  color: #fff;
+}
+
+/* ── Pill navbar: brand pill (burger + wordmark) and Book a Demo ──
+   Both pills carry their own white capsule, so the bar itself can be
+   transparent over the landing photo, solid navy on inner heroes, or
+   the light scrolled bar — the pills read identically on all three. */
+.mk-navbar--pills .mk-navbar-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(16px, 2.5vw, 36px);
+}
+
+/* Both pills share one exact footprint. Figma spec: 182x44 capsule,
+   radius 49, 1px #113055 border on a #FCFEF3 fill; 38px #2191D0 burger
+   disc inset 3px; wordmark 23px tall, 11px after the disc. */
+.mk-pill-brand,
+.mk-pill-cta {
+  box-sizing: border-box;
+  height: 44px;
+  width: 182px;
+  border-radius: 49px;
+}
+
+.mk-pill-brand {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  padding: 2px 18px 2px 2px;
+  background: #FCFEF3;
+  border: 1px solid #113055;
+}
+
+.mk-nav-burger {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #2191D0;
+  color: #fff;
+  border: 1px solid #2191D0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  flex: 0 0 auto;
+}
+
+.mk-nav-burger:hover {
+  background: var(--tb-blue-800);
+}
+
+.mk-nav-burger:focus-visible {
+  outline: 2px solid var(--tb-blue-800);
+  outline-offset: 2px;
+}
+
+/* The shared icon set hardcodes a blue stroke attribute — force white
+   so the burger reads on its blue disc. */
+.mk-nav-burger svg,
+.mk-nav-burger svg * {
+  stroke: #fff !important;
+}
+
+.mk-pill-brand-logo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  line-height: 0;
+}
+
+.mk-pill-brand-logo img {
+  height: 23px;
+  width: auto;
+  display: block;
+}
+
+.mk-pill-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #2191D0;
+  border: 5px solid #FCFEF3;
+  text-decoration: none;
+  flex: 0 0 auto;
+}
+
+.mk-pill-cta span {
+  color: #FCFEF3;
+  font-family: var(--AkkuratLL);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.mk-pill-cta:hover {
+  background: var(--tb-blue-800);
+}
+
+/* Burger dropdown — anchored under the brand pill. */
+.mk-nav-menu-pop {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 0;
+  min-width: 250px;
+  background: #fff;
+  border: 1px solid var(--tb-cream-300);
+  border-radius: 18px;
+  box-shadow: 0 18px 44px rgba(16, 25, 90, 0.16);
+  padding: 10px;
+  z-index: 120;
+}
+
+.mk-nav-menu-pop a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-family: var(--AkkuratLL);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tb-blue-900);
+  text-decoration: none;
+}
+
+.mk-nav-menu-pop a:hover {
+  background: var(--tb-blue-50);
+  color: var(--tb-blue-800);
+}
+
+.mk-nav-menu-pop-divider {
+  height: 1px;
+  background: var(--tb-cream-300);
+  margin: 8px 8px;
+}
+
+.mk-nav-menu-pop-phone {
+  font-family: var(--AkkuratMonoLL);
+  font-size: 14px;
+}
+
+@media (max-width: 639.98px) {
+  .mk-pill-brand,
+  .mk-pill-cta {
+    height: 40px;
+    width: auto;
+    min-width: 150px;
+  }
+  .mk-pill-brand {
+    padding-right: 14px;
+  }
+  .mk-nav-burger {
+    width: 34px;
+    height: 34px;
+  }
+  .mk-pill-brand-logo img {
+    height: 20px;
+  }
+  .mk-pill-cta span {
+    font-size: 16px;
+  }
+  .mk-pill-cta {
+    padding: 0 14px;
+  }
+}
+
+/* ── Landing hero mosaic: paper-record photos in a bento grid ──────
+   Nine tiles on a deep-navy backdrop with uniform gutters and rounded
+   corners (reference collage style). Named grid areas let each
+   breakpoint recompose the collage without touching the markup. */
+.mk-home-hero-mosaic-wrap {
+  background: #0B1140;
+}
+
+.mk-home-hero-mosaic {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  grid-template-areas:
+    "a a b b b c"
+    "a a b b b c"
+    "a a d d e e"
+    "a a d d e e"
+    "f f d d h i"
+    "f f g g h i";
+  gap: clamp(8px, 0.9vw, 14px);
+  padding: clamp(10px, 1.2vw, 18px);
+}
+
+.mk-hero-tile {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+@media (max-width: 1023.98px) {
+  .mk-home-hero-mosaic {
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+    grid-template-areas:
+      "a a b b"
+      "a a b b"
+      "c d d e"
+      "f d d g"
+      "f h h i";
+  }
+}
+
+@media (max-width: 639.98px) {
+  .mk-home-hero-mosaic {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    grid-template-areas:
+      "a b"
+      "a b"
+      "d d"
+      "d d"
+      "e f"
+      "g i";
+    gap: 8px;
+    padding: 8px;
+  }
+  /* Small screens show six tiles; the rest sit out of the collage. */
+  .mk-hero-tile:nth-child(3),
+  .mk-hero-tile:nth-child(8) {
+    display: none;
+  }
+}
+
+/* Pills navbar: neutralise the legacy mobile grid layouts (written for
+   the old logo + hamburger bar, all !important). The two pills are a
+   plain flex row at every width. */
+.mk-navbar--pills .mk-navbar-inner {
+  display: flex !important;
+  grid-template-columns: none !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  flex: none !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: clamp(12px, 2.5vw, 36px) !important;
+}
+
+/* ── Landing hero: flat brand-blue background, no imagery ── */
+.mk-home-photo-hero {
+  background: #2191D0;
+}
+
+.mk-home-hero-deck .mk-home-photo-hero-container {
+  margin-top: auto;
+  padding-bottom: clamp(32px, 4.5vw, 56px);
+}
+
+/* ── Landing hero deck: sliding problem cards ──────────────────────
+   Navy cards on the blue hero — one slides in from the right at a
+   time. Text side is a centred stat stack (kicker / huge orange
+   figure / one sentence, per the reference), photo fills the right. */
+.mk-home-hero-deck {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Centred between the nav and the bottom headline row. */
+.mk-hero-deck-frame {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: auto;
+  margin-bottom: auto;
+  padding-top: var(--navbar-height);
+}
+
+/* Thin band — the deck is a strip, not a full-viewport card; the
+   original headline row keeps its place at the bottom of the hero. */
+.mk-hero-deck-viewport {
+  flex: none;
+  height: clamp(300px, 42vh, 400px);
+  overflow: hidden;
+}
+
+/* Continuous marquee: the doubled slide list drifts left-to-right
+   forever; -50% -> 0 over one full copy keeps the seam invisible. */
+.mk-hero-deck-track {
+  display: flex;
+  height: 100%;
+  width: max-content;
+  animation: mk-hero-marquee 72s linear infinite;
+}
+
+@keyframes mk-hero-marquee {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+
+.mk-hero-deck-viewport:hover .mk-hero-deck-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-hero-deck-track {
+    animation: none;
+  }
+}
+
+.mk-hero-slide {
+  flex: 0 0 auto;
+  width: min(1150px, calc(100vw - 2 * var(--containerPadding, 40px)));
+  height: 100%;
+  margin-right: 18px;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  background: #10195A;
+  overflow: hidden;
+}
+
+.mk-hero-slide-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: clamp(14px, 2vh, 22px);
+  padding: clamp(28px, 4vw, 64px);
+}
+
+.mk-hero-slide-kicker {
+  font-family: var(--AkkuratLL);
+  font-size: clamp(14px, 1.2vw, 17px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #FCFEF3;
+  margin: 0;
+}
+
+.mk-hero-slide-value {
+  font-family: 'All Round Gothic', 'Quicksand', 'Comfortaa', var(--AkkuratLL);
+  font-size: clamp(52px, 6vw, 88px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: #F08A1D;
+  margin: 0;
+}
+
+.mk-hero-slide-label {
+  font-family: var(--AkkuratLL);
+  font-size: clamp(16px, 1.5vw, 21px);
+  font-weight: 400;
+  line-height: 1.45;
+  color: #FCFEF3;
+  max-width: 480px;
+  margin: 0;
+}
+
+.mk-hero-slide-media {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 0.85fr 1.15fr;
+  gap: 10px;
+  padding: 12px;
+  min-height: 100%;
+}
+
+.mk-hero-slide-tile {
+  position: relative;
+  overflow: hidden;
+}
+
+.mk-hero-slide-tile:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 899.98px) {
+  .mk-hero-slide {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  .mk-hero-slide-media {
+    order: -1;
+    min-height: 240px;
+  }
+  .mk-hero-slide-text {
+    padding: 24px 20px 32px;
+  }
+  .mk-hero-slide-value {
+    font-size: clamp(56px, 15vw, 84px);
+  }
+  .mk-hero-slide-label {
+    font-size: 17px;
+  }
+}
+
+/* Exempt the hero deck marquee from the global animation kill-switch
+   (same treatment as .mk-home-hero-rail-track). */
+.mk-page .mk-hero-deck-track {
+  animation: mk-hero-marquee 72s linear infinite !important;
+}
+
+.mk-page .mk-hero-deck-viewport:hover .mk-hero-deck-track {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-page .mk-hero-deck-track {
+    animation: none !important;
+  }
+}
+
+/* Standalone header logo: the navbar is full-bleed while the hero copy sits
+   in the capped .mk-container, so inset the icon by the container overflow to
+   line its left edge up with the hero heading. White mark for the blue hero. */
+.mk-nav-home-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: auto;
+  margin-left: max(0px, calc((100vw - var(--containerWidth)) / 2));
+}
+
+.mk-nav-home-icon img {
+  width: 36px;
+  height: 36px;
+  display: block;
+}
+
+/* Header logo swaps with the nav surface: white while floating over the blue
+   hero, blue once the nav sits on a light background (scrolled past the hero,
+   or pages/heroes with a light surface). Selectors include the parent class
+   so they out-specify the base `.mk-nav-home-icon img` sizing rule. */
+.mk-nav-home-icon .mk-nav-home-icon--blue { display: none; }
+
+.mk-navbar--scrolled .mk-nav-home-icon .mk-nav-home-icon--white,
+.mk-navbar--light-hero .mk-nav-home-icon .mk-nav-home-icon--white {
+  display: none;
+}
+
+.mk-navbar--scrolled .mk-nav-home-icon .mk-nav-home-icon--blue,
+.mk-navbar--light-hero .mk-nav-home-icon .mk-nav-home-icon--blue {
+  display: block;
 }

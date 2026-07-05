@@ -110,5 +110,16 @@ export const COMMON_ICD11_CODES: ICD11CodeEntry[] = [
   // ===== STIs =====
   { code: '1A60', title: 'Syphilis', chapter: 'Infectious diseases', minLevel: 'payam', notifiable: true, keywords: ['syphilis'] },
   { code: '1A61', title: 'Gonorrhoea', chapter: 'Infectious diseases', minLevel: 'payam', keywords: ['gonorrhea', 'discharge'] },
+  // ===== ADDITIONAL COMMON PRESENTATIONS =====
+  { code: 'RA01', title: 'COVID-19', chapter: 'Infectious diseases', minLevel: 'payam', notifiable: true, keywords: ['covid', 'coronavirus', 'sars-cov-2'] },
+  { code: '1G40', title: 'Sepsis', chapter: 'Infectious diseases', minLevel: 'county', causeOfDeath: true, keywords: ['sepsis', 'septicaemia', 'blood infection'] },
+  { code: '1F86', title: 'Schistosomiasis (Bilharzia)', chapter: 'Infectious diseases', minLevel: 'county', notifiable: true, keywords: ['schistosomiasis', 'bilharzia'] },
+  { code: '3A51', title: 'Sickle cell disorders', chapter: 'Blood disorders', minLevel: 'county', causeOfDeath: true, keywords: ['sickle cell', 'crisis', 'anaemia'] },
+  { code: 'BD1Z', title: 'Heart failure, unspecified', chapter: 'Circulatory', minLevel: 'county', causeOfDeath: true, keywords: ['heart failure', 'oedema', 'breathlessness'] },
+  { code: '8A80', title: 'Migraine', chapter: 'Nervous system', minLevel: 'payam', keywords: ['migraine', 'headache'] },
+  { code: '6B00', title: 'Generalised anxiety disorder', chapter: 'Mental health', minLevel: 'payam', keywords: ['anxiety', 'worry'] },
+  { code: 'EA80', title: 'Atopic eczema (dermatitis)', chapter: 'Skin', minLevel: 'boma', keywords: ['eczema', 'dermatitis', 'rash', 'itch'] },
+  { code: 'DA42', title: 'Gastritis', chapter: 'Digestive', minLevel: 'payam', keywords: ['gastritis', 'epigastric pain'] },
+  { code: 'MG26', title: 'Fever of unknown origin', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['fever', 'pyrexia'] },
 ];
 

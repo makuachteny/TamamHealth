@@ -73,6 +73,14 @@ export default function RootLayout({
       <head>
         <link rel="icon" type="image/svg+xml" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />
         <link rel="apple-touch-icon" sizes="192x192" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />
+        {/* Fonts load here (not via a CSS @import) because Turbopack strips
+            external @import URLs in dev, which silently dropped every font. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&family=DM+Mono:wght@400;500&family=Comfortaa:wght@400;500;600;700&family=Quicksand:wght@400;500;600&display=swap"
+        />
       </head>
       <body className="antialiased">
         <div className="mk-page">

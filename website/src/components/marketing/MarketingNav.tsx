@@ -1,22 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DuoIcon } from "./DuoIcon";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Marketing — Navbar
-   Flat top-level links only — Product, About Us — plus a "Get in touch"
-   CTA that routes to the contact page. No dropdowns.
+   Two floating pills: a brand pill (round burger button + blue tamam
+   wordmark) on the left, and a "Book a Demo" capsule on the right.
+   The burger opens a dropdown with the site links — same pattern on
+   every viewport size.
    ═══════════════════════════════════════════════════════════════════ */
 
 // Fundraising entry points are locked off for now. Flip to true to re-enable.
-const SHOW_FUNDRAISING = false;
 
 const DISPLAY_PHONE = "(973) 566-4336";
 const PHONE_TEL = "tel:+19735664336";
-const CONTACT_FORM_HREF = "/about/contact";
+const DEMO_HREF = "/?intent=demo#contact-form";
 type NavScrollState = "top" | "hero" | "past";
 type NavTone = "home" | "platform" | "company" | "commerce" | "resource" | "clinical";
 
@@ -30,35 +31,22 @@ function getNavTone(pathname: string): NavTone {
 }
 
 export default function MarketingNav() {
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [scrollState, setScrollState] = useState<NavScrollState>("top");
-  const [lightHero, setLightHero] = useState(false);
   const pathname = usePathname();
   const tone = getNavTone(pathname);
-  // Homepage hero is the deep-blue theme, so its nav matches that solid
-  // color while you're within the hero, then switches to the standard
-  // light "scrolled" bar once you scroll past the hero into the rest of
-  // the page. (The nav is position:sticky, not overlapping the hero, so a
-  // "transparent at top" state would just show the plain white page behind
-  // it rather than the hero — solid is the reliable choice here.)
+  const navRef = useRef<HTMLElement>(null);
+
+  // Homepage: the landing photo runs behind the nav (the hero pulls itself
+  // up under the sticky bar with a negative top margin), so the nav floats
+  // transparent over the photo while you're within the hero, then switches
+  // to the standard light "scrolled" bar once you scroll past it. The
+  // pills carry their own white background, so they read on any surface.
   const navClass = tone === "home"
-    ? (scrollState === "past" ? "mk-navbar--scrolled" : "mk-navbar--hero-solid")
+    ? (scrollState === "past" ? "mk-navbar--scrolled" : "mk-navbar--overlay")
     : scrollState === "past"
       ? "mk-navbar--scrolled"
-      : lightHero
-        ? "mk-navbar--light-hero"
-        : "mk-navbar--hero-solid";
-
-  // The nav sits on the deep-navy hero (`--hero-solid`), where a navy logo
-  // would be invisible. Serve natively-white logo assets on that state
-  // instead of relying on a CSS filter (which renders unreliably).
-  const onDarkNav = navClass === "mk-navbar--hero-solid";
-  const logoMark = onDarkNav
-    ? "/assets/logos/SVG/Tamam_Style_Guide-33-white.svg"
-    : "/assets/logos/SVG/Tamam_Style_Guide-33.svg";
-  const logoType = onDarkNav
-    ? "/assets/logos/SVG/Tamam_Style_Guide-31-white.svg"
-    : "/assets/logos/SVG/Tamam_Style_Guide-31.svg";
+      : "mk-navbar--light-hero";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -88,20 +76,6 @@ export default function MarketingNav() {
       const nav = document.querySelector<HTMLElement>(".mk-navbar");
       const navHeight = nav?.getBoundingClientRect().height ?? 80;
       const heroBottom = hero ? hero.offsetTop + hero.offsetHeight - navHeight : 0;
-      const nextLightHero = Boolean(
-        hero?.matches([
-          ".mk-home-hero",
-          ".mk-mod-hero--showcase",
-          ".mk-mod-hero--data",
-          ".mk-mod-hero--legal",
-          ".mk-hero-contact",
-          ".mk-hero-case-index",
-          ".mk-hero-patient-experience",
-          ".mk-platform-explorer",
-        ].join(", "))
-      );
-
-      setLightHero((current) => current === nextLightHero ? current : nextLightHero);
 
       if (scrollY <= 10) {
         setScrollState("top");
@@ -121,196 +95,92 @@ export default function MarketingNav() {
     };
   }, [pathname]);
 
+  // Close the dropdown on navigation, outside click, or Escape.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
   return (
-    <>
-      {/* Main navbar */}
-      <nav className={`mk-navbar ${navClass} mk-navbar--tone-${tone}`}>
-        <div className="mk-container mk-navbar-inner">
-          <Link href="/" className="mk-nav-logo" aria-label="Tamam Healthcare System — home">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={logoMark}
-              alt=""
-              className="mk-nav-logo-mark"
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={logoType}
-              alt="Tamam Healthcare System"
-              className="mk-nav-logo-type"
-            />
-          </Link>
+    <nav ref={navRef} className={`mk-navbar mk-navbar--pills ${navClass} mk-navbar--tone-${tone}`}>
+      <div className="mk-container mk-navbar-inner">
+        {/* Standalone white logo icon, inset to the hero container's left
+            edge so it sits on the same line as the "Many communities…"
+            heading (the navbar itself is full-bleed, the hero is capped). */}
+        <Link
+          href="/"
+          className="mk-nav-home-icon"
+          aria-label="Tamam Healthcare System — home"
+        >
+          {/* White over the blue hero; the blue mark takes over once the nav
+              sits on a light background (scrolled / light-hero pages). */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="mk-nav-home-icon--white" src="/assets/tamamhealth-logo-icon-white.svg" alt="" aria-hidden="true" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="mk-nav-home-icon--blue" src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="" aria-hidden="true" />
+        </Link>
 
-          {/* Desktop right: nav links grouped with the CTA */}
-          <div className="mk-nav-actions desktop-only">
-            <Link href="/products" className="mk-nav-item mk-nav-item-link">Product</Link>
-            <Link href="/about" className="mk-nav-item mk-nav-item-link">About Us</Link>
-            {SHOW_FUNDRAISING && (
-              <>
-                <div style={{ width: 1, height: 20, background: "var(--tb-cream-300)" }} />
-                <Link
-                  href="/donate"
-                  className="mk-nav-donate-link"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "var(--tb-gold-dark)",
-                    textDecoration: "none",
-                    padding: "7px 14px",
-                    borderRadius: 8,
-                    background: "var(--tb-tint-gold)",
-                    border: "1px solid var(--tb-gold)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <DuoIcon name="heart" size={14} /> Fund Our Pilot
-                </Link>
-              </>
-            )}
-            <Link href="/about/contact" className="mk-btn mk-btn-green mk-btn-sm mk-nav-demo">
-              Get in touch
-            </Link>
-          </div>
-
-          {/* Mobile hamburger */}
-          <div className="mk-mobile-top-actions" aria-label="Mobile quick actions">
-            <Link href="/about/contact" className="mk-mobile-top-demo">
-              Get in touch
-            </Link>
-          </div>
+        {/* Brand pill: burger opens the menu; the wordmark goes home. */}
+        <div className="mk-pill-brand">
           <button
             type="button"
-            className="mk-mobile-toggle"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label="Toggle menu"
+            className="mk-nav-burger"
+            onClick={() => setMenuOpen(open => !open)}
+            aria-expanded={menuOpen}
+            aria-haspopup="true"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
           >
-            {mobileOpen ? <DuoIcon name="x" size={24} /> : <DuoIcon name="menu" size={24} />}
+            <DuoIcon name={menuOpen ? "x" : "menu"} size={20} strokeWidth={2.4} color="#fff" />
           </button>
-        </div>
+          <Link href="/" className="mk-pill-brand-logo" aria-label="Tamam Healthcare System — home">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/assets/logos/SVG/Tamam_Style_Guide-31-blue.svg" alt="tamam" />
+          </Link>
 
-        <a href={PHONE_TEL} className="mk-mobile-sales-row">
-          <span>Call sales</span>
-          <DuoIcon name="phone" size={18} strokeWidth={1.8} aria-hidden="true" />
-          <span>{DISPLAY_PHONE}</span>
-        </a>
-
-        {/* Mobile dropdown */}
-        {mobileOpen && (
-          <div className="mk-mobile-menu">
-            <div className="mk-mobile-menu-inner">
-              <Link href="/products" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+          {menuOpen && (
+            <div className="mk-nav-menu-pop" role="menu">
+              {/* One-page site: the menu scrolls to sections instead of routing. */}
+              <Link href="/#products" role="menuitem" onClick={() => setMenuOpen(false)}>
                 Product
               </Link>
-              <Link href="/about" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
+              <Link href="/#about" role="menuitem" onClick={() => setMenuOpen(false)}>
                 About Us
               </Link>
-
-              <div className="mk-mobile-menu-divider" />
-              <a href={PHONE_TEL} className="mk-mobile-phone" onClick={() => setMobileOpen(false)}>
-                <DuoIcon name="phone" size={17} strokeWidth={1.8} aria-hidden="true" />
-                {DISPLAY_PHONE}
-              </a>
-
-              {SHOW_FUNDRAISING && (
-                <Link
-                  href="/donate"
-                  onClick={() => setMobileOpen(false)}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    fontSize: 15, fontWeight: 700, color: "var(--tb-gold-dark)",
-                    textDecoration: "none", padding: "12px 0",
-                    background: "var(--tb-tint-gold)", borderRadius: 10,
-                    border: "1px solid var(--tb-gold)", textAlign: "center",
-                  }}
-                >
-                  <DuoIcon name="heart" size={16} /> Fund Our Pilot
-                </Link>
-              )}
-
-              <Link
-                href="/about/contact"
-                className="mk-btn mk-btn-green mk-mobile-cta"
-                onClick={() => setMobileOpen(false)}
-              >
+              <Link href="/#download" role="menuitem" onClick={() => setMenuOpen(false)}>
+                Download
+              </Link>
+              <Link href="/#contact" role="menuitem" onClick={() => setMenuOpen(false)}>
                 Get in touch
               </Link>
+              <div className="mk-nav-menu-pop-divider" aria-hidden="true" />
+              <a href={PHONE_TEL} className="mk-nav-menu-pop-phone" role="menuitem" onClick={() => setMenuOpen(false)}>
+                <DuoIcon name="phone" size={15} strokeWidth={1.8} aria-hidden="true" />
+                {DISPLAY_PHONE}
+              </a>
             </div>
-          </div>
-        )}
-      </nav>
+          )}
+        </div>
 
-      <style jsx global>{`
-        .desktop-only {
-          display: flex;
-        }
+        <Link href={DEMO_HREF} className="mk-pill-cta">
+          <span>Book a Demo</span>
+        </Link>
 
-        .mk-nav-item {
-          position: relative;
-          color: var(--tb-text);
-          text-decoration: none;
-        }
-
-        .mk-nav-item:hover {
-          color: var(--tb-blue-700);
-        }
-
-        .mk-mobile-group-label {
-          margin: 4px 0 0;
-          font-size: 12px;
-          font-weight: 700;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: var(--tb-text-muted);
-        }
-
-        .mk-mobile-toggle {
-          display: none;
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          margin-left: auto;
-          padding: 8px;
-          color: var(--tb-text);
-          line-height: 0;
-        }
-
-        .mk-mobile-toggle:focus:not(:focus-visible) {
-          outline: none;
-        }
-
-        .mk-mobile-toggle:focus-visible {
-          outline: 2px solid currentColor;
-          outline-offset: 5px;
-          border-radius: 8px;
-        }
-
-        .mk-mobile-link {
-          font-size: 18px;
-          font-weight: 500;
-          color: var(--tb-text);
-          text-decoration: none;
-          min-height: 48px;
-          display: flex;
-          align-items: center;
-        }
-
-        .mk-mobile-link:hover {
-          color: var(--tb-blue-700);
-        }
-
-        .mk-nav-donate-link:hover {
-          background: var(--tb-gold) !important;
-          color: #fff !important;
-        }
-
-        @media (max-width: 1120px) {
-          .desktop-only { display: none !important; }
-          .mk-mobile-toggle { display: block !important; }
-        }
-      `}</style>
-    </>
+      </div>
+    </nav>
   );
 }

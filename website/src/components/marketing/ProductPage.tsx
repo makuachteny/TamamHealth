@@ -15,7 +15,7 @@ import { Check } from "@/components/marketing/icons";
 
 export function ProductHero({
   eyebrow, title, subtitle, accentColor = "var(--tb-blue-700)",
-  primaryCta = { label: "Request a demo", href: "/about/contact?intent=demo#contact-form" },
+  primaryCta = { label: "Request a demo", href: "/?intent=demo#contact-form" },
   secondaryCta,
   illustration,
 }: {
@@ -160,7 +160,7 @@ export function ProductBenefits({ eyebrow, heading, benefits, accentColor = "var
 
 export function ProductCTA({
   heading, subtitle,
-  primaryCta = { label: "Talk to our team", href: "/about/contact#contact-form" },
+  primaryCta = { label: "Talk to our team", href: "/#contact-form" },
 }: {
   heading: string;
   subtitle: string;

@@ -70,7 +70,7 @@ export function PlatformExplorer() {
   const active = EXPLORER_PRODUCTS.find((p) => p.slug === activeSlug) ?? EXPLORER_PRODUCTS[0];
 
   return (
-    <section className="mk-section mk-section-white mk-platform-explorer">
+    <section className="mk-section mk-section-explore mk-platform-explorer">
       <div className="mk-container">
         <Reveal>
           <div className="mk-section-heading">

@@ -7,10 +7,9 @@ const PRIMARY_SHORTCUT_PRIORITY = [
   '/patients',
   '/patient-intake',
   '/appointments',
-  '/messages',
+  '/lab',
   '/reports',
   '/surveillance',
-  '/lab',
   '/pharmacy',
   '/wards',
   '/facility-management',
@@ -53,7 +52,9 @@ export function groupNavItemsBySection(items: NavItem[]): { section: string | nu
 
 export function getPrimaryShortcutItems(items: NavItem[], maxItems = 5) {
   const withPriority = items
-    .filter(item => item.href !== '/dashboard' && !item.href.startsWith('/dashboard/'))
+    // Messaging lives in the module menu and mobile tab bar, not the top
+    // rail — its rail slot belongs to the lab shortcut.
+    .filter(item => item.href !== '/dashboard' && !item.href.startsWith('/dashboard/') && item.href !== '/messages')
     .map((item, index) => ({
       item,
       index,

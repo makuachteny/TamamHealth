@@ -689,13 +689,6 @@ export default function EhrClinicalDashboard({
 
           {view === 'dashboard' && (
             <>
-              <div className="ehr-clinical-strip">
-                <button type="button" aria-label="Consultation" onClick={() => router.push('/consultation')}><Plus className="w-4 h-4" /> Consultation</button>
-                <button type="button" aria-label="Labs and studies" onClick={() => router.push('/lab')}><FlaskConical className="w-4 h-4" /> Labs / studies</button>
-                <button type="button" aria-label="Patient search" onClick={() => router.push('/patients')}><Search className="w-4 h-4" /> Patient search</button>
-                <button type="button" aria-label="Intake review" onClick={() => router.push('/patient-intake')}><ClipboardList className="w-4 h-4" /> Intake review</button>
-              </div>
-
 		              <section className="ehr-worklist-panel">
 		                <div>
 		                  <h3>Assigned patients</h3>

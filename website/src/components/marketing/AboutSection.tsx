@@ -1,49 +1,45 @@
 "use client";
 
 import Image from "next/image";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
-import { Reveal, RelatedLinksGrid, SplitFeatureBlock } from "@/components/marketing/MarketingShared";
+import { Reveal } from "@/components/marketing/MarketingShared";
 
 /* ═══════════════════════════════════════════════════════════════════
-   TamamHealth About — Our Story
-   Founded by Tufts University students from lived experience
+   TamamHealth About — the journey, the win, and the team
    ═══════════════════════════════════════════════════════════════════ */
 
-export default function AboutPage() {
+export function AboutSection() {
   return (
-    <>
-      <MarketingHero
-        variant="photo"
-        eyebrow="OUR STORY"
-        title={<>Born from scraps of paper.<br />Built by people who lived it.<br />Made to save lives.</>}
-        subtitle="TamamHealth began with one observation: across South Sudan, brilliant clinicians lose patients to broken paper systems, not to a lack of skill. We're here to change that."
-        primaryCta={{ label: "Get in touch", href: "/about/contact#contact-form" }}
-        image="/assets/team-derby-center.jpg"
-        imageAlt="TamamHealth team"
-        imagePriority
-      />
-
-      {/* ── THE ORIGIN STORY ────────────────────────────────────────── */}
-      <SplitFeatureBlock
-        eyebrow="Where it all started"
-        title="Built from scraps of paper in Kakuma Refugee Camp"
-        body="In Kakuma Refugee Camp, Kenya, healthcare meant handwritten notes on scraps of paper, filing cabinets that couldn't survive the rainy season, and patients whose medical histories vanished between visits. Teny Makuach grew up watching this and started TamamHealth so health workers would not have to rely on systems that forget patients. At Tufts University, that beginning became a shared team mission across product, engineering, research, partnerships, and implementation."
-        image="/assets/village-community.jpg"
-        imageAlt="Village community in East Africa"
-        tone="navy"
-        imageSide="right"
-      />
-
-      {/* ── TUFTS NEW VENTURES WIN ──────────────────────────────────── */}
-      <SplitFeatureBlock
-        eyebrow="April 2026"
-        title="$10,000 Healthcare Track winner"
-        body="Selected from over 300 startups, TamamHealth won the Healthcare Track at the Tufts $100K New Ventures Competition — validation from one of the nation's most respected university venture programs."
-        image="/assets/team-tufts-win.jpg"
-        imageAlt="TamamHealth team winning $10,000 at Tufts New Ventures Competition 2026"
-        tone="cream"
-        imageSide="left"
-      />
+    <div id="about">
+      {/* ── OUR JOURNEY ─────────────────────────────────────────────── */}
+      <section className="mk-section mk-section-white">
+        <div className="mk-container">
+          <Reveal>
+            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 72 }}>Our journey</h2>
+            <div className="mk-timeline">
+              <TimelineItem
+                year="2024"
+                title="Idea born"
+                description="Teny starts TamamHealth after seeing how fragile paper records fail patients and health workers."
+              />
+              <TimelineItem
+                year="2025"
+                title="Team forms"
+                description="The team begins turning the idea into a shared product mission across engineering, research, partnerships, and implementation."
+              />
+              <TimelineItem
+                year="Apr 2026"
+                title="Won $10K"
+                description="Tufts New Ventures Healthcare Track winner — validation from one of the nation's top university venture competitions."
+              />
+              <TimelineItem
+                year="Now"
+                title="Serving Africa"
+                description="Preparing pilots with health workers, facilities, and partners who want South Sudanese healthcare to have a stronger memory."
+              />
+            </div>
+          </Reveal>
+        </div>
+      </section>
 
       {/* ── MEET THE TEAM ───────────────────────────────────────── */}
       <section className="mk-section mk-section-white">
@@ -100,58 +96,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── TIMELINE ────────────────────────────────────────────────── */}
-      <section className="mk-section mk-section-white">
-        <div className="mk-container">
-          <Reveal>
-            <h2 className="mk-h2" style={{ textAlign: "center", marginBottom: 72 }}>Our journey</h2>
-            <div className="mk-timeline">
-              <TimelineItem
-                year="2024"
-                title="Idea born"
-                description="Teny starts TamamHealth after seeing how fragile paper records fail patients and health workers."
-              />
-              <TimelineItem
-                year="2025"
-                title="Team forms"
-                description="The team begins turning the idea into a shared product mission across engineering, research, partnerships, and implementation."
-              />
-              <TimelineItem
-                year="Apr 2026"
-                title="Won $10K"
-                description="Tufts New Ventures Healthcare Track winner — validation from one of the nation's top university venture competitions."
-              />
-              <TimelineItem
-                year="Now"
-                title="Serving Africa"
-                description="Preparing pilots with health workers, facilities, and partners who want South Sudanese healthcare to have a stronger memory."
-              />
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <RelatedLinksGrid
-        heading="Where to go next"
-        items={[
-          {
-            label: "Platform",
-            title: "Explore the products",
-            body: "See how registration, triage, pharmacy, lab, billing, and telehealth connect into one record.",
-            href: "/products",
-            image: "/assets/doctor-tablet-review.jpg",
-          },
-          {
-            label: "Get involved",
-            title: "Talk to our team",
-            body: "Become a pilot partner or ask us anything about bringing TamamHealth to your facility.",
-            href: "/about/contact",
-            image: "/assets/team-derby-center.jpg",
-          },
-        ]}
-      />
-
-    </>
+    </div>
   );
 }
 

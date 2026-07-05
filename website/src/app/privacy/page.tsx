@@ -135,7 +135,7 @@ export default function PrivacyPage() {
                     For privacy-related questions or concerns, contact us at{" "}
                     <a href="mailto:support.tamam@gmail.com" style={{ color: "var(--tb-green)", fontWeight: 600 }}>support.tamam@gmail.com</a>
                     {" "}or visit our{" "}
-                    <Link href="/about/contact#contact-form" style={{ color: "var(--tb-green)", fontWeight: 600 }}>contact page</Link>.
+                    <Link href="/#contact-form" style={{ color: "var(--tb-green)", fontWeight: 600 }}>contact page</Link>.
                   </p>
                 </Section>
               </Reveal>
@@ -153,7 +153,7 @@ export default function PrivacyPage() {
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
             <Link href="/terms" className="mk-btn mk-btn-outline-green">Terms &amp; Conditions</Link>
-            <Link href="/about/contact#contact-form" className="mk-btn mk-btn-green">Contact us</Link>
+            <Link href="/#contact-form" className="mk-btn mk-btn-green">Contact us</Link>
           </div>
         </div>
       </section>
