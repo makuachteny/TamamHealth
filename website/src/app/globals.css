@@ -1,18 +1,131 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 html,
 body {
-  background: var(--tb-cream-50, #FEFFF9);
-  scroll-behavior: auto;
+  margin: 0;
+  padding: 0;
+  background: #FEFFF9;
 }
 
-*,
-*::before,
-*::after {
-  box-shadow: none !important;
-  text-shadow: none !important;
-  animation: none !important;
-  transition: none !important;
+/* ── Breakpoints: desktop ≥1024 · tablet 640–1023 · mobile ≤639 ── */
+@media (min-width: 1024px) {
+  .tm-nav-burger,
+  .tm-nav-drawer {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .tm-nav-links {
+    display: none !important;
+  }
+  .tm-nav-burger {
+    display: inline-flex !important;
+  }
+  .tm-section {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+  .tm-hero-pad {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+  .tm-shadow-plate {
+    box-shadow: none !important;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .tm-grid-products,
+  .tm-grid-insights,
+  .tm-grid-split {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .tm-grid-breakdown {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  .tm-grid-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .tm-grid-team {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .tm-section {
+    padding: 64px 16px !important;
+  }
+  .tm-hero {
+    min-height: 100vh !important;
+  }
+  .tm-hero-pad {
+    padding: 120px 16px 28px !important;
+  }
+  .tm-hero-sub {
+    font-size: 15.5px !important;
+    padding-left: 14px !important;
+  }
+  .tm-grid-products,
+  .tm-grid-insights,
+  .tm-grid-split,
+  .tm-grid-stats,
+  .tm-grid-breakdown,
+  .tm-grid-ground,
+  .tm-grid-principles {
+    grid-template-columns: 1fr !important;
+  }
+  .tm-grid-team {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .tm-breakdown-card {
+    min-height: 300px !important;
+  }
+  .tm-form-pad {
+    padding: 24px 16px !important;
+  }
+  .tm-btn-row a {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+  .tm-workflow span {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .tm-contact-h {
+    font-size: 30px !important;
+  }
+}
+
+/* ── Hover / focus states (expressed as style-hover / style-focus in the
+   source design; ported to real CSS since inline styles can't do pseudo-
+   states) ── */
+/* !important is required here: these elements also carry an inline
+   `style` (base state), which otherwise always wins over an external
+   stylesheet rule regardless of pseudo-class — so :hover/:focus would
+   never fire without it. */
+.tm-nav-link:hover {
+  color: #ffffff !important;
+}
+.tm-nav-cta:hover {
+  background: #369fda !important;
+}
+.tm-hero-btn-primary:hover {
+  background: #369fda !important;
+}
+.tm-hero-btn-secondary:hover {
+  background: #ddf2fb !important;
+}
+.tm-principle-card:hover {
+  background: #eff8fd !important;
+}
+.tm-product-card:hover {
+  box-shadow: 8px 8px 0 #ddf2fb !important;
+}
+.tm-team-card:hover {
+  background: #eff8fd !important;
+}
+.tm-form-input:focus {
+  border-color: #2191d0 !important;
+}
+.tm-submit-btn:hover {
+  background: #369fda !important;
 }

@@ -12,8 +12,6 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/public ./public
-# Drop privileges. node:20-alpine ships a `node` user (UID 1000); chown the
-# Next.js build dir so revalidation/cache writes succeed without root.
 RUN chown -R node:node /app/.next
 USER node
 EXPOSE 3001
