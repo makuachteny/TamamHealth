@@ -1,9 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MarketingActionModalButton } from "./MarketingActionModal";
+import { DuoIcon } from "./DuoIcon";
 import { Reveal } from "./MarketingShared";
 
 // Real field photos — South Sudanese health workers and the everyday strain
@@ -53,27 +52,26 @@ export function HomeHero() {
         <div className="mk-container mk-home-split-hero-grid">
           <Reveal>
             <div className="mk-home-split-hero-copy">
+              <span className="mk-home-split-hero-tag">
+                <DuoIcon name="location" size={13} color="currentColor" />
+                South Sudan &middot; The world&apos;s youngest country
+              </span>
               <h1 className="mk-h1 mk-home-split-hero-title">
-                Many communities.
-                <br />
-                One system of care.
+                Here, a mother is more likely to die giving birth than almost anywhere on Earth.
               </h1>
               <p className="mk-body-lg mk-home-split-hero-subtitle">
-                Tamam brings patients, wards, pharmacy, lab, blood bank, maternal &amp; child health, and
-                registration into a single platform for the whole facility — built to work in every corner
-                of South Sudan, online or off.
+                Not because no one cares — but because the clinics that serve her run on paper,
+                without power, without records, without a way to know her story. Tamam is changing that.
               </p>
               <div className="mk-home-split-hero-actions">
-                <MarketingActionModalButton
-                  intent="demo"
-                  className="mk-btn mk-btn-green"
-                  source="home-split-hero"
-                >
-                  Book a Demo
-                </MarketingActionModalButton>
-                <Link href="/about/contact" className="mk-btn mk-btn-outline-white">
-                  Get in Touch
-                </Link>
+                <a href="#problem" className="mk-btn mk-btn-green">
+                  Understand the crisis
+                  <DuoIcon name="chevron-down" size={14} color="currentColor" />
+                </a>
+                <a href="#solution" className="mk-btn mk-btn-outline-white">
+                  See our solution
+                  <DuoIcon name="arrow-right" size={14} color="currentColor" />
+                </a>
               </div>
             </div>
           </Reveal>
@@ -120,14 +118,6 @@ export function HomeHero() {
         </p>
       </div>
     </section>
-
-    <div className="mk-photo-hero-statement">
-      <p className="mk-photo-hero-statement-lead">Starting in South Sudan &ndash; built to</p>
-      <p className="mk-photo-hero-statement-main">
-        scale to every <span className="mk-photo-hero-statement-accent">underserved</span>
-      </p>
-      <p className="mk-photo-hero-statement-lead">health system.</p>
-    </div>
     </>
   );
 }

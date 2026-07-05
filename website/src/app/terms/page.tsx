@@ -142,7 +142,7 @@ export default function TermsPage() {
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
             <Link href="/privacy" className="mk-btn mk-btn-outline-green">Privacy Policy</Link>
-            <Link href="/about/contact#contact-form" className="mk-btn mk-btn-green">Contact us</Link>
+            <Link href="/#get-involved" className="mk-btn mk-btn-green">Contact us</Link>
           </div>
         </div>
       </section>

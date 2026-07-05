@@ -1,11 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth — Root Entry Point
-   Redirects to the public story/landing page (staff sign-in is linked
-   from its header and footer).
+   Redirects to staff sign-in. Already-authenticated users are bounced
+   to their dashboard from the login page itself.
    ═══════════════════════════════════════════════════════════════════ */
 
 import { redirect } from "next/navigation";
 
 export default function RootPage() {
-  redirect("/product");
+  redirect("/login");
 }

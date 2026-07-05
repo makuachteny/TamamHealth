@@ -5,11 +5,8 @@ import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Marketing — Footer (Simplified 3-column layout)
-   Brand column + 3 link columns + bottom bar
+   Brand column + 2 link columns + bottom bar
    ═══════════════════════════════════════════════════════════════════ */
-
-// Fundraising entry points are locked off for now. Flip to true to re-enable.
-const SHOW_FUNDRAISING = false;
 
 const SOCIAL_LINKS = [
   {
@@ -59,8 +56,8 @@ export default function MarketingFooter() {
             <p>Ready to build connected care?</p>
             <h2>See how TamamHealth can support clinical care, facility operations, and national reporting from one connected platform.</h2>
           </div>
-          <Link href="/about/contact?intent=demo#contact-form" className="mk-footer-cta-button">
-            Book a demo
+          <Link href="/#get-involved" className="mk-footer-cta-button">
+            Get involved
           </Link>
         </div>
 
@@ -97,30 +94,14 @@ export default function MarketingFooter() {
             </div>
           </div>
 
-          {/* Platform column */}
-          <div className="mk-footer-links-column">
-            <h5 className="mk-footer-column-heading">Platform</h5>
-            <nav className="mk-footer-nav">
-              <Link href="/ehr">EHR &amp; Clinical</Link>
-              <Link href="/billing">Billing &amp; Payments</Link>
-              <Link href="/telehealth">Telehealth</Link>
-              <Link href="/analytics">Analytics</Link>
-              <Link href="/pharmacy-lab">Pharmacy &amp; Lab</Link>
-              <Link href="/pricing#packages">Pricing</Link>
-            </nav>
-          </div>
-
           {/* Company column */}
           <div className="mk-footer-links-column">
-            <h5 className="mk-footer-column-heading">Company</h5>
+            <h5 className="mk-footer-column-heading">Learn More</h5>
             <nav className="mk-footer-nav">
-              <Link href="/about">Our Story</Link>
-              <Link href="/about/team">Team</Link>
-              <Link href="/about/contact#contact-form">Contact</Link>
-              {SHOW_FUNDRAISING && (
-                <Link href="/donate" style={{ color: "var(--tb-gold)", fontWeight: 600 }}>Fund Our Pilot</Link>
-              )}
-              <Link href="/case-studies">Case Studies</Link>
+              <Link href="/#problem">The Problem</Link>
+              <Link href="/#solution">Our Solution</Link>
+              <Link href="/#team">The Team</Link>
+              <Link href="/#get-involved">Get Involved</Link>
             </nav>
           </div>
 

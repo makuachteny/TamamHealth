@@ -8,114 +8,45 @@ import { MarketingActionModalButton } from "./MarketingActionModal";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth Marketing — Navbar
-   Two grouped dropdowns (Product, About Us) for the deeper page lists,
-   plus top-level links for the pages people look for directly —
-   Case Studies, Pricing, Resources — and a "Book a Demo" CTA.
+   Single-page site: anchor links into the homepage's sections, plus
+   Staff Sign In and a Partner With Us CTA.
    ═══════════════════════════════════════════════════════════════════ */
 
-// Fundraising entry points are locked off for now. Flip to true to re-enable.
-const SHOW_FUNDRAISING = false;
-
-const PRODUCT_LINKS = [
-  { label: "Hospital Management System", href: "/products/hospital" },
-  { label: "Clinic Management System", href: "/products/clinic" },
-  { label: "Laboratory Information System", href: "/products/lab" },
-  { label: "Radiology Information System", href: "/products/radiology" },
-  { label: "Pharmacy Management System", href: "/products/pharmacy" },
-  { label: "Patient Experience Platform", href: "/patient-experience" },
-  { label: "Telehealth", href: "/telehealth" },
-  { label: "EHR", href: "/ehr" },
-];
-
-const RESOURCES_LINKS = [
-  { label: "Case Studies", href: "/case-studies" },
-  { label: "Download", href: "/download" },
-  { label: "Analytics", href: "/analytics" },
-];
-
-const ABOUT_LINKS = [
-  { label: "Our Story", href: "/about" },
-  { label: "Our Team", href: "/about/team" },
-  { label: "Careers", href: "/about/careers" },
-  { label: "Contact", href: "/about/contact" },
+const NAV_LINKS = [
+  { label: "The Problem", href: "/#problem" },
+  { label: "Our Solution", href: "/#solution" },
+  { label: "The Team", href: "/#team" },
+  { label: "Get Involved", href: "/#get-involved" },
 ];
 
 const DISPLAY_PHONE = "(973) 566-4336";
 const PHONE_TEL = "tel:+19735664336";
-const CONTACT_FORM_HREF = "/about/contact";
-type NavScrollState = "top" | "hero" | "past";
-type NavTone = "home" | "platform" | "company" | "commerce" | "resource" | "clinical";
+const STAFF_APP_URL = "https://app.tamamhealth.org";
 
-function getNavTone(pathname: string): NavTone {
-  if (pathname === "/") return "home";
-  if (pathname === "/billing" || pathname === "/pricing" || pathname === "/donate") return "commerce";
-  if (pathname.startsWith("/about")) return "company";
-  if (pathname === "/download" || pathname.startsWith("/resources") || pathname.startsWith("/case-studies")) return "resource";
-  if (pathname.startsWith("/products") || pathname === "/ehr" || pathname === "/pharmacy-lab") return "clinical";
-  return "platform";
-}
+type NavScrollState = "top" | "hero" | "past";
 
 export default function MarketingNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrollState, setScrollState] = useState<NavScrollState>("top");
-  const [lightHero, setLightHero] = useState(false);
   const pathname = usePathname();
-  const tone = getNavTone(pathname);
+  const isHome = pathname === "/";
   // Homepage hero is the dark-blue theme, so its nav just toggles between
   // fully transparent (floating over the hero at the very top) and the
   // matching solid dark-blue bar (as soon as you scroll at all, including
-  // past the hero) — it never switches to the generic light "scrolled" bar.
-  const navClass = tone === "home"
+  // past the hero) — legal pages (privacy/terms) use the generic light bar.
+  const navClass = isHome
     ? (scrollState === "top" ? "mk-navbar--hero" : "mk-navbar--hero-solid")
     : scrollState === "past"
       ? "mk-navbar--scrolled"
-      : lightHero
-        ? "mk-navbar--light-hero"
-        : "mk-navbar--hero-solid";
+      : "mk-navbar--light-hero";
 
   useEffect(() => {
     const handleScroll = () => {
       const scrollY = window.scrollY;
-
-      const hero = document.querySelector<HTMLElement>(
-        [
-          ".mk-home-hero",
-          ".mk-home-split-hero",
-          ".mk-mod-hero",
-          ".mk-product-hero",
-          ".mk-subpage-hero",
-          ".mk-case-hero",
-          ".mk-hero-split",
-          ".mk-hero-donate",
-          ".mk-hero-team",
-          ".mk-hero-billing",
-          ".mk-hero-telehealth",
-          ".mk-hero-download",
-          ".mk-hero-careers",
-          ".mk-hero-pricing",
-          ".mk-hero-contact",
-          ".mk-hero-case-index",
-          ".mk-hero-patient-experience",
-          ".mk-hero-api-docs",
-        ].join(", ")
-      );
+      const hero = document.querySelector<HTMLElement>(".mk-home-split-hero, .mk-mod-hero");
       const nav = document.querySelector<HTMLElement>(".mk-navbar");
       const navHeight = nav?.getBoundingClientRect().height ?? 80;
       const heroBottom = hero ? hero.offsetTop + hero.offsetHeight - navHeight : 0;
-      const nextLightHero = Boolean(
-        hero?.matches([
-          ".mk-home-hero",
-          ".mk-mod-hero--showcase",
-          ".mk-mod-hero--data",
-          ".mk-mod-hero--legal",
-          ".mk-hero-contact",
-          ".mk-hero-pricing",
-          ".mk-hero-case-index",
-          ".mk-hero-patient-experience",
-        ].join(", "))
-      );
-
-      setLightHero((current) => current === nextLightHero ? current : nextLightHero);
 
       if (scrollY <= 10) {
         setScrollState("top");
@@ -138,7 +69,7 @@ export default function MarketingNav() {
   return (
     <>
       {/* Main navbar */}
-      <nav className={`mk-navbar ${navClass} mk-navbar--tone-${tone}`}>
+      <nav className={`mk-navbar ${navClass}${isHome ? " mk-navbar--tone-home" : ""}`}>
         <div className="mk-container mk-navbar-inner">
           <Link href="/" className="mk-nav-logo" aria-label="Tamam Healthcare System — home">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -157,69 +88,24 @@ export default function MarketingNav() {
 
           {/* Desktop center nav links */}
           <div className="mk-nav-center desktop-only">
-            <div className="mk-nav-item">
-              <Link href="/products" className="mk-nav-item-link">Product</Link>
-              <DuoIcon name="chevron-down" size={14} />
-              <div className="mk-nav-dropdown">
-                {PRODUCT_LINKS.map((item) => (
-                  <Link key={item.href} href={item.href}>{item.label}</Link>
-                ))}
-              </div>
-            </div>
-            <div className="mk-nav-item">
-              <Link href="/case-studies" className="mk-nav-item-link">Resources</Link>
-              <DuoIcon name="chevron-down" size={14} />
-              <div className="mk-nav-dropdown">
-                {RESOURCES_LINKS.map((item) => (
-                  <Link key={item.href} href={item.href}>{item.label}</Link>
-                ))}
-              </div>
-            </div>
-            <Link href="/pricing" className="mk-nav-item mk-nav-item-link">Pricing</Link>
-            <div className="mk-nav-item">
-              <Link href="/about" className="mk-nav-item-link">About Us</Link>
-              <DuoIcon name="chevron-down" size={14} />
-              <div className="mk-nav-dropdown">
-                {ABOUT_LINKS.map((item) => (
-                  <Link key={item.href} href={item.href}>{item.label}</Link>
-                ))}
-              </div>
-            </div>
+            {NAV_LINKS.map((item) => (
+              <Link key={item.href} href={item.href} className="mk-nav-item mk-nav-item-link">
+                {item.label}
+              </Link>
+            ))}
           </div>
 
           {/* Desktop right CTA actions */}
           <div className="mk-nav-actions desktop-only">
-            {SHOW_FUNDRAISING && (
-              <>
-                <div style={{ width: 1, height: 20, background: "var(--tb-cream-300)" }} />
-                <Link
-                  href="/donate"
-                  className="mk-nav-donate-link"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "var(--tb-gold-dark)",
-                    textDecoration: "none",
-                    padding: "7px 14px",
-                    borderRadius: 8,
-                    background: "var(--tb-tint-gold)",
-                    border: "1px solid var(--tb-gold)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <DuoIcon name="heart" size={14} /> Fund Our Pilot
-                </Link>
-              </>
-            )}
+            <a href={STAFF_APP_URL} className="mk-nav-item mk-nav-staff-link">
+              Staff Sign In
+            </a>
             <MarketingActionModalButton
               intent="demo"
               className="mk-btn mk-btn-green mk-btn-sm mk-nav-demo"
               source="nav-book-demo"
             >
-              Book a Demo
+              Partner With Us
             </MarketingActionModalButton>
           </div>
 
@@ -230,7 +116,7 @@ export default function MarketingNav() {
               className="mk-mobile-top-demo"
               source="nav-mobile-book-demo"
             >
-              Book a Demo
+              Partner With Us
             </MarketingActionModalButton>
           </div>
           <button
@@ -253,29 +139,7 @@ export default function MarketingNav() {
         {mobileOpen && (
           <div className="mk-mobile-menu">
             <div className="mk-mobile-menu-inner">
-              <p className="mk-mobile-group-label">Product</p>
-              {PRODUCT_LINKS.map((item) => (
-                <Link key={item.href} href={item.href} className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                  {item.label}
-                </Link>
-              ))}
-
-              <div className="mk-mobile-menu-divider" />
-
-              <p className="mk-mobile-group-label">Resources</p>
-              {RESOURCES_LINKS.map((item) => (
-                <Link key={item.href} href={item.href} className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                  {item.label}
-                </Link>
-              ))}
-              <Link href="/pricing" className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
-                Pricing
-              </Link>
-
-              <div className="mk-mobile-menu-divider" />
-
-              <p className="mk-mobile-group-label">About Us</p>
-              {ABOUT_LINKS.map((item) => (
+              {NAV_LINKS.map((item) => (
                 <Link key={item.href} href={item.href} className="mk-mobile-link" onClick={() => setMobileOpen(false)}>
                   {item.label}
                 </Link>
@@ -287,21 +151,13 @@ export default function MarketingNav() {
                 {DISPLAY_PHONE}
               </a>
 
-              {SHOW_FUNDRAISING && (
-                <Link
-                  href="/donate"
-                  onClick={() => setMobileOpen(false)}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    fontSize: 15, fontWeight: 700, color: "var(--tb-gold-dark)",
-                    textDecoration: "none", padding: "12px 0",
-                    background: "var(--tb-tint-gold)", borderRadius: 10,
-                    border: "1px solid var(--tb-gold)", textAlign: "center",
-                  }}
-                >
-                  <DuoIcon name="heart" size={16} /> Fund Our Pilot
-                </Link>
-              )}
+              <a
+                href={STAFF_APP_URL}
+                className="mk-mobile-link"
+                onClick={() => setMobileOpen(false)}
+              >
+                Staff Sign In
+              </a>
 
               <MarketingActionModalButton
                 intent="demo"
@@ -309,7 +165,7 @@ export default function MarketingNav() {
                 source="nav-mobile-menu-book-demo"
                 onOpen={() => setMobileOpen(false)}
               >
-                Book a Demo
+                Partner With Us
               </MarketingActionModalButton>
             </div>
           </div>
@@ -331,13 +187,10 @@ export default function MarketingNav() {
           color: var(--tb-blue-700);
         }
 
-        .mk-mobile-group-label {
-          margin: 4px 0 0;
-          font-size: 12px;
-          font-weight: 700;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: var(--tb-text-muted);
+        .mk-nav-staff-link {
+          font-size: 14px;
+          font-weight: 600;
+          white-space: nowrap;
         }
 
         .mk-mobile-toggle {
@@ -373,11 +226,6 @@ export default function MarketingNav() {
 
         .mk-mobile-link:hover {
           color: var(--tb-blue-700);
-        }
-
-        .mk-nav-donate-link:hover {
-          background: var(--tb-gold) !important;
-          color: #fff !important;
         }
 
         @media (max-width: 1120px) {

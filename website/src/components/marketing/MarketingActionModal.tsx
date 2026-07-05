@@ -27,8 +27,8 @@ const MODAL_CONFIG: Record<MarketingIntent, ModalConfig> = {
     submitLabel: "Request demo",
     successTitle: "Demo request received",
     successBody: "We received your request and will follow up with the right next step.",
-    fullPageHref: "/about/contact?intent=demo#contact-form",
-    fullPageLabel: "Open the full contact page",
+    fullPageHref: "/#get-involved",
+    fullPageLabel: "Open the contact section",
   },
   pricing: {
     eyebrow: "Get pricing",
@@ -38,8 +38,8 @@ const MODAL_CONFIG: Record<MarketingIntent, ModalConfig> = {
     submitLabel: "Request pricing",
     successTitle: "Pricing request received",
     successBody: "We will review your facility details and follow up with a practical pricing path.",
-    fullPageHref: "/pricing#packages",
-    fullPageLabel: "View pricing details",
+    fullPageHref: "/#get-involved",
+    fullPageLabel: "Open the contact section",
   },
   contact: {
     eyebrow: "Contact TamamHealth",
@@ -49,8 +49,8 @@ const MODAL_CONFIG: Record<MarketingIntent, ModalConfig> = {
     submitLabel: "Send message",
     successTitle: "Message received",
     successBody: "We received your message and will route it to the right person.",
-    fullPageHref: "/about/contact#contact-form",
-    fullPageLabel: "Open the full contact page",
+    fullPageHref: "/#get-involved",
+    fullPageLabel: "Open the contact section",
   },
 };
 
@@ -253,11 +253,11 @@ export function MarketingActionModalButton({
 export function getMarketingIntentFromCta(label: string, href: string): MarketingIntent | null {
   const text = `${label} ${href}`.toLowerCase();
 
-  if (href === "/pricing" || text.includes("pricing") || text.includes("quote")) {
+  if (text.includes("pricing") || text.includes("quote")) {
     return "pricing";
   }
 
-  if (href === "/about/contact") {
+  if (href === "/#get-involved") {
     if (text.includes("demo") || text.includes("walkthrough")) {
       return "demo";
     }
