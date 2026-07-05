@@ -12,6 +12,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
+import { addPatientDocument } from '@/lib/services/patient-document-service';
 import { isPathAllowed } from '@/lib/role-routes';
 import {
   Scan, Upload, CheckCircle2, Clock, AlertTriangle,
@@ -65,15 +66,61 @@ export default function RadiologyDashboard() {
     fileInputRef.current?.click();
   };
 
-  const handleFilesChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024; // 5MB per file — PouchDB doc budget
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = String(reader.result || '');
+        resolve(dataUrl.slice(dataUrl.indexOf(',') + 1)); // strip data: prefix
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const handleFilesChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const studyId = attachTargetRef.current;
     const files = e.target.files;
     if (!studyId || !files || files.length === 0) return;
-    const added = Array.from(files).map(f => ({ name: f.name, url: URL.createObjectURL(f) }));
+    const chosen = Array.from(files);
+    e.target.value = ''; // allow re-selecting the same file
+
+    // Immediate thumbnails for this session.
+    const added = chosen.map(f => ({ name: f.name, url: URL.createObjectURL(f) }));
     setAttachments(prev => ({ ...prev, [studyId]: [...(prev[studyId] || []), ...added] }));
+
+    // Real studies: persist each file to the patient chart (synced
+    // patient_documents store, category 'radiology') so the image survives
+    // the session and reaches the ordering clinician.
+    const study = realStudies.find(s => s.id === studyId);
+    if (study) {
+      for (const file of chosen) {
+        if (file.size > MAX_ATTACHMENT_BYTES) continue; // skip oversized silently in toast below
+        try {
+          const base64Data = await fileToBase64(file);
+          await addPatientDocument({
+            patientId: study.patientId,
+            title: `${study.modality} — ${study.bodyPart}: ${file.name}`,
+            category: 'radiology',
+            fileName: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            base64Data,
+            sizeBytes: file.size,
+            note: `Attached from radiology work queue (order ${studyId})`,
+            uploadedById: currentUser?._id,
+            uploadedByName: currentUser?.name,
+            hospitalId: currentUser?.hospitalId,
+            orgId: currentUser?.orgId,
+          });
+        } catch {
+          // Persistence failure keeps the session thumbnail; staff can retry.
+        }
+      }
+    }
+
     setSubmitToast(t('radiology.imageAttachedFor', { id: studyId }));
     window.setTimeout(() => setSubmitToast(null), 3000);
-    e.target.value = ''; // allow re-selecting the same file
   };
 
   const removeAttachment = (studyId: string, url: string) => {
@@ -95,6 +142,7 @@ export default function RadiologyDashboard() {
           const [modality, bodyPart] = r.testName.split(' — ');
           return {
             id: r._id,
+            patientId: r.patientId,
             patientName: r.patientName,
             modality: (modality || r.testName).trim(),
             bodyPart: (bodyPart || r.testName).trim(),

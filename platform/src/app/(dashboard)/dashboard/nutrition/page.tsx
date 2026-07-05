@@ -11,6 +11,8 @@ import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { isPathAllowed } from '@/lib/role-routes';
+import { useNutritionScreenings } from '@/lib/hooks/useNutritionScreenings';
+import { classifyScreening, MUAC_THRESHOLDS } from '@/lib/services/nutrition-screening-service';
 import {
   AlertTriangle, CheckCircle2, TrendingDown,
   Baby, HeartPulse, BarChart3, Activity, Scale,
@@ -21,27 +23,11 @@ import {
 // Clinical Officer design instead of a one-off hardcoded hex.
 const ACCENT = 'var(--accent-primary)';
 
-const MUAC_THRESHOLDS = { severe: 11.5, moderate: 12.5, normal: 13.5 };
-
-// MUAC threshold for pregnant/lactating women (ANC): <21.0cm = undernourished.
-const ANC_MUAC_THRESHOLD = 21.0;
-
 type Screening = {
   id: string; name: string; age: string; sex: string;
   muac: number; weight: number; height: number; edema: boolean;
   status: string; date: string;
 };
-
-/** WHO-aligned classification from MUAC + bilateral pitting edema.
- *  Children (6–59m): edema or MUAC <11.5 = SAM; <12.5 = MAM; <13.5 = At Risk.
- *  ANC mothers: MUAC <21.0 = Underweight. */
-function classifyScreening(muac: number, edema: boolean, isAnc: boolean): string {
-  if (isAnc) return muac < ANC_MUAC_THRESHOLD ? 'Underweight' : 'Normal';
-  if (edema || muac < MUAC_THRESHOLDS.severe) return 'SAM';
-  if (muac < MUAC_THRESHOLDS.moderate) return 'MAM';
-  if (muac < MUAC_THRESHOLDS.normal) return 'At Risk';
-  return 'Normal';
-}
 
 const EMPTY_FORM = { name: '', age: '', sex: 'F', muac: '', weight: '', height: '', edema: false, isAnc: false };
 
@@ -77,17 +63,30 @@ export default function NutritionDashboard() {
   const { t } = useTranslation();
   usePatients();
 
-  // New screenings recorded in this session are prepended to the list.
-  // (Backend persistence for nutrition docs isn't wired yet; this keeps the
-  // workflow usable and the data flows into the on-screen stats.)
-  const [localScreenings, setLocalScreenings] = useState<Screening[]>([]);
+  // Real screenings persist to the synced nutrition_screenings store; demo
+  // rows fill in behind them in demo mode only.
+  const { screenings: savedScreenings, add: addScreening } = useNutritionScreenings();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
 
-  const screenings = useMemo(
-    () => [...localScreenings, ...(IS_DEMO ? SAMPLE_SCREENINGS : [])],
-    [localScreenings],
+  const screenings = useMemo<Screening[]>(
+    () => [
+      ...savedScreenings.map(s => ({
+        id: s._id,
+        name: s.patientName,
+        age: s.age,
+        sex: s.sex,
+        muac: s.muac,
+        weight: s.weightKg ?? 0,
+        height: s.heightCm ?? 0,
+        edema: s.edema,
+        status: s.status,
+        date: s.screeningDate,
+      })),
+      ...(IS_DEMO ? SAMPLE_SCREENINGS : []),
+    ],
+    [savedScreenings],
   );
   // Supplies are adjustable in-session (+/− receipt and consumption) so the
   // card is recordable, not display-only. Status re-derives from thresholds.
@@ -110,29 +109,33 @@ export default function NutritionDashboard() {
     });
   };
 
-  const submitScreening = () => {
+  const submitScreening = async () => {
     const muac = parseFloat(form.muac);
     const weight = parseFloat(form.weight);
     const height = parseFloat(form.height);
     if (!form.name.trim() || !form.age.trim()) { setFormError(t('nutrition.formErrorNameAge')); return; }
     if (!Number.isFinite(muac) || muac <= 0 || muac > 40) { setFormError(t('nutrition.formErrorMuac')); return; }
-    const status = classifyScreening(muac, form.edema, form.isAnc);
-    const entry: Screening = {
-      id: `ns-local-${Date.now()}`,
-      name: form.name.trim(),
-      age: form.isAnc && !form.age.toUpperCase().includes('ANC') ? `${form.age.trim()} ANC` : form.age.trim(),
-      sex: form.isAnc ? 'F' : form.sex,
-      muac,
-      weight: Number.isFinite(weight) ? weight : 0,
-      height: Number.isFinite(height) ? height : 0,
-      edema: form.edema,
-      status,
-      date: new Date().toISOString().slice(0, 10),
-    };
-    setLocalScreenings(prev => [entry, ...prev]);
-    setForm(EMPTY_FORM);
-    setFormError('');
-    setShowForm(false);
+    try {
+      await addScreening({
+        patientName: form.name.trim(),
+        age: form.isAnc && !form.age.toUpperCase().includes('ANC') ? `${form.age.trim()} ANC` : form.age.trim(),
+        sex: form.isAnc ? 'F' : form.sex,
+        muac,
+        weightKg: Number.isFinite(weight) ? weight : undefined,
+        heightCm: Number.isFinite(height) ? height : undefined,
+        edema: form.edema,
+        isAnc: form.isAnc,
+        screenedById: currentUser?._id,
+        screenedByName: currentUser?.name,
+        hospitalId: currentUser?.hospitalId,
+        orgId: currentUser?.orgId,
+      });
+      setForm(EMPTY_FORM);
+      setFormError('');
+      setShowForm(false);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   const stats = useMemo(() => {

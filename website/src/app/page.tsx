@@ -551,7 +551,9 @@ export default function Home() {
               textShadow: "0 2px 6px rgba(0,0,0,0.65), 0 4px 28px rgba(0,0,0,0.5)",
             }}
           >
-            No power. No records. No history.
+            No internet. No records.
+            <br />
+            No history.
           </h1>
           <div className="tm-hero-sub" style={{ position: "relative", maxWidth: 560, paddingLeft: 18, fontSize: 18 }}>
             <div
@@ -712,7 +714,7 @@ export default function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#10195A", background: "#FEFFF9", padding: "6px 14px" }}>
-                The Problem · Ground Truth
+                Ground Truth
               </span>
             </div>
             <h2 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>
@@ -808,7 +810,7 @@ export default function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#FFFFFF", background: "#10195A", padding: "6px 14px" }}>
-                The Solution · The Platform
+                The Platform
               </span>
             </div>
             <h2 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>
@@ -861,7 +863,7 @@ export default function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#FFFFFF", background: "#10195A", padding: "6px 14px" }}>
-                The Solution · The Products
+                The Products
               </span>
             </div>
             <h2 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>

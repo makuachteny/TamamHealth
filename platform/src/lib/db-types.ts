@@ -806,6 +806,39 @@ export interface PatientDocumentDoc extends BaseDoc {
   orgId?: string;
 }
 
+/** WHO-aligned malnutrition classification from MUAC + edema. */
+export type NutritionStatus = 'SAM' | 'MAM' | 'At Risk' | 'Underweight' | 'Normal';
+
+/**
+ * A MUAC-based nutrition screening (child 6–59m or ANC mother), recorded by
+ * nutrition staff. Feeds the nutrition dashboard and program reports.
+ * Facility-operational PHI; org-scoped sync.
+ */
+export interface NutritionScreeningDoc extends BaseDoc {
+  type: 'nutrition_screening';
+  /** Optional link to a registered patient (screenings may precede registration). */
+  patientId?: string;
+  patientName: string;
+  /** Display age, e.g. '2y', '18m', '28w ANC'. */
+  age: string;
+  sex: string;
+  /** Mid-upper-arm circumference in cm. */
+  muac: number;
+  weightKg?: number;
+  heightCm?: number;
+  /** Bilateral pitting edema (any grade ⇒ SAM). */
+  edema: boolean;
+  /** Pregnant/lactating (ANC) — uses the adult MUAC threshold. */
+  isAnc: boolean;
+  status: NutritionStatus;
+  /** yyyy-mm-dd. */
+  screeningDate: string;
+  screenedById?: string;
+  screenedByName?: string;
+  hospitalId?: string;
+  orgId?: string;
+}
+
 export type ReminderChannel = 'sms' | 'whatsapp' | 'call' | 'in_person';
 export type ReminderStatus = 'queued' | 'sent' | 'cancelled';
 

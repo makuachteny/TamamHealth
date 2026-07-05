@@ -114,3 +114,79 @@ export async function markReminderSent(id: string): Promise<PatientReminderDoc |
 export async function cancelReminder(id: string): Promise<PatientReminderDoc | null> {
   return setStatus(id, 'cancelled', {}, 'CANCEL_PATIENT_REMINDER');
 }
+
+// ── Gateway dispatch ─────────────────────────────────────────────────────────
+
+export interface ReminderDispatchOutcome {
+  attempted: number;
+  sent: number;
+  failed: number;
+  skippedNoPhone: number;
+  skippedChannel: number;
+  gatewayEnabled: boolean;
+}
+
+/**
+ * Dispatch due SMS reminders through the configured gateway (lib/sms — Africa's
+ * Talking, Twilio, or noop). Server-side only: providers read secret env vars.
+ *
+ * Opt-in per deployment via PATIENT_REMINDER_SMS_ENABLED='true' (mirrors the
+ * appointment-reminder flag) so an unconfigured deploy keeps the honest
+ * staff-worked queue instead of silently "sending" via the noop provider.
+ *
+ * Reminders that fail to send stay `queued` so staff still see and work them —
+ * delivery failure must never silently drop a clinical recall.
+ */
+export async function dispatchDueReminders(asOf: string = todayISO()): Promise<ReminderDispatchOutcome> {
+  const gatewayEnabled = process.env.PATIENT_REMINDER_SMS_ENABLED === 'true';
+  const outcome: ReminderDispatchOutcome = {
+    attempted: 0, sent: 0, failed: 0, skippedNoPhone: 0, skippedChannel: 0, gatewayEnabled,
+  };
+  if (!gatewayEnabled) return outcome;
+
+  const due = await getDueReminders(asOf);
+  if (due.length === 0) return outcome;
+
+  // Dynamic imports keep the SMS provider layer and the patients DB accessor
+  // out of client bundles that import this service via usePatientReminders.
+  const { sendSms } = await import('../sms');
+  const { patientsDB } = await import('../db');
+
+  for (const reminder of due) {
+    // Only SMS-channel reminders go through the gateway; calls / in-person
+    // reminders remain staff-worked queue items.
+    if (reminder.channel !== 'sms' && reminder.channel !== 'whatsapp') {
+      outcome.skippedChannel++;
+      continue;
+    }
+    let phone = '';
+    try {
+      const patient = await patientsDB().get(reminder.patientId) as { phone?: string };
+      phone = patient?.phone || '';
+    } catch { /* patient missing — treated as no phone below */ }
+    if (!phone) {
+      outcome.skippedNoPhone++;
+      continue;
+    }
+    outcome.attempted++;
+    try {
+      const result = await sendSms({ to: phone, body: reminder.message });
+      if (result.ok) {
+        await setStatus(reminder._id, 'sent', { sentAt: new Date().toISOString() }, 'DISPATCH_REMINDER_SMS');
+        outcome.sent++;
+      } else {
+        outcome.failed++;
+      }
+    } catch {
+      outcome.failed++;
+    }
+  }
+
+  await logAuditSafe(
+    'DISPATCH_PATIENT_REMINDERS',
+    undefined,
+    undefined,
+    `SMS dispatch: ${outcome.sent} sent, ${outcome.failed} failed, ${outcome.skippedNoPhone} no phone, ${outcome.skippedChannel} non-SMS`,
+  );
+  return outcome;
+}

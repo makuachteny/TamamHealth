@@ -49,7 +49,7 @@ export default function OpengraphImage() {
           <span style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.01em" }}>tamam</span>
         </div>
         <div style={{ display: "flex", fontSize: 60, fontWeight: 700, lineHeight: 1.15, maxWidth: 920 }}>
-          No power. No records. No history.
+          No internet. No records. No history.
         </div>
         <div style={{ display: "flex", fontSize: 26, color: "#C7D8F5", marginTop: 28, maxWidth: 880 }}>
           Tamam brings digital health records that work offline, so care never starts from zero.
