@@ -436,7 +436,7 @@ export default function Home() {
               display: "none",
               marginLeft: "auto",
               background: "none",
-              border: "1px solid rgba(255,255,255,0.35)",
+              border: "none",
               color: "#FFFFFF",
               width: 44,
               height: 44,
@@ -510,6 +510,7 @@ export default function Home() {
             fill
             priority={i === 0}
             sizes="100vw"
+            className={i > 0 ? "tm-hero-slide-extra" : undefined}
             style={{
               objectFit: "cover",
               objectPosition: "center 30%",
@@ -555,18 +556,7 @@ export default function Home() {
             <br />
             No history.
           </h1>
-          <div className="tm-hero-sub" style={{ position: "relative", maxWidth: 560, paddingLeft: 18, fontSize: 18 }}>
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: 3,
-                background:
-                  "linear-gradient(to bottom, rgba(33,145,208,0) 0%, rgba(127,196,234,0.95) 22%, rgba(33,145,208,0.95) 55%, rgba(33,145,208,0) 100%)",
-              }}
-            />
+          <div className="tm-hero-sub" style={{ maxWidth: 560, fontSize: 18 }}>
             <p
               style={{
                 fontSize: "inherit",
@@ -613,7 +603,7 @@ export default function Home() {
             <p style={{ margin: 0, fontFamily: "'DM Mono', monospace", fontSize: 12.5, color: "#C7D8F5" }}>
               {SLIDES[activeSlide].caption}
             </p>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className="tm-hero-dots" style={{ display: "flex", gap: 8 }}>
               {SLIDES.map((slide, i) => (
                 <button
                   key={slide.src}

@@ -62,7 +62,10 @@ body {
   }
   .tm-hero-sub {
     font-size: 15.5px !important;
-    padding-left: 14px !important;
+  }
+  .tm-hero-slide-extra,
+  .tm-hero-dots {
+    display: none !important;
   }
   .tm-grid-products,
   .tm-grid-insights,
