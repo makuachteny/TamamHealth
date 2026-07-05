@@ -1,0 +1,25 @@
+{
+  "name": "TamamHealth",
+  "short_name": "Tamam",
+  "description": "Offline-first health record infrastructure for real facilities and low-connectivity care.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#10195A",
+  "theme_color": "#10195A",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

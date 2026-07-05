@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="40" fill="#eff6ff"/>
+  <svg x="28" y="28" width="136" height="136" viewBox="90 -11 316 316">
+    <g fill="#3b82f6">
+      <circle cx="127.67" cy="28.84" r="28.84"/>
+      <circle cx="218.69" cy="46.28" r="28.84"/>
+      <circle cx="296.1" cy="97.22" r="28.84"/>
+      <circle cx="348.12" cy="173.91" r="28.84"/>
+      <circle cx="366.84" cy="264.67" r="28.84"/>
+      <circle cx="130.25" cy="103.54" r="24.99"/>
+      <circle cx="192.48" cy="116.29" r="24.99"/>
+      <circle cx="245.1" cy="151.87" r="24.99"/>
+      <circle cx="280.09" cy="204.88" r="24.99"/>
+      <circle cx="292.14" cy="267.26" r="24.99"/>
+      <circle cx="129.41" cy="171.67" r="14.53"/>
+      <circle cx="165.64" cy="178.9" r="14.53"/>
+      <circle cx="196.34" cy="199.45" r="14.53"/>
+      <circle cx="216.83" cy="230.18" r="14.53"/>
+      <circle cx="224.01" cy="266.42" r="14.53"/>
+      <circle cx="129.38" cy="213.9" r="8.05"/>
+      <circle cx="149.44" cy="217.9" r="8.05"/>
+      <circle cx="166.45" cy="229.28" r="8.05"/>
+      <circle cx="177.81" cy="246.31" r="8.05"/>
+      <circle cx="181.78" cy="266.38" r="8.05"/>
+    </g>
+  </svg>
+</svg>
