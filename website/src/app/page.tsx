@@ -442,7 +442,8 @@ export default function Home() {
               height: 44,
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 18,
+              fontSize: 22,
+              lineHeight: 1,
               cursor: "pointer",
               padding: 0,
             }}
@@ -579,14 +580,16 @@ export default function Home() {
               className="tm-hero-btn-primary"
               style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 15, fontWeight: 700, padding: "15px 30px", textDecoration: "none", letterSpacing: "0.02em" }}
             >
-              Understand the crisis ↓
+              <span className="tm-btn-label-full">Understand the crisis</span>
+              <span className="tm-btn-label-short">Crisis</span> ↓
             </a>
             <a
               href="#solution"
               className="tm-hero-btn-secondary"
               style={{ background: "#FEFFF9", color: "#10195A", fontSize: 15, fontWeight: 700, padding: "15px 30px", textDecoration: "none", letterSpacing: "0.02em" }}
             >
-              See our solution →
+              <span className="tm-btn-label-full">See our solution</span>
+              <span className="tm-btn-label-short">Solution</span> →
             </a>
           </div>
           <div
@@ -668,17 +671,6 @@ export default function Home() {
                   <Image src={b.image} alt={b.alt} fill sizes="(max-width: 1023px) 100vw, 33vw" style={{ objectFit: "cover" }} />
                   <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,17,69,0.95) 0%, rgba(11,17,69,0.2) 55%, rgba(11,17,69,0) 100%)" }} />
                   <div style={{ position: "relative", padding: 24, display: "flex", flexDirection: "column", gap: 8, margin: "0 0 20px 20px", background: "rgba(11,17,69,0.55)", backdropFilter: "blur(4px)", marginRight: 20, paddingTop: 18, paddingBottom: 18, paddingLeft: 20, paddingRight: 20 }}>
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        top: 8,
-                        bottom: 8,
-                        width: 4,
-                        background:
-                          "linear-gradient(to bottom, rgba(33,145,208,0) 0%, rgba(127,196,234,0.95) 22%, rgba(33,145,208,0.95) 55%, rgba(33,145,208,0) 100%)",
-                      }}
-                    />
                     <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, lineHeight: 1.15 }}>{b.title}</span>
                     <span style={{ fontSize: 14, lineHeight: 1.55, color: "rgba(255,255,255,0.85)" }}>{b.body}</span>
                   </div>
@@ -755,8 +747,8 @@ export default function Home() {
             </h2>
           </div>
 
-          <div style={{ display: "flex", alignItems: "stretch", gap: 0, flexWrap: "wrap", border: "1.5px solid #10195A" }}>
-            <div style={{ flex: 1, minWidth: 220, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 8, textAlign: "center", padding: "36px 28px", background: "#FADCDC" }}>
+          <div className="tm-compare-strip" style={{ display: "flex", alignItems: "stretch", gap: 0, flexWrap: "wrap", border: "1.5px solid #10195A" }}>
+            <div className="tm-compare-col" style={{ flex: 1, minWidth: 220, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 8, textAlign: "center", padding: "36px 28px", background: "#FADCDC" }}>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#7A2020" }}>
                 The current system
               </span>
@@ -764,13 +756,13 @@ export default function Home() {
                 Decentralized, fragmented data
               </span>
             </div>
-            <div style={{ flex: 1.2, minWidth: 260, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 12, padding: "36px 28px", background: "#FEFFF9", borderLeft: "1.5px solid #10195A", borderRight: "1.5px solid #10195A" }}>
+            <div className="tm-compare-col" style={{ flex: 1.2, minWidth: 260, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 12, padding: "36px 28px", background: "#FEFFF9", borderLeft: "1.5px solid #10195A", borderRight: "1.5px solid #10195A" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/assets/tamam-logo-mark.svg" alt="" style={{ height: 58, width: "auto" }} />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/assets/tamam-logo-type.svg" alt="Tamam Healthcare System" style={{ height: 17, width: "auto" }} />
             </div>
-            <div style={{ flex: 1, minWidth: 220, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 8, textAlign: "center", padding: "36px 28px", background: "#DDF2FB" }}>
+            <div className="tm-compare-col" style={{ flex: 1, minWidth: 220, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 8, textAlign: "center", padding: "36px 28px", background: "#DDF2FB" }}>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#015697" }}>
                 What Tamam offers
               </span>
@@ -1062,13 +1054,13 @@ export default function Home() {
 
       {/* ═══ Footer ═══ */}
       <footer style={{ background: "#0B1145", color: "#C7D8F5", borderTop: "1px solid rgba(255,255,255,0.15)", padding: "28px 32px" }}>
-        <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", fontSize: 13, alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="tm-footer-row" style={{ maxWidth: 1320, margin: "0 auto", display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", fontSize: 13, alignItems: "center" }}>
+          <div className="tm-footer-brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/tamam-logo-mark.svg" alt="" style={{ height: 24, width: "auto" }} />
+            <img src="/assets/tamam-logo-mark.svg" alt="" style={{ height: 24, width: 24, flexShrink: 0 }} />
             <span>© 2026 TamamHealth — digital health platform for South Sudan</span>
           </div>
-          <div style={{ display: "flex", gap: 20, fontFamily: "'DM Mono', monospace", fontSize: 12 }}>
+          <div className="tm-footer-links" style={{ display: "flex", gap: 20, fontFamily: "'DM Mono', monospace", fontSize: 12 }}>
             <span>Terms &amp; Conditions</span>
             <span>Privacy Policy</span>
           </div>

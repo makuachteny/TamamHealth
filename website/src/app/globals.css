@@ -2,7 +2,17 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: #FEFFF9;
+  /* Matches the hero/footer navy rather than the page's cream sections, so
+     mobile Safari's elastic overscroll (or any Android rubber-band/bounce)
+     never flashes white above the hero or below the footer. */
+  background: #0B1145;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+  max-width: 100vw;
+}
+
+.tm-btn-label-short {
+  display: none;
 }
 
 /* ── Breakpoints: desktop ≥1024 · tablet 640–1023 · mobile ≤639 ── */
@@ -85,9 +95,34 @@ body {
   .tm-form-pad {
     padding: 24px 16px !important;
   }
+  .tm-btn-row {
+    flex-wrap: nowrap !important;
+    gap: 10px !important;
+  }
   .tm-btn-row a {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 13px 12px !important;
+    font-size: 13.5px !important;
     text-align: center;
+    white-space: nowrap;
+  }
+  .tm-btn-label-full {
+    display: none;
+  }
+  .tm-btn-label-short {
+    display: inline;
+  }
+  .tm-compare-strip {
+    flex-direction: column !important;
+  }
+  .tm-compare-col {
+    min-width: 0 !important;
+    width: 100%;
+    box-sizing: border-box;
   }
   .tm-workflow span {
     flex: 1 1 auto;
@@ -95,6 +130,17 @@ body {
   }
   .tm-contact-h {
     font-size: 30px !important;
+  }
+  .tm-footer-row {
+    flex-direction: column !important;
+    justify-content: center !important;
+    text-align: center;
+  }
+  .tm-footer-brand {
+    flex-direction: column !important;
+  }
+  .tm-footer-links {
+    justify-content: center !important;
   }
 }
 
