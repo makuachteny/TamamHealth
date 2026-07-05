@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useRef, useState } from "react";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth — One-Page Website
@@ -318,16 +319,32 @@ export default function Home() {
   const [formFacility, setFormFacility] = useState("");
   const [formMessage, setFormMessage] = useState("");
   const [sent, setSent] = useState(false);
+  const dragStartX = useRef<number | null>(null);
 
-  // Auto-advance every 5s; resets whenever activeSlide changes for any
-  // reason (auto-advance or a manual dot click), matching the source
-  // design's "restart timer on manual select" behaviour.
-  useEffect(() => {
-    const id = setInterval(() => {
+  // Hero defaults to the midwives photo (SLIDES[0]) and stays put — no
+  // auto-advance. Visitors switch photos via the dots or by swiping/
+  // dragging the image; leaving the hero resets it back to the default.
+  const SWIPE_THRESHOLD = 50;
+
+  const handleHeroPointerDown = (e: React.PointerEvent) => {
+    dragStartX.current = e.clientX;
+  };
+
+  const handleHeroPointerUp = (e: React.PointerEvent) => {
+    if (dragStartX.current === null) return;
+    const delta = e.clientX - dragStartX.current;
+    dragStartX.current = null;
+    if (delta > SWIPE_THRESHOLD) {
+      setActiveSlide((s) => (s - 1 + SLIDES.length) % SLIDES.length);
+    } else if (delta < -SWIPE_THRESHOLD) {
       setActiveSlide((s) => (s + 1) % SLIDES.length);
-    }, 5000);
-    return () => clearInterval(id);
-  }, [activeSlide]);
+    }
+  };
+
+  const handleHeroPointerLeave = () => {
+    dragStartX.current = null;
+    setActiveSlide(0);
+  };
 
   const sendMessage = () => {
     const subject = encodeURIComponent(
@@ -465,10 +482,14 @@ export default function Home() {
         )}
       </nav>
 
+      <main>
       {/* ═══ Hero — full-bleed image ═══ */}
       <section
         id="top"
         className="tm-hero"
+        onPointerDown={handleHeroPointerDown}
+        onPointerUp={handleHeroPointerUp}
+        onPointerLeave={handleHeroPointerLeave}
         style={{
           position: "relative",
           minHeight: "100vh",
@@ -477,19 +498,19 @@ export default function Home() {
           color: "#FFFFFF",
           overflow: "hidden",
           background: "#0B1145",
+          touchAction: "pan-y",
+          cursor: "grab",
         }}
       >
         {SLIDES.map((slide, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             key={slide.src}
             src={slide.src}
             alt={slide.alt}
+            fill
+            priority={i === 0}
+            sizes="100vw"
             style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
               objectFit: "cover",
               objectPosition: "center 30%",
               opacity: i === activeSlide ? 1 : 0,
@@ -644,8 +665,7 @@ export default function Home() {
             <div className="tm-grid-breakdown" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
               {BREAKDOWN_STEPS.map((b) => (
                 <div key={b.num} className="tm-breakdown-card" style={{ position: "relative", overflow: "hidden", minHeight: 380, display: "flex", alignItems: "flex-end", background: "#0B1145" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={b.image} alt={b.alt} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                  <Image src={b.image} alt={b.alt} fill sizes="(max-width: 1023px) 100vw, 33vw" style={{ objectFit: "cover" }} />
                   <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,17,69,0.95) 0%, rgba(11,17,69,0.2) 55%, rgba(11,17,69,0) 100%)" }} />
                   <span style={{ position: "absolute", top: 0, left: 0, fontFamily: "'Lora', Georgia, serif", fontSize: 44, fontWeight: 700, background: "#FEFFF9", color: "#10195A", padding: "10px 22px", lineHeight: 1 }}>
                     {b.num}
@@ -792,9 +812,14 @@ export default function Home() {
           </div>
 
           <div className="tm-grid-split" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 48, alignItems: "center" }}>
-            <div className="tm-shadow-plate" style={{ border: "1.5px solid #10195A", boxShadow: "12px 12px 0 #DDF2FB" }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/Dashboard.png" alt="TamamHealth platform dashboard" style={{ display: "block", width: "100%", height: "auto" }} />
+            <div className="tm-shadow-plate" style={{ border: "1.5px solid #10195A", boxShadow: "12px 12px 0 #DDF2FB", position: "relative", aspectRatio: "3416 / 1974" }}>
+              <Image
+                src="/assets/Dashboard.png"
+                alt="TamamHealth platform dashboard"
+                fill
+                sizes="(max-width: 1023px) 100vw, 50vw"
+                style={{ objectFit: "cover" }}
+              />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
               <p style={{ margin: 0, fontSize: 17, lineHeight: 1.65, color: "#26336F" }}>
@@ -838,9 +863,14 @@ export default function Home() {
           <div className="tm-grid-products" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 24 }}>
             {PRODUCTS.map((prod) => (
               <div key={prod.acronym} className="tm-product-card" style={{ background: "#FEFFF9", border: "1.5px solid #10195A", display: "flex", flexDirection: "column" }}>
-                <div style={{ position: "relative", borderBottom: "1.5px solid #10195A" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={prod.image} alt={prod.imageAlt} style={{ display: "block", width: "100%", height: 200, objectFit: "cover" }} />
+                <div style={{ position: "relative", borderBottom: "1.5px solid #10195A", height: 200 }}>
+                  <Image
+                    src={prod.image}
+                    alt={prod.imageAlt}
+                    fill
+                    sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw"
+                    style={{ objectFit: "cover" }}
+                  />
                   <span style={{ position: "absolute", top: 0, right: 0, fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, letterSpacing: "0.08em", background: "#10195A", color: "#FFFFFF", padding: "8px 16px" }}>
                     {prod.acronym}
                   </span>
@@ -915,8 +945,15 @@ export default function Home() {
           <div className="tm-grid-team" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 1, background: "#10195A", border: "1.5px solid #10195A" }}>
             {TEAM.map((t) => (
               <div key={t.name} className="tm-team-card" style={{ background: "#FEFFF9", display: "flex", flexDirection: "column" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={t.image} alt={t.name} style={{ display: "block", width: "100%", aspectRatio: "1", objectFit: "cover", borderBottom: "1.5px solid #10195A" }} />
+                <div style={{ position: "relative", aspectRatio: "1", borderBottom: "1.5px solid #10195A" }}>
+                  <Image
+                    src={t.image}
+                    alt={t.name}
+                    fill
+                    sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 16vw"
+                    style={{ objectFit: "cover" }}
+                  />
+                </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "16px 18px 18px" }}>
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{t.name}</span>
                   <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#64748B" }}>{t.role}</span>
@@ -1020,6 +1057,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+      </main>
 
       {/* ═══ Footer ═══ */}
       <footer style={{ background: "#0B1145", color: "#C7D8F5", borderTop: "1px solid rgba(255,255,255,0.15)", padding: "28px 32px" }}>

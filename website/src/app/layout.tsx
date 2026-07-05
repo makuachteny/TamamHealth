@@ -1,16 +1,33 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+const TITLE = "TamamHealth — Digital Health Records for South Sudan";
+const DESCRIPTION =
+  "South Sudan's clinics run on paper-based records that get lost, damaged, or destroyed. TamamHealth brings digital records that work offline, so care never starts from zero.";
+
 export const metadata: Metadata = {
-  title: "TamamHealth — Digital Health Records for South Sudan",
-  description:
-    "South Sudan's clinics care for patients they can't see. TamamHealth works where the grid doesn't — offline-first health records from the front desk to the national report.",
+  metadataBase: new URL("https://tamamhealth.org"),
+  title: TITLE,
+  description: DESCRIPTION,
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/icons/icon-192.svg", sizes: "192x192", type: "image/svg+xml" },
       { url: "/icons/icon-512.svg", sizes: "512x512", type: "image/svg+xml" },
     ],
+  },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: "https://tamamhealth.org",
+    siteName: "TamamHealth",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
   },
 };
 
