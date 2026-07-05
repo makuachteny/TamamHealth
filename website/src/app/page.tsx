@@ -871,6 +871,7 @@ export default function Home() {
                     sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw"
                     style={{ objectFit: "cover" }}
                   />
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,17,69,0.45) 0%, rgba(11,17,69,0) 45%)" }} />
                   <span style={{ position: "absolute", top: 0, right: 0, fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, letterSpacing: "0.08em", background: "#10195A", color: "#FFFFFF", padding: "8px 16px" }}>
                     {prod.acronym}
                   </span>
@@ -953,6 +954,7 @@ export default function Home() {
                     sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 16vw"
                     style={{ objectFit: "cover" }}
                   />
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,17,69,0.32) 0%, rgba(11,17,69,0) 40%)" }} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "16px 18px 18px" }}>
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{t.name}</span>
