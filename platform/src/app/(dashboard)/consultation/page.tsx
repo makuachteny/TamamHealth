@@ -202,6 +202,17 @@ export default function ConsultationPage() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextAutosave = useRef(false);
   const consultPageRef = useRef<HTMLElement | null>(null);
+  const visitNotesRef = useRef<HTMLDivElement | null>(null);
+  const visitNotesVisible = step > 0;
+
+  // Bring the Visit notes panel into view the moment it first appears (the
+  // clinician has just moved past History into Intake) so they don't have to
+  // discover it by scrolling — it then stays pinned (sticky) from there on.
+  useEffect(() => {
+    if (visitNotesVisible) {
+      visitNotesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [visitNotesVisible]);
 
   // Pre-select patient from URL (?patientId=...) once patients load.
   useEffect(() => {
@@ -3641,40 +3652,13 @@ export default function ConsultationPage() {
                     </div>
                   )}
 
-                  {/* Consultation progress */}
-                  <div className="card-elevated p-4 ehr-consult-progress-card">
-                    <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('consultation.progress')}</p>
-                    <div className="ehr-consult-progress-list">
-                      {workflowProgressItems.map(({ label, icon: Icon, filled, active }) => (
-                        <div key={label} className="ehr-consult-progress-row" style={{
-                          borderColor: active ? 'var(--accent-primary)' : 'var(--border-light)',
-                          background: filled ? 'var(--accent-light)' : 'var(--bg-card)',
-                        }}>
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{
-                              background: filled ? 'rgba(59, 130, 246,0.12)' : 'var(--overlay-subtle)',
-                              border: `1px solid ${filled || active ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                            }}>
-                              {filled ? (
-                                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="#2191D0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                              ) : (
-                                <Icon className="w-4 h-4" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
-                              )}
-                            </div>
-                            <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{label}</span>
-                          </div>
-                          <span className="text-[11px] font-semibold" style={{ color: filled ? 'var(--accent-text)' : active ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-                            {filled ? 'Done' : active ? 'Current' : 'Open'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Visit notes — running summary of everything recorded so
-                      far. Appears once the clinician moves past History and
-                      accumulates step by step; the rail scrolls to hold it. */}
-                  {step > 0 && (() => {
+                  {/* Visit notes — running summary of everything recorded so far,
+                      updating live as the clinician talks to the patient and works
+                      through the rest of the consultation. Appears once they move
+                      past History, and stays pinned in view (its own scroll region)
+                      so it doesn't get lost below the patient/allergy/progress cards
+                      as the note grows. */}
+                  {visitNotesVisible && (() => {
                     const vitalNotes = [
                       vitals.temperature && `Temp ${vitals.temperature}°C`,
                       (vitals.systolic || vitals.diastolic) && `BP ${vitals.systolic || '—'}/${vitals.diastolic || '—'}`,
@@ -3706,7 +3690,11 @@ export default function ConsultationPage() {
                       ].filter(Boolean) as string[] },
                     ].filter(group => group.items.length > 0);
                     return (
-                      <div className="card-elevated p-4">
+                      <div
+                        ref={visitNotesRef}
+                        className="card-elevated p-4"
+                        style={{ position: 'sticky', top: 72, maxHeight: 'calc(100vh - 96px)', overflowY: 'auto' }}
+                      >
                         <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Visit notes</p>
                         {noteGroups.length === 0 ? (
                           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>

@@ -553,25 +553,34 @@ export default function Home() {
           >
             No power. No records. No history.
           </h1>
-          <p
-            className="tm-hero-sub"
-            style={{
-              fontSize: 18,
-              lineHeight: 1.6,
-              color: "#E4EEFB",
-              margin: 0,
-              maxWidth: 560,
-              textShadow: "0 1px 4px rgba(0,0,0,0.7), 0 2px 16px rgba(0,0,0,0.5)",
-              borderLeft: "3px solid #2191D0",
-              paddingLeft: 18,
-            }}
-          >
-            South Sudan&apos;s clinics run on paper-based records that get lost, damaged, or destroyed — and when
-            the paper goes, the patient&apos;s story goes with it.{" "}
-            <strong style={{ color: "#FFFFFF" }}>
-              Tamam brings digital records that work offline, so care never starts from zero.
-            </strong>
-          </p>
+          <div className="tm-hero-sub" style={{ position: "relative", maxWidth: 560, paddingLeft: 18, fontSize: 18 }}>
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: 3,
+                background:
+                  "linear-gradient(to bottom, rgba(33,145,208,0) 0%, rgba(127,196,234,0.95) 22%, rgba(33,145,208,0.95) 55%, rgba(33,145,208,0) 100%)",
+              }}
+            />
+            <p
+              style={{
+                fontSize: "inherit",
+                lineHeight: 1.6,
+                color: "#E4EEFB",
+                margin: 0,
+                textShadow: "0 1px 4px rgba(0,0,0,0.7), 0 2px 16px rgba(0,0,0,0.5)",
+              }}
+            >
+              South Sudan&apos;s clinics run on paper-based records that get lost, damaged, or destroyed — and when
+              the paper goes, the patient&apos;s story goes with it.{" "}
+              <strong style={{ color: "#FFFFFF" }}>
+                Tamam brings digital records that work offline, so care never starts from zero.
+              </strong>
+            </p>
+          </div>
           <div className="tm-btn-row" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <a
               href="#problem"
@@ -629,7 +638,6 @@ export default function Home() {
         <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, background: "#2191D0", color: "#FFFFFF", padding: "6px 12px" }}>01</span>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#10195A", background: "#FEFFF9", padding: "6px 14px" }}>
                 The Problem
               </span>
@@ -667,10 +675,18 @@ export default function Home() {
                 <div key={b.num} className="tm-breakdown-card" style={{ position: "relative", overflow: "hidden", minHeight: 380, display: "flex", alignItems: "flex-end", background: "#0B1145" }}>
                   <Image src={b.image} alt={b.alt} fill sizes="(max-width: 1023px) 100vw, 33vw" style={{ objectFit: "cover" }} />
                   <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,17,69,0.95) 0%, rgba(11,17,69,0.2) 55%, rgba(11,17,69,0) 100%)" }} />
-                  <span style={{ position: "absolute", top: 0, left: 0, fontFamily: "'Lora', Georgia, serif", fontSize: 44, fontWeight: 700, background: "#FEFFF9", color: "#10195A", padding: "10px 22px", lineHeight: 1 }}>
-                    {b.num}
-                  </span>
-                  <div style={{ position: "relative", padding: 24, display: "flex", flexDirection: "column", gap: 8, borderLeft: "4px solid #2191D0", margin: "0 0 20px 20px", background: "rgba(11,17,69,0.55)", backdropFilter: "blur(4px)", marginRight: 20, paddingTop: 18, paddingBottom: 18, paddingLeft: 20, paddingRight: 20 }}>
+                  <div style={{ position: "relative", padding: 24, display: "flex", flexDirection: "column", gap: 8, margin: "0 0 20px 20px", background: "rgba(11,17,69,0.55)", backdropFilter: "blur(4px)", marginRight: 20, paddingTop: 18, paddingBottom: 18, paddingLeft: 20, paddingRight: 20 }}>
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: 8,
+                        bottom: 8,
+                        width: 4,
+                        background:
+                          "linear-gradient(to bottom, rgba(33,145,208,0) 0%, rgba(127,196,234,0.95) 22%, rgba(33,145,208,0.95) 55%, rgba(33,145,208,0) 100%)",
+                      }}
+                    />
                     <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, lineHeight: 1.15 }}>{b.title}</span>
                     <span style={{ fontSize: 14, lineHeight: 1.55, color: "rgba(255,255,255,0.85)" }}>{b.body}</span>
                   </div>
@@ -695,7 +711,6 @@ export default function Home() {
         <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 72 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, background: "#2191D0", color: "#FFFFFF", padding: "6px 12px" }}>01</span>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#10195A", background: "#FEFFF9", padding: "6px 14px" }}>
                 The Problem · Ground Truth
               </span>
@@ -739,7 +754,6 @@ export default function Home() {
         <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, background: "#2191D0", color: "#FFFFFF", padding: "6px 12px" }}>02</span>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#FFFFFF", background: "#10195A", padding: "6px 14px" }}>
                 The Solution
               </span>
@@ -793,7 +807,6 @@ export default function Home() {
         <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, background: "#2191D0", color: "#FFFFFF", padding: "6px 12px" }}>02</span>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#FFFFFF", background: "#10195A", padding: "6px 14px" }}>
                 The Solution · The Platform
               </span>
@@ -847,7 +860,6 @@ export default function Home() {
         <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, background: "#2191D0", color: "#FFFFFF", padding: "6px 12px" }}>02</span>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#FFFFFF", background: "#10195A", padding: "6px 14px" }}>
                 The Solution · The Products
               </span>
@@ -875,9 +887,6 @@ export default function Home() {
                   <span style={{ position: "absolute", top: 0, right: 0, fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, letterSpacing: "0.08em", background: "#10195A", color: "#FFFFFF", padding: "8px 16px" }}>
                     {prod.acronym}
                   </span>
-                  <span style={{ position: "absolute", bottom: 0, left: 0, fontFamily: "'Lora', Georgia, serif", fontSize: 15, fontWeight: 600, background: "#FEFFF9", color: "#10195A", padding: "7px 16px" }}>
-                    {prod.index}
-                  </span>
                 </div>
                 <div style={{ padding: "24px 26px 28px", display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
                   <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, margin: 0, lineHeight: 1.15 }}>{prod.title}</h3>
@@ -902,7 +911,6 @@ export default function Home() {
         <div className="tm-grid-split" style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 56, alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, background: "#2191D0", color: "#FFFFFF", padding: "6px 12px" }}>03</span>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#10195A", background: "#FEFFF9", padding: "6px 14px" }}>
                 The Goal
               </span>
@@ -934,7 +942,6 @@ export default function Home() {
         <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, background: "#2191D0", color: "#FFFFFF", padding: "6px 12px" }}>04</span>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#FFFFFF", background: "#10195A", padding: "6px 14px" }}>
                 The Team
               </span>

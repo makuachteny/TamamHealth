@@ -18,7 +18,17 @@ export const SPECIAL_LABS = [
   'HIV Rapid Test', 'CD4 Count', 'Liver Function', 'Renal Function',
   'Typhoid (Widal)', 'Rheumatoid Factor', 'ANA (autoimmune screen)',
   'Uric Acid', 'Vitamin D', 'Stool Culture', 'Blood Culture', 'Lipid Profile',
+  // Imaging studies — ordered from consultation like any special investigation,
+  // routed to the radiology work queue (specimen 'Imaging') instead of the lab.
+  'X-Ray — Chest', 'X-Ray — Limb/Skeletal', 'Ultrasound — Abdomen', 'Ultrasound — Obstetric',
 ] as const;
+
+/** Specimen value that routes an order to radiology instead of the lab bench. */
+export const IMAGING_SPECIMEN = 'Imaging';
+
+/** True when an investigation is an imaging study (belongs in the radiology queue). */
+export const isImagingStudy = (test: { specimen?: string; testName: string }): boolean =>
+  test.specimen === IMAGING_SPECIMEN || /^(x-ray|ultrasound|ct\b|mri)/i.test(test.testName);
 
 export const LAB_TESTS: string[] = [...BASIC_LABS, ...SPECIAL_LABS];
 
@@ -43,6 +53,10 @@ export const LAB_SPECIMENS: Record<string, string> = {
   'Stool Culture': 'Stool',
   'Blood Culture': 'Blood',
   'Lipid Profile': 'Blood',
+  'X-Ray — Chest': 'Imaging',
+  'X-Ray — Limb/Skeletal': 'Imaging',
+  'Ultrasound — Abdomen': 'Imaging',
+  'Ultrasound — Obstetric': 'Imaging',
 };
 
 // ── Store-backed accessors (read live facility settings) ────────────────────

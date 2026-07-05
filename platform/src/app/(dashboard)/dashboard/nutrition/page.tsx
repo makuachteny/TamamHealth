@@ -4,7 +4,7 @@ import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import SpotlightCard from '@/components/dashboard/SpotlightCard';
 import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import TopBar from '@/components/TopBar';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { useApp } from '@/lib/context';
@@ -14,7 +14,7 @@ import { isPathAllowed } from '@/lib/role-routes';
 import {
   AlertTriangle, CheckCircle2, TrendingDown,
   Baby, HeartPulse, BarChart3, Activity, Scale,
-  Utensils, Droplets, Users, MessageSquare,
+  Utensils, Droplets, Users, MessageSquare, Plus, X,
 } from '@/components/icons/lucide';
 
 // Use the platform accent token so this dashboard matches the reference
@@ -22,6 +22,28 @@ import {
 const ACCENT = 'var(--accent-primary)';
 
 const MUAC_THRESHOLDS = { severe: 11.5, moderate: 12.5, normal: 13.5 };
+
+// MUAC threshold for pregnant/lactating women (ANC): <21.0cm = undernourished.
+const ANC_MUAC_THRESHOLD = 21.0;
+
+type Screening = {
+  id: string; name: string; age: string; sex: string;
+  muac: number; weight: number; height: number; edema: boolean;
+  status: string; date: string;
+};
+
+/** WHO-aligned classification from MUAC + bilateral pitting edema.
+ *  Children (6–59m): edema or MUAC <11.5 = SAM; <12.5 = MAM; <13.5 = At Risk.
+ *  ANC mothers: MUAC <21.0 = Underweight. */
+function classifyScreening(muac: number, edema: boolean, isAnc: boolean): string {
+  if (isAnc) return muac < ANC_MUAC_THRESHOLD ? 'Underweight' : 'Normal';
+  if (edema || muac < MUAC_THRESHOLDS.severe) return 'SAM';
+  if (muac < MUAC_THRESHOLDS.moderate) return 'MAM';
+  if (muac < MUAC_THRESHOLDS.normal) return 'At Risk';
+  return 'Normal';
+}
+
+const EMPTY_FORM = { name: '', age: '', sex: 'F', muac: '', weight: '', height: '', edema: false, isAnc: false };
 
 // Demo-only screenings + supply inventory. Gated on NEXT_PUBLIC_DEMO_MODE so
 // production deploys render empty states instead of confusing staff with
@@ -55,9 +77,63 @@ export default function NutritionDashboard() {
   const { t } = useTranslation();
   usePatients();
 
-  // Stable references so the stats memo below doesn't re-run every render.
-  const screenings = useMemo(() => (IS_DEMO ? SAMPLE_SCREENINGS : []), []);
-  const supplies = useMemo(() => (IS_DEMO ? SUPPLY_ITEMS : []), []);
+  // New screenings recorded in this session are prepended to the list.
+  // (Backend persistence for nutrition docs isn't wired yet; this keeps the
+  // workflow usable and the data flows into the on-screen stats.)
+  const [localScreenings, setLocalScreenings] = useState<Screening[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [formError, setFormError] = useState('');
+
+  const screenings = useMemo(
+    () => [...localScreenings, ...(IS_DEMO ? SAMPLE_SCREENINGS : [])],
+    [localScreenings],
+  );
+  // Supplies are adjustable in-session (+/− receipt and consumption) so the
+  // card is recordable, not display-only. Status re-derives from thresholds.
+  const [supplyLevels, setSupplyLevels] = useState<Record<string, number>>({});
+  const supplies = useMemo(
+    () =>
+      (IS_DEMO ? SUPPLY_ITEMS : []).map(item => {
+        const stock = supplyLevels[item.name] ?? item.stock;
+        const status = stock <= item.threshold / 2 ? 'critical' : stock <= item.threshold ? 'low' : 'ok';
+        return { ...item, stock, status };
+      }),
+    [supplyLevels],
+  );
+
+  const adjustSupply = (name: string, delta: number) => {
+    setSupplyLevels(prev => {
+      const item = SUPPLY_ITEMS.find(s => s.name === name);
+      const current = prev[name] ?? item?.stock ?? 0;
+      return { ...prev, [name]: Math.max(0, current + delta) };
+    });
+  };
+
+  const submitScreening = () => {
+    const muac = parseFloat(form.muac);
+    const weight = parseFloat(form.weight);
+    const height = parseFloat(form.height);
+    if (!form.name.trim() || !form.age.trim()) { setFormError(t('nutrition.formErrorNameAge')); return; }
+    if (!Number.isFinite(muac) || muac <= 0 || muac > 40) { setFormError(t('nutrition.formErrorMuac')); return; }
+    const status = classifyScreening(muac, form.edema, form.isAnc);
+    const entry: Screening = {
+      id: `ns-local-${Date.now()}`,
+      name: form.name.trim(),
+      age: form.isAnc && !form.age.toUpperCase().includes('ANC') ? `${form.age.trim()} ANC` : form.age.trim(),
+      sex: form.isAnc ? 'F' : form.sex,
+      muac,
+      weight: Number.isFinite(weight) ? weight : 0,
+      height: Number.isFinite(height) ? height : 0,
+      edema: form.edema,
+      status,
+      date: new Date().toISOString().slice(0, 10),
+    };
+    setLocalScreenings(prev => [entry, ...prev]);
+    setForm(EMPTY_FORM);
+    setFormError('');
+    setShowForm(false);
+  };
 
   const stats = useMemo(() => {
     return {
@@ -144,8 +220,97 @@ export default function NutritionDashboard() {
                 <Scale className="w-4 h-4" style={{ color: ACCENT }} />
                 <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nutrition.screenings')}</span>
               </div>
-              <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{t('nutrition.totalCount', { count: stats.total })}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{t('nutrition.totalCount', { count: stats.total })}</span>
+                <button
+                  onClick={() => { setShowForm(v => !v); setFormError(''); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold"
+                  style={{ background: showForm ? 'var(--overlay-subtle)' : ACCENT, color: showForm ? 'var(--text-primary)' : '#fff', border: 'none', cursor: 'pointer' }}
+                >
+                  {showForm ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                  {showForm ? t('nutrition.formCancel') : t('nutrition.newScreening')}
+                </button>
+              </div>
             </div>
+
+            {/* ── New screening entry form ── */}
+            {showForm && (
+              <div className="mb-4 p-4 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formName')}</label>
+                    <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-md text-xs"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formAge')}</label>
+                    <input value={form.age} onChange={e => setForm(f => ({ ...f, age: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-md text-xs"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formSex')}</label>
+                    <select value={form.isAnc ? 'F' : form.sex} disabled={form.isAnc}
+                      onChange={e => setForm(f => ({ ...f, sex: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-md text-xs"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}>
+                      <option value="F">F</option>
+                      <option value="M">M</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formMuac')}</label>
+                    <input type="number" step="0.1" min="0" value={form.muac} onChange={e => setForm(f => ({ ...f, muac: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-md text-xs"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formWeight')}</label>
+                    <input type="number" step="0.1" min="0" value={form.weight} onChange={e => setForm(f => ({ ...f, weight: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-md text-xs"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formHeight')}</label>
+                    <input type="number" step="0.1" min="0" value={form.height} onChange={e => setForm(f => ({ ...f, height: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-md text-xs"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }} />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-4 mt-3">
+                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                    <input type="checkbox" checked={form.edema} onChange={e => setForm(f => ({ ...f, edema: e.target.checked }))} />
+                    {t('nutrition.formEdema')}
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                    <input type="checkbox" checked={form.isAnc} onChange={e => setForm(f => ({ ...f, isAnc: e.target.checked }))} />
+                    {t('nutrition.formAnc')}
+                  </label>
+                  {/* Live classification preview */}
+                  {parseFloat(form.muac) > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{
+                        background: `${getStatusColor(classifyScreening(parseFloat(form.muac), form.edema, form.isAnc))}15`,
+                        color: getStatusColor(classifyScreening(parseFloat(form.muac), form.edema, form.isAnc)),
+                      }}>
+                      {t('nutrition.formClassification')}: {classifyScreening(parseFloat(form.muac), form.edema, form.isAnc)}
+                    </span>
+                  )}
+                </div>
+                {formError && (
+                  <p className="text-xs mt-2 font-semibold" style={{ color: 'var(--color-danger)' }}>{formError}</p>
+                )}
+                <button
+                  onClick={submitScreening}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold mt-3"
+                  style={{ background: ACCENT, color: '#fff', border: 'none', cursor: 'pointer' }}
+                >
+                  <CheckCircle2 className="w-3 h-3" /> {t('nutrition.formSave')}
+                </button>
+              </div>
+            )}
+
             {screenings.length === 0 ? (
               <div
                 className="flex flex-col items-center justify-center gap-2 text-center"
@@ -257,9 +422,24 @@ export default function NutritionDashboard() {
                        <CheckCircle2 className="w-3 h-3" style={{ color: 'var(--color-success)' }} />}
                       <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{item.name}</span>
                     </div>
-                    <span className="text-xs font-bold" style={{
-                      color: item.status === 'critical' ? 'var(--color-danger)' : item.status === 'low' ? 'var(--color-warning)' : 'var(--text-primary)',
-                    }}>{item.stock} {item.unit}</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => adjustSupply(item.name, -1)}
+                        aria-label={`Decrease ${item.name}`}
+                        className="flex items-center justify-center rounded"
+                        style={{ width: 18, height: 18, background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)', cursor: 'pointer', fontSize: 12, lineHeight: 1 }}
+                      >−</button>
+                      <span className="text-xs font-bold" style={{
+                        color: item.status === 'critical' ? 'var(--color-danger)' : item.status === 'low' ? 'var(--color-warning)' : 'var(--text-primary)',
+                        minWidth: 64, textAlign: 'center',
+                      }}>{item.stock} {item.unit}</span>
+                      <button
+                        onClick={() => adjustSupply(item.name, 1)}
+                        aria-label={`Increase ${item.name}`}
+                        className="flex items-center justify-center rounded"
+                        style={{ width: 18, height: 18, background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)', cursor: 'pointer', fontSize: 12, lineHeight: 1 }}
+                      >+</button>
+                    </div>
                   </div>
                 ))}
               </div>

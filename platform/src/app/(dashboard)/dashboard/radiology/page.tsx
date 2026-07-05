@@ -4,13 +4,14 @@ import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import SpotlightCard from '@/components/dashboard/SpotlightCard';
 import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import TopBar from '@/components/TopBar';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useLabResults } from '@/lib/hooks/useLabResults';
+import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import { isPathAllowed } from '@/lib/role-routes';
 import {
   Scan, Upload, CheckCircle2, Clock, AlertTriangle,
@@ -43,7 +44,7 @@ export default function RadiologyDashboard() {
   const { t } = useTranslation();
   const { currentUser } = useApp();
   const { patients } = usePatients();
-  const { results: labResults } = useLabResults();
+  const { results: labResults, update: updateLabResult } = useLabResults();
   const [selectedStudy, setSelectedStudy] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [findings, setFindings] = useState('');
@@ -53,18 +54,90 @@ export default function RadiologyDashboard() {
   const [submittedFindings, setSubmittedFindings] = useState<Record<string, string>>({});
   const [submitToast, setSubmitToast] = useState<string | null>(null);
 
+  // Attached imaging files per study (session-scoped object URLs, same
+  // in-memory pattern as findings until the PACS/storage backend lands).
+  const [attachments, setAttachments] = useState<Record<string, { name: string; url: string }[]>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachTargetRef = useRef<string | null>(null);
+
+  const openAttachDialog = (studyId: string) => {
+    attachTargetRef.current = studyId;
+    fileInputRef.current?.click();
+  };
+
+  const handleFilesChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const studyId = attachTargetRef.current;
+    const files = e.target.files;
+    if (!studyId || !files || files.length === 0) return;
+    const added = Array.from(files).map(f => ({ name: f.name, url: URL.createObjectURL(f) }));
+    setAttachments(prev => ({ ...prev, [studyId]: [...(prev[studyId] || []), ...added] }));
+    setSubmitToast(t('radiology.imageAttachedFor', { id: studyId }));
+    window.setTimeout(() => setSubmitToast(null), 3000);
+    e.target.value = ''; // allow re-selecting the same file
+  };
+
+  const removeAttachment = (studyId: string, url: string) => {
+    URL.revokeObjectURL(url);
+    setAttachments(prev => ({
+      ...prev,
+      [studyId]: (prev[studyId] || []).filter(a => a.url !== url),
+    }));
+  };
+
+  // Real imaging orders flow in from consultation as lab_result docs with
+  // specimen 'Imaging' (see clinical-flow/lab-catalog.ts). They are listed
+  // first; demo studies fill the queue only in demo mode.
+  const realStudies = useMemo(
+    () =>
+      labResults
+        .filter(r => isImagingStudy(r))
+        .map(r => {
+          const [modality, bodyPart] = r.testName.split(' — ');
+          return {
+            id: r._id,
+            patientName: r.patientName,
+            modality: (modality || r.testName).trim(),
+            bodyPart: (bodyPart || r.testName).trim(),
+            status: r.status,
+            priority: r.critical ? 'urgent' : 'routine',
+            orderedBy: r.orderedBy,
+            date: (r.orderedAt || '').slice(0, 10),
+            notes: r.clinicalNotes || '',
+            findings: r.result || undefined,
+            isReal: true,
+          };
+        }),
+    [labResults],
+  );
+
   const studies = useMemo(
-    () => (IS_DEMO ? SAMPLE_STUDIES : []).map(s => {
-      const override = submittedFindings[s.id];
-      return override ? { ...s, status: 'completed', findings: override } : s;
-    }),
-    [submittedFindings],
+    () => [
+      ...realStudies,
+      ...(IS_DEMO ? SAMPLE_STUDIES : []).map(s => {
+        const override = submittedFindings[s.id];
+        return override
+          ? { ...s, status: 'completed', findings: override, isReal: false }
+          : { ...s, isReal: false };
+      }),
+    ],
+    [realStudies, submittedFindings],
   );
   const filtered = filterStatus === 'all' ? studies : studies.filter(s => s.status === filterStatus);
 
-  const handleSubmitReport = (studyId: string) => {
+  const handleSubmitReport = async (studyId: string) => {
     if (!findings.trim()) return;
-    setSubmittedFindings(prev => ({ ...prev, [studyId]: findings.trim() }));
+    const isReal = realStudies.some(s => s.id === studyId);
+    if (isReal) {
+      // Persist to the actual order doc so the findings reach the ordering
+      // clinician's consultation view and the HMIS reports.
+      await updateLabResult(studyId, {
+        result: findings.trim(),
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+      });
+    } else {
+      setSubmittedFindings(prev => ({ ...prev, [studyId]: findings.trim() }));
+    }
     setFindings('');
     setSubmitToast(t('radiology.reportSubmittedFor', { id: studyId }));
     window.setTimeout(() => setSubmitToast(null), 3000);
@@ -97,6 +170,15 @@ export default function RadiologyDashboard() {
   return (
     <>
       <TopBar title={t('radiology.title')} />
+      {/* Hidden picker for study image attachments (JPEG/PNG/DICOM exports) */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,.dcm"
+        multiple
+        onChange={handleFilesChosen}
+        style={{ display: 'none' }}
+      />
       <main className="page-container page-enter">
 
         <DashboardGreetingHeader />
@@ -272,19 +354,44 @@ export default function RadiologyDashboard() {
                               <CheckCircle2 className="w-3 h-3" /> {t('radiology.submitReport')}
                             </button>
                             <button
-                              disabled
+                              onClick={(e) => { e.stopPropagation(); openAttachDialog(study.id); }}
                               title={t('radiology.attachImageTitle')}
                               className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold"
                               style={{
-                                background: 'var(--overlay-subtle)',
-                                color: 'var(--text-muted)',
+                                background: 'var(--bg-card-solid)',
+                                color: 'var(--text-secondary)',
                                 border: '1px solid var(--border-medium)',
-                                cursor: 'not-allowed',
-                                opacity: 0.6,
+                                cursor: 'pointer',
                               }}
                             >
                               <Upload className="w-3 h-3" /> {t('radiology.attachImage')}
                             </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Attached imaging files */}
+                      {(attachments[study.id] || []).length > 0 && (
+                        <div className="mt-3">
+                          <span className="text-[9px] font-bold uppercase block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                            {t('radiology.attachedImages')}
+                          </span>
+                          <div className="flex flex-wrap gap-2">
+                            {(attachments[study.id] || []).map(att => (
+                              <div key={att.url} className="relative rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-medium)', width: 96 }}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={att.url} alt={att.name} style={{ width: 96, height: 72, objectFit: 'cover', display: 'block', background: 'var(--overlay-subtle)' }} />
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); removeAttachment(study.id, att.url); }}
+                                  title={t('radiology.removeImage')}
+                                  className="absolute top-1 right-1 flex items-center justify-center rounded-full"
+                                  style={{ width: 18, height: 18, background: 'rgba(15,23,42,0.65)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11, lineHeight: 1 }}
+                                >
+                                  ×
+                                </button>
+                                <span className="block px-1.5 py-1 text-[9px] truncate" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-solid)' }}>{att.name}</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}

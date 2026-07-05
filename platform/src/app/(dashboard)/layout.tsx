@@ -13,6 +13,7 @@ import ConnectivityNotice from '@/components/ConnectivityNotice';
 import MessagingDock from '@/components/MessagingDock';
 import { MessagingDockProvider } from '@/lib/messaging-dock-context';
 import { TourProvider } from '@/lib/tour/tour-context';
+import GetStartedCard from '@/components/onboarding/GetStartedCard';
 import ForcePasswordChange from '@/components/ForcePasswordChange';
 import { useAutoLock } from '@/lib/hooks/useAutoLock';
 import { Loader2 } from '@/components/icons/lucide';
@@ -73,6 +74,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="dashboard-content-area flex-1 flex flex-col min-w-0 overflow-hidden">
           <main id="main-content" className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
             <RoleGuard>{children}</RoleGuard>
+            <GetStartedCard />
           </main>
         </div>
       </div>

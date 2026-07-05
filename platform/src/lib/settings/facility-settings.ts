@@ -118,6 +118,11 @@ export const DEFAULT_FACILITY_SETTINGS: FacilitySettings = {
     { name: 'Stool Culture', tier: 'special', specimen: 'Stool', loinc: '625-4' },
     { name: 'Blood Culture', tier: 'special', specimen: 'Blood', loinc: '600-7' },
     { name: 'Lipid Profile', tier: 'special', specimen: 'Blood', loinc: '57698-3' },
+    // Imaging studies — specimen 'Imaging' routes these to the radiology queue.
+    { name: 'X-Ray — Chest', tier: 'special', specimen: 'Imaging' },
+    { name: 'X-Ray — Limb/Skeletal', tier: 'special', specimen: 'Imaging' },
+    { name: 'Ultrasound — Abdomen', tier: 'special', specimen: 'Imaging' },
+    { name: 'Ultrasound — Obstetric', tier: 'special', specimen: 'Imaging' },
   ],
   rooms: ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5', 'Room 6', 'Bay A', 'Bay B', 'Bay C', 'Bay D'],
   departments: ['General Medicine', 'Maternity', 'Emergency', 'Pediatrics', 'Ophthalmology', 'Dental', 'Dermatology', 'OPD'],

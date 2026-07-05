@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useLabResults } from '@/lib/hooks/useLabResults';
+import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import {
   FlaskConical, CheckCircle2, AlertTriangle, Activity,
@@ -126,7 +127,10 @@ export default function LabDashboardPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const { currentUser } = useApp();
-  const { results, loading, update } = useLabResults();
+  const { results: allResults, loading, update } = useLabResults();
+  // Imaging orders (specimen 'Imaging') belong to the radiology work queue —
+  // keep the lab bench focused on specimen-based investigations.
+  const results = useMemo(() => allResults.filter(r => !isImagingStudy(r)), [allResults]);
   const dateLabel = useMemo(() => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date()), []);
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [eventCounter, setEventCounter] = useState(0);
