@@ -303,10 +303,10 @@ const GOAL_STATS = [
 ];
 
 const TEAM = [
-  { name: "Teny Makuach", role: "Founder", image: "/assets/founder-teny.jpg" },
+  { name: "Teny Makuach", role: "Founder and Developer", image: "/assets/founder-teny.jpg" },
   { name: "Ekow Williams", role: "Community & Partnerships", image: "/assets/founder-ekow.jpg" },
   { name: "Toye Adebayo", role: "Project Manager", image: "/assets/founder-toye.jpg" },
-  { name: "Mark Dosu", role: "Software Developer", image: "/assets/Mark-Dosu.jpeg" },
+  { name: "Mark Dosu", role: "Developer", image: "/assets/Mark-Dosu.jpeg" },
   { name: "Chinonye Hycent", role: "Research Lead", image: "/assets/chinonye-hycent.jpg" },
   { name: "Isaac Kyalo", role: "Technical Lead", image: "/assets/isaac-kyalo.jpg" },
 ];
