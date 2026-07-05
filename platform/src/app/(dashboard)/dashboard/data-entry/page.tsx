@@ -2,6 +2,7 @@
 import DashboardHero from '@/components/dashboard/DashboardHero';
 import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import SpotlightCard from '@/components/dashboard/SpotlightCard';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,6 +11,7 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useToast } from '@/components/Toast';
+import { isPathAllowed } from '@/lib/role-routes';
 import {
   ClipboardCheck, Baby, Skull, Syringe, HeartPulse,
   Database, Building2, ArrowRight, CheckCircle2, AlertTriangle,
@@ -257,6 +259,8 @@ export default function DataEntryDashboard() {
       <TopBar title={t('dataEntry.title')} />
       <main className="page-container page-enter">
 
+        <DashboardGreetingHeader />
+
         <DashboardHero
           className="mb-5"
           stats={[
@@ -274,24 +278,11 @@ export default function DataEntryDashboard() {
             { label: 'All Patients', icon: Users, href: '/patients', color: '#0D9488' },
             { label: 'Data Quality', icon: ClipboardCheck, href: '/data-quality', color: 'var(--accent-primary)' },
             { label: 'Reports', icon: BarChart3, href: '/reports', color: '#F59E0B' },
-          ]}
-          secondaryCard={<SpotlightCard title="Profile Completeness" value={`${facilityStats?.pct ?? 0}%`} caption="facility profile filled" href="/my-facility" />}
+          ].filter(action => isPathAllowed(currentUser.role, action.href))}
+          secondaryCard={isPathAllowed(currentUser.role, '/my-facility') ? (
+            <SpotlightCard title="Profile Completeness" value={`${facilityStats?.pct ?? 0}%`} caption="facility profile filled" href="/my-facility" />
+          ) : undefined}
         />
-
-        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
-        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
-              <ClipboardCheck className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.title')}</h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {myHospital?.name || currentUser.hospitalName || ''}{myHospital?.state ? ` · ${myHospital.state}` : ''}
-              </p>
-            </div>
-          </div>
-        </div>
 
         {/* Facility banner */}
         {myHospital && (
@@ -413,7 +404,7 @@ export default function DataEntryDashboard() {
                   { label: t('dataEntry.generalBeds'), occupied: latest.occupiedBeds, total: latest.totalBeds, color: 'var(--accent-primary)' },
                   { label: t('dashboard.bedIcu'), occupied: latest.icuOccupied, total: latest.icuBeds, color: 'var(--color-danger)' },
                   { label: t('dashboard.bedMaternity'), occupied: latest.maternityOccupied, total: latest.maternityBeds, color: '#EC4899' },
-                  { label: t('dashboard.bedPediatric'), occupied: latest.pediatricOccupied, total: latest.pediatricBeds, color: '#2191D0' },
+                  { label: t('dashboard.bedPediatric'), occupied: latest.pediatricOccupied, total: latest.pediatricBeds, color: 'var(--color-brand-500)' },
                 ].map(bed => {
                   const pct = bed.total > 0 ? Math.round((bed.occupied / bed.total) * 100) : 0;
                   return (
@@ -637,7 +628,7 @@ export default function DataEntryDashboard() {
                 {textField(t('dataEntry.stockOutItems'), 'stockOutItems', t('dataEntry.stockOutItemsPlaceholder'))}
 
                 {/* 6. Infection Control */}
-                {sectionHeader(ShieldCheck, t('dataEntry.infectionControl'), '#2191D0')}
+                {sectionHeader(ShieldCheck, t('dataEntry.infectionControl'), 'var(--color-brand-500)')}
                 <div className="grid grid-cols-2 gap-3">
                   {numField(t('dataEntry.handwashStations'), 'handwashStations')}
                   {numField(t('dataEntry.functionalStations'), 'handwashFunctional')}

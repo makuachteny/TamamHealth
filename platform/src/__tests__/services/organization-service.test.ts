@@ -29,7 +29,7 @@ function validOrganization(overrides: Partial<CreateOrganizationInput> = {}): Cr
     slug: 'moh-ss',
     logoUrl: 'https://example.com/logo.png',
     primaryColor: '#2191D0',
-    secondaryColor: '#1E40AF',
+    secondaryColor: '#015697',
     accentColor: '#FF6B6B',
     subscriptionStatus: 'active' as const,
     subscriptionPlan: 'professional' as const,

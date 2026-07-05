@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import TopBar from '@/components/TopBar';
 import { useBirths } from '@/lib/hooks/useBirths';
+import { usePatients } from '@/lib/hooks/usePatients';
+import { patientFullName } from '@/lib/patient-utils';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { FilterMenu } from '@/components/filters';
 import {
   Baby, Plus, X, ChevronDown, ChevronUp,
 } from '@/components/icons/lucide';
@@ -16,15 +18,25 @@ import {
 export default function BirthsPage() {
   const { births, loading, register } = useBirths();
   const { hospitals } = useHospitals();
+  const { patients } = usePatients();
+
+  // Birth records store the mother as free text only — link her name to a
+  // chart when a real registered patient matches it (same guard idea as ANC:
+  // never link demo/seed-only identities).
+  const motherChartId = useMemo(() => {
+    const byName = new Map<string, string>();
+    for (const p of patients) {
+      if (p._id.startsWith('demo-') || p._id.includes('_demo')) continue;
+      byName.set(patientFullName(p).trim().toLowerCase(), p._id);
+    }
+    return (name?: string) => (name ? byName.get(name.trim().toLowerCase()) : undefined);
+  }, [patients]);
   const { currentUser, globalSearch } = useApp();
   const { canRecordVitalEvents } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();
   // Text search comes from the shared global search bar (TopBar).
   const search = globalSearch;
-  const [deliveryFilter, setDeliveryFilter] = useState('all');
-  const activeFilterCount = (deliveryFilter !== 'all' ? 1 : 0);
-  const clearFilters = () => { setDeliveryFilter('all'); };
   const [showForm, setShowForm] = useState(false);
   const [expandedBirth, setExpandedBirth] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -37,7 +49,6 @@ export default function BirthsPage() {
   });
 
   const filtered = (births || []).filter(b =>
-    (deliveryFilter === 'all' || b.deliveryType === deliveryFilter) &&
     (!search || `${b.childFirstName} ${b.childSurname}`.toLowerCase().includes(search.toLowerCase()) ||
     (b.motherName || '').toLowerCase().includes(search.toLowerCase()) || (b.certificateNumber || '').toLowerCase().includes(search.toLowerCase()))
   );
@@ -64,22 +75,7 @@ export default function BirthsPage() {
 
   return (
     <>
-      <TopBar title={t('nav.births')} searchTrailing={
-              <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
-                <FilterMenu.Field label="Delivery type">
-                  <select
-                    className="w-full text-sm"
-                    value={deliveryFilter}
-                    onChange={e => setDeliveryFilter(e.target.value)}
-                  >
-                    <option value="all">All deliveries</option>
-                    <option value="normal">Normal</option>
-                    <option value="caesarean">Caesarean</option>
-                    <option value="assisted">Assisted</option>
-                  </select>
-                </FilterMenu.Field>
-              </FilterMenu>
-          } actions={
+      <TopBar title={t('nav.births')} actions={
             canRecordVitalEvents && (
               <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
                 <Plus className="w-4 h-4" /> {t('births.registerBirth')}
@@ -116,7 +112,20 @@ export default function BirthsPage() {
                     <td className="text-xs font-mono">{b.dateOfBirth}</td>
                     <td className="text-sm">{b.birthWeight}g</td>
                     <td className="text-xs capitalize">{b.deliveryType}</td>
-                    <td className="text-sm">{b.motherName}</td>
+                    <td className="text-sm">
+                      {motherChartId(b.motherName) ? (
+                        <Link
+                          href={`/patients/${motherChartId(b.motherName)}`}
+                          className="hover:underline"
+                          style={{ color: 'var(--accent-primary)', fontWeight: 600 }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          {b.motherName}
+                        </Link>
+                      ) : (
+                        b.motherName
+                      )}
+                    </td>
                     <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{(b.facilityName || '').replace(' Hospital', '').replace(' Teaching', '')}</td>
                     <td className="text-xs" style={{ color: 'var(--text-muted)' }}>
                       <div className="flex items-center gap-1">

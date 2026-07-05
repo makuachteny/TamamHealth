@@ -44,6 +44,25 @@ export function initials(name: string): string {
   return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || '?';
 }
 
+/** Round-avatar fill palette. Deterministic per name, so the same person always
+ *  gets the same colour. White initials sit on top. */
+const AVATAR_COLORS = ['#F8593E', '#FF7F00', '#00A95D'];
+export function avatarColor(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+/** State/acuity avatar colour: critical (red), watch (orange), stable (green).
+ *  Accepts triage priority (RED/YELLOW/GREEN) or a free-text priority/status;
+ *  anything unknown reads as stable. */
+export function stateColor(state?: string | null): string {
+  const s = (state || '').toLowerCase();
+  if (s === 'red' || s.includes('critical') || s.includes('emerg')) return '#F8593E';
+  if (s === 'yellow' || s.includes('watch') || s.includes('urgent')) return '#FF7F00';
+  return '#00A95D';
+}
+
 /**
  * Patient age in whole years. Prefers an explicit estimatedAge, otherwise
  * derives it from dateOfBirth with a month/day adjustment so it never reads a

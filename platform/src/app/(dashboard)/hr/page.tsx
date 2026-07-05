@@ -413,7 +413,7 @@ export default function HRPage() {
                     <tr key={u._id}>
                       <td>
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1E3A8A 100%)' }}>{initials || '?'}</div>
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg, #2191D0 0%, #015697 100%)' }}>{initials || '?'}</div>
                           <div>
                             <div className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{u.name}</div>
                             <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>@{u.username}</div>
@@ -506,7 +506,7 @@ export default function HRPage() {
                 {SHIFT_TYPES.map(shift => {
                   const list = schedules.filter(s => s.shiftType === shift);
                   if (list.length === 0) return null;
-                  const shiftColor = shift === 'morning' ? 'var(--color-success-text)' : shift === 'afternoon' ? 'var(--color-warning-400)' : shift === 'night' ? '#1E3A8A' : 'var(--accent-primary)';
+                  const shiftColor = shift === 'morning' ? 'var(--color-success-text)' : shift === 'afternoon' ? 'var(--color-warning-400)' : shift === 'night' ? '#015697' : 'var(--accent-primary)';
                   return (
                     <div key={shift}>
                       <div className="px-5 py-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: shiftColor, background: 'var(--overlay-subtle)', borderTop: '1px solid var(--border-light)', borderBottom: '1px solid var(--border-light)' }}>

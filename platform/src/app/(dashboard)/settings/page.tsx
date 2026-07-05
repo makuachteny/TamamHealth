@@ -434,7 +434,7 @@ export default function SettingsPage() {
               className="flex items-center gap-2 px-5 py-3 font-medium text-sm transition-colors"
               style={{
                 color: activeTab === tab.key ? 'var(--accent-primary)' : 'var(--text-muted)',
-                borderBottom: activeTab === tab.key ? '2px solid #3b82f6' : '2px solid transparent',
+                borderBottom: activeTab === tab.key ? '2px solid #2191D0' : '2px solid transparent',
                 marginBottom: '-1px',
                 background: 'transparent', border: 'none', borderBottomStyle: 'solid',
                 borderBottomWidth: '2px',
@@ -1227,7 +1227,7 @@ export default function SettingsPage() {
                       <input type="checkbox"
                         checked={hospitalForm[f.key as keyof typeof hospitalForm] as boolean}
                         onChange={e => setHospitalForm(p => ({ ...p, [f.key]: e.target.checked }))}
-                        className="w-4 h-4 rounded accent-[#3b82f6]"
+                        className="w-4 h-4 rounded accent-[#2191D0]"
                       />
                       {f.label}
                     </label>

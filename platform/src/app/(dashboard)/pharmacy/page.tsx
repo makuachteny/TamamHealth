@@ -5,7 +5,7 @@ import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
 import PatientName from '@/components/PatientName';
 import { Pill, AlertTriangle, Loader2, Plus, X, Printer, Calendar, Package, ShoppingCart, User, ChevronRight, AlertOctagon, Filter } from '@/components/icons/lucide';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
@@ -38,7 +38,15 @@ export default function PharmacyPage() {
   }, [openFilter]);
   // Patients tab — which patient's prescription view is open (patient _id)
   const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
-  const { globalSearch, currentUser } = useApp();
+  const { globalSearch, setGlobalSearch, currentUser } = useApp();
+  const searchParams = useSearchParams();
+  // Deep link from a patient chart: /pharmacy?patient=<name> pre-filters via
+  // the shared global search (the page's only free-text filter).
+  useEffect(() => {
+    const patientParam = searchParams?.get('patient');
+    if (patientParam) setGlobalSearch(patientParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const { canDispense } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();
@@ -419,7 +427,7 @@ export default function PharmacyPage() {
             <div className="card-elevated overflow-hidden">
               <div className="flex items-center gap-2 px-4 pt-3 pb-2">
                 <div className="icon-box-sm">
-                  <Pill className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                  <Pill className="w-4 h-4" style={{ color: '#2191D0' }} />
                 </div>
                 <span className="text-sm font-semibold">{t('pharmacy.prescriptionQueue')}</span>
                 <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>({filteredQueue.length})</span>
@@ -456,7 +464,7 @@ export default function PharmacyPage() {
                       <td className="text-sm">
                         <div className="flex items-center gap-2">
                           <div className="icon-box-sm">
-                            <Pill className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
+                            <Pill className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
                           </div>
                           {rx.medication}
                           {rx.urgency === 'immediate' && (
@@ -501,7 +509,7 @@ export default function PharmacyPage() {
               <div className="card-elevated overflow-hidden">
                 <div className="flex items-center gap-2 px-4 pt-3 pb-2">
                   <div className="icon-box-sm">
-                    <Pill className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                    <Pill className="w-4 h-4" style={{ color: '#2191D0' }} />
                   </div>
                   <span className="text-sm font-semibold">{t('pharmacy.medicationInventory')}</span>
                   <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>({filteredInventory.length})</span>
@@ -538,7 +546,7 @@ export default function PharmacyPage() {
                             <div className="icon-box-sm">
                               {item.status === 'expired' || item.status === 'critical'
                                 ? <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />
-                                : <Pill className="w-3.5 h-3.5" style={{ color: item.status === 'low' ? '#F59E0B' : '#3B82F6' }} />
+                                : <Pill className="w-3.5 h-3.5" style={{ color: item.status === 'low' ? '#F59E0B' : '#2191D0' }} />
                               }
                             </div>
                             {item.medicationName}
@@ -689,7 +697,7 @@ export default function PharmacyPage() {
                           <td className="font-medium text-sm">
                             <div className="flex items-center gap-2">
                               <div className="icon-box-sm">
-                                <Calendar className="w-3.5 h-3.5" style={{ color: expired ? 'var(--color-danger)' : soon ? '#F59E0B' : '#3B82F6' }} />
+                                <Calendar className="w-3.5 h-3.5" style={{ color: expired ? 'var(--color-danger)' : soon ? '#F59E0B' : '#2191D0' }} />
                               </div>
                               {item.medicationName}
                             </div>
@@ -717,7 +725,7 @@ export default function PharmacyPage() {
             <div className="card-elevated overflow-hidden">
               <div className="flex items-center gap-2 px-4 pt-3 pb-2">
                 <div className="icon-box-sm">
-                  <Package className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                  <Package className="w-4 h-4" style={{ color: '#2191D0' }} />
                 </div>
                 <span className="text-sm font-semibold">{t('pharmacy.inventoryOverview')}</span>
                 <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>{totalUnits.toLocaleString()} {t('pharmacy.kpiTotalMeds')}</span>
@@ -795,7 +803,7 @@ export default function PharmacyPage() {
                           <td className="font-medium text-sm">
                             <div className="flex items-center gap-2">
                               <div className="icon-box-sm">
-                                <Pill className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
+                                <Pill className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
                               </div>
                               {rx.medication}
                             </div>
@@ -864,7 +872,7 @@ export default function PharmacyPage() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="icon-box-sm">
-                      <Pill className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                      <Pill className="w-4 h-4" style={{ color: '#2191D0' }} />
                     </div>
                     <h3 className="text-base font-semibold">{t('pharmacy.receiveStock')}</h3>
                   </div>

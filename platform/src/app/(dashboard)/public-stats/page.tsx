@@ -42,7 +42,7 @@ export default function PublicStatsPage() {
               { label: t('publicStats.healthFacilities'), value: hospitals.length, icon: Building2, color: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.12)' },
               { label: t('patients.kpiTotalPatients'), value: totalPop.toLocaleString(), icon: Users, color: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.12)' },
               { label: t('publicStats.hospitalBeds'), value: totalBeds.toLocaleString(), icon: BedDouble, color: 'var(--color-warning)', bg: 'rgba(252,211,77,0.12)' },
-              { label: t('publicStats.healthWorkers'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: '#2563EB', bg: 'rgba(56,189,248,0.12)' },
+              { label: t('publicStats.healthWorkers'), value: totalStaff.toLocaleString(), icon: Stethoscope, color: '#2191D0', bg: 'rgba(56,189,248,0.12)' },
               { label: t('publicStats.dhis2Coverage'), value: `${dqData?.dhis2Adoption ?? 0}%`, icon: Wifi, color: scoreColor(dqData?.dhis2Adoption ?? 0), bg: 'rgba(33, 145, 208, 0.12)' },
             ].map(stat => (
               <div key={stat.label} className="kpi">

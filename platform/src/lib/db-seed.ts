@@ -10,7 +10,7 @@ import {
   appointmentsDB, wardDB, pharmacyInventoryDB, triageDB, availabilityDB,
   assetsDB, leaveRequestsDB, payrollEntriesDB,
   problemsDB, telehealthDB, patientNotesDB, orderSetsDB,
-  phoneNotesDB, assessmentsDB,
+  phoneNotesDB, assessmentsDB, intakeFormsDB,
   isSeeded, markSeeded, resetAllDatabases, getDB
 } from './db';
 // `@/data/mock` carries 88 KB of fake patient PHI (50+ patient records, fake
@@ -22,7 +22,7 @@ import type {
   DiseaseAlertDoc, LabResultDoc, PrescriptionDoc, MedicalRecordDoc, MessageDoc,
   BirthRegistrationDoc, DeathRegistrationDoc, FacilityAssessmentDoc,
   ImmunizationDoc, ANCVisitDoc, FollowUpDoc, OrganizationDoc,
-  PatientNoteDoc, OrderSetDoc, PhoneNoteDoc, AssessmentDoc
+  PatientNoteDoc, OrderSetDoc, PhoneNoteDoc, AssessmentDoc, PatientIntakeFormDoc
 } from './db-types';
 import type { AllergyEntry, DirectiveEntry, CareAlertEntry } from '@/data/mock';
 import type {
@@ -230,7 +230,7 @@ async function fetchAdminCredential(): Promise<{ username: string; password: str
   }
 }
 
-const labOrders: Omit<LabResultDoc, '_rev' | 'createdBy'>[] = [
+export const labOrders: Omit<LabResultDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'lab-001', type: 'lab_result', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', hospitalNumber: 'JTH-000001', testName: 'Malaria RDT', specimen: 'Blood', status: 'completed', result: 'Positive (P. falciparum)', unit: '', referenceRange: 'Negative', abnormal: true, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T08:30:00Z', completedAt: '2026-02-09T09:15:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T08:30:00Z', updatedAt: '2026-02-09T09:15:00Z' },
   { _id: 'lab-002', type: 'lab_result', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', hospitalNumber: 'JTH-000005', testName: 'Full Blood Count', specimen: 'Blood (EDTA)', status: 'completed', result: 'Hb 7.2 g/dL, WBC 14.3\u00d710\u00b3/\u03bcL', unit: '', referenceRange: '', abnormal: true, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-09T07:45:00Z', completedAt: '2026-02-09T10:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T07:45:00Z', updatedAt: '2026-02-09T10:30:00Z' },
   { _id: 'lab-003', type: 'lab_result', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', hospitalNumber: 'JTH-000012', testName: 'CD4 Count', specimen: 'Blood (EDTA)', status: 'in_progress', result: '', unit: '', referenceRange: '500-1500 cells/\u03bcL', abnormal: false, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-09T09:00:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:00:00Z', updatedAt: '2026-02-09T09:00:00Z' },
@@ -243,7 +243,7 @@ const labOrders: Omit<LabResultDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'lab-010', type: 'lab_result', patientId: 'pat-00015', patientName: 'Tut Chuol Both', hospitalNumber: 'JTH-000015', testName: 'Renal Function', specimen: 'Blood', status: 'completed', result: 'Creatinine 1.8 mg/dL, BUN 45 mg/dL', unit: '', referenceRange: 'Cr 0.6-1.2, BUN 7-20', abnormal: true, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-08T14:00:00Z', completedAt: '2026-02-08T16:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-08T14:00:00Z', updatedAt: '2026-02-08T16:30:00Z' },
 ];
 
-const prescriptionQueue: Omit<PrescriptionDoc, '_rev' | 'createdBy'>[] = [
+export const prescriptionQueue: Omit<PrescriptionDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'rx-001', type: 'prescription', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', medication: 'Artemether-Lumefantrine (Coartem)', dose: '80/480mg BD x 3 days', route: 'Oral', frequency: 'BD', duration: '3 days', prescribedBy: 'Dr. James Wani Igga', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:15:00Z', updatedAt: '2026-02-09T09:15:00Z' },
   { _id: 'rx-002', type: 'prescription', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg OD x 30 days', route: 'Oral', frequency: 'OD', duration: '30 days', prescribedBy: 'Dr. Achol Mayen Deng', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:30:00Z', updatedAt: '2026-02-09T09:30:00Z' },
   { _id: 'rx-003', type: 'prescription', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', medication: 'TDF/3TC/DTG', dose: '300/300/50mg OD x 90 days', route: 'Oral', frequency: 'OD', duration: '90 days', prescribedBy: 'Dr. Achol Mayen Deng', status: 'dispensed', dispensedAt: '2026-02-09T10:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T10:00:00Z', updatedAt: '2026-02-09T10:30:00Z' },
@@ -252,7 +252,7 @@ const prescriptionQueue: Omit<PrescriptionDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'rx-006', type: 'prescription', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', medication: 'Amoxicillin', dose: '500mg TDS x 7 days', route: 'Oral', frequency: 'TDS', duration: '7 days', prescribedBy: 'Dr. James Wani Igga', status: 'pending', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T11:00:00Z', updatedAt: '2026-02-09T11:00:00Z' },
 ];
 
-const seedMessages: Omit<MessageDoc, '_rev' | 'createdBy'>[] = [
+export const seedMessages: Omit<MessageDoc, '_rev' | 'createdBy'>[] = [
   {
     _id: 'msg-001', type: 'message', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678',
     fromDoctorId: 'user-dr.wani', fromDoctorName: 'Dr. James Wani Igga', fromHospitalName: 'Juba Teaching Hospital',
@@ -335,7 +335,7 @@ const seedFacilityAssessments: Omit<FacilityAssessmentDoc, '_rev' | 'createdBy'>
   { _id: 'assess-006', type: 'facility_assessment', facilityId: 'hosp-006', facilityName: 'Aweil State Hospital', assessmentDate: '2026-01-20', assessedBy: 'WHO Assessment Team', generalEquipmentScore: 38, diagnosticCapacityScore: 30, essentialMedicinesScore: 28, infectionControlScore: 35, hasCleanWater: false, hasSanitation: false, hasWasteManagement: false, hasEmergencyTransport: false, hasCommunication: false, powerReliabilityScore: 15, staffingScore: 30, hisStaffCount: 0, hisStaffTrained: 0, hasPatientRegisters: true, hasDHIS2Reporting: false, reportingCompleteness: 25, reportingTimeliness: 20, dataQualityScore: 22, overallScore: 28, state: 'Northern Bahr el Ghazal', recommendations: 'Critical infrastructure deficits. No HIS staff. No DHIS2. Needs immediate investment.', createdAt: '2026-01-20T10:00:00Z', updatedAt: '2026-01-20T10:00:00Z' },
 ];
 
-const seedImmunizations: Omit<ImmunizationDoc, '_rev' | 'createdBy'>[] = [
+export const seedImmunizations: Omit<ImmunizationDoc, '_rev' | 'createdBy'>[] = [
   // Child 1: Akon Deng (birth-001) — good coverage
   { _id: 'imm-001', type: 'immunization', patientId: 'pat-00051', patientName: 'Akon Deng', gender: 'Female', dateOfBirth: '2025-06-15', vaccine: 'BCG', doseNumber: 1, dateGiven: '2025-06-15', nextDueDate: '2025-08-15', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', state: 'Central Equatoria', administeredBy: 'Nurse Stella Keji Lemi', batchNumber: 'BCG-2025-JTH-044', site: 'left arm', adverseReaction: false, status: 'completed', createdAt: '2025-06-15T08:00:00Z', updatedAt: '2025-06-15T08:00:00Z' },
   { _id: 'imm-002', type: 'immunization', patientId: 'pat-00051', patientName: 'Akon Deng', gender: 'Female', dateOfBirth: '2025-06-15', vaccine: 'OPV', doseNumber: 0, dateGiven: '2025-06-15', nextDueDate: '2025-08-15', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', state: 'Central Equatoria', administeredBy: 'Nurse Stella Keji Lemi', batchNumber: 'OPV-2025-JTH-112', site: 'oral', adverseReaction: false, status: 'completed', createdAt: '2025-06-15T08:05:00Z', updatedAt: '2025-06-15T08:05:00Z' },
@@ -503,7 +503,7 @@ async function safePut(db: PouchDB.Database, doc: Record<string, unknown>): Prom
 // ═══ Payment & Billing Seed Data ══════════════════════════════════
 // 5 patients with diverse payment scenarios for workflow testing
 
-const seedCharges: Omit<ChargeDoc, '_rev' | 'createdBy'>[] = [
+export const seedCharges: Omit<ChargeDoc, '_rev' | 'createdBy'>[] = [
   // Patient 1 (pat-00001 Deng Mabior Garang) — Cash payment, fully paid
   { _id: 'chg-001', type: 'charge', encounterId: 'enc-pay-001', patientId: 'pat-00001', description: 'Outpatient Consultation', category: 'consultation', units: 1, billedAmount: 5000, status: 'approved', serviceDate: '2026-03-10', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', createdAt: '2026-03-10T08:00:00Z', updatedAt: '2026-03-10T08:00:00Z' },
   { _id: 'chg-002', type: 'charge', encounterId: 'enc-pay-001', patientId: 'pat-00001', description: 'Malaria RDT', category: 'laboratory', units: 1, billedAmount: 2000, status: 'approved', serviceDate: '2026-03-10', providerId: 'user-lab.gatluak', providerName: 'Lab Tech Gatluak Puok', facilityId: 'hosp-001', createdAt: '2026-03-10T08:30:00Z', updatedAt: '2026-03-10T08:30:00Z' },
@@ -531,7 +531,7 @@ const seedCharges: Omit<ChargeDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'chg-016', type: 'charge', encounterId: 'enc-pay-005', patientId: 'pat-00022', description: 'Hemoglobin Test', category: 'laboratory', units: 1, billedAmount: 2000, status: 'approved', serviceDate: '2026-03-01', providerId: 'user-lab.gatluak', providerName: 'Lab Tech Gatluak Puok', facilityId: 'hosp-001', createdAt: '2026-03-01T10:00:00Z', updatedAt: '2026-03-01T10:00:00Z' },
 ];
 
-const seedInsurancePolicies: Omit<InsurancePolicyDoc, '_rev' | 'createdBy'>[] = [
+export const seedInsurancePolicies: Omit<InsurancePolicyDoc, '_rev' | 'createdBy'>[] = [
   // Patient 3 — Donor-funded coverage (Health Pooled Fund)
   {
     _id: 'ins-001', type: 'insurance_policy', patientId: 'pat-00012',
@@ -575,7 +575,7 @@ const seedPatientNotes: Omit<PatientNoteDoc, '_rev'>[] = [
   },
 ];
 
-const seedClaims: Omit<ClaimDoc, '_rev' | 'createdBy'>[] = [
+export const seedClaims: Omit<ClaimDoc, '_rev' | 'createdBy'>[] = [
   // Patient 3 — Donor claim (paid in full)
   {
     _id: 'clm-001', type: 'claim', encounterId: 'enc-pay-003', patientId: 'pat-00012',
@@ -610,7 +610,7 @@ const seedClaims: Omit<ClaimDoc, '_rev' | 'createdBy'>[] = [
   },
 ];
 
-const seedPayments: Omit<PaymentDoc, '_rev' | 'createdBy'>[] = [
+export const seedPayments: Omit<PaymentDoc, '_rev' | 'createdBy'>[] = [
   // Patient 1 — Cash payment (fully paid)
   {
     _id: 'pay-001', type: 'payment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang',
@@ -708,7 +708,7 @@ const seedPayments: Omit<PaymentDoc, '_rev' | 'createdBy'>[] = [
   },
 ];
 
-const seedPaymentPlans: Omit<PaymentPlanDoc, '_rev' | 'createdBy'>[] = [
+export const seedPaymentPlans: Omit<PaymentPlanDoc, '_rev' | 'createdBy'>[] = [
   // Patient 4 — 3-month interest-free plan for emergency visit balance
   {
     _id: 'plan-001', type: 'payment_plan', patientId: 'pat-00018',
@@ -731,7 +731,7 @@ const seedPaymentPlans: Omit<PaymentPlanDoc, '_rev' | 'createdBy'>[] = [
   },
 ];
 
-const seedLedgerEntries: Omit<LedgerEntryDoc, '_rev' | 'createdBy'>[] = [
+export const seedLedgerEntries: Omit<LedgerEntryDoc, '_rev' | 'createdBy'>[] = [
   // ── Patient 1: Deng Mabior Garang — Fully paid (balance: 0) ──
   { _id: 'led-001', type: 'ledger_entry', patientId: 'pat-00001', encounterId: 'enc-pay-001', entryType: 'charge', amount: 10000, runningBalance: 10000, description: 'Consultation + Malaria RDT + Coartem', referenceId: 'chg-001', referenceType: 'charge', currency: 'SSP', facilityId: 'hosp-001', createdAt: '2026-03-10T09:00:00Z', updatedAt: '2026-03-10T09:00:00Z' },
   { _id: 'led-002', type: 'ledger_entry', patientId: 'pat-00001', encounterId: 'enc-pay-001', entryType: 'payment', amount: -10000, runningBalance: 0, description: 'Cash payment — RCT-20260310-001', referenceId: 'pay-001', referenceType: 'payment', method: 'cash', currency: 'SSP', facilityId: 'hosp-001', createdAt: '2026-03-10T09:30:00Z', updatedAt: '2026-03-10T09:30:00Z' },
@@ -759,7 +759,7 @@ const seedLedgerEntries: Omit<LedgerEntryDoc, '_rev' | 'createdBy'>[] = [
 // ═══ Appointments seed data ═══════════════════════════════════════
 // Scheduled across recent + upcoming days, mixed statuses, linked to
 // seeded patients and providers (user-<username>).
-const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
+export const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-1', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(1), appointmentTime: '09:00', endTime: '09:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Malaria treatment follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(1) },
   { _id: 'appointment-2', type: 'appointment', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', patientPhone: '+211912555005', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(2), appointmentTime: '10:00', endTime: '10:30', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Obstetrics & Gynecology', reason: 'Antenatal check-up', status: 'scheduled', reminderSent: false, isRecurring: true, recurrencePattern: 'monthly', bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(5), updatedAt: daysAgo(5) },
   { _id: 'appointment-3', type: 'appointment', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', patientPhone: '+211912555012', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(7), appointmentTime: '11:00', endTime: '11:30', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Internal Medicine', reason: 'HIV / CD4 review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(4), updatedAt: daysAgo(4) },
@@ -1250,12 +1250,36 @@ export async function seedDatabase(): Promise<void> {
   // Sample nurse → doctor care assignments so the "assigned to you" worklist
   // (clinician dashboard) and the nurse's reassign control have demo data.
   // Keyed by patient id; all assigned by the seeded nurse to hosp-001 doctors.
-  const careAssignments: Record<string, { doctorId: string; doctorName: string; note?: string }> = {
+  const careAssignments: Record<string, { doctorId: string; doctorName: string; note?: string; assignedBy?: string; assignedByName?: string }> = {
     'pat-00001': { doctorId: 'user-dr.wani', doctorName: 'Dr. James Wani Igga', note: 'Febrile, ?malaria — please review this morning' },
     'pat-00022': { doctorId: 'user-dr.wani', doctorName: 'Dr. James Wani Igga', note: 'Severe anaemia / sickle cell crisis — admitted, needs review' },
     'pat-00030': { doctorId: 'user-dr.wani', doctorName: 'Dr. James Wani Igga', note: 'Burns >30% TBSA in ICU — urgent' },
     'pat-00012': { doctorId: 'user-dr.achol', doctorName: 'Dr. Achol Mayen Deng', note: 'HIV / CD4 review due' },
     'pat-00040': { doctorId: 'user-dr.achol', doctorName: 'Dr. Achol Mayen Deng', note: 'Abdominal pain — awaiting work-up' },
+    // Clinical Officer worklist (CO Deng, Wau State Hospital / hosp-002). These
+    // are Wau-registered patients so they pass the CO's facility scope and
+    // populate the "Patients assigned to you" board end-to-end.
+    'pat-00002': { doctorId: 'user-co.deng', doctorName: 'CO Deng Mabior Kuol', note: 'New fever + cough — assess and start work-up', assignedBy: 'user-nurse.wau', assignedByName: 'Nurse Grace Achai Lual' },
+    'pat-00006': { doctorId: 'user-co.deng', doctorName: 'CO Deng Mabior Kuol', note: 'Hypertension review — BP high at triage', assignedBy: 'user-nurse.wau', assignedByName: 'Nurse Grace Achai Lual' },
+    'pat-00010': { doctorId: 'user-co.deng', doctorName: 'CO Deng Mabior Kuol', note: 'Diabetic foot — wound check and dressing', assignedBy: 'user-nurse.wau', assignedByName: 'Nurse Grace Achai Lual' },
+    'pat-00014': { doctorId: 'user-co.deng', doctorName: 'CO Deng Mabior Kuol', note: 'Antenatal visit — routine ANC review', assignedBy: 'user-nurse.wau', assignedByName: 'Nurse Grace Achai Lual' },
+    'pat-00018': { doctorId: 'user-co.deng', doctorName: 'CO Deng Mabior Kuol', note: 'Persistent diarrhoea — assess dehydration', assignedBy: 'user-nurse.wau', assignedByName: 'Nurse Grace Achai Lual' },
+    'pat-00026': { doctorId: 'user-co.deng', doctorName: 'CO Deng Mabior Kuol', note: 'Follow-up after malaria treatment', assignedBy: 'user-nurse.wau', assignedByName: 'Nurse Grace Achai Lual' },
+    // Doctor worklists — Juba Teaching Hospital (hosp-001) patients so the
+    // assigned patients pass each doctor's facility scope and populate their
+    // "Patients assigned to you" board. (The five entries above at hosp-002/004
+    // were registered off-facility and so never surfaced on the Juba doctors'
+    // boards; these Juba-registered patients fix that end-to-end.)
+    'pat-00005': { doctorId: 'user-dr.wani', doctorName: 'Dr. James Wani Igga', note: 'Chest pain — review ECG this morning' },
+    'pat-00009': { doctorId: 'user-dr.wani', doctorName: 'Dr. James Wani Igga', note: 'Poorly controlled diabetes — medication review' },
+    'pat-00013': { doctorId: 'user-dr.achol', doctorName: 'Dr. Achol Mayen Deng', note: 'Postnatal review — check BP and bleeding' },
+    'pat-00017': { doctorId: 'user-dr.achol', doctorName: 'Dr. Achol Mayen Deng', note: 'TB follow-up — sputum result back' },
+    // Clinician worklist (Dr. Peter Garang Deng, hosp-001).
+    'pat-00021': { doctorId: 'user-clinician.peter', doctorName: 'Dr. Peter Garang Deng', note: 'New OPD consult — abdominal pain' },
+    'pat-00025': { doctorId: 'user-clinician.peter', doctorName: 'Dr. Peter Garang Deng', note: 'Wound review — surgical follow-up' },
+    // Wau doctor worklist (Dr. Mary Akuol Deng, hosp-002).
+    'pat-00034': { doctorId: 'user-dr.wau', doctorName: 'Dr. Mary Akuol Deng', note: 'Severe malaria — review response to treatment', assignedBy: 'user-nurse.wau', assignedByName: 'Nurse Grace Achai Lual' },
+    'pat-00038': { doctorId: 'user-dr.wau', doctorName: 'Dr. Mary Akuol Deng', note: 'Pneumonia — reassess before discharge', assignedBy: 'user-nurse.wau', assignedByName: 'Nurse Grace Achai Lual' },
   };
 
   // Demo-only clinical chart extras (structured allergies, directives, care
@@ -1333,8 +1357,8 @@ export async function seedDatabase(): Promise<void> {
         assignedDoctor: assign.doctorId,
         assignedDoctorName: assign.doctorName,
         assignedAt: daysAgo(0),
-        assignedBy: 'user-nurse.stella',
-        assignedByName: 'Nurse Stella Keji Lemi',
+        assignedBy: assign.assignedBy ?? 'user-nurse.stella',
+        assignedByName: assign.assignedByName ?? 'Nurse Stella Keji Lemi',
         assignmentNote: assign.note,
       } : {}),
       ...(extras?.structuredAllergies ? {
@@ -1533,6 +1557,111 @@ export async function seedDatabase(): Promise<void> {
     await safePut(rDB, doc as unknown as Record<string, unknown>);
   }
 
+  // Clinical Officer's own outgoing referrals (CO Deng, Wau / hosp-002). The
+  // dashboard's "My Referrals" stat + "Open referrals" worklist filter on
+  // `createdBy === currentUser._id`, which the mock referrals never set — so
+  // without these the CO (and every clinician) shows zero. These give the CO a
+  // populated referrals worklist end-to-end.
+  const coReferrals = [
+    {
+      _id: 'ref-co-001', type: 'referral', patientId: 'pat-00063', patientName: 'Santino Madut',
+      fromHospital: 'Wau State Hospital', fromHospitalId: 'hosp-002',
+      toHospital: 'Juba Teaching Hospital', toHospitalId: 'hosp-001',
+      referralDate: dateAgo(1), urgency: 'urgent',
+      reason: 'Uncontrolled hypertension — cardiology review', department: 'Cardiology',
+      status: 'sent', referringDoctor: 'CO Deng Mabior Kuol',
+      notes: 'BP persistently >180/110 despite two agents; ECG changes.',
+      createdBy: 'user-co.deng', createdByName: 'CO Deng Mabior Kuol',
+      state: 'Western Bahr el Ghazal', county: 'Wau',
+      orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0),
+    },
+    {
+      _id: 'ref-co-002', type: 'referral', patientId: 'pat-00064', patientName: 'Aluel Garang',
+      fromHospital: 'Wau State Hospital', fromHospitalId: 'hosp-002',
+      toHospital: 'Juba Teaching Hospital', toHospitalId: 'hosp-001',
+      referralDate: dateAgo(0), urgency: 'routine',
+      reason: 'Diabetic foot — surgical debridement assessment', department: 'Surgery',
+      status: 'sent', referringDoctor: 'CO Deng Mabior Kuol',
+      notes: 'Grade 2 ulcer, not healing on outpatient care.',
+      createdBy: 'user-co.deng', createdByName: 'CO Deng Mabior Kuol',
+      state: 'Western Bahr el Ghazal', county: 'Wau',
+      orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0),
+    },
+  ];
+  for (const r of coReferrals) {
+    await safePut(rDB, r as unknown as Record<string, unknown>);
+  }
+
+  // Seed patient intake forms (all public org) — the front-desk review queue
+  // for forms patients submitted (or didn't) ahead of a visit.
+  const intakeDB = intakeFormsDB();
+  const intakeForms: PatientIntakeFormDoc[] = [
+    {
+      _id: 'intake-demo-01', type: 'patient_intake_form',
+      patientId: 'pat-00057', patientName: 'Achol Mayen Garang', hospitalNumber: 'JTH-000057',
+      providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga',
+      status: 'pending_review',
+      requestedAt: daysAgo(3), receivedAt: daysAgo(2),
+      fields: [
+        { label: 'Date of birth', value: '2002-03-15' },
+        { label: 'Phone', value: '+211912555057' },
+        { label: 'Address', value: 'Juba, Central Equatoria' },
+        { label: 'Emergency contact', value: 'Mayen Garang (father) — +211912555099' },
+        { label: 'Known allergies', value: 'Penicillin' },
+        { label: 'Reason for visit', value: 'Follow-up on ongoing treatment' },
+      ],
+      hospitalId: 'hosp-001', orgId: PUBLIC_ORG_ID,
+      createdAt: daysAgo(3), updatedAt: daysAgo(2),
+    },
+    {
+      _id: 'intake-demo-02', type: 'patient_intake_form',
+      patientId: 'pat-00058', patientName: 'Nyakuoth Koang Jal', hospitalNumber: 'BSH-000003',
+      providerId: 'user-nurse.wau', providerName: 'Nurse Stella Keji Lemi',
+      status: 'pending_review',
+      requestedAt: daysAgo(6), receivedAt: daysAgo(5),
+      fields: [
+        { label: 'Date of birth', value: '1996-01-20' },
+        { label: 'Phone', value: '+211912555058' },
+        { label: 'Address', value: 'Rubkona, Unity' },
+        { label: 'Emergency contact', value: 'Nyandeng Jal (sister) — +211912555098' },
+        { label: 'Known allergies', value: 'None reported' },
+        { label: 'Reason for visit', value: 'Antenatal check-up' },
+      ],
+      hospitalId: 'hosp-004', orgId: PUBLIC_ORG_ID,
+      createdAt: daysAgo(6), updatedAt: daysAgo(5),
+    },
+    {
+      _id: 'intake-demo-03', type: 'patient_intake_form',
+      patientId: 'pat-00059', patientName: 'Abuk Deng Mading', hospitalNumber: 'WSH-000002',
+      providerId: 'user-co.deng', providerName: 'Clinical Officer Deng Mabior Kuol',
+      status: 'not_submitted',
+      requestedAt: daysAgo(10),
+      fields: [
+        { label: 'Date of birth', value: '1994-06-10' },
+        { label: 'Phone', value: '+211912555059' },
+      ],
+      hospitalId: 'hosp-002', orgId: PUBLIC_ORG_ID,
+      createdAt: daysAgo(10), updatedAt: daysAgo(10),
+    },
+    {
+      _id: 'intake-demo-04', type: 'patient_intake_form',
+      patientId: 'pat-00060', patientName: 'Nyandit Dut Malual', hospitalNumber: 'MTH-000002',
+      providerId: 'user-dr.wau', providerName: 'Dr. Peter Garang Deng',
+      status: 'merged',
+      requestedAt: daysAgo(21), receivedAt: daysAgo(20), mergedAt: daysAgo(19), mergedBy: 'Grace Poni Lukudu',
+      fields: [
+        { label: 'Date of birth', value: '2000-08-05' },
+        { label: 'Phone', value: '+211912555060' },
+        { label: 'Address', value: 'Malakal, Upper Nile' },
+      ],
+      hospitalId: 'hosp-003', orgId: PUBLIC_ORG_ID,
+      createdAt: daysAgo(21), updatedAt: daysAgo(19),
+    },
+  ];
+  for (const doc of intakeForms) {
+    await safePut(intakeDB, doc as unknown as Record<string, unknown>);
+  }
+
   // Seed disease alerts (all public org). Spread reportDates across the last
   // ~8 weeks so the surveillance weekly-trend line buckets into multiple ISO
   // weeks instead of collapsing to a single point. Each base alert is
@@ -1688,6 +1817,234 @@ export async function seedDatabase(): Promise<void> {
         facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: triageStat[i % triageStat.length],
         orgId: PUBLIC_ORG_ID, createdAt: daysAgo(i % 5), updatedAt: daysAgo(i % 5),
       } as unknown as Record<string, unknown>);
+    }
+  }
+
+  // ── Visualization fill: today's appointments + walk-ins for EVERY staffed
+  //    facility ─────────────────────────────────────────────────────────────
+  // So that whichever user you log in as (Juba / Wau / Malakal / Bentiu, public
+  // or private org), their dashboard shows a populated appointment board and a
+  // busy reception/walk-in queue rather than a near-empty list. Rows are built
+  // from each facility's own patients + providers so they pass facility/org
+  // scoping and land on the right dashboards.
+  {
+    const visApptDB = appointmentsDB();
+    const visTrDB = triageDB();
+
+    type VisProvider = { id: string; name: string };
+    type VisFacility = {
+      fid: string; fname: string; level: string; org: string;
+      providers: VisProvider[]; triager: VisProvider; desk: VisProvider;
+    };
+    const DESK_JUBA: VisProvider = { id: 'user-desk.amira', name: 'Amira Juma Hassan' };
+    const DESK_WAU: VisProvider = { id: 'user-desk.wau', name: 'Tabitha Nyandeng Kuol' };
+
+    const VIS_FACILITIES: VisFacility[] = [
+      {
+        fid: 'hosp-001', fname: 'Juba Teaching Hospital', level: 'national', org: PUBLIC_ORG_ID,
+        providers: [
+          { id: 'user-dr.wani', name: 'Dr. James Wani Igga' },
+          { id: 'user-dr.achol', name: 'Dr. Achol Mayen Deng' },
+        ],
+        triager: { id: 'user-triage.mary', name: 'Mary Nyaruai Gai' }, desk: DESK_JUBA,
+      },
+      {
+        fid: 'hosp-002', fname: 'Wau State Hospital', level: 'state', org: PUBLIC_ORG_ID,
+        providers: [
+          { id: 'user-co.deng', name: 'CO Deng Mabior Kuol' },
+          { id: 'user-dr.wau', name: 'Dr. Mary Akuol Deng' },
+        ],
+        triager: { id: 'user-nurse.wau', name: 'Nurse Grace Achai Lual' }, desk: DESK_WAU,
+      },
+      {
+        fid: 'hosp-003', fname: 'Malakal Teaching Hospital', level: 'national', org: PUBLIC_ORG_ID,
+        providers: [
+          { id: 'user-midwife.nyakong', name: 'Midwife Nyakong Gatkuoth' },
+          { id: 'user-nurse.stella', name: 'Nurse Stella Keji Lemi' },
+        ],
+        triager: { id: 'user-nurse.stella', name: 'Nurse Stella Keji Lemi' }, desk: DESK_JUBA,
+      },
+      {
+        fid: 'hosp-004', fname: 'Bentiu State Hospital', level: 'state', org: PUBLIC_ORG_ID,
+        providers: [
+          { id: 'user-lab.gatluak', name: 'Lab Tech Gatluak Puok' },
+        ],
+        triager: { id: 'user-lab.gatluak', name: 'Lab Tech Gatluak Puok' }, desk: DESK_JUBA,
+      },
+      // Private org (Mercy) shares the Juba facility but its own patients pool is
+      // empty, so borrow Juba patients tagged to the private org so Dr. Mercy /
+      // org-admin dashboards also populate.
+      {
+        fid: 'hosp-001', fname: 'Juba Teaching Hospital', level: 'national', org: PRIVATE_ORG_ID,
+        providers: [
+          { id: 'user-dr.mercy', name: 'Dr. Grace Lado' },
+        ],
+        triager: { id: 'user-triage.mary', name: 'Mary Nyaruai Gai' }, desk: DESK_JUBA,
+      },
+    ];
+
+    const VIS_SLOTS = [
+      { t: '08:00', e: '08:30' }, { t: '08:45', e: '09:15' }, { t: '09:30', e: '10:00' },
+      { t: '10:15', e: '10:45' }, { t: '11:00', e: '11:30' }, { t: '11:45', e: '12:15' },
+      { t: '13:00', e: '13:30' }, { t: '13:45', e: '14:15' }, { t: '14:30', e: '15:00' },
+      { t: '15:15', e: '15:45' }, { t: '16:00', e: '16:30' }, { t: '16:45', e: '17:15' },
+      { t: '07:15', e: '07:45' },
+    ];
+    const VIS_APPT_STATUS = ['confirmed', 'checked_in', 'scheduled', 'in_progress', 'checked_in', 'confirmed', 'scheduled', 'completed'];
+    const VIS_APPT_TYPE = ['general', 'follow_up', 'specialist', 'anc', 'general', 'lab'];
+    const VIS_DEPT = ['Outpatient', 'Internal Medicine', 'Obstetrics & Gynecology', 'Surgery', 'Paediatrics'];
+    const VIS_REASON = [
+      'Routine consultation', 'Follow-up review', 'Malaria follow-up', 'Antenatal check-up',
+      'Hypertension review', 'Diabetes review', 'Wound dressing follow-up', 'Fever assessment',
+    ];
+    const VIS_TRI_PRI = ['GREEN', 'YELLOW', 'GREEN', 'RED', 'YELLOW', 'GREEN'];
+    const VIS_TRI_STATUS = ['pending', 'seen', 'pending', 'pending', 'seen', 'pending'];
+    const VIS_WALKIN = [
+      'Walk-in fever and headache', 'Walk-in prescription refill', 'Walk-in high blood sugar check',
+      'Walk-in cough, 3 days', 'Walk-in abdominal pain', 'Walk-in wound review',
+      'Walk-in antenatal check', 'Walk-in blood pressure check',
+    ];
+    const patName = (p: { firstName: string; middleName?: string; surname: string }) =>
+      `${p.firstName} ${p.middleName ? p.middleName + ' ' : ''}${p.surname}`.replace(/\s+/g, ' ').trim();
+
+    for (let f = 0; f < VIS_FACILITIES.length; f++) {
+      const fac = VIS_FACILITIES[f];
+      const facPatients = patients.filter((p) => p.registrationHospital === fac.fid);
+      if (facPatients.length === 0) continue;
+
+      // Today's appointments (6 per public facility, fewer where the roster is thin).
+      const todayCount = Math.min(fac.org === PRIVATE_ORG_ID ? 4 : 13, facPatients.length, VIS_SLOTS.length);
+      for (let i = 0; i < todayCount; i++) {
+        const p = facPatients[i % facPatients.length];
+        const prov = fac.providers[i % fac.providers.length];
+        const slot = VIS_SLOTS[i];
+        const name = patName(p);
+        await safePut(visApptDB, {
+          _id: `appt-vis-${fac.fid}-${fac.org === PRIVATE_ORG_ID ? 'priv-' : ''}today-${i}`,
+          type: 'appointment', patientId: p.id, patientName: name, patientPhone: p.phone || '',
+          providerId: prov.id, providerName: prov.name,
+          facilityId: fac.fid, facilityName: fac.fname, facilityLevel: fac.level,
+          appointmentDate: dateAgo(0), appointmentTime: slot.t, endTime: slot.e, duration: 30,
+          appointmentType: VIS_APPT_TYPE[i % VIS_APPT_TYPE.length],
+          priority: i % 4 === 0 ? 'urgent' : 'routine',
+          department: VIS_DEPT[i % VIS_DEPT.length], reason: VIS_REASON[i % VIS_REASON.length],
+          status: VIS_APPT_STATUS[i % VIS_APPT_STATUS.length],
+          ...(VIS_APPT_STATUS[i % VIS_APPT_STATUS.length] === 'checked_in' || VIS_APPT_STATUS[i % VIS_APPT_STATUS.length] === 'in_progress'
+            ? { checkedInAt: daysAgo(0) } : {}),
+          reminderSent: true, reminderChannel: 'sms', isRecurring: false,
+          bookedBy: fac.desk.id, bookedByName: fac.desk.name,
+          state: p.state, county: p.county, orgId: fac.org,
+          createdAt: daysAgo((i % 5) + 1), updatedAt: daysAgo(0),
+        } as unknown as Record<string, unknown>);
+      }
+
+      // Telehealth visits today — a couple per facility so every clinician has
+      // a video visit to Join from the dashboard (appointmentType 'telehealth'
+      // drives the Join button + the telehealth visit room).
+      const thCount = Math.min(2, facPatients.length);
+      for (let i = 0; i < thCount; i++) {
+        const p = facPatients[(i + 2) % facPatients.length];
+        const prov = fac.providers[i % fac.providers.length];
+        const slot = VIS_SLOTS[(i + 4) % VIS_SLOTS.length];
+        const name = patName(p);
+        await safePut(visApptDB, {
+          _id: `appt-vis-${fac.fid}-${fac.org === PRIVATE_ORG_ID ? 'priv-' : ''}th-${i}`,
+          type: 'appointment', patientId: p.id, patientName: name, patientPhone: p.phone || '',
+          providerId: prov.id, providerName: prov.name,
+          facilityId: fac.fid, facilityName: fac.fname, facilityLevel: fac.level,
+          appointmentDate: dateAgo(0), appointmentTime: slot.t, endTime: slot.e, duration: 30,
+          appointmentType: 'telehealth', priority: 'routine',
+          department: 'Telemedicine', reason: 'Telehealth follow-up consultation',
+          status: i % 2 === 0 ? 'confirmed' : 'scheduled',
+          reminderSent: true, reminderChannel: 'sms', isRecurring: false,
+          bookedBy: fac.desk.id, bookedByName: fac.desk.name,
+          state: p.state, county: p.county, orgId: fac.org,
+          createdAt: daysAgo(1), updatedAt: daysAgo(0),
+        } as unknown as Record<string, unknown>);
+      }
+
+      // Extra "Scheduled" lane fill — 10 more scheduled arrivals for today per
+      // public facility so the Scheduled tab is well populated.
+      if (fac.org !== PRIVATE_ORG_ID) {
+        const SCHED_COUNT = 10;
+        for (let i = 0; i < SCHED_COUNT; i++) {
+          const p = facPatients[(i + todayCount) % facPatients.length];
+          const prov = fac.providers[i % fac.providers.length];
+          // Generate a time from mid-morning onward; overlaps are fine for a demo.
+          const mins = 8 * 60 + i * 25; // 08:00, 08:25, 08:50, …
+          const hh = String(Math.floor(mins / 60)).padStart(2, '0');
+          const mm = String(mins % 60).padStart(2, '0');
+          const emins = mins + 20;
+          const ehh = String(Math.floor(emins / 60)).padStart(2, '0');
+          const emm = String(emins % 60).padStart(2, '0');
+          const name = patName(p);
+          await safePut(visApptDB, {
+            _id: `appt-vis-${fac.fid}-sched-${i}`,
+            type: 'appointment', patientId: p.id, patientName: name, patientPhone: p.phone || '',
+            providerId: prov.id, providerName: prov.name,
+            facilityId: fac.fid, facilityName: fac.fname, facilityLevel: fac.level,
+            appointmentDate: dateAgo(0), appointmentTime: `${hh}:${mm}`, endTime: `${ehh}:${emm}`, duration: 20,
+            appointmentType: VIS_APPT_TYPE[i % VIS_APPT_TYPE.length],
+            priority: i % 5 === 0 ? 'urgent' : 'routine',
+            department: VIS_DEPT[i % VIS_DEPT.length], reason: VIS_REASON[i % VIS_REASON.length],
+            status: 'scheduled',
+            reminderSent: i % 2 === 0, reminderChannel: 'sms', isRecurring: false,
+            bookedBy: fac.desk.id, bookedByName: fac.desk.name,
+            state: p.state, county: p.county, orgId: fac.org,
+            createdAt: daysAgo((i % 4) + 1), updatedAt: daysAgo(0),
+          } as unknown as Record<string, unknown>);
+        }
+      }
+
+      // Upcoming appointments (4 per facility) so calendars / carousels populate.
+      const upcomingCount = Math.min(4, facPatients.length);
+      for (let i = 0; i < upcomingCount; i++) {
+        const p = facPatients[(i + 3) % facPatients.length];
+        const prov = fac.providers[i % fac.providers.length];
+        const slot = VIS_SLOTS[i % VIS_SLOTS.length];
+        const name = patName(p);
+        await safePut(visApptDB, {
+          _id: `appt-vis-${fac.fid}-${fac.org === PRIVATE_ORG_ID ? 'priv-' : ''}up-${i}`,
+          type: 'appointment', patientId: p.id, patientName: name, patientPhone: p.phone || '',
+          providerId: prov.id, providerName: prov.name,
+          facilityId: fac.fid, facilityName: fac.fname, facilityLevel: fac.level,
+          appointmentDate: dateFromNow(i + 1), appointmentTime: slot.t, endTime: slot.e, duration: 30,
+          appointmentType: VIS_APPT_TYPE[(i + 2) % VIS_APPT_TYPE.length],
+          priority: 'routine',
+          department: VIS_DEPT[(i + 1) % VIS_DEPT.length], reason: VIS_REASON[(i + 2) % VIS_REASON.length],
+          status: i % 2 === 0 ? 'confirmed' : 'scheduled',
+          reminderSent: i % 2 === 0, reminderChannel: 'sms', isRecurring: false,
+          bookedBy: fac.desk.id, bookedByName: fac.desk.name,
+          state: p.state, county: p.county, orgId: fac.org,
+          createdAt: daysAgo((i % 4) + 1), updatedAt: daysAgo(i % 3),
+        } as unknown as Record<string, unknown>);
+      }
+
+      // Today's reception walk-ins (5 per public facility) so the queue is busy.
+      if (fac.org === PRIVATE_ORG_ID) continue; // walk-ins tracked on the public facility record
+      const walkCount = Math.min(5, facPatients.length);
+      for (let i = 0; i < walkCount; i++) {
+        const p = facPatients[(i + 1) % facPatients.length];
+        const name = patName(p);
+        const pri = VIS_TRI_PRI[i % VIS_TRI_PRI.length];
+        await safePut(visTrDB, {
+          _id: `triage-vis-${fac.fid}-today-${i}`,
+          type: 'triage', patientId: p.id, patientName: name, hospitalNumber: p.hospitalNumber,
+          airway: 'clear',
+          breathing: pri === 'RED' ? 'distressed' : 'normal',
+          circulation: pri === 'RED' ? 'impaired' : 'normal',
+          consciousness: 'alert', priority: pri,
+          temperature: pri === 'RED' ? '39.0' : '37.2', pulse: pri === 'RED' ? '120' : '84',
+          respiratoryRate: pri === 'RED' ? '26' : '18',
+          systolic: pri === 'RED' ? '96' : '122', diastolic: pri === 'RED' ? '62' : '78',
+          oxygenSaturation: pri === 'RED' ? '92' : '98',
+          chiefComplaint: VIS_WALKIN[i % VIS_WALKIN.length],
+          triagedBy: fac.triager.id, triagedByName: fac.triager.name, triagedAt: daysAgo(0),
+          facilityId: fac.fid, facilityName: fac.fname,
+          status: VIS_TRI_STATUS[i % VIS_TRI_STATUS.length],
+          orgId: fac.org, createdAt: daysAgo(0), updatedAt: daysAgo(0),
+        } as unknown as Record<string, unknown>);
+      }
     }
   }
 

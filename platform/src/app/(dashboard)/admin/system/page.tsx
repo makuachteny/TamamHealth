@@ -34,7 +34,7 @@ export default function AdminSystemPage() {
   const [trialDays, setTrialDays] = useState(30);
   const [maxOrganizations, setMaxOrganizations] = useState(100);
   const [defaultPrimaryColor, setDefaultPrimaryColor] = useState('var(--accent-primary)');
-  const [defaultSecondaryColor, setDefaultSecondaryColor] = useState('#0F47AF');
+  const [defaultSecondaryColor, setDefaultSecondaryColor] = useState('#015697');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [dbStats, setDbStats] = useState<DBStats[]>([]);

@@ -2,6 +2,7 @@
 import DashboardHero from '@/components/dashboard/DashboardHero';
 import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import SpotlightCard from '@/components/dashboard/SpotlightCard';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 
 // Admin-oriented landing for the Medical Superintendent — the clinical
 // administrator who runs the hospital. Unlike the doctor/clinical-officer
@@ -17,7 +18,7 @@ import TopBar from '@/components/TopBar';
 import {
   Users, Stethoscope, HeartPulse, BedDouble, Wallet, Package,
   ClipboardCheck, BarChart3, Activity, AlertTriangle, SendHorizontal,
-  ChevronRight, ArrowRight, Building2,
+  ChevronRight, ArrowRight,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -54,7 +55,6 @@ export default function SuperintendentDashboard() {
   const [leave, setLeave] = useState<LeaveRequestDoc[]>([]);
 
   const facilityId = currentUser?.hospitalId;
-  const facilityName = currentUser?.hospitalName || currentUser?.hospital?.name || t('common.facility');
   const today = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
@@ -96,14 +96,16 @@ export default function SuperintendentDashboard() {
   const kpis = [
     { id: 'staff', label: t('dashboard.activeStaff'), value: facilityUsers.length || (totalDoctors + totalNurses), sub: t('superintendent.staffSub', { doctors: totalDoctors, nurses: totalNurses }), Icon: Users, color: 'var(--accent-primary)', href: '/hr' },
     { id: 'beds', label: t('dashboard.bedOccupancy'), value: `${occupancyPct}%`, sub: t('superintendent.bedsSub', { occupied: bedOccupancy, total: bedTotal }), Icon: BedDouble, color: '#15795C', href: '/wards' },
-    { id: 'leave', label: t('hr.kpiPendingLeave'), value: pendingLeave.length, sub: t('superintendent.leaveSub', { count: onLeaveToday.length }), Icon: ClipboardCheck, color: pendingLeave.length > 0 ? '#C44536' : 'var(--accent-primary)', href: '/hr?tab=leave', alarm: pendingLeave.length > 0 },
-    { id: 'alerts', label: t('dashboard.activeAlerts'), value: activeAlerts.length, sub: t('superintendent.alertsSub', { count: pendingReferrals.length }), Icon: AlertTriangle, color: activeAlerts.length > 0 ? '#C44536' : 'var(--accent-primary)', href: '/surveillance', alarm: activeAlerts.length > 0 },
+    { id: 'leave', label: t('hr.kpiPendingLeave'), value: pendingLeave.length, sub: t('superintendent.leaveSub', { count: onLeaveToday.length }), Icon: ClipboardCheck, color: pendingLeave.length > 0 ? 'var(--color-danger-500)' : 'var(--accent-primary)', href: '/hr?tab=leave', alarm: pendingLeave.length > 0 },
+    { id: 'alerts', label: t('dashboard.activeAlerts'), value: activeAlerts.length, sub: t('superintendent.alertsSub', { count: pendingReferrals.length }), Icon: AlertTriangle, color: activeAlerts.length > 0 ? 'var(--color-danger-500)' : 'var(--accent-primary)', href: '/surveillance', alarm: activeAlerts.length > 0 },
   ];
 
   return (
     <>
       <TopBar title={t('superintendent.topBarTitle')} />
       <main className="page-container page-enter">
+        <DashboardGreetingHeader />
+
         <DashboardHero
           className="mb-5"
           stats={[
@@ -119,20 +121,6 @@ export default function SuperintendentDashboard() {
           actions={QUICK_ACTIONS.slice(0, 4).map(a => ({ label: t(a.labelKey), icon: a.Icon, href: a.href }))}
           secondaryCard={<SpotlightCard title="Active Alerts" value={activeAlerts.length} caption={`${pendingReferrals.length} pending referrals`} href="/surveillance" />}
         />
-        <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>
-              {facilityName}
-            </h1>
-            <p className="text-[12px]" style={{ color: 'var(--text-muted)', marginTop: 2 }}>
-              {t('superintendent.roleLine', { name: currentUser?.name || '' })}
-            </p>
-          </div>
-          <button onClick={() => router.push('/my-facility')} className="btn btn-secondary">
-            <Building2 className="w-4 h-4" /> {t('breadcrumb.myFacility')}
-          </button>
-        </div>
-
         {/* ═══ KPI ROW ═══ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
           {kpis.map(k => (
@@ -180,11 +168,11 @@ export default function SuperintendentDashboard() {
                     style={{ textAlign: 'left' }}
                   >
                     <div className="icon-box-sm flex-shrink-0">
-                      <AlertTriangle className="w-4 h-4" style={{ color: a.alertLevel === 'emergency' ? '#C44536' : '#B8741C' }} />
+                      <AlertTriangle className="w-4 h-4" style={{ color: a.alertLevel === 'emergency' ? 'var(--color-danger-500)' : '#B8741C' }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{a.disease || t('superintendent.alertFallback')}</div>
-                      <div className="text-[11.5px] mt-0.5 capitalize" style={{ color: a.alertLevel === 'emergency' ? '#C44536' : '#B8741C' }}>
+                      <div className="text-[11.5px] mt-0.5 capitalize" style={{ color: a.alertLevel === 'emergency' ? 'var(--color-danger-500)' : '#B8741C' }}>
                         {a.alertLevel} · {[a.county, a.state].filter(Boolean).join(', ') || t('superintendent.locationFallback')} · {t('dashboard.casesCount', { count: a.cases })}
                       </div>
                     </div>

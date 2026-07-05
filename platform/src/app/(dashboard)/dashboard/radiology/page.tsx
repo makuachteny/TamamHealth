@@ -2,6 +2,7 @@
 import DashboardHero from '@/components/dashboard/DashboardHero';
 import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import SpotlightCard from '@/components/dashboard/SpotlightCard';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 
 import { useState, useMemo } from 'react';
 import TopBar from '@/components/TopBar';
@@ -10,6 +11,7 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useLabResults } from '@/lib/hooks/useLabResults';
+import { isPathAllowed } from '@/lib/role-routes';
 import {
   Scan, Upload, CheckCircle2, Clock, AlertTriangle,
   FileText, BarChart3, TrendingUp, Eye,
@@ -97,6 +99,8 @@ export default function RadiologyDashboard() {
       <TopBar title={t('radiology.title')} />
       <main className="page-container page-enter">
 
+        <DashboardGreetingHeader />
+
         <DashboardHero
           className="mb-5"
           stats={[
@@ -111,10 +115,10 @@ export default function RadiologyDashboard() {
           className="mb-5"
           actions={[
             { label: 'All Patients', icon: Users, href: '/patients' },
-            { label: 'Imaging Queue', icon: Scan, href: '/radiology', color: 'var(--accent-primary)' },
+            { label: 'Imaging Queue', icon: Scan, href: '/lab', color: 'var(--accent-primary)' },
             { label: 'Reports', icon: BarChart3, href: '/reports', color: '#0D9488' },
             { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#F59E0B' },
-          ]}
+          ].filter(action => isPathAllowed(currentUser.role, action.href))}
           secondaryCard={<SpotlightCard title="Urgent Studies" value={stats.urgent} caption={`${stats.pending} pending · ${stats.inProgress} in progress`} />}
         />
 
@@ -129,21 +133,6 @@ export default function RadiologyDashboard() {
             <CheckCircle2 className="w-3.5 h-3.5" /> {submitToast}
           </div>
         )}
-
-        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
-        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
-              <Scan className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('radiology.title')}</h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {currentUser.hospitalName || currentUser.hospital?.name || ''}
-              </p>
-            </div>
-          </div>
-        </div>
 
         {/* KPI tiles */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
@@ -229,7 +218,7 @@ export default function RadiologyDashboard() {
                       </p>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{
-                      background: study.status === 'completed' ? '#05966915' : study.status === 'in_progress' ? '#3b82f615' : '#D9770615',
+                      background: study.status === 'completed' ? '#05966915' : study.status === 'in_progress' ? '#2191D015' : '#D9770615',
                       color: study.status === 'completed' ? 'var(--color-success)' : study.status === 'in_progress' ? 'var(--accent-primary)' : 'var(--color-warning)',
                     }}>{t(`radiology.status_${study.status}`)}</span>
                   </div>

@@ -4,22 +4,22 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import {
   User, Calendar, FileText, FlaskConical, Syringe,
-  HeartPulse, Shield, Pill, Scan, FolderOpen,
+  HeartPulse, Pill, Scan,
   ChevronRight, AlertTriangle,
   MessageSquare, ArrowRight, Activity,
   Plus, X, LogOut, Send, Building2,
   Wallet, CreditCard, Phone, Banknote,
   Clock, CheckCircle2, Stethoscope,
   Thermometer, Weight, Droplets, Eye,
-  Upload, ClipboardList, Receipt,
-  UserCircle, Download, Trash2,
-  Edit3, Save, FileUp,
+  Receipt,
+  UserCircle,
+  Shield, Upload, FileUp, ClipboardList,
 } from '@/components/icons/lucide';
 import type { PatientDoc, AppointmentDoc, LabResultDoc, MedicalRecordDoc, PrescriptionDoc, ImmunizationDoc } from '@/lib/db-types';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { formatMoney } from '@/lib/format-utils';
 
-type Tab = 'overview' | 'appointments' | 'records' | 'lab' | 'prescriptions' | 'radiology' | 'documents' | 'immunizations' | 'messages' | 'chat' | 'billing' | 'insurance' | 'forms' | 'uploads' | 'statements' | 'profile';
+type Tab = 'overview' | 'appointments' | 'records' | 'lab' | 'prescriptions' | 'radiology' | 'immunizations' | 'messages' | 'chat' | 'billing' | 'profile';
 
 // Hide the patient-portal "Demo Accounts" dropdown in production. The seed
 // patients exist client-side regardless (so the portal can demo offline),
@@ -342,7 +342,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
             <span style={{ background: '#E52E42' }} />
             <span style={{ background: '#ffffff', border: '1px solid var(--border-medium)' }} />
             <span style={{ background: '#10B944' }} />
-            <span style={{ background: '#0F4C81' }} />
+            <span style={{ background: '#015697' }} />
             <span style={{ background: '#FCD34D' }} />
           </div>
           <p className="pp-form-footer-text">
@@ -400,9 +400,9 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           font-weight: 700;
           letter-spacing: 0.18em;
           text-transform: uppercase;
-          color: var(--accent-primary, #3b82f6);
+          color: var(--accent-primary, #2191D0);
           padding: 5px 12px;
-          border: 1px solid var(--accent-primary, #3b82f6);
+          border: 1px solid var(--accent-primary, #2191D0);
           border-radius: 999px;
           background: var(--accent-light, rgba(33, 145, 208, 0.08));
           margin-bottom: 18px;
@@ -663,6 +663,66 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
     return appointments.filter(a => a.appointmentDate >= today && a.status !== 'cancelled' && a.status !== 'no_show');
   }, [appointments]);
 
+  // `registrationHospitalName` isn't on the `PatientDoc` type but the seed/
+  // registration data carries it alongside the hospital id — fall back to the
+  // id itself only if the name was never recorded.
+  const patientFacilityName = (patient as { registrationHospitalName?: string }).registrationHospitalName
+    || patient.registrationHospital
+    || '';
+
+  const [bookingDate, setBookingDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [bookingTime, setBookingTime] = useState<'morning' | 'afternoon' | 'any'>('any');
+  const [bookingDepartment, setBookingDepartment] = useState('General / OPD');
+  const [bookingReason, setBookingReason] = useState('');
+  const [bookingVisitType, setBookingVisitType] = useState<'in_person' | 'telehealth_video' | 'telehealth_audio'>('in_person');
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
+  const resetBookingForm = () => {
+    setBookingDate(new Date().toISOString().slice(0, 10));
+    setBookingTime('any');
+    setBookingDepartment('General / OPD');
+    setBookingReason('');
+    setBookingVisitType('in_person');
+    setBookingError(null);
+  };
+
+  const handleSubmitBooking = async () => {
+    if (bookingSubmitting) return;
+    setBookingSubmitting(true);
+    setBookingError(null);
+    try {
+      const session = readPatientPortalSession();
+      if (!session) throw new Error('Missing patient session');
+      const timeOfDay: Record<typeof bookingTime, string> = { morning: '09:00', afternoon: '14:00', any: '' };
+      const { appointment } = await patientPortalFetch<{ appointment: AppointmentDoc }>(
+        '/api/patient-portal/appointments',
+        session.token,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            patientPhone: patient.phone || '',
+            facilityId: patient.registrationHospital || '',
+            facilityName: patientFacilityName,
+            appointmentDate: bookingDate,
+            appointmentTime: timeOfDay[bookingTime],
+            department: bookingDepartment,
+            reason: bookingReason,
+            appointmentType: bookingVisitType === 'in_person' ? 'general' : 'telehealth',
+            state: patient.state || '',
+          }),
+        }
+      );
+      setAppointments(prev => [...prev, appointment]);
+      setShowBooking(false);
+      resetBookingForm();
+    } catch (err) {
+      setBookingError(err instanceof Error ? err.message : t('patientPortal.bookingRequestError'));
+    } finally {
+      setBookingSubmitting(false);
+    }
+  };
+
   const [chatDepartment, setChatDepartment] = useState('General / OPD');
 
   const mainTabs: { key: Tab; label: string; icon: typeof User; count?: number }[] = [
@@ -672,21 +732,14 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
     { key: 'lab', label: t('patientPortal.tabLabResults'), icon: FlaskConical, count: labResults.filter(l => l.status === 'pending').length },
     { key: 'radiology', label: t('patientPortal.tabRadiology'), icon: Scan },
     { key: 'immunizations', label: t('patientPortal.tabImmunizations'), icon: Syringe },
-    { key: 'insurance', label: t('patientPortal.tabInsurance'), icon: Shield },
-  ];
-  const serviceTabs: { key: Tab; label: string; icon: typeof User; count?: number }[] = [
-    { key: 'billing', label: t('patientPortal.tabBilling'), icon: Wallet },
-    { key: 'statements', label: t('patientPortal.tabStatements'), icon: Receipt },
-    { key: 'forms', label: t('patientPortal.tabForms'), icon: ClipboardList },
-    { key: 'uploads', label: t('patientPortal.tabUploads'), icon: Upload },
-    { key: 'documents', label: t('patientPortal.tabDocuments'), icon: FolderOpen },
   ];
   const actionTabs: { key: Tab; label: string; icon: typeof User; count?: number }[] = [
     { key: 'appointments', label: t('patientPortal.tabAppointments'), icon: Calendar, count: upcomingApts.length },
+    { key: 'billing', label: t('patientPortal.tabBilling'), icon: Wallet },
     { key: 'chat', label: t('patientPortal.tabMessages'), icon: MessageSquare },
     { key: 'profile', label: t('patientPortal.tabMyProfile'), icon: UserCircle },
   ];
-  const tabs = [...mainTabs, ...serviceTabs, ...actionTabs];
+  const tabs = [...mainTabs, ...actionTabs];
 
   type ChatMsg = { id?: string; text: string; from: 'patient' | 'system'; time: string };
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([
@@ -749,10 +802,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
     try {
       const session = readPatientPortalSession();
       if (!session) throw new Error('Missing patient session');
-      const registrationHospitalName =
-        (patient as { registrationHospitalName?: string }).registrationHospitalName
-        || patient.registrationHospital
-        || '';
       const { message: saved } = await patientPortalFetch<{ message: { _id: string; body: string } }>(
         '/api/patient-portal/messages',
         session.token,
@@ -762,9 +811,9 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             patientPhone: patient.phone || '',
             recipientDepartment: chatDepartment,
             recipientHospitalId: patient.registrationHospital || '',
-            recipientHospitalName: registrationHospitalName,
+            recipientHospitalName: patientFacilityName,
             fromHospitalId: patient.registrationHospital || '',
-            fromHospitalName: registrationHospitalName,
+            fromHospitalName: patientFacilityName,
             subject: `Patient message — ${chatDepartment}`,
             body: trimmed,
             sentAt: now.toISOString(),
@@ -813,7 +862,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', marginBottom: 10 }}>
             <Building2 size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{patient.registrationHospital}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{patientFacilityName}</span>
           </div>
         </div>
 
@@ -821,28 +870,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
           {/* Health records section */}
           <p style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', padding: '8px 14px 4px', opacity: 0.7 }}>{t('patientPortal.sectionHealthRecords')}</p>
           {mainTabs.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-              padding: '10px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: activeTab === tab.key ? 'var(--accent-primary)' : 'transparent',
-              color: activeTab === tab.key ? '#fff' : 'var(--text-secondary)',
-              fontSize: 13, fontWeight: 600, textAlign: 'left', marginBottom: 1,
-              transition: 'all 0.15s ease',
-            }}>
-              <tab.icon size={15} />
-              <span style={{ flex: 1 }}>{tab.label}</span>
-              {tab.count ? <span style={{
-                fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6,
-                background: activeTab === tab.key ? 'rgba(255,255,255,0.25)' : 'var(--accent-light)',
-                color: activeTab === tab.key ? '#fff' : 'var(--accent-primary)',
-              }}>{tab.count}</span> : null}
-            </button>
-          ))}
-
-          {/* Services section */}
-          <div style={{ height: 1, background: 'var(--border-medium)', margin: '10px 14px' }} />
-          <p style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', padding: '4px 14px 4px', opacity: 0.7 }}>{t('patientPortal.sectionServicesBilling')}</p>
-          {serviceTabs.map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
               display: 'flex', alignItems: 'center', gap: 10, width: '100%',
               padding: '10px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -937,7 +964,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                 <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 4 }}>{t('patientPortal.hospital')}</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
                   <Building2 size={14} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{patient.registrationHospital}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{patientFacilityName}</span>
                 </div>
               </div>
               <div style={{ flex: 1, minWidth: 150 }}>
@@ -957,7 +984,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <MessageSquare size={15} style={{ color: 'var(--accent-primary)' }} />
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{chatDepartment}</span>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>&middot; {patient.registrationHospital}</span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>&middot; {patientFacilityName}</span>
             </div>
             <div style={{ height: 380, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {chatMessages.map((msg, i) => (
@@ -1040,14 +1067,14 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
 
           {/* ── Welcome Banner ── */}
           <div style={{
-            background: 'linear-gradient(135deg, #1E40AF 0%, #3b82f6 60%, #60A5FA 100%)',
+            background: 'linear-gradient(135deg, #015697 0%, #2191D0 60%, #369FDA 100%)',
             borderRadius: 14, padding: '22px 24px', color: '#fff', position: 'relative', overflow: 'hidden',
           }}>
             <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
             <div style={{ position: 'absolute', bottom: -20, right: 60, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
             <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.8, marginBottom: 4 }}>{t('patientPortal.welcomeBack')}</p>
             <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{patient.firstName} {patient.surname}</h2>
-            <p style={{ fontSize: 13, opacity: 0.85 }}>{patient.hospitalNumber} &middot; {patient.registrationHospital}</p>
+            <p style={{ fontSize: 13, opacity: 0.85 }}>{patient.hospitalNumber} &middot; {patientFacilityName}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 16 }}>
               {[
                 { n: records.length, l: t('patientPortal.totalVisits') },
@@ -1093,8 +1120,8 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                 <Info label={t('patient.bloodType')} value={patient.bloodType || '—'} />
                 <Info label={t('patient.phone')} value={patient.phone || '—'} />
                 <Info label={t('patientPortal.geocodeId')} value={patient.geocodeId || '—'} />
-                <Info label={t('patient.location')} value={`${patient.county || ''}, ${patient.state}`} />
-                <Info label={t('patient.facility')} value={patient.registrationHospital} />
+                <Info label={t('patient.location')} value={patient.county || patient.state ? `${patient.county || ''}${patient.county && patient.state ? ', ' : ''}${patient.state || ''}` : '—'} />
+                <Info label={t('patient.facility')} value={patientFacilityName} />
               </div>
             </div>
 
@@ -1148,7 +1175,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   { key: 'heartRate', label: t('patientPortal.heartRate'), icon: Activity, unit: 'bpm', color: '#EC4899' },
                   { key: 'temperature', label: t('patientPortal.temperature'), icon: Thermometer, unit: '°C', color: '#F59E0B' },
                   { key: 'weight', label: t('patientPortal.weight'), icon: Weight, unit: 'kg', color: '#6366F1' },
-                  { key: 'respiratoryRate', label: t('patientPortal.respRate'), icon: Droplets, unit: '/min', color: '#06B6D4' },
+                  { key: 'respiratoryRate', label: t('patientPortal.respRate'), icon: Droplets, unit: '/min', color: '#369FDA' },
                   { key: 'oxygenSaturation', label: 'SpO₂', icon: Eye, unit: '%', color: '#1F9D6F' },
                 ].filter(v => vitals[v.key]).map(v => (
                   <div key={v.key} style={{ padding: '12px 14px', borderRadius: 10, background: `${v.color}08`, border: `1px solid ${v.color}15`, textAlign: 'center' }}>
@@ -1250,7 +1277,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             </div>
 
             {/* Quick Actions */}
-            <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #1e3a8a 100%)', border: 'none', display: 'flex', flexDirection: 'column' }}>
+            <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #015697 100%)', border: 'none', display: 'flex', flexDirection: 'column' }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{t('patientPortal.quickActions')}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
                 {[
@@ -1496,63 +1523,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
         </div>
       )}
 
-      {/* ═══ Documents ═══ */}
-      {activeTab === 'documents' && (
-        <div>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>{t('patientPortal.tabDocuments')}</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {/* Generate document entries from existing data */}
-            {records.length > 0 && (
-              <div className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
-                onClick={() => setActiveTab('records')}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <FileText size={16} style={{ color: 'var(--accent-primary)' }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.tabMedicalRecords')}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('patientPortal.consultationRecords', { count: records.length })}</div>
-                </div>
-                <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} />
-              </div>
-            )}
-            {labResults.length > 0 && (
-              <div className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
-                onClick={() => setActiveTab('lab')}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <FlaskConical size={16} style={{ color: 'var(--accent-primary)' }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.labReports')}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('patientPortal.labResultsCountShort', { count: labResults.length })}</div>
-                </div>
-                <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} />
-              </div>
-            )}
-            {/* Discharge summaries */}
-            <div className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.dischargeSummaries')}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('patientPortal.dischargeSummariesDesc')}</div>
-              </div>
-            </div>
-            {/* Referral letters */}
-            <div className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.referralLetters')}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('patientPortal.referralLettersDesc')}</div>
-              </div>
-            </div>
-            {/* Insurance / ID docs */}
-            <div className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.insuranceIdDocuments')}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('patientPortal.insuranceIdDocumentsDesc')}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ═══ Billing & Payments ═══ */}
       {activeTab === 'billing' && <BillingTab patient={patient} sessionToken={sessionToken} />}
 
@@ -1590,26 +1560,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
         </div>
       )}
 
-      {/* ═══ Insurance ═══ */}
-      {activeTab === 'insurance' && (
-        <InsuranceTab patient={patient} />
-      )}
-
-      {/* ═══ Forms ═══ */}
-      {activeTab === 'forms' && (
-        <FormsTab />
-      )}
-
-      {/* ═══ Uploads ═══ */}
-      {activeTab === 'uploads' && (
-        <UploadsTab />
-      )}
-
-      {/* ═══ Statements ═══ */}
-      {activeTab === 'statements' && (
-        <StatementsTab />
-      )}
-
       {/* ═══ My Profile ═══ */}
       {activeTab === 'profile' && (
         <ProfileTab patient={patient} />
@@ -1617,351 +1567,51 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
 
       {/* Booking Modal */}
       {showBooking && (
-        <Modal onClose={() => setShowBooking(false)}>
+        <Modal onClose={() => { setShowBooking(false); resetBookingForm(); }}>
           <div className="modal-panel modal-panel--md">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.requestAppointment')}</h3>
-              <button onClick={() => setShowBooking(false)} style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}><X size={14} /></button>
+              <button onClick={() => { setShowBooking(false); resetBookingForm(); }} style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}><X size={14} /></button>
             </div>
             <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 14 }}>{t('patientPortal.bookingNotice')}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--accent-light)', border: '1px solid var(--accent-border)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Building2 size={14} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.bookingAt', { facility: patient.registrationHospital })}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.bookingAt', { facility: patientFacilityName })}</span>
               </div>
-              <div><label>{t('patientPortal.preferredDate')}</label><input type="date" defaultValue={new Date().toISOString().slice(0, 10)} /></div>
+              <div><label>{t('patientPortal.preferredDate')}</label><input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} /></div>
               <div><label>{t('patientPortal.preferredTime')}</label>
-                <select><option>{t('patientPortal.timeMorning')}</option><option>{t('patientPortal.timeAfternoon')}</option><option>{t('patientPortal.timeAnyTime')}</option></select>
+                <select value={bookingTime} onChange={e => setBookingTime(e.target.value as typeof bookingTime)}>
+                  <option value="morning">{t('patientPortal.timeMorning')}</option>
+                  <option value="afternoon">{t('patientPortal.timeAfternoon')}</option>
+                  <option value="any">{t('patientPortal.timeAnyTime')}</option>
+                </select>
               </div>
               <div><label>{t('patientPortal.department')}</label>
-                <select><option>General / OPD</option><option>Obstetrics</option><option>Internal Medicine</option><option>Pediatrics</option><option>Surgery</option><option>Laboratory</option><option>Dental</option></select>
+                <select value={bookingDepartment} onChange={e => setBookingDepartment(e.target.value)}>
+                  <option>General / OPD</option><option>Obstetrics</option><option>Internal Medicine</option><option>Pediatrics</option><option>Surgery</option><option>Laboratory</option><option>Dental</option>
+                </select>
               </div>
-              <div><label>{t('patientPortal.reason')}</label><textarea rows={3} placeholder={t('patientPortal.reasonPlaceholder')} /></div>
+              <div><label>{t('patientPortal.reason')}</label><textarea rows={3} placeholder={t('patientPortal.reasonPlaceholder')} value={bookingReason} onChange={e => setBookingReason(e.target.value)} /></div>
               <div><label>{t('patientPortal.visitType')}</label>
-                <select><option>{t('patientPortal.visitInPerson')}</option><option>{t('patientPortal.visitTelehealthVideo')}</option><option>{t('patientPortal.visitTelehealthAudio')}</option></select>
+                <select value={bookingVisitType} onChange={e => setBookingVisitType(e.target.value as typeof bookingVisitType)}>
+                  <option value="in_person">{t('patientPortal.visitInPerson')}</option>
+                  <option value="telehealth_video">{t('patientPortal.visitTelehealthVideo')}</option>
+                  <option value="telehealth_audio">{t('patientPortal.visitTelehealthAudio')}</option>
+                </select>
               </div>
+              {bookingError && <p style={{ fontSize: 12, color: 'var(--color-danger)' }}>{bookingError}</p>}
               <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                <button onClick={() => setShowBooking(false)} className="btn btn-secondary" style={{ flex: 1 }}>{t('action.cancel')}</button>
-                <button onClick={() => { setShowBooking(false); }} className="btn btn-primary" style={{ flex: 1 }}>{t('patientPortal.submitRequest')}</button>
+                <button onClick={() => { setShowBooking(false); resetBookingForm(); }} className="btn btn-secondary" style={{ flex: 1 }} disabled={bookingSubmitting}>{t('action.cancel')}</button>
+                <button onClick={handleSubmitBooking} className="btn btn-primary" style={{ flex: 1 }} disabled={bookingSubmitting || !bookingDate || !bookingDepartment}>
+                  {bookingSubmitting ? t('status.loading') : t('patientPortal.submitRequest')}
+                </button>
               </div>
             </div>
           </div>
         </Modal>
       )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═════════════════════════════════════════
-   INSURANCE TAB
-   ═════════════════════════════════════════ */
-function InsuranceTab({}: { patient: PatientDoc }) {
-  const { t } = useTranslation();
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [insuranceList] = useState<Array<{
-    id: string;
-    provider: string;
-    policyNumber: string;
-    type: string;
-    status: 'Active' | 'Expired' | 'Pending';
-    expiryDate: string;
-  }>>([]);
-
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.insuranceInformation')}</h2>
-        <button onClick={() => setShowAddForm(!showAddForm)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 14px', borderRadius: 8, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Plus size={13} /> {t('patientPortal.addInsurance')}
-        </button>
-      </div>
-
-      {/* Info banner */}
-      <div className="card-elevated" style={{ padding: 16, marginBottom: 16, background: 'var(--accent-light)', border: '1px solid var(--accent-border)' }}>
-        <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          {t('patientPortal.insuranceBanner')}
-        </p>
-      </div>
-
-      {/* Insurances on file */}
-      <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>{t('patientPortal.insurancesOnFile')}</h3>
-      {insuranceList.length === 0 ? (
-        <Empty icon={Shield} text={t('patientPortal.noInsurance')} action={t('patientPortal.addInsurance')} onAction={() => setShowAddForm(true)} />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {insuranceList.map(ins => (
-            <div key={ins.id} className="card-elevated" style={{ padding: '16px 18px', borderLeft: '4px solid var(--color-success)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 8 }}>
-                <div>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{ins.provider}</p>
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('patientPortal.typeInsurance', { type: ins.type })}</p>
-                </div>
-                <Badge text={ins.status} color="var(--color-success)" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-                <Info label={t('patientPortal.policyNumber')} value={ins.policyNumber} />
-                <Info label={t('patientPortal.expires')} value={ins.expiryDate} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Upload insurance card */}
-      <div className="card-elevated" style={{ padding: 18, marginTop: 16 }}>
-        <SH icon={Upload} title={t('patientPortal.uploadInsuranceCard')} />
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, marginBottom: 12 }}>
-          {t('patientPortal.uploadInsuranceCardDesc')}
-        </p>
-        <div style={{
-          padding: 24, borderRadius: 10, border: '2px dashed var(--border-medium)', textAlign: 'center',
-          background: 'var(--overlay-subtle)', cursor: 'pointer', transition: 'all 0.2s',
-        }}>
-          <FileUp size={56} style={{ color: 'var(--text-muted)', margin: '0 auto 8px', opacity: 0.5 }} />
-          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>{t('patientPortal.clickToUpload')}</p>
-          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{t('patientPortal.pngJpgPdfLimit')}</p>
-        </div>
-      </div>
-
-      {/* Add Insurance Form Modal */}
-      {showAddForm && (
-        <Modal onClose={() => setShowAddForm(false)}>
-          <div className="modal-panel modal-panel--md">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.addInsurance')}</h3>
-              <button onClick={() => setShowAddForm(false)} style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}><X size={14} /></button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div><label>{t('patientPortal.insuranceProvider')}</label><input type="text" placeholder={t('patientPortal.insuranceProviderPlaceholder')} /></div>
-              <div><label>{t('patientPortal.policyMemberNumber')}</label><input type="text" placeholder={t('patientPortal.policyMemberNumberPlaceholder')} /></div>
-              <div><label>{t('patientPortal.insuranceType')}</label>
-                <select><option>{t('patientPortal.insTypePrimary')}</option><option>{t('patientPortal.insTypeSecondary')}</option><option>{t('patientPortal.insTypeSupplemental')}</option></select>
-              </div>
-              <div><label>{t('patientPortal.policyHolder')}</label><input type="text" placeholder={t('patientPortal.policyHolderPlaceholder')} /></div>
-              <div><label>{t('patientPortal.expiryDate')}</label><input type="date" /></div>
-              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                <button onClick={() => setShowAddForm(false)} className="btn btn-secondary" style={{ flex: 1 }}>{t('action.cancel')}</button>
-                <button onClick={() => setShowAddForm(false)} className="btn btn-primary" style={{ flex: 1 }}>{t('patientPortal.saveInsurance')}</button>
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-/* ═════════════════════════════════════════
-   FORMS TAB
-   ═════════════════════════════════════════ */
-function FormsTab() {
-  const { t } = useTranslation();
-  const forms = [
-    { id: 'f1', name: t('patientPortal.formRegistration'), status: 'completed' as const, date: '2026-02-01', required: true },
-    { id: 'f2', name: t('patientPortal.formMedicalHistory'), status: 'completed' as const, date: '2026-02-01', required: true },
-    { id: 'f3', name: t('patientPortal.formConsent'), status: 'completed' as const, date: '2026-02-01', required: true },
-    { id: 'f4', name: t('patientPortal.formInsuranceAuth'), status: 'pending' as const, date: '', required: false },
-    { id: 'f5', name: t('patientPortal.formAdvanceDirective'), status: 'pending' as const, date: '', required: false },
-    { id: 'f6', name: t('patientPortal.formSatisfactionSurvey'), status: 'available' as const, date: '', required: false },
-    { id: 'f7', name: t('patientPortal.formRefillRequest'), status: 'available' as const, date: '', required: false },
-    { id: 'f8', name: t('patientPortal.formReferralRequest'), status: 'available' as const, date: '', required: false },
-  ];
-
-  const statusIcon = (s: string) => {
-    if (s === 'completed') return { color: 'var(--color-success)', text: t('patientPortal.completed') };
-    if (s === 'pending') return { color: 'var(--color-warning)', text: t('patientPortal.pending') };
-    return { color: 'var(--accent-primary)', text: t('patientPortal.available') };
-  };
-
-  return (
-    <div>
-      <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>{t('patientPortal.patientForms')}</h2>
-
-      {/* Required forms */}
-      <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{t('patientPortal.requiredForms')}</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
-        {forms.filter(f => f.required).map(form => {
-          const si = statusIcon(form.status);
-          return (
-            <div key={form.id} className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: `${si.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <ClipboardList size={16} style={{ color: si.color }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{form.name}</p>
-                {form.date && <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('patientPortal.completedDate', { date: form.date })}</p>}
-              </div>
-              <Badge text={si.text} color={si.color} />
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Optional / available forms */}
-      <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{t('patientPortal.optionalForms')}</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {forms.filter(f => !f.required).map(form => {
-          const si = statusIcon(form.status);
-          return (
-            <div key={form.id} className="card-elevated" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: form.status !== 'completed' ? 'pointer' : 'default' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: `${si.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <ClipboardList size={16} style={{ color: si.color }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{form.name}</p>
-                {form.date && <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('patientPortal.completedDate', { date: form.date })}</p>}
-              </div>
-              {form.status !== 'completed' ? (
-                <button style={{ fontSize: 11, fontWeight: 600, padding: '6px 12px', borderRadius: 6, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>
-                  {form.status === 'pending' ? t('patientPortal.complete') : t('patientPortal.fillOut')}
-                </button>
-              ) : (
-                <Badge text={t('patientPortal.done')} color="var(--color-success)" />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ═════════════════════════════════════════
-   UPLOADS TAB
-   ═════════════════════════════════════════ */
-function UploadsTab() {
-  const { t } = useTranslation();
-  const [uploads] = useState([
-    { id: 'u1', name: 'Insurance Card (Front)', type: 'image/png', size: '1.2 MB', date: '2026-02-01', category: 'Insurance' },
-    { id: 'u2', name: 'Insurance Card (Back)', type: 'image/png', size: '1.1 MB', date: '2026-02-01', category: 'Insurance' },
-    { id: 'u3', name: 'National ID', type: 'image/jpg', size: '0.8 MB', date: '2026-02-01', category: 'Identification' },
-    { id: 'u4', name: 'Referral Letter — JTH', type: 'application/pdf', size: '0.3 MB', date: '2026-03-15', category: 'Medical' },
-  ]);
-
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.myUploads', { count: uploads.length })}</h2>
-      </div>
-
-      {/* Upload area */}
-      <div className="card-elevated" style={{ padding: 20, marginBottom: 16 }}>
-        <div style={{
-          padding: 32, borderRadius: 10, border: '2px dashed var(--border-medium)', textAlign: 'center',
-          background: 'var(--overlay-subtle)', cursor: 'pointer', transition: 'all 0.2s',
-        }}>
-          <Upload size={44} style={{ color: 'var(--accent-primary)', margin: '0 auto 10px', opacity: 0.6 }} />
-          <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{t('patientPortal.uploadDocuments')}</p>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('patientPortal.dragFilesHere')}</p>
-          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{t('patientPortal.acceptedFormats')}</p>
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-          {[
-            { key: 'Insurance Card', label: t('patientPortal.catInsuranceCard') },
-            { key: 'ID Document', label: t('patientPortal.catIdDocument') },
-            { key: 'Referral Letter', label: t('patientPortal.catReferralLetter') },
-            { key: 'Lab Report', label: t('patientPortal.catLabReport') },
-            { key: 'Other', label: t('patientPortal.catOther') },
-          ].map(cat => (
-            <button key={cat.key} style={{ fontSize: 11, fontWeight: 600, padding: '6px 12px', borderRadius: 6, background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)', cursor: 'pointer' }}>{cat.label}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* File list */}
-      <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{t('patientPortal.uploadedFiles')}</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {uploads.map(file => (
-          <div key={file.id} className="card-elevated" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{file.name}</p>
-              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{file.category} · {file.size} · {file.date}</p>
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}><Download size={13} /></button>
-              <button style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-danger)' }}><Trash2 size={13} /></button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Guidelines */}
-      <div className="card-elevated" style={{ padding: 14, marginTop: 16, background: 'var(--accent-light)', border: '1px solid var(--accent-border)' }}>
-        <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          <strong>{t('patientPortal.uploadTipsLabel')}</strong> {t('patientPortal.uploadTipsBody')}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/* ═════════════════════════════════════════
-   STATEMENTS TAB
-   ═════════════════════════════════════════ */
-function StatementsTab() {
-  const { t } = useTranslation();
-  const statements = [
-    { id: 'st-001', period: 'March 2026', date: '2026-04-01', total: 80000, paid: 23500, items: 3 },
-    { id: 'st-002', period: 'February 2026', date: '2026-03-01', total: 25000, paid: 25000, items: 2 },
-    { id: 'st-003', period: 'January 2026', date: '2026-02-01', total: 15000, paid: 15000, items: 1 },
-  ];
-
-  return (
-    <div>
-      <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>{t('patientPortal.billingStatements')}</h2>
-
-      {/* Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', alignItems: 'stretch', gap: 10, marginBottom: 16 }}>
-        {[
-          { label: t('patientPortal.currentBalance'), value: formatMoney(statements[0].total - statements[0].paid), color: 'var(--color-danger)' },
-          { label: t('patientPortal.lastPayment'), value: formatMoney(10000), color: 'var(--color-success)' },
-          { label: t('patientPortal.totalStatements'), value: `${statements.length}`, color: 'var(--accent-primary)' },
-        ].map((s, i) => (
-          <div key={i} className="card-elevated" style={{ padding: '14px 16px', borderTop: `3px solid ${s.color}` }}>
-            <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{s.value}</p>
-            <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Statement list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {statements.map(st => {
-          const balance = st.total - st.paid;
-          return (
-            <div key={st.id} className="card-elevated" style={{ padding: '16px 18px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 10 }}>
-                <div>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.statementPeriod', { period: st.period })}</p>
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('patientPortal.generatedItems', { date: st.date, count: st.items })}</p>
-                </div>
-                <Badge text={balance === 0 ? t('patientPortal.paid') : t('patientPortal.outstanding')} color={balance === 0 ? 'var(--color-success)' : 'var(--color-danger)'} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-                <Info label={t('patientPortal.totalBilled')} value={formatMoney(st.total)} />
-                <Info label={t('patientPortal.paid')} value={formatMoney(st.paid)} />
-                <Info label={t('patientPortal.balance')} value={formatMoney(balance)} />
-              </div>
-              {balance > 0 && (
-                <div style={{ height: 4, borderRadius: 2, background: 'var(--border-medium)', overflow: 'hidden', marginBottom: 10 }}>
-                  <div style={{ height: '100%', width: `${(st.paid / st.total) * 100}%`, background: 'var(--color-success)', borderRadius: 2 }} />
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button style={{ fontSize: 11, fontWeight: 600, padding: '6px 14px', borderRadius: 6, background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Download size={12} /> {t('patientPortal.downloadPdf')}
-                </button>
-                {balance > 0 && (
-                  <button style={{ fontSize: 11, fontWeight: 600, padding: '6px 14px', borderRadius: 6, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>
-                    {t('patientPortal.payNow')}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
@@ -1972,30 +1622,29 @@ function StatementsTab() {
    ═════════════════════════════════════════ */
 function ProfileTab({ patient }: { patient: PatientDoc }) {
   const { t } = useTranslation();
-  const [editing, setEditing] = useState(false);
+  const facilityName = (patient as { registrationHospitalName?: string }).registrationHospitalName
+    || patient.registrationHospital
+    || '—';
 
   const fields = [
-    { label: t('patientPortal.firstName'), value: patient.firstName, editable: false },
-    { label: t('patientPortal.middleName'), value: patient.middleName || '—', editable: false },
-    { label: t('patientPortal.surname'), value: patient.surname, editable: false },
-    { label: t('patientPortal.dateOfBirth'), value: patient.dateOfBirth || `~${patient.estimatedAge} years`, editable: false },
-    { label: t('patient.gender'), value: patient.gender, editable: false },
-    { label: t('patient.bloodType'), value: patient.bloodType || '—', editable: false },
-    { label: t('patient.phone'), value: patient.phone || '—', editable: true },
-    { label: t('patientPortal.geocodeId'), value: patient.geocodeId || '—', editable: false },
-    { label: t('patientPortal.county'), value: patient.county || '—', editable: true },
-    { label: t('patientPortal.state'), value: patient.state || '—', editable: true },
-    { label: t('patient.hospitalNumber'), value: patient.hospitalNumber || '—', editable: false },
-    { label: t('patientPortal.registrationHospital'), value: patient.registrationHospital || '—', editable: false },
+    { label: t('patientPortal.firstName'), value: patient.firstName },
+    { label: t('patientPortal.middleName'), value: patient.middleName || '—' },
+    { label: t('patientPortal.surname'), value: patient.surname },
+    { label: t('patientPortal.dateOfBirth'), value: patient.dateOfBirth || `~${patient.estimatedAge} years` },
+    { label: t('patient.gender'), value: patient.gender },
+    { label: t('patient.bloodType'), value: patient.bloodType || '—' },
+    { label: t('patient.phone'), value: patient.phone || '—' },
+    { label: t('patientPortal.geocodeId'), value: patient.geocodeId || '—' },
+    { label: t('patientPortal.county'), value: patient.county || '—' },
+    { label: t('patientPortal.state'), value: patient.state || '—' },
+    { label: t('patient.hospitalNumber'), value: patient.hospitalNumber || '—' },
+    { label: t('patientPortal.registrationHospital'), value: facilityName },
   ];
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ marginBottom: 16 }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{t('patientPortal.tabMyProfile')}</h2>
-        <button onClick={() => setEditing(!editing)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 14px', borderRadius: 8, background: editing ? 'var(--color-success)' : 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-          {editing ? <><Save size={13} /> {t('patientPortal.saveChanges')}</> : <><Edit3 size={13} /> {t('patientPortal.editProfile')}</>}
-        </button>
       </div>
 
       {/* Profile header */}
@@ -2008,7 +1657,7 @@ function ProfileTab({ patient }: { patient: PatientDoc }) {
           }
         </div>
         <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{patient.firstName} {patient.surname}</p>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{patient.hospitalNumber} · {patient.registrationHospital}</p>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{patient.hospitalNumber} · {facilityName}</p>
       </div>
 
       {/* Fields grid */}
@@ -2018,11 +1667,7 @@ function ProfileTab({ patient }: { patient: PatientDoc }) {
           {fields.map((f, i) => (
             <div key={i}>
               <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{f.label}</p>
-              {editing && f.editable ? (
-                <input type="text" defaultValue={f.value} style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--accent-primary)', background: 'var(--bg-card-solid)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }} />
-              ) : (
-                <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{f.value}</p>
-              )}
+              <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{f.value}</p>
             </div>
           ))}
         </div>
@@ -2071,13 +1716,11 @@ function ProfileTab({ patient }: { patient: PatientDoc }) {
       </div>
 
       {/* Note about editable fields */}
-      {!editing && (
-        <div className="card-elevated" style={{ padding: 14, marginTop: 14, background: 'var(--accent-light)', border: '1px solid var(--accent-border)' }}>
-          <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-            {t('patientPortal.protectedFieldsNote')}
-          </p>
-        </div>
-      )}
+      <div className="card-elevated" style={{ padding: 14, marginTop: 14, background: 'var(--accent-light)', border: '1px solid var(--accent-border)' }}>
+        <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+          {t('patientPortal.protectedFieldsNote')}
+        </p>
+      </div>
     </div>
   );
 }
@@ -2235,7 +1878,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
     { key: 'mpesa', name: 'M-Pesa', icon: Phone, desc: t('patientPortal.payViaMpesa'), color: '#4CAF50' },
     { key: 'mtn', name: 'MTN Mobile Money', icon: Phone, desc: t('patientPortal.payViaMtn'), color: '#FFC107' },
     { key: 'airtel', name: 'Airtel Money', icon: Phone, desc: t('patientPortal.payViaAirtel'), color: '#E53935' },
-    { key: 'card', name: t('patientPortal.cardPayment'), icon: CreditCard, desc: t('patientPortal.payViaCard'), color: '#5C6BC0' },
+    { key: 'card', name: t('patientPortal.cardPayment'), icon: CreditCard, desc: t('patientPortal.payViaCard'), color: '#2191D0' },
     { key: 'bank', name: t('patientPortal.bankTransfer'), icon: Banknote, desc: t('patientPortal.payViaBank'), color: '#00897B' },
   ];
 
@@ -2541,7 +2184,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
     return (
       <div>
         <div style={{
-          background: 'linear-gradient(135deg, #1E40AF 0%, #3b82f6 60%, #60A5FA 100%)',
+          background: 'linear-gradient(135deg, #015697 0%, #2191D0 60%, #369FDA 100%)',
           borderRadius: 14, padding: '20px 24px', color: '#fff', marginBottom: 16, position: 'relative', overflow: 'hidden',
         }}>
           <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 4 }}>{t('patientPortal.accountSummary')}</p>
@@ -2562,7 +2205,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
     <div>
       {/* Balance banner */}
       <div style={{
-        background: 'linear-gradient(135deg, #1E40AF 0%, #3b82f6 60%, #60A5FA 100%)',
+        background: 'linear-gradient(135deg, #015697 0%, #2191D0 60%, #369FDA 100%)',
         borderRadius: 14, padding: '20px 24px', color: '#fff', marginBottom: 16, position: 'relative', overflow: 'hidden',
       }}>
         <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
@@ -2691,7 +2334,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
           </div>
 
           {/* Payment history summary */}
-          <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #1e3a8a 100%)', border: 'none' }}>
+          <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #015697 100%)', border: 'none' }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>{t('patientPortal.paymentSummary')}</p>
             {[
               { label: t('patientPortal.totalBilled'), value: formatMoney(safeBills.reduce((s, b) => s + b.amount, 0)) },

@@ -1,18 +1,15 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
-
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
+import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useMessagingDock } from '@/lib/messaging-dock-context';
+import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import {
   Pill, AlertTriangle, Package, Clock, ShieldCheck,
   MessageSquare, Activity, Radio, ChevronRight,
-  Search, ClipboardList, Send, CheckCircle2, XCircle,
-  AlertOctagon, X, Check, Plus, Filter, Users, BarChart3,
+  ClipboardList, Send, CheckCircle2, XCircle,
+  AlertOctagon, X, Check, Plus, Users, BarChart3,
 } from '@/components/icons/lucide';
 
 const ACCENT = 'var(--accent-primary)';
@@ -22,13 +19,13 @@ const ACCENT = 'var(--accent-primary)';
 const PHARMACY_LIVE_FEED_ENABLED = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 const EVENT_TYPES = [
-  { type: 'rx_received', label: 'Prescription Received', color: '#2563EB', icon: ClipboardList },
+  { type: 'rx_received', label: 'Prescription Received', color: 'var(--color-brand-500)', icon: ClipboardList },
   { type: 'dispensed', label: 'Medication Dispensed', color: 'var(--color-success)', icon: CheckCircle2 },
   { type: 'stock_alert', label: 'Stock Alert Triggered', color: '#F87171', icon: AlertTriangle },
   { type: 'controlled', label: 'Controlled Substance Logged', color: '#A855F7', icon: ShieldCheck },
   { type: 'expired', label: 'Expired Item Flagged', color: 'var(--color-danger)', icon: XCircle },
   { type: 'pickup', label: 'Awaiting Patient Pickup', color: ACCENT, icon: Clock },
-  { type: 'restock', label: 'Restock Order Placed', color: '#2563EB', icon: Package },
+  { type: 'restock', label: 'Restock Order Placed', color: 'var(--color-brand-500)', icon: Package },
   { type: 'message', label: 'Pharmacist Message', color: '#EC4899', icon: MessageSquare },
 ];
 
@@ -63,7 +60,7 @@ const DRUG_INTERACTIONS: DrugInteraction[] = [
 const INTERACTION_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   HIGH: { bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)', text: 'var(--color-danger)' },
   MODERATE: { bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)', text: 'var(--color-warning)' },
-  LOW: { bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.3)', text: '#2563EB' },
+  LOW: { bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.3)', text: 'var(--color-brand-500)' },
 };
 
 function checkDrugInteractions(medication: string, patientMedications: string[]): DrugInteraction[] {
@@ -325,7 +322,9 @@ function ReceiveStockModal({ items, onConfirm, onClose }: {
 export default function PharmacyDashboardPage() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { currentUser } = useApp();
   const { openDock } = useMessagingDock();
+  const dateLabel = useMemo(() => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date()), []);
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [eventCounter, setEventCounter] = useState(0);
 
@@ -341,19 +340,8 @@ export default function PharmacyDashboardPage() {
   const [showReceiveStock, setShowReceiveStock] = useState(false);
   // Prescription queue status filter
   const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'dispensed' | 'awaiting_pickup' | 'controlled'>('all');
-  // Inline search + the filter-icon dropdown that houses both the search and the
-  // status chips (replaces the platform-wide top search bar on this dashboard).
+  // Queue text search (bound to the shared shell's left-rail search).
   const [queueSearch, setQueueSearch] = useState('');
-  const [showQueueFilter, setShowQueueFilter] = useState(false);
-  const queueFilterRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!showQueueFilter) return;
-    const onDown = (e: MouseEvent) => {
-      if (queueFilterRef.current && !queueFilterRef.current.contains(e.target as Node)) setShowQueueFilter(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [showQueueFilter]);
 
   const generateEvent = useCallback((): LiveEvent => {
     const evtType = EVENT_TYPES[Math.floor(Math.random() * EVENT_TYPES.length)];
@@ -481,337 +469,196 @@ export default function PharmacyDashboardPage() {
 
   return (
     <>
-      <TopBar title={t('pharmacy.operations')} hideSearch />
-      <main className="page-container page-enter">
-
-        <DashboardHero
-          className="mb-5"
-          stats={[
-            { label: 'Pending Rx', value: pendingRx },
-            { label: 'Dispensed Today', value: dispensedToday },
-            { label: 'Low Stock', value: lowStockCount },
-            { label: 'Awaiting Pickup', value: awaitingPickup },
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <EhrCareDashboard
+          title={t('pharmacy.operations')}
+          eyebrow={t('nav.pharmacy')}
+          greetingName={currentUser?.name}
+          dateLabel={dateLabel}
+          tabs={[
+            { key: 'all', label: t('pharmacy.viewAll'), count: prescriptionQueue.length },
+            { key: 'pending', label: t('pharmacy.pending'), count: pendingRx },
+            { key: 'dispensed', label: t('pharmacy.kpiDispensed'), count: dispensedToday },
+            { key: 'awaiting_pickup', label: t('pharmacy.kpiPickup'), count: awaitingPickup },
+            { key: 'controlled', label: t('pharmacy.kpiControlled'), count: controlledCount },
           ]}
-        />
-
-        <DashboardActionsRow
-          className="mb-5"
+          activeTab={queueFilter}
+          onTabChange={(k) => setQueueFilter(k as typeof queueFilter)}
+          searchValue={queueSearch}
+          searchPlaceholder={t('topbar.searchPlaceholder')}
+          onSearchChange={setQueueSearch}
+          filters={[]}
           actions={[
-            { label: 'All Patients', icon: Users, href: '/patients' },
-            { label: 'Controlled Substances', icon: ShieldCheck, href: '/controlled-substances', color: '#C44536' },
-            { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
-            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#0D9488' },
+            { label: t('pharmacy.receiveStock'), icon: Package, onClick: () => setShowReceiveStock(true), tone: 'primary' },
+            { label: t('pharmacy.kpiControlled'), icon: ShieldCheck, onClick: () => router.push('/controlled-substances') },
+            { label: t('pharmacy.message'), icon: MessageSquare, onClick: () => openDock() },
           ]}
-          secondaryCard={<SpotlightCard title="Low Stock Items" value={lowStockCount} caption={`${criticalCount} critical · ${awaitingPickup} awaiting pickup`} />}
-        />
-
-        {/* Command Center Header */}
-        <div className="flex items-center justify-between" style={{ marginBottom: 44 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center">
-              <Pill className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
-                {t('nav.pharmacy')}
-              </h1>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions (moved up to the top of the dashboard) */}
-        <div className="dash-card rounded-2xl p-3 mb-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.quickActions')}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              { label: t('pharmacy.dispense'), icon: Pill, color: ACCENT },
-              { label: t('pharmacy.checkStock'), icon: Search, href: '/pharmacy', color: '#2563EB' },
-              { label: t('pharmacy.message'), icon: Send, href: '/messages', color: '#EC4899' },
-              { label: t('pharmacy.inventory'), icon: Package, href: '/pharmacy', color: 'var(--color-success)' },
-            ].map(action => (
-              <button key={action.label} onClick={() => action.href === '/messages' ? openDock() : action.href ? router.push(action.href) : undefined}
-                className="card-elevated flex items-center gap-3 px-3.5 py-3 text-left transition-all">
-                <action.icon className="w-[22px] h-[22px] flex-shrink-0" style={{ color: action.color }} />
-                <span className="text-[12px] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Dispensing Pipeline — medication journey from shelf to patient,
-            styled as a left-to-right stage chain. */}
-        <div className="dash-card rounded-2xl overflow-hidden mb-4">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: 'var(--border-light)' }}>
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4" style={{ color: ACCENT }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.dispensingPipeline')}</span>
-            </div>
-            <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.pendingBadge', { count: pendingRx })}</span>
-          </div>
-          <div className="p-4 overflow-x-auto">
-            <div className="flex items-center gap-1 min-w-[680px]">
-              {[
-                { key: 'stock', label: t('pharmacy.inStock'), icon: Package, color: ACCENT, count: stockAlerts.filter(s => s.status === 'adequate').length },
-                { key: 'received', label: t('pharmacy.stageReceived'), icon: ClipboardList, color: ACCENT, count: prescriptionQueue.length },
-                { key: 'pending', label: t('pharmacy.pending'), icon: Clock, color: 'var(--color-warning)', count: pendingRx },
-                { key: 'dispensed', label: t('pharmacy.kpiDispensed'), icon: CheckCircle2, color: 'var(--color-success)', count: dispensedToday },
-                { key: 'pickup', label: t('pharmacy.kpiPickup'), icon: Send, color: '#2563EB', count: awaitingPickup },
-                { key: 'reorder', label: t('pharmacy.reorderNeeded'), icon: AlertTriangle, color: 'var(--color-danger)', count: criticalCount + lowStockCount },
-              ].map((stage, idx, arr) => (
-                <div key={stage.key} className="flex items-center flex-1">
-                  <div className="flex-1 p-2.5 rounded-xl transition-all" style={{
-                    background: stage.count > 0 ? 'var(--overlay-subtle)' : 'transparent',
-                    border: `1px solid ${stage.count > 0 ? 'var(--border-light)' : 'transparent'}`,
-                    opacity: stage.count > 0 ? 1 : 0.5,
-                  }}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <stage.icon className="w-3.5 h-3.5" style={{ color: stage.color }} />
-                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: stage.color }}>{stage.label}</span>
-                    </div>
-                    <span className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{stage.count}</span>
-                  </div>
-                  {idx < arr.length - 1 && (
-                    <div className="px-1 flex-shrink-0">
-                      <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)', opacity: 0.45 }} />
-                    </div>
-                  )}
+          actionStrip={[
+            { label: t('pharmacy.inventory'), icon: Package, onClick: () => router.push('/pharmacy') },
+            { label: t('pharmacy.checkStock'), icon: ClipboardList, onClick: () => router.push('/pharmacy') },
+            { label: t('nav.reports'), icon: BarChart3, onClick: () => router.push('/reports') },
+            { label: t('nav.patients'), icon: Users, onClick: () => router.push('/patients') },
+          ]}
+          rows={visibleQueue.map((rx): EhrCareDashboardRow => ({
+            id: rx.id,
+            title: rx.patient,
+            subtitle: `${rx.medication} · ${rx.dose}`,
+            meta: `${rx.prescriber} · ${rx.time}`,
+            compactMeta: rx.time,
+            time: rx.time,
+            status: rx.status === 'awaiting_pickup' ? t('pharmacy.statusPickup') : t(`pharmacy.status_${rx.status}`),
+            statusTone: rx.status === 'dispensed' ? 'done' : rx.status === 'awaiting_pickup' ? 'ready' : rx.priority === 'urgent' ? 'warning' : 'scheduled',
+            priority: rx.priority === 'urgent' ? t('pharmacy.urgent') : undefined,
+            actionLabel: rx.status === 'pending' ? t('pharmacy.dispense') : rx.status === 'dispensed' ? t('action.undo') : undefined,
+            onAction: rx.status === 'pending' ? () => handleDispense(rx) : rx.status === 'dispensed' ? () => handleUndoDispense(rx) : undefined,
+          }))}
+          metrics={[
+            { label: t('pharmacy.kpiPendingRx'), value: pendingRx },
+            { label: t('pharmacy.kpiDispensed'), value: dispensedToday },
+            { label: t('pharmacy.kpiPickup'), value: awaitingPickup },
+            { label: t('pharmacy.kpiLowStock'), value: lowStockCount, tone: 'warning' },
+            { label: t('pharmacy.kpiControlled'), value: criticalCount, tone: 'danger' },
+          ]}
+          metricsTitle={t('pharmacy.operations')}
+          checklist={[
+            { label: t('pharmacy.pending'), done: pendingRx === 0, onClick: () => setQueueFilter('pending') },
+            { label: t('pharmacy.kpiControlled'), done: controlledCount === 0, onClick: () => setQueueFilter('controlled') },
+            { label: t('pharmacy.receiveStock'), done: criticalCount === 0, onClick: () => setShowReceiveStock(true) },
+          ]}
+          checklistTitle={t('pharmacy.quickActions')}
+          missionTitle={t('pharmacy.operations')}
+          missionDescription={t('pharmacy.dispensingPipeline')}
+          emptyTitle={t('pharmacy.noPrescriptionsFound')}
+        >
+          <div className="flex flex-col gap-3" style={{ minWidth: 0 }}>
+            {/* Dispensing Pipeline */}
+            <div className="dash-card rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4" style={{ color: ACCENT }} />
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.dispensingPipeline')}</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-
-          {/* Prescription Queue with One-Tap Dispense - 2 cols */}
-          <div className="md:col-span-2 dash-card rounded-2xl overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 380px)', minHeight: 320 }}>
-            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-              <div className="flex items-center gap-2">
-                <ClipboardList className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.prescriptionQueue')}</span>
+                <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.pendingBadge', { count: pendingRx })}</span>
               </div>
-              <div className="flex items-center gap-2">
-                {/* Search + status filters live behind this filter icon, between the
-                    queue title and "View all". */}
-                <div className="relative" ref={queueFilterRef}>
-                  <button
-                    onClick={() => setShowQueueFilter(o => !o)}
-                    title={t('pharmacy.prescriptionQueue')}
-                    aria-label={t('pharmacy.prescriptionQueue')}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
-                    style={{
-                      background: (queueSearch || queueFilter !== 'all') ? `${ACCENT}18` : 'var(--overlay-subtle)',
-                      border: `1px solid ${(queueSearch || queueFilter !== 'all') ? ACCENT : 'var(--border-light)'}`,
-                      color: (queueSearch || queueFilter !== 'all') ? ACCENT : 'var(--text-muted)',
-                    }}
-                  >
-                    <Filter className="w-3.5 h-3.5" />
+              <div className="p-4 overflow-x-auto">
+                <div className="flex items-center gap-1 min-w-[680px]">
+                  {[
+                    { key: 'stock', label: t('pharmacy.inStock'), icon: Package, color: ACCENT, count: stockAlerts.filter(s => s.status === 'adequate').length },
+                    { key: 'received', label: t('pharmacy.stageReceived'), icon: ClipboardList, color: ACCENT, count: prescriptionQueue.length },
+                    { key: 'pending', label: t('pharmacy.pending'), icon: Clock, color: 'var(--color-warning)', count: pendingRx },
+                    { key: 'dispensed', label: t('pharmacy.kpiDispensed'), icon: CheckCircle2, color: 'var(--color-success)', count: dispensedToday },
+                    { key: 'pickup', label: t('pharmacy.kpiPickup'), icon: Send, color: 'var(--color-brand-500)', count: awaitingPickup },
+                    { key: 'reorder', label: t('pharmacy.reorderNeeded'), icon: AlertTriangle, color: 'var(--color-danger)', count: criticalCount + lowStockCount },
+                  ].map((stage, idx, arr) => (
+                    <div key={stage.key} className="flex items-center flex-1">
+                      <div className="flex-1 p-2.5 rounded-xl transition-all" style={{
+                        background: stage.count > 0 ? 'var(--overlay-subtle)' : 'transparent',
+                        border: `1px solid ${stage.count > 0 ? 'var(--border-light)' : 'transparent'}`,
+                        opacity: stage.count > 0 ? 1 : 0.5,
+                      }}>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <stage.icon className="w-3.5 h-3.5" style={{ color: stage.color }} />
+                          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: stage.color }}>{stage.label}</span>
+                        </div>
+                        <span className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{stage.count}</span>
+                      </div>
+                      {idx < arr.length - 1 && (
+                        <div className="px-1 flex-shrink-0">
+                          <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)', opacity: 0.45 }} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {/* Stock Alerts */}
+              <div className="dash-card rounded-2xl overflow-hidden flex flex-col" style={{ minHeight: 260 }}>
+                <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.stockAlerts')}</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}>{t('pharmacy.criticalBadge', { count: criticalCount })}</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>{lowStockCount} {t('pharmacy.kpiLowStock')}</span>
+                  </div>
+                  <button onClick={() => setShowReceiveStock(true)} className="text-[10px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-90" style={{ background: 'var(--color-success)' }}>
+                    <Plus className="w-3 h-3" /> {t('pharmacy.receiveStock')}
                   </button>
-                  {showQueueFilter && (
-                    <div
-                      className="absolute right-0 top-full mt-1.5 z-30 p-2.5 rounded-xl"
-                      style={{ width: 260, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}
-                    >
-                      {/* Search */}
-                      <div className="relative mb-2">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-                        <input
-                          type="search"
-                          value={queueSearch}
-                          onChange={e => setQueueSearch(e.target.value)}
-                          placeholder={t('topbar.searchPlaceholder')}
-                          className="w-full !pl-8 !pr-2 !py-1.5 text-[12px]"
-                          style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', borderRadius: 8, color: 'var(--text-primary)' }}
-                        />
-                      </div>
-                      {/* Status filter chips — pending / dispensed / pickup / controlled counts */}
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {([
-                          { key: 'all', label: t('pharmacy.viewAll'), count: prescriptionQueue.length, color: 'var(--text-secondary)' },
-                          { key: 'pending', label: t('pharmacy.kpiPendingRx'), count: pendingRx, color: ACCENT },
-                          { key: 'dispensed', label: t('pharmacy.kpiDispensed'), count: dispensedToday, color: 'var(--color-success)' },
-                          { key: 'awaiting_pickup', label: t('pharmacy.kpiPickup'), count: awaitingPickup, color: '#2563EB' },
-                          { key: 'controlled', label: t('pharmacy.kpiControlled'), count: controlledCount, color: '#A855F7' },
-                        ] as const).map(chip => {
-                          const active = queueFilter === chip.key;
-                          return (
-                            <button
-                              key={chip.key}
-                              onClick={() => setQueueFilter(active && chip.key !== 'all' ? 'all' : chip.key)}
-                              title={active && chip.key !== 'all' ? t('action.deselect') : undefined}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all"
-                              style={{
-                                background: active ? `${chip.color}18` : 'var(--overlay-subtle)',
-                                border: `1px solid ${active ? chip.color : 'var(--border-light)'}`,
-                                color: active ? chip.color : 'var(--text-secondary)',
-                              }}
-                            >
-                              {chip.label}
-                              <span className="px-1 rounded text-[9px] font-bold" style={{ background: `${chip.color}20`, color: chip.color }}>{chip.count}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
-                <button onClick={() => router.push('/pharmacy')} className="text-[10px] font-medium flex items-center gap-1" style={{ color: ACCENT }}>
-                  {t('pharmacy.viewAll')} <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-            <div className="p-3 space-y-1.5 flex-1" style={{ overflowY: 'auto', minHeight: 0 }}>
-              {visibleQueue.length === 0 && (
-                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.noPrescriptionsFound')}</p>
-              )}
-              {visibleQueue.map(rx => (
-                <div key={rx.id} className="flex items-center gap-3 p-2.5 rounded-xl transition-all" style={{
-                  background: rx.priority === 'urgent' ? `${ACCENT}08` : 'var(--overlay-subtle)',
-                  border: `1px solid ${rx.priority === 'urgent' ? `${ACCENT}25` : 'var(--border-light)'}`,
-                }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{rx.patient}</p>
-                    <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
-                      {rx.medication} · {rx.dose}
-                    </p>
-                    <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{rx.prescriber} · {rx.time}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
-                      background: rx.status === 'dispensed' ? 'rgba(74,222,128,0.15)' :
-                        rx.status === 'awaiting_pickup' ? 'rgba(56,189,248,0.15)' : `${ACCENT}15`,
-                      color: rx.status === 'dispensed' ? 'var(--color-success)' :
-                        rx.status === 'awaiting_pickup' ? '#2563EB' : ACCENT,
-                    }}>{rx.status === 'awaiting_pickup' ? t('pharmacy.statusPickup') : t(`pharmacy.status_${rx.status}`)}</span>
-                    {rx.priority === 'urgent' && (
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
-                        background: 'rgba(248,113,113,0.15)', color: '#F87171',
-                      }}>{t('pharmacy.urgent')}</span>
-                    )}
-                    {rx.status === 'pending' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDispense(rx); }}
-                        className="mt-1 px-3 py-1 rounded-lg text-[10px] font-bold text-white transition-all hover:opacity-90 flex items-center gap-1"
-                        style={{ background: 'var(--color-success)' }}
-                      >
-                        <Pill className="w-3 h-3" /> {t('pharmacy.dispense')}
-                      </button>
-                    )}
-                    {rx.status === 'dispensed' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleUndoDispense(rx); }}
-                        className="mt-1 px-3 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-90 flex items-center gap-1"
-                        style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
-                      >
-                        {t('action.undo')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Stock Alerts - 1 col */}
-          <div className="dash-card rounded-2xl overflow-hidden flex flex-col" style={{
-            height: 'calc(100vh - 380px)', minHeight: 320,
-          }}>
-            <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" style={{ color: '#F87171' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.stockAlerts')}</span>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
-                  background: 'rgba(248,113,113,0.12)', color: '#F87171',
-                }}>{t('pharmacy.criticalBadge', { count: criticalCount })}</span>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
-                  background: 'rgba(251,191,36,0.12)', color: 'var(--color-warning)',
-                }}>{lowStockCount} {t('pharmacy.kpiLowStock')}</span>
-              </div>
-              <button
-                onClick={() => setShowReceiveStock(true)}
-                className="text-[10px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-90"
-                style={{ background: 'var(--color-success)' }}
-              >
-                <Plus className="w-3 h-3" /> {t('pharmacy.receiveStock')}
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-              {stockAlerts.map((item, i) => {
-                const pct = Math.round((item.stock / item.reorder) * 100);
-                return (
-                  <div key={i} className="p-2.5 rounded-lg transition-all" style={{
-                    background: item.status === 'critical' ? 'rgba(248,113,113,0.06)' : 'rgba(251,191,36,0.06)',
-                    border: `1px solid ${item.status === 'critical' ? 'rgba(248,113,113,0.15)' : 'rgba(251,191,36,0.15)'}`,
-                  }}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{item.name}</span>
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ml-1" style={{
-                        background: item.status === 'critical' ? 'rgba(248,113,113,0.15)' : 'rgba(251,191,36,0.15)',
-                        color: item.status === 'critical' ? '#F87171' : 'var(--color-warning)',
-                      }}>{t(`pharmacy.stockStatus_${item.status}`)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                      <span>{item.stock} / {item.reorder} {item.unit}</span>
-                      <span style={{ color: item.status === 'critical' ? '#F87171' : 'var(--color-warning)' }}>{pct}%</span>
-                    </div>
-                    <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--overlay-subtle)' }}>
-                      <div className="h-full rounded-full transition-all duration-700" style={{
-                        width: `${pct}%`,
-                        background: item.status === 'critical' ? 'var(--color-danger)' : 'var(--color-warning)',
-                      }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Dispensing Activity Feed - 1 col */}
-          <div className="dash-card rounded-2xl overflow-hidden flex flex-col" style={{
-            height: 'calc(100vh - 380px)', minHeight: 320,
-          }}>
-            <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-              <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.activityFeed')}</span>
-              </div>
-              <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.eventsCount', { count: eventCounter })}</span>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {liveEvents.map(evt => {
-                const Icon = evt.icon;
-                return (
-                  <div key={evt.id} className="p-2 rounded-lg transition-all" style={{
-                    background: evt.isNew ? `${evt.color}08` : 'transparent',
-                    border: evt.isNew ? `1px solid ${evt.color}20` : '1px solid transparent',
-                    animation: evt.isNew ? 'fadeIn 0.3s ease-out' : undefined,
-                  }}>
-                    <div className="flex items-start gap-2">
-                      <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: 'transparent' }}>
-                        <Icon className="w-3 h-3" style={{ color: evt.color }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] font-semibold truncate" style={{ color: evt.color }}>{t(`pharmacy.event_${evt.type}`)}</span>
-                          {evt.isNew && (
-                            <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: `${evt.color}20`, color: evt.color }}>{t('pharmacy.new')}</span>
-                          )}
+                <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+                  {stockAlerts.map((item, i) => {
+                    const pct = Math.round((item.stock / item.reorder) * 100);
+                    return (
+                      <div key={i} className="p-2.5 rounded-lg transition-all" style={{
+                        background: item.status === 'critical' ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)',
+                        border: `1px solid ${item.status === 'critical' ? 'var(--color-danger-border)' : 'var(--color-warning-border)'}`,
+                      }}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{item.name}</span>
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ml-1" style={{
+                            background: item.status === 'critical' ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)',
+                            color: item.status === 'critical' ? 'var(--color-danger)' : 'var(--color-warning)',
+                          }}>{t(`pharmacy.stockStatus_${item.status}`)}</span>
                         </div>
-                        <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{evt.patient}</p>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <span className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>{evt.medication}</span>
-                          <span className="text-[9px] font-mono flex-shrink-0 ml-1" style={{ color: 'var(--text-muted)' }}>{evt.time}</span>
+                        <div className="flex items-center justify-between text-[10px] mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                          <span>{item.stock} / {item.reorder} {item.unit}</span>
+                          <span style={{ color: item.status === 'critical' ? 'var(--color-danger)' : 'var(--color-warning)' }}>{pct}%</span>
+                        </div>
+                        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--overlay-subtle)' }}>
+                          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: item.status === 'critical' ? 'var(--color-danger)' : 'var(--color-warning)' }} />
                         </div>
                       </div>
-                    </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Dispensing Activity Feed */}
+              <div className="dash-card rounded-2xl overflow-hidden flex flex-col" style={{ minHeight: 260 }}>
+                <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
+                  <div className="flex items-center gap-2">
+                    <Radio className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.activityFeed')}</span>
                   </div>
-                );
-              })}
+                  <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.eventsCount', { count: eventCounter })}</span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                  {liveEvents.map(evt => {
+                    const Icon = evt.icon;
+                    return (
+                      <div key={evt.id} className="p-2 rounded-lg transition-all" style={{
+                        background: evt.isNew ? `${evt.color}08` : 'transparent',
+                        border: evt.isNew ? `1px solid ${evt.color}20` : '1px solid transparent',
+                        animation: evt.isNew ? 'fadeIn 0.3s ease-out' : undefined,
+                      }}>
+                        <div className="flex items-start gap-2">
+                          <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: 'transparent' }}>
+                            <Icon className="w-3 h-3" style={{ color: evt.color }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-semibold truncate" style={{ color: evt.color }}>{t(`pharmacy.event_${evt.type}`)}</span>
+                              {evt.isNew && (
+                                <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: `${evt.color}20`, color: evt.color }}>{t('pharmacy.new')}</span>
+                              )}
+                            </div>
+                            <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{evt.patient}</p>
+                            <div className="flex items-center justify-between mt-0.5">
+                              <span className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>{evt.medication}</span>
+                              <span className="text-[9px] font-mono flex-shrink-0 ml-1" style={{ color: 'var(--text-muted)' }}>{evt.time}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-
+        </EhrCareDashboard>
       </main>
 
       {/* Modals and Toasts */}

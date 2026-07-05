@@ -154,7 +154,7 @@ export default function DHIS2ExportPage() {
           disabled={syncing}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
           style={{
-            background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
+            background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #2191D0, #015697)',
             color: syncing ? 'var(--text-muted)' : '#fff',
             boxShadow: syncing ? 'none' : '0 4px 12px rgba(33, 145, 208, 0.3)',
           }}
@@ -171,7 +171,7 @@ export default function DHIS2ExportPage() {
             { label: t('dhis2.statConnection'), value: t('dhis2.statConnectionActive'), icon: Wifi, color: '#10B944', sub: 'hmis.southsudan.health' },
             { label: t('dhis2.tabDataElements'), value: `${syncedCount}/${DHIS2_DATA_ELEMENTS.length}`, icon: Database, color: 'var(--accent-primary)', sub: t('sync.synced') },
             { label: t('dhis2.statReportsDue'), value: String(DHIS2_REPORTS.filter(r => r.status !== 'submitted').length), icon: FileText, color: 'var(--color-warning)', sub: t('dhis2.statPendingCompletion') },
-            { label: t('dhis2.statLastSync'), value: t('dhis2.statLastSyncValue'), icon: Clock, color: '#1E3A8A', sub: 'Feb 22, 2026' },
+            { label: t('dhis2.statLastSync'), value: t('dhis2.statLastSyncValue'), icon: Clock, color: '#015697', sub: 'Feb 22, 2026' },
           ].map((stat) => (
             <div key={stat.label} className="card-elevated p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -193,7 +193,7 @@ export default function DHIS2ExportPage() {
               className="flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors"
               style={{
                 color: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--text-muted)',
-                borderBottom: activeTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
+                borderBottom: activeTab === tab.id ? '2px solid #2191D0' : '2px solid transparent',
               }}
             >
               <tab.icon className="w-4 h-4" />
@@ -348,7 +348,7 @@ export default function DHIS2ExportPage() {
               disabled={syncing}
               className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all"
               style={{
-                background: 'linear-gradient(135deg, #3b82f6, #1E40AF)',
+                background: 'linear-gradient(135deg, #2191D0, #015697)',
                 boxShadow: '0 4px 12px rgba(33, 145, 208, 0.3)',
               }}
             >

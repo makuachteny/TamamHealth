@@ -37,6 +37,22 @@ export default function TopBar({
   searchTrailing?: ReactNode;
   splitActions?: boolean;
 }) {
+  // Title + search row on one line: when there's a title and a search row to
+  // show it, GlobalSearchBar renders the title as the row's leading item
+  // instead of TopBar stacking it in a row of its own above.
+  if (title && !hideSearch && !titleActions) {
+    return (
+      <GlobalSearchBar
+        title={title}
+        titleIcon={titleIcon}
+        actions={actions}
+        searchTrailing={searchTrailing}
+        splitActions={splitActions}
+        hideInput={hideSearchInput}
+      />
+    );
+  }
+
   return (
     <>
       {(title || titleActions) && (

@@ -437,6 +437,13 @@ export async function getPatientInsurancePolicies(patientId: string): Promise<In
     .sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
 }
 
+/** Patient ids holding at least one active insurance policy — one bulk query
+ *  so list views can badge every row without a per-patient lookup. */
+export async function getInsuredPatientIds(): Promise<Set<string>> {
+  const rows = await findByType<InsurancePolicyDoc>(insurancePoliciesDB(), 'insurance_policy');
+  return new Set(rows.filter(d => d && d.isActive).map(d => d.patientId));
+}
+
 export async function getPrimaryPolicy(patientId: string): Promise<InsurancePolicyDoc | null> {
   const policies = await getPatientInsurancePolicies(patientId);
   return policies.find(p => p.isPrimary) || policies[0] || null;

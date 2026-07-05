@@ -191,10 +191,10 @@ export default function NurseDashboard() {
           }))}
           actions={actions}
           actionStrip={[
-            { label: 'Patient search', icon: Users, onClick: () => router.push('/patients') },
-            { label: 'Wards', icon: BedDouble, onClick: () => router.push('/wards') },
-            { label: 'Immunizations', icon: Syringe, onClick: () => router.push('/immunizations') },
-            { label: 'Appointments', icon: Calendar, onClick: () => router.push('/appointments') },
+            ...(canUseRoute('/patients') ? [{ label: 'Patient search', icon: Users, onClick: () => router.push('/patients') }] : []),
+            ...(canUseRoute('/wards') ? [{ label: 'Wards', icon: BedDouble, onClick: () => router.push('/wards') }] : []),
+            ...(canUseRoute('/immunizations') ? [{ label: 'Immunizations', icon: Syringe, onClick: () => router.push('/immunizations') }] : []),
+            ...(canUseRoute('/appointments') ? [{ label: 'Appointments', icon: Calendar, onClick: () => router.push('/appointments') }] : []),
           ]}
           rows={rows}
           metrics={metrics}

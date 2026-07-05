@@ -1,0 +1,161 @@
+'use client';
+
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useApp } from '@/lib/context';
+import type { UserRole } from '@/lib/db-types';
+import TourCard from '@/components/tour/TourCard';
+import { clinicalOfficerTourSteps } from './clinical-officer-steps';
+import { hasSeenTour, markTourSeen } from './tour-storage';
+import type { TourDefinition } from './types';
+
+// Role -> tour. Clinical Officer is the first module walked through; other
+// roles can get their own entry here later without touching the engine.
+const TOURS_BY_ROLE: Partial<Record<UserRole, TourDefinition>> = {
+  clinical_officer: { key: 'clinical-officer', steps: clinicalOfficerTourSteps },
+};
+
+const MEASURE_RETRY_MS = 120;
+const MEASURE_TIMEOUT_MS = 4000;
+
+interface TourContextValue {
+  /** Whether the signed-in user has a tour defined at all. */
+  available: boolean;
+  start: () => void;
+}
+
+const TourContext = createContext<TourContextValue>({ available: false, start: () => {} });
+
+export function useTourContext(): TourContextValue {
+  return useContext(TourContext);
+}
+
+export function TourProvider({ children }: { children: React.ReactNode }) {
+  const { currentUser } = useApp();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const tour = currentUser ? TOURS_BY_ROLE[currentUser.role] : undefined;
+  const steps = useMemo(() => tour?.steps ?? [], [tour]);
+
+  const [active, setActive] = useState(false);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const autoStartedRef = useRef(false);
+
+  const step = active ? steps[stepIndex] : undefined;
+
+  const stop = useCallback(() => {
+    setActive(false);
+    setRect(null);
+  }, []);
+
+  const finish = useCallback(() => {
+    if (tour && currentUser) markTourSeen(tour.key, currentUser._id);
+    stop();
+  }, [tour, currentUser, stop]);
+
+  const start = useCallback(() => {
+    if (!tour) return;
+    setStepIndex(0);
+    setRect(null);
+    setActive(true);
+  }, [tour]);
+
+  // Auto-launch once per user, the first time they land on their dashboard.
+  useEffect(() => {
+    if (!tour || !currentUser || autoStartedRef.current) return;
+    if (pathname !== '/dashboard') return;
+    if (hasSeenTour(tour.key, currentUser._id)) return;
+    autoStartedRef.current = true;
+    const timer = setTimeout(() => start(), 600);
+    return () => clearTimeout(timer);
+  }, [tour, currentUser, pathname, start]);
+
+  // Follow the current step to its route.
+  useEffect(() => {
+    if (!active || !step) return;
+    if (pathname !== step.route) router.push(step.route);
+  }, [active, step, pathname, router]);
+
+  // Locate (and, if needed, reveal) the current step's target once we're on
+  // the right route. Polls briefly since a fresh navigation's target may not
+  // exist in the DOM the instant the route changes.
+  useEffect(() => {
+    if (!active || !step) return;
+    if (pathname !== step.route) { setRect(null); return; }
+
+    let cancelled = false;
+    let clickedPreStep = false;
+    setRect(null);
+    const startedAt = Date.now();
+
+    const tick = () => {
+      if (cancelled) return;
+      if (step.preClickSelector && !clickedPreStep) {
+        const trigger = document.querySelector<HTMLElement>(step.preClickSelector);
+        if (trigger) {
+          trigger.click();
+          clickedPreStep = true;
+        }
+      }
+      const el = document.querySelector<HTMLElement>(step.target);
+      if (el) {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        requestAnimationFrame(() => {
+          if (!cancelled) setRect(el.getBoundingClientRect());
+        });
+        return;
+      }
+      if (Date.now() - startedAt > MEASURE_TIMEOUT_MS) return;
+      setTimeout(tick, MEASURE_RETRY_MS);
+    };
+    tick();
+
+    return () => { cancelled = true; };
+  }, [active, step, pathname]);
+
+  // Keep the highlight glued to its target through scrolling/resizing.
+  useEffect(() => {
+    if (!active || !step || !rect) return;
+    const el = document.querySelector<HTMLElement>(step.target);
+    if (!el) return;
+    const onUpdate = () => setRect(el.getBoundingClientRect());
+    window.addEventListener('scroll', onUpdate, true);
+    window.addEventListener('resize', onUpdate);
+    return () => {
+      window.removeEventListener('scroll', onUpdate, true);
+      window.removeEventListener('resize', onUpdate);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, step, rect !== null]);
+
+  const next = useCallback(() => {
+    if (stepIndex >= steps.length - 1) { finish(); return; }
+    setStepIndex(i => i + 1);
+  }, [stepIndex, steps.length, finish]);
+
+  const back = useCallback(() => {
+    setStepIndex(i => Math.max(0, i - 1));
+  }, []);
+
+  const value = useMemo(() => ({ available: !!tour, start }), [tour, start]);
+
+  return (
+    <TourContext.Provider value={value}>
+      {children}
+      {active && step && (
+        <TourCard
+          step={step}
+          rect={rect}
+          index={stepIndex}
+          total={steps.length}
+          onBack={stepIndex > 0 ? back : undefined}
+          onNext={next}
+          onSkip={finish}
+          isLast={stepIndex === steps.length - 1}
+        />
+      )}
+    </TourContext.Provider>
+  );
+}

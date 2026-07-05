@@ -27,7 +27,10 @@ import { formatPhoneDisplay } from '@/lib/field-formats';
 // `hideInput` drops the text search field (and its quick-jump dropdown) while
 // keeping the actions/trailing row — used on pages that already have the
 // platform header search and don't want a duplicate search box (e.g. payments).
-export default function GlobalSearchBar({ actions, searchTrailing, splitActions, hideInput }: { actions?: ReactNode; searchTrailing?: ReactNode; splitActions?: boolean; hideInput?: boolean } = {}) {
+// `title`/`titleIcon` render the page title as the row's leading, non-shrinking
+// item — TopBar hands these down so the title sits on the same line as the
+// search box and actions instead of stacked in a row of its own.
+export default function GlobalSearchBar({ title, titleIcon, actions, searchTrailing, splitActions, hideInput }: { title?: string; titleIcon?: ReactNode; actions?: ReactNode; searchTrailing?: ReactNode; splitActions?: boolean; hideInput?: boolean } = {}) {
   const { t } = useTranslation();
   const { globalSearch, setGlobalSearch } = useApp();
   const [localSearch, setLocalSearch] = useState(globalSearch);
@@ -97,6 +100,12 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions,
       {/* In split mode this groups search + trailing into the left grid column;
           otherwise `contents` makes them plain flex children as before. */}
       <div className={split ? 'flex items-center gap-3 min-w-0' : 'contents'}>
+      {title && (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {titleIcon}
+          <h1 className="text-base font-semibold whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>{title}</h1>
+        </div>
+      )}
       {!hideInput && (
       <div className={split ? 'relative flex-1 min-w-0' : 'relative flex-1 min-w-[220px] max-w-2xl'} ref={searchContainerRef}>
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px]" color="var(--text-muted)" />

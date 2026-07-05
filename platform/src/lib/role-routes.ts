@@ -60,21 +60,22 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/settings',
-      '/appointments', '/telehealth',
+      '/appointments', '/telehealth', '/patient-intake',
       '/wards', '/alerts', '/blood-bank',
     ],
     defaultDashboard: '/dashboard',
   },
 
   clinical_officer: {
-    // Diagnoses, treats, prescribes, orders labs, refers. Clinical scope only —
-    // payment processing belongs to cashier/biller, not clinicians.
+    // Diagnoses, treats, prescribes, orders labs, refers, runs telehealth
+    // visits. Clinical scope only — payment processing belongs to
+    // cashier/biller, not clinicians.
     allowed: [
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
-      '/surveillance', '/settings',
-      '/appointments',
-      '/wards', '/blood-bank',
+      '/settings',
+      '/appointments', '/telehealth', '/patient-intake',
+      '/wards', '/alerts', '/blood-bank',
     ],
     defaultDashboard: '/dashboard',
   },
@@ -85,8 +86,8 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/dashboard/nurse', '/patients', '/messages',
       '/lab', '/immunizations', '/anc', '/births', '/deaths',
-      '/settings', '/appointments',
-      '/wards', 
+      '/settings', '/appointments', '/patient-intake',
+      '/wards',
     ],
     defaultDashboard: '/dashboard/nurse',
   },
@@ -100,7 +101,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     allowed: [
       '/dashboard/nurse', '/patients', '/messages',
       '/anc', '/births', '/deaths', '/immunizations',
-      '/wards', '/referrals', '/appointments',
+      '/wards', '/referrals', '/appointments', '/patient-intake',
       '/settings',
     ],
     defaultDashboard: '/dashboard/nurse',
@@ -121,13 +122,15 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   },
 
   front_desk: {
-    // Reception: registration, appointment booking, referral intake.
-    // Money handling moves to the dedicated cashier role; bed/ward management is
-    // a nursing function. Insurance claims belong to the medical biller.
+    // Reception: registration, appointment booking, referral intake, and
+    // reviewing patient-submitted intake forms before they're merged into
+    // a chart. Money handling moves to the dedicated cashier role; bed/ward
+    // management is a nursing function. Insurance claims belong to the
+    // medical biller.
     allowed: [
       '/dashboard/front-desk', '/check-in', '/patients', '/referrals', '/messages',
       '/settings',
-      '/appointments',
+      '/appointments', '/patient-intake',
 
     ],
     defaultDashboard: '/dashboard/front-desk',
@@ -188,7 +191,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/facility-settings',
       '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
       '/appointments', '/telehealth', '/facility-assessments', '/data-quality',
-      '/payments', '/payments/claims',
+      '/payments', '/payments/claims', '/patient-intake',
       '/wards', '/equipment', '/hr', '/dashboard/hr',
       '/blood-bank', '/controlled-substances', '/emergency-preparedness',
     ],
@@ -304,7 +307,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/appointments', '/telehealth', '/wards', '/alerts', '/settings',
-      '/blood-bank',
+      '/blood-bank', '/patient-intake',
     ],
     defaultDashboard: '/dashboard',
   },
@@ -328,7 +331,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/reports', '/settings',
       '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
-      '/appointments', '/facility-assessments', '/data-quality',
+      '/appointments', '/facility-assessments', '/data-quality', '/patient-intake',
       '/facility-settings',
       '/payments', '/payments/claims',
       '/wards', '/equipment', '/hr', '/dashboard/hr',

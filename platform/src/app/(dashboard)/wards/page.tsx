@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
@@ -24,6 +25,8 @@ export default function WardsPage() {
   const { patients } = usePatients();
   const { wards, activeAdmissions, totalBeds, occupiedBeds, availableBeds, occupancyRate, admit, discharge } = useWards();
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
+  const admitFromQueryRef = useRef(false);
 
   const [admitOpen, setAdmitOpen] = useState(false);
   const [dischargeFor, setDischargeFor] = useState<AdmissionDoc | null>(null);
@@ -48,6 +51,19 @@ export default function WardsPage() {
     dischargeSummary: '',
     followUpRequired: false,
   });
+
+  // Deep link from consultation (?admitPatientId=&diagnosis=): open the admit
+  // modal pre-filled with the patient and diagnosis just captured there,
+  // instead of leaving the clinician to reselect both from scratch.
+  useEffect(() => {
+    const admitPatientId = searchParams?.get('admitPatientId');
+    if (!admitPatientId || admitFromQueryRef.current) return;
+    if (!patients.some(p => p._id === admitPatientId)) return;
+    admitFromQueryRef.current = true;
+    const diagnosis = searchParams?.get('diagnosis') || '';
+    setAdmitForm(prev => ({ ...prev, patientId: admitPatientId, admittingDiagnosis: diagnosis }));
+    setAdmitOpen(true);
+  }, [searchParams, patients]);
 
   const facilityId = currentUser?.hospitalId || currentUser?.hospital?._id;
   const facilityWards = useMemo(

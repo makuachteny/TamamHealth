@@ -323,7 +323,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
             {/* Airway */}
             <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2 mb-2">
-                <Wind className="w-4 h-4" style={{ color: '#2563EB' }} />
+                <Wind className="w-4 h-4" style={{ color: '#2191D0' }} />
                 <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.airway')}</span>
               </div>
               <div className="flex gap-2">
@@ -416,7 +416,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
             {/* Consciousness (AVPU) */}
             <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2 mb-2">
-                <Brain className="w-4 h-4" style={{ color: '#2563EB' }} />
+                <Brain className="w-4 h-4" style={{ color: '#2191D0' }} />
                 <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nurse.consciousnessAvpu')}</span>
               </div>
               <div className="grid grid-cols-2 gap-1.5 keep-cols">
@@ -665,7 +665,7 @@ export default function TriageWorkflow({ initialPatientId }: { initialPatientId?
                       </p>
                     </button>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: ti.status === 'pending' ? 'rgba(252,211,77,0.12)' : ti.status === 'seen' ? 'rgba(92,184,168,0.12)' : 'rgba(31, 157, 111,0.12)', color: ti.status === 'pending' ? 'var(--color-warning)' : ti.status === 'seen' ? '#2563EB' : 'var(--color-success)' }}>
+                      <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: ti.status === 'pending' ? 'rgba(252,211,77,0.12)' : ti.status === 'seen' ? 'rgba(92,184,168,0.12)' : 'rgba(31, 157, 111,0.12)', color: ti.status === 'pending' ? 'var(--color-warning)' : ti.status === 'seen' ? '#2191D0' : 'var(--color-success)' }}>
                         {ti.status}
                       </span>
                       {(() => {

@@ -100,7 +100,7 @@ export default function BalanceBanner({ patientId, compact, onPayClick }: Balanc
             fontSize: 12, fontWeight: 600, cursor: 'pointer',
           }}
         >
-          <span className="icon-box-sm" style={{ color: 'var(--teal, #3B82F6)', width: 22, height: 22 }}>
+          <span className="icon-box-sm" style={{ color: 'var(--teal, #2191D0)', width: 22, height: 22 }}>
             <CreditCard size={13} />
           </span>
           {t('billing.collectPayment')}

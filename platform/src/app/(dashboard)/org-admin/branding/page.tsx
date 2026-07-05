@@ -22,7 +22,7 @@ export default function OrgBrandingPage() {
   // Form state
   const [orgName, setOrgName] = useState('');
   const [primaryColor, setPrimaryColor] = useState('var(--accent-primary)');
-  const [secondaryColor, setSecondaryColor] = useState('#0F47AF');
+  const [secondaryColor, setSecondaryColor] = useState('#015697');
   const [accentColor, setAccentColor] = useState('var(--accent-primary)');
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
   const [bankDetails, setBankDetails] = useState('');
@@ -39,7 +39,7 @@ export default function OrgBrandingPage() {
           setOrg(o);
           setOrgName(o.name);
           setPrimaryColor(o.primaryColor || 'var(--accent-primary)');
-          setSecondaryColor(o.secondaryColor || '#0F47AF');
+          setSecondaryColor(o.secondaryColor || '#015697');
           setAccentColor(o.accentColor || 'var(--accent-primary)');
           setLogoUrl(o.logoUrl);
           setBankDetails(o.bankDetails || '');
@@ -122,7 +122,7 @@ export default function OrgBrandingPage() {
     if (!org) return;
     setOrgName(org.name);
     setPrimaryColor(org.primaryColor || 'var(--accent-primary)');
-    setSecondaryColor(org.secondaryColor || '#0F47AF');
+    setSecondaryColor(org.secondaryColor || '#015697');
     setAccentColor(org.accentColor || 'var(--accent-primary)');
     setLogoUrl(org.logoUrl);
     setBankDetails(org.bankDetails || '');

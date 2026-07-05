@@ -33,7 +33,7 @@ const VitalsTrends = dynamic(() => import('@/components/VitalsTrends'), {
 });
 import PatientTimeline from '@/components/PatientTimeline';
 import { formatDateTime, formatDate } from '@/lib/format-utils';
-import { patientFullName, patientInitials, patientAgeLabel } from '@/lib/patient-utils';
+import { patientFullName, patientInitials, patientAgeLabel, avatarColor } from '@/lib/patient-utils';
 import { usePatientAppointments } from '@/lib/hooks/useAppointments';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useTriage } from '@/lib/hooks/useTriage';
@@ -920,7 +920,6 @@ export default function PatientDetailPage() {
           {/* Patient Header — TamamHealth-style: avatar | name+pills+info-strip | action row */}
           {(() => {
             const initials = patientInitials(patient);
-            const isFemale = patient.gender === 'Female';
             const patientANC = (allANCVisits || []).filter(a => a.patientId === patient._id);
             const activeANC = patientANC.find(a => !a.linkedBirthId);
             const isPregnant = !!activeANC;
@@ -945,9 +944,7 @@ export default function PatientDetailPage() {
                     aria-hidden
                     style={{
                       width: 180, borderRadius: 14,
-                      background: isFemale
-                        ? 'var(--accent-primary)'
-                        : 'var(--accent-primary)',
+                      background: avatarColor(patientFullName(patient)),
                       boxShadow: 'none',
                     }}
                   >
@@ -1143,7 +1140,7 @@ export default function PatientDetailPage() {
           })()}
 
           <div className="ehr-chart-layout">
-          {/* Chart navigation — left rail, like the EHR reference screens */}
+          {/* Chart navigation — horizontal tab bar directly below the patient header */}
           <div
             className="ehr-chart-nav flex mb-5 no-print overflow-x-auto"
             style={{ borderBottom: '1px solid var(--border-light)' }}
@@ -2015,7 +2012,7 @@ export default function PatientDetailPage() {
                             {(rec.prescriptions || []).length > 0 && (
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                                  <Pill className="w-3 h-3" style={{ color: '#3B82F6' }} />
+                                  <Pill className="w-3 h-3" style={{ color: '#2191D0' }} />
                                   Prescriptions ({rec.prescriptions!.length})
                                 </p>
                                 <ul className="space-y-1">
@@ -2117,7 +2114,7 @@ export default function PatientDetailPage() {
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.title')}</span>
                 </div>
-                <button onClick={() => router.push('/lab')} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
+                <button onClick={() => router.push(`/lab?patient=${encodeURIComponent(patientFullName(patient))}`)} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
                   View in Lab Module <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -2173,18 +2170,18 @@ export default function PatientDetailPage() {
               <div className="flex items-center justify-between px-1 mb-1">
                 <div className="flex items-center gap-2">
                   <div className="icon-box-sm">
-                    <Pill className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
+                    <Pill className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Prescriptions</span>
                 </div>
-                <button onClick={() => router.push('/pharmacy')} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
+                <button onClick={() => router.push(`/pharmacy?patient=${encodeURIComponent(patientFullName(patient))}`)} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
                   View in Pharmacy <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
               {patient.preferredPharmacy && (
                 <div className="card-elevated px-5 py-3 flex items-center gap-3">
                   <div className="icon-box-sm flex-shrink-0">
-                    <Building2 className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
+                    <Building2 className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Preferred Pharmacy</p>
@@ -2400,7 +2397,7 @@ export default function PatientDetailPage() {
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referral.title')}</span>
                 </div>
-                <button onClick={() => router.push('/referrals')} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
+                <button onClick={() => router.push(`/referrals?patient=${encodeURIComponent(patientFullName(patient))}`)} className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--tamamhealth-blue)' }}>
                   View in Referrals <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>

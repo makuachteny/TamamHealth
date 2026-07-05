@@ -2,9 +2,9 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, CheckCircle2, ChevronRight, ClipboardList, Search, Stethoscope, type LucideIcon } from '@/components/icons/lucide';
+import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import EhrMiniCalendar, { formatDateTitle, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
-import { initials } from '@/lib/patient-utils';
+import { initials, stateColor } from '@/lib/patient-utils';
 
 export type EhrCareDashboardAction = {
   label: string;
@@ -72,7 +72,6 @@ function titleCase(value: string): string {
 
 export default function EhrCareDashboard({
   title,
-  eyebrow,
   greetingName,
   dateLabel,
   activeView = 'dashboard',
@@ -150,6 +149,11 @@ export default function EhrCareDashboard({
   const effectiveView = onViewChange ? activeView : internalView;
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
+  // Clicking a row opens a right-side detail slider where the actions live,
+  // keeping the row itself clean (avatar · time · name).
+  const [openRow, setOpenRow] = useState<EhrCareDashboardRow | null>(null);
+  const [detailTab, setDetailTab] = useState<'visit' | 'financial'>('visit');
+  const openDetail = (row: EhrCareDashboardRow) => { setDetailTab('visit'); setOpenRow(row); };
   const rowEventDates = useMemo(() => rows.map(row => row.date).filter((date): date is string => Boolean(date)), [rows]);
   const eventDates = calendarEventDates || rowEventDates;
   const visibleRows = useMemo(() => {
@@ -164,7 +168,6 @@ export default function EhrCareDashboard({
   const headerActions = actions.slice(0, 3);
   const railActions = actions.slice(3);
   const headerTitle = greetingName ? `Welcome, ${greetingName}` : title;
-  const headerSubtitle = greetingName ? title : dateLabel;
 
   return (
     <div className="ehr-schedule-shell ehr-care-dashboard">
@@ -183,9 +186,9 @@ export default function EhrCareDashboard({
         <div className="ehr-schedule-primary-controls ehr-clinical-dashboard-header-main">
           <div className="ehr-greeting-row">
             <div className="ehr-care-header-copy">
-              {eyebrow && <p className="ehr-care-eyebrow">{eyebrow}</p>}
+              {/* Only the "Welcome, {name}" greeting — no eyebrow/subtitle — so
+                  every role matches the Clinical Officer header exactly. */}
               <p className="ehr-care-greeting">{headerTitle}</p>
-              {headerSubtitle && <p className="ehr-care-header-subtitle">{headerSubtitle}</p>}
             </div>
           </div>
         </div>
@@ -293,52 +296,27 @@ export default function EhrCareDashboard({
               </div>
             ) : visibleRows.map(row => (
               <div key={row.id}>
-                <div className={`ehr-appointment-row ehr-care-row ${row.statusTone || 'scheduled'}`} onClick={row.onClick}>
-                  <div className="ehr-patient-icon">{initials(row.title)}</div>
+                <div
+                  className={`ehr-appointment-row ehr-care-row ${row.statusTone || 'scheduled'}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => (row.onClick ? row.onClick() : openDetail(row))}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); row.onClick ? row.onClick() : openDetail(row); } }}
+                >
+                  <div className="ehr-patient-icon" style={{ background: stateColor(row.statusTone === 'danger' ? 'red' : row.statusTone === 'warning' ? 'yellow' : row.priority), color: '#fff' }}>{initials(row.title)}</div>
                   <div className="ehr-appointment-main">
-                    <button type="button" onClick={(event) => { event.stopPropagation(); row.onClick?.(); }}>{row.title}</button>
-                    <p>{row.subtitle}</p>
-                    {row.meta && <small className="ehr-row-meta">{row.meta}</small>}
-                    {(row.compactMeta || row.meta) && <small className="ehr-row-compact-time">{row.compactMeta || row.meta}</small>}
-                    <div className="ehr-care-badges">
-                      {row.status && <span className={`ehr-care-status ${row.statusTone || 'scheduled'}`}>{titleCase(row.status)}</span>}
-                      {row.priority && <span>{row.priority}</span>}
-                      {row.room && <span>{row.room}</span>}
-                    </div>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); row.onClick ? row.onClick() : openDetail(row); }}>{row.title}</button>
+                    <p>{row.subtitle}{row.room ? ` · ${row.room}` : ''}</p>
                   </div>
-                  <div className="ehr-status-menu ehr-care-row-actions" onClick={(event) => event.stopPropagation()}>
-                    {row.actionLabel && row.onAction && (
-                      <button type="button" className="ehr-care-action primary" onClick={row.onAction}>{row.actionLabel}</button>
-                    )}
-                    {row.secondaryActionLabel && row.onSecondaryAction && (
-                      <button type="button" className="ehr-care-action" onClick={row.onSecondaryAction}>{row.secondaryActionLabel}</button>
-                    )}
+                  <div className="ehr-appointment-time">
+                    <strong>{row.time || row.compactMeta || '—'}</strong>
+                    {(row.priority || row.status) && <span>{row.priority || (row.status ? titleCase(row.status) : '')}</span>}
                   </div>
                 </div>
                 {row.detail}
               </div>
             ))}
           </div>
-
-          {actionStrip && actionStrip.length > 0 && (
-            <div className="ehr-clinical-strip">
-              {actionStrip.map(action => (
-                <button key={action.label} type="button" className={action.active ? 'primary' : ''} onClick={action.onClick}>
-                  <action.icon className="w-4 h-4" />{action.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {showActionStrip && !actionStrip && (
-            <div className="ehr-clinical-strip">
-              {actions.map(action => (
-                <button key={action.label} type="button" className={action.active ? 'primary' : ''} onClick={action.onClick}>
-                  <action.icon className="w-4 h-4" />{action.label}
-                </button>
-              ))}
-            </div>
-          )}
 
           {footerContent && (
             <div className="ehr-care-footer">
@@ -347,16 +325,21 @@ export default function EhrCareDashboard({
           )}
 
           {children && (
-            <div className={`ehr-worklist-panel ehr-care-workflow ${effectiveView === 'calendar' ? 'is-calendar' : ''}`}>
-              {children}
-            </div>
+            <>
+              <div className={`ehr-worklist-panel ehr-care-workflow ${effectiveView === 'calendar' ? 'is-calendar' : ''}`}>
+                {children}
+              </div>
+            </>
           )}
         </section>
 
         {effectiveView === 'dashboard' && (
         <aside className="ehr-right-rail">
           <div className="ehr-side-card">
-            <h2>{metricsTitle}</h2>
+            <div className="ehr-side-card-head">
+              <ClipboardList className="w-5 h-5" />
+              <h2>{metricsTitle}</h2>
+            </div>
             {metrics.map(metric => (
               <button
                 key={metric.label}
@@ -370,7 +353,10 @@ export default function EhrCareDashboard({
             ))}
           </div>
           <div className="ehr-side-card">
-            <h2>{checklistTitle}</h2>
+            <div className="ehr-side-card-head">
+              <ClipboardCheck className="w-5 h-5" />
+              <h2>{checklistTitle}</h2>
+            </div>
             {checklistDescription && <p>{checklistDescription}</p>}
             {checklist.map(item => (
               <button key={item.label} type="button" onClick={item.onClick || (item.href ? () => router.push(item.href as string) : undefined)}>
@@ -381,7 +367,7 @@ export default function EhrCareDashboard({
           </div>
           {showMissionCard && missionTitle && missionDescription && (
             <div className="ehr-side-card ehr-mission-card">
-              <div className="ehr-mission-head">
+              <div className="ehr-side-card-head ehr-mission-head">
                 <Stethoscope className="w-5 h-5" />
                 <h2>{missionTitle}</h2>
               </div>
@@ -391,6 +377,100 @@ export default function EhrCareDashboard({
         </aside>
         )}
       </div>
+
+      {openRow && (
+        <>
+          <button
+            type="button"
+            className="appointment-detail-backdrop"
+            aria-label="Close details"
+            onClick={() => setOpenRow(null)}
+          />
+          <aside className="appointment-detail-sidebar" role="dialog" aria-modal="true" aria-label="Details">
+            <div className="appointment-detail-sidebar__header">
+              <button type="button" className="appointment-detail-sidebar__back" onClick={() => setOpenRow(null)} aria-label="Close">
+                <ChevronLeft size={22} />
+              </button>
+              <div className="appointment-detail-sidebar__title">
+                <h2>{openRow.title}</h2>
+                {(openRow.time || openRow.compactMeta) && (
+                  <p className="appointment-detail-sidebar__time">{openRow.time || openRow.compactMeta}</p>
+                )}
+                {openRow.subtitle && <p>{openRow.subtitle}</p>}
+              </div>
+              <button type="button" className="appointment-detail-sidebar__close" onClick={() => setOpenRow(null)} aria-label="Close">
+                <X size={16} />
+              </button>
+              {(openRow.status || openRow.priority) && (
+                <div className="appointment-detail-sidebar__status">
+                  {openRow.status && <span>{titleCase(openRow.status)}</span>}
+                  {openRow.priority && <span>{openRow.priority}</span>}
+                </div>
+              )}
+            </div>
+
+            <div className="appointment-detail-sidebar__tabs" role="tablist" aria-label="Detail sections">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={detailTab === 'visit'}
+                className={detailTab === 'visit' ? 'active' : undefined}
+                onClick={() => setDetailTab('visit')}
+              >
+                Visit Information
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={detailTab === 'financial'}
+                className={detailTab === 'financial' ? 'active' : undefined}
+                onClick={() => setDetailTab('financial')}
+              >
+                Financial Information
+              </button>
+            </div>
+
+            <div className="appointment-detail-sidebar__body" role="tabpanel">
+              {(detailTab === 'visit'
+                ? [
+                    { label: 'Time', value: openRow.time || openRow.compactMeta },
+                    { label: 'Reason', value: openRow.subtitle },
+                    { label: 'Priority', value: openRow.priority },
+                    { label: 'Status', value: openRow.status ? titleCase(openRow.status) : undefined },
+                    { label: 'Room', value: openRow.room },
+                    { label: 'Details', value: openRow.meta },
+                  ]
+                : [
+                    { label: 'Balance', value: '—' },
+                    { label: 'Charge', value: 'Not started' },
+                    { label: 'Payment Responsibility', value: 'Not recorded' },
+                    { label: 'Insurance', value: 'Not recorded' },
+                    { label: 'Claim Status', value: 'Not started' },
+                  ]
+              ).filter((item): item is { label: string; value: string } => Boolean(item.value))
+                .map(item => (
+                  <div className="appointment-detail-row" key={item.label}>
+                    <dt>{item.label}</dt>
+                    <dd>{item.value}</dd>
+                  </div>
+                ))}
+            </div>
+
+            <div className="appointment-detail-sidebar__actions">
+              {openRow.actionLabel && openRow.onAction && (
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => { openRow.onAction?.(); setOpenRow(null); }}>
+                  {openRow.actionLabel}
+                </button>
+              )}
+              {openRow.secondaryActionLabel && openRow.onSecondaryAction && (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { openRow.onSecondaryAction?.(); setOpenRow(null); }}>
+                  {openRow.secondaryActionLabel}
+                </button>
+              )}
+            </div>
+          </aside>
+        </>
+      )}
     </div>
   );
 }

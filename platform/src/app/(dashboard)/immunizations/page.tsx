@@ -14,7 +14,6 @@ import { useBodyScrollLock } from '@/lib/hooks/useBodyScrollLock';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { FilterMenu } from '@/components/filters';
 import type { ImmunizationDefaulter } from '@/lib/services/immunization-service';
 import type { ImmunizationDoc } from '@/lib/db-types';
 import {
@@ -45,9 +44,6 @@ export default function ImmunizationsPage() {
   const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
   // Text search comes from the shared global search bar (TopBar).
   const search = globalSearch;
-  const [vaccineFilter, setVaccineFilter] = useState('all');
-  const activeFilterCount = (vaccineFilter !== 'all' ? 1 : 0);
-  const clearFilters = () => { setVaccineFilter('all'); };
   const [showModal, setShowModal] = useState(false);
   // Edit/correct affordance for a saved dose. Clinical records are corrected
   // (via updateImmunization), never hard-deleted, so a fix preserves audit/sync.
@@ -145,10 +141,9 @@ export default function ImmunizationsPage() {
     const entries = Array.from(childGroups.entries());
     const q = search.toLowerCase();
     return entries.filter(([, records]) =>
-      (!search || records[0]?.patientName?.toLowerCase().includes(q)) &&
-      (vaccineFilter === 'all' || records.some(r => r.vaccine === vaccineFilter))
+      !search || records[0]?.patientName?.toLowerCase().includes(q)
     );
-  }, [childGroups, search, vaccineFilter]);
+  }, [childGroups, search]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,18 +209,7 @@ export default function ImmunizationsPage() {
 
   return (
     <>
-      <TopBar title={t('immun.title')} searchTrailing={
-          activeTab === 'records' && (
-            <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
-              <FilterMenu.Field label="Filter by vaccine">
-                <select value={vaccineFilter} onChange={e => setVaccineFilter(e.target.value)} className="w-full text-sm">
-                  <option value="all">All vaccines</option>
-                  {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
-                </select>
-              </FilterMenu.Field>
-            </FilterMenu>
-          )
-      } actions={
+      <TopBar title={t('immun.title')} actions={
         canRecordVitalEvents && (
           <button onClick={() => setShowModal(true)} className="btn btn-primary">
             <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}

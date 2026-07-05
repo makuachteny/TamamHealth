@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import Badge from '@/components/Badge';
@@ -72,7 +73,13 @@ const LAB_TESTS_CATALOG = [
 
 export default function LabPage() {
   // Per-column filters (replace the old search + status-tabs top bar).
+  const searchParams = useSearchParams();
   const [colFilters, setColFilters] = useState({ patient: '', test: '', specimen: '', status: '', result: '', orderedBy: '' });
+  // Deep link from a patient chart: /lab?patient=<name> pre-filters the queue.
+  useEffect(() => {
+    const patientParam = searchParams?.get('patient');
+    if (patientParam) setColFilters(f => ({ ...f, patient: patientParam }));
+  }, [searchParams]);
   const setColFilter = (k: string, v: string) => setColFilters(f => ({ ...f, [k]: v }));
   const anyColFilter = Object.values(colFilters).some(Boolean);
   const clearColFilters = () => setColFilters({ patient: '', test: '', specimen: '', status: '', result: '', orderedBy: '' });

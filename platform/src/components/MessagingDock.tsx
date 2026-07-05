@@ -38,12 +38,12 @@ const AVAILABILITY_COLORS: Record<string, string> = {
   busy:         'var(--color-warning-600)',
   in_procedure: 'var(--accent-primary)',
   in_emergency: '#DC2626',
-  in_theatre:   '#0E7490',
-  on_rounds:    '#0369A1',
+  in_theatre:   '#015697',
+  on_rounds:    '#015697',
   away:         'var(--text-muted)',
 };
 
-const AVATAR_PALETTE = ['var(--accent-primary)', BRAND_SECONDARY, '#0EA5E9', '#0891B2', '#1D4ED8', '#0369A1', '#1E40AF', '#475569'];
+const AVATAR_PALETTE = ['var(--accent-primary)', BRAND_SECONDARY, '#369FDA', '#2191D0', '#015697', '#015697', '#015697', '#475569'];
 const NON_MESSAGEABLE_ROLES: UserRole[] = ['super_admin', 'government'];
 
 function colorFor(seed: string): string {
@@ -100,6 +100,60 @@ export default function MessagingDock() {
   // read cursor, so this mirrors the read action client-side).
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const threadRef = useRef<HTMLDivElement>(null);
+
+  // Drag-to-reposition for the floating launcher. The dock stays anchored at
+  // its default bottom-right corner (right: 20, bottom: 20) and this offset is
+  // applied on top via a transform, so dragging never touches layout — just a
+  // translate, which is what lets us drag in real time without re-rendering.
+  // The offset lives in state (not just a ref) so the expanded panel opens
+  // from wherever the launcher was last left instead of snapping back to the
+  // corner.
+  const [dockOffset, setDockOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+  const draggedRef = useRef(false);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+
+  const clampDockOffset = (x: number, y: number) => {
+    const size = 56;
+    const margin = 20;
+    const originLeft = window.innerWidth - margin - size;
+    const originTop = window.innerHeight - margin - size;
+    return {
+      x: Math.min(Math.max(x, -originLeft), window.innerWidth - size - originLeft),
+      y: Math.min(Math.max(y, -originTop), window.innerHeight - size - originTop),
+    };
+  };
+
+  const handleLauncherPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, originX: dockOffset.x, originY: dockOffset.y };
+    draggedRef.current = false;
+  };
+  const handleLauncherPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) draggedRef.current = true;
+    const { x, y } = clampDockOffset(drag.originX + dx, drag.originY + dy);
+    // Mutate the DOM directly while dragging (no React re-render per pointermove)
+    // for a 1:1, lag-free follow; the offset is only committed to state on release.
+    if (launcherRef.current) launcherRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  };
+  const handleLauncherPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    setDockOffset(clampDockOffset(drag.originX + dx, drag.originY + dy));
+    dragRef.current = null;
+  };
+  const handleLauncherClick = () => {
+    // A drag ending on release also fires a click — swallow it so dragging
+    // the icon doesn't also pop the panel open.
+    if (draggedRef.current) { draggedRef.current = false; return; }
+    openDock();
+  };
 
   const meId = currentUser?._id || '';
   const meName = currentUser?.name || '';
@@ -198,10 +252,18 @@ export default function MessagingDock() {
   if (!open) {
     return (
       <button
-        onClick={openDock}
+        ref={launcherRef}
+        onClick={handleLauncherClick}
+        onPointerDown={handleLauncherPointerDown}
+        onPointerMove={handleLauncherPointerMove}
+        onPointerUp={handleLauncherPointerUp}
+        onPointerCancel={handleLauncherPointerUp}
         aria-label="Open messages"
-        className="fixed z-[60] flex items-center justify-center rounded-full text-white shadow-lg transition-transform"
-        style={{ right: 20, bottom: 20, width: 56, height: 56, background: 'var(--accent-primary)', boxShadow: 'var(--card-shadow-lg)' }}
+        className="fixed z-[60] flex items-center justify-center rounded-full text-white shadow-lg"
+        style={{
+          right: 20, bottom: 20, width: 56, height: 56, background: 'var(--accent-primary)', boxShadow: 'var(--card-shadow-lg)',
+          transform: `translate3d(${dockOffset.x}px, ${dockOffset.y}px, 0)`, touchAction: 'none', cursor: 'grab',
+        }}
       >
         <MessageSquare className="w-6 h-6" color="#FFFFFF" />
         {unreadCount > 0 && (
@@ -227,6 +289,9 @@ export default function MessagingDock() {
         borderRadius: 'var(--card-radius)', border: '1px solid var(--glass-border)',
         background: 'var(--glass-bg-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
         boxShadow: 'var(--panel-shadow), var(--glass-highlight)',
+        // Opens from wherever the launcher was last dragged to, instead of
+        // snapping back to the default corner.
+        transform: `translate3d(${dockOffset.x}px, ${dockOffset.y}px, 0)`,
       }}
     >
       {/* Header */}

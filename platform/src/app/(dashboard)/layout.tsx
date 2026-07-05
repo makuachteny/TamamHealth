@@ -12,6 +12,7 @@ import LockScreen from '@/components/LockScreen';
 import ConnectivityNotice from '@/components/ConnectivityNotice';
 import MessagingDock from '@/components/MessagingDock';
 import { MessagingDockProvider } from '@/lib/messaging-dock-context';
+import { TourProvider } from '@/lib/tour/tour-context';
 import ForcePasswordChange from '@/components/ForcePasswordChange';
 import { useAutoLock } from '@/lib/hooks/useAutoLock';
 import { Loader2 } from '@/components/icons/lucide';
@@ -52,6 +53,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <SettingsProvider>
     <MessagingDockProvider>
+    <TourProvider>
     <div className="flex h-screen overflow-hidden tamam-solid-bg tamam-ehr-app">
       {isLocked && currentUser && (
         <LockScreen
@@ -79,6 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <ConnectivityNotice />
       <MessagingDock />
     </div>
+    </TourProvider>
     </MessagingDockProvider>
     </SettingsProvider>
   );

@@ -29,7 +29,7 @@ const PAYER_LABEL_KEYS: Record<PayerType, string> = {
 const PAYER_COLORS: Record<PayerType, string> = {
   self_pay: 'var(--accent-primary)',
   nhis: 'var(--color-success)',
-  cbhi: '#0891B2',
+  cbhi: '#2191D0',
   donor: 'var(--color-warning)',
   government: 'var(--accent-primary)',
   private: '#EA580C',

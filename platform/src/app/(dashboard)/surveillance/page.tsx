@@ -10,7 +10,6 @@ import {
 } from '@/components/icons/lucide';
 import EmptyState from '@/components/EmptyState';
 import Badge, { type BadgeTone } from '@/components/Badge';
-import { FilterMenu } from '@/components/filters';
 import { formatDate } from '@/lib/format-utils';
 // `states` is a static reference list (28 states/oblasts) used only to
 // populate a dropdown. It contains no PHI, so importing from the mock
@@ -34,7 +33,7 @@ const COLORS = {
   malaria: 'var(--accent-primary)',
   cholera: 'var(--color-danger)',
   measles: 'var(--color-warning)',
-  pneumonia: '#2563EB',
+  pneumonia: '#2191D0',
   diarrhea: 'var(--color-success)',
   tb: '#D4A843',
   hiv: 'var(--accent-primary)',
@@ -189,7 +188,6 @@ const REPORTABLE_DISEASES = [
 export default function SurveillancePage() {
   const { t } = useTranslation();
   const [hoveredHospital, setHoveredHospital] = useState<string | null>(null);
-  const [selectedDisease, setSelectedDisease] = useState<string>('all');
   const [showNewAlert, setShowNewAlert] = useState(false);
   const [alertForm, setAlertForm] = useState({
     disease: '',
@@ -250,8 +248,7 @@ export default function SurveillancePage() {
     return 'normal';
   }
 
-  const sortedAlerts = [...(diseaseAlerts || [])].sort((a, b) => (severityOrder[a.alertLevel] ?? 3) - (severityOrder[b.alertLevel] ?? 3));
-  const filteredAlerts = selectedDisease === 'all' ? sortedAlerts : sortedAlerts.filter(a => a.disease === selectedDisease);
+  const filteredAlerts = [...(diseaseAlerts || [])].sort((a, b) => (severityOrder[a.alertLevel] ?? 3) - (severityOrder[b.alertLevel] ?? 3));
 
   const totalAlerts = (diseaseAlerts || []).length;
   const emergencies = (diseaseAlerts || []).filter(a => a.alertLevel === 'emergency').length;
@@ -259,11 +256,6 @@ export default function SurveillancePage() {
   const watchItems = (diseaseAlerts || []).filter(a => a.alertLevel === 'watch').length;
   const totalCases = (diseaseAlerts || []).reduce((sum, a) => sum + (a.cases || 0), 0);
   const totalDeaths = (diseaseAlerts || []).reduce((sum, a) => sum + (a.deaths || 0), 0);
-
-  const uniqueDiseases = [...new Set((diseaseAlerts || []).map(a => a.disease))];
-
-  const activeFilterCount = (selectedDisease !== 'all' ? 1 : 0);
-  const clearFilters = () => { setSelectedDisease('all'); };
 
   // ── Aggregations derived from the live alert feed (replaces the
   // previous hard-coded weeklyDiseaseData / casesByState / idsrSummary).
@@ -366,20 +358,7 @@ export default function SurveillancePage() {
 
   return (
     <>
-      <TopBar title={t('nav.surveillance')} searchTrailing={
-                <FilterMenu activeCount={activeFilterCount} onClear={clearFilters} size="sm">
-                  <FilterMenu.Field label={t('surveillance.allDiseases')}>
-                    <select
-                      className="w-full text-sm"
-                      value={selectedDisease}
-                      onChange={e => setSelectedDisease(e.target.value)}
-                    >
-                      <option value="all">{t('surveillance.allDiseases')}</option>
-                      {uniqueDiseases.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </FilterMenu.Field>
-                </FilterMenu>
-              } actions={
+      <TopBar title={t('nav.surveillance')} actions={
               <>
                 {canReportAlert && (
                   <button className="btn btn-primary btn-sm" onClick={() => setShowNewAlert(true)}>
@@ -400,7 +379,7 @@ export default function SurveillancePage() {
             <div className="flex items-center gap-8">
               <div className="flex items-center gap-2">
                 <div className="icon-box-sm">
-                  <Activity className="w-3.5 h-3.5" style={{ color: '#2563EB' }} />
+                  <Activity className="w-3.5 h-3.5" style={{ color: '#2191D0' }} />
                 </div>
                 <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('surveillance.totalCasesThisWeek')}</span>
                 <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{totalCases.toLocaleString()}</span>
@@ -709,7 +688,7 @@ export default function SurveillancePage() {
                   {filteredAlerts.map(alert => {
                     const config = alertLevelConfig[alert.alertLevel];
                     return (
-                      <div key={alert._id} className="p-3 rounded-lg cursor-pointer" onClick={() => setSelectedDisease(alert.disease)} style={{ background: config.bg }}>
+                      <div key={alert._id} className="p-3 rounded-lg" style={{ background: config.bg }}>
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
                             <div className="icon-box-sm">

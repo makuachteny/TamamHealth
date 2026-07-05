@@ -2,6 +2,7 @@
 import DashboardHero from '@/components/dashboard/DashboardHero';
 import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import SpotlightCard from '@/components/dashboard/SpotlightCard';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 
 import { useApp } from '@/lib/context';
 import TopBar from '@/components/TopBar';
@@ -81,6 +82,8 @@ export default function StateDashboardPage() {
       <TopBar title={t('state.title')} />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
+        <DashboardGreetingHeader />
+
         <DashboardHero
           className="mb-5"
           stats={[
@@ -96,26 +99,11 @@ export default function StateDashboardPage() {
           actions={[
             { label: 'Hospitals', icon: Building2, href: '/hospitals' },
             { label: 'MCH Analytics', icon: HeartPulse, href: '/mch-analytics', color: '#EC4899' },
-            { label: 'Surveillance', icon: Activity, href: '/surveillance', color: '#C44536' },
+            { label: 'Surveillance', icon: Activity, href: '/surveillance', color: 'var(--color-danger-500)' },
             { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
           ]}
           secondaryCard={<SpotlightCard title="ANC-1 Coverage" value={`${anc1Rate}%`} caption={`${facilitiesInState.length} facilities in state`} href="/mch-analytics" />}
         />
-
-        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
-        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{stateName || t('state.title')}</h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {stateName ? t('state.subtitle', { facilities: facilitiesInState.length, counties: counties.length }) : t('state.noStateAssigned')}
-              </p>
-            </div>
-          </div>
-        </div>
 
         {/* ═══ KPI TILES ═══ */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">

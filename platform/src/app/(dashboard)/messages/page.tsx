@@ -16,7 +16,7 @@ import {
 
 /* ─────────────────────────── constants ─────────────────────────── */
 
-const AVATAR_PALETTE = ['#2191D0', '#015697', '#0E7490', '#1D4ED8', '#0369A1', '#1E40AF', '#0891B2', '#475569'];
+const AVATAR_PALETTE = ['#2191D0', '#015697', '#015697', '#015697', '#015697', '#015697', '#2191D0', '#475569'];
 const PRESENCE: Record<StaffPresence, { label: string; color: string }> = {
   active: { label: 'Active', color: 'var(--color-success)' },
   busy: { label: 'Busy', color: 'var(--color-danger)' },

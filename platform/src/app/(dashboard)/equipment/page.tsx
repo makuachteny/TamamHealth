@@ -9,7 +9,6 @@ import { useApp } from '@/lib/context';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { FilterMenu } from '@/components/filters';
 import type { AssetDoc, AssetCategory, AssetStatus } from '@/lib/db-types-asset';
 
 const CATEGORIES: { id: AssetCategory; labelKey: string }[] = [
@@ -39,12 +38,8 @@ export default function AssetsPage() {
   const { showToast } = useToast();
   const { t } = useTranslation();
 
-  const [filter, setFilter] = useState<AssetCategory | ''>('');
-  const [statusFilter, setStatusFilter] = useState<AssetStatus | ''>('');
   // Text search comes from the shared global search bar (TopBar).
   const q = globalSearch;
-  const activeFilterCount = (filter ? 1 : 0) + (statusFilter ? 1 : 0);
-  const clearFilters = () => { setFilter(''); setStatusFilter(''); };
   const [createOpen, setCreateOpen] = useState(false);
   const [serviceFor, setServiceFor] = useState<AssetDoc | null>(null);
 
@@ -67,8 +62,6 @@ export default function AssetsPage() {
 
   const filtered = useMemo(() => {
     return assets.filter(a => {
-      if (filter && a.category !== filter) return false;
-      if (statusFilter && a.status !== statusFilter) return false;
       if (q) {
         const needle = q.toLowerCase();
         if (
@@ -80,7 +73,7 @@ export default function AssetsPage() {
       }
       return true;
     });
-  }, [assets, filter, statusFilter, q]);
+  }, [assets, q]);
 
   const handleCreate = async () => {
     if (!form.name.trim() || !form.assetTag.trim()) {
@@ -136,22 +129,7 @@ export default function AssetsPage() {
 
   return (
     <>
-      <TopBar title={t('equipment.topBarTitle')} searchTrailing={
-        <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
-          <FilterMenu.Field label={t('equipment.allCategories')}>
-            <select value={filter} onChange={e => setFilter(e.target.value as AssetCategory | '')} className="w-full text-sm">
-              <option value="">{t('equipment.allCategories')}</option>
-              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{t(c.labelKey)}</option>)}
-            </select>
-          </FilterMenu.Field>
-          <FilterMenu.Field label={t('equipment.allStatuses')}>
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as AssetStatus | '')} className="w-full text-sm">
-              <option value="">{t('equipment.allStatuses')}</option>
-              {(Object.entries(STATUS_TOKENS) as [AssetStatus, typeof STATUS_TOKENS[AssetStatus]][]).map(([id, tok]) => <option key={id} value={id}>{t(tok.labelKey)}</option>)}
-            </select>
-          </FilterMenu.Field>
-        </FilterMenu>
-      } actions={
+      <TopBar title={t('equipment.topBarTitle')} actions={
         <button onClick={() => setCreateOpen(true)} className="btn btn-primary">
           <Plus className="w-4 h-4" /> {t('equipment.registerAsset')}
         </button>

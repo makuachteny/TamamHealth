@@ -434,7 +434,7 @@ export default function MARPage() {
                       >
                         <div className="flex items-start gap-2">
                           <div className="icon-box-sm shrink-0">
-                            <Pill className="w-3.5 h-3.5" style={{ color: '#1E3A8A' }} />
+                            <Pill className="w-3.5 h-3.5" style={{ color: '#015697' }} />
                           </div>
                           <div className="min-w-0">
                             <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -503,7 +503,7 @@ export default function MARPage() {
               >
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="icon-box">
-                    <Pill className="w-4 h-4" style={{ color: '#1E3A8A' }} />
+                    <Pill className="w-4 h-4" style={{ color: '#015697' }} />
                   </div>
                   <div className="min-w-0">
                     <div className="text-[10.5px] font-bold uppercase" style={{

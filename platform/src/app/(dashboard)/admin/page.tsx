@@ -6,7 +6,6 @@ import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
-import { FilterMenu } from '@/components/filters';
 import {
   Building2, Users, HeartPulse, CreditCard, ChevronRight, ChevronLeft,
   Shield, Activity, Settings, BarChart3,
@@ -28,11 +27,8 @@ export default function AdminDashboardPage() {
   const [auditLoading, setAuditLoading] = useState(true);
   // Audit-log text search comes from the shared global search bar (TopBar).
   const auditSearch = globalSearch;
-  const [auditAction, setAuditAction] = useState('all');
   const [auditPage, setAuditPage] = useState(0);
   const AUDIT_PAGE_SIZE = 20;
-  const auditFilterCount = auditAction !== 'all' ? 1 : 0;
-  const clearAuditFilters = () => { setAuditAction('all'); setAuditPage(0); };
   // Reset to the first page whenever the search term changes (previously this
   // was wired into the SearchInput onChange; now it follows the global search).
   useEffect(() => { setAuditPage(0); }, [auditSearch]);
@@ -138,27 +134,15 @@ export default function AdminDashboardPage() {
     }
   }, [organizations, orgsLoading]);
 
-  // Distinct action types present in the loaded logs (for the filter dropdown)
-  const auditActionOptions = useMemo(() => {
-    const actions = Array.from(new Set(auditLogs.map(l => l.action).filter(Boolean))).sort();
-    return [
-      { value: 'all', label: t('admin.allActions') },
-      ...actions.map(a => ({ value: a, label: a })),
-    ];
-  }, [auditLogs, t]);
-
   // Filtered & paginated audit logs
   const filteredAuditLogs = useMemo(() => {
     const q = auditSearch.trim().toLowerCase();
-    return auditLogs.filter(log => {
-      const matchSearch = !q ||
-        (log.username?.toLowerCase().includes(q)) ||
-        (log.action?.toLowerCase().includes(q)) ||
-        (log.details?.toLowerCase().includes(q));
-      const matchAction = auditAction === 'all' || log.action === auditAction;
-      return matchSearch && matchAction;
-    });
-  }, [auditLogs, auditSearch, auditAction]);
+    return auditLogs.filter(log => !q ||
+      (log.username?.toLowerCase().includes(q)) ||
+      (log.action?.toLowerCase().includes(q)) ||
+      (log.details?.toLowerCase().includes(q))
+    );
+  }, [auditLogs, auditSearch]);
 
   const totalAuditPages = Math.ceil(filteredAuditLogs.length / AUDIT_PAGE_SIZE);
   const paginatedLogs = filteredAuditLogs.slice(auditPage * AUDIT_PAGE_SIZE, (auditPage + 1) * AUDIT_PAGE_SIZE);
@@ -221,15 +205,7 @@ export default function AdminDashboardPage() {
 
   return (
     <>
-      <TopBar title={t('admin.topBarTitle')} searchTrailing={
-        <FilterMenu activeCount={auditFilterCount} onClear={clearAuditFilters} title={t('admin.auditLog')}>
-          <FilterMenu.Field label={t('admin.filterByAction')}>
-            <select className="w-full text-sm" value={auditAction} onChange={e => { setAuditAction(e.target.value); setAuditPage(0); }}>
-              {auditActionOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </FilterMenu.Field>
-        </FilterMenu>
-      } />
+      <TopBar title={t('admin.topBarTitle')} />
       <main className="page-container page-enter">
 
         {/* KPI Stat Cards */}
