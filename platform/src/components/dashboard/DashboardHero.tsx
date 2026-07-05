@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react';
 import { useApp } from '@/lib/context';
-import FacilitySyncCard from '@/components/dashboard/FacilitySyncCard';
 
 export interface HeroStat {
   label: string;
@@ -12,9 +11,11 @@ export interface HeroStat {
 /**
  * Dashboard top row — the clinical-officer treatment: a flat greeting panel
  * (dark "Welcome, {name}" headline, muted date, facility pill, flat stat
- * tiles) matching the ehr-schedule-header / dash-card visual language, with
- * the Facility Sync ring card on the same line to its right. Each dashboard
- * passes the 3–4 stats that matter for its role.
+ * tiles) matching the ehr-schedule-header / dash-card visual language. Each
+ * dashboard passes the 3–4 stats that matter for its role.
+ *
+ * NOTE: the former "Facility Sync" ring card was removed platform-wide — it
+ * rendered hardcoded fake sync data. Real sync status lives at /dhis2-export.
  *
  * The role-specific second card (Next/Today's Appointments, etc.) is placed by
  * each dashboard in its own quick-actions row, mirroring the CO layout.
@@ -23,13 +24,11 @@ export default function DashboardHero({
   stats,
   title,
   className = '',
-  showSync = true,
 }: {
   stats: HeroStat[];
   /** Override the greeting headline (defaults to "Good Morning {name}"). */
   title?: string;
   className?: string;
-  showSync?: boolean;
 }) {
   const { currentUser } = useApp();
   const now = new Date();
@@ -39,7 +38,7 @@ export default function DashboardHero({
   const facility = currentUser?.hospitalName;
 
   const hero = (
-    <div className={`dash-card flex flex-col justify-between flex-shrink-0 ${showSync ? 'lg:col-span-2' : ''}`} style={{ minHeight: 224, padding: 22 }}>
+    <div className="dash-card flex flex-col justify-between flex-shrink-0" style={{ minHeight: 224, padding: 22 }}>
       <div className="min-w-0">
         <h2 style={{ fontFamily: "var(--font-platform)", fontWeight: 700, fontSize: 22, lineHeight: 1.2, letterSpacing: 0, color: 'var(--text-primary)' }}>
           {headline}
@@ -74,14 +73,5 @@ export default function DashboardHero({
     </div>
   );
 
-  if (!showSync) {
-    return <div className={className}>{hero}</div>;
-  }
-
-  return (
-    <div className={`grid grid-cols-1 lg:grid-cols-3 gap-5 flex-shrink-0 ${className}`}>
-      {hero}
-      <FacilitySyncCard className="lg:col-span-1" />
-    </div>
-  );
+  return <div className={className}>{hero}</div>;
 }

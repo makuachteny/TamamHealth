@@ -557,7 +557,19 @@ export default function Home() {
             <br />
             No history.
           </h1>
-          <div className="tm-hero-sub" style={{ maxWidth: 560, fontSize: 18 }}>
+          <div className="tm-hero-sub" style={{ position: "relative", maxWidth: 560, paddingLeft: 18, fontSize: 18 }}>
+            <div
+              className="tm-hero-line"
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: 3,
+                background:
+                  "linear-gradient(to bottom, rgba(33,145,208,0) 0%, rgba(127,196,234,0.95) 22%, rgba(33,145,208,0.95) 55%, rgba(33,145,208,0) 100%)",
+              }}
+            />
             <p
               style={{
                 fontSize: "inherit",

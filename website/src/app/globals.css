@@ -72,7 +72,9 @@ body {
   }
   .tm-hero-sub {
     font-size: 15.5px !important;
+    padding-left: 0 !important;
   }
+  .tm-hero-line,
   .tm-hero-slide-extra,
   .tm-hero-dots {
     display: none !important;

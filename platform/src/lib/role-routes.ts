@@ -35,7 +35,9 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/wards', '/equipment', '/hr', '/dashboard/hr',
       '/blood-bank', '/controlled-substances', '/emergency-preparedness',
     ],
-    defaultDashboard: '/facility-management',
+    // Platform admins land on the real admin console — the facility-style
+    // dashboard's patient/bed stats are meaningless at platform level.
+    defaultDashboard: '/admin',
   },
 
   org_admin: {

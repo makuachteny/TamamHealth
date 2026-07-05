@@ -9,6 +9,10 @@ import { ArrowUpRight } from '@/components/icons/lucide';
  * front-desk / facility roles who manage the day's schedule (rather than a
  * single "next" appointment). Shows today's total plus a checked-in /
  * waiting breakdown.
+ *
+ * Renders nothing when there are no appointments today — an empty card is
+ * dashboard noise (design cleanup); /appointments remains reachable from the
+ * sidebar and quick actions.
  */
 export default function TodaysAppointmentsCard({ className = '' }: { className?: string }) {
   const router = useRouter();
@@ -18,6 +22,8 @@ export default function TodaysAppointmentsCard({ className = '' }: { className?:
   const todays = (appointments || []).filter(a => a.appointmentDate === today && a.status !== 'cancelled');
   const arrived = todays.filter(a => a.status === 'checked_in' || a.status === 'in_progress' || a.status === 'completed').length;
   const waiting = todays.length - arrived;
+
+  if (todays.length === 0) return null;
 
   return (
     <div className={`dash-card flex flex-col justify-between ${className}`} style={{ minHeight: 188, padding: 22 }}>
@@ -33,26 +39,18 @@ export default function TodaysAppointmentsCard({ className = '' }: { className?:
           <ArrowUpRight className="w-[16px] h-[16px]" style={{ color: 'var(--accent-primary)' }} />
         </button>
       </div>
-      {todays.length > 0 ? (
-        <>
-          <div className="flex items-end gap-2">
-            <span className="dash-stat__value tabular-nums" style={{ fontSize: 44 }}>{todays.length}</span>
-            <span className="dash-stat__label mb-1.5">scheduled</span>
-          </div>
-          <div className="flex items-center gap-4" style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 12, color: 'var(--text-secondary)' }}>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="rounded-full" style={{ width: 8, height: 8, background: 'var(--color-success)' }} /> {arrived} checked in
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="rounded-full" style={{ width: 8, height: 8, background: 'var(--text-muted)' }} /> {waiting} waiting
-            </span>
-          </div>
-        </>
-      ) : (
-        <div className="dash-stat__label flex-1 flex items-center">
-          No appointments scheduled for today.
-        </div>
-      )}
+      <div className="flex items-end gap-2">
+        <span className="dash-stat__value tabular-nums" style={{ fontSize: 44 }}>{todays.length}</span>
+        <span className="dash-stat__label mb-1.5">scheduled</span>
+      </div>
+      <div className="flex items-center gap-4" style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 12, color: 'var(--text-secondary)' }}>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="rounded-full" style={{ width: 8, height: 8, background: 'var(--color-success)' }} /> {arrived} checked in
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="rounded-full" style={{ width: 8, height: 8, background: 'var(--text-muted)' }} /> {waiting} waiting
+        </span>
+      </div>
     </div>
   );
 }

@@ -208,57 +208,9 @@ export default function AdminDashboardPage() {
       <TopBar title={t('admin.topBarTitle')} />
       <main className="page-container page-enter">
 
-        {/* KPI Stat Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
-          {[
-            {
-              id: 'totalOrgs',
-              label: t('admin.kpiTotalOrganizations'),
-              value: orgsLoading ? '...' : organizations.length.toString(),
-              sub: t('admin.kpiOrgsActive', { count: activeOrgs.length }),
-              icon: Building2,
-              accent: 'var(--accent-primary)',
-            },
-            {
-              id: 'totalUsers',
-              label: t('admin.kpiTotalUsers'),
-              value: countsLoading ? '...' : totalUsers.toLocaleString(),
-              sub: t('admin.kpiAcrossAllOrgs'),
-              icon: Users,
-              accent: 'var(--accent-primary)',
-            },
-            {
-              id: 'totalPatients',
-              label: t('admin.kpiTotalPatients'),
-              value: countsLoading ? '...' : totalPatients.toLocaleString(),
-              sub: t('admin.kpiAcrossAllOrgs'),
-              icon: HeartPulse,
-              accent: 'var(--accent-primary)',
-            },
-            {
-              id: 'activeSubs',
-              label: t('admin.kpiActiveSubscriptions'),
-              value: orgsLoading ? '...' : activeSubscriptions.toString(),
-              sub: t('admin.kpiSubsBreakdown', { trial: trialOrgs, suspended: suspendedOrgs }),
-              icon: CreditCard,
-              accent: 'var(--accent-primary)',
-            },
-          ].map((stat) => (
-            <button key={stat.id} type="button" className="dash-card text-left" style={{ padding: '14px 16px', cursor: 'pointer' }} onClick={() => {
-              const routes: Record<string, string> = { totalOrgs: '/admin/organizations', totalUsers: '/admin/users', totalPatients: '/patients', activeSubs: '/admin/billing' };
-              if (routes[stat.id]) router.push(routes[stat.id]);
-            }}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="icon-box-sm">
-                  <stat.icon className="w-3.5 h-3.5" style={{ color: stat.accent }} />
-                </div>
-                <span className="kpi-card-title">{stat.label}</span>
-              </div>
-              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{stat.value}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{stat.sub}</div>
-            </button>
-          ))}
-        </div>
+        {/* KPI stat cards removed per design cleanup — org/user/patient/
+            subscription counts live on their own pages (/admin/organizations,
+            /admin/users, /patients, /admin/billing). */}
 
         {/* SYSTEM HEALTH DASHBOARD */}
         <div className="dash-card overflow-hidden mb-4">
