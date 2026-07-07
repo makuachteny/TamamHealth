@@ -3,8 +3,8 @@ import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { ProductListing } from "@/components/marketing/ProductListing";
 
 export const metadata: Metadata = {
-  title: "Platform · TamamHealth Digital Health",
-  description: "Connected clinical care, facility operations, billing, pharmacy, lab, referrals, and reporting for South Sudan health facilities.",
+  title: "Platform · Tamam Digital Health",
+  description: "Offline-ready health record workflows for clinics and hospitals moving beyond paper.",
 };
 
 export default function ProductsPage() {
@@ -12,15 +12,15 @@ export default function ProductsPage() {
     <main className="mk-main">
       <MarketingHero
         variant="split"
-        eyebrow="OUR PLATFORM"
-        title="Connected tools for clinical care and facility operations"
-        subtitle="Pick what fits the kind of facility you run; every service shares the same patient record, offline sync, billing traceability, and DHIS2-ready reporting."
+        eyebrow="PRODUCTS"
+        title="Software for the patient day"
+        subtitle="Start with one workflow or run the full facility record. Tamam keeps registration, clinical notes, lab, pharmacy, billing, and reporting connected."
         primaryCta={{ label: "Request a demo", href: "/about/contact?intent=demo#contact-form" }}
-        secondaryCta={{ label: "Browse services", href: "#products-grid" }}
+        secondaryCta={{ label: "View products", href: "#products-grid" }}
         stats={[
-          { value: "6", label: "services on one record" },
-          { value: "Offline", label: "sync by design" },
-          { value: "Pilot", label: "facilities welcome" },
+          { value: "4", label: "core workflows" },
+          { value: "Offline", label: "ready records" },
+          { value: "Demo", label: "available now" },
         ]}
         className="mk-hero-products"
       />

@@ -128,11 +128,11 @@ export default function ContactPage() {
         variant="showcase"
         eyebrow="GET IN TOUCH"
         title="Let's talk."
-        subtitle="Whether you run a clinic, lead a health system, work in public health, or care about South Sudan's future, we want to hear from you."
+        subtitle="Whether you run a clinic, lead a health system, work in public health, or care about healthcare's future, we want to hear from you."
         primaryCta={{ label: "Send us a message", href: "#contact-form" }}
         stats={[{ value: "Pilot", label: "facility conversations" }, { value: "Partner", label: "health system alliances" }]}
         image="/assets/community-health-worker.jpg"
-        imageAlt="Community health worker at an African clinic"
+        imageAlt="Community health worker at a clinic"
         imagePriority
         className="mk-hero-contact"
       />
@@ -177,7 +177,7 @@ export default function ContactPage() {
                 icon="location"
                 tone="gold"
                 label="Community"
-                primary="South Sudanese everywhere"
+                primary="Health systems everywhere"
                 secondary="Diaspora, builders, donors, and advocates"
               />
             </div>
@@ -209,7 +209,7 @@ export default function ContactPage() {
                 }}>
                   <Image
                     src="/assets/founder-teny.jpg"
-                    alt="Teny Makuach, founder of TamamHealth"
+                    alt="Teny Makuach, founder of Tamam"
                     fill
                     sizes="56px"
                     style={{ objectFit: "cover" }}
@@ -380,16 +380,16 @@ export default function ContactPage() {
                 answer="We are a small team, so response times vary. Pilot partnerships, health-worker feedback, and mission-aligned introductions are the highest priority."
               />
               <FAQItem
-                question="Can I see TamamHealth in action first?"
+                question="Can I see Tamam in action first?"
                 answer="Yes — pick &quot;Book a demo&quot; in the form and we&apos;ll tailor a walkthrough to your facility&apos;s size, specialty, and offline-first workflows."
               />
               <FAQItem
-                question="Where is TamamHealth based?"
-                answer="TamamHealth was founded at Tufts University and is being built with South Sudan at the center of the mission."
+                question="Where is Tamam based?"
+                answer="Tamam was founded at Tufts University and is being built with South Sudan as the starting point of the mission."
               />
               <FAQItem
                 question="I represent a partner org or NGO — who do I reach?"
-                answer="Email support.tamam@gmail.com with a short note about your organization, the health system you serve, and where you think TamamHealth can help."
+                answer="Email support.tamam@gmail.com with a short note about your organization, the health system you serve, and where you think Tamam can help."
               />
             </div>
           </Reveal>

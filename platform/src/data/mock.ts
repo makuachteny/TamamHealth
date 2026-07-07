@@ -2129,6 +2129,7 @@ export interface MedicalRecord {
   /** ISO 8601 timestamp (date + time) captured when the consultation was started. */
   startedAt?: string;
   visitType: 'outpatient' | 'inpatient' | 'emergency' | 'referral';
+  visitDisposition?: 'checkout' | 'referred' | 'admitted';
   providerName: string;
   providerRole: string;
   department: string;

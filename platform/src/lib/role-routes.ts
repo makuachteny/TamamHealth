@@ -24,7 +24,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/facility-management',
       '/admin', '/admin/organizations', '/admin/users', '/admin/system',
       '/admin/billing', '/admin/analytics',
-      '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
+      '/dashboard', '/patients', '/patient-intake', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/reports', '/hospitals', '/settings',
       '/epidemic-intelligence', '/mch-analytics', '/government',
@@ -46,7 +46,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       '/facility-settings',
       '/hospitals', '/reports', '/settings',
       // Facility-management sidebar destinations (see FACILITY_NAV in permissions.ts).
-      '/patients', '/pharmacy', '/messages',
+      '/patients', '/patient-intake', '/pharmacy', '/messages',
       '/appointments',
       '/payments', '/payments/claims',
       '/wards', '/equipment', '/hr', '/dashboard/hr',
@@ -57,7 +57,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   doctor: {
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
+      '/dashboard', '/patients', '/patient-intake', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/settings',
       '/appointments', '/telehealth',
@@ -70,9 +70,9 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // Diagnoses, treats, prescribes, orders labs, refers. Clinical scope only —
     // payment processing belongs to cashier/biller, not clinicians.
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
+      '/dashboard', '/patients', '/patient-intake', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
-      '/surveillance', '/settings',
+      '/settings',
       '/appointments',
       '/wards', '/blood-bank',
     ],
@@ -83,7 +83,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // Ward & bedside care, immunisation, ANC support, vital-event documentation.
     // Not payment processing (cashier/biller).
     allowed: [
-      '/dashboard/nurse', '/patients', '/messages',
+      '/dashboard/nurse', '/patients', '/patient-intake', '/messages',
       '/lab', '/immunizations', '/anc', '/births', '/deaths',
       '/settings', '/appointments',
       '/wards', 
@@ -98,7 +98,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // no payment handling, and no laboratory operations page — ANC lab results
     // are reviewed inside the patient/ANC record, not the lab orders queue.
     allowed: [
-      '/dashboard/nurse', '/patients', '/messages',
+      '/dashboard/nurse', '/patients', '/patient-intake', '/messages',
       '/anc', '/births', '/deaths', '/immunizations',
       '/wards', '/referrals', '/appointments',
       '/settings',
@@ -125,7 +125,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // Money handling moves to the dedicated cashier role; bed/ward management is
     // a nursing function. Insurance claims belong to the medical biller.
     allowed: [
-      '/dashboard/front-desk', '/check-in', '/patients', '/referrals', '/messages',
+      '/dashboard/front-desk', '/check-in', '/patients', '/patient-intake', '/referrals', '/messages',
       '/settings',
       '/appointments',
 
@@ -182,7 +182,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   medical_superintendent: {
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
+      '/dashboard', '/patients', '/patient-intake', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/reports', '/hospitals', '/settings',
       '/facility-settings',
@@ -247,7 +247,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
       // Clinical context (read). Lab/pharmacy are operational service queues run
       // by lab techs/pharmacists; the manager sees utilisation via reports, not
       // the live work queues.
-      '/patients', '/wards', '/referrals', '/appointments', '/messages',
+      '/patients', '/patient-intake', '/wards', '/referrals', '/appointments', '/messages',
       '/settings',
     ],
     defaultDashboard: '/facility-management',
@@ -266,7 +266,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
   // ───────── Clinical-flow workflow stations (EHR Clinical Flow doc §4) ─────────
   central_registration_clerk: {
     allowed: [
-      '/patients', '/appointments', '/referrals', '/messages',
+      '/patients', '/patient-intake', '/appointments', '/referrals', '/messages',
       '/settings', '/dashboard/front-desk', '/payments',
     ],
     defaultDashboard: '/dashboard/front-desk',
@@ -274,7 +274,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   clinic_clerk: {
     allowed: [
-      '/patients', '/appointments', '/messages',
+      '/patients', '/patient-intake', '/appointments', '/messages',
       '/settings', '/dashboard/front-desk',
     ],
     defaultDashboard: '/dashboard/front-desk',
@@ -285,7 +285,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // routes the patient. No lab operations page — orders are placed by the
     // clinician downstream.
     allowed: [
-      '/patients', '/messages', '/settings',
+      '/patients', '/patient-intake', '/messages', '/settings',
       '/dashboard/nurse', '/wards',
     ],
     defaultDashboard: '/dashboard/nurse',
@@ -293,7 +293,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   rooming_nurse: {
     allowed: [
-      '/patients', '/messages', '/settings',
+      '/patients', '/patient-intake', '/messages', '/settings',
       '/dashboard/nurse', '/immunizations', '/anc', '/lab',
     ],
     defaultDashboard: '/dashboard/nurse',
@@ -301,7 +301,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   clinician: {
     allowed: [
-      '/dashboard', '/patients', '/consultation', '/referrals', '/messages',
+      '/dashboard', '/patients', '/patient-intake', '/consultation', '/referrals', '/messages',
       '/lab', '/pharmacy', '/immunizations', '/anc', '/births', '/deaths',
       '/appointments', '/telehealth', '/wards', '/alerts', '/settings',
       '/blood-bank',
@@ -311,7 +311,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   records_hmis_officer: {
     allowed: [
-      '/dashboard/data-entry', '/patients', '/facility-assessments', '/data-quality',
+      '/dashboard/data-entry', '/patients', '/patient-intake', '/facility-assessments', '/data-quality',
       '/reports', '/vital-statistics', '/immunizations', '/anc', '/births', '/deaths',
       '/hospitals', '/messages', '/settings', '/dhis2-export',
     ],
@@ -324,7 +324,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
     // clinician — no consultation/telehealth encounter tools and no lab/pharmacy
     // operations pages (those belong to clinicians, lab techs, and pharmacists).
     allowed: [
-      '/dashboard', '/patients', '/referrals', '/messages',
+      '/dashboard', '/patients', '/patient-intake', '/referrals', '/messages',
       '/immunizations', '/anc', '/births', '/deaths',
       '/surveillance', '/reports', '/settings',
       '/epidemic-intelligence', '/mch-analytics', '/my-facility', '/facility-overview',
@@ -343,6 +343,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 };
 
 const DEFAULT_DASHBOARD_FALLBACK = '/dashboard';
+const ACCOUNT_ROUTES = ['/profile'];
 
 function getConfig(role: UserRole | string): RoleRouteConfig | undefined {
   return (ROLE_ROUTE_TABLE as Record<string, RoleRouteConfig>)[role];
@@ -367,6 +368,9 @@ export function hasRoleRouteConfig(role: UserRole | string): boolean {
  * with `hasRoleRouteConfig(role)` first.
  */
 export function isPathAllowed(role: UserRole | string, pathname: string): boolean {
+  if (ACCOUNT_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))) {
+    return true;
+  }
   const config = getConfig(role);
   if (!config) return false;
   return config.allowed.some(

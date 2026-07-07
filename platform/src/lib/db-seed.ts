@@ -10,7 +10,7 @@ import {
   appointmentsDB, wardDB, pharmacyInventoryDB, triageDB, availabilityDB,
   assetsDB, leaveRequestsDB, payrollEntriesDB,
   problemsDB, telehealthDB, patientNotesDB, orderSetsDB,
-  phoneNotesDB, assessmentsDB,
+  phoneNotesDB, assessmentsDB, handoffsDB,
   isSeeded, markSeeded, resetAllDatabases, getDB
 } from './db';
 // `@/data/mock` carries 88 KB of fake patient PHI (50+ patient records, fake
@@ -22,7 +22,7 @@ import type {
   DiseaseAlertDoc, LabResultDoc, PrescriptionDoc, MedicalRecordDoc, MessageDoc,
   BirthRegistrationDoc, DeathRegistrationDoc, FacilityAssessmentDoc,
   ImmunizationDoc, ANCVisitDoc, FollowUpDoc, OrganizationDoc,
-  PatientNoteDoc, OrderSetDoc, PhoneNoteDoc, AssessmentDoc
+  PatientNoteDoc, OrderSetDoc, PhoneNoteDoc, AssessmentDoc, ShiftHandoffDoc
 } from './db-types';
 import type { AllergyEntry, DirectiveEntry, CareAlertEntry } from '@/data/mock';
 import type {
@@ -37,10 +37,8 @@ import type {
 import type { WardDoc, BedDoc, AdmissionDoc } from './db-types-ward';
 import type { AssetDoc } from './db-types-asset';
 import type { PayrollEntryDoc, LeaveRequestDoc } from './db-types-hr';
-
-// Default org IDs
-const PUBLIC_ORG_ID = 'org-moh-ss';
-const PRIVATE_ORG_ID = 'org-mercy-hospital';
+import { DEMO_ROLE_PROFILE, DEMO_USER_PROFILES, PRIVATE_ORG_ID, PUBLIC_ORG_ID } from './demo-users';
+import { getDemoPasswordMap } from './demo-passwords';
 
 // ═══ Date-freshness helpers ═══════════════════════════════════════
 // Demo clinical data is anchored RELATIVE to "now" so trend charts and
@@ -101,133 +99,7 @@ const defaultOrganizations: Omit<OrganizationDoc, '_rev'>[] = [
   },
 ];
 
-// Profile metadata for the seeded demo users. Plaintext passwords are
-// generated server-side at first boot (see lib/seed-credentials.ts) and
-// fetched at seed time via /api/demo-credentials.
-type SeedUserRole =
-  | 'super_admin' | 'government' | 'county_health_director' | 'doctor'
-  | 'clinical_officer' | 'nurse' | 'midwife'
-  | 'lab_tech' | 'pharmacist' | 'front_desk' | 'cashier'
-  | 'data_entry_clerk' | 'medical_superintendent'
-  | 'hrio' | 'nutritionist' | 'radiologist'
-  | 'org_admin' | 'hospital_manager' | 'medical_biller'
-  | 'central_registration_clerk' | 'clinic_clerk' | 'triage_nurse' | 'rooming_nurse'
-  | 'clinician' | 'records_hmis_officer' | 'facility_administrator';
-
-interface SeedUserProfile {
-  username: string;
-  name: string;
-  role: SeedUserRole;
-  hospitalId?: string;
-  hospitalName?: string;
-  orgId?: string;
-}
-
-const defaultUsers: SeedUserProfile[] = [
-  // Platform super admin (no org)
-  { username: 'superadmin', name: 'TamamHealth Platform Admin', role: 'super_admin' },
-  // Public org users (government MoH)
-  { username: 'admin', name: 'Ministry of Health', role: 'government', orgId: PUBLIC_ORG_ID },
-  { username: 'dr.wani', name: 'Dr. James Wani Igga', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'dr.achol', name: 'Dr. Achol Mayen Deng', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'co.deng', name: 'CO Deng Mabior Kuol', role: 'clinical_officer', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'dr.wau', name: 'Dr. Mary Akuol Deng', role: 'doctor', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'nurse.wau', name: 'Nurse Grace Achai Lual', role: 'nurse', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'pharma.wau', name: 'Pharmacist John Bol Garang', role: 'pharmacist', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'desk.wau', name: 'Tabitha Nyandeng Kuol', role: 'front_desk', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'nurse.stella', name: 'Nurse Stella Keji Lemi', role: 'nurse', hospitalId: 'hosp-003', hospitalName: 'Malakal Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'lab.gatluak', name: 'Lab Tech Gatluak Puok', role: 'lab_tech', hospitalId: 'hosp-004', hospitalName: 'Bentiu State Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'pharma.rose', name: 'Pharmacist Rose Gbudue', role: 'pharmacist', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'desk.amira', name: 'Amira Juma Hassan', role: 'front_desk', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'data.ayen', name: 'Ayen Dut Malual', role: 'data_entry_clerk', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'supt.lado', name: 'Dr. Lado Tombe Kenyi', role: 'medical_superintendent', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'manager.aluel', name: 'Aluel Bol Maker', role: 'hospital_manager', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'biller.nyandeng', name: 'Nyandeng Chol Atem', role: 'medical_biller', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'hrio.dut', name: 'Dut Machar Kuol', role: 'hrio', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'nutr.nyabol', name: 'Nyabol Koang Jal', role: 'nutritionist', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'rad.tamamhealth', name: 'TamamHealth Ladu Soro', role: 'radiologist', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'midwife.nyakong', name: 'Midwife Nyakong Gatkuoth', role: 'midwife', hospitalId: 'hosp-003', hospitalName: 'Malakal Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'cashier.deng', name: 'Deng Akec Ring', role: 'cashier', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'county.lopez', name: 'Dr. Lopez Lokai Modi', role: 'county_health_director', orgId: PUBLIC_ORG_ID },
-  // Clinical-flow workflow stations (EHR Clinical Flow doc §4)
-  { username: 'reg.clerk', name: 'Grace Poni Lukudu', role: 'central_registration_clerk', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'clinic.clerk', name: 'Joseph Taban Lado', role: 'clinic_clerk', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'triage.mary', name: 'Mary Nyaruai Gai', role: 'triage_nurse', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'rooming.sara', name: 'Sara Aluel Bol', role: 'rooming_nurse', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'clinician.peter', name: 'Dr. Peter Garang Deng', role: 'clinician', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'hmis.john', name: 'John Majok Chol', role: 'records_hmis_officer', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  { username: 'facadmin.rita', name: 'Rita Akello Ojok', role: 'facility_administrator', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID },
-  // Private org admin (Mercy Hospital Group)
-  { username: 'org.admin', name: 'Mercy Org Administrator', role: 'org_admin', orgId: PRIVATE_ORG_ID },
-  { username: 'dr.mercy', name: 'Dr. Grace Lado', role: 'doctor', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PRIVATE_ORG_ID },
-];
-
-/**
- * Role → staff-profile defaults. Populates department + specialty for every
- * seeded user so the staff directory, HR, messaging contacts, and provider
- * pickers are fully filled out for all roles (not just name + role).
- */
-const ROLE_PROFILE: Record<SeedUserRole, { department: string; specialty?: string }> = {
-  super_admin: { department: 'Administration' },
-  org_admin: { department: 'Administration' },
-  government: { department: 'Public Health' },
-  county_health_director: { department: 'County Health Office' },
-  doctor: { department: 'Internal Medicine', specialty: 'Physician' },
-  clinical_officer: { department: 'Outpatient', specialty: 'Clinical Officer' },
-  clinician: { department: 'General Medicine', specialty: 'Medical Officer' },
-  nurse: { department: 'Nursing', specialty: 'Registered Nurse' },
-  triage_nurse: { department: 'Emergency', specialty: 'Triage Nurse' },
-  rooming_nurse: { department: 'Outpatient', specialty: 'Nurse' },
-  midwife: { department: 'Maternity', specialty: 'Midwife' },
-  pharmacist: { department: 'Pharmacy', specialty: 'Pharmacist' },
-  lab_tech: { department: 'Laboratory', specialty: 'Laboratory Technician' },
-  radiologist: { department: 'Radiology', specialty: 'Radiologist' },
-  nutritionist: { department: 'Nutrition', specialty: 'Nutritionist' },
-  front_desk: { department: 'Reception' },
-  cashier: { department: 'Billing', specialty: 'Cashier' },
-  medical_biller: { department: 'Billing', specialty: 'Medical Biller' },
-  data_entry_clerk: { department: 'Records' },
-  central_registration_clerk: { department: 'Registration' },
-  clinic_clerk: { department: 'Outpatient' },
-  records_hmis_officer: { department: 'Records & HMIS' },
-  hrio: { department: 'Human Resources' },
-  hospital_manager: { department: 'Administration' },
-  medical_superintendent: { department: 'Administration', specialty: 'Physician' },
-  facility_administrator: { department: 'Administration' },
-};
-
-/**
- * Demo-mode seed: pull plaintext passwords for the seeded users from the
- * server. The /api/demo-credentials route reads `.seed-credentials.json` (or
- * generates it on first hit) so the same passwords work for the local
- * PouchDB seed and the server-side login API.
- */
-async function fetchDemoCredentials(): Promise<Record<string, string>> {
-  const res = await fetch('/api/demo-credentials', { cache: 'no-store' });
-  if (!res.ok) {
-    throw new Error(`[db-seed] /api/demo-credentials returned ${res.status}`);
-  }
-  const body = (await res.json()) as { profiles: { username: string; password: string | null }[] };
-  const out: Record<string, string> = {};
-  for (const p of body.profiles) {
-    if (p.password) out[p.username] = p.password;
-  }
-  return out;
-}
-
-/** Same endpoint, but only the bootstrap admin password is needed in production. */
-async function fetchAdminCredential(): Promise<{ username: string; password: string } | null> {
-  try {
-    const res = await fetch('/api/demo-credentials', { cache: 'no-store' });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { profiles: { username: string; password: string | null }[] };
-    const adminRow = body.profiles.find((p) => p.username === 'admin');
-    if (!adminRow?.password) return null;
-    return { username: 'admin', password: adminRow.password };
-  } catch {
-    return null;
-  }
-}
+const defaultUsers = DEMO_USER_PROFILES;
 
 const labOrders: Omit<LabResultDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'lab-001', type: 'lab_result', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', hospitalNumber: 'JTH-000001', testName: 'Malaria RDT', specimen: 'Blood', status: 'completed', result: 'Positive (P. falciparum)', unit: '', referenceRange: 'Negative', abnormal: true, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T08:30:00Z', completedAt: '2026-02-09T09:15:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T08:30:00Z', updatedAt: '2026-02-09T09:15:00Z' },
@@ -237,7 +109,7 @@ const labOrders: Omit<LabResultDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'lab-005', type: 'lab_result', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', hospitalNumber: 'JTH-000022', testName: 'Hemoglobin', specimen: 'Blood', status: 'completed', result: '4.2 g/dL', unit: 'g/dL', referenceRange: '12.0-16.0', abnormal: true, critical: true, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T10:00:00Z', completedAt: '2026-02-09T10:45:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T10:00:00Z', updatedAt: '2026-02-09T10:45:00Z' },
   { _id: 'lab-006', type: 'lab_result', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', hospitalNumber: 'JTH-000030', testName: 'Liver Function Tests', specimen: 'Blood', status: 'pending', result: '', unit: '', referenceRange: '', abnormal: false, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T11:00:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T11:00:00Z', updatedAt: '2026-02-09T11:00:00Z' },
   { _id: 'lab-007', type: 'lab_result', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', hospitalNumber: 'JTH-000035', testName: 'HIV Rapid Test', specimen: 'Blood', status: 'completed', result: 'Non-reactive', unit: '', referenceRange: 'Non-reactive', abnormal: false, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-09T08:00:00Z', completedAt: '2026-02-09T08:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T08:00:00Z', updatedAt: '2026-02-09T08:30:00Z' },
-  { _id: 'lab-008', type: 'lab_result', patientId: 'pat-00040', patientName: 'Majok Chol Wol', hospitalNumber: 'JTH-000040', testName: 'Urinalysis', specimen: 'Urine', status: 'in_progress', result: '', unit: '', referenceRange: 'Normal', abnormal: false, critical: false, orderedBy: 'Dr. Peter Garang Deng', orderedAt: '2026-02-09T09:30:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:30:00Z', updatedAt: '2026-02-09T09:30:00Z' },
+  { _id: 'lab-008', type: 'lab_result', patientId: 'pat-00040', patientName: 'Majok Chol Wol', hospitalNumber: 'JTH-000040', testName: 'Urinalysis', specimen: 'Urine', status: 'in_progress', result: '', unit: '', referenceRange: 'Normal', abnormal: false, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T09:30:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T09:30:00Z', updatedAt: '2026-02-09T09:30:00Z' },
   { _id: 'lab-009', type: 'lab_result', patientId: 'pat-00008', patientName: 'Ayen Dut Malual', hospitalNumber: 'JTH-000008', testName: 'Sputum AFB', specimen: 'Sputum', status: 'pending', result: '', unit: '', referenceRange: 'Negative', abnormal: false, critical: false, orderedBy: 'Dr. James Wani Igga', orderedAt: '2026-02-09T11:30:00Z', completedAt: '', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-09T11:30:00Z', updatedAt: '2026-02-09T11:30:00Z' },
   { _id: 'lab-010', type: 'lab_result', patientId: 'pat-00015', patientName: 'Tut Chuol Both', hospitalNumber: 'JTH-000015', testName: 'Renal Function', specimen: 'Blood', status: 'completed', result: 'Creatinine 1.8 mg/dL, BUN 45 mg/dL', unit: '', referenceRange: 'Cr 0.6-1.2, BUN 7-20', abnormal: true, critical: false, orderedBy: 'Dr. Achol Mayen Deng', orderedAt: '2026-02-08T14:00:00Z', completedAt: '2026-02-08T16:30:00Z', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', createdAt: '2026-02-08T14:00:00Z', updatedAt: '2026-02-08T16:30:00Z' },
 ];
@@ -411,10 +283,10 @@ const seedANCVisits: Omit<ANCVisitDoc, '_rev' | 'createdBy'>[] = [
 
 // Follow-up seed data (pending follow-ups)
 const seedFollowUps: Omit<FollowUpDoc, '_rev' | 'createdBy'>[] = [
-  { _id: 'followup-001', type: 'follow_up', patientId: 'BOMA-KJ-HH1003', patientName: 'Achol Deng', geocodeId: 'BOMA-KJ-HH1003', assignedWorker: 'user-bhw.akol', assignedWorkerName: 'Akol Deng Mading', status: 'active', condition: 'Malaria', facilityLevel: 'boma', scheduledDate: new Date(Date.now() - 1 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', sourceVisitId: 'boma-visit-006', createdAt: new Date(Date.now() - 3 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 3 * 86400000).toISOString() },
-  { _id: 'followup-002', type: 'follow_up', patientId: 'BOMA-KJ-HH1015', patientName: 'Kuol Mabior', geocodeId: 'BOMA-KJ-HH1015', assignedWorker: 'user-bhw.akol', assignedWorkerName: 'Akol Deng Mading', status: 'active', condition: 'Diarrhea', facilityLevel: 'boma', scheduledDate: new Date(Date.now() - 2 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', sourceVisitId: 'boma-visit-007', createdAt: new Date(Date.now() - 5 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 5 * 86400000).toISOString() },
-  { _id: 'followup-003', type: 'follow_up', patientId: 'BOMA-KJ-HH1022', patientName: 'Nyamal Gatdet', geocodeId: 'BOMA-KJ-HH1022', assignedWorker: 'user-bhw.akol', assignedWorkerName: 'Akol Deng Mading', status: 'active', condition: 'Malnutrition', facilityLevel: 'boma', scheduledDate: new Date(Date.now() - 4 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', sourceVisitId: 'boma-visit-008', createdAt: new Date(Date.now() - 7 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 7 * 86400000).toISOString() },
-  { _id: 'followup-004', type: 'follow_up', patientId: 'BOMA-KJ-HH1008', patientName: 'Deng Deng', geocodeId: 'BOMA-KJ-HH1008', assignedWorker: 'user-bhw.akol', assignedWorkerName: 'Akol Deng Mading', status: 'active', condition: 'Pneumonia', facilityLevel: 'boma', scheduledDate: new Date().toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', sourceVisitId: 'boma-visit-004', createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+  { _id: 'followup-001', type: 'follow_up', patientId: 'BOMA-KJ-HH1003', patientName: 'Achol Deng', geocodeId: 'BOMA-KJ-HH1003', assignedWorker: 'user-county.lopez', assignedWorkerName: 'Dr. Lopez Lokai Modi', status: 'active', condition: 'Malaria', facilityLevel: 'boma', scheduledDate: new Date(Date.now() - 1 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', sourceVisitId: 'boma-visit-006', createdAt: new Date(Date.now() - 3 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 3 * 86400000).toISOString() },
+  { _id: 'followup-002', type: 'follow_up', patientId: 'BOMA-KJ-HH1015', patientName: 'Kuol Mabior', geocodeId: 'BOMA-KJ-HH1015', assignedWorker: 'user-county.lopez', assignedWorkerName: 'Dr. Lopez Lokai Modi', status: 'active', condition: 'Diarrhea', facilityLevel: 'boma', scheduledDate: new Date(Date.now() - 2 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', sourceVisitId: 'boma-visit-007', createdAt: new Date(Date.now() - 5 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 5 * 86400000).toISOString() },
+  { _id: 'followup-003', type: 'follow_up', patientId: 'BOMA-KJ-HH1022', patientName: 'Nyamal Gatdet', geocodeId: 'BOMA-KJ-HH1022', assignedWorker: 'user-county.lopez', assignedWorkerName: 'Dr. Lopez Lokai Modi', status: 'active', condition: 'Malnutrition', facilityLevel: 'boma', scheduledDate: new Date(Date.now() - 4 * 86400000).toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', sourceVisitId: 'boma-visit-008', createdAt: new Date(Date.now() - 7 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 7 * 86400000).toISOString() },
+  { _id: 'followup-004', type: 'follow_up', patientId: 'BOMA-KJ-HH1008', patientName: 'Deng Deng', geocodeId: 'BOMA-KJ-HH1008', assignedWorker: 'user-county.lopez', assignedWorkerName: 'Dr. Lopez Lokai Modi', status: 'active', condition: 'Pneumonia', facilityLevel: 'boma', scheduledDate: new Date().toISOString(), state: 'Central Equatoria', county: 'Kajo-keji', sourceVisitId: 'boma-visit-004', createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 2 * 86400000).toISOString() },
 ];
 
 // Child patients linked to immunization records (fixing orphaned child-001..006 IDs)
@@ -785,7 +657,237 @@ const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-22', type: 'appointment', patientId: 'pat-00015', patientName: 'Tut Chuol Both', patientPhone: '+211912555015', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(3), appointmentTime: '11:30', endTime: '12:00', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Nephrology', reason: 'Renal function review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(4), updatedAt: daysAgo(2) },
   { _id: 'appointment-23', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(3), appointmentTime: '10:00', endTime: '10:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Blood pressure check', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(1) },
   { _id: 'appointment-24', type: 'appointment', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', patientPhone: '+211912555022', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(5), appointmentTime: '14:30', endTime: '15:00', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Haematology', reason: 'Post-transfusion review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(1) },
+  // ── Provider dashboard schedule for the canonical doctor demo account. ──
+  { _id: 'appointment-dashboard-1', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '08:15', endTime: '08:45', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Malaria and blood pressure follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(0) },
+  { _id: 'appointment-dashboard-2', type: 'appointment', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', patientPhone: '+211912555012', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '09:30', endTime: '10:00', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Internal Medicine', reason: 'HIV review and fatigue', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
+  { _id: 'appointment-dashboard-3', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '11:00', endTime: '11:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Endocrinology', reason: 'Diabetes medication review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
+  { _id: 'appointment-dashboard-4', type: 'appointment', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', patientPhone: '+211912555022', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(1), appointmentTime: '09:00', endTime: '09:45', duration: 45, appointmentType: 'specialist', priority: 'urgent', department: 'Haematology', reason: 'Sickle cell crisis follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
+  { _id: 'appointment-dashboard-5', type: 'appointment', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', patientPhone: '+211912555030', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(2), appointmentTime: '13:30', endTime: '14:00', duration: 30, appointmentType: 'follow_up', priority: 'urgent', department: 'Surgery', reason: 'Burn wound review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
 ];
+
+async function upsertSeedDoc(db: PouchDB.Database, doc: Record<string, unknown>): Promise<void> {
+  try {
+    const existing = await db.get(doc._id as string) as PouchDB.Core.ExistingDocument<Record<string, unknown>>;
+    await db.put({ ...existing, ...doc, _rev: existing._rev });
+  } catch (err: unknown) {
+    const e = err as { status?: number };
+    if (e.status === 404) {
+      await db.put(doc);
+      return;
+    }
+    throw err;
+  }
+}
+
+async function seedDashboardAppointments(): Promise<void> {
+  const apptDB = appointmentsDB();
+  for (const appointment of seedAppointments.filter(a => a._id.startsWith('appointment-dashboard-'))) {
+    await upsertSeedDoc(apptDB, appointment as unknown as Record<string, unknown>);
+  }
+}
+
+function scheduledDoseISO(day: string, time: string): string {
+  return new Date(`${day}T${time}:00`).toISOString();
+}
+
+async function seedClinicalNurseData(): Promise<void> {
+  const today = dateAgo(0);
+  const now = daysAgo(0);
+  const rxDB = prescriptionsDB();
+  const trDB = triageDB();
+  const hfDB = handoffsDB();
+  const wDB = wardDB();
+  const mrDB = medicalRecordsDB();
+
+  const nursePrescriptions: Record<string, unknown>[] = [
+    {
+      _id: 'rx-nurse-mth-001', type: 'prescription',
+      patientId: 'pat-00200', patientName: 'Gatwech Puok',
+      medication: 'Artesunate IV', dose: '2.4 mg/kg', route: 'IV', frequency: 'TDS', duration: '24 hours then reassess',
+      prescribedBy: 'Midwife Nyakong Gatkuoth', status: 'pending', orderStatus: 'dispensed',
+      urgency: 'immediate', admissionId: 'admission-mth-1',
+      administrations: [{
+        id: 'mar-nurse-mth-001-0800', scheduledFor: scheduledDoseISO(today, '08:00'), recordedAt: scheduledDoseISO(today, '08:12'),
+        status: 'given', doseGiven: '2.4 mg/kg', route: 'IV', administeredBy: 'user-nurse.stella', administeredByName: 'Nurse Stella Keji Lemi',
+        notes: 'Given via left forearm cannula; patient monitored for 15 minutes.',
+      }],
+      hospitalId: 'hosp-003', hospitalName: 'Malakal Teaching Hospital', orgId: PUBLIC_ORG_ID,
+      createdAt: daysAgo(0.25), updatedAt: daysAgo(0.05), dispensedAt: daysAgo(0.2),
+    },
+    {
+      _id: 'rx-nurse-mth-002', type: 'prescription',
+      patientId: 'pat-00201', patientName: 'Nyakuoth Gatluak',
+      medication: 'Ferrous Sulfate + Folic Acid', dose: '200mg / 400mcg', route: 'Oral', frequency: 'OD', duration: '30 days',
+      prescribedBy: 'Midwife Nyakong Gatkuoth', status: 'pending', orderStatus: 'dispensed',
+      urgency: 'definitive', admissionId: 'admission-mth-2',
+      hospitalId: 'hosp-003', hospitalName: 'Malakal Teaching Hospital', orgId: PUBLIC_ORG_ID,
+      createdAt: daysAgo(0.4), updatedAt: daysAgo(0.1), dispensedAt: daysAgo(0.35),
+    },
+    {
+      _id: 'rx-nurse-mth-003', type: 'prescription',
+      patientId: 'pat-00203', patientName: 'Nyandeng Reath',
+      medication: 'Ceftriaxone', dose: '1g', route: 'IV', frequency: 'BD', duration: '5 days',
+      prescribedBy: 'Midwife Nyakong Gatkuoth', status: 'pending', orderStatus: 'dispensed',
+      urgency: 'definitive', admissionId: 'admission-mth-3',
+      administrations: [{
+        id: 'mar-nurse-mth-003-0800', scheduledFor: scheduledDoseISO(today, '08:00'), recordedAt: scheduledDoseISO(today, '08:20'),
+        status: 'held', doseGiven: '1g', route: 'IV', administeredBy: 'user-nurse.stella', administeredByName: 'Nurse Stella Keji Lemi',
+        reason: 'IV site infiltrated; new cannula requested before next dose.',
+      }],
+      hospitalId: 'hosp-003', hospitalName: 'Malakal Teaching Hospital', orgId: PUBLIC_ORG_ID,
+      createdAt: daysAgo(0.6), updatedAt: daysAgo(0.08), dispensedAt: daysAgo(0.55),
+    },
+    {
+      _id: 'rx-nurse-jth-001', type: 'prescription',
+      patientId: 'pat-00040', patientName: 'Majok Chol Wol',
+      medication: 'Diazepam', dose: '10mg', route: 'IV', frequency: 'PRN', duration: 'stat if seizure recurs',
+      prescribedBy: 'Dr. Achol Mayen Deng', status: 'pending', orderStatus: 'dispensed',
+      urgency: 'immediate', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID,
+      createdAt: daysAgo(0.2), updatedAt: daysAgo(0.1), dispensedAt: daysAgo(0.18),
+    },
+    {
+      _id: 'rx-nurse-wau-001', type: 'prescription',
+      patientId: 'pat-00063', patientName: 'Santino Madut',
+      medication: 'Ceftriaxone', dose: '1g', route: 'IV', frequency: 'BD', duration: '5 days',
+      prescribedBy: 'CO Deng Mabior Kuol', status: 'pending', orderStatus: 'dispensed',
+      urgency: 'definitive', hospitalId: 'hosp-002', hospitalName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID,
+      createdAt: daysAgo(0.3), updatedAt: daysAgo(0.08), dispensedAt: daysAgo(0.25),
+    },
+  ];
+
+  for (const doc of nursePrescriptions) await upsertSeedDoc(rxDB, doc);
+
+  const nurseTriages: Record<string, unknown>[] = [
+    {
+      _id: 'triage-nurse-jth-mary-1', type: 'triage',
+      patientId: 'pat-00040', patientName: 'Majok Chol Wol', hospitalNumber: 'JTH-000040',
+      airway: 'obstructed', breathing: 'distressed', circulation: 'impaired', consciousness: 'pain',
+      priority: 'RED', temperature: '39.0', pulse: '132', respiratoryRate: '30', systolic: '88', diastolic: '56', oxygenSaturation: '86',
+      chiefComplaint: 'Collapsed at home; possible seizure and aspiration risk', modeOfArrival: 'ambulance', symptomDuration: '1 hour',
+      triagedBy: 'user-triage.mary', triagedByName: 'Mary Nyaruai Gai', triagedAt: daysAgo(0.04),
+      facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'pending', assignedRoom: 'Emergency Bay 1',
+      orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0.04), updatedAt: daysAgo(0.04),
+    },
+    {
+      _id: 'triage-nurse-jth-sara-1', type: 'triage',
+      patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', hospitalNumber: 'JTH-000005',
+      airway: 'clear', breathing: 'normal', circulation: 'normal', consciousness: 'alert',
+      priority: 'GREEN', temperature: '36.8', pulse: '82', respiratoryRate: '18', systolic: '116', diastolic: '74', oxygenSaturation: '99',
+      chiefComplaint: 'ANC rooming vitals before clinician review', modeOfArrival: 'walk-in', symptomDuration: 'Routine visit',
+      triagedBy: 'user-rooming.sara', triagedByName: 'Sara Aluel Bol', triagedAt: daysAgo(0.08),
+      facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', status: 'seen', assignedRoom: 'Room 3',
+      orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0.08), updatedAt: daysAgo(0.08),
+    },
+    {
+      _id: 'triage-nurse-mth-stella-1', type: 'triage',
+      patientId: 'pat-00205', patientName: 'Nyaluak Deng', hospitalNumber: 'MTH-000015',
+      airway: 'clear', breathing: 'distressed', circulation: 'normal', consciousness: 'alert',
+      priority: 'YELLOW', temperature: '38.4', pulse: '104', respiratoryRate: '25', systolic: '118', diastolic: '76', oxygenSaturation: '92',
+      chiefComplaint: 'Asthma flare with productive cough', modeOfArrival: 'walk-in', symptomDuration: '2 days',
+      triagedBy: 'user-nurse.stella', triagedByName: 'Nurse Stella Keji Lemi', triagedAt: daysAgo(0.02),
+      facilityId: 'hosp-003', facilityName: 'Malakal Teaching Hospital', status: 'pending', assignedRoom: 'Treatment Bay 2',
+      orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0.02), updatedAt: daysAgo(0.02),
+    },
+    {
+      _id: 'triage-nurse-wau-grace-1', type: 'triage',
+      patientId: 'pat-00084', patientName: 'Awut Anyieth', hospitalNumber: 'WSH-000031',
+      airway: 'clear', breathing: 'distressed', circulation: 'normal', consciousness: 'alert',
+      priority: 'YELLOW', temperature: '38.1', pulse: '116', respiratoryRate: '29', systolic: '102', diastolic: '64', oxygenSaturation: '93',
+      chiefComplaint: 'Child with fever and fast breathing', modeOfArrival: 'walk-in', symptomDuration: '1 day',
+      triagedBy: 'user-nurse.wau', triagedByName: 'Nurse Grace Achai Lual', triagedAt: daysAgo(0.03),
+      facilityId: 'hosp-002', facilityName: 'Wau State Hospital', status: 'pending', assignedRoom: 'Paeds Bay',
+      orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0.03), updatedAt: daysAgo(0.03),
+    },
+  ];
+
+  for (const doc of nurseTriages) await upsertSeedDoc(trDB, doc);
+
+  const malakalWardDocs: Record<string, unknown>[] = [
+    { _id: 'ward-mth-1', type: 'ward', name: 'Malakal Medical Ward', wardType: 'general_female', facilityId: 'hosp-003', facilityName: 'Malakal Teaching Hospital', facilityLevel: 'state', floor: 'Ground', totalBeds: 20, occupiedBeds: 14, availableBeds: 6, nurseInCharge: 'user-nurse.stella', nurseInChargeName: 'Nurse Stella Keji Lemi', isActive: true, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: now },
+    { _id: 'ward-mth-2', type: 'ward', name: 'Malakal Emergency Ward', wardType: 'emergency', facilityId: 'hosp-003', facilityName: 'Malakal Teaching Hospital', facilityLevel: 'state', floor: 'Ground', totalBeds: 12, occupiedBeds: 9, availableBeds: 3, nurseInCharge: 'user-nurse.stella', nurseInChargeName: 'Nurse Stella Keji Lemi', isActive: true, orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: now },
+    { _id: 'bed-mth-1', type: 'bed', bedNumber: 'MTH-MW-B01', wardId: 'ward-mth-1', wardName: 'Malakal Medical Ward', facilityId: 'hosp-003', status: 'occupied', currentPatientId: 'pat-00201', currentPatientName: 'Nyakuoth Gatluak', currentAdmissionId: 'admission-mth-2', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: now },
+    { _id: 'bed-mth-2', type: 'bed', bedNumber: 'MTH-ER-B02', wardId: 'ward-mth-2', wardName: 'Malakal Emergency Ward', facilityId: 'hosp-003', status: 'occupied', currentPatientId: 'pat-00200', currentPatientName: 'Gatwech Puok', currentAdmissionId: 'admission-mth-1', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: now },
+    { _id: 'bed-mth-3', type: 'bed', bedNumber: 'MTH-MW-B03', wardId: 'ward-mth-1', wardName: 'Malakal Medical Ward', facilityId: 'hosp-003', status: 'occupied', currentPatientId: 'pat-00203', currentPatientName: 'Nyandeng Reath', currentAdmissionId: 'admission-mth-3', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(120), updatedAt: now },
+    { _id: 'admission-mth-1', type: 'admission', patientId: 'pat-00200', patientName: 'Gatwech Puok', hospitalNumber: 'MTH-000010', admissionDate: dateAgo(0), admittingDiagnosis: 'Severe malaria with convulsions', icd11Code: '1F4Z', severity: 'critical', admittedBy: 'user-nurse.stella', admittedByName: 'Nurse Stella Keji Lemi', wardId: 'ward-mth-2', wardName: 'Malakal Emergency Ward', bedId: 'bed-mth-2', bedNumber: 'MTH-ER-B02', facilityId: 'hosp-003', facilityName: 'Malakal Teaching Hospital', facilityLevel: 'state', attendingPhysician: 'user-midwife.nyakong', attendingPhysicianName: 'Midwife Nyakong Gatkuoth', nurseAssigned: 'user-nurse.stella', nurseAssignedName: 'Nurse Stella Keji Lemi', isolationRequired: false, status: 'admitted', followUpRequired: false, state: 'Upper Nile', county: 'Malakal', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0.25), updatedAt: now },
+    { _id: 'admission-mth-2', type: 'admission', patientId: 'pat-00201', patientName: 'Nyakuoth Gatluak', hospitalNumber: 'MTH-000011', admissionDate: dateAgo(1), admittingDiagnosis: 'Pregnancy with abdominal pain', icd11Code: 'JA00', severity: 'moderate', admittedBy: 'user-midwife.nyakong', admittedByName: 'Midwife Nyakong Gatkuoth', wardId: 'ward-mth-1', wardName: 'Malakal Medical Ward', bedId: 'bed-mth-1', bedNumber: 'MTH-MW-B01', facilityId: 'hosp-003', facilityName: 'Malakal Teaching Hospital', facilityLevel: 'state', attendingPhysician: 'user-midwife.nyakong', attendingPhysicianName: 'Midwife Nyakong Gatkuoth', nurseAssigned: 'user-nurse.stella', nurseAssignedName: 'Nurse Stella Keji Lemi', isolationRequired: false, status: 'admitted', followUpRequired: false, state: 'Upper Nile', county: 'Malakal', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: now },
+    { _id: 'admission-mth-3', type: 'admission', patientId: 'pat-00203', patientName: 'Nyandeng Reath', hospitalNumber: 'MTH-000013', admissionDate: dateAgo(0), admittingDiagnosis: 'Severe anaemia with suspected infection', icd11Code: '3A00', severity: 'severe', admittedBy: 'user-nurse.stella', admittedByName: 'Nurse Stella Keji Lemi', wardId: 'ward-mth-1', wardName: 'Malakal Medical Ward', bedId: 'bed-mth-3', bedNumber: 'MTH-MW-B03', facilityId: 'hosp-003', facilityName: 'Malakal Teaching Hospital', facilityLevel: 'state', attendingPhysician: 'user-midwife.nyakong', attendingPhysicianName: 'Midwife Nyakong Gatkuoth', nurseAssigned: 'user-nurse.stella', nurseAssignedName: 'Nurse Stella Keji Lemi', isolationRequired: false, status: 'admitted', followUpRequired: true, followUpDate: dateFromNow(2), state: 'Upper Nile', county: 'Malakal', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0.4), updatedAt: now },
+  ];
+
+  for (const doc of malakalWardDocs) await upsertSeedDoc(wDB, doc);
+
+  const handoffDocs: ShiftHandoffDoc[] = [
+    {
+      _id: 'handoff-nurse-mth-current', type: 'shift_handoff',
+      facilityId: 'hosp-003', facilityName: 'Malakal Teaching Hospital', orgId: PUBLIC_ORG_ID,
+      shiftDate: today, shift: 'day',
+      outgoingNurseId: 'user-nurse.stella', outgoingNurseName: 'Nurse Stella Keji Lemi',
+      incomingNurseName: 'Evening nurse',
+      notes: 'Emergency bay has one critical malaria patient. Review oxygen saturation and IV access before 15:00.',
+      patients: [
+        { patientId: 'pat-00200', patientName: 'Gatwech Puok', hospitalNumber: 'MTH-000010', priority: 'RED', situation: 'Convulsions stopped after treatment; still febrile.', background: 'Suspected severe malaria, started IV artesunate.', assessment: 'SpO2 91% on oxygen, pulse 124, BP borderline.', recommendation: 'Repeat vitals hourly, maintain IV access, escalate if GCS drops.', tasks: ['Repeat glucose at 14:00', 'Check next artesunate dose', 'Confirm lab malaria smear result'] },
+        { patientId: 'pat-00203', patientName: 'Nyandeng Reath', hospitalNumber: 'MTH-000013', priority: 'YELLOW', situation: 'Anaemia with dizziness, IV antibiotics held once due to cannula issue.', recommendation: 'Restart IV line and give next antibiotic dose when access secure.', tasks: ['New cannula', 'Recheck Hb result'] },
+      ],
+      metrics: { totalPatients: 8, critical: 1, overdueMar: 1, dueMar: 2 },
+      signedAt: daysAgo(0.02), status: 'signed', createdAt: daysAgo(0.02), updatedAt: daysAgo(0.02),
+    },
+    {
+      _id: 'handoff-nurse-jth-current', type: 'shift_handoff',
+      facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID,
+      shiftDate: today, shift: 'day',
+      outgoingNurseId: 'user-triage.mary', outgoingNurseName: 'Mary Nyaruai Gai',
+      incomingNurseName: 'Sara Aluel Bol',
+      notes: 'RED triage patient in Emergency Bay 1 awaiting clinician review. ANC rooming queue is stable.',
+      patients: [
+        { patientId: 'pat-00040', patientName: 'Majok Chol Wol', hospitalNumber: 'JTH-000040', priority: 'RED', situation: 'Arrived by ambulance after collapse.', assessment: 'Airway risk and oxygen saturation low.', recommendation: 'Keep in emergency bay, clinician review now.', tasks: ['Prepare suction', 'Repeat vitals in 15 minutes'] },
+      ],
+      metrics: { totalPatients: 12, critical: 1, overdueMar: 1, dueMar: 1 },
+      signedAt: daysAgo(0.03), status: 'signed', createdAt: daysAgo(0.03), updatedAt: daysAgo(0.03),
+    },
+    {
+      _id: 'handoff-nurse-wau-current', type: 'shift_handoff',
+      facilityId: 'hosp-002', facilityName: 'Wau State Hospital', orgId: PUBLIC_ORG_ID,
+      shiftDate: today, shift: 'day',
+      outgoingNurseId: 'user-nurse.wau', outgoingNurseName: 'Nurse Grace Achai Lual',
+      incomingNurseName: 'Night nurse',
+      notes: 'Paeds respiratory patient remains YELLOW; keep oxygen and fever monitoring active.',
+      patients: [
+        { patientId: 'pat-00084', patientName: 'Awut Anyieth', hospitalNumber: 'WSH-000031', priority: 'YELLOW', situation: 'Child with fast breathing and fever.', recommendation: 'Repeat respiratory rate and SpO2 after nebulization.', tasks: ['Nebulization response check', 'Document intake/output'] },
+      ],
+      metrics: { totalPatients: 10, critical: 0, overdueMar: 1, dueMar: 2 },
+      signedAt: daysAgo(0.04), status: 'signed', createdAt: daysAgo(0.04), updatedAt: daysAgo(0.04),
+    },
+  ];
+
+  for (const doc of handoffDocs) await upsertSeedDoc(hfDB, doc as unknown as Record<string, unknown>);
+
+  const nursingVitals: Record<string, unknown>[] = [
+    {
+      _id: 'mr-nurse-vitals-mth-00200', type: 'medical_record', recordKind: 'nursing_vitals',
+      patientId: 'pat-00200', patientName: 'Gatwech Puok', hospitalNumber: 'MTH-000010',
+      visitDate: today, consultedAt: daysAgo(0.03), providerName: 'Nurse Stella Keji Lemi', providerRole: 'Nurse',
+      chiefComplaint: 'Nursing observation: severe malaria monitoring',
+      vitals: { temperature: 38.9, pulse: 124, respiratoryRate: 28, oxygenSaturation: 91, systolic: 92, diastolic: 58, gcs: 13 },
+      fluidBalance: { oralIntakeMl: 120, ivIntakeMl: 500, urineOutputMl: 180 },
+      assessment: 'Fever improving after antipyretic; remains tachycardic.',
+      plan: 'Continue hourly vitals and strict intake/output.',
+      hospitalId: 'hosp-003', hospitalName: 'Malakal Teaching Hospital', orgId: PUBLIC_ORG_ID,
+      createdAt: daysAgo(0.03), updatedAt: daysAgo(0.03),
+    },
+    {
+      _id: 'mr-nurse-vitals-jth-00040', type: 'medical_record', recordKind: 'nursing_vitals',
+      patientId: 'pat-00040', patientName: 'Majok Chol Wol', hospitalNumber: 'JTH-000040',
+      visitDate: today, consultedAt: daysAgo(0.04), providerName: 'Mary Nyaruai Gai', providerRole: 'Triage Nurse',
+      chiefComplaint: 'Emergency triage observation',
+      vitals: { temperature: 39.0, pulse: 132, respiratoryRate: 30, oxygenSaturation: 86, systolic: 88, diastolic: 56, gcs: 11 },
+      assessment: 'Airway risk; positioned laterally and oxygen applied.',
+      plan: 'Emergency clinician review and repeat vitals every 15 minutes.',
+      hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital', orgId: PUBLIC_ORG_ID,
+      createdAt: daysAgo(0.04), updatedAt: daysAgo(0.04),
+    },
+  ];
+
+  for (const doc of nursingVitals) await upsertSeedDoc(mrDB, doc);
+}
 
 // ═══ Ward + bed + admission seed data ═════════════════════════════
 // occupiedBeds/availableBeds are set explicitly so the bed-occupancy
@@ -941,6 +1043,27 @@ const seedTelehealth: Omit<TelehealthSessionDoc, '_rev' | 'createdBy'>[] = [
 
 const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
+interface SeedCredentialProfile {
+  username: string;
+  password: string | null;
+}
+
+interface SeedCredentialsResponse {
+  profiles?: SeedCredentialProfile[];
+  error?: string;
+}
+
+async function fetchSeedPassword(username: string): Promise<string | null> {
+  const res = await fetch('/api/demo-credentials', { cache: 'no-store' });
+  if (!res.ok) {
+    throw new Error(`[db-seed] failed to fetch seed credentials (${res.status})`);
+  }
+
+  const data = await res.json() as SeedCredentialsResponse;
+  const profile = data.profiles?.find((p) => p.username === username);
+  return profile?.password ?? null;
+}
+
 /**
  * Production seed: creates only the initial super admin user and a default organization.
  * No demo patients, no sample records — a clean slate for real hospital data.
@@ -980,17 +1103,17 @@ async function seedProduction(): Promise<void> {
   });
 
   // Create initial super admin. The plaintext lives only on the server in
-  // .seed-credentials.json — fetched here so the local PouchDB hash matches
-  // what the server-side login endpoint expects.
+  // .seed-credentials.json. Fetch it through the server API so this client-side
+  // seed module never imports the Node-only seed-credentials module.
   const db = usersDB();
-  const cred = await fetchAdminCredential();
-  if (!cred) {
+  const adminPassword = await fetchSeedPassword('admin');
+  if (!adminPassword) {
     throw new Error(
-      '[db-seed] could not fetch admin credential from /api/demo-credentials. ' +
+      '[db-seed] could not resolve the bootstrap admin credential. ' +
       'Set ADMIN_INITIAL_PASSWORD on the server or check that the credentials file is writable.',
     );
   }
-  const hash = await hashPassword(cred.password);
+  const hash = await hashPassword(adminPassword);
   await safePut(db, {
     _id: 'user-admin',
     type: 'user',
@@ -1112,6 +1235,8 @@ export async function seedDatabase(): Promise<void> {
     // Run photo migration on already-seeded databases so existing installs
     // pick up the new photoUrl field without requiring a reset.
     await migratePatientPhotos();
+    await seedDashboardAppointments();
+    await seedClinicalNurseData();
     return;
   }
 
@@ -1138,22 +1263,15 @@ export async function seedDatabase(): Promise<void> {
     await safePut(orgDB, org as unknown as Record<string, unknown>);
   }
 
-  // Seed users. Plaintext passwords for the demo accounts live only on the
-  // server (see lib/seed-credentials.ts); fetch them once and hash locally
-  // so the offline-fallback PouchDB login path verifies the same plaintext
-  // the server-side login endpoint accepts.
-  const credentials = await fetchDemoCredentials();
+  // Seed users. Demo-mode plaintext passwords are derived locally so the
+  // browser can bootstrap offline without calling back into the server.
+  const credentials = getDemoPasswordMap();
   const db = usersDB();
   let userIdx = 0;
   for (const u of defaultUsers) {
-    const plaintext = credentials[u.username];
-    if (!plaintext) {
-      console.warn(`[db-seed] skipping ${u.username} — no credential returned by /api/demo-credentials`);
-      continue;
-    }
-    const hash = await hashPassword(plaintext);
+    const hash = await hashPassword(credentials[u.username]);
     userIdx += 1;
-    const profile = ROLE_PROFILE[u.role];
+    const profile = DEMO_ROLE_PROFILE[u.role];
     // Canonical South Sudan staff phone: +211 921 000 0NN (national number is
     // 9 digits beginning with 9), unique per seeded user.
     const phone = `+2119210000${String(userIdx).padStart(2, '0')}`;
@@ -1449,28 +1567,28 @@ export async function seedDatabase(): Promise<void> {
       _id: 'mr-demo-cosign-1', type: 'medical_record',
       patientId: 'pat-00012', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',
       visitDate: daysAgo(1).slice(0, 10), consultedAt: daysAgo(1),
-      visitType: 'outpatient', providerName: 'Intern Kuol Deng Majok', providerRole: 'Medical Intern',
+      visitType: 'outpatient', providerName: 'Dr. Achol Mayen Deng', providerRole: 'Doctor',
       department: 'General Medicine', chiefComplaint: 'HIV follow-up — CD4 review',
       historyOfPresentIllness: 'Patient on ARVs, doing well. CD4 trending up.',
       vitalSigns: { temperature: '36.9', systolic: '120', diastolic: '78', pulse: '74', respiratoryRate: '14', oxygenSaturation: '98', weight: '65' },
       diagnoses: [{ code: 'B24', name: 'HIV disease', type: 'primary' }],
       prescriptions: [], labResults: [], treatmentPlan: 'Continue TDF/3TC/DTG. Repeat CD4 in 6 months.',
       documentStatus: 'awaiting_cosign',
-      signedBy: 'user-intern.kuol', signedByName: 'Intern Kuol Deng Majok', signedByRole: 'Medical Intern',
+      signedBy: 'user-dr.achol', signedByName: 'Dr. Achol Mayen Deng', signedByRole: 'Doctor',
       orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1),
     } as unknown as MedicalRecordDoc,
     {
       _id: 'mr-demo-cosign-2', type: 'medical_record',
       patientId: 'pat-00020', hospitalId: 'hosp-001', hospitalName: 'Juba Teaching Hospital',
       visitDate: daysAgo(0).slice(0, 10), consultedAt: daysAgo(0),
-      visitType: 'outpatient', providerName: 'Intern Aluel Bol Ring', providerRole: 'Medical Intern',
+      visitType: 'outpatient', providerName: 'Dr. James Wani Igga', providerRole: 'Doctor',
       department: 'Paediatrics', chiefComplaint: 'Malaria — follow-up day 3',
       historyOfPresentIllness: 'Child improving after Coartem. Fever resolved.',
       vitalSigns: { temperature: '37.0', systolic: '100', diastolic: '65', pulse: '88', respiratoryRate: '22', oxygenSaturation: '98', weight: '22' },
       diagnoses: [{ code: 'B54', name: 'Unspecified malaria', type: 'primary' }],
       prescriptions: [], labResults: [], treatmentPlan: 'Complete Coartem course. Review if fever returns.',
       documentStatus: 'awaiting_cosign',
-      signedBy: 'user-intern.aluel', signedByName: 'Intern Aluel Bol Ring', signedByRole: 'Medical Intern',
+      signedBy: 'user-dr.wani', signedByName: 'Dr. James Wani Igga', signedByRole: 'Doctor',
       orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0),
     } as unknown as MedicalRecordDoc,
   ];
@@ -1875,7 +1993,6 @@ export async function seedDatabase(): Promise<void> {
     aluel: { id: 'user-manager.aluel', name: 'Aluel Bol Maker' },
     mary: { id: 'user-triage.mary', name: 'Mary Nyaruai Gai' },
     sara: { id: 'user-rooming.sara', name: 'Sara Aluel Bol' },
-    peter: { id: 'user-clinician.peter', name: 'Dr. Peter Garang Deng' },
     nyandeng: { id: 'user-biller.nyandeng', name: 'Nyandeng Chol Atem' },
     amira: { id: 'user-desk.amira', name: 'Amira Juma Hassan' },
     // Wau State Hospital (hosp-002) staff so the Clinical Officer demo (co.deng) has a populated chat.
@@ -1895,10 +2012,10 @@ export async function seedDatabase(): Promise<void> {
   const staffConversations: SeedConv[] = [
     {
       id: 'conv-seed-huddle', kind: 'group', name: 'Morning Clinical Huddle',
-      members: [P.wani, P.achol, P.peter, P.mary],
+      members: [P.wani, P.achol, P.mary],
       msgs: [
         { from: P.achol, body: 'Morning team — quick huddle at 7:30 before rounds?', minsAgo: 180 },
-        { from: P.peter, body: 'Works for me.', minsAgo: 175 },
+        { from: P.mary, body: 'Works for me.', minsAgo: 175 },
         { from: P.wani, body: "I'll be there.", minsAgo: 170 },
         { from: P.mary, body: 'Bed 12 needs review before discharge — vitals stable overnight.', minsAgo: 45 },
       ],
@@ -2132,12 +2249,45 @@ export async function seedDatabase(): Promise<void> {
     { description: 'Antenatal Visit', category: 'consultation', amount: 3500 },
   ];
   const smDB = getDB('tamamhealth_saved_payment_methods');
+  const generatedBillingPatients = [
+    ...patients.map((p) => ({
+      id: p.id as string,
+      name: `${p.firstName} ${p.surname}`.replace(/\s+/g, ' ').trim(),
+      phone: (p as unknown as Record<string, unknown>).phone as string | undefined,
+      registrationHospital: (p as unknown as Record<string, unknown>).registrationHospital as string | undefined,
+    })),
+    ...childPatients.map((p) => ({
+      id: p.id as string,
+      name: `${(p.firstName as string) ?? ''} ${(p.surname as string) ?? ''}`.replace(/\s+/g, ' ').trim(),
+      phone: p.phone as string | undefined,
+      registrationHospital: p.registrationHospital as string | undefined,
+    })),
+    ...motherPatients.map((p) => ({
+      id: p.id as string,
+      name: `${(p.firstName as string) ?? ''} ${(p.surname as string) ?? ''}`.replace(/\s+/g, ' ').trim(),
+      phone: p.phone as string | undefined,
+      registrationHospital: p.registrationHospital as string | undefined,
+    })),
+    ...wauPatients.map((p) => ({
+      id: p.id as string,
+      name: `${(p.firstName as string) ?? ''} ${(p.surname as string) ?? ''}`.replace(/\s+/g, ' ').trim(),
+      phone: p.phone as string | undefined,
+      registrationHospital: p.registrationHospital as string | undefined,
+    })),
+    ...malakalPatients.map((p) => ({
+      id: p.id as string,
+      name: `${(p.firstName as string) ?? ''} ${(p.surname as string) ?? ''}`.replace(/\s+/g, ' ').trim(),
+      phone: p.phone as string | undefined,
+      registrationHospital: p.registrationHospital as string | undefined,
+    })),
+  ].filter((p, idx, arr) => arr.findIndex(other => other.id === p.id) === idx);
+
   let _gi = 0;
-  for (const gp of patients) {
+  for (const gp of generatedBillingPatients) {
     if (HANDCRAFTED_BILLING.has(gp.id)) continue;
     _gi++;
     const facilityId = gp.registrationHospital || 'hosp-001';
-    const gName = `${gp.firstName} ${gp.surname}`;
+    const gName = gp.name;
     const ts = daysAgo((_gi % 18) + 2);
     const svcDate = ts.slice(0, 10);
     const enc = `enc-gen-${gp.id}`;
@@ -2224,6 +2374,8 @@ export async function seedDatabase(): Promise<void> {
   for (const t of seedTriage) {
     await safePut(trDB, t as unknown as Record<string, unknown>);
   }
+
+  await seedClinicalNurseData();
 
   // Seed assets
   const asDB = assetsDB();

@@ -12,9 +12,14 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/', '<rootDir>/src/__tests__/helpers/'],
+  // next/jest transforms test files with SWC; the default 'babel' coverage
+  // provider re-instruments that already-compiled output via babel-plugin-istanbul
+  // and crashes ("original argument must be of type function"). 'v8' reads
+  // coverage from V8's native instrumentation instead, so it's compatible.
+  coverageProvider: 'v8',
 };
 
-export default async () => {
+const createConfig = async () => {
   const jestConfig = await createJestConfig(config as unknown as Parameters<typeof createJestConfig>[0])();
   jestConfig.transformIgnorePatterns = [
     '/node_modules/(?!(jose|uuid|pouchdb-adapter-memory)/).*\\.js$',
@@ -30,3 +35,5 @@ export default async () => {
   ];
   return jestConfig;
 };
+
+export default createConfig;

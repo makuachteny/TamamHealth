@@ -75,7 +75,7 @@ export default function FacilitySyncCard({
                 className="absolute rounded-full"
                 style={{
                   width: 16, height: 16, left: cx - 8, top: cy - 8,
-                  background: el.status === 'synced' ? '#34D399' : 'var(--color-warning)',
+                  background: el.status === 'synced' ? 'var(--color-success)' : 'var(--color-warning)',
                 }}
               />
             );
@@ -86,7 +86,7 @@ export default function FacilitySyncCard({
         </div>
       </div>
       <div className="mt-3 pt-2.5 border-t flex items-center gap-1.5" style={{ borderColor: 'var(--border-light)' }}>
-        <span className="rounded-full flex-shrink-0" style={{ width: 20, height: 20, background: '#34D399' }} />
+        <span className="rounded-full flex-shrink-0" style={{ width: 20, height: 20, background: 'var(--color-success)' }} />
         <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Last synced: today · 08:00</span>
       </div>
     </div>

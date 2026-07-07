@@ -187,16 +187,16 @@ export default function ConflictsPage() {
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                         {c.resourceType}
                       </span>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-platform-mono)' }}>
                         {c.resourceId}
                       </span>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      {t('conflicts.defaultWinner')} <span style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{c.winningRev}</span>
+                      {t('conflicts.defaultWinner')} <span style={{ fontFamily: 'var(--font-platform-mono)', color: 'var(--text-primary)' }}>{c.winningRev}</span>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                       {t('conflicts.losingRevisions')} {c.losingRevs.map((r) => (
-                        <span key={r} style={{ fontFamily: 'monospace', color: 'var(--text-primary)', marginRight: 8 }}>{r}</span>
+                        <span key={r} style={{ fontFamily: 'var(--font-platform-mono)', color: 'var(--text-primary)', marginRight: 8 }}>{r}</span>
                       ))}
                     </div>
                     {c.status !== 'pending' && (
@@ -206,7 +206,7 @@ export default function ConflictsPage() {
                           user: c.resolvedBy || t('syncConflicts.unknownUser'),
                           date: c.resolvedAt?.slice(0, 16).replace('T', ' ') ?? '',
                         })}
-                        {c.resolvedRev && <> → {t('conflicts.kept')} <span style={{ fontFamily: 'monospace' }}>{c.resolvedRev}</span></>}
+                        {c.resolvedRev && <> → {t('conflicts.kept')} <span style={{ fontFamily: 'var(--font-platform-mono)' }}>{c.resolvedRev}</span></>}
                         {c.resolutionNote && <> — “{c.resolutionNote}”</>}
                       </div>
                     )}

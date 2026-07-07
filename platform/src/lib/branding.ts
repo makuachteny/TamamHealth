@@ -10,10 +10,10 @@ export interface OrgBranding {
 
 export const DEFAULT_BRANDING: OrgBranding = {
   name: 'TamamHealth',
-  // Tamam Healthcare System brand greens (style guide, June 2026).
+  // Tamam Healthcare System platform blues.
   primaryColor: '#2191D0',
   secondaryColor: '#015697',
-  accentColor: '#2191D0',
+  accentColor: '#369FDA',
 };
 
 export function getOrgBranding(org?: OrganizationDoc | null): OrgBranding {
@@ -35,8 +35,10 @@ export function brandingToCSSVars(branding: OrgBranding): Record<string, string>
     // Override the accent system with org branding
     '--accent-primary': branding.primaryColor,
     '--accent-hover': branding.secondaryColor,
+    '--accent-text': branding.secondaryColor,
     '--accent-light': `${branding.primaryColor}12`,
-    '--accent-border': `${branding.primaryColor}30`,
+    '--accent-border': branding.primaryColor,
+    '--border-accent': branding.primaryColor,
     '--nav-active-bg': branding.primaryColor,
   };
 }

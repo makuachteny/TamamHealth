@@ -5,57 +5,32 @@ import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, ChevronRight, X } from '@/components/icons/lucide';
 import { Icon } from '@/components/icons';
 import { useApp } from '@/lib/context';
+import { DEMO_ACCOUNT_NAMES, DEMO_LOGIN_ACCOUNTS, type DemoLoginAccount } from '@/lib/demo-users';
+import { getDemoPasswordMap } from '@/lib/demo-passwords';
 import { resolveLandingPage } from '@/lib/user-prefs';
-import type { UserRole } from '@/lib/db-types';
 
 // Tamam brand accent — sourced from the shared theme tokens.
 const ACCENT = 'var(--accent-primary)';
 const ACCENT_DEEP = 'var(--accent-hover)';
 
-// Real display names for each demo account (from the seed roster).
-const ACCOUNT_NAME: Record<string, string> = {
-  'chv.ajak': 'Ajak Deng Mawien',
-  'bhw.akol': 'Akol Deng Mading',
-  'reg.clerk': 'Grace Poni Lukudu',
-  'clinic.clerk': 'Joseph Taban Lado',
-  'cashier.deng': 'Deng Akec Ring',
-  'biller.nyandeng': 'Nyandeng Chol Atem',
-  'triage.mary': 'Mary Nyaruai Gai',
-  'rooming.sara': 'Sara Aluel Bol',
-  'nurse.stella': 'Stella Keji Lemi',
-  'midwife.nyakong': 'Nyakong Gatkuoth',
-  'co.deng': 'Deng Mabior Kuol',
-  'clinician.peter': 'Dr. Peter Garang Deng',
-  'lab.gatluak': 'Gatluak Puok',
-  'rad.tamamhealth': 'Ladu Soro',
-  'pharma.rose': 'Rose Gbudue',
-  'nutr.nyabol': 'Nyabol Koang Jal',
-  'data.ayen': 'Ayen Dut Malual',
-  'hmis.john': 'John Majok Chol',
-  'facadmin.rita': 'Rita Akello Ojok',
-  'org.admin': 'Mercy Org Administrator',
-  'sup.mary': 'Mary Lado Kenyi',
-  'county.lopez': 'Dr. Lopez Lokai Modi',
-  'admin': 'Ministry of Health',
-  'superadmin': 'TamamHealth Platform Admin',
-};
+const ACCOUNT_NAME = DEMO_ACCOUNT_NAMES;
 
 // Hero-image pool — every user's sign-in screen gets a distinct photo. With more
 // accounts than photos a few repeat, but never adjacent within a group.
 const IMAGE_POOL = [
   '/assets/patients/community-health-worker.jpg',
-  '/assets/community-health-worker.jpg',
+  '/assets/patients/community-health-worker.jpg',
   '/assets/patients/portrait-man-camera.jpg',
   '/assets/patients/portrait-man-beanie.jpg',
   '/assets/health-data.jpg',
   '/assets/patients/doctor-writing-notes.jpg',
   '/assets/patients/african-nurse.jpg',
-  '/assets/african-nurse.jpg',
+  '/assets/patients/african-nurse.jpg',
   '/assets/patients/doctor-nurse-consultation.jpg',
-  '/assets/doctor-nurse-consultation.jpg',
+  '/assets/patients/doctor-nurse-consultation.jpg',
   '/assets/patients/doctor-prescription.jpg',
   '/assets/patients/doctor-tablet-review.jpg',
-  '/assets/doctor-tablet-smiling.jpg',
+  '/assets/patients/doctor-tablet-smiling.jpg',
   '/assets/patients/doctor-tablet-smiling.jpg',
   '/assets/patients/founder-teny.jpg',
   '/assets/patients/founder-ekow.jpg',
@@ -72,52 +47,8 @@ const TEAM_AVATARS = [
   '/assets/patients/african-nurse.jpg',
 ];
 
-// Demo roster — passwords are fetched at runtime from /api/demo-credentials.
-// One login per distinct role: no duplicates. The workflow-station roles from
-// the EHR Clinical Flow doc are the source of truth; the older overlapping
-// roles (Doctor, HRIO, Med. Superintendent) map onto Clinician, Records/HMIS
-// Officer, and Facility Administrator respectively. The Medical Receptionist
-// (front_desk) is surfaced explicitly so its Reception dashboard is reachable.
-// Ordered along the care & data flow: community → front desk → clinical →
-// diagnostics → records/admin → sub-national → national. The `group` drives the
-// section headers in the picker.
-const demoAccounts: { role: string; roleKey: UserRole; user: string; desc: string; hospital: string; group: string }[] = [
-  // 1 ── Front desk & billing: register, check in, collect, bill.
-  { group: 'Front desk & billing',     role: 'Medical Receptionist',   roleKey: 'front_desk',                 user: 'desk.amira',       desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Front desk & billing',     role: 'Registration Clerk',     roleKey: 'central_registration_clerk', user: 'reg.clerk',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Front desk & billing',     role: 'Clinic Clerk',           roleKey: 'clinic_clerk',               user: 'clinic.clerk',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Front desk & billing',     role: 'Cashier',                roleKey: 'cashier',                    user: 'cashier.deng',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Front desk & billing',     role: 'Medical Biller',         roleKey: 'medical_biller',             user: 'biller.nyandeng',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-
-  // 3 ── Clinical care: triage → rooming → nursing/midwifery → clinician.
-  { group: 'Clinical care',            role: 'Triage Nurse',           roleKey: 'triage_nurse',               user: 'triage.mary',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Clinical care',            role: 'Rooming Nurse',          roleKey: 'rooming_nurse',              user: 'rooming.sara',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Clinical care',            role: 'Nurse',                  roleKey: 'nurse',                      user: 'nurse.stella',     desc: 'Malakal Teaching Hospital', hospital: 'hosp-003' },
-  { group: 'Clinical care',            role: 'Midwife',                roleKey: 'midwife',                    user: 'midwife.nyakong',  desc: 'Malakal Teaching Hospital', hospital: 'hosp-003' },
-  { group: 'Clinical care',            role: 'Clinical Officer',       roleKey: 'clinical_officer',           user: 'co.deng',          desc: 'Wau State Hospital',        hospital: 'hosp-002' },
-  { group: 'Clinical care',            role: 'Clinician',              roleKey: 'clinician',                  user: 'clinician.peter',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-
-  // 4 ── Diagnostics & pharmacy.
-  { group: 'Diagnostics & pharmacy',   role: 'Lab Tech',               roleKey: 'lab_tech',                   user: 'lab.gatluak',      desc: 'Bentiu State Hospital',     hospital: 'hosp-004' },
-  { group: 'Diagnostics & pharmacy',   role: 'Radiologist',            roleKey: 'radiologist',                user: 'rad.tamamhealth',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Diagnostics & pharmacy',   role: 'Pharmacist',             roleKey: 'pharmacist',                 user: 'pharma.rose',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Diagnostics & pharmacy',   role: 'Nutritionist',           roleKey: 'nutritionist',               user: 'nutr.nyabol',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-
-  // 5 ── Records & administration: capture, quality, oversight.
-  { group: 'Records & administration', role: 'Data Entry Clerk',       roleKey: 'data_entry_clerk',           user: 'data.ayen',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Records & administration', role: 'Records / HMIS Officer', roleKey: 'records_hmis_officer',       user: 'hmis.john',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Records & administration', role: 'Facility Administrator', roleKey: 'facility_administrator',     user: 'facadmin.rita',    desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Records & administration', role: 'Org Admin',              roleKey: 'org_admin',                  user: 'org.admin',        desc: 'Mercy Hospital Group',      hospital: '' },
-
-  // 6 ── Sub-national oversight: data aggregates up to county.
-  { group: 'Sub-national oversight',   role: 'County Health Director', roleKey: 'county_health_director',      user: 'county.lopez',     desc: 'County Health Office',      hospital: '' },
-
-  // 7 ── National & platform: MoH reporting and platform administration.
-  { group: 'National & platform',      role: 'Government',             roleKey: 'government',                  user: 'admin',            desc: 'National MoH oversight',    hospital: '' },
-  { group: 'National & platform',      role: 'Super Admin',            roleKey: 'super_admin',                user: 'superadmin',       desc: 'Platform-wide access',      hospital: '' },
-];
-
-type Account = typeof demoAccounts[number];
+const demoAccounts = DEMO_LOGIN_ACCOUNTS;
+type Account = DemoLoginAccount;
 
 const imageForIndex = (i: number) => IMAGE_POOL[i % IMAGE_POOL.length];
 const emailFor = (user: string) => `${user}@tamamhealth.ss`;
@@ -130,30 +61,12 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [demoCreds, setDemoCreds] = useState<Record<string, string>>({});
+  const demoCreds = getDemoPasswordMap();
   // The user the visitor tapped. `null` = show the account list. The string
   // 'manual' = blank, fully-editable form for non-demo / production sign-in.
   const [selected, setSelected] = useState<Account | 'manual' | null>(null);
   const [hospitalId, setHospitalId] = useState('');
   const demoEnabled = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
-
-  // Pull freshly-generated demo passwords from the server (one-time per load).
-  useEffect(() => {
-    if (!demoEnabled) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/demo-credentials', { cache: 'no-store' });
-        if (!res.ok) return;
-        const body = await res.json() as { profiles: { username: string; password: string | null }[] };
-        if (cancelled) return;
-        const map: Record<string, string> = {};
-        for (const p of body.profiles) if (p.password) map[p.username] = p.password;
-        setDemoCreds(map);
-      } catch { /* demo creds are a convenience; fail silently */ }
-    })();
-    return () => { cancelled = true; };
-  }, [demoEnabled]);
 
   useEffect(() => {
     if (isAuthenticated && currentUser) router.push(resolveLandingPage(currentUser.role));
@@ -196,7 +109,7 @@ export default function LoginPage() {
       <div className="tl-loading">
         <div className="tl-loading-mark">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/tamam-icon.svg" alt="" aria-hidden width={40} height={40} />
+          <img src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="" aria-hidden width={40} height={40} />
         </div>
         <p>Redirecting to your dashboard…</p>
         <style jsx>{`
@@ -406,7 +319,7 @@ const sharedStyles = (
     }
     .tl-brand { display: flex; align-items: center; gap: 9px; }
     .tl-brand-logo { height: 30px; width: auto; }
-    .tl-title { font-family: 'DM Sans', Arial, sans-serif; font-size: 28px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); margin: 0; }
+    .tl-title { font-family: var(--font-platform); font-size: 28px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); margin: 0; }
     .tl-subtitle { font-size: 13.5px; color: var(--text-muted); margin: 6px 0 0; }
     .tl-db-banner { margin: 14px 0 0; padding: 8px 12px; font-size: 11.5px; color: ${ACCENT_DEEP}; background: var(--accent-light); border: 1px solid var(--accent-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 
@@ -477,11 +390,11 @@ const sharedStyles = (
     .tl-hero::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--accent-hover) 18%, transparent); }
     .tl-hero-close { position: absolute; top: 18px; right: 18px; z-index: 3; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: none; background: var(--bg-card-solid); color: var(--text-primary); cursor: pointer; box-shadow: none; }
     .tl-hero-close:hover { background: var(--bg-card-solid); }
-    .tl-chip { position: absolute; z-index: 2; backdrop-filter: blur(6px); }
+    .tl-chip { position: absolute; z-index: 2; backdrop-filter: none; }
     .tl-chip-task { top: 64px; left: 34px; background: ${ACCENT}; color: var(--color-white); border-radius: 14px; padding: 11px 15px; box-shadow: none; }
     .tl-chip-title { font-size: 13px; font-weight: 700; }
     .tl-chip-time { font-size: 11.5px; opacity: 0.9; margin-top: 2px; }
-    .tl-week { position: absolute; z-index: 2; right: 30px; bottom: 150px; display: flex; gap: 4px; padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--color-white) 22%, transparent); border: 1px solid color-mix(in srgb, var(--color-white) 45%, transparent); backdrop-filter: blur(10px); }
+    .tl-week { position: absolute; z-index: 2; right: 30px; bottom: 150px; display: flex; gap: 4px; padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--color-white) 22%, transparent); border: 1px solid color-mix(in srgb, var(--color-white) 45%, transparent); backdrop-filter: none; }
     .tl-week-day { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 34px; padding: 4px 0; border-radius: 10px; color: var(--color-white); }
     .tl-week-day.is-on { background: ${ACCENT}; }
     .tl-week-dow { font-size: 10px; font-weight: 600; opacity: 0.85; }

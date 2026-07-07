@@ -226,8 +226,8 @@ export default function MessagingDock() {
       style={{
         right: 20, bottom: 20, width: 372, height: 540, maxHeight: 'calc(100vh - 40px)', maxWidth: 'calc(100vw - 40px)',
         borderRadius: 'var(--card-radius)', border: '1px solid var(--glass-border)',
-        background: 'var(--glass-bg-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
-        boxShadow: 'var(--panel-shadow), var(--glass-highlight)',
+        background: 'var(--glass-bg-strong)',
+        boxShadow: 'none',
       }}
     >
       {/* Header */}
@@ -415,7 +415,7 @@ export default function MessagingDock() {
                 placeholder="Type a message…"
                 rows={1}
                 className="flex-1 resize-none text-[13px] px-3 py-2 rounded-2xl"
-                style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontFamily: "'DM Sans', sans-serif", maxHeight: 96, outline: 'none' }}
+                style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontFamily: "var(--font-platform)", maxHeight: 96, outline: 'none' }}
               />
               <button
                 onClick={handleSend}
@@ -440,7 +440,7 @@ export default function MessagingDock() {
                 onChange={e => setStaffSearch(e.target.value)}
                 placeholder="Search staff…"
                 className="w-full text-[13px] pl-9 pr-3 py-2 rounded-xl"
-                style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontFamily: "'DM Sans', sans-serif", outline: 'none' }}
+                style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontFamily: "var(--font-platform)", outline: 'none' }}
               />
             </div>
           </div>
@@ -473,7 +473,7 @@ export default function MessagingDock() {
                 onChange={e => setConvSearch(e.target.value)}
                 placeholder="Search conversations…"
                 className="w-full text-[13px] pl-9 pr-3 py-2 rounded-xl"
-                style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontFamily: "'DM Sans', sans-serif", outline: 'none' }}
+                style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontFamily: "var(--font-platform)", outline: 'none' }}
               />
             </div>
           </div>

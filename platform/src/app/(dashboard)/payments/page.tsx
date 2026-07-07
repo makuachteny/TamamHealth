@@ -98,7 +98,7 @@ export default function PaymentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [scope]);
+  }, [scope, t]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -685,7 +685,7 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
       }
     })();
     return () => { cancelled = true; };
-  }, [line.patientId]);
+  }, [line.patientId, t]);
 
   const sortedPayments = [...payments].sort((a, b) => (b.processedAt || '').localeCompare(a.processedAt || ''));
   const owing = line.outstanding > 0;
@@ -730,8 +730,8 @@ function PatientBillingDetail({ line, payments, claims, plans, bills, onClose, o
         {/* Balance hero */}
         <div className="px-5 py-4" style={{
           background: owing
-            ? 'linear-gradient(135deg, rgba(196, 69, 54, 0.08) 0%, rgba(228, 168, 75, 0.06) 100%)'
-            : 'linear-gradient(135deg, rgba(27, 158, 119, 0.08) 0%, rgba(33, 145, 208, 0.04) 100%)',
+            ? 'var(--accent-primary)'
+            : 'var(--accent-primary)',
           borderBottom: '1px solid var(--border-light)',
         }}>
           <div className="flex items-end justify-between gap-3 flex-wrap">

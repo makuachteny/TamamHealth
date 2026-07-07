@@ -37,8 +37,8 @@ describe('Patient check-in (P-checkin)', () => {
   });
 
   test('maps acuity to triage priority', async () => {
-    expect((await checkInPatient({ ...base, acuity: 'emergency' })).triage.priority).toBe('RED');
-    expect((await checkInPatient({ ...base, acuity: 'priority' })).triage.priority).toBe('YELLOW');
+    expect((await checkInPatient({ ...base, patientId: 'patient-red', acuity: 'emergency' })).triage.priority).toBe('RED');
+    expect((await checkInPatient({ ...base, patientId: 'patient-yellow', acuity: 'priority' })).triage.priority).toBe('YELLOW');
   });
 
   test('captures vitals and arrival context', async () => {
@@ -76,5 +76,15 @@ describe('Patient check-in (P-checkin)', () => {
     const res = await checkInPatient({ ...base });
     expect(res.appointmentCheckedIn).toBe(false);
     expect(res.triage.status).toBe('pending');
+  });
+
+  test('does not create duplicate same-day active queue entries', async () => {
+    const first = await checkInPatient({ ...base, chiefComplaint: 'Fever' });
+    const second = await checkInPatient({ ...base, chiefComplaint: 'Headache', acuity: 'emergency' });
+    const list = await getTriageByPatient('patient-001');
+
+    expect(second.triage._id).toBe(first.triage._id);
+    expect(list).toHaveLength(1);
+    expect(list[0].chiefComplaint).toBe('Fever');
   });
 });

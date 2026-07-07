@@ -16,7 +16,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Super Admin',
   org_admin: 'Org Admin',
   doctor: 'Doctor',
-  clinical_officer: 'Clinical Officer',
+  clinical_officer: 'Doctor',
   nurse: 'Nurse',
   midwife: 'Midwife',
   lab_tech: 'Lab Technician',

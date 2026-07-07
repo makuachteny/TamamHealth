@@ -6,6 +6,7 @@ import { ClipboardList, X } from '@/components/icons/lucide';
 import AllergyList from './AllergyList';
 import DirectiveList from './DirectiveList';
 import Modal from '@/components/Modal';
+import Badge from '@/components/Badge';
 
 export default function ChartSummaryPanel({
   patient,
@@ -57,7 +58,7 @@ export default function ChartSummaryPanel({
   }
 
   return (
-    <div className="card-elevated lg:col-span-3 lg:order-1 flex flex-col" style={{ overflow: 'hidden', height: 320 }}>
+    <div className="card-elevated chart-summary-panel lg:col-span-3 lg:order-1 flex flex-col" style={{ overflow: 'hidden', height: 320 }}>
       {/* Header */}
       <div className="px-5 py-3 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
         <div className="flex items-center gap-2.5">
@@ -103,8 +104,11 @@ export default function ChartSummaryPanel({
                         </span>
                       )}
                       <span className="truncate" style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</span>
+                      {p.status === 'active' && (
+                        <Badge tone="success" className="flex-shrink-0">active</Badge>
+                      )}
                       {p.status === 'chronic' && (
-                        <span className="flex-shrink-0" style={{ fontSize: 12, color: 'var(--text-muted)' }}>Chronic</span>
+                        <Badge tone="warning" className="flex-shrink-0">chronic</Badge>
                       )}
                     </div>
                   </li>
@@ -119,7 +123,7 @@ export default function ChartSummaryPanel({
           <div style={sectionHeader}>
             <span>Medications</span>
             {currentMeds.length > 0 && (
-              <span style={{ fontSize: 10, fontWeight: 700, background: 'rgba(33,145,208,0.12)', color: '#3B82F6', borderRadius: 10, padding: '1px 7px' }}>{currentMeds.length}</span>
+              <Badge tone="accent">{currentMeds.length}</Badge>
             )}
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-3 scrollbar-none">

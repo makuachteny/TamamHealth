@@ -5,14 +5,22 @@
 html,
 body {
   background: var(--tb-cream-50, #FEFFF9);
-  scroll-behavior: auto;
+  scroll-behavior: smooth;
+  scroll-padding-top: var(--navbar-height, 80px);
 }
 
-*,
-*::before,
-*::after {
-  box-shadow: none !important;
-  text-shadow: none !important;
-  animation: none !important;
-  transition: none !important;
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -21,7 +21,7 @@ export default function TodaysAppointmentsCard({ className = '' }: { className?:
   return (
     <div className={`hero-banner flex flex-col justify-between ${className}`} style={{ minHeight: 188, padding: 22 }}>
       <div className="relative z-[1] flex items-start justify-between">
-        <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 17, color: '#fff' }}>Today&apos;s Appointments</span>
+        <span style={{ fontFamily: "var(--font-platform)", fontWeight: 600, fontSize: 17, color: '#fff' }}>Today&apos;s Appointments</span>
         <button
           onClick={() => router.push('/appointments')}
           className="flex items-center justify-center flex-shrink-0 transition-transform"
@@ -35,12 +35,12 @@ export default function TodaysAppointmentsCard({ className = '' }: { className?:
       {todays.length > 0 ? (
         <>
           <div className="relative z-[1] flex items-end gap-2">
-            <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 56, lineHeight: 1 }}>{todays.length}</span>
-            <span className="mb-2" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>scheduled</span>
+            <span style={{ fontFamily: "var(--font-platform)", fontWeight: 700, fontSize: 56, lineHeight: 1 }}>{todays.length}</span>
+            <span className="mb-2" style={{ fontFamily: "var(--font-platform)", fontWeight: 300, fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>scheduled</span>
           </div>
-          <div className="relative z-[1] flex items-center gap-4" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
+          <div className="relative z-[1] flex items-center gap-4" style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>
             <span className="inline-flex items-center gap-1.5">
-              <span className="rounded-full" style={{ width: 10, height: 10, background: '#34D399' }} /> {arrived} checked in
+              <span className="rounded-full" style={{ width: 10, height: 10, background: 'var(--color-success)' }} /> {arrived} checked in
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="rounded-full" style={{ width: 10, height: 10, background: 'rgba(255,255,255,0.7)' }} /> {waiting} waiting
@@ -48,7 +48,7 @@ export default function TodaysAppointmentsCard({ className = '' }: { className?:
           </div>
         </>
       ) : (
-        <div className="relative z-[1] flex-1 flex items-center" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: 14, color: 'rgba(255,255,255,0.88)' }}>
+        <div className="relative z-[1] flex-1 flex items-center" style={{ fontFamily: "var(--font-platform)", fontWeight: 300, fontSize: 14, color: 'rgba(255,255,255,0.88)' }}>
           No appointments scheduled for today.
         </div>
       )}

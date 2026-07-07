@@ -30,17 +30,11 @@ const RechartsOrgChart = dynamic(
         return (
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart {...commonProps}>
-              <defs>
-                <linearGradient id="orgGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={brandColor} stopOpacity={0.18} />
-                  <stop offset="95%" stopColor={brandColor} stopOpacity={0} />
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
               <XAxis {...xProps} />
               <YAxis tick={{ fontSize: 11, fill: '#888' }} />
               <Tooltip {...tooltipProps} />
-              <Area type="monotone" dataKey="patients" stroke={brandColor} fill="url(#orgGrad)" strokeWidth={2} />
+              <Area type="monotone" dataKey="patients" stroke={brandColor} fill={brandColor} fillOpacity={0.12} strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         );

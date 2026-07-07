@@ -1,6 +1,6 @@
-# TamamHealth Website
+# Tamam Website
 
-Marketing and landing site for TamamHealth Health — the digital health platform for South Sudan.
+Marketing and landing site for Tamam — the digital health platform for hospitals and health systems everywhere, starting in South Sudan.
 
 ## Getting Started
 

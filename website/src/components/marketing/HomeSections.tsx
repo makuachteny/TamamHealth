@@ -137,7 +137,7 @@ export function HomePlatformSection() {
         <Reveal>
           <div className="mk-home-platform-flow">
             <p className="mk-label">The FLOW</p>
-            <div className="mk-home-platform-flow-line" aria-label="TamamHealth workflow from registration to reporting">
+            <div className="mk-home-platform-flow-line" aria-label="Tamam workflow from registration to reporting">
               {PLATFORM_WORKFLOW_STEPS.map((step) => (
                 <span key={step}>{step}</span>
               ))}
@@ -150,7 +150,7 @@ export function HomePlatformSection() {
             <div className="mk-split-image mk-dashboard-showcase">
               <Image
                 src="/assets/Dashboard.png"
-                alt="TamamHealth platform dashboard"
+                alt="Tamam platform dashboard"
                 width={1280}
                 height={740}
                 priority
@@ -158,15 +158,15 @@ export function HomePlatformSection() {
             </div>
             <div className="mk-split-content">
               <h2 className="mk-h2 mk-home-platform-heading">
-                <span>Workflow</span>
+                <span>One patient day</span>
               </h2>
               <p>
-                From the front desk to the ward, every step in TamamHealth links back to the same patient encounter. Clinicians, facility teams, and health leaders can work from cleaner records without duplicating data.
+                Tamam focuses on the work teams repeat every day: register the patient, capture the visit, send orders, dispense medicines, collect payment, and report what happened.
               </p>
               <div className="mk-home-platform-checks">
                 <span>Patient history</span>
                 <span>Facility operations</span>
-                <span>National reporting</span>
+                <span>Cleaner reporting</span>
               </div>
               <Link href="/products#products-grid" className="mk-btn mk-btn-outline-green mk-home-platform-cta">
                 Explore the platform

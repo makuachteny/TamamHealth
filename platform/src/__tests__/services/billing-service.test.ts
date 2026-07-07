@@ -403,7 +403,7 @@ describe('billing-service', () => {
 });
 
 describe('billing-service ↔ ledger reconciliation', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+   
   const { getPatientBalance } = require('@/lib/services/ledger-service');
 
   test('createBill debits the ledger so the patient balance reflects it', async () => {

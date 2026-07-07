@@ -49,10 +49,10 @@ export default function TeamPage() {
       <MarketingHero
         variant="mosaic"
         eyebrow="OUR TEAM"
-        title="The people building TamamHealth"
+        title="The people building Tamam"
         subtitle="A multidisciplinary team building digital health infrastructure for facilities, health workers, patients, and public health leaders."
         image="/assets/team-derby-center.jpg"
-        imageAlt="TamamHealth team"
+        imageAlt="Tamam team"
         imagePriority
         className="mk-hero-team"
       />
@@ -64,7 +64,7 @@ export default function TeamPage() {
               <p className="mk-label">our mission</p>
               <h2 className="mk-h2">One mission, many hands.</h2>
               <p>
-                TamamHealth started with Teny&apos;s firsthand experience of how broken paper records can fail patients. Today, the mission belongs to the whole team: build reliable, offline-ready health technology that helps clinics, hospitals, communities, and governments keep every patient story connected.
+                Tamam started with Teny&apos;s firsthand experience of how broken paper records can fail patients. Today, the mission belongs to the whole team: build reliable, offline-ready health technology that helps clinics, hospitals, communities, and governments keep every patient story connected.
               </p>
             </div>
           </Reveal>
@@ -88,7 +88,7 @@ export default function TeamPage() {
                 <h2 className="mk-h2">Built close to the problem.</h2>
               </div>
               <p>
-                We bring together product, engineering, research, partnerships, and implementation work so TamamHealth is not just software on a screen. Every decision is tested against real clinical workflows, low-connectivity settings, facility operations, and the reporting needs of health systems.
+                We bring together product, engineering, research, partnerships, and implementation work so Tamam is not just software on a screen. Every decision is tested against real clinical workflows, low-connectivity settings, facility operations, and the reporting needs of health systems.
               </p>
             </div>
           </Reveal>
@@ -103,7 +103,7 @@ export default function TeamPage() {
                 <p className="mk-label" style={{ color: "var(--tb-gold-dark)" }}>APRIL 2026</p>
                 <h2 className="mk-h2">$10,000 Healthcare Track Winner</h2>
                 <p className="mk-body" style={{ lineHeight: 1.8 }}>
-                  In April 2026, TamamHealth competed in the Tufts $100K New Ventures Competition, the flagship venture competition at Tufts University hosted by the Derby Entrepreneurship Center.
+                  In April 2026, Tamam competed in the Tufts $100K New Ventures Competition, the flagship venture competition at Tufts University hosted by the Derby Entrepreneurship Center.
                 </p>
                 <p className="mk-body" style={{ marginTop: 16, lineHeight: 1.8 }}>
                   The judges recognized a team building from lived experience, technical discipline, and a clear understanding of why healthcare software must keep working when infrastructure is unreliable.
@@ -112,7 +112,7 @@ export default function TeamPage() {
               <div className="mk-split-image">
                 <Image
                   src="/assets/team-tufts-win.jpg"
-                  alt="TamamHealth team winning $10,000 at Tufts New Ventures Competition 2026"
+                  alt="Tamam team winning $10,000 at Tufts New Ventures Competition 2026"
                   width={600}
                   height={800}
                   style={{ width: "100%", height: "auto", borderRadius: 16 }}

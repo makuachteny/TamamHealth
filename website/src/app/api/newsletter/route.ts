@@ -13,7 +13,7 @@ const isRateLimited = createIpRateLimiter(60 * 60 * 1000, 3);
  */
 async function sendEmail(to: string, subject: string, text: string, html?: string): Promise<boolean> {
   const msg: EmailMessage = { to, subject, text, html };
-  return sendMarketingEmail('newsletter', msg, 'TamamHealth');
+  return sendMarketingEmail('newsletter', msg, 'Tamam');
 }
 
 export async function POST(req: NextRequest) {
@@ -54,19 +54,19 @@ export async function POST(req: NextRequest) {
 
     // Send welcome email to subscriber
     const welcomeText = [
-      'Welcome to the TamamHealth newsletter!',
+      'Welcome to the Tamam newsletter!',
       '',
       "You'll receive updates about our platform, healthcare technology insights, and news from our team.",
       '',
       'Best regards,',
-      'The TamamHealth Team',
+      'The Tamam Team',
     ].join('\n');
     const welcomeHtml = `
-      <h2 style="color: #3B82F6;">Welcome to TamamHealth!</h2>
+      <h2 style="color: #3B82F6;">Welcome to Tamam!</h2>
       <p>Thanks for subscribing to our newsletter. You'll receive updates about our platform, healthcare technology insights, and news from our team.</p>
-      <p>Best regards,<br/>The TamamHealth Team</p>
+      <p>Best regards,<br/>The Tamam Team</p>
     `;
-    await sendEmail(email, 'Welcome to the TamamHealth Newsletter', welcomeText, welcomeHtml);
+    await sendEmail(email, 'Welcome to the Tamam Newsletter', welcomeText, welcomeHtml);
 
     return NextResponse.json({ ok: true });
   } catch (err) {

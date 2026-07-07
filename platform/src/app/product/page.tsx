@@ -28,13 +28,6 @@ function Counter({ end, suffix = "", prefix = "" }: { end: number; suffix?: stri
 
 // ─── DATA ───────────────────────────────────────────────────────
 
-const HERO_STATS = [
-  { value: 90, suffix: "+", label: "product.stat.featuresLabel", sub: "product.stat.featuresSub" },
-  { value: 11, suffix: ".4M", label: "product.stat.peopleLabel", sub: "product.stat.peopleSub" },
-  { value: 8, suffix: "+", label: "product.stat.modulesLabel", sub: "product.stat.modulesSub" },
-  { value: 4, suffix: "+", label: "product.stat.releasesLabel", sub: "product.stat.releasesSub" },
-];
-
 const FEATURE_CATEGORIES = [
   {
     title: "product.feature.configurableTitle",
@@ -319,7 +312,7 @@ export default function ProductPage() {
                 <div className="p-hero__img-col">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/assets/doctor-tablet-smiling.jpg"
+                    src="/assets/patients/doctor-tablet-smiling.jpg"
                     alt="Doctor using TamamHealth on a tablet"
                     className="p-hero__photo"
                   />
@@ -339,7 +332,7 @@ export default function ProductPage() {
                 </Reveal>
 
                 <Reveal delay={0.13}>
-                  <p className="p-hero__green-sub">
+                  <p className="p-hero__sub">
                     We empower hospitals and clinics to deliver better patient care — offline-first,
                     multilingual, and purpose-built for South Sudan&apos;s healthcare realities.
                   </p>
@@ -399,7 +392,7 @@ export default function ProductPage() {
               <Reveal delay={0.1}>
                 <div className="p-recognition__image-wrap">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/assets/doctor-nurse-consultation.jpg" alt="Clinical team using TamamHealth" className="p-recognition__photo" />
+                  <img src="/assets/patients/doctor-nurse-consultation.jpg" alt="Clinical team using TamamHealth" className="p-recognition__photo" />
                 </div>
               </Reveal>
             </div>
@@ -810,7 +803,7 @@ function ShowcaseVisual({ type }: { type: string }) {
   return (
     <div className="p-showcase__visual-wrap">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/assets/african-nurse.jpg" alt={t("product.visual.downloadAlt")} className="p-showcase__photo" />
+      <img src="/assets/patients/african-nurse.jpg" alt={t("product.visual.downloadAlt")} className="p-showcase__photo" />
       <div className="p-showcase__photo-caption">
         <span>{t("product.visual.downloadLabel")}</span> — {t("product.visual.downloadCaption")}
       </div>
@@ -823,8 +816,6 @@ function ShowcaseVisual({ type }: { type: string }) {
 // ═══════════════════════════════════════════════════════════════════
 
 const productCSS = `
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&family=IBM+Plex+Serif:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
-
 :root {
   --p-blue: #3b82f6;
   --p-blue-hover: #1E40AF;
@@ -855,10 +846,10 @@ const productCSS = `
   --p-shadow-lg: none;
   --p-shadow-xl: none;
 
-  --p-font-display: 'IBM Plex Sans', sans-serif;
-  --p-font-body: 'IBM Plex Sans', sans-serif;
-  --p-font-accent: 'IBM Plex Sans', sans-serif;
-  --p-font-mono: 'IBM Plex Mono', monospace;
+  --p-font-display: var(--font-platform);
+  --p-font-body: var(--font-platform);
+  --p-font-accent: var(--font-platform);
+  --p-font-mono: var(--font-platform-mono);
 
   --p-section-pad: clamp(56px, 7vh, 88px);
 }
@@ -988,13 +979,13 @@ a { color: inherit; text-decoration: none; }
   white-space: nowrap;
 }
 .p-btn--demo {
-  background: #22c55e; color: #fff; border: none; border-radius: 999px;
+  background: var(--p-blue); color: #fff; border: none; border-radius: 999px;
   font-family: var(--p-font-accent); font-size: 13px; font-weight: 600;
   padding: 10px 22px; cursor: pointer; text-decoration: none;
   letter-spacing: 0; text-transform: none; transition: background 0.2s;
   white-space: nowrap;
 }
-.p-btn--demo:hover { background: #16a34a; }
+.p-btn--demo:hover { background: #015697; }
 .p-header__actions {
   display: flex; gap: 10px; margin-left: auto; align-items: center; flex-shrink: 0;
 }
@@ -1041,9 +1032,9 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: -0.025em; margin-bottom: 20px; margin-top: 12px;
 }
 .p-hero__title--accent { color: var(--p-blue); -webkit-text-fill-color: initial; background: none; }
-.p-hero__green-sub {
+.p-hero__sub {
   font-size: clamp(15px, 1.2vw, 17px); line-height: 1.7;
-  color: #16a34a; font-weight: 500;
+  color: #015697; font-weight: 500;
   margin-bottom: 32px; max-width: 480px;
 }
 .p-hero__stat-row {
@@ -1186,7 +1177,7 @@ a { color: inherit; text-decoration: none; }
 .p-showcase__photo-caption {
   position: absolute; bottom: 0; left: 0; right: 0;
   padding: 20px; color: #fff;
-  background: linear-gradient(0deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0) 100%);
+  background: var(--bg-card-solid);
   font-size: 13px; line-height: 1.5;
 }
 .p-showcase__photo-caption span {
@@ -1427,7 +1418,7 @@ a { color: inherit; text-decoration: none; }
 
 .p-tour__cta {
   text-align: center; padding: 56px 32px; border-radius: var(--p-radius-xl);
-  background: linear-gradient(135deg, var(--p-blue-pale) 0%, var(--p-blue-light) 100%);
+  background: var(--bg-card-solid);
   border: 1px solid var(--p-blue-light);
 }
 .p-tour__cta h3 {
@@ -1440,7 +1431,7 @@ a { color: inherit; text-decoration: none; }
 .p-final-cta { padding: 0 0 96px; }
 .p-final-cta__inner {
   text-align: center; padding: 88px 48px; border-radius: var(--p-radius-xl);
-  background: linear-gradient(135deg, var(--p-blue) 0%, var(--p-blue-mid) 100%);
+  background: var(--bg-card-solid);
   position: relative; overflow: hidden;
 }
 .p-final-cta__inner::before {

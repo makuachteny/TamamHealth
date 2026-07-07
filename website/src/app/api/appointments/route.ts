@@ -28,7 +28,7 @@ const isRateLimited = createIpRateLimiter(60 * 60 * 1000, 5);
 
 async function sendEmail(to: string, subject: string, text: string, html?: string, replyTo?: string): Promise<boolean> {
   const msg: EmailMessage = { to, subject, text, html, replyTo };
-  return sendMarketingEmail('appointment', msg, 'TamamHealth');
+  return sendMarketingEmail('appointment', msg, 'Tamam');
 }
 
 export async function POST(req: NextRequest) {
@@ -127,15 +127,15 @@ export async function POST(req: NextRequest) {
       schedulingUrl ? `You can finish booking directly here: ${schedulingUrl}` : 'Our team will follow up with a calendar confirmation.',
       '',
       'Best regards,',
-      'The TamamHealth Team',
+      'The Tamam Team',
     ].join('\n');
     const confirmHtml = `
       <p>Hi ${escapeHtml(appointment.name)},</p>
       <p>${appointment.selectedSlot ? `We received your appointment request for ${escapeHtml(appointment.selectedSlot)}.` : 'We received your appointment request.'}</p>
       ${schedulingUrl ? `<p>You can finish booking directly here: <a href="${escapeHtml(schedulingUrl)}">${escapeHtml(schedulingUrl)}</a></p>` : '<p>Our team will follow up with a calendar confirmation.</p>'}
-      <p>Best regards,<br/>The TamamHealth Team</p>
+      <p>Best regards,<br/>The Tamam Team</p>
     `;
-    await sendEmail(appointment.email, 'Your TamamHealth appointment request', confirmText, confirmHtml);
+    await sendEmail(appointment.email, 'Your Tamam appointment request', confirmText, confirmHtml);
 
     return NextResponse.json({
       ok: true,

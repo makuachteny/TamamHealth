@@ -26,7 +26,7 @@ export default function SpotlightCard({
   return (
     <div className={`hero-banner flex flex-col justify-between ${className}`} style={{ minHeight: 188, padding: 22 }}>
       <div className="relative z-[1] flex items-start justify-between">
-        <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 17, color: '#fff' }}>{title}</span>
+        <span style={{ fontFamily: "var(--font-platform)", fontWeight: 600, fontSize: 17, color: '#fff' }}>{title}</span>
         {href && (
           <button
             onClick={() => router.push(href)}
@@ -40,9 +40,9 @@ export default function SpotlightCard({
         )}
       </div>
       <div className="relative z-[1]">
-        <div className="tabular-nums" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 56, lineHeight: 1 }}>{value}</div>
+        <div className="tabular-nums" style={{ fontFamily: "var(--font-platform)", fontWeight: 700, fontSize: 56, lineHeight: 1 }}>{value}</div>
         {caption && (
-          <div className="mt-1.5" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: 13, color: 'rgba(255,255,255,0.88)' }}>{caption}</div>
+          <div className="mt-1.5" style={{ fontFamily: "var(--font-platform)", fontWeight: 300, fontSize: 13, color: 'rgba(255,255,255,0.88)' }}>{caption}</div>
         )}
       </div>
     </div>

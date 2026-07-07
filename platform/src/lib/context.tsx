@@ -75,6 +75,7 @@ interface AppState {
 
 /** localStorage key for persisting the user's sync on/off preference */
 const SYNC_PREFERENCE_KEY = 'tamamhealth.sync.preference';
+const BOOT_DB_TIMEOUT_MS = 2500;
 
 function readSyncPreference(): boolean {
   if (typeof window === 'undefined') return true;
@@ -120,69 +121,87 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Initialize database and check session
   useEffect(() => {
     const init = async () => {
-      // Seed database on first load (client-side only)
-      // In production, seeding only runs if DB is empty (isSeeded check inside seedDatabase)
+      let seedPromise: Promise<void> | null = null;
+      // Seed database on first load (client-side only). Do not hard-block app
+      // boot on the full demo seed; in development and on large seeded
+      // datasets it can take long enough to strand the whole app behind the
+      // loading screen even though server-auth and route rendering are ready.
       try {
         const { seedDatabase } = await import('./db-seed');
-        await seedDatabase();
+        seedPromise = seedDatabase().catch((err) => {
+          console.error('[TamamHealth] Database seed error:', err);
+        });
+        await Promise.race([
+          seedPromise,
+          new Promise<void>((resolve) => {
+            window.setTimeout(() => {
+              console.warn(`[TamamHealth] Database seed exceeded ${BOOT_DB_TIMEOUT_MS}ms; continuing app boot while seed finishes in background.`);
+              resolve();
+            }, BOOT_DB_TIMEOUT_MS);
+          }),
+        ]);
       } catch (err) {
-        console.error('[TamamHealth] Database seed error:', err);
+        console.error('[TamamHealth] Database seed bootstrap error:', err);
+      }
+
+      // Check for an existing server session. The auth token is httpOnly, so
+      // the browser cannot inspect it through document.cookie; /api/auth/me is
+      // the source of truth for refreshes and direct route entry.
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            // Load hospital data if user has a hospitalId
+            let hospital: HospitalDoc | undefined;
+            if (data.user.hospitalId) {
+              try {
+                const { getHospitalById } = await import('./services/hospital-service');
+                const h = await getHospitalById(data.user.hospitalId);
+                if (h) hospital = h;
+              } catch {
+                // OK
+              }
+            }
+
+            // Load organization data
+            let organization: OrganizationDoc | undefined;
+            if (data.user.orgId) {
+              try {
+                const { getOrganizationById } = await import('./services/organization-service');
+                const org = await getOrganizationById(data.user.orgId);
+                if (org) organization = org;
+              } catch {
+                // OK
+              }
+            }
+
+            const { getOrgBranding, brandingToCSSVars } = await import('./branding');
+            const branding = getOrgBranding(organization);
+            const vars = brandingToCSSVars(branding);
+            for (const [key, value] of Object.entries(vars)) {
+              document.documentElement.style.setProperty(key, value);
+            }
+
+            // Apply org language setting
+            if (organization?.locale) {
+              const { initLocaleFromOrg } = await import('./i18n/useTranslation');
+              initLocaleFromOrg(organization.locale);
+            }
+
+            setCurrentUser({ ...data.user, hospital, organization, branding });
+            setIsAuthenticated(true);
+          }
+        }
+      } catch {
+        // Offline - OK
       }
       setDbReady(true);
 
-      // Check for existing session via cookie (skip API call if no cookie)
-      const hasCookie = document.cookie.split(';').some(c => c.trim().startsWith('tamamhealth-token='));
-      if (hasCookie) {
-        try {
-          const res = await fetch('/api/auth/me');
-          if (res.ok) {
-            const data = await res.json();
-            if (data.user) {
-              // Load hospital data if user has a hospitalId
-              let hospital: HospitalDoc | undefined;
-              if (data.user.hospitalId) {
-                try {
-                  const { getHospitalById } = await import('./services/hospital-service');
-                  const h = await getHospitalById(data.user.hospitalId);
-                  if (h) hospital = h;
-                } catch {
-                  // OK
-                }
-              }
-
-              // Load organization data
-              let organization: OrganizationDoc | undefined;
-              if (data.user.orgId) {
-                try {
-                  const { getOrganizationById } = await import('./services/organization-service');
-                  const org = await getOrganizationById(data.user.orgId);
-                  if (org) organization = org;
-                } catch {
-                  // OK
-                }
-              }
-
-              const { getOrgBranding, brandingToCSSVars } = await import('./branding');
-              const branding = getOrgBranding(organization);
-              const vars = brandingToCSSVars(branding);
-              for (const [key, value] of Object.entries(vars)) {
-                document.documentElement.style.setProperty(key, value);
-              }
-
-              // Apply org language setting
-              if (organization?.locale) {
-                const { initLocaleFromOrg } = await import('./i18n/useTranslation');
-                initLocaleFromOrg(organization.locale);
-              }
-
-              setCurrentUser({ ...data.user, hospital, organization, branding });
-              setIsAuthenticated(true);
-            }
-          }
-        } catch {
-          // Offline - OK
-        }
-      }
+      // Ensure the background seed is allowed to finish even after the app is
+      // marked ready. This keeps offline data bootstrapping alive without
+      // freezing the login/dashboard shell.
+      void seedPromise;
     };
 
     init();
@@ -199,8 +218,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Register service worker with a cache-busting version tag so a new
     // deploy forces the browser to fetch and install the new worker instead
-    // of serving stale assets from the previous CACHE_NAME.
-    if ('serviceWorker' in navigator) {
+    // of serving stale assets from the previous CACHE_NAME. Skipped in local
+    // dev — its cache-first strategy for /_next/static/ otherwise serves
+    // stale CSS/JS across reloads and fights the dev server's hot-reload.
+    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       const buildId = process.env.NEXT_PUBLIC_BUILD_ID || 'dev';
       navigator.serviceWorker.register(`/sw.js?v=${buildId}`).catch(() => {});
     }

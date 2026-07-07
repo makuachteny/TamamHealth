@@ -61,19 +61,19 @@ export default function TermsPage() {
               <Reveal>
                 <Section id="acceptance" title="1. Acceptance of Terms">
                   <p>
-                    By accessing or using TamamHealth Technologies&apos; platform (&quot;the Service&quot;), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use the Service.
+                    By accessing or using Tamam Technologies&apos; platform (&quot;the Service&quot;), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use the Service.
                   </p>
                 </Section>
 
                 <Section id="description" title="2. Description of Service">
                   <p>
-                    TamamHealth provides a digital health records platform designed for healthcare providers in Africa. The Service includes electronic health records (EHR), billing and payment tools, telehealth capabilities, analytics, pharmacy and lab management, and related features.
+                    Tamam provides a digital health records platform designed for hospitals and healthcare providers everywhere. The Service includes electronic health records (EHR), billing and payment tools, telehealth capabilities, analytics, pharmacy and lab management, and related features.
                   </p>
                 </Section>
 
                 <Section id="user-accounts" title="3. User Accounts">
                   <p>
-                    You are responsible for maintaining the confidentiality of your account credentials. You agree to notify us immediately of any unauthorized use of your account. TamamHealth is not liable for losses arising from unauthorized access to your account.
+                    You are responsible for maintaining the confidentiality of your account credentials. You agree to notify us immediately of any unauthorized use of your account. Tamam is not liable for losses arising from unauthorized access to your account.
                   </p>
                 </Section>
 
@@ -81,7 +81,7 @@ export default function TermsPage() {
                   <p>
                     Patient health data processed through the Service is handled in accordance with our{" "}
                     <Link href="/privacy" style={{ color: "var(--tb-green)", fontWeight: 600 }}>Privacy Policy</Link>.
-                    TamamHealth implements industry-standard security measures to protect health information. Users are responsible for ensuring their use of the Service complies with applicable local healthcare data regulations.
+                    Tamam implements industry-standard security measures to protect health information. Users are responsible for ensuring their use of the Service complies with applicable local healthcare data regulations.
                   </p>
                 </Section>
 
@@ -93,25 +93,25 @@ export default function TermsPage() {
 
                 <Section id="offline-functionality" title="6. Offline Functionality">
                   <p>
-                    The Service is designed to operate in low-connectivity environments. Data created offline is synchronized when connectivity is restored. TamamHealth is not responsible for data conflicts arising from extended offline usage across multiple devices.
+                    The Service is designed to operate in low-connectivity environments. Data created offline is synchronized when connectivity is restored. Tamam is not responsible for data conflicts arising from extended offline usage across multiple devices.
                   </p>
                 </Section>
 
                 <Section id="payment-terms" title="7. Payment Terms">
                   <p>
-                    Pricing and payment terms are established in your subscription agreement. All fees are non-refundable unless otherwise specified. TamamHealth reserves the right to modify pricing with 30 days&apos; notice.
+                    Pricing and payment terms are established in your subscription agreement. All fees are non-refundable unless otherwise specified. Tamam reserves the right to modify pricing with 30 days&apos; notice.
                   </p>
                 </Section>
 
                 <Section id="liability" title="8. Limitation of Liability">
                   <p>
-                    TamamHealth provides the Service &quot;as is&quot; and &quot;as available.&quot; We do not warrant that the Service will be uninterrupted or error-free. TamamHealth&apos;s liability is limited to the amount paid by you for the Service in the 12 months preceding the claim.
+                    Tamam provides the Service &quot;as is&quot; and &quot;as available.&quot; We do not warrant that the Service will be uninterrupted or error-free. Tamam&apos;s liability is limited to the amount paid by you for the Service in the 12 months preceding the claim.
                   </p>
                 </Section>
 
                 <Section id="termination" title="9. Termination">
                   <p>
-                    Either party may terminate the agreement with 30 days&apos; written notice. Upon termination, TamamHealth will provide a reasonable period for you to export your data. TamamHealth reserves the right to suspend or terminate accounts that violate these terms.
+                    Either party may terminate the agreement with 30 days&apos; written notice. Upon termination, Tamam will provide a reasonable period for you to export your data. Tamam reserves the right to suspend or terminate accounts that violate these terms.
                   </p>
                 </Section>
 

@@ -4,12 +4,9 @@ import Link from "next/link";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact";
 
 /* ═══════════════════════════════════════════════════════════════════
-   TamamHealth Marketing — Footer (Simplified 3-column layout)
+   Tamam Marketing — Footer (Simplified 3-column layout)
    Brand column + 3 link columns + bottom bar
    ═══════════════════════════════════════════════════════════════════ */
-
-// Fundraising entry points are locked off for now. Flip to true to re-enable.
-const SHOW_FUNDRAISING = false;
 
 const SOCIAL_LINKS = [
   {
@@ -56,8 +53,8 @@ export default function MarketingFooter() {
       <div className="mk-container">
         <div className="mk-footer-cta">
           <div>
-            <p>Ready to build connected care?</p>
-            <h2>See how TamamHealth can support clinical care, facility operations, and national reporting from one connected platform.</h2>
+            <p>Ready to see Tamam?</p>
+            <h2>Book a short walkthrough of the clinical workflow, offline record, and facility dashboard.</h2>
           </div>
           <Link href="/about/contact?intent=demo#contact-form" className="mk-footer-cta-button">
             Book a demo
@@ -68,7 +65,7 @@ export default function MarketingFooter() {
         <div className="mk-footer-inner">
           {/* Brand column */}
           <div className="mk-footer-brand">
-            <Link href="/" className="mk-nav-logo" style={{ textDecoration: "none" }} aria-label="TamamHealth — home">
+            <Link href="/" className="mk-nav-logo" style={{ textDecoration: "none" }} aria-label="Tamam — home">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/assets/logos/SVG/Tamam_Style_Guide-33.svg"
@@ -78,13 +75,13 @@ export default function MarketingFooter() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/assets/logos/SVG/Tamam_Style_Guide-31.svg"
-                alt="Tamam Healthcare System"
+                alt="Tamam"
                 className="mk-nav-logo-type"
               />
             </Link>
 
             <p style={{ fontSize: 14, color: "var(--tb-text-sec)", lineHeight: 1.6, margin: 0, maxWidth: 260 }}>
-              Digital health infrastructure for connected care. Offline-first, secure, and built for real facilities.
+              Offline-ready health records for clinics and hospitals moving beyond paper.
             </p>
 
             {/* Social links */}
@@ -101,11 +98,11 @@ export default function MarketingFooter() {
           <div className="mk-footer-links-column">
             <h5 className="mk-footer-column-heading">Platform</h5>
             <nav className="mk-footer-nav">
-              <Link href="/ehr">EHR &amp; Clinical</Link>
-              <Link href="/billing">Billing &amp; Payments</Link>
-              <Link href="/telehealth">Telehealth</Link>
-              <Link href="/analytics">Analytics</Link>
-              <Link href="/pharmacy-lab">Pharmacy &amp; Lab</Link>
+              <Link href="/products">Products</Link>
+              <Link href="/products/hospital">Hospital</Link>
+              <Link href="/products/clinic">Clinic</Link>
+              <Link href="/products/lab">Lab</Link>
+              <Link href="/products/pharmacy">Pharmacy</Link>
               <Link href="/pricing#packages">Pricing</Link>
             </nav>
           </div>
@@ -117,10 +114,6 @@ export default function MarketingFooter() {
               <Link href="/about">Our Story</Link>
               <Link href="/about/team">Team</Link>
               <Link href="/about/contact#contact-form">Contact</Link>
-              {SHOW_FUNDRAISING && (
-                <Link href="/donate" style={{ color: "var(--tb-gold)", fontWeight: 600 }}>Fund Our Pilot</Link>
-              )}
-              <Link href="/case-studies">Case Studies</Link>
             </nav>
           </div>
 
@@ -135,7 +128,7 @@ export default function MarketingFooter() {
 
         {/* Bottom bar */}
         <div className="mk-footer-bottom">
-          <span>Copyright &copy; {new Date().getFullYear()} TamamHealth Technologies</span>
+          <span>Copyright &copy; {new Date().getFullYear()} Tamam Technologies</span>
           <div className="mk-footer-links">
             <Link href="/terms" style={{ color: "inherit", textDecoration: "none" }}>Terms &amp; Conditions</Link>
             <Link href="/privacy" style={{ color: "inherit", textDecoration: "none" }}>Privacy Policy</Link>

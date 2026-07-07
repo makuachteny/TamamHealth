@@ -9,14 +9,14 @@ export function ProductListing() {
       <div className="mk-container">
         <Reveal>
           <div className="mk-section-heading">
-            <h2 className="mk-h2">The workflows TamamHealth connects</h2>
+            <h2 className="mk-h2">Start with the workflow you need</h2>
           </div>
         </Reveal>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 330px), 1fr))",
-            gap: 24,
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
+            gap: 20,
           }}
         >
           {PRODUCT_CARDS.map((product, index) => (
@@ -40,7 +40,7 @@ function ProductListingCard({ product }: { product: (typeof PRODUCT_CARDS)[numbe
         style={{
           background: "var(--tb-cream-50)",
           border: "1px solid var(--tb-cream-300)",
-          borderRadius: 16,
+          borderRadius: 8,
           height: "100%",
           display: "flex",
           flexDirection: "column",
@@ -53,7 +53,7 @@ function ProductListingCard({ product }: { product: (typeof PRODUCT_CARDS)[numbe
           style={{
             position: "relative",
             width: "100%",
-            aspectRatio: "16 / 9",
+            aspectRatio: "4 / 3",
             background: product.bg,
             overflow: "hidden",
           }}
@@ -74,14 +74,14 @@ function ProductListingCard({ product }: { product: (typeof PRODUCT_CARDS)[numbe
           />
         </div>
 
-        <div style={{ padding: "22px 24px 24px", display: "flex", flexDirection: "column", flex: 1 }}>
+        <div style={{ padding: "18px 20px 20px", display: "flex", flexDirection: "column", flex: 1 }}>
           <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6, color: "var(--tb-text-pri)" }}>{product.title}</h3>
-          <p style={{ fontSize: 14, color: product.accent, fontWeight: 600, margin: "0 0 14px" }}>{product.tagline}</p>
-          <p style={{ fontSize: 14.5, color: "var(--tb-text-sec)", lineHeight: 1.55, marginBottom: 16, flex: 1 }}>
+          <p style={{ fontSize: 14, color: product.accent, fontWeight: 700, margin: "0 0 10px" }}>{product.tagline}</p>
+          <p style={{ fontSize: 14.5, color: "var(--tb-text-sec)", lineHeight: 1.5, marginBottom: 14, flex: 1 }}>
             {product.description}
           </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18 }}>
-            {product.modules.slice(0, 6).map((moduleName) => (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+            {product.modules.slice(0, 4).map((moduleName) => (
               <span
                 key={moduleName}
                 style={{
@@ -97,7 +97,7 @@ function ProductListingCard({ product }: { product: (typeof PRODUCT_CARDS)[numbe
                 {moduleName}
               </span>
             ))}
-            {product.modules.length > 6 && (
+            {product.modules.length > 4 && (
               <span
                 style={{
                   fontSize: 11,
@@ -106,7 +106,7 @@ function ProductListingCard({ product }: { product: (typeof PRODUCT_CARDS)[numbe
                   padding: "3px 8px",
                 }}
               >
-                +{product.modules.length - 6} more
+                +{product.modules.length - 4} more
               </span>
             )}
           </div>

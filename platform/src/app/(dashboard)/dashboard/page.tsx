@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import { useApp } from '@/lib/context';
 import TopBar from '@/components/TopBar';
+import EhrClinicalDashboard from '@/components/ehr/EhrClinicalDashboard';
 import {
   Users, AlertTriangle,
   ChevronRight, ChevronLeft, Stethoscope,
@@ -29,10 +30,11 @@ import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useWards } from '@/lib/hooks/useWards';
 import { formatCompactDateTime } from '@/lib/format-utils';
 import { patientFullName, patientAge } from '@/lib/patient-utils';
-import { getDefaultDashboard } from '@/lib/permissions';
+import { getDefaultDashboard, getRoleConfig } from '@/lib/permissions';
 import SuperintendentDashboard from '@/components/dashboards/SuperintendentDashboard';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import PatientAvatar from '@/components/patients/PatientAvatar';
+import type { AppointmentDoc, PatientDoc } from '@/lib/db-types';
 
 const DEPARTMENTS = ['OPD', 'Emergency', 'Maternity', 'Pediatrics', 'Surgery', 'Lab', 'Pharmacy', 'ICU'];
 
@@ -355,6 +357,7 @@ export default function DashboardPage() {
   // Index into the clinician's upcoming-appointments carousel. Declared with the
   // other hooks (above any early return) so hook order is always stable.
   const [apptIndex, setApptIndex] = useState(0);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentDoc | null>(null);
   const apptCarouselRef = useRef<HTMLDivElement>(null);
   const apptScrolling = useRef(false);
   useEffect(() => {
@@ -509,6 +512,7 @@ export default function DashboardPage() {
   // dashboard) by the effect above. Anyone else who isn't a doctor/clinical
   // officer is likewise mid-redirect.
   if (currentUser.role !== 'doctor' && currentUser.role !== 'clinical_officer' && currentUser.role !== 'clinician') return null;
+  const legacyCurrentUser = currentUser as NonNullable<typeof currentUser>;
 
 
 
@@ -569,7 +573,6 @@ export default function DashboardPage() {
 
   // ─── Greeting hero values ───
   const now = new Date();
-  const greeting = now.getHours() < 12 ? 'Good Morning' : now.getHours() < 17 ? 'Good Afternoon' : 'Good Evening';
   const heroDate = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const myReferralsCount = (referrals || []).filter(r => r.createdBy === currentUser._id).length;
   const heroStats = [
@@ -598,10 +601,31 @@ export default function DashboardPage() {
     { label: 'Ward Admission', icon: BedDouble, action: () => { setAdmitDone(false); setAdmitForm2({ patientId: '', wardId: '', diagnosis: '' }); setWardAdmitOpen(true); } },
   ];
 
+  const outstandingItems = [
+    { label: 'Documents to sign', count: signCount, tone: signCount > 0 ? 'warning' as const : 'neutral' as const, href: '/consultation' },
+    { label: 'Phone notes', count: phoneNotesInbox.length, tone: phoneNotesInbox.length > 0 ? 'warning' as const : 'neutral' as const, href: '/messages' },
+    { label: 'Open referrals', count: myReferralsCount, href: '/referrals' },
+    { label: 'Patient intake', count: Math.max(0, assignedRows.length ? Math.min(assignedRows.length, 4) : 0), href: '/patient-intake' },
+    { label: 'Awaiting labs', count: resumableEncounters.length, tone: resumableEncounters.length > 0 ? 'danger' as const : 'neutral' as const, href: '/lab' },
+  ];
+  const canAccessBilling = !!getRoleConfig(currentUser.role)?.allowedRoutes.includes('/payments');
+
   return (
     <>
       {/* Clinical officers don't get the platform-wide search bar on their dashboard. */}
-      <TopBar title={t('nav.dashboard')} hideSearch={currentUser.role === 'clinical_officer'} />
+      <TopBar title={t('nav.dashboard')} hideSearch />
+      <main className="page-container page-enter">
+        <EhrClinicalDashboard
+          clinicianName={currentUser.name || 'clinician'}
+          facilityName={currentUser.hospitalName}
+          patients={assignedRows}
+          appointments={myUpcomingAppts}
+          outstanding={outstandingItems}
+          onUpdateAppointmentStatus={updateApptStatus}
+          canAccessBilling={canAccessBilling}
+        />
+      </main>
+      {false && currentUser && (
       <main className="page-container page-enter">
 
         {/* Clinical alerts moved to a dedicated /alerts page. */}
@@ -633,20 +657,20 @@ export default function DashboardPage() {
               }}
             />
             <div className="relative z-[1] min-w-0">
-              <h2 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 24, lineHeight: 1, letterSpacing: 0 }}>
-                {greeting}{currentUser.name ? ` ${currentUser.name}` : ''}
+              <h2 style={{ fontFamily: "var(--font-platform)", fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0 }}>
+                Welcome{legacyCurrentUser.name ? `, ${legacyCurrentUser.name}` : ''}
               </h2>
               <div className="flex items-center gap-2.5 mt-2.5 flex-wrap">
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: 14, lineHeight: 1, letterSpacing: 0, color: 'rgba(255,255,255,0.9)' }}>
+                <span style={{ fontFamily: "var(--font-platform)", fontWeight: 300, fontSize: 14, lineHeight: 1, letterSpacing: 0, color: 'rgba(255,255,255,0.9)' }}>
                   {heroDate}
                 </span>
-                {currentUser.hospitalName && (
+                {legacyCurrentUser.hospitalName && (
                   <span
                     className="inline-flex items-center gap-2"
-                    style={{ height: 26, padding: '0 12px 0 3px', background: 'transparent', border: '0.5px solid #FEFFF9', borderRadius: 9999, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 12, color: '#fff' }}
+                    style={{ height: 26, padding: '0 12px 0 3px', background: 'transparent', border: '0.5px solid rgba(255,255,255,0.5)', borderRadius: 9999, fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 12, color: '#fff' }}
                   >
-                    <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#90F489', flexShrink: 0, display: 'block' }} />
-                    {currentUser.hospitalName}
+                    <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--color-success)', flexShrink: 0, display: 'block' }} />
+                    {legacyCurrentUser.hospitalName}
                   </span>
                 )}
               </div>
@@ -657,7 +681,7 @@ export default function DashboardPage() {
                   <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.75)' }}>
                     {s.label}
                   </div>
-                  <div className="mt-2 tabular-nums" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 48, lineHeight: 1, letterSpacing: -0.5 }}>
+                  <div className="mt-2 tabular-nums" style={{ fontFamily: "var(--font-platform)", fontWeight: 700, fontSize: 48, lineHeight: 1, letterSpacing: -0.5 }}>
                     {s.value}
                   </div>
                 </div>
@@ -669,7 +693,7 @@ export default function DashboardPage() {
           <div className="dash-card p-4 md:col-span-2 lg:col-span-1 flex flex-col" style={{ minHeight: 224, height: 224 }}>
             {/* Header row */}
             <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
-              <h3 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15, lineHeight: 1, color: 'var(--text-primary)', flexShrink: 0 }}>Patient Satisfaction</h3>
+              <h3 style={{ fontFamily: "var(--font-platform)", fontWeight: 600, fontSize: 15, lineHeight: 1, color: 'var(--text-primary)', flexShrink: 0 }}>Patient Satisfaction</h3>
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 {/* Chart type picker */}
                 {(['line', 'area', 'bar'] as const).map(t => (
@@ -705,40 +729,30 @@ export default function DashboardPage() {
                 {reviewsChartType === 'bar' ? (
                   <BarChart data={reviewsData} margin={{ top: 2, right: 4, left: -26, bottom: 0 }} barCategoryGap="28%">
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
-                    <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'DM Sans' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
-                    <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'DM Sans', paddingTop: 2 }} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-platform)' }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-platform)' }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'var(--font-platform)' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
+                    <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'var(--font-platform)', paddingTop: 2 }} />
                     <Bar dataKey="inpatient" name="Inpatient" fill="#2191D0" radius={[3, 3, 0, 0]} />
                     <Bar dataKey="outpatient" name="Outpatient" fill="#FF7F00" radius={[3, 3, 0, 0]} />
                   </BarChart>
                 ) : reviewsChartType === 'area' ? (
                   <AreaChart data={reviewsData} margin={{ top: 2, right: 4, left: -26, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradIn" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2191D0" stopOpacity={0.18} />
-                        <stop offset="95%" stopColor="#2191D0" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gradOut" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#FF7F00" stopOpacity={0.15} />
-                        <stop offset="95%" stopColor="#FF7F00" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
-                    <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'DM Sans' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
-                    <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'DM Sans', paddingTop: 2 }} />
-                    <Area type="monotone" dataKey="inpatient" name="Inpatient" stroke="#2191D0" strokeWidth={2} fill="url(#gradIn)" dot={false} activeDot={{ r: 4 }} />
-                    <Area type="monotone" dataKey="outpatient" name="Outpatient" stroke="#FF7F00" strokeWidth={2} fill="url(#gradOut)" dot={false} activeDot={{ r: 4 }} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-platform)' }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-platform)' }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'var(--font-platform)' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
+                    <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'var(--font-platform)', paddingTop: 2 }} />
+                    <Area type="monotone" dataKey="inpatient" name="Inpatient" stroke="#2191D0" strokeWidth={2} fill="#2191D0" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
+                    <Area type="monotone" dataKey="outpatient" name="Outpatient" stroke="#FF7F00" strokeWidth={2} fill="#FF7F00" fillOpacity={0.12} dot={false} activeDot={{ r: 4 }} />
                   </AreaChart>
                 ) : (
                   <LineChart data={reviewsData} margin={{ top: 2, right: 4, left: -26, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
-                    <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'DM Sans' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
-                    <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'DM Sans', paddingTop: 2 }} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-platform)' }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[60, 100]} ticks={[60, 70, 80, 90, 100]} tickFormatter={(v: number) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-platform)' }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 11, fontFamily: 'var(--font-platform)' }} formatter={(v: number | undefined) => [(v ?? 0).toFixed(0) + '%', '']} />
+                    <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, fontFamily: 'var(--font-platform)', paddingTop: 2 }} />
                     <Line type="monotone" dataKey="inpatient" name="Inpatient" stroke="#2191D0" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
                     <Line type="monotone" dataKey="outpatient" name="Outpatient" stroke="#FF7F00" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
                   </LineChart>
@@ -759,7 +773,7 @@ export default function DashboardPage() {
                   onClick={() => setWorklistTab('patients')}
                   className="transition-colors focus:outline-none"
                   style={{
-                    fontFamily: "'DM Sans', sans-serif",
+                    fontFamily: "var(--font-platform)",
                     fontWeight: 500,
                     fontSize: 24,
                     lineHeight: '100%',
@@ -780,7 +794,7 @@ export default function DashboardPage() {
                   onClick={() => setWorklistTab('documents')}
                   className="transition-colors focus:outline-none"
                   style={{
-                    fontFamily: "'DM Sans', sans-serif",
+                    fontFamily: "var(--font-platform)",
                     fontWeight: 500,
                     fontSize: 24,
                     lineHeight: '100%',
@@ -1119,7 +1133,7 @@ export default function DashboardPage() {
 
             {/* Fixed header */}
             <div className="relative z-[1] flex items-center justify-between flex-shrink-0" style={{ padding: '14px 16px 0' }}>
-              <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, color: '#fff', lineHeight: 1, letterSpacing: 0 }}>
+              <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, color: '#fff', lineHeight: 1, letterSpacing: 0 }}>
                 Upcoming Appointments
                 {myUpcomingAppts.length > 1 && (
                   <span style={{ marginLeft: 6, fontSize: 13, opacity: 0.6 }}>{apptIndex + 1}/{myUpcomingAppts.length}</span>
@@ -1171,25 +1185,43 @@ export default function DashboardPage() {
               {myUpcomingAppts.length > 0 ? myUpcomingAppts.map((appt) => {
                 const when = new Date(apptKey(appt)).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
                 return (
-                  <div key={appt._id} className="flex-shrink-0 flex flex-col relative"
-                    style={{ width: '100%', scrollSnapAlign: 'start', padding: '10px 16px 16px', zIndex: 1, pointerEvents: 'auto' }}>
+                  <div
+                    key={appt._id}
+                    role="button"
+                    tabIndex={0}
+                    className="flex-shrink-0 flex flex-col relative"
+                    onClick={() => setSelectedAppointment(appt)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedAppointment(appt);
+                      }
+                    }}
+                    style={{ width: '100%', scrollSnapAlign: 'start', padding: '10px 16px 16px', zIndex: 1, pointerEvents: 'auto', cursor: 'pointer' }}
+                  >
                     {/* Patient info — vertically centered */}
                     <div className="flex-1 flex flex-col justify-center">
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 24, color: '#fff', lineHeight: 1, letterSpacing: 0 }}>{appt.patientName}</div>
-                      <div className="mt-1.5" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 400, fontSize: 13, color: 'rgba(255,255,255,0.72)' }}>{when}</div>
+                      <div style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, color: '#fff', lineHeight: 1, letterSpacing: 0 }}>{appt.patientName}</div>
+                      <div className="mt-1.5" style={{ fontFamily: "var(--font-platform)", fontWeight: 400, fontSize: 13, color: 'rgba(255,255,255,0.72)' }}>{when}</div>
                     </div>
                     {/* Actions */}
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => updateApptStatus(appt._id, 'checked_in')}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          updateApptStatus(appt._id, 'checked_in');
+                        }}
                         className="transition-opacity hover:opacity-90"
-                        style={{ background: '#fff', color: 'var(--text-primary)', fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 12, padding: '7px 18px', borderRadius: 999 }}
+                        style={{ background: '#fff', color: 'var(--text-primary)', fontFamily: "var(--font-platform)", fontWeight: 600, fontSize: 12, padding: '7px 18px', borderRadius: 999 }}
                       >
                         Check In
                       </button>
                       <button
-                        onClick={() => router.push(`/patients/${appt.patientId}`)}
-                        style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)', fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 12 }}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          router.push(`/patients/${appt.patientId}`);
+                        }}
+                        style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)', fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 12 }}
                       >
                         Open Patient Record
                       </button>
@@ -1198,7 +1230,7 @@ export default function DashboardPage() {
                 );
               }) : (
                 <div className="flex-shrink-0 flex items-center relative z-[1]" style={{ width: '100%', padding: '12px 16px 16px' }}>
-                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 400, fontSize: 14, color: 'rgba(255,255,255,0.72)' }}>No upcoming appointments scheduled.</div>
+                  <div style={{ fontFamily: "var(--font-platform)", fontWeight: 400, fontSize: 14, color: 'rgba(255,255,255,0.72)' }}>No upcoming appointments scheduled.</div>
                 </div>
               )}
             </div>
@@ -1795,7 +1827,166 @@ export default function DashboardPage() {
           )}
         </ModalOverlay>
 
+        {selectedAppointment && (() => {
+          const appointment = selectedAppointment as AppointmentDoc;
+          return (
+          <>
+            <button
+              type="button"
+              className="appointment-detail-backdrop"
+              aria-label="Close appointment details"
+              onClick={() => setSelectedAppointment(null)}
+            />
+            <DashboardAppointmentDrawer
+              appointment={appointment}
+              patient={patients.find(patient => patient._id === appointment.patientId)}
+              onClose={() => setSelectedAppointment(null)}
+              onOpenPatient={() => {
+                const patientId = appointment.patientId;
+                setSelectedAppointment(null);
+                router.push(`/patients/${patientId}`);
+              }}
+              onCheckIn={() => {
+                const appointmentId = appointment._id;
+                setSelectedAppointment(null);
+                updateApptStatus(appointmentId, 'checked_in');
+              }}
+              onOpenSchedule={() => {
+                setSelectedAppointment(null);
+                router.push('/appointments');
+              }}
+            />
+          </>
+          );
+        })()}
+
       </main>
+      )}
     </>
   );
+}
+
+function DashboardAppointmentDrawer({
+  appointment,
+  patient,
+  onClose,
+  onOpenPatient,
+  onCheckIn,
+  onOpenSchedule,
+}: {
+  appointment: AppointmentDoc;
+  patient?: PatientDoc;
+  onClose: () => void;
+  onOpenPatient: () => void;
+  onCheckIn: () => void;
+  onOpenSchedule: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<'visit' | 'financial'>('visit');
+  const visitRows = [
+    { label: 'Patient Phone', value: appointment.patientPhone || patient?.phone || 'Not recorded' },
+    { label: 'Date', value: dashboardFormatDate(appointment.appointmentDate) },
+    { label: 'Time', value: dashboardAppointmentTimeRange(appointment) },
+    { label: 'Duration', value: `${appointment.duration} minutes` },
+    { label: 'Provider', value: appointment.providerName || 'Unassigned' },
+    { label: 'Department', value: appointment.department || 'Not assigned' },
+    { label: 'Visit Type', value: dashboardReadable(appointment.appointmentType) },
+    { label: 'Visit Reason', value: appointment.reason || 'Not recorded' },
+    { label: 'Facility', value: appointment.facilityName || 'Not assigned' },
+    { label: 'Reminder', value: appointment.reminderSent ? `Sent${appointment.reminderChannel ? ` by ${appointment.reminderChannel}` : ''}` : 'Not sent' },
+    { label: 'Recurring', value: appointment.isRecurring ? dashboardReadable(appointment.recurrencePattern || 'recurring') : 'No' },
+    ...(appointment.notes ? [{ label: 'Notes', value: appointment.notes }] : []),
+  ];
+  const financialRows = [
+    { label: 'Balance', value: '$0.00' },
+    { label: 'Charge', value: appointment.status === 'completed' ? 'Ready for charge capture' : 'Charge not started' },
+    { label: 'Payment Responsibility', value: 'Not recorded' },
+    { label: 'Insurance', value: 'Not recorded' },
+    { label: 'Claim Status', value: 'Not started' },
+    { label: 'Booked By', value: appointment.bookedByName || appointment.bookedBy || 'Not recorded' },
+    { label: 'Facility', value: appointment.facilityName || 'Not assigned' },
+    { label: 'Facility Level', value: dashboardReadable(appointment.facilityLevel) },
+    { label: 'Patient Intake', value: appointment.reminderSent ? 'Sent to patient' : 'Not sent to patient' },
+  ];
+  const detailRows = activeTab === 'visit' ? visitRows : financialRows;
+
+  return (
+    <aside className="appointment-detail-sidebar" aria-label="Appointment details" role="dialog" aria-modal="true">
+      <div className="appointment-detail-sidebar__header">
+        <button type="button" className="appointment-detail-sidebar__back" onClick={onClose} aria-label="Close appointment details">
+          <ChevronLeft size={22} />
+        </button>
+        <div className="appointment-detail-sidebar__title">
+          <h2>{dashboardAppointmentTimeRange(appointment)}</h2>
+          <button type="button" onClick={onOpenPatient}>{appointment.patientName}</button>
+          <p>{patient ? `${patientAge(patient)} · ${patient.gender || 'Sex not recorded'}` : appointment.patientPhone || 'Patient details not loaded'}</p>
+          <div className="appointment-detail-sidebar__status">
+            <span>{dashboardReadable(appointment.status)}</span>
+            <span>{dashboardReadable(appointment.priority)}</span>
+          </div>
+        </div>
+        <button type="button" className="appointment-detail-sidebar__close" onClick={onClose} aria-label="Close appointment details">
+          <X size={16} />
+        </button>
+      </div>
+
+      <div className="appointment-detail-sidebar__tabs" role="tablist" aria-label="Appointment detail sections">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'visit'}
+          className={activeTab === 'visit' ? 'active' : undefined}
+          onClick={() => setActiveTab('visit')}
+        >
+          Visit Information
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'financial'}
+          className={activeTab === 'financial' ? 'active' : undefined}
+          onClick={() => setActiveTab('financial')}
+        >
+          Financial Information
+        </button>
+      </div>
+
+      <div className="appointment-detail-sidebar__body" role="tabpanel">
+        {detailRows.map(row => (
+          <DashboardDetailRow key={row.label} label={row.label} value={row.value} />
+        ))}
+      </div>
+
+      <div className="appointment-detail-sidebar__actions">
+        <button type="button" className="btn btn-primary btn-sm" onClick={onOpenPatient}>Open patient record</button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={onCheckIn}>Check in</button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={onOpenSchedule}>Open schedule</button>
+      </div>
+    </aside>
+  );
+}
+
+function DashboardDetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="appointment-detail-row">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function dashboardAppointmentTimeRange(appointment: AppointmentDoc) {
+  const start = appointment.appointmentTime || '00:00';
+  if (appointment.endTime) return `${start} - ${appointment.endTime}`;
+  return `${start} · ${appointment.duration}m`;
+}
+
+function dashboardFormatDate(date: string) {
+  const parsed = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return parsed.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: '2-digit', year: 'numeric' });
+}
+
+function dashboardReadable(value?: string) {
+  if (!value) return 'Not recorded';
+  return value.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
 }

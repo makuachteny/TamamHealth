@@ -181,7 +181,7 @@ export default function PatientPortalPage() {
 
         {/* ── Welcome Banner ───────────────────────────────── */}
         <div style={{
-          background: 'linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #3b82f6 100%)',
+          background: 'var(--accent-primary)',
           borderRadius: 'var(--card-radius)', padding: '28px 32px', marginBottom: 24,
           position: 'relative', overflow: 'hidden',
         }}>
@@ -270,7 +270,7 @@ export default function PatientPortalPage() {
                             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{bill.description}</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono, monospace)' }}>{bill.id}</span>
+                            <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'var(--font-platform-mono)' }}>{bill.id}</span>
                             <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{new Date(bill.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                           </div>
                         </div>
@@ -354,7 +354,7 @@ export default function PatientPortalPage() {
                     }}
                     style={{
                       width: '100%', padding: '12px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: 'linear-gradient(135deg, #3b82f6, #3FA9C9)', color: '#fff',
+                      background: 'var(--accent-primary)', color: '#fff',
                       fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                   >
@@ -501,7 +501,7 @@ export default function PatientPortalPage() {
               disabled={!paymentMethod || !paymentAmount}
               style={{
                 width: '100%', padding: '14px 24px', borderRadius: 10, border: 'none', cursor: paymentMethod ? 'pointer' : 'not-allowed',
-                background: paymentMethod ? 'linear-gradient(135deg, #3b82f6, #3FA9C9)' : 'var(--border-light)',
+                background: paymentMethod ? 'var(--accent-primary)' : 'var(--border-light)',
                 color: paymentMethod ? '#fff' : 'var(--text-muted)',
                 fontSize: '0.9375rem', fontWeight: 700, transition: 'all 0.15s',
               }}
@@ -564,7 +564,7 @@ export default function PatientPortalPage() {
                       {method.instructions.split('\n').map((line, i) => (
                         <div key={i} style={{
                           fontSize: '0.8125rem', color: 'var(--text-primary)', lineHeight: 1.8,
-                          fontFamily: line.includes(':') ? 'var(--font-mono, monospace)' : 'inherit',
+                          fontFamily: line.includes(':') ? 'var(--font-platform-mono)' : 'inherit',
                         }}>
                           {line}
                         </div>
@@ -580,7 +580,7 @@ export default function PatientPortalPage() {
                     }}>
                       <div>
                         <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginBottom: 2 }}>{t('lab.reference')}</div>
-                        <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono, monospace)' }}>
+                        <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-platform-mono)' }}>
                           {selectedBill.id}
                         </div>
                       </div>
@@ -601,7 +601,7 @@ export default function PatientPortalPage() {
                       onClick={handleCompletePayment}
                       style={{
                         width: '100%', padding: '14px 24px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                        background: `linear-gradient(135deg, ${method.color}, ${method.color}CC)`,
+                        background: `var(--accent-primary)`,
                         color: '#fff', fontSize: '0.9375rem', fontWeight: 700,
                       }}
                     >
@@ -644,7 +644,7 @@ export default function PatientPortalPage() {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('lab.reference')}</span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono, monospace)' }}>{selectedBill?.id}</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-platform-mono)' }}>{selectedBill?.id}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('portal.amount')}</span>

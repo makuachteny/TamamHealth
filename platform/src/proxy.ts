@@ -12,6 +12,7 @@ import {
   hasRoleRouteConfig,
   isPathAllowed,
 } from './lib/role-routes';
+import { IDLE_ACTIVITY_COOKIE_NAME, IDLE_TIMEOUT_MS, isIdleExpired } from './lib/session-idle';
 
 // NOTE: The authoritative token-revocation check (lib/token-blacklist.ts)
 // uses node:fs and therefore can't run in this Edge-runtime proxy.
@@ -44,6 +45,17 @@ const CSRF_EXEMPT_API_PATHS = new Set<string>([
 // check above still guards it against cross-site abuse.
 function isCheckoutApiPath(pathname: string): boolean {
   return pathname === '/api/checkout' || pathname.startsWith('/api/checkout/');
+}
+
+/** Slides the idle-timeout window forward on every authenticated request. */
+function refreshIdleCookie(response: NextResponse, now: number): void {
+  response.cookies.set(IDLE_ACTIVITY_COOKIE_NAME, String(now), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: IDLE_TIMEOUT_MS / 1000,
+    path: '/',
+  });
 }
 
 function isCsrfExemptApiPath(pathname: string): boolean {
@@ -269,6 +281,20 @@ export async function proxy(request: NextRequest) {
   const role = payload.role;
   const userId = payload.sub;
 
+  // Idle-session timeout — see lib/session-idle.ts. Ends the session after
+  // IDLE_TIMEOUT_MS of no authenticated requests, independent of the JWT's
+  // fixed 8h expiry.
+  const now = Date.now();
+  if (isIdleExpired(request.cookies.get(IDLE_ACTIVITY_COOKIE_NAME)?.value, now)) {
+    const resp = pathname.startsWith('/api/')
+      ? NextResponse.json({ error: 'Session expired due to inactivity' }, { status: 401 })
+      : NextResponse.redirect(new URL('/login', request.url));
+    resp.cookies.set('tamamhealth-token', '', { maxAge: 0, path: '/' });
+    resp.cookies.set(IDLE_ACTIVITY_COOKIE_NAME, '', { maxAge: 0, path: '/' });
+    logRequest(request, resp, userId, role, Date.now() - startTime);
+    return resp;
+  }
+
   // CSRF defence layer 2: HMAC-bound double-submit token. For any
   // state-changing API request (POST/PUT/PATCH/DELETE) we require both:
   //   - the X-CSRF-Token header,
@@ -316,11 +342,13 @@ export async function proxy(request: NextRequest) {
     const resp = NextResponse.redirect(
       new URL(getDefaultDashboard(role), request.url),
     );
+    refreshIdleCookie(resp, now);
     logRequest(request, resp, userId, role, Date.now() - startTime);
     return resp;
   }
 
   const response = NextResponse.next();
+  refreshIdleCookie(response, now);
 
   // Lazy-mint the CSRF cookie if a valid session is missing one (e.g. a user
   // upgraded across the deploy that introduced this defence, or their cookie

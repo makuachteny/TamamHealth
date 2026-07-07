@@ -19,6 +19,7 @@ import { useProblems } from '@/lib/hooks/useProblems';
 import { useToast } from '@/components/Toast';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import Badge, { type BadgeTone } from '@/components/Badge';
 import type { ProblemStatus, ProblemDoc } from '@/lib/db-types';
 
 interface ProblemListProps {
@@ -26,11 +27,16 @@ interface ProblemListProps {
   patientName?: string;
 }
 
-const STATUS_TINT: Record<ProblemStatus, { bg: string; color: string; ring: string; label: string }> = {
-  active:   { bg: 'rgba(196,69,54,0.10)',  color: 'var(--tamamhealth-red)', ring: 'rgba(196,69,54,0.20)', label: 'Active' },
-  chronic:  { bg: 'rgba(124,58,237,0.10)', color: '#6D28D9',                ring: 'rgba(124,58,237,0.22)', label: 'Chronic' },
-  inactive: { bg: 'rgba(100,116,139,0.10)',color: '#475569',                ring: 'rgba(100,116,139,0.22)', label: 'Inactive' },
-  resolved: { bg: 'rgba(31, 157, 111,0.10)', color: '#047857',                ring: 'rgba(31, 157, 111,0.22)', label: 'Resolved' },
+// Problem status → semantic tone, matching the mockup's Chart Summary
+// "Problems" pill colors (active = green, chronic = amber) and extended
+// consistently to this fuller status set: inactive/resolved read as calm
+// neutral-gray (no longer needing clinical attention). Ring/bg/color all
+// derive from the shared clinical tokens so this stays in sync with Badge.
+const STATUS_TINT: Record<ProblemStatus, { tone: BadgeTone; bg: string; color: string; ring: string; label: string }> = {
+  active:   { tone: 'success', bg: 'var(--color-success-bg)', color: 'var(--color-success-text)', ring: 'color-mix(in srgb, var(--color-success) 25%, transparent)', label: 'Active' },
+  chronic:  { tone: 'warning', bg: 'var(--color-warning-bg)', color: 'var(--color-warning-text)', ring: 'color-mix(in srgb, var(--color-warning) 28%, transparent)', label: 'Chronic' },
+  inactive: { tone: 'neutral', bg: 'var(--overlay-subtle)',   color: 'var(--text-secondary)',     ring: 'var(--border-medium)',                                      label: 'Inactive' },
+  resolved: { tone: 'neutral', bg: 'var(--overlay-subtle)',   color: 'var(--text-secondary)',     ring: 'var(--border-medium)',                                      label: 'Resolved' },
 };
 
 function ProblemRow({
@@ -141,12 +147,9 @@ function ProblemRow({
           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             {problem.name}
           </span>
-          <span
-            className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
-            style={{ background: tint.bg, color: tint.color, letterSpacing: '0.06em' }}
-          >
+          <Badge tone={tint.tone} uppercase>
             {t(`problemList.status_${problem.status}`)}
-          </span>
+          </Badge>
           {problem.icd11Code && (
             <span
               className="text-[10.5px] font-medium"
@@ -167,7 +170,7 @@ function ProblemRow({
           </div>
         )}
         {problem.resolvedDate && (
-          <div className="mt-1 text-[11px]" style={{ color: '#047857' }}>
+          <div className="mt-1 text-[11px]" style={{ color: 'var(--color-success-text)' }}>
             {t('problemList.resolvedPrefix', { date: problem.resolvedDate })}
           </div>
         )}
@@ -186,7 +189,7 @@ function ProblemRow({
         <button
           onClick={() => onResolve(problem._id)}
           className="text-xs font-bold inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-emerald-50 transition"
-          style={{ color: '#047857' }}
+          style={{ color: 'var(--color-success-text)' }}
         >
           <CheckCircle2 className="w-3.5 h-3.5" /> {t('problemList.resolve')}
         </button>

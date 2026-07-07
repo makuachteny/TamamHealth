@@ -55,11 +55,13 @@ export function ProductModuleGrid({ eyebrow, heading, modules, columns = 3 }: {
   modules: ProductModule[];
   columns?: 2 | 3 | 4;
 }) {
+  const visibleModules = modules.slice(0, Math.min(modules.length, 6));
+
   return (
-    <section className="mk-section mk-section-white">
+    <section className="mk-section mk-section-white mk-product-compact-section">
       <div className="mk-container">
         <Reveal>
-          <div style={{ textAlign: "center", maxWidth: 720, margin: "0 auto 56px" }}>
+          <div style={{ textAlign: "center", maxWidth: 660, margin: "0 auto 32px" }}>
             {eyebrow && <p className="mk-label" style={{ marginBottom: 12 }}>{eyebrow}</p>}
             <h2 className="mk-h2">{heading}</h2>
           </div>
@@ -68,18 +70,18 @@ export function ProductModuleGrid({ eyebrow, heading, modules, columns = 3 }: {
           style={{
             display: "grid",
             gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${columns === 4 ? 220 : columns === 2 ? 320 : 260}px), 1fr))`,
-            gap: 20,
+            gap: 14,
           }}
           className="mk-module-grid"
         >
-          {modules.map((m, i) => (
+          {visibleModules.map((m, i) => (
             <Reveal key={m.title} delay={i * 0.04}>
               <div
                 style={{
                   background: "var(--tb-cream-50)",
                   border: "1px solid var(--tb-cream-300)",
-                  borderRadius: 12,
-                  padding: "22px 22px 24px",
+                  borderRadius: 8,
+                  padding: "16px 18px",
                   height: "100%",
                 }}
               >
@@ -96,7 +98,7 @@ export function ProductModuleGrid({ eyebrow, heading, modules, columns = 3 }: {
                   </div>
                 )}
                 <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: "var(--tb-text-pri)" }}>{m.title}</h3>
-                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", lineHeight: 1.55, margin: 0 }}>{m.description}</p>
+                <p style={{ fontSize: 14, color: "var(--tb-text-sec)", lineHeight: 1.45, margin: 0 }}>{m.description}</p>
               </div>
             </Reveal>
           ))}
@@ -117,11 +119,13 @@ export function ProductBenefits({ eyebrow, heading, benefits, accentColor = "var
   benefits: ProductBenefit[];
   accentColor?: string;
 }) {
+  const visibleBenefits = benefits.slice(0, Math.min(benefits.length, 3));
+
   return (
-    <section className="mk-section mk-section-cream">
+    <section className="mk-section mk-section-cream mk-product-compact-section">
       <div className="mk-container">
         <Reveal>
-          <div style={{ textAlign: "center", maxWidth: 720, margin: "0 auto 56px" }}>
+          <div style={{ textAlign: "center", maxWidth: 660, margin: "0 auto 32px" }}>
             {eyebrow && <p className="mk-label" style={{ color: accentColor, marginBottom: 12 }}>{eyebrow}</p>}
             <h2 className="mk-h2">{heading}</h2>
           </div>
@@ -130,10 +134,10 @@ export function ProductBenefits({ eyebrow, heading, benefits, accentColor = "var
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
-            gap: 24,
+            gap: 20,
           }}
         >
-          {benefits.map((b, i) => (
+          {visibleBenefits.map((b, i) => (
             <Reveal key={b.title} delay={i * 0.04}>
               <div style={{ position: "relative", paddingLeft: 28 }}>
                 <span
@@ -148,7 +152,7 @@ export function ProductBenefits({ eyebrow, heading, benefits, accentColor = "var
                   <Check size={11} strokeWidth={1.8} />
                 </span>
                 <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8, color: "var(--tb-text-pri)" }}>{b.title}</h3>
-                <p style={{ fontSize: 14.5, color: "var(--tb-text-sec)", lineHeight: 1.6, margin: 0 }}>{b.description}</p>
+                <p style={{ fontSize: 14.5, color: "var(--tb-text-sec)", lineHeight: 1.5, margin: 0 }}>{b.description}</p>
               </div>
             </Reveal>
           ))}
@@ -262,6 +266,7 @@ export function ProductIllustration({
       <div className="mk-product-photo-caption">
         <span>{visual.label}</span>
         <strong>{visual.detail}</strong>
+        <small>Photo placeholder. Real doctors using Tamam will replace this.</small>
       </div>
     </div>
   );

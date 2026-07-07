@@ -154,9 +154,9 @@ export default function DHIS2ExportPage() {
           disabled={syncing}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
           style={{
-            background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #3b82f6, #1E40AF)',
+            background: syncing ? 'var(--overlay-medium)' : 'var(--accent-primary)',
             color: syncing ? 'var(--text-muted)' : '#fff',
-            boxShadow: syncing ? 'none' : '0 4px 12px rgba(33, 145, 208, 0.3)',
+            boxShadow: 'none',
           }}
         >
           <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
@@ -348,8 +348,8 @@ export default function DHIS2ExportPage() {
               disabled={syncing}
               className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all"
               style={{
-                background: 'linear-gradient(135deg, #3b82f6, #1E40AF)',
-                boxShadow: '0 4px 12px rgba(33, 145, 208, 0.3)',
+                background: 'var(--accent-primary)',
+                boxShadow: 'none',
               }}
             >
               <Upload className="w-4 h-4" />

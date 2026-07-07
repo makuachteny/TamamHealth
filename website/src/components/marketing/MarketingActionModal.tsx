@@ -21,7 +21,7 @@ type ModalConfig = {
 const MODAL_CONFIG: Record<MarketingIntent, ModalConfig> = {
   demo: {
     eyebrow: "Book a demo",
-    title: "See TamamHealth around your facility workflow",
+    title: "See Tamam around your facility workflow",
     description: "Share a few details and the team will follow up with a walkthrough shaped around your clinic, hospital, or program.",
     subject: "Demo request",
     submitLabel: "Request demo",
@@ -42,7 +42,7 @@ const MODAL_CONFIG: Record<MarketingIntent, ModalConfig> = {
     fullPageLabel: "View pricing details",
   },
   contact: {
-    eyebrow: "Contact TamamHealth",
+    eyebrow: "Contact Tamam",
     title: "Send the team a message",
     description: "Use this for partnerships, pilots, support questions, press, or product feedback.",
     subject: "Website contact request",
@@ -217,7 +217,7 @@ export function MarketingActionModalButton({
                     </label>
                     <label className="mk-action-modal-field mk-action-modal-field-wide">
                       <span>City or country</span>
-                      <input name="location" autoComplete="address-level2" placeholder="Juba, South Sudan" />
+                      <input name="location" autoComplete="address-level2" placeholder="City or country" />
                     </label>
                     <label className="mk-action-modal-field mk-action-modal-field-wide">
                       <span>What should we know?</span>

@@ -62,7 +62,7 @@ export default function ChartCard({
         style={{ borderBottom: '1px solid var(--border-light)' }}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <h3 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', letterSpacing: -0.2, lineHeight: 1 }}>
+          <h3 style={{ fontFamily: "var(--font-platform)", fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', letterSpacing: -0.2, lineHeight: 1 }}>
             {title}
           </h3>
           {subtitle && (
@@ -83,7 +83,7 @@ export default function ChartCard({
                 borderRadius: 6,
                 border: 'none',
                 cursor: 'pointer',
-                fontFamily: "'DM Sans', sans-serif",
+                fontFamily: "var(--font-platform)",
                 background: chartType === t ? 'var(--accent-primary)' : 'var(--overlay-subtle)',
                 color: chartType === t ? '#fff' : 'var(--text-muted)',
                 transition: 'background 0.15s, color 0.15s',
@@ -109,7 +109,7 @@ export default function ChartCard({
                 padding: '3px 8px',
                 cursor: 'pointer',
                 outline: 'none',
-                fontFamily: "'DM Sans', sans-serif",
+                fontFamily: "var(--font-platform)",
               }}
             >
               {periods.map(p => (
@@ -135,7 +135,7 @@ export const tooltipStyle = {
     border: '1px solid var(--border-light)',
     borderRadius: 8,
     fontSize: 12,
-    fontFamily: "'DM Sans', sans-serif",
+    fontFamily: "var(--font-platform)",
     boxShadow: 'none',
   },
   cursor: { stroke: 'var(--border-light)', strokeWidth: 1 },
@@ -145,21 +145,14 @@ export const tooltipStyle = {
 export const axisTick = {
   fontSize: 11,
   fill: 'var(--text-muted)' as string,
-  fontFamily: "'DM Sans', sans-serif",
+  fontFamily: "var(--font-platform)",
 };
 
-/** Gradient defs for area charts — drop inside <defs> in an <AreaChart> */
+/** Flat area chart placeholder kept for existing chart call sites. */
 export function AreaGradients({ id1 = 'grad1', id2 = 'grad2', color1 = 'var(--accent-primary)', color2 = 'var(--color-warning)' }) {
-  return (
-    <defs>
-      <linearGradient id={id1} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="5%" stopColor={color1} stopOpacity={0.18} />
-        <stop offset="95%" stopColor={color1} stopOpacity={0} />
-      </linearGradient>
-      <linearGradient id={id2} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="5%" stopColor={color2} stopOpacity={0.15} />
-        <stop offset="95%" stopColor={color2} stopOpacity={0} />
-      </linearGradient>
-    </defs>
-  );
+  void id1;
+  void id2;
+  void color1;
+  void color2;
+  return null;
 }

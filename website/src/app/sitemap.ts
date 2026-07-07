@@ -3,10 +3,9 @@ import type { MetadataRoute } from 'next';
 /**
  * /sitemap.xml — generated at build time by Next.js' file convention.
  *
- * Lists every static marketing route the site currently ships. Dynamic
- * pages (e.g. `/case-studies/[slug]`) are not enumerated here because we
- * don't yet have a programmatic source of slugs; add them once the
- * case-study CMS lands.
+ * Lists every static marketing route the site currently ships. Keep this
+ * intentionally small until the public content library contains
+ * verified, customer-approved stories and documentation.
  *
  * Set `NEXT_PUBLIC_SITE_URL` in production to point at the canonical host;
  * otherwise the default `https://tamamhealth.org` is used.
@@ -25,24 +24,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/products/clinic', priority: 0.8, changeFrequency: 'monthly' },
     { path: '/products/lab', priority: 0.8, changeFrequency: 'monthly' },
     { path: '/products/pharmacy', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/products/radiology', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/products/feedback', priority: 0.7, changeFrequency: 'monthly' },
-    { path: '/ehr', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/billing', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/telehealth', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/analytics', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/pharmacy-lab', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/patient-experience', priority: 0.7, changeFrequency: 'monthly' },
     { path: '/pricing', priority: 0.9, changeFrequency: 'monthly' },
-    { path: '/case-studies', priority: 0.7, changeFrequency: 'monthly' },
     { path: '/about', priority: 0.7, changeFrequency: 'monthly' },
     { path: '/about/team', priority: 0.6, changeFrequency: 'monthly' },
-    { path: '/about/careers', priority: 0.6, changeFrequency: 'monthly' },
     { path: '/about/contact', priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/resources/blog', priority: 0.6, changeFrequency: 'weekly' },
-    { path: '/resources/case-studies', priority: 0.5, changeFrequency: 'monthly' },
-    { path: '/resources/help-center', priority: 0.5, changeFrequency: 'monthly' },
-    { path: '/resources/api-docs', priority: 0.4, changeFrequency: 'monthly' },
     { path: '/privacy', priority: 0.3, changeFrequency: 'yearly' },
     { path: '/terms', priority: 0.3, changeFrequency: 'yearly' },
   ];

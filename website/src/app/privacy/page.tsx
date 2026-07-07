@@ -62,7 +62,7 @@ export default function PrivacyPage() {
               <Reveal>
                 <Section id="introduction" title="Introduction">
                   <p>
-                    TamamHealth Technologies (&quot;TamamHealth,&quot; &quot;we,&quot; &quot;our&quot;) is committed to protecting the privacy and security of your personal and health information. This Privacy Policy describes how we collect, use, store, and share data when you use our digital health platform.
+                    Tamam Technologies (&quot;Tamam,&quot; &quot;we,&quot; &quot;our&quot;) is committed to protecting the privacy and security of your personal and health information. This Privacy Policy describes how we collect, use, store, and share data when you use our digital health platform.
                   </p>
                 </Section>
 
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
 
                 <Section id="storage-offline" title="Data Storage & Offline Use">
                   <p>
-                    TamamHealth is designed for low-connectivity environments. Data created while offline is stored locally on your device and synchronized when internet connectivity is restored. We use industry-standard encryption for both local storage and cloud synchronization.
+                    Tamam is designed for low-connectivity environments. Data created while offline is stored locally on your device and synchronized when internet connectivity is restored. We use industry-standard encryption for both local storage and cloud synchronization.
                   </p>
                 </Section>
 

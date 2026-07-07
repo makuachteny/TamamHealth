@@ -52,8 +52,10 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
     if (q.length < 2) return [];
     return (patients || [])
       .filter(p =>
-        `${p.firstName || ''} ${p.surname || ''}`.toLowerCase().includes(q) ||
+        `${p.firstName || ''} ${p.middleName || ''} ${p.surname || ''}`.toLowerCase().includes(q) ||
         (p.hospitalNumber || '').toLowerCase().includes(q) ||
+        (p.nationalId || '').toLowerCase().includes(q) ||
+        (p.geocodeId || '').toLowerCase().includes(q) ||
         (p.phone || '').includes(q)
       )
       .slice(0, 6);
@@ -89,12 +91,12 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
 
   return (
     <div className={split
-      ? 'mx-[10px] mt-[10px] flex-shrink-0 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:items-center'
+      ? 'mx-[10px] mt-[10px] flex-shrink-0 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3 xl:items-center'
       : 'mx-[10px] mt-[10px] flex-shrink-0 flex items-center gap-3 flex-wrap'}>
       {/* In split mode this groups search + trailing into the left grid column;
           otherwise `contents` makes them plain flex children as before. */}
-      <div className={split ? 'flex items-center gap-3 min-w-0' : 'contents'}>
-      <div className={split ? 'relative flex-1 min-w-0' : 'relative flex-1 min-w-[220px] max-w-2xl'} ref={searchContainerRef}>
+      <div className={split ? 'flex flex-wrap sm:flex-nowrap items-center gap-3 min-w-0' : 'contents'}>
+      <div className={split ? 'relative flex-[1_1_260px] min-w-[180px] max-w-full' : 'relative flex-1 min-w-[180px] max-w-2xl'} ref={searchContainerRef}>
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px]" color="var(--text-muted)" />
         <input
           type="search"
@@ -121,7 +123,7 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
               width: 'min(100%, 420px)',
               background: 'var(--bg-card-solid)',
               border: '1px solid var(--border-medium)',
-              boxShadow: '0 16px 48px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.06)',
+              boxShadow: 'none',
             }}
           >
             {patientMatches.length === 0 ? (
@@ -196,7 +198,7 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
           pushed to the row's end. */}
       {actions && (
         <div className={split
-          ? 'flex items-center gap-2 flex-wrap lg:justify-end'
+          ? 'flex items-center gap-2 flex-wrap xl:justify-end min-w-0'
           : 'flex items-center gap-2 flex-shrink-0 ml-auto flex-wrap'}>
           {actions}
         </div>

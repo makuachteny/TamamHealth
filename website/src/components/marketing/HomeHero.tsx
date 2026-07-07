@@ -9,13 +9,13 @@ const HERO_TITLE_LINES = [
   "Remember",
   "every",
   "patient.",
-  "Unify every",
-  "workflow.",
+  "Run the",
+  "next visit.",
 ] as const;
 
 const HERO_RAILS = [
   [
-    { src: "/assets/Dashboard.png", alt: "TamamHealth facility dashboard", label: "Facility dashboard" },
+    { src: "/assets/Dashboard.png", alt: "Tamam facility dashboard", label: "Facility dashboard" },
     { src: "/assets/doctor-nurse-consultation.jpg", alt: "Clinical team reviewing patient information", label: "Clinical care" },
     { src: "/assets/doctor-tablet-review.jpg", alt: "Doctor reviewing care data on a tablet", label: "Care review" },
   ],
@@ -180,11 +180,11 @@ export function HomeHero() {
                 </span>
               </h1>
               <p className="mk-home-hero-subtitle">
-                TamamHealth connects registration, clinical notes, pharmacy, lab, billing, referrals, and ministry reporting in one secure record built for real facilities and low-connectivity care.
+                Tamam helps clinics and hospitals move from paper to one offline-ready patient record across registration, clinical notes, lab, pharmacy, billing, and reporting.
               </p>
             </div>
 
-            <div className="mk-home-hero-visual" aria-label="TamamHealth product and care workflows">
+            <div className="mk-home-hero-visual" aria-label="Tamam product and care workflows">
               <div className="mk-home-hero-rails" aria-hidden="true">
                 {HERO_RAILS.map((rail, railIndex) => (
                   <div className={`mk-home-hero-rail mk-home-hero-rail-${railIndex + 1}`} key={`rail-${railIndex}`}>
@@ -206,7 +206,7 @@ export function HomeHero() {
                 ))}
               </div>
 
-              <form className="mk-home-hero-panel" onSubmit={handleDemoSubmit} aria-label="Request a TamamHealth demo">
+              <form className="mk-home-hero-panel" onSubmit={handleDemoSubmit} aria-label="Request a Tamam demo">
                 {step === "details" && (
                   <>
                     <h2>Request a free demo</h2>
@@ -232,7 +232,7 @@ export function HomeHero() {
                       </label>
                       <label className="mk-home-hero-field">
                         <span>City or country</span>
-                        <input name="location" autoComplete="address-level2" placeholder="Juba, South Sudan" defaultValue={demoForm?.location || ""} />
+                        <input name="location" autoComplete="address-level2" placeholder="City or country" defaultValue={demoForm?.location || ""} />
                       </label>
                     </div>
                     <button type="submit" className="mk-home-hero-panel-button">
