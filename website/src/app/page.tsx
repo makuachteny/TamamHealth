@@ -303,7 +303,7 @@ const GOAL_STATS = [
 ];
 
 const TEAM = [
-  { name: "Teny Makuach", role: "Founder and Developer", image: "/assets/founder-teny.jpg" },
+  { name: "Teny Makuach", role: "Founder & Developer", image: "/assets/founder-teny.jpg" },
   { name: "Ekow Williams", role: "Community & Partnerships", image: "/assets/founder-ekow.jpg" },
   { name: "Toye Adebayo", role: "Project Manager", image: "/assets/founder-toye.jpg" },
   { name: "Mark Dosu", role: "Developer", image: "/assets/Mark-Dosu.jpeg" },
@@ -318,7 +318,8 @@ export default function Home() {
   const [formEmail, setFormEmail] = useState("");
   const [formFacility, setFormFacility] = useState("");
   const [formMessage, setFormMessage] = useState("");
-  const [sent, setSent] = useState(false);
+  const [formStatus, setFormStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [formError, setFormError] = useState("");
   const dragStartX = useRef<number | null>(null);
 
   // Hero defaults to the midwives photo (SLIDES[0]) and stays put — no
@@ -346,15 +347,37 @@ export default function Home() {
     setActiveSlide(0);
   };
 
-  const sendMessage = () => {
-    const subject = encodeURIComponent(
-      "TamamHealth — Get involved" + (formFacility ? ` (${formFacility})` : "")
-    );
-    const body = encodeURIComponent(
-      `${formMessage || ""}\n\n— ${formName || ""}${formEmail ? " · " + formEmail : ""}`
-    );
-    window.location.href = `mailto:support.tamam@gmail.com?subject=${subject}&body=${body}`;
-    setSent(true);
+  const sendMessage = async () => {
+    if (!formMessage.trim()) {
+      setFormStatus("error");
+      setFormError("Please write a message first.");
+      return;
+    }
+    setFormStatus("sending");
+    setFormError("");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formName,
+          email: formEmail,
+          facility: formFacility,
+          message: formMessage,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setFormStatus("error");
+        setFormError(data.error || "Failed to send. Please email us directly.");
+        return;
+      }
+      setFormStatus("sent");
+      setFormMessage("");
+    } catch {
+      setFormStatus("error");
+      setFormError("Network error. Please email us directly.");
+    }
   };
 
   return (
@@ -600,8 +623,8 @@ export default function Home() {
               className="tm-hero-btn-secondary"
               style={{ background: "#FEFFF9", color: "#10195A", fontSize: 15, fontWeight: 700, padding: "15px 30px", textDecoration: "none", letterSpacing: "0.02em" }}
             >
-              <span className="tm-btn-label-full">See our solution</span>
-              <span className="tm-btn-label-short">Solution</span> →
+              <span className="tm-btn-label-full">See our solution →</span>
+              <span className="tm-btn-label-short">Solution ↓</span>
             </a>
           </div>
           <div
@@ -995,7 +1018,7 @@ export default function Home() {
                   value={formName}
                   onChange={(e) => {
                     setFormName(e.target.value);
-                    setSent(false);
+                    setFormStatus("idle");
                   }}
                   className="tm-form-input"
                   style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.3)", color: "#FFFFFF", fontFamily: "'DM Sans', sans-serif", fontSize: 15, padding: "13px 14px", outline: "none" }}
@@ -1009,7 +1032,7 @@ export default function Home() {
                   value={formEmail}
                   onChange={(e) => {
                     setFormEmail(e.target.value);
-                    setSent(false);
+                    setFormStatus("idle");
                   }}
                   className="tm-form-input"
                   style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.3)", color: "#FFFFFF", fontFamily: "'DM Sans', sans-serif", fontSize: 15, padding: "13px 14px", outline: "none" }}
@@ -1023,7 +1046,7 @@ export default function Home() {
                   value={formFacility}
                   onChange={(e) => {
                     setFormFacility(e.target.value);
-                    setSent(false);
+                    setFormStatus("idle");
                   }}
                   className="tm-form-input"
                   style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.3)", color: "#FFFFFF", fontFamily: "'DM Sans', sans-serif", fontSize: 15, padding: "13px 14px", outline: "none" }}
@@ -1038,7 +1061,7 @@ export default function Home() {
                 value={formMessage}
                 onChange={(e) => {
                   setFormMessage(e.target.value);
-                  setSent(false);
+                  setFormStatus("idle");
                 }}
                 className="tm-form-input"
                 style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.3)", color: "#FFFFFF", fontFamily: "'DM Sans', sans-serif", fontSize: 15, padding: "13px 14px", outline: "none", resize: "vertical" }}
@@ -1046,11 +1069,15 @@ export default function Home() {
             </label>
             <button
               onClick={sendMessage}
+              disabled={formStatus === "sending"}
               className="tm-submit-btn"
-              style={{ alignSelf: "flex-start", background: "#2191D0", color: "#FFFFFF", fontFamily: "'DM Sans', sans-serif", fontSize: 15.5, fontWeight: 700, padding: "15px 34px", border: "none", cursor: "pointer", letterSpacing: "0.02em" }}
+              style={{ alignSelf: "flex-start", background: formStatus === "sent" ? "#1F9D55" : "#2191D0", color: "#FFFFFF", fontFamily: "'DM Sans', sans-serif", fontSize: 15.5, fontWeight: 700, padding: "15px 34px", border: "none", cursor: formStatus === "sending" ? "wait" : "pointer", letterSpacing: "0.02em", opacity: formStatus === "sending" ? 0.7 : 1 }}
             >
-              {sent ? "Opening your email app…" : "Send message"}
+              {formStatus === "sending" ? "Sending…" : formStatus === "sent" ? "Message sent ✓" : "Send message"}
             </button>
+            {formStatus === "error" && (
+              <p style={{ margin: 0, fontSize: 14, color: "#FFB4B4" }}>{formError}</p>
+            )}
           </div>
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, flexWrap: "wrap", fontSize: 14, color: "#C7D8F5" }}>
