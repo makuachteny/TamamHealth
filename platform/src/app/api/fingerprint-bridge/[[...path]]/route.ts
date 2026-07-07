@@ -44,12 +44,14 @@ async function proxy(req: NextRequest, pathSegments: string[] | undefined): Prom
   }
 }
 
-export async function GET(req: NextRequest, ctx: { params: { path?: string[] } }) {
-  return proxy(req, ctx.params.path);
+export async function GET(req: NextRequest, ctx: { params: Promise<{ path?: string[] }> }) {
+  const { path } = await ctx.params;
+  return proxy(req, path);
 }
 
-export async function POST(req: NextRequest, ctx: { params: { path?: string[] } }) {
-  return proxy(req, ctx.params.path);
+export async function POST(req: NextRequest, ctx: { params: Promise<{ path?: string[] }> }) {
+  const { path } = await ctx.params;
+  return proxy(req, path);
 }
 
 export async function OPTIONS() {
