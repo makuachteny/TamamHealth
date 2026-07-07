@@ -7,6 +7,72 @@ Tracking doc: [`docs/operations/jira-github-do-tracking.md`](../../docs/operatio
 
 ---
 
+## Quick start (Terraform + SSH bootstrap)
+
+### 1. Prerequisites (your laptop)
+
+```bash
+# DigitalOcean API token (read + write) — create at cloud.digitalocean.com → API
+export DIGITALOCEAN_TOKEN="dop_v1_..."
+
+# SSH key for droplet login (create if missing)
+ssh-keygen -t ed25519 -C "tamamhealth-deploy" -f ~/.ssh/id_ed25519 -N ""
+
+# Your public IP for SSH firewall rule
+curl -4 ifconfig.me   # append /32 → admin_ssh_cidr
+```
+
+### 2. Provision infrastructure
+
+```bash
+cd infra/digitalocean/terraform
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars: ssh_public_key, admin_ssh_cidr, domain
+
+terraform init
+terraform plan
+terraform apply
+```
+
+Terraform creates **two droplets**, **reserved IPs**, and **firewalls** (22/80/443).
+
+### 3. DNS (GoDaddy or your registrar)
+
+Point A records at the IPs from `terraform output`:
+
+| Environment | Records |
+|-------------|---------|
+| Staging | `app.staging.<domain>`, `couch.staging.<domain>` |
+| Production | `@`, `app`, `couch`, `www` |
+
+### 4. Bootstrap each droplet
+
+```bash
+# From repo root — first boot builds images on the droplet (~15–30 min)
+./scripts/do-ssh-deploy.sh --host <staging-ip> --env staging --domain tamamhealth.org
+./scripts/do-ssh-deploy.sh --host <production-ip> --env production --domain tamamhealth.org
+```
+
+### 5. Wire GitHub Actions (repo Admin required)
+
+Create **staging** and **production** environments with secrets:
+
+| Secret | Value |
+|--------|-------|
+| `STAGING_SSH_HOST` | staging reserved IP |
+| `STAGING_SSH_USER` | `root` |
+| `STAGING_SSH_KEY` | private key matching droplet SSH key |
+| `PROD_SSH_HOST` | production reserved IP |
+| `PROD_SSH_USER` | `root` |
+| `PROD_SSH_KEY` | same or separate deploy key |
+
+After secrets are set, every green `main` build auto-deploys staging. Production
+promotes via **Actions → deploy-production → Run workflow**.
+
+See [`docs/operations/github-environments-setup.md`](../../docs/operations/github-environments-setup.md).
+
+---
+
 ## Staging droplet
 
 | Setting | Value |

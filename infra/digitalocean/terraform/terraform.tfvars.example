@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars (gitignored). Or export DIGITALOCEAN_TOKEN instead of do_token.
+
+region = "fra1"
+domain = "tamamhealth.org"
+
+# cat ~/.ssh/id_ed25519.pub
+ssh_public_key = "ssh-ed25519 AAAA... you@host"
+
+# curl -4 ifconfig.me then add /32
+admin_ssh_cidr = "203.0.113.10/32"

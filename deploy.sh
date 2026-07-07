@@ -19,7 +19,7 @@
 set -euo pipefail
 
 # ----- EDIT THESE -----------------------------------------------------------
-REPO_URL="${REPO_URL:-https://github.com/YOUR-ORG/tamamhealth.git}"
+REPO_URL="${REPO_URL:-https://github.com/makuachteny/TamamHealth.git}"
 APP_DIR="${APP_DIR:-/opt/tamamhealth}"
 DOMAIN_ROOT="${DOMAIN_ROOT:-tamamhealth.org}"
 DOMAIN_APP="${DOMAIN_APP:-app.tamamhealth.org}"
@@ -54,10 +54,12 @@ fi
 # REPO_URL has a YOUR-ORG placeholder. If the operator didn't override it,
 # `git clone` will fail with an unhelpful 404. Refuse before the network call.
 if echo "$REPO_URL" | grep -q 'YOUR-ORG'; then
-  die "REPO_URL still points at the YOUR-ORG placeholder. Re-run with REPO_URL=https://github.com/<your-org>/tamamhealth.git ./deploy.sh"
+  die "REPO_URL still points at the YOUR-ORG placeholder. Re-run with REPO_URL=https://github.com/makuachteny/TamamHealth.git ./deploy.sh"
 fi
 
-if [ ! -d "$APP_DIR/.git" ]; then
+if [ "${SKIP_GIT_SYNC:-}" = "1" ]; then
+  say "Skipping git sync (code already on host)"
+elif [ ! -d "$APP_DIR/.git" ]; then
   say "Cloning repo to $APP_DIR"
   git clone "$REPO_URL" "$APP_DIR"
 else
