@@ -1,41 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth — One-Page Website
    Ported 1:1 from the Claude Design project "Website outline improvement",
-   file "One-Page Website v3.dc.html".
+   file "One-Page Website v3.dc.html" (2026-07-07 revision).
+   Deviation from the design source: the contact form submits via Web3Forms
+   instead of a mailto: link (the design's mailto approach doesn't work for
+   visitors without a configured mail client).
    ═══════════════════════════════════════════════════════════════════ */
-
-const SLIDES = [
-  {
-    src: "/assets/landing-img.jpg",
-    alt: "A team of South Sudanese midwives outside a maternity tent",
-    caption: "Midwives outside a maternity tent — the front line of care",
-  },
-  {
-    src: "/assets/images/reviewing-health-records.jpeg",
-    alt: "A family reviewing paper health records",
-    caption: "A family's health history, kept on paper",
-  },
-  {
-    src: "/assets/images/doctor-clipboard-review.jpeg",
-    alt: "A clinician reviewing a patient's paper chart on a clipboard",
-    caption: "Clinicians rebuild each patient's story by hand",
-  },
-  {
-    src: "/assets/images/community-medication-distribution.jpeg",
-    alt: "A health worker distributing medication and recording it in a paper register",
-    caption: "Medication logged line-by-line in paper registers",
-  },
-  {
-    src: "/assets/images/pediatric-ward-interior.jpeg",
-    alt: "A crowded pediatric ward with limited beds",
-    caption: "Pediatric wards stretched past capacity",
-  },
-];
 
 const CRISIS_STATS = [
   {
@@ -68,21 +43,18 @@ const CRISIS_STATS = [
 
 const BREAKDOWN_STEPS = [
   {
-    num: "1",
     image: "/assets/images/reviewing-health-records.jpeg",
     alt: "A family reviewing paper health records",
     title: "Paper-based record system",
     body: "Every visit starts from scratch — histories live in ledgers, slips, and memory.",
   },
   {
-    num: "2",
     image: "/assets/images/pediatric-ward-interior.jpeg",
     alt: "A crowded pediatric ward",
     title: "Slow diagnosis process",
     body: "Clinicians rebuild each patient's story by hand while wards fill past capacity.",
   },
   {
-    num: "3",
     image: "/assets/images/community-medication-distribution.jpeg",
     alt: "A health worker recording medication in a paper register",
     title: "Misdiagnosis",
@@ -103,10 +75,10 @@ const INSIGHTS = [
     title: "Medical experts",
     bg: "#0B1145",
     fg: "#FFFFFF",
-    shadow: "#2191D0",
-    borderColor: "rgba(255,255,255,0.35)",
-    kickerColor: "#7FC4EA",
-    numColor: "rgba(255,255,255,0.18)",
+    shadow: "#E8863A",
+    borderColor: "rgba(232,134,58,0.6)",
+    kickerColor: "#F5A263",
+    numColor: "rgba(232,134,58,0.25)",
     rule: "rgba(255,255,255,0.2)",
     points: [
       "High data loss between visits and departments",
@@ -118,12 +90,12 @@ const INSIGHTS = [
     number: "02",
     kicker: "From the waiting line",
     title: "Patients",
-    bg: "#FFFFFF",
+    bg: "#FEFFF9",
     fg: "#10195A",
-    shadow: "rgba(221,242,251,0.35)",
-    borderColor: "#FFFFFF",
-    kickerColor: "#2191D0",
-    numColor: "#EFF8FD",
+    shadow: "rgba(232,134,58,0.45)",
+    borderColor: "#FEFFF9",
+    kickerColor: "#C2571B",
+    numColor: "rgba(232,134,58,0.18)",
     rule: "#E2E8F0",
     points: [
       "Manual transfers between facilities are ineffective",
@@ -156,37 +128,43 @@ const PRINCIPLES = [
   },
 ];
 
-const WORKFLOW_STEPS = [
-  "Register",
-  "Triage",
-  "Consult",
-  "Order",
-  "Dispense",
-  "Bill",
-  "Report",
-].map((label, i) => ({ label, bg: i % 2 === 0 ? "#FFFFFF" : "#EFF8FD" }));
+const PAPER_CHIPS = [
+  { label: "Paper ledgers", rotate: -3, duration: "3.8s", delay: "0s" },
+  { label: "Lab slips", rotate: 2, duration: "4.4s", delay: "0.6s" },
+  { label: "Referral notes", rotate: -2, duration: "4.1s", delay: "1.1s" },
+  { label: "Pharmacy logs", rotate: 3, duration: "3.6s", delay: "0.3s" },
+  { label: "Vaccination cards", rotate: -1, duration: "4.7s", delay: "0.9s" },
+];
+
+const TAMAM_CHECKS = ["One patient record", "Facility dashboard", "DHIS2-ready national reports"];
+
+const STEP_DEFS = [
+  { label: "Register", desc: "Patient identity captured once — reused on every future visit." },
+  { label: "Triage", desc: "Vitals and priority recorded straight into the encounter." },
+  { label: "Consult", desc: "The clinician sees the full history before the first question." },
+  { label: "Order", desc: "Lab and imaging orders flow directly to the bench worklist." },
+  { label: "Dispense", desc: "Pharmacy fills against the electronic prescription — batch and expiry tracked." },
+  { label: "Bill", desc: "Charges accumulate automatically from everything done in the visit." },
+  { label: "Report", desc: "Encounter data rolls up into facility dashboards and DHIS2-ready reports." },
+];
 
 const OUTCOMES = [
   {
     title: "No duplicate records",
     body: "Each visit adds to the same patient story, so teams stop rebuilding history from paper slips.",
-    border: "1px solid #E2E8F0",
   },
   {
     title: "One source for operations",
     body: "Clinical work, pharmacy activity, billing, and reporting all stay connected to the encounter.",
-    border: "1px solid #E2E8F0",
   },
   {
     title: "Built for low connectivity",
     body: "Facilities can keep working through network gaps and sync when the connection returns.",
-    border: "none",
   },
 ];
 
 const PRODUCTS = [
   {
-    index: "01",
     acronym: "HMIS",
     title: "Hospital Management System",
     tagline: "For State, County & Referral hospitals",
@@ -207,7 +185,6 @@ const PRODUCTS = [
     imageAlt: "Hospital clinicians coordinating patient care",
   },
   {
-    index: "02",
     acronym: "CMS",
     title: "Clinic Management System",
     tagline: "For PHCUs, private practices & faith-based clinics",
@@ -225,7 +202,6 @@ const PRODUCTS = [
     imageAlt: "Community health worker at a primary care clinic",
   },
   {
-    index: "03",
     acronym: "LIS",
     title: "Laboratory Information System",
     tagline: "For diagnostic centres & hospital labs",
@@ -243,7 +219,6 @@ const PRODUCTS = [
     imageAlt: "Lab staff recording results",
   },
   {
-    index: "04",
     acronym: "RIS",
     title: "Radiology Information System",
     tagline: "For radiology centres & imaging departments",
@@ -260,7 +235,6 @@ const PRODUCTS = [
     imageAlt: "Radiologist reviewing imaging on a workstation",
   },
   {
-    index: "05",
     acronym: "PMS",
     title: "Pharmacy Management System",
     tagline: "For retail & hospital pharmacies",
@@ -278,21 +252,20 @@ const PRODUCTS = [
     imageAlt: "Pharmacist preparing a prescription",
   },
   {
-    index: "06",
-    acronym: "PP",
+    acronym: "PPS",
     title: "Patient Portal",
-    tagline: "Self-service access for patients & caregivers",
+    tagline: "Patients' window into their own care",
     description:
-      "Patients and caregivers view visit summaries, lab results, and upcoming appointments online or via SMS — staying connected to their own care story between visits.",
+      "Patients see their own records, prescriptions, lab results, and visit history — on a phone, by SMS, or at a kiosk — and share feedback that flows back to the facility.",
     modules: [
-      "Visit Summaries",
-      "Lab Results Access",
+      "My Records",
+      "Prescriptions & Results",
+      "Visit History",
       "Appointment Reminders",
-      "SMS/WhatsApp Notifications",
-      "Multi-language Support",
+      "Feedback & Follow-up",
     ],
-    image: "/assets/doctor-tablet-smiling.jpg",
-    imageAlt: "A patient reviewing their health records on a tablet",
+    image: "/assets/african-nurse.jpg",
+    imageAlt: "Health worker helping a patient access their records on a phone",
   },
 ];
 
@@ -303,16 +276,32 @@ const GOAL_STATS = [
 ];
 
 const TEAM = [
-  { name: "Teny Makuach", role: "Founder & Developer", image: "/assets/founder-teny.jpg" },
+  { name: "Teny Makuach", role: "Founder", image: "/assets/founder-teny.jpg" },
   { name: "Ekow Williams", role: "Community & Partnerships", image: "/assets/founder-ekow.jpg" },
   { name: "Toye Adebayo", role: "Project Manager", image: "/assets/founder-toye.jpg" },
-  { name: "Mark Dosu", role: "Developer", image: "/assets/Mark-Dosu.jpeg" },
+  { name: "Mark Dosu", role: "Software Developer", image: "/assets/Mark-Dosu.jpeg" },
   { name: "Chinonye Hycent", role: "Research Lead", image: "/assets/chinonye-hycent.jpg" },
   { name: "Isaac Kyalo", role: "Technical Lead", image: "/assets/isaac-kyalo.jpg" },
 ];
 
+const KICKER: React.CSSProperties = {
+  fontFamily: "'DM Mono', monospace",
+  fontSize: 13,
+  letterSpacing: "0.16em",
+  textTransform: "uppercase",
+  padding: "6px 14px",
+};
+
+const H2: React.CSSProperties = {
+  fontFamily: "'Lora', Georgia, serif",
+  fontSize: "clamp(30px, 3.8vw, 48px)",
+  fontWeight: 600,
+  margin: 0,
+  lineHeight: 1.1,
+};
+
 export default function Home() {
-  const [activeSlide, setActiveSlide] = useState(0);
+  const [activeStep, setActiveStep] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [formName, setFormName] = useState("");
   const [formEmail, setFormEmail] = useState("");
@@ -320,32 +309,22 @@ export default function Home() {
   const [formMessage, setFormMessage] = useState("");
   const [formStatus, setFormStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [formError, setFormError] = useState("");
-  const dragStartX = useRef<number | null>(null);
+  const stepTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Hero defaults to the midwives photo (SLIDES[0]) and stays put — no
-  // auto-advance. Visitors switch photos via the dots or by swiping/
-  // dragging the image; leaving the hero resets it back to the default.
-  const SWIPE_THRESHOLD = 50;
-
-  const handleHeroPointerDown = (e: React.PointerEvent) => {
-    dragStartX.current = e.clientX;
+  const startStepTimer = () => {
+    if (stepTimer.current) clearInterval(stepTimer.current);
+    stepTimer.current = setInterval(() => {
+      setActiveStep((s) => (s + 1) % STEP_DEFS.length);
+    }, 3200);
   };
 
-  const handleHeroPointerUp = (e: React.PointerEvent) => {
-    if (dragStartX.current === null) return;
-    const delta = e.clientX - dragStartX.current;
-    dragStartX.current = null;
-    if (delta > SWIPE_THRESHOLD) {
-      setActiveSlide((s) => (s - 1 + SLIDES.length) % SLIDES.length);
-    } else if (delta < -SWIPE_THRESHOLD) {
-      setActiveSlide((s) => (s + 1) % SLIDES.length);
-    }
-  };
-
-  const handleHeroPointerLeave = () => {
-    dragStartX.current = null;
-    setActiveSlide(0);
-  };
+  useEffect(() => {
+    startStepTimer();
+    return () => {
+      if (stepTimer.current) clearInterval(stepTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sendMessage = async () => {
     if (!formMessage.trim()) {
@@ -356,20 +335,26 @@ export default function Home() {
     setFormStatus("sending");
     setFormError("");
     try {
-      const res = await fetch("/api/contact", {
+      // Web3Forms is designed for browser-side submission; the access key is
+      // public by design (it can only be used to send mail TO our inbox).
+      const res = await fetch("https://api.web3forms.com/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          name: formName,
-          email: formEmail,
-          facility: formFacility,
+          access_key: "e45ff797-cfa3-459e-80db-cda054dd35ea",
+          subject: `TamamHealth — Get involved${formFacility ? ` (${formFacility})` : ""}`,
+          from_name: formName || "TamamHealth Website",
+          name: formName || "Anonymous",
+          email: formEmail || undefined,
+          facility: formFacility || undefined,
           message: formMessage,
+          botcheck: "",
         }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+      const data = await res.json().catch(() => ({ success: false }));
+      if (!res.ok || !data.success) {
         setFormStatus("error");
-        setFormError(data.error || "Failed to send. Please email us directly.");
+        setFormError("Failed to send. Please email us directly.");
         return;
       }
       setFormStatus("sent");
@@ -380,14 +365,11 @@ export default function Home() {
     }
   };
 
+  const crisisLead = CRISIS_STATS[0];
+  const crisisRest = CRISIS_STATS.slice(1);
+
   return (
-    <div
-      style={{
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        color: "#10195A",
-        background: "#FEFFF9",
-      }}
-    >
+    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", color: "#10195A", background: "#FEFFF9" }}>
       {/* ═══ Nav ═══ */}
       <nav
         style={{
@@ -403,37 +385,14 @@ export default function Home() {
           borderBottom: "1px solid rgba(255,255,255,0.12)",
         }}
       >
-        <div
-          style={{
-            maxWidth: 1320,
-            margin: "0 auto",
-            height: 66,
-            display: "flex",
-            alignItems: "center",
-            gap: 28,
-          }}
-        >
-          <a
-            href="#top"
-            style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", color: "#FFFFFF" }}
-          >
+        <div style={{ maxWidth: 1320, margin: "0 auto", height: 66, display: "flex", alignItems: "center", gap: 28 }}>
+          <a href="#top" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", color: "#FFFFFF" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/assets/tamam-logo-mark.svg"
-              alt=""
-              style={{ height: 22, width: "auto", filter: "brightness(0) invert(1)" }}
-            />
+            <img src="/assets/tamam-logo-mark.svg" alt="" style={{ height: 22, width: "auto", filter: "brightness(0) invert(1)" }} />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/assets/tamam-logo-type.svg"
-              alt="Tamam Healthcare System"
-              style={{ height: 15, width: "auto", filter: "brightness(0) invert(1)" }}
-            />
+            <img src="/assets/tamam-logo-type.svg" alt="Tamam Healthcare System" style={{ height: 15, width: "auto", filter: "brightness(0) invert(1)" }} />
           </a>
-          <div
-            className="tm-nav-links"
-            style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 26, flexWrap: "wrap" }}
-          >
+          <div className="tm-nav-links tm-right-col" style={{ marginLeft: "auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <a href="#problem" className="tm-nav-link" style={{ color: "#C7D8F5", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em" }}>
               Problem
             </a>
@@ -443,30 +402,25 @@ export default function Home() {
             <a href="#team" className="tm-nav-link" style={{ color: "#C7D8F5", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em" }}>
               Team
             </a>
-            <a
-              href="#contact"
-              className="tm-nav-cta"
-              style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 13.5, fontWeight: 700, padding: "11px 22px", textDecoration: "none", letterSpacing: "0.02em" }}
-            >
+            <a href="#contact" className="tm-nav-cta" style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 13.5, fontWeight: 700, padding: "11px 22px", textDecoration: "none", letterSpacing: "0.02em" }}>
               Book a Demo →
             </a>
           </div>
           <button
             className="tm-nav-burger"
-            onClick={() => setMenuOpen((v) => !v)}
+            onClick={() => setMenuOpen((o) => !o)}
             aria-label="Open menu"
             style={{
               display: "none",
               marginLeft: "auto",
               background: "none",
-              border: "none",
+              border: "1px solid rgba(255,255,255,0.35)",
               color: "#FFFFFF",
               width: 44,
               height: 44,
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 22,
-              lineHeight: 1,
+              fontSize: 18,
               cursor: "pointer",
               padding: 0,
             }}
@@ -475,17 +429,7 @@ export default function Home() {
           </button>
         </div>
         {menuOpen && (
-          <div
-            className="tm-nav-drawer"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              background: "#0B1145",
-              borderTop: "1px solid rgba(255,255,255,0.12)",
-              padding: "8px 0 16px",
-              margin: "0 -32px",
-            }}
-          >
+          <div className="tm-nav-drawer" style={{ display: "flex", flexDirection: "column", background: "#0B1145", borderTop: "1px solid rgba(255,255,255,0.12)", padding: "8px 0 16px", margin: "0 -32px" }}>
             <a href="#problem" onClick={() => setMenuOpen(false)} style={{ color: "#FFFFFF", textDecoration: "none", fontSize: 16, fontWeight: 600, padding: "14px 32px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
               Problem
             </a>
@@ -495,11 +439,7 @@ export default function Home() {
             <a href="#team" onClick={() => setMenuOpen(false)} style={{ color: "#FFFFFF", textDecoration: "none", fontSize: 16, fontWeight: 600, padding: "14px 32px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
               Team
             </a>
-            <a
-              href="#contact"
-              onClick={() => setMenuOpen(false)}
-              style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 15, fontWeight: 700, padding: "14px 32px", textDecoration: "none", margin: "12px 32px 0", textAlign: "center" }}
-            >
+            <a href="#contact" onClick={() => setMenuOpen(false)} style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 15, fontWeight: 700, padding: "14px 32px", textDecoration: "none", margin: "12px 32px 0", textAlign: "center" }}>
               Book a Demo →
             </a>
           </div>
@@ -511,216 +451,193 @@ export default function Home() {
       <section
         id="top"
         className="tm-hero"
-        onPointerDown={handleHeroPointerDown}
-        onPointerUp={handleHeroPointerUp}
-        onPointerLeave={handleHeroPointerLeave}
         style={{
           position: "relative",
           minHeight: "100vh",
           display: "flex",
-          alignItems: "flex-end",
+          flexDirection: "column",
+          justifyContent: "flex-end",
           color: "#FFFFFF",
           overflow: "hidden",
           background: "#0B1145",
-          touchAction: "pan-y",
-          cursor: "grab",
         }}
       >
-        {SLIDES.map((slide, i) => (
-          <Image
-            key={slide.src}
-            src={slide.src}
-            alt={slide.alt}
-            fill
-            priority={i === 0}
-            sizes="100vw"
-            className={i > 0 ? "tm-hero-slide-extra" : undefined}
-            style={{
-              objectFit: "cover",
-              objectPosition: "center 30%",
-              opacity: i === activeSlide ? 1 : 0,
-              transition: "opacity 1.2s ease",
-            }}
-          />
-        ))}
+        <Image
+          src="/assets/landing-img.jpg"
+          alt="A team of South Sudanese midwives outside a maternity tent"
+          fill
+          priority
+          sizes="100vw"
+          style={{ objectFit: "cover", objectPosition: "center 30%" }}
+        />
         <div
           style={{
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(to top, rgba(11,17,69,0.55) 0%, rgba(11,17,69,0.22) 48%, rgba(11,17,69,0.02) 100%)",
+              "linear-gradient(to bottom, rgba(11,17,69,0.6) 0%, rgba(11,17,69,0.15) 30%, rgba(11,17,69,0) 45%, rgba(11,17,69,0.4) 72%, rgba(11,17,69,1) 100%)",
           }}
         />
+
+        {/* Right message column, aligned with the nav links */}
         <div
-          className="tm-hero-pad"
+          className="tm-hero-msg tm-right-col"
           style={{
-            position: "relative",
-            width: "100%",
-            maxWidth: 1320,
-            margin: "0 auto",
-            padding: "160px 32px 48px",
+            position: "absolute",
+            top: "50%",
+            transform: "translateY(-50%)",
+            right: "max(32px, calc((100% - 1320px) / 2))",
             display: "flex",
             flexDirection: "column",
-            gap: 28,
+            gap: 16,
+            alignItems: "flex-start",
           }}
         >
           <h1
             style={{
               fontFamily: "'Lora', Georgia, serif",
-              fontSize: "clamp(34px, 4.6vw, 58px)",
+              fontSize: "clamp(28px, 2.7vw, 40px)",
               fontWeight: 600,
-              lineHeight: 1.12,
+              lineHeight: 1.16,
               margin: 0,
-              maxWidth: 940,
-              letterSpacing: "-0.015em",
-              textShadow: "0 2px 6px rgba(0,0,0,0.65), 0 4px 28px rgba(0,0,0,0.5)",
+              textShadow: "0 2px 20px rgba(0,0,0,0.55)",
             }}
           >
-            No internet. No records.
+            No power. No records.
             <br />
             No history.
           </h1>
-          <div className="tm-hero-sub" style={{ position: "relative", maxWidth: 560, paddingLeft: 18, fontSize: 18 }}>
-            <div
-              className="tm-hero-line"
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: 3,
-                background:
-                  "linear-gradient(to bottom, rgba(33,145,208,0) 0%, rgba(127,196,234,0.95) 22%, rgba(33,145,208,0.95) 55%, rgba(33,145,208,0) 100%)",
-              }}
-            />
-            <p
-              style={{
-                fontSize: "inherit",
-                lineHeight: 1.6,
-                color: "#E4EEFB",
-                margin: 0,
-                textShadow: "0 1px 4px rgba(0,0,0,0.7), 0 2px 16px rgba(0,0,0,0.5)",
-              }}
-            >
-              South Sudan&apos;s clinics run on paper-based records that get lost, damaged, or destroyed — and when
-              the paper goes, the patient&apos;s story goes with it.{" "}
-              <strong style={{ color: "#FFFFFF" }}>
-                Tamam brings digital records that work offline, so care never starts from zero.
-              </strong>
-            </p>
-          </div>
-          <div className="tm-btn-row" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <p className="tm-hero-sub" style={{ fontSize: 15.5, lineHeight: 1.65, color: "#F0F5FF", margin: 0, textShadow: "0 1px 14px rgba(0,0,0,0.65)" }}>
+            South Sudan&apos;s clinics run on paper-based records that get lost, damaged, or destroyed — and when the
+            paper goes, the patient&apos;s story goes with it.{" "}
+            <strong style={{ color: "#FFFFFF" }}>Tamam brings digital records that work offline, so care never starts from zero.</strong>
+          </p>
+          <div className="tm-btn-row" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
             <a
               href="#problem"
               className="tm-hero-btn-primary"
-              style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 15, fontWeight: 700, padding: "15px 30px", textDecoration: "none", letterSpacing: "0.02em" }}
+              style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 14.5, fontWeight: 700, padding: "13px 26px", textDecoration: "none", letterSpacing: "0.02em" }}
             >
-              <span className="tm-btn-label-full">Understand the crisis</span>
-              <span className="tm-btn-label-short">Crisis</span> ↓
+              Understand the crisis →
             </a>
             <a
               href="#solution"
               className="tm-hero-btn-secondary"
-              style={{ background: "#FEFFF9", color: "#10195A", fontSize: 15, fontWeight: 700, padding: "15px 30px", textDecoration: "none", letterSpacing: "0.02em" }}
+              style={{ background: "rgba(254,255,249,0.92)", color: "#10195A", fontSize: 14.5, fontWeight: 700, padding: "13px 26px", textDecoration: "none", letterSpacing: "0.02em" }}
             >
-              <span className="tm-btn-label-full">See our solution →</span>
-              <span className="tm-btn-label-short">Solution ↓</span>
+              See our solution →
             </a>
           </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 16,
-              flexWrap: "wrap",
-              borderTop: "1px solid rgba(255,255,255,0.3)",
-              paddingTop: 16,
-            }}
-          >
-            <p style={{ margin: 0, fontFamily: "'DM Mono', monospace", fontSize: 12.5, color: "#C7D8F5" }}>
-              {SLIDES[activeSlide].caption}
-            </p>
-            <div className="tm-hero-dots" style={{ display: "flex", gap: 8 }}>
-              {SLIDES.map((slide, i) => (
-                <button
-                  key={slide.src}
-                  onClick={() => setActiveSlide(i)}
-                  aria-label={`Show photo ${i + 1}`}
-                  style={{
-                    width: i === activeSlide ? 36 : 16,
-                    height: 4,
-                    border: "none",
-                    cursor: "pointer",
-                    padding: 0,
-                    background: i === activeSlide ? "#7FC4EA" : "rgba(255,255,255,0.4)",
-                    transition: "all 0.3s ease",
-                  }}
-                />
-              ))}
-            </div>
+        </div>
+
+        {/* Bottom-left giant wordmark */}
+        <div
+          className="tm-hero-pad"
+          style={{
+            position: "relative",
+            width: "100%",
+            maxWidth: 1384,
+            margin: "40px auto 0",
+            padding: "0 32px 40px",
+            boxSizing: "border-box",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/tamam-logo-type.svg" alt="Tamam" style={{ width: "min(56vw, 640px)", height: "auto", filter: "brightness(0) invert(1)", display: "block" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ width: 14, height: 14, borderRadius: 999, background: "#2191D0", display: "inline-block" }} />
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13.5, letterSpacing: "0.22em", textTransform: "uppercase", color: "#7FC4EA", fontWeight: 500 }}>
+              Offline-ready digital health infrastructure
+            </span>
           </div>
         </div>
       </section>
 
       {/* ═══ 01 The Problem ═══ */}
-      <section id="problem" className="tm-section" style={{ background: "#10195A", color: "#FFFFFF", padding: "100px 32px" }}>
+      <section id="problem" className="tm-section" style={{ background: "linear-gradient(to bottom, #0B1145 0%, #10195A 480px)", color: "#FFFFFF", padding: "100px 32px" }}>
         <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#10195A", background: "#FEFFF9", padding: "6px 14px" }}>
-                The Problem
-              </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 820 }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span style={{ ...KICKER, color: "#10195A", background: "#E8863A" }}>The Problem</span>
             </div>
-            <h2 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>
-              A health system asked to do the impossible
-            </h2>
-            <p style={{ fontSize: 17, lineHeight: 1.6, color: "rgba(255,255,255,0.72)", margin: 0, maxWidth: 680 }}>
+            <h2 style={H2}>A health system asked to do the impossible</h2>
+            <p style={{ fontSize: 17, lineHeight: 1.65, color: "rgba(255,255,255,0.84)", margin: 0, maxWidth: 680 }}>
               Across South Sudan, clinics and hospitals deliver care through conflict, flooding, and displacement — on
               paper registers, without reliable power or connectivity.
             </p>
           </div>
 
-          <div className="tm-grid-stats" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 1, background: "rgba(255,255,255,0.2)" }}>
-            {CRISIS_STATS.map((s) => (
-              <div key={s.unit} style={{ background: "#10195A", padding: "32px 28px 28px", display: "flex", flexDirection: "column", gap: 12, borderTop: "4px solid #2191D0" }}>
-                <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 56, fontWeight: 600, lineHeight: 0.95, color: "#FFFFFF", letterSpacing: "-0.02em" }}>
-                  {s.value}
-                </span>
-                <span style={{ fontWeight: 700, color: "#7FC4EA", textTransform: "uppercase", letterSpacing: "0.03em", fontSize: 13 }}>{s.unit}</span>
-                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "rgba(255,255,255,0.65)" }}>{s.context}</p>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: "auto" }}>
-                  — {s.source}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-            <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 26, fontWeight: 600, margin: 0 }}>
-              How care breaks down, visit after visit
-            </h3>
-            <div className="tm-grid-breakdown" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
-              {BREAKDOWN_STEPS.map((b) => (
-                <div key={b.num} className="tm-breakdown-card" style={{ position: "relative", overflow: "hidden", minHeight: 380, display: "flex", alignItems: "flex-end", background: "#0B1145" }}>
-                  <Image src={b.image} alt={b.alt} fill sizes="(max-width: 1023px) 100vw, 33vw" style={{ objectFit: "cover" }} />
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,17,69,0.95) 0%, rgba(11,17,69,0.2) 55%, rgba(11,17,69,0) 100%)" }} />
-                  <div style={{ position: "relative", padding: 24, display: "flex", flexDirection: "column", gap: 8, margin: "0 0 20px 20px", background: "rgba(11,17,69,0.55)", backdropFilter: "blur(4px)", marginRight: 20, paddingTop: 18, paddingBottom: 18, paddingLeft: 20, paddingRight: 20 }}>
-                    <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, lineHeight: 1.15 }}>{b.title}</span>
-                    <span style={{ fontSize: 14, lineHeight: 1.55, color: "rgba(255,255,255,0.85)" }}>{b.body}</span>
+          <div className="tm-grid-split" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 40, alignItems: "stretch" }}>
+            <div
+              style={{
+                background: "linear-gradient(135deg, rgba(232,134,58,0.16) 0%, rgba(11,17,69,0) 55%), #0B1145",
+                padding: "44px 40px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                gap: 14,
+              }}
+            >
+              <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(72px, 7vw, 110px)", fontWeight: 600, lineHeight: 0.95, color: "#F5A263", letterSpacing: "-0.02em" }}>
+                {crisisLead.value}
+              </span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: "0.05em" }}>{crisisLead.unit}</span>
+              <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.6, color: "rgba(255,255,255,0.82)", maxWidth: 400 }}>{crisisLead.context}</p>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, color: "rgba(255,255,255,0.62)" }}>— {crisisLead.source}</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              {crisisRest.map((s) => (
+                <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 26, padding: "26px 4px", borderTop: "1px solid rgba(255,255,255,0.18)" }}>
+                  <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 42, fontWeight: 600, lineHeight: 1, color: "#F5A263", letterSpacing: "-0.02em", minWidth: 172 }}>
+                    {s.value}
+                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: "0.04em" }}>{s.unit}</span>
+                    <span style={{ fontSize: 13.5, lineHeight: 1.5, color: "rgba(255,255,255,0.78)" }}>
+                      {s.context}{" "}
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "rgba(255,255,255,0.62)" }}>— {s.source}</span>
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="tm-grid-ground" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 1, background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.2)" }}>
-            {GROUND_STATS.map((g) => (
-              <div key={g.label} style={{ display: "flex", alignItems: "baseline", gap: 16, background: "#0B1145", padding: "26px 28px" }}>
-                <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 52, fontWeight: 600, color: "#7FC4EA", lineHeight: 1, letterSpacing: "-0.02em" }}>{g.value}</span>
-                <span style={{ fontWeight: 600, color: "#E4EEFB", textTransform: "uppercase", fontSize: 12.5, letterSpacing: "0.04em" }}>{g.label}</span>
-              </div>
-            ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 12 }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+              <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(24px, 2.6vw, 32px)", fontWeight: 600, margin: 0 }}>
+                How care breaks down, visit after visit
+              </h3>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "#F5A263" }}>
+                Paper → Delay → Misdiagnosis
+              </span>
+            </div>
+            <div className="tm-grid-breakdown" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
+              {BREAKDOWN_STEPS.map((b) => (
+                <div key={b.title} className="tm-breakdown-card" style={{ position: "relative", overflow: "hidden", minHeight: 380, display: "flex", alignItems: "flex-end", background: "#0B1145" }}>
+                  <Image src={b.image} alt={b.alt} fill sizes="(max-width: 1023px) 100vw, 33vw" style={{ objectFit: "cover" }} />
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,17,69,0.95) 0%, rgba(11,17,69,0.2) 55%, rgba(11,17,69,0) 100%)" }} />
+                  <div
+                    style={{
+                      position: "relative",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      margin: "0 20px 20px 20px",
+                      background: "rgba(11,17,69,0.55)",
+                      backdropFilter: "blur(4px)",
+                      padding: "18px 20px",
+                    }}
+                  >
+                    <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, lineHeight: 1.15 }}>{b.title}</span>
+                    <span style={{ fontSize: 14, lineHeight: 1.55, color: "rgba(255,255,255,0.85)" }}>{b.body}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -729,22 +646,44 @@ export default function Home() {
       <section id="research" className="tm-section" style={{ padding: "0 32px 100px", background: "#10195A", color: "#FFFFFF" }}>
         <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 72 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#10195A", background: "#FEFFF9", padding: "6px 14px" }}>
-                Ground Truth
-              </span>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span style={{ ...KICKER, color: "#10195A", background: "#E8863A" }}>Ground Truth</span>
             </div>
-            <h2 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>
-              The daily reality inside South Sudan&apos;s facilities
-            </h2>
-            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "rgba(255,255,255,0.72)", maxWidth: 680 }}>
-              Documented across South Sudanese facilities, from the wards to the waiting line — the same failures
-              repeat on both sides of the consultation desk.
+            <h2 style={H2}>The daily reality inside South Sudan&apos;s facilities</h2>
+            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "rgba(255,255,255,0.84)", maxWidth: 680 }}>
+              Documented across South Sudanese facilities, from the wards to the waiting line — the same failures repeat
+              on both sides of the consultation desk.
             </p>
+          </div>
+
+          <div className="tm-grid-ground" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 40 }}>
+            {GROUND_STATS.map((g) => (
+              <div key={g.value} style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "4px solid #E8863A", paddingTop: 18 }}>
+                <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(52px, 5vw, 72px)", fontWeight: 600, color: "#F5A263", lineHeight: 1, letterSpacing: "-0.02em" }}>
+                  {g.value}
+                </span>
+                <span style={{ fontSize: 14, lineHeight: 1.5, fontWeight: 600, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: "0.05em" }}>{g.label}</span>
+              </div>
+            ))}
           </div>
           <div className="tm-grid-insights" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 24 }}>
             {INSIGHTS.map((ins) => (
-              <div key={ins.number} style={{ background: ins.bg, color: ins.fg, border: `1.5px solid ${ins.borderColor}`, padding: "34px 34px 36px", display: "flex", flexDirection: "column", gap: 22, boxShadow: `8px 8px 0 ${ins.shadow}` }}>
+              <div
+                key={ins.number}
+                className="tm-insight-card"
+                style={{
+                  background: ins.bg,
+                  color: ins.fg,
+                  border: `1.5px solid ${ins.borderColor}`,
+                  padding: "34px 34px 36px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 22,
+                  boxShadow: `8px 8px 0 ${ins.shadow}`,
+                  transition: "box-shadow 0.22s ease, transform 0.22s ease",
+                  ["--tm-insight-shadow" as string]: ins.shadow,
+                }}
+              >
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: ins.kickerColor }}>
@@ -754,7 +693,7 @@ export default function Home() {
                   </div>
                   <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 60, fontWeight: 700, lineHeight: 1, color: ins.numColor }}>{ins.number}</span>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                <div style={{ display: "flex", flexDirection: "column" }}>
                   {ins.points.map((pt) => (
                     <div key={pt} style={{ display: "flex", gap: 14, alignItems: "baseline", padding: "13px 0", borderTop: `1px solid ${ins.rule}` }}>
                       <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: ins.kickerColor }}>→</span>
@@ -772,102 +711,207 @@ export default function Home() {
       <section id="solution" className="tm-section" style={{ padding: "100px 32px", background: "#FFFFFF", borderTop: "1.5px solid #10195A" }}>
         <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#FFFFFF", background: "#10195A", padding: "6px 14px" }}>
-                The Solution
-              </span>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span style={{ ...KICKER, color: "#FFFFFF", background: "#10195A" }}>The Solution</span>
             </div>
-            <h2 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>
-              Simple enough for the front desk. Strong enough for the nation.
-            </h2>
+            <h2 style={H2}>Simple enough for the front desk. Strong enough for the nation.</h2>
+            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#64748B", maxWidth: 680 }}>
+              Everything the paper system loses — history, time, trust — Tamam keeps. One offline-first record that
+              follows the patient through every visit.
+            </p>
           </div>
 
           <div className="tm-compare-strip" style={{ display: "flex", alignItems: "stretch", gap: 0, flexWrap: "wrap", border: "1.5px solid #10195A" }}>
-            <div className="tm-compare-col" style={{ flex: 1, minWidth: 220, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 8, textAlign: "center", padding: "36px 28px", background: "#FADCDC" }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#7A2020" }}>
-                The current system
+            <div className="tm-compare-col" style={{ flex: 1.1, minWidth: 250, display: "flex", flexDirection: "column", gap: 18, padding: "34px 30px", background: "#F8E3D2" }}>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#9A4A12" }}>
+                Today — fragmented on paper
               </span>
-              <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, color: "#7A2020", lineHeight: 1.2 }}>
-                Decentralized, fragmented data
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
+                {PAPER_CHIPS.map((chip) => (
+                  <span
+                    key={chip.label}
+                    style={{
+                      display: "inline-block",
+                      background: "#FEFFF9",
+                      border: "1px solid #C88A5A",
+                      color: "#7A3D10",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      padding: "8px 14px",
+                      transform: `rotate(${chip.rotate}deg)`,
+                      boxShadow: "2px 2px 0 rgba(154,74,18,0.25)",
+                    }}
+                  >
+                    {chip.label}
+                  </span>
+                ))}
+              </div>
+              <span style={{ fontSize: 13.5, lineHeight: 1.55, color: "#9A4A12" }}>
+                Scattered across desks, drawers, and memory — lost with every flood, fire, and transfer.
               </span>
             </div>
-            <div className="tm-compare-col" style={{ flex: 1.2, minWidth: 260, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 12, padding: "36px 28px", background: "#FEFFF9", borderLeft: "1.5px solid #10195A", borderRight: "1.5px solid #10195A" }}>
+            <div
+              className="tm-compare-col"
+              style={{
+                flex: 0.9,
+                minWidth: 230,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 14,
+                padding: "34px 26px",
+                background: "#FEFFF9",
+                borderLeft: "1.5px solid #10195A",
+                borderRight: "1.5px solid #10195A",
+              }}
+            >
+              <span style={{ fontSize: 22, color: "#94A3B8" }}>→</span>
+              <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 96, height: 96 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/assets/tamam-logo-mark.svg" alt="" style={{ height: 54, width: "auto", position: "relative" }} />
+              </span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/tamam-logo-mark.svg" alt="" style={{ height: 58, width: "auto" }} />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/tamam-logo-type.svg" alt="Tamam Healthcare System" style={{ height: 17, width: "auto" }} />
+              <img src="/assets/tamam-logo-type.svg" alt="Tamam Healthcare System" style={{ height: 16, width: "auto" }} />
+              <span style={{ fontSize: 22, color: "#94A3B8" }}>→</span>
             </div>
-            <div className="tm-compare-col" style={{ flex: 1, minWidth: 220, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 8, textAlign: "center", padding: "36px 28px", background: "#DDF2FB" }}>
+            <div className="tm-compare-col" style={{ flex: 1.1, minWidth: 250, display: "flex", flexDirection: "column", gap: 18, padding: "34px 30px", background: "#DDF2FB" }}>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#015697" }}>
-                What Tamam offers
+                With Tamam — one connected record
               </span>
-              <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, color: "#015697", lineHeight: 1.2 }}>
-                Digitized healthcare
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {TAMAM_CHECKS.map((c) => (
+                  <span key={c} style={{ background: "#FEFFF9", border: "1px solid #2191D0", color: "#015697", fontSize: 13, fontWeight: 600, padding: "9px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ color: "#2191D0" }}>✓</span> {c}
+                  </span>
+                ))}
+              </div>
+              <span style={{ fontSize: 13.5, lineHeight: 1.55, color: "#015697" }}>
+                Offline-first, synced when connection returns — nothing lost, nothing rewritten.
               </span>
             </div>
           </div>
 
-          <div className="tm-grid-principles" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 1, background: "#10195A", border: "1.5px solid #10195A" }}>
-            {PRINCIPLES.map((p) => (
-              <div key={p.number} className="tm-principle-card" style={{ background: "#FEFFF9", padding: "30px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
-                <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 48, fontWeight: 700, color: "#DDF2FB", lineHeight: 1, WebkitTextStroke: "1.5px #2191D0" }}>
-                  {p.number}
-                </span>
-                <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 21, fontWeight: 600, margin: 0, lineHeight: 1.2 }}>{p.title}</h3>
-                <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: "#26336F" }}>{p.body}</p>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div className="tm-grid-insights" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0 56px", borderTop: "1.5px solid #10195A" }}>
+              {PRINCIPLES.map((p) => (
+                <div key={p.number} style={{ display: "flex", gap: 18, alignItems: "baseline", padding: "22px 4px", borderBottom: "1px solid #E2E8F0" }}>
+                  <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 26, fontWeight: 700, color: "#2191D0", lineHeight: 1, minWidth: 40 }}>{p.number}</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 19, fontWeight: 600, margin: 0, lineHeight: 1.2 }}>{p.title}</h3>
+                    <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#26336F" }}>{p.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ background: "#EFF8FD", border: "1px solid #DDF2FB", padding: "24px 28px", display: "flex", flexDirection: "column", gap: 16, marginTop: 28 }}>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "#015697" }}>
+                What connected records change
+              </span>
+              <div className="tm-grid-ground" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 28 }}>
+                {OUTCOMES.map((o) => (
+                  <div key={o.title} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700 }}>{o.title}</span>
+                    <span style={{ fontSize: 13.5, lineHeight: 1.55, color: "#26336F" }}>{o.body}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* ═══ 04 The Platform ═══ */}
-      <section id="platform" className="tm-section" style={{ padding: "100px 32px", background: "#FEFFF9" }}>
-        <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#FFFFFF", background: "#10195A", padding: "6px 14px" }}>
-                The Platform
-              </span>
+      <section id="platform" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#10195A", color: "#FFFFFF", overflow: "hidden" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: "30%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 900,
+            height: 600,
+            borderRadius: 999,
+            background: "radial-gradient(ellipse, rgba(33,145,208,0.22) 0%, rgba(33,145,208,0) 65%)",
+            pointerEvents: "none",
+          }}
+        />
+        <div style={{ position: "relative", maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 52 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center", textAlign: "center" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span style={{ ...KICKER, color: "#10195A", background: "#FEFFF9" }}>The Platform</span>
             </div>
-            <h2 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>
-              One patient record, from front desk to national report
-            </h2>
+            <h2 style={{ ...H2, maxWidth: 800 }}>One patient record, from front desk to national report</h2>
+            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.65, color: "rgba(255,255,255,0.84)", maxWidth: 640 }}>
+              Follow a single visit through the platform — every step feeds the same encounter, and the encounter feeds
+              the nation&apos;s picture of health.
+            </p>
           </div>
 
-          <div className="tm-workflow" style={{ display: "flex", gap: 0, flexWrap: "wrap", border: "1.5px solid #10195A", alignSelf: "flex-start" }}>
-            {WORKFLOW_STEPS.map((step) => (
-              <span key={step.label} style={{ display: "inline-flex", alignItems: "center", fontFamily: "'DM Mono', monospace", fontSize: 13.5, fontWeight: 500, color: "#10195A", padding: "12px 20px", borderRight: "1px solid #10195A", background: step.bg }}>
-                {step.label}
+          <div style={{ display: "flex", flexDirection: "column", gap: 28, alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "center", flexWrap: "wrap", rowGap: 20 }}>
+              {STEP_DEFS.map((s, i) => {
+                const active = i === activeStep;
+                return (
+                  <button
+                    key={s.label}
+                    onClick={() => {
+                      startStepTimer();
+                      setActiveStep(i);
+                    }}
+                    className="tm-step-node-btn"
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 20px", minWidth: 92 }}
+                  >
+                    <span
+                      style={{
+                        width: 46,
+                        height: 46,
+                        borderRadius: 999,
+                        border: `1.5px solid ${active ? "#2191D0" : "rgba(255,255,255,0.55)"}`,
+                        background: active ? "#2191D0" : "transparent",
+                        color: active ? "#FFFFFF" : "rgba(255,255,255,0.82)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: 13,
+                        transition: "all 0.3s ease",
+                        boxShadow: active ? "0 0 24px rgba(33,145,208,0.55)" : "none",
+                      }}
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)", transition: "color 0.3s ease" }}>{s.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 14,
+                flexWrap: "wrap",
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                padding: "14px 24px",
+                maxWidth: 720,
+                margin: "0 auto",
+              }}
+            >
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7FC4EA", whiteSpace: "nowrap" }}>
+                {STEP_DEFS[activeStep].label}
               </span>
-            ))}
+              <span style={{ fontSize: 15, lineHeight: 1.55, color: "#E4EEFB" }}>{STEP_DEFS[activeStep].desc}</span>
+            </div>
           </div>
 
-          <div className="tm-grid-split" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 48, alignItems: "center" }}>
-            <div className="tm-shadow-plate" style={{ border: "1.5px solid #10195A", boxShadow: "12px 12px 0 #DDF2FB", position: "relative", aspectRatio: "3416 / 1974" }}>
-              <Image
-                src="/assets/Dashboard.png"
-                alt="TamamHealth platform dashboard"
-                fill
-                sizes="(max-width: 1023px) 100vw, 50vw"
-                style={{ objectFit: "cover" }}
-              />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-              <p style={{ margin: 0, fontSize: 17, lineHeight: 1.65, color: "#26336F" }}>
-                From the front desk to the ward, every step in TamamHealth links back to the same patient encounter.
-                Clinicians, facility teams, and health leaders work from cleaner records without duplicating data.
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 0, border: "1.5px solid #10195A" }}>
-                {OUTCOMES.map((o) => (
-                  <div key={o.title} style={{ display: "flex", gap: 16, alignItems: "flex-start", padding: "18px 20px", borderBottom: o.border, background: "#FFFFFF" }}>
-                    <span style={{ fontFamily: "'DM Mono', monospace", color: "#2191D0", fontSize: 16, fontWeight: 700, lineHeight: 1.4 }}>✓</span>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                      <span style={{ fontSize: 15.5, fontWeight: 700 }}>{o.title}</span>
-                      <span style={{ fontSize: 14, lineHeight: 1.55, color: "#26336F" }}>{o.body}</span>
-                    </div>
-                  </div>
-                ))}
+          <div style={{ width: "100%", maxWidth: 1020, margin: "0 auto" }}>
+            <div className="tm-shadow-plate" style={{ border: "1px solid rgba(255,255,255,0.3)", background: "#0B1145", boxShadow: "0 48px 110px rgba(0,0,0,0.55)" }}>
+              <Image src="/assets/Dashboard.png" alt="TamamHealth platform dashboard" width={1920} height={1109} style={{ display: "block", width: "100%", height: "auto" }} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", padding: "13px 20px", borderTop: "1px solid rgba(255,255,255,0.25)", background: "#0B1145" }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "rgba(255,255,255,0.75)" }}>Facility dashboard — Wau State Hospital, demo data</span>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#7FC4EA" }}>● Offline-first · syncs when connected</span>
               </div>
             </div>
           </div>
@@ -878,14 +922,10 @@ export default function Home() {
       <section id="products" className="tm-section" style={{ padding: "100px 32px", background: "#FFFFFF", borderTop: "1.5px solid #10195A" }}>
         <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#FFFFFF", background: "#10195A", padding: "6px 14px" }}>
-                The Products
-              </span>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span style={{ ...KICKER, color: "#FFFFFF", background: "#10195A" }}>The Products</span>
             </div>
-            <h2 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>
-              Six products, one connected encounter
-            </h2>
+            <h2 style={H2}>Six products, one connected encounter</h2>
             <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#64748B", maxWidth: 680 }}>
               From referral hospitals to single-room clinics — every product ties back to the same record, built for
               intermittent connectivity.
@@ -893,23 +933,31 @@ export default function Home() {
           </div>
           <div className="tm-grid-products" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 24 }}>
             {PRODUCTS.map((prod) => (
-              <div key={prod.acronym} className="tm-product-card" style={{ background: "#FEFFF9", border: "1.5px solid #10195A", display: "flex", flexDirection: "column" }}>
-                <div style={{ position: "relative", borderBottom: "1.5px solid #10195A", height: 200 }}>
-                  <Image
-                    src={prod.image}
-                    alt={prod.imageAlt}
-                    fill
-                    sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw"
-                    style={{ objectFit: "cover" }}
-                  />
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,17,69,0.45) 0%, rgba(11,17,69,0) 45%)" }} />
-                  <span style={{ position: "absolute", top: 0, right: 0, fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, letterSpacing: "0.08em", background: "#10195A", color: "#FFFFFF", padding: "8px 16px" }}>
+              <div key={prod.acronym} className="tm-product-card" style={{ background: "#FEFFF9", border: "1.5px solid #10195A", display: "flex", flexDirection: "column", transition: "box-shadow 0.22s ease, transform 0.22s ease" }}>
+                <div style={{ position: "relative", borderBottom: "1.5px solid #10195A" }}>
+                  <div style={{ position: "relative", width: "100%", height: 200 }}>
+                    <Image src={prod.image} alt={prod.imageAlt} fill sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw" style={{ objectFit: "cover", objectPosition: "center 25%" }} />
+                  </div>
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      right: 0,
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      letterSpacing: "0.08em",
+                      background: "#10195A",
+                      color: "#FFFFFF",
+                      padding: "8px 16px",
+                    }}
+                  >
                     {prod.acronym}
                   </span>
                 </div>
                 <div style={{ padding: "24px 26px 28px", display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
                   <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, margin: 0, lineHeight: 1.15 }}>{prod.title}</h3>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#2191D0", textTransform: "uppercase", letterSpacing: "0.04em" }}>{prod.tagline}</p>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#015697", textTransform: "uppercase", letterSpacing: "0.04em" }}>{prod.tagline}</p>
                   <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#26336F" }}>{prod.description}</p>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: "auto", paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
                     {prod.modules.map((m) => (
@@ -929,15 +977,11 @@ export default function Home() {
       <section id="goal" className="tm-section" style={{ padding: "100px 32px", background: "#10195A", color: "#FFFFFF" }}>
         <div className="tm-grid-split" style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 56, alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#10195A", background: "#FEFFF9", padding: "6px 14px" }}>
-                The Goal
-              </span>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span style={{ ...KICKER, color: "#10195A", background: "#FEFFF9" }}>The Goal</span>
             </div>
-            <h2 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>
-              Prove it works, then bring it to every clinic that needs it
-            </h2>
-            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.65, color: "rgba(255,255,255,0.75)" }}>
+            <h2 style={H2}>Prove it works, then bring it to every clinic that needs it</h2>
+            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.65, color: "rgba(255,255,255,0.84)" }}>
               We&apos;re raising <strong style={{ color: "#7FC4EA" }}>$100,000</strong> to launch TamamHealth in 10
               clinics across Juba and greater South Sudan — proof that offline-first digital records can work in the
               hardest conditions on Earth.
@@ -945,8 +989,8 @@ export default function Home() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "rgba(255,255,255,0.25)", border: "1px solid rgba(255,255,255,0.25)" }}>
             {GOAL_STATS.map((g) => (
-              <div key={g.label} style={{ display: "flex", alignItems: "baseline", gap: 20, background: "#10195A", padding: "24px 28px" }}>
-                <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 46, fontWeight: 600, color: "#7FC4EA", lineHeight: 1, minWidth: 130, letterSpacing: "-0.02em" }}>
+              <div key={g.value} style={{ display: "flex", alignItems: "baseline", gap: 20, background: "#10195A", padding: "24px 28px" }}>
+                <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 54, fontWeight: 600, color: "#7FC4EA", lineHeight: 1, minWidth: 150, letterSpacing: "-0.02em" }}>
                   {g.value}
                 </span>
                 <span style={{ fontSize: 14.5, lineHeight: 1.45, color: "#E4EEFB", fontWeight: 500 }}>{g.label}</span>
@@ -960,27 +1004,16 @@ export default function Home() {
       <section id="team" className="tm-section" style={{ padding: "100px 32px", background: "#FEFFF9" }}>
         <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase", color: "#FFFFFF", background: "#10195A", padding: "6px 14px" }}>
-                The Team
-              </span>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span style={{ ...KICKER, color: "#FFFFFF", background: "#10195A" }}>The Team</span>
             </div>
-            <h2 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>
-              Built by people who&apos;ve lived this
-            </h2>
+            <h2 style={H2}>Built by people who know the problem</h2>
           </div>
           <div className="tm-grid-team" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 1, background: "#10195A", border: "1.5px solid #10195A" }}>
             {TEAM.map((t) => (
               <div key={t.name} className="tm-team-card" style={{ background: "#FEFFF9", display: "flex", flexDirection: "column" }}>
-                <div style={{ position: "relative", aspectRatio: "1", borderBottom: "1.5px solid #10195A" }}>
-                  <Image
-                    src={t.image}
-                    alt={t.name}
-                    fill
-                    sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 16vw"
-                    style={{ objectFit: "cover" }}
-                  />
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,17,69,0.32) 0%, rgba(11,17,69,0) 40%)" }} />
+                <div style={{ position: "relative", width: "100%", aspectRatio: "1", borderBottom: "1.5px solid #10195A" }}>
+                  <Image src={t.image} alt={t.name} fill sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 220px" style={{ objectFit: "cover" }} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "16px 18px 18px" }}>
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{t.name}</span>
@@ -1071,13 +1104,23 @@ export default function Home() {
               onClick={sendMessage}
               disabled={formStatus === "sending"}
               className="tm-submit-btn"
-              style={{ alignSelf: "flex-start", background: formStatus === "sent" ? "#1F9D55" : "#2191D0", color: "#FFFFFF", fontFamily: "'DM Sans', sans-serif", fontSize: 15.5, fontWeight: 700, padding: "15px 34px", border: "none", cursor: formStatus === "sending" ? "wait" : "pointer", letterSpacing: "0.02em", opacity: formStatus === "sending" ? 0.7 : 1 }}
+              style={{
+                alignSelf: "flex-start",
+                background: formStatus === "sent" ? "#1F9D55" : "#2191D0",
+                color: "#FFFFFF",
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 15.5,
+                fontWeight: 700,
+                padding: "15px 34px",
+                border: "none",
+                cursor: formStatus === "sending" ? "wait" : "pointer",
+                letterSpacing: "0.02em",
+                opacity: formStatus === "sending" ? 0.7 : 1,
+              }}
             >
               {formStatus === "sending" ? "Sending…" : formStatus === "sent" ? "Message sent ✓" : "Send message"}
             </button>
-            {formStatus === "error" && (
-              <p style={{ margin: 0, fontSize: 14, color: "#FFB4B4" }}>{formError}</p>
-            )}
+            {formStatus === "error" && <p style={{ margin: 0, fontSize: 14, color: "#FFB4B4" }}>{formError}</p>}
           </div>
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, flexWrap: "wrap", fontSize: 14, color: "#C7D8F5" }}>
@@ -1085,7 +1128,7 @@ export default function Home() {
               support.tamam@gmail.com
             </a>
             <span style={{ color: "rgba(255,255,255,0.3)" }}>|</span>
-            <span>Founded at Tufts University · building for South Sudan</span>
+            <span>Founded at Tufts University · starting in South Sudan, built to scale</span>
           </div>
         </div>
       </section>
@@ -1096,8 +1139,8 @@ export default function Home() {
         <div className="tm-footer-row" style={{ maxWidth: 1320, margin: "0 auto", display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", fontSize: 13, alignItems: "center" }}>
           <div className="tm-footer-brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/tamam-logo-mark.svg" alt="" style={{ height: 24, width: 24, flexShrink: 0 }} />
-            <span>© 2026 TamamHealth — digital health platform for South Sudan</span>
+            <img src="/assets/tamam-logo-mark.svg" alt="" style={{ height: 24, width: "auto", flexShrink: 0 }} />
+            <span>© 2026 TamamHealth — offline-first digital health infrastructure, starting in South Sudan</span>
           </div>
           <div className="tm-footer-links" style={{ display: "flex", gap: 20, fontFamily: "'DM Mono', monospace", fontSize: 12 }}>
             <span>Terms &amp; Conditions</span>

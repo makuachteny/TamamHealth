@@ -5,15 +5,29 @@ body {
   /* Matches the hero/footer navy rather than the page's cream sections, so
      mobile Safari's elastic overscroll (or any Android rubber-band/bounce)
      never flashes white above the hero or below the footer. */
-  background: #0B1145;
+  background: #0b1145;
   overflow-x: hidden;
 }
 
-.tm-btn-label-short {
-  display: none;
+html {
+  scroll-behavior: smooth;
+}
+
+section[id] {
+  scroll-margin-top: 78px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.6);
 }
 
 /* ── Breakpoints: desktop ≥1024 · tablet 640–1023 · mobile ≤639 ── */
+.tm-right-col {
+  width: 470px;
+  box-sizing: border-box;
+}
+
 @media (min-width: 1024px) {
   .tm-nav-burger,
   .tm-nav-drawer {
@@ -21,7 +35,24 @@ body {
   }
 }
 
+@media (max-width: 1279px) and (min-width: 1024px) {
+  .tm-right-col {
+    width: 420px;
+  }
+}
+
+@media (max-width: 1023px) and (min-width: 640px) {
+  .tm-hero-msg.tm-right-col {
+    width: min(470px, 52vw);
+    right: 24px !important;
+  }
+}
+
 @media (max-width: 1023px) {
+  .tm-grid-platform {
+    grid-template-columns: 1fr !important;
+    gap: 32px !important;
+  }
   .tm-nav-links {
     display: none !important;
   }
@@ -59,23 +90,32 @@ body {
 }
 
 @media (max-width: 639px) {
+  #platform .tm-step-node-btn {
+    padding: 0 10px !important;
+    min-width: 74px !important;
+  }
   .tm-section {
     padding: 64px 16px !important;
   }
   .tm-hero {
     min-height: 100vh !important;
+    justify-content: space-between !important;
   }
   .tm-hero-pad {
-    padding: 120px 16px 28px !important;
+    padding: 0 32px 24px !important;
+  }
+  .tm-hero-msg.tm-right-col {
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 112px 32px 0 !important;
   }
   .tm-hero-sub {
     font-size: 15.5px !important;
-    padding-left: 0 !important;
-  }
-  .tm-hero-line,
-  .tm-hero-slide-extra,
-  .tm-hero-dots {
-    display: none !important;
+    padding-left: 14px !important;
   }
   .tm-grid-products,
   .tm-grid-insights,
@@ -95,34 +135,9 @@ body {
   .tm-form-pad {
     padding: 24px 16px !important;
   }
-  .tm-btn-row {
-    flex-wrap: nowrap !important;
-    gap: 10px !important;
-  }
   .tm-btn-row a {
-    flex: 1 1 0;
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    padding: 13px 12px !important;
-    font-size: 13.5px !important;
+    flex: 1 1 auto;
     text-align: center;
-    white-space: nowrap;
-  }
-  .tm-btn-label-full {
-    display: none;
-  }
-  .tm-btn-label-short {
-    display: inline;
-  }
-  .tm-compare-strip {
-    flex-direction: column !important;
-  }
-  .tm-compare-col {
-    min-width: 0 !important;
-    width: 100%;
-    box-sizing: border-box;
   }
   .tm-workflow span {
     flex: 1 1 auto;
@@ -161,13 +176,15 @@ body {
   background: #369fda !important;
 }
 .tm-hero-btn-secondary:hover {
-  background: #ddf2fb !important;
+  background: #fefff9 !important;
 }
-.tm-principle-card:hover {
-  background: #eff8fd !important;
+.tm-insight-card:hover {
+  box-shadow: 12px 12px 0 var(--tm-insight-shadow) !important;
+  transform: translate(-4px, -4px);
 }
 .tm-product-card:hover {
-  box-shadow: 8px 8px 0 #ddf2fb !important;
+  box-shadow: 10px 10px 0 #ddf2fb !important;
+  transform: translate(-4px, -4px);
 }
 .tm-team-card:hover {
   background: #eff8fd !important;
