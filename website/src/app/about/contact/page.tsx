@@ -80,6 +80,9 @@ export default function ContactPage() {
   useEffect(() => {
     const requestedIntent = parseIntent(new URLSearchParams(window.location.search).get("intent"));
     if (!requestedIntent) return;
+    // One-time mount initialization from the URL query (browser-only); the
+    // synchronous set is the correct pattern here, not a derived-state anti-pattern.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData((prev) => ({
       ...prev,
       intent: requestedIntent,
