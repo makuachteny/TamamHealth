@@ -6,8 +6,9 @@
  * Controlled component: captured templates accumulate in `value` (parent form
  * state) and are persisted by the parent AFTER the patient record is created
  * (see patients/new). Talks to the local fingerprint-bridge via
- * fingerprint-service; renders nothing when the feature flag is off and
- * degrades to an informational note when the bridge/scanner is unavailable —
+ * fingerprint-service; degrades to an informational note when the feature
+ * flag is off or the bridge/scanner is unavailable — the section stays
+ * visible so staff know fingerprint intake is part of registration, but
  * registration must never depend on biometric hardware.
  */
 
@@ -64,9 +65,8 @@ export default function FingerprintCapture({ value, onChange }: FingerprintCaptu
     if (isFingerprintEnabled()) refreshStatus();
   }, [refreshStatus]);
 
-  if (!isFingerprintEnabled()) return null;
-
-  const ready = !!status?.available && !!status?.scannerConnected;
+  const enabled = isFingerprintEnabled();
+  const ready = enabled && !!status?.available && !!status?.scannerConnected;
 
   const handleCapture = async () => {
     setCapturing(true);
@@ -108,7 +108,11 @@ export default function FingerprintCapture({ value, onChange }: FingerprintCaptu
         {t('fingerprint.sectionDesc')}
       </p>
 
-      {!ready ? (
+      {!enabled ? (
+        <div className="flex items-center gap-2 p-3 rounded-lg text-xs" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border-light)' }}>
+          <span>{t('fingerprint.featureDisabled')}</span>
+        </div>
+      ) : !ready ? (
         <div className="flex items-center gap-2 p-3 rounded-lg text-xs" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border-light)' }}>
           <span>{status?.available ? t('fingerprint.scannerDisconnected') : t('fingerprint.bridgeUnavailable')}</span>
           <button type="button" onClick={refreshStatus} className="btn btn-secondary btn-sm ml-auto">

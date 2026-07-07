@@ -16,10 +16,7 @@
     "test:ci": "jest --ci --coverage",
     "db:migrate": "tsx scripts/migrate.ts",
     "setup:couchdb:validators": "node scripts/install-validate-doc-updates.mjs",
-    "docs:api": "typedoc",
-    "license:generate": "node scripts/license.mjs generate",
-    "license:verify": "node scripts/license.mjs verify",
-    "release": "node scripts/release.mjs"
+    "docs:api": "typedoc"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.62.0",

@@ -231,9 +231,11 @@ export default function EhrTopRail() {
         <EhrTopActions items={quickActionItems.slice(0, 6)} navLabel={navLabel} onOpenModule={openModule} />
       </nav>
 
-      {/* Hospital name intentionally not shown — this slot stays as a spacer
-          so the rail's centre column keeps the layout balanced. */}
-      <div aria-hidden className="ehr-top-hospital-name" />
+      {currentUser && (
+        <div className="ehr-top-hospital-name">
+          <span>{currentUser.hospitalName || currentUser.branding.name}</span>
+        </div>
+      )}
 
       <button
         type="button"

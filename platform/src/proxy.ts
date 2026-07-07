@@ -224,10 +224,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Public pages — product, public-stats, patient-portal, legal pages
+  // Public pages — root (redirects to /login), public-stats, patient-portal, legal pages
   if (
     pathname === '/' ||
-    pathname === '/product' ||
     pathname === '/public-stats' ||
     pathname === '/patient-portal' ||
     pathname === '/terms' ||

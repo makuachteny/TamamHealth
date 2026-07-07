@@ -16,12 +16,8 @@ feature work.
 git clone <repo-url> && cd TamamHealth/platform
 npm install
 
-# Interactive setup: writes .env.local, prompts for a license key
+# Interactive setup: writes .env.local
 npm run setup
-
-# No license? Generate a local trial key:
-npm run license:generate -- "Local Dev" 20271231 trial
-# Paste the TAMAMHEALTH-... key into .env.local as TAMAMHEALTH_LICENSE_KEY
 
 # macOS/Linux: raise the file-descriptor limit first or Next.js dev mode
 # hits EMFILE errors and every route 404s:

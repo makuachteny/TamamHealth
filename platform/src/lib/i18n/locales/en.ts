@@ -1641,6 +1641,7 @@ const en: TranslationMap = {
   'fingerprint.confidence': 'Match confidence: {{score}}%',
   'fingerprint.consentLabel': 'The patient consents to having their fingerprint template stored for identification at this organization. Only a mathematical template is stored — never an image of the fingerprint.',
   'fingerprint.enrollFailed': 'Patient was registered, but saving fingerprints failed. You can enroll them later.',
+  'fingerprint.featureDisabled': 'Fingerprint enrollment is not enabled at this facility. Patients can still be registered and identified by photo, hospital number, or geocode ID.',
   'fingerprint.fingerLeftIndex': 'Left index',
   'fingerprint.fingerLeftLittle': 'Left little',
   'fingerprint.fingerLeftMiddle': 'Left middle',

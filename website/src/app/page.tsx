@@ -943,7 +943,7 @@ export default function Home() {
               </span>
             </div>
             <h2 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>
-              Built by people who know the problem
+              Built by people who&apos;ve lived this
             </h2>
           </div>
           <div className="tm-grid-team" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 1, background: "#10195A", border: "1.5px solid #10195A" }}>

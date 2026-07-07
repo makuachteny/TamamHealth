@@ -19,7 +19,6 @@ missing or weak — the rules live in `src/lib/config-validation.ts` and run fro
 
 - [ ] `NEXT_PUBLIC_DEMO_MODE=false` — disables seed data + the demo-credentials endpoint.
 - [ ] `JWT_SECRET` — `openssl rand -base64 48` (≥32 chars, no placeholder).
-- [ ] `TAMAMHEALTH_LICENSE_SECRET` — `openssl rand -base64 48`. **Operator key**; signs every tenant license. Never the public default.
 - [ ] `ADMIN_INITIAL_PASSWORD` — set, or read the auto-generated value from `platform/.seed-credentials.json` after first boot. No placeholder.
 - [ ] `NEXT_PUBLIC_ADMIN_PASSWORD` — **must be unset** (it would bundle into client JS).
 - [ ] `DATABASE_URL` — Postgres for national analytics (migrations run at boot).
@@ -56,26 +55,13 @@ suspension. The control **fails open** on a transient DB read error (a live
 clinic is never bricked by an outage) and **fails closed** only on an explicit
 operator action.
 
-### 2.2 License expiry & renewal
-
-Licenses are HMAC-SHA256 signed (`src/lib/license.ts`), signed with
-`TAMAMHEALTH_LICENSE_SECRET`. Format:
-`TAMAMHEALTH-<org-slug>-<YYYYMMDD>-<plan>-<signature>`.
-
-- Issue / rotate with `npm run license`.
-- The app logs a loud warning at boot when the license is missing or expired
-  (`src/instrumentation.ts`). Hard enforcement of clinical access is done via
-  the tenant kill-switch (§2.1) rather than auto-bricking on the expiry date —
-  patient safety means we don't hard-stop a clinic mid-shift; suspend
-  deliberately instead.
-
-### 2.3 Token revocation (per user / per session)
+### 2.2 Token revocation (per user / per session)
 
 `docs/security/token-revocation.md` — logout and admin deactivation revoke a
 user's JWT. Deactivating a user (`isActive=false`) is enforced on every request
 in the same gate as the tenant check.
 
-### 2.4 Usage telemetry / monitoring
+### 2.3 Usage telemetry / monitoring
 
 - **Errors / performance:** Sentry (`SENTRY_DSN`), PHI-scrubbed. Thresholds and
   PagerDuty wiring in `docs/operations/monitoring.md`.
@@ -84,10 +70,10 @@ in the same gate as the tenant check.
   (user counts, hospitals, activity); national analytics dashboards aggregate
   cross-org once `DATABASE_URL` is set.
 
-### 2.5 Controlled updates / patches
+### 2.4 Controlled updates / patches
 
-- Ship only signed, tagged releases via `scripts/release.mjs` (`npm run release`);
-  pin the container image by digest, not a floating tag.
+- Ship only signed, tagged releases; pin the container image by digest, not a
+  floating tag.
 - Postgres migrations are applied at boot under an advisory lock
   (`src/lib/db/migrate.ts`) so rolling replicas can't race; an out-of-order or
   edited migration refuses to start.
@@ -162,7 +148,6 @@ Automate and **test restores quarterly** — an untested backup is not a backup.
 NODE_ENV=production
 NEXT_PUBLIC_DEMO_MODE=false
 JWT_SECRET=$(openssl rand -base64 48)
-TAMAMHEALTH_LICENSE_SECRET=$(openssl rand -base64 48)
 DATABASE_URL=postgresql://…
 # HTTPS terminated upstream; secure cookies + CSP on
 # Optional but recommended:

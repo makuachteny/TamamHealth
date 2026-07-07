@@ -257,7 +257,11 @@ export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
 // populated and scrollable.
 // Bumped to 42: per-patient sample problem list + current medications for every
 // patient (all rosters) so all four chart-summary windows are populated.
-export const SEED_VERSION = 43;
+// Bumped to 44: seeded appointments no longer double-book — each facility's
+// today bookings draw from a shared slot allocator (and the handful of static
+// rows that collided were re-timed), so the day calendar shows one
+// appointment per slot.
+export const SEED_VERSION = 44;
 
 export async function isSeeded(): Promise<boolean> {
   try {

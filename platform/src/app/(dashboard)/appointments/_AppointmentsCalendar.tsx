@@ -124,6 +124,11 @@ export default function AppointmentsCalendar({
       popup
       style={{ height: '100%' }}
       scrollToTime={new Date(1970, 0, 1, 7, 0, 0)}
+      // Side-by-side columns for concurrent appointments. The default
+      // "overlap" algorithm stretches every event to the right edge and
+      // cascades overlapping ones on top of each other, hiding all but the
+      // topmost — unusable on a busy clinic day.
+      dayLayoutAlgorithm="no-overlap"
       // No hover tooltip — it just repeated the time + title already shown in the
       // event block. And blank the in-event time label in day/week views since
       // the time gutter on the left already conveys the time (no repetition).

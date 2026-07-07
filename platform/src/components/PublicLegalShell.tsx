@@ -23,12 +23,11 @@ export default function PublicLegalShell({
       {/* ── Header ── */}
       <header className="lg-header">
         <div className="lg-container lg-header__inner">
-          <Link href="/product" className="lg-logo">
+          <Link href="/login" className="lg-logo">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/logos/SVG/Tamam_Style_Guide-21.svg" alt="TamamHealth" style={{ height: 26, width: 'auto' }} />
           </Link>
           <nav className="lg-header__nav">
-            <Link href="/product" className="lg-header__link">Home</Link>
             <Link href="/login" className="lg-btn-secondary">Staff Sign In</Link>
           </nav>
         </div>
@@ -51,7 +50,7 @@ export default function PublicLegalShell({
         <div className="lg-container lg-footer__inner">
           <p>© {new Date().getFullYear()} TamamHealth. All rights reserved.</p>
           <nav className="lg-footer__nav">
-            <Link href="/product">Home</Link>
+            <Link href="/login">Home</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
             <a href="mailto:support.tamam@gmail.com">Contact</a>

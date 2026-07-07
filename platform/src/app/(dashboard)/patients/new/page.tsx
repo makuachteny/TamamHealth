@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, ArrowLeft, ArrowRight, Trash2, UserPlus, MapPin, Users, Wallet, ClipboardList } from '@/components/icons/lucide';
+import { Check, ArrowLeft, ArrowRight, Trash2, UserPlus, MapPin, Users, ScanLine, Wallet, ClipboardList } from '@/components/icons/lucide';
 import FingerprintCapture, { type CapturedFingerprint } from '@/components/FingerprintCapture';
 import { statesAndCounties, states, tribes, languages } from '@/data/mock';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -20,15 +20,16 @@ interface PatientRegistrationFormProps {
 
 export function PatientRegistrationForm({ embedded = false, onCancel, onRegistered }: PatientRegistrationFormProps = {}) {
   const { t } = useTranslation();
-  const steps = [t('patientNew.stepDemographics'), t('patientNew.stepContactLocation'), t('patientNew.stepNextOfKin'), 'Payment Coverage', t('patientNew.stepReview')];
+  const steps = [t('patientNew.stepDemographics'), t('patientNew.stepContactLocation'), t('patientNew.stepNextOfKin'), 'Biometrics', 'Payment Coverage', t('patientNew.stepReview')];
   const stepDescriptions = [
     'Capture the patient identity details used across triage, visits, and records.',
     'Record contact, household, geocode, and location information.',
-    'Add a reliable contact, optional patient photo, and fingerprint enrollment when available.',
+    'Add reliable family or friend contacts for follow-up and care decisions.',
+    'Capture the patient photo and enroll fingerprints for identification at future visits.',
     'Set how the patient will be billed or covered at checkout.',
     'Confirm the registration details before creating the chart.',
   ];
-  const stepIcons = [UserPlus, MapPin, Users, Wallet, ClipboardList];
+  const stepIcons = [UserPlus, MapPin, Users, ScanLine, Wallet, ClipboardList];
   const router = useRouter();
   const { create: createPatient } = usePatients();
   const { currentUser } = useApp();
@@ -578,6 +579,22 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     + Add another contact
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* Step 3: Biometrics — patient photo and fingerprint enrollment */}
+            {step === 3 && (
+              <div className="registration-section">
+                <div className="registration-section-header">
+                  <div>
+                    <p>Identity verification</p>
+                    <h3>Photo &amp; Fingerprint</h3>
+                  </div>
+                  <span>Optional but recommended</span>
+                </div>
+                <p className="registration-section-note">
+                  A photo and fingerprints let staff confirm this patient&apos;s identity at future visits, even when documents or a hospital card are unavailable.
+                </p>
 
                 {/* Patient photo capture */}
                 <div className="registration-inline-panel registration-inline-panel--media">
@@ -635,8 +652,8 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
               </div>
             )}
 
-            {/* Step 3: Payment Coverage */}
-            {step === 3 && (
+            {/* Step 4: Payment Coverage */}
+            {step === 4 && (
               <div className="registration-section">
                 <div className="registration-section-header">
                   <div>
@@ -712,8 +729,8 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
               </div>
             )}
 
-            {/* Step 4: Review */}
-            {step === 4 && (
+            {/* Step 5: Review */}
+            {step === 5 && (
               <div className="registration-section">
                 <div className="registration-review-heading">
                   <div style={{ width: 60, height: 60, borderRadius: 12, overflow: 'hidden', flexShrink: 0, border: '1px solid var(--border-light)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -747,6 +764,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                       {geocodeId && <p className="text-sm font-mono"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewGeocodeId')}</span> {geocodeId}</p>}
                       {form.nationalId && <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewNationalId')}</span> {form.nationalId}</p>}
                       <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewNok')}</span> {form.nokName} ({form.nokRelationship})</p>
+                      <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Fingerprints:</span> {fingerprints.length > 0 ? `${fingerprints.length} enrolled` : 'Not captured'}</p>
                     </div>
                   </div>
                   <div className="registration-review-card">

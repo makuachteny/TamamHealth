@@ -1,13 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { AppointmentDoc, AppointmentStatus } from '@/lib/db-types';
 import {
   ArrowRightLeft,
   Calendar,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   ClipboardCheck,
   ClipboardList,
   FlaskConical,
@@ -26,6 +28,8 @@ import { useInsuredPatientIds } from '@/lib/hooks/usePayments';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useWards } from '@/lib/hooks/useWards';
+import Modal from '@/components/Modal';
+import InsuranceSnapshot from '@/components/payments/InsuranceSnapshot';
 import {
   toIsoDate,
   parseIsoDate,
@@ -148,7 +152,7 @@ export default function EhrClinicalDashboard({
   const searchParams = useSearchParams();
   const { showToast } = useToast();
   // Gate the "Start consultation" action to roles that can actually consult.
-  const { canConsult } = usePermissions();
+  const { canConsult, canBookAppointments } = usePermissions();
   // Coverage lives in insurance_policy docs, not on the appointment — one
   // bulk set of covered patient ids badges every row as Insured/Not insured.
   const insuredIds = useInsuredPatientIds();
@@ -172,6 +176,24 @@ export default function EhrClinicalDashboard({
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [openAppointment, setOpenAppointment] = useState<AppointmentDoc | null>(null);
   const [appointmentDetailTab, setAppointmentDetailTab] = useState<'visit' | 'financial'>('visit');
+  // Which action dropdown (if any) is open in the appointment detail popup.
+  const [detailMenuOpen, setDetailMenuOpen] = useState<'note' | 'more' | null>(null);
+  const noteMenuRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close whichever action dropdown is open on an outside click.
+  useEffect(() => {
+    if (!detailMenuOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      const ref = detailMenuOpen === 'note' ? noteMenuRef : moreMenuRef;
+      if (ref.current && !ref.current.contains(event.target as Node)) setDetailMenuOpen(null);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [detailMenuOpen]);
+
+  // A fresh appointment (or none) shouldn't inherit the previous one's open menu.
+  useEffect(() => { setDetailMenuOpen(null); }, [openAppointment?._id]);
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
   const [locationFilter, setLocationFilter] = useState('all');
   const [providerFilter, setProviderFilter] = useState<string[]>([]);
@@ -348,9 +370,14 @@ export default function EhrClinicalDashboard({
             </button>
           )}
           <button type="button" aria-label="Print" onClick={() => window.print()}><Printer className="w-4 h-4" /> Print</button>
-          <button type="button" className="primary" aria-label="Send intake" onClick={() => router.push('/patient-intake')}>
+          <button type="button" aria-label="Send intake" onClick={() => router.push('/patient-intake')}>
             <SendHorizontal className="w-4 h-4" /> Send intake
           </button>
+          {canBookAppointments && (
+            <button type="button" className="primary" aria-label="New appointment" onClick={() => router.push('/appointments?new=1')}>
+              <Plus className="w-4 h-4" /> New appointment
+            </button>
+          )}
         </div>
       </section>
 
@@ -759,42 +786,51 @@ export default function EhrClinicalDashboard({
           )}
 
           {openAppointment && (
-            <>
-              <button
-                type="button"
-                className="appointment-detail-backdrop"
-                aria-label="Close appointment details"
-                onClick={() => setOpenAppointment(null)}
-              />
-              <aside className="appointment-detail-sidebar" aria-label="Appointment details" role="dialog" aria-modal="true">
-                <div className="appointment-detail-sidebar__header">
-                  <button type="button" className="appointment-detail-sidebar__back" onClick={() => setOpenAppointment(null)} aria-label="Close appointment details">
-                    <ChevronLeft size={22} />
-                  </button>
-                  <div className="appointment-detail-sidebar__title">
-                    <h2>{openAppointment.patientName}</h2>
-                    <button
-                      type="button"
-                      onClick={() => openPatientRecord(openAppointment)}
-                    >
-                      Open patient record
-                    </button>
+            <Modal onClose={() => setOpenAppointment(null)} width={560}>
+              <div
+                className="modal-panel modal-panel--md"
+                style={{ width: '100%', maxHeight: 'min(85vh, 720px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}
+                aria-label="Appointment details"
+                role="dialog"
+                aria-modal="true"
+              >
+                <div className="appointment-detail-modal__header">
+                  <div className="appointment-detail-modal__header-row">
+                    <h2 className="appointment-detail-modal__time">{appointmentTimeRange(openAppointment)}</h2>
+                    <div className="appointment-detail-modal__header-right">
+                      <select
+                        value={openAppointment.status}
+                        className="appointment-detail-modal__status-select"
+                        aria-label="Appointment status"
+                        onChange={event => {
+                          const status = event.target.value as AppointmentStatus;
+                          void onUpdateAppointmentStatus?.(openAppointment._id, status);
+                          setOpenAppointment({ ...openAppointment, status });
+                        }}
+                      >
+                        {statusOptions.map(status => (
+                          <option key={status} value={status}>{statusLabel(status)}</option>
+                        ))}
+                      </select>
+                      <button type="button" className="appointment-detail-modal__close" onClick={() => setOpenAppointment(null)} aria-label="Close appointment details">
+                        <X size={16} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="appointment-detail-sidebar__status">
-                    <span>{statusLabel(openAppointment.status)}</span>
-                    <span>{typeLabel(openAppointment.priority)}</span>
+                  <div className="appointment-detail-modal__subrow">
+                    <button type="button" className="appointment-detail-modal__patient-link" onClick={() => openPatientRecord(openAppointment)}>
+                      {openAppointment.patientName}
+                    </button>
+                    <span className="appointment-detail-modal__priority-badge">{typeLabel(openAppointment.priority)}</span>
                     {isTelehealth(openAppointment) && (
                       <button type="button" className="appointment-detail-join-pill" onClick={() => joinTelehealth(openAppointment)}>
                         <Video className="w-3.5 h-3.5" /> Join
                       </button>
                     )}
                   </div>
-                  <button type="button" className="appointment-detail-sidebar__close" onClick={() => setOpenAppointment(null)} aria-label="Close appointment details">
-                    <X size={16} />
-                  </button>
                 </div>
 
-                <div className="appointment-detail-sidebar__tabs" role="tablist" aria-label="Appointment detail sections">
+                <div className="appointment-detail-modal__tabs" role="tablist" aria-label="Appointment detail sections">
                   <button
                     type="button"
                     role="tab"
@@ -815,39 +851,48 @@ export default function EhrClinicalDashboard({
                   </button>
                 </div>
 
-                <div className="appointment-detail-sidebar__body" role="tabpanel">
-                  {(appointmentDetailTab === 'visit'
-                    ? [
-                        { label: 'Resources', value: openAppointment.providerName || clinicianName || 'Unassigned' },
-                        { label: 'Appointment Mode', value: openAppointment.appointmentType === 'telehealth' ? 'Telehealth' : openAppointment.appointmentType === 'walk_in' ? 'Walk-in' : 'In Office' },
-                        { label: 'Date', value: formatAppointmentDate(openAppointment.appointmentDate) },
-                        { label: 'Time', value: appointmentTimeRange(openAppointment) },
-                        { label: 'Duration', value: `${openAppointment.duration} minutes` },
-                        { label: 'Location', value: openAppointment.facilityName || facilityName || 'Not assigned' },
-                        { label: 'Department', value: openAppointment.department || 'Not assigned' },
-                        { label: 'Visit Reason', value: openAppointment.reason || typeLabel(openAppointment.appointmentType) },
-                        { label: 'Phone', value: openAppointment.patientPhone || 'Not recorded' },
-                        { label: 'Language', value: patientLanguages.get(openAppointment.patientId) || 'Not recorded' },
-                        { label: 'Patient Intake', value: openAppointment.reminderSent ? 'Sent to patient' : 'Not sent to patient' },
-                        { label: 'Note', value: openAppointment.notes ? 'Note started' : 'Note not started' },
-                        ...(openAppointment.notes ? [{ label: 'Notes', value: openAppointment.notes }] : []),
-                      ]
-                    : [
+                <div className="appointment-detail-modal__body" role="tabpanel">
+                  {appointmentDetailTab === 'visit' ? (
+                    [
+                      { label: 'Resources', value: openAppointment.providerName || clinicianName || 'Unassigned' },
+                      { label: 'Appointment Mode', value: openAppointment.appointmentType === 'telehealth' ? 'Telehealth' : openAppointment.appointmentType === 'walk_in' ? 'Walk-in' : 'In Office' },
+                      { label: 'Date', value: formatAppointmentDate(openAppointment.appointmentDate) },
+                      { label: 'Time', value: appointmentTimeRange(openAppointment) },
+                      { label: 'Duration', value: `${openAppointment.duration} minutes` },
+                      { label: 'Location', value: openAppointment.facilityName || facilityName || 'Not assigned' },
+                      { label: 'Department', value: openAppointment.department || 'Not assigned' },
+                      { label: 'Visit Reason', value: openAppointment.reason || typeLabel(openAppointment.appointmentType) },
+                      { label: 'Phone', value: openAppointment.patientPhone || 'Not recorded' },
+                      { label: 'Language', value: patientLanguages.get(openAppointment.patientId) || 'Not recorded' },
+                      { label: 'Patient Intake', value: openAppointment.reminderSent ? 'Sent to patient' : 'Not sent to patient' },
+                      { label: 'Note', value: openAppointment.notes ? 'Note started' : 'Note not started' },
+                      ...(openAppointment.notes ? [{ label: 'Notes', value: openAppointment.notes }] : []),
+                    ].map(row => <DetailRow key={row.label} label={row.label} value={row.value} />)
+                  ) : (
+                    <>
+                      {[
                         { label: 'Balance', value: '$0.00' },
                         { label: 'Charge', value: openAppointment.status === 'completed' ? 'Ready for charge capture' : 'Charge not started' },
                         { label: 'Payment Responsibility', value: 'Not recorded' },
-                        { label: 'Insurance', value: insuredIds.has(openAppointment.patientId) ? 'Insured' : 'Not insured' },
                         { label: 'Claim Status', value: 'Not started' },
                         { label: 'Booked By', value: openAppointment.bookedByName || openAppointment.bookedBy || 'Not recorded' },
                         { label: 'Facility', value: openAppointment.facilityName || facilityName || 'Not assigned' },
                         { label: 'Facility Level', value: openAppointment.facilityLevel ? typeLabel(openAppointment.facilityLevel) : 'Not assigned' },
                         { label: 'Reminder', value: openAppointment.reminderSent ? `Sent${openAppointment.reminderChannel ? ` by ${openAppointment.reminderChannel}` : ''}` : 'Not sent' },
-                      ]).map(row => (
-                    <DetailRow key={row.label} label={row.label} value={row.value} />
-                  ))}
+                      ].map(row => <DetailRow key={row.label} label={row.label} value={row.value} />)}
+                      <div className="appointment-detail-modal__insurance">
+                        <div className="appointment-detail-modal__insurance-label">Insurance &amp; Eligibility</div>
+                        {openAppointment.patientId ? (
+                          <InsuranceSnapshot patientId={openAppointment.patientId} editable />
+                        ) : (
+                          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No patient linked to this appointment.</p>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                <div className="appointment-detail-sidebar__actions">
+                <div className="appointment-detail-modal__actions">
                   {isTelehealth(openAppointment) && (
                     <button
                       type="button"
@@ -858,13 +903,42 @@ export default function EhrClinicalDashboard({
                     </button>
                   )}
                   {canConsult && openAppointment.patientId ? (
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      onClick={() => router.push(`/consultation?patientId=${encodeURIComponent(openAppointment.patientId)}`)}
-                    >
-                      <Stethoscope className="w-4 h-4" /> Start consultation
-                    </button>
+                    <div className="appointment-detail-modal__split" ref={noteMenuRef}>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm appointment-detail-modal__split-main"
+                        onClick={() => router.push(`/consultation?patientId=${encodeURIComponent(openAppointment.patientId)}`)}
+                      >
+                        <Stethoscope className="w-4 h-4" /> Create Clinical Note
+                      </button>
+                      <button
+                        type="button"
+                        className="appointment-detail-modal__split-toggle"
+                        aria-label="More clinical note options"
+                        aria-expanded={detailMenuOpen === 'note'}
+                        onClick={() => setDetailMenuOpen(current => (current === 'note' ? null : 'note'))}
+                      >
+                        {detailMenuOpen === 'note' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+                      {detailMenuOpen === 'note' && (
+                        <div className="appointment-detail-modal__menu">
+                          <button
+                            type="button"
+                            onClick={() => { setDetailMenuOpen(null); router.push(`/consultation?patientId=${encodeURIComponent(openAppointment.patientId)}`); }}
+                          >
+                            <Stethoscope size={14} /> Start consultation
+                          </button>
+                          <button type="button" onClick={() => { setDetailMenuOpen(null); openPatientRecord(openAppointment); }}>
+                            <ClipboardList size={14} /> Open patient record
+                          </button>
+                          {isTelehealth(openAppointment) && (
+                            <button type="button" onClick={() => { setDetailMenuOpen(null); joinTelehealth(openAppointment); }}>
+                              <Video size={14} /> Join telehealth visit
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <button
                       type="button"
@@ -874,12 +948,32 @@ export default function EhrClinicalDashboard({
                       Open patient record
                     </button>
                   )}
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => router.push(`/appointments?appointment=${openAppointment._id}`)}>
-                    Open schedule
-                  </button>
+                  <div className="appointment-detail-modal__split" ref={moreMenuRef}>
+                    <button
+                      type="button"
+                      className="appointment-detail-modal__more-toggle"
+                      aria-expanded={detailMenuOpen === 'more'}
+                      onClick={() => setDetailMenuOpen(current => (current === 'more' ? null : 'more'))}
+                    >
+                      More Options {detailMenuOpen === 'more' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                    {detailMenuOpen === 'more' && (
+                      <div className="appointment-detail-modal__menu appointment-detail-modal__menu--right">
+                        <button
+                          type="button"
+                          onClick={() => { const id = openAppointment._id; setDetailMenuOpen(null); setOpenAppointment(null); router.push(`/appointments?appointment=${id}`); }}
+                        >
+                          <Calendar size={14} /> Reschedule or cancel
+                        </button>
+                        <button type="button" onClick={() => { setDetailMenuOpen(null); window.print(); }}>
+                          <Printer size={14} /> Print appointment
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </aside>
-            </>
+              </div>
+            </Modal>
           )}
         </main>
 

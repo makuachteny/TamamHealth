@@ -1,6 +1,5 @@
 /**
  * Next.js Instrumentation — runs once on server startup.
- * Used to verify the license key before the app serves requests.
  */
 
 import { validateProductionConfig } from './lib/config-validation';
@@ -50,28 +49,6 @@ export async function register() {
     const { assertDopplerEnv } = await import('./lib/secrets');
     assertDopplerEnv();
     assertProductionConfig();
-    const { checkLicense } = await import('./lib/license');
-    const license = checkLicense();
-
-    if (!license) {
-      console.warn('');
-      console.warn('  ============================================================');
-      console.warn('  WARNING: No valid TamamHealth license key found.');
-      console.warn('  Set TAMAMHEALTH_LICENSE_KEY in your .env.local file.');
-      console.warn('  Run "npm run setup" to configure your license.');
-      console.warn('  Contact support.tamam@gmail.com to obtain a license.');
-      console.warn('  ============================================================');
-      console.warn('');
-    } else if (license.expired) {
-      console.warn('');
-      console.warn('  ============================================================');
-      console.warn(`  WARNING: TamamHealth license expired on ${license.expiry.slice(0, 4)}-${license.expiry.slice(4, 6)}-${license.expiry.slice(6, 8)}.`);
-      console.warn('  Contact support.tamam@gmail.com to renew your license.');
-      console.warn('  ============================================================');
-      console.warn('');
-    } else {
-      console.log(`  TamamHealth licensed to: ${license.org} (${license.plan})`);
-    }
 
     // Apply pending Postgres migrations before the app starts serving. The
     // runner takes a Postgres advisory lock so rolling-deploy replicas can't

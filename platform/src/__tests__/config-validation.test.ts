@@ -1,13 +1,12 @@
 /**
  * Tests for production config validation (fail-closed secrets).
  */
-import { validateProductionConfig, DEFAULT_LICENSE_SECRET } from '@/lib/config-validation';
+import { validateProductionConfig } from '@/lib/config-validation';
 
 /** A fully-valid production env baseline; tests override single keys. */
 function validEnv(overrides: Record<string, string | undefined> = {}) {
   return {
     JWT_SECRET: 'x'.repeat(48),
-    TAMAMHEALTH_LICENSE_SECRET: 'y'.repeat(48),
     AIRTEL_WEBHOOK_SECRET: 'airtel-webhook-secret',
     MPESA_WEBHOOK_SECRET: 'mpesa-webhook-secret',
     ...overrides,
@@ -30,17 +29,6 @@ describe('validateProductionConfig', () => {
   });
   test('flags short JWT_SECRET', () => {
     expect(validateProductionConfig(validEnv({ JWT_SECRET: 'short' }))[0]).toMatch(/at least 32/);
-  });
-
-  // --- License signing secret ---
-  test('flags missing license secret', () => {
-    expect(validateProductionConfig(validEnv({ TAMAMHEALTH_LICENSE_SECRET: undefined }))[0]).toMatch(/LICENSE_SECRET is unset/);
-  });
-  test('flags the public default license secret', () => {
-    expect(validateProductionConfig(validEnv({ TAMAMHEALTH_LICENSE_SECRET: DEFAULT_LICENSE_SECRET }))[0]).toMatch(/public default/);
-  });
-  test('flags a short license secret', () => {
-    expect(validateProductionConfig(validEnv({ TAMAMHEALTH_LICENSE_SECRET: 'tooshort' }))[0]).toMatch(/at least 32/);
   });
 
   // --- Admin password / public exposure ---

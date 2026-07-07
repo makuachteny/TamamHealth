@@ -40,7 +40,6 @@ gatekeeper.
 
 - A machine with Docker and Docker Compose installed (4 GB+ RAM recommended)
 - This repository cloned onto it
-- A license key (see §3)
 
 ### Steps
 
@@ -52,9 +51,8 @@ cp .env.example .env          # then edit: set strong COUCHDB_USER/PASSWORD
 
 # 2. Platform runtime config
 cp platform/.env.example platform/.env.production
-# Edit: JWT_SECRET (long random string), TAMAMHEALTH_LICENSE_KEY,
-# NEXT_PUBLIC_SYNC_ENABLED=true, NEXT_PUBLIC_COUCHDB_URL (the public URL
-# clients will reach CouchDB on).
+# Edit: JWT_SECRET (long random string), NEXT_PUBLIC_SYNC_ENABLED=true,
+# NEXT_PUBLIC_COUCHDB_URL (the public URL clients will reach CouchDB on).
 # NOTE: NEXT_PUBLIC_* values are baked in at BUILD time — set them before
 # the next step.
 
@@ -80,25 +78,7 @@ docker compose --profile analytics up -d
 - Secrets handling (Doppler vs. legacy env files) is documented in
   [operations/secrets.md](operations/secrets.md).
 
-## 3. License keys
-
-Licenses are verified **offline** — no internet connection is ever needed to
-activate.
-
-```bash
-# Generate (requires the signing secret — keys are issued centrally):
-cd platform
-node scripts/license.mjs generate "Facility Name" 20271231 standard
-
-# Verify a key:
-node scripts/license.mjs verify TAMAMHEALTH-facility-name-20271231-...
-```
-
-Put the key in `platform/.env.production` as `TAMAMHEALTH_LICENSE_KEY`. The
-server logs `TamamHealth licensed to: <name> (<plan>)` at startup when the
-key is valid.
-
-## 4. Routine operations
+## 3. Routine operations
 
 ### Check system health
 
@@ -128,7 +108,7 @@ docker compose up -d
 Clinical data lives in Docker volumes (`couchdb_data`), not in containers —
 rebuilding images never touches it.
 
-## 5. Backups and restore
+## 4. Backups and restore
 
 The authoritative procedure (offsite encrypted backups, retention, restore
 drill) is [operations/backups.md](operations/backups.md). Summary:
@@ -141,11 +121,11 @@ drill) is [operations/backups.md](operations/backups.md). Summary:
 - A quarterly restore drill runs from CI (`backups-cron.yml`); if it fails,
   treat it as an incident.
 
-## 6. Troubleshooting
+## 5. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Platform container crash-loops with "STARTUP REFUSED" | License key missing/invalid, or analytics profile on but Postgres unreachable | Check `TAMAMHEALTH_LICENSE_KEY`; check `docker compose logs postgres` |
+| Platform container crash-loops with "STARTUP REFUSED" | Invalid production config (weak/placeholder secret), or analytics profile on but Postgres unreachable | Check the startup log for which env var it flagged; check `docker compose logs postgres` |
 | `Watchpack Error ... EMFILE: too many open files` and every page is 404 (dev mode only) | macOS/Linux file-descriptor limit too low | Run `ulimit -n 10240` in the shell before `npm run dev` (or add it to `~/.zshrc`) |
 | Clinician device shows "Initializing offline database..." for a long time on first load | First-run seed of the local PouchDB databases | Wait — one-time per device/browser. Subsequent loads are fast |
 | Devices not syncing | CouchDB unreachable from the device, or `NEXT_PUBLIC_SYNC_ENABLED`/`NEXT_PUBLIC_COUCHDB_URL` not baked into the build | Check the reverse proxy/TLS; rebuild the platform image after changing `NEXT_PUBLIC_*` vars |
@@ -153,13 +133,12 @@ drill) is [operations/backups.md](operations/backups.md). Summary:
 | Lost/stolen clinician device | Local PouchDB copy on the device | Deactivate the user account (admin → users). Data on the server is unaffected; consider device-level disk encryption policy |
 | Server disk failure | — | Restore per [operations/backups.md](operations/backups.md). Devices re-sync their unsynced work automatically when the server returns |
 
-## 7. What never to do
+## 6. What never to do
 
 - **Never** delete the `couchdb_data` volume — that is the clinical record.
 - **Never** expose CouchDB (5984) or Postgres (5432) to the network without
   TLS and authentication in front.
-- **Never** commit or share `.env` files, license signing secrets, or backup
-  encryption keys.
+- **Never** commit or share `.env` files or backup encryption keys.
 - **Never** edit data directly in CouchDB's Fauxton UI on a production
   server — all writes must go through the application so audit logs, sync
   events, and validation stay intact.

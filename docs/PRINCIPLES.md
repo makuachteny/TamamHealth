@@ -69,19 +69,15 @@ unavailable.
 - No feature gates behind a vendor-hosted service without an offline/
   self-hosted fallback.
 
-## 4. Licensing and deployment stay independent
+## 4. Deployment stays operator-simple
 
-**Rule:** License verification is offline (HMAC-SHA256 signed keys, see
-`platform/src/lib/license.ts` and `platform/scripts/license.mjs`). Activation
-must never phone home. Deployment of the full stack must remain possible by
-a non-specialist from the operator runbook.
+**Rule:** Deployment of the full stack must remain possible by a
+non-specialist from the operator runbook, with no phone-home activation step.
 
-**Why:** Facilities cannot depend on reaching a license server, and the
-people installing the system in the field are health workers, not DevOps
-engineers.
+**Why:** The people installing the system in the field are health workers,
+not DevOps engineers.
 
 **How to check a PR:**
-- No license check may perform a network call.
 - Changes to deployment keep `docker-compose.yml` as the single entry point
   for the facility tier; if a step gets more complicated, the
   [OPERATOR-RUNBOOK.md](OPERATOR-RUNBOOK.md) is updated in the same PR.

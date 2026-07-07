@@ -68,23 +68,17 @@ Works on **Windows**, **macOS**, and **Linux**.
 
 ### Installation
 
-The platform is distributed as a downloadable archive (`.tar.gz` or `.zip`). Contact [support.tamam@gmail.com](mailto:support.tamam@gmail.com) to obtain a license key and download link.
-
 ```bash
-# 1. Extract the archive
-tar -xzf tamamhealth-platform-<version>.tar.gz    # Linux/macOS
-# Or unzip tamamhealth-platform-<version>.zip      # Windows
+# 1. Clone the repository
+git clone <repo-url>
+cd TamamHealth/platform
 
-# 2. Navigate into the folder
-cd tamamhealth-platform-<version>
-
-# 3. Run the setup script (verifies license, installs deps, configures env)
+# 2. Run the setup script (installs deps, configures env)
 npm run setup
 ```
 
 The setup script will:
 
-- Ask for your **license key** (issued by TamamHealth Health Technologies)
 - Install all dependencies
 - Generate a secure JWT secret
 - Create your `.env.local` configuration file
@@ -555,7 +549,7 @@ APPOINTMENT_REMINDER_SMS_ENABLED=false
 
 | Command | Description |
 |---------|-------------|
-| `npm run setup` | First-time setup (license, deps, env config) |
+| `npm run setup` | First-time setup (deps, env config) |
 | `npm run dev` | Start development server on `localhost:3000` |
 | `npm run build` | Create production build |
 | `npm start` | Run production server |
@@ -563,9 +557,6 @@ APPOINTMENT_REMINDER_SMS_ENABLED=false
 | `npm test` | Run Jest test suite (1,390 tests) |
 | `npm run test:ci` | Run tests with coverage reporting |
 | `npm run db:migrate` | Apply pending PostgreSQL migrations (requires DATABASE_URL; also runs at server boot) |
-| `npm run license:generate` | Generate a license key (admin only) |
-| `npm run license:verify` | Verify a license key |
-| `npm run release` | Package a distributable release archive |
 
 ---
 

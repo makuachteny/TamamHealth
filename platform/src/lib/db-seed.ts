@@ -763,7 +763,7 @@ export const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-1', type: 'appointment', patientId: 'pat-00001', patientName: 'Deng Mabior Garang', patientPhone: '+211912345678', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(1), appointmentTime: '09:00', endTime: '09:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Internal Medicine', reason: 'Malaria treatment follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(3), updatedAt: daysAgo(1) },
   { _id: 'appointment-2', type: 'appointment', patientId: 'pat-00005', patientName: 'Nyamal Koang Gatdet', patientPhone: '+211912555005', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(2), appointmentTime: '10:00', endTime: '10:30', duration: 30, appointmentType: 'anc', priority: 'routine', department: 'Obstetrics & Gynecology', reason: 'Antenatal check-up', status: 'scheduled', reminderSent: false, isRecurring: true, recurrencePattern: 'monthly', bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(5), updatedAt: daysAgo(5) },
   { _id: 'appointment-3', type: 'appointment', patientId: 'pat-00012', patientName: 'Gatluak Ruot Nyuon', patientPhone: '+211912555012', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateFromNow(7), appointmentTime: '11:00', endTime: '11:30', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Internal Medicine', reason: 'HIV / CD4 review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(4), updatedAt: daysAgo(4) },
-  { _id: 'appointment-4', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '08:30', endTime: '09:00', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Diabetes management', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(6), updatedAt: daysAgo(0) },
+  { _id: 'appointment-4', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '08:45', endTime: '09:15', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Diabetes management', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(6), updatedAt: daysAgo(0) },
   { _id: 'appointment-5', type: 'appointment', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', patientPhone: '+211912555022', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '12:00', endTime: '12:45', duration: 45, appointmentType: 'general', priority: 'urgent', department: 'Internal Medicine', reason: 'Severe anaemia review', status: 'in_progress', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(7), updatedAt: daysAgo(0) },
   { _id: 'appointment-6', type: 'appointment', patientId: 'pat-00030', patientName: 'Achol Mayen Ring', patientPhone: '+211912555030', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(2), appointmentTime: '09:30', endTime: '10:00', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Surgery', reason: 'Post-op wound check', status: 'completed', completedAt: daysAgo(2), reminderSent: true, reminderChannel: 'app', isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(9), updatedAt: daysAgo(2) },
   { _id: 'appointment-7', type: 'appointment', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', patientPhone: '+211912555035', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(3), appointmentTime: '14:00', endTime: '14:30', duration: 30, appointmentType: 'lab', priority: 'routine', department: 'Laboratory', reason: 'Routine blood work', status: 'completed', completedAt: daysAgo(3), reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(10), updatedAt: daysAgo(3) },
@@ -781,7 +781,7 @@ export const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-31', type: 'appointment', patientId: 'pat-00015', patientName: 'Tut Chuol Both', patientPhone: '+211912555015', providerId: 'user-dr.mercy', providerName: 'Dr. Grace Lado', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '13:45', endTime: '14:15', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Nephrology', reason: 'Renal follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PRIVATE_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-32', type: 'appointment', patientId: 'pat-00040', patientName: 'Majok Chol Wol', patientPhone: '+211912555040', providerId: 'user-dr.wani', providerName: 'Dr. James Wani Igga', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '14:30', endTime: '15:00', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Abdominal pain follow-up', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-33', type: 'appointment', patientId: 'pat-00018', patientName: 'Rose Tombura Gbudue', patientPhone: '+211912555018', providerId: 'user-dr.achol', providerName: 'Dr. Achol Mayen Deng', facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national', appointmentDate: dateAgo(0), appointmentTime: '15:15', endTime: '15:45', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Endocrinology', reason: 'Diabetes review', status: 'confirmed', reminderSent: true, reminderChannel: 'app', isRecurring: false, bookedBy: 'user-data.ayen', bookedByName: 'Ayen Dut Malual', state: 'Central Equatoria', county: 'Juba', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
-  { _id: 'appointment-34', type: 'appointment', patientId: 'pat-00063', patientName: 'Santino Madut', patientPhone: '+211915200063', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '08:45', endTime: '09:15', duration: 30, appointmentType: 'follow_up', priority: 'urgent', department: 'Outpatient', reason: 'Chest pain reassessment', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
+  { _id: 'appointment-34', type: 'appointment', patientId: 'pat-00063', patientName: 'Santino Madut', patientPhone: '+211915200063', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '09:15', endTime: '09:45', duration: 30, appointmentType: 'follow_up', priority: 'urgent', department: 'Outpatient', reason: 'Chest pain reassessment', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-35', type: 'appointment', patientId: 'pat-00064', patientName: 'Aluel Garang', patientPhone: '+211915200064', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '10:15', endTime: '10:45', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Fever follow-up', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   // ── Extra upcoming appointments for carousel demo ──
   { _id: 'appointment-17', type: 'appointment', patientId: 'pat-00022', patientName: 'Kuol Akot Ajith', patientPhone: '+211912555022', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(1), appointmentTime: '09:00', endTime: '09:30', duration: 30, appointmentType: 'follow_up', priority: 'urgent', department: 'Outpatient', reason: 'Anaemia review', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(2), updatedAt: daysAgo(1) },
@@ -789,7 +789,7 @@ export const seedAppointments: Omit<AppointmentDoc, '_rev' | 'createdBy'>[] = [
   { _id: 'appointment-19', type: 'appointment', patientId: 'pat-00035', patientName: 'Ladu Tombe Keji', patientPhone: '+211912555035', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(4), appointmentTime: '11:00', endTime: '11:30', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Outpatient', reason: 'Malaria follow-up', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(4), updatedAt: daysAgo(3) },
   { _id: 'appointment-20', type: 'appointment', patientId: 'pat-00040', patientName: 'Majok Chol Wol', patientPhone: '+211912555040', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(6), appointmentTime: '14:00', endTime: '14:30', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Hypertension review', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(5), updatedAt: daysAgo(2) },
   { _id: 'appointment-25', type: 'appointment', patientId: 'pat-00063', patientName: 'Santino Madut', patientPhone: '+211915200063', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateAgo(0), appointmentTime: '08:15', endTime: '08:45', duration: 30, appointmentType: 'follow_up', priority: 'urgent', department: 'Outpatient', reason: 'Chest pain review', status: 'checked_in', checkedInAt: daysAgo(0), reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
-  { _id: 'appointment-26', type: 'appointment', patientId: 'pat-00064', patientName: 'Aluel Garang', patientPhone: '+211915200064', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(1), appointmentTime: '09:15', endTime: '09:45', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Fever follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
+  { _id: 'appointment-26', type: 'appointment', patientId: 'pat-00064', patientName: 'Aluel Garang', patientPhone: '+211915200064', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(1), appointmentTime: '09:45', endTime: '10:15', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Fever follow-up', status: 'confirmed', reminderSent: true, reminderChannel: 'sms', isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(0), updatedAt: daysAgo(0) },
   { _id: 'appointment-27', type: 'appointment', patientId: 'pat-00065', patientName: 'Deng Wol', patientPhone: '+211915200065', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(2), appointmentTime: '10:45', endTime: '11:15', duration: 30, appointmentType: 'follow_up', priority: 'routine', department: 'Outpatient', reason: 'Diabetes review', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
   { _id: 'appointment-28', type: 'appointment', patientId: 'pat-00066', patientName: 'Nyibol Atem', patientPhone: '+211915200066', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(3), appointmentTime: '12:15', endTime: '12:45', duration: 30, appointmentType: 'specialist', priority: 'urgent', department: 'Respiratory', reason: 'Asthma review', status: 'confirmed', reminderSent: true, reminderChannel: 'both', isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0) },
   { _id: 'appointment-29', type: 'appointment', patientId: 'pat-00067', patientName: 'Mabior Deng', patientPhone: '+211915200067', providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol', facilityId: 'hosp-002', facilityName: 'Wau State Hospital', facilityLevel: 'state', appointmentDate: dateFromNow(5), appointmentTime: '13:30', endTime: '14:00', duration: 30, appointmentType: 'general', priority: 'routine', department: 'Outpatient', reason: 'Routine consultation', status: 'scheduled', reminderSent: false, isRecurring: false, bookedBy: 'user-desk.wau', bookedByName: 'Tabitha Nyandeng Kuol', state: 'Western Bahr el Ghazal', county: 'Wau', orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(1) },
@@ -1890,6 +1890,41 @@ export async function seedDatabase(): Promise<void> {
       { t: '15:15', e: '15:45' }, { t: '16:00', e: '16:30' }, { t: '16:45', e: '17:15' },
       { t: '07:15', e: '07:45' },
     ];
+
+    // Per-facility slot allocator for TODAY. A clinic front desk never
+    // double-books a slot, so every generated booking below (today's
+    // appointments, telehealth visits, and the scheduled-lane fill) draws
+    // its time from here. The taken list is primed with the static
+    // seedAppointments rows for the same facility so generated bookings
+    // slot around them instead of on top of them. Returns null when the
+    // clinic day is full — callers stop seeding at that point.
+    const todayIso = dateAgo(0);
+    const toMins = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const toHHMM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    const takenByFacility = new Map<string, Array<[number, number]>>();
+    const takeTodaySlot = (facilityId: string, dur: number): { t: string; e: string } | null => {
+      let taken = takenByFacility.get(facilityId);
+      if (!taken) {
+        taken = seedAppointments
+          .filter((a) => a.facilityId === facilityId && a.appointmentDate === todayIso)
+          .map((a) => [
+            toMins(a.appointmentTime),
+            a.endTime ? toMins(a.endTime) : toMins(a.appointmentTime) + (a.duration || 30),
+          ] as [number, number]);
+        takenByFacility.set(facilityId, taken);
+      }
+      let start = 7 * 60 + 15; // clinic day runs 07:15–19:30
+      const dayEnd = 19 * 60 + 30;
+      while (start + dur <= dayEnd) {
+        const clash = taken.find(([s, e]) => start < e && start + dur > s);
+        if (!clash) {
+          taken.push([start, start + dur]);
+          return { t: toHHMM(start), e: toHHMM(start + dur) };
+        }
+        start = clash[1];
+      }
+      return null;
+    };
     const VIS_APPT_STATUS = ['confirmed', 'checked_in', 'scheduled', 'in_progress', 'checked_in', 'confirmed', 'scheduled', 'completed'];
     const VIS_APPT_TYPE = ['general', 'follow_up', 'specialist', 'anc', 'general', 'lab'];
     const VIS_DEPT = ['Outpatient', 'Internal Medicine', 'Obstetrics & Gynecology', 'Surgery', 'Paediatrics'];
@@ -1912,12 +1947,13 @@ export async function seedDatabase(): Promise<void> {
       const facPatients = patients.filter((p) => p.registrationHospital === fac.fid);
       if (facPatients.length === 0) continue;
 
-      // Today's appointments (6 per public facility, fewer where the roster is thin).
-      const todayCount = Math.min(fac.org === PRIVATE_ORG_ID ? 4 : 13, facPatients.length, VIS_SLOTS.length);
+      // Today's appointments (13 per public facility, fewer where the roster is thin).
+      const todayCount = Math.min(fac.org === PRIVATE_ORG_ID ? 4 : 13, facPatients.length);
       for (let i = 0; i < todayCount; i++) {
         const p = facPatients[i % facPatients.length];
         const prov = fac.providers[i % fac.providers.length];
-        const slot = VIS_SLOTS[i];
+        const slot = takeTodaySlot(fac.fid, 30);
+        if (!slot) break; // clinic day is fully booked
         const name = patName(p);
         await safePut(visApptDB, {
           _id: `appt-vis-${fac.fid}-${fac.org === PRIVATE_ORG_ID ? 'priv-' : ''}today-${i}`,
@@ -1945,7 +1981,8 @@ export async function seedDatabase(): Promise<void> {
       for (let i = 0; i < thCount; i++) {
         const p = facPatients[(i + 2) % facPatients.length];
         const prov = fac.providers[i % fac.providers.length];
-        const slot = VIS_SLOTS[(i + 4) % VIS_SLOTS.length];
+        const slot = takeTodaySlot(fac.fid, 30);
+        if (!slot) break;
         const name = patName(p);
         await safePut(visApptDB, {
           _id: `appt-vis-${fac.fid}-${fac.org === PRIVATE_ORG_ID ? 'priv-' : ''}th-${i}`,
@@ -1970,20 +2007,15 @@ export async function seedDatabase(): Promise<void> {
         for (let i = 0; i < SCHED_COUNT; i++) {
           const p = facPatients[(i + todayCount) % facPatients.length];
           const prov = fac.providers[i % fac.providers.length];
-          // Generate a time from mid-morning onward; overlaps are fine for a demo.
-          const mins = 8 * 60 + i * 25; // 08:00, 08:25, 08:50, …
-          const hh = String(Math.floor(mins / 60)).padStart(2, '0');
-          const mm = String(mins % 60).padStart(2, '0');
-          const emins = mins + 20;
-          const ehh = String(Math.floor(emins / 60)).padStart(2, '0');
-          const emm = String(emins % 60).padStart(2, '0');
+          const slot = takeTodaySlot(fac.fid, 20);
+          if (!slot) break;
           const name = patName(p);
           await safePut(visApptDB, {
             _id: `appt-vis-${fac.fid}-sched-${i}`,
             type: 'appointment', patientId: p.id, patientName: name, patientPhone: p.phone || '',
             providerId: prov.id, providerName: prov.name,
             facilityId: fac.fid, facilityName: fac.fname, facilityLevel: fac.level,
-            appointmentDate: dateAgo(0), appointmentTime: `${hh}:${mm}`, endTime: `${ehh}:${emm}`, duration: 20,
+            appointmentDate: dateAgo(0), appointmentTime: slot.t, endTime: slot.e, duration: 20,
             appointmentType: VIS_APPT_TYPE[i % VIS_APPT_TYPE.length],
             priority: i % 5 === 0 ? 'urgent' : 'routine',
             department: VIS_DEPT[i % VIS_DEPT.length], reason: VIS_REASON[i % VIS_REASON.length],
@@ -2001,7 +2033,9 @@ export async function seedDatabase(): Promise<void> {
       for (let i = 0; i < upcomingCount; i++) {
         const p = facPatients[(i + 3) % facPatients.length];
         const prov = fac.providers[i % fac.providers.length];
-        const slot = VIS_SLOTS[i % VIS_SLOTS.length];
+        // Afternoon slots — the static seedAppointments rows for the same
+        // future dates all sit in the morning, so these never double-book.
+        const slot = VIS_SLOTS[6 + (i % 4)];
         const name = patName(p);
         await safePut(visApptDB, {
           _id: `appt-vis-${fac.fid}-${fac.org === PRIVATE_ORG_ID ? 'priv-' : ''}up-${i}`,
