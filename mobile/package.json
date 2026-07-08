@@ -2,6 +2,9 @@
   "name": "tamamhealth-patient",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "main": "expo-router/entry",
   "scripts": {
     "dev": "expo start",
