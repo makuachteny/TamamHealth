@@ -48,4 +48,34 @@ See [docs/PRINCIPLES.md](docs/PRINCIPLES.md) and the PR template checklist.
 
 ## Local development
 
-See [docs/DEVELOPER-ONBOARDING.md](docs/DEVELOPER-ONBOARDING.md).
+### Quick start (one command)
+
+```bash
+./scripts/setup.sh
+```
+
+Checks your Node version (`.nvmrc`), installs deps for the root + `platform` + `website` + `mobile`, seeds `.env.local` files, and installs the git pre-commit hooks. Idempotent — safe to re-run. Then:
+
+```bash
+cd platform && npm run dev   # http://localhost:3000
+cd website  && npm run dev   # http://localhost:3001
+```
+
+Deeper guide: [docs/DEVELOPER-ONBOARDING.md](docs/DEVELOPER-ONBOARDING.md).
+
+### Node version
+
+Pinned in `.nvmrc`. Run `nvm use` (or `nvm install`) so your local Node, CI, and each package's `engines` all agree — this prevents "works on my machine" build breaks.
+
+### Pre-commit hooks
+
+`husky` + `lint-staged` run on every commit: `eslint --fix` on staged files plus a project-level `tsc --noEmit` for `platform`/`website`. **A commit with lint or type errors is blocked locally** (before it ever reaches CI). Hooks install when you run `npm install` at the repo root (or `./scripts/setup.sh`). Emergency bypass: `git commit --no-verify`.
+
+### CI gates
+
+Every PR must pass four checks before it can merge: **`platform`**, **`website`**, **`mobile`**, and **`fingerprint-bridge`** (lint + type-check + tests/build). The pre-commit hooks run the same lint/type checks locally, so *green locally ≈ green CI*.
+
+### Gotchas
+
+- **App aborts at boot with `STARTUP REFUSED — Postgres migrations failed`** — `DATABASE_URL` points at a Postgres that isn't running. Local dev is offline-first (PouchDB); leave `DATABASE_URL` commented out in `platform/.env.local` (`setup.sh` does this for you).
+- **`vendor-chunks` 500s after switching branches** — stale Next build cache: `rm -rf platform/.next`.
