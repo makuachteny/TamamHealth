@@ -1,0 +1,16 @@
+{
+  "name": "tamamhealth-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Root dev-tooling for the TamamHealth monorepo: husky + lint-staged pre-commit hooks. The apps live in platform/, website/, mobile/, sync-worker/, and fingerprint-bridge/ — each with its own package.json.",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2"
+  }
+}
