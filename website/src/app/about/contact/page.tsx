@@ -80,6 +80,8 @@ export default function ContactPage() {
   useEffect(() => {
     const requestedIntent = parseIntent(new URLSearchParams(window.location.search).get("intent"));
     if (!requestedIntent) return;
+    // One-time mount init from the URL query (browser-only); correct pattern here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData((prev) => ({
       ...prev,
       intent: requestedIntent,

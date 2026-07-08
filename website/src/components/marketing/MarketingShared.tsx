@@ -20,6 +20,8 @@ export function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: n
     if (!node) return;
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      // One-time mount init from a browser-only API; correct pattern here.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(true);
       return;
     }
