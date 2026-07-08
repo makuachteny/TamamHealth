@@ -1,14 +1,23 @@
+// The platform's 4 main colors: navy (primary), sky blue (--info, secondary
+// accent), orange and purple (distinct third/fourth action colors). Clinical
+// safety colors (success/warning/danger) are intentionally kept separate
+// from this set — they're status signals, not brand colors.
+// brandSecondary feeds org branding's --accent-hover (pairs with white
+// button text), so it stays navy-dark rather than the lighter sky accent —
+// see INFO below for the actual sky-blue token.
 export const THEME_COLORS = {
-  brandPrimary: '#2191D0',
-  brandSecondary: '#015697',
-  brandDarker: '#2191D0',
+  brandPrimary: '#10195A',
+  brandSecondary: '#10195A',
+  brandDarker: '#10195A',
+  brandOrange: '#CA4D1C',
+  brandPurple: '#7847EB',
   info: '#2191D0',
   infoLight: '#DDF2FB',
   success: '#1B9E77',
   successStrong: '#15795C',
   successBg: '#DDF2E9',
   warning: '#D97706',
-  warningStrong: '#9C640E',
+  warningStrong: '#9C5E16',
   warningBg: '#FFF1C7',
   danger: '#C44536',
   dangerStrong: '#B93328',
@@ -32,6 +41,8 @@ export const THEME_COLORS = {
 export const BRAND_PRIMARY = THEME_COLORS.brandPrimary;
 export const BRAND_SECONDARY = THEME_COLORS.brandSecondary;
 export const BRAND_DARKER = THEME_COLORS.brandDarker;
+export const BRAND_ORANGE = THEME_COLORS.brandOrange;
+export const BRAND_PURPLE = THEME_COLORS.brandPurple;
 export const INFO = THEME_COLORS.info;
 export const INFO_LIGHT = THEME_COLORS.infoLight;
 export const SUCCESS = THEME_COLORS.success;

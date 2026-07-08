@@ -17,7 +17,8 @@ const READ_ROLES: UserRole[] = [
   'medical_superintendent',
 ];
 const WRITE_ROLES: UserRole[] = [
-  'super_admin', 'org_admin', 'doctor', 'medical_superintendent',
+  'super_admin', 'org_admin', 'doctor', 'clinical_officer', 'nurse',
+  'medical_superintendent',
 ];
 export async function GET(request: NextRequest) {
   try {

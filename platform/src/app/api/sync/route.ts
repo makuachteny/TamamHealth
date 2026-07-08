@@ -203,13 +203,16 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
   patients: (doc) => ({
     id: doc._id,
     hospital_number: doc.hospitalNumber,
-    name: doc.name,
+    // Patient docs store the name as firstName/middleName/surname, not a single `name`.
+    name: [doc.firstName, doc.middleName, doc.surname].filter(Boolean).join(' ') || undefined,
     gender: doc.gender,
     date_of_birth: doc.dateOfBirth,
-    age: doc.age,
+    // Doc field is `estimatedAge`; there is no top-level `age`.
+    age: doc.estimatedAge,
     state: doc.state,
     county: doc.county,
-    hospital_id: doc.hospitalId,
+    // Doc field is `registrationHospital`; there is no `hospitalId`.
+    hospital_id: doc.registrationHospital,
     org_id: doc.orgId,
     created_at: doc.createdAt,
     updated_at: doc.updatedAt,

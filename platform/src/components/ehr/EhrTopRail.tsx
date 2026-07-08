@@ -88,7 +88,7 @@ export default function EhrTopRail() {
   }, [allowedRoutes, currentUser, roleConfig]);
 
   const navGroups = useMemo(() => groupNavItemsBySection(navItems), [navItems]);
-  const quickActionItems = useMemo(() => getPrimaryShortcutItems(navItems), [navItems]);
+  const quickActionItems = useMemo(() => getPrimaryShortcutItems(navItems, currentUser?.role), [navItems, currentUser?.role]);
 
   const navLabel = (item: NavItem): string => {
     const keyMap: Record<string, string> = {

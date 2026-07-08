@@ -21,7 +21,7 @@ export default function MobileQuickCreateSheet({ open, onClose }: MobileQuickCre
     () => uniqueAllowedNavItems(roleConfig?.navItems || [], allowedRoutes),
     [roleConfig, allowedRoutes]
   );
-  const shortcuts = useMemo(() => getPrimaryShortcutItems(navItems, 4), [navItems]);
+  const shortcuts = useMemo(() => getPrimaryShortcutItems(navItems, currentUser?.role, 4), [navItems, currentUser?.role]);
 
   return (
     <MobileBottomSheet open={open} onClose={onClose} title="Quick create">

@@ -25,8 +25,8 @@ describe('Platform Config Service', () => {
     expect(config.type).toBe('platform_config');
     expect(config.platformName).toBe('TamamHealth');
     expect(config.maintenanceMode).toBe(false);
-    expect(config.defaultPrimaryColor).toBe('#2191D0');
-    expect(config.defaultSecondaryColor).toBe('#015697');
+    expect(config.defaultPrimaryColor).toBe('#10195A');
+    expect(config.defaultSecondaryColor).toBe('#10195A');
   });
 
   test('default config has default feature flags', async () => {

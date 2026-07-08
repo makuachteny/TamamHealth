@@ -62,12 +62,6 @@ const BREAKDOWN_STEPS = [
   },
 ];
 
-const GROUND_STATS = [
-  { value: "48%", label: "of health data is never reported" },
-  { value: "80%", label: "of patients have no IDs" },
-  { value: "85%", label: "of facilities have no internet" },
-];
-
 const INSIGHTS = [
   {
     number: "01",
@@ -105,29 +99,6 @@ const INSIGHTS = [
   },
 ];
 
-const PRINCIPLES = [
-  {
-    number: "01",
-    title: "One record across every visit",
-    body: "Registration, triage, consultation, lab, pharmacy, referral, billing, and reporting stay connected to the same patient story.",
-  },
-  {
-    number: "02",
-    title: "Care that keeps working offline",
-    body: "Clinics keep working through unreliable internet, power interruptions, and paper-heavy workflows, then sync safely when connection returns.",
-  },
-  {
-    number: "03",
-    title: "Accountable Data",
-    body: "Facility and country layers protect sensitive health records while making encounter-level reporting easier to trust.",
-  },
-  {
-    number: "04",
-    title: "Facility data to national insight",
-    body: "Clean clinical records become facility dashboards, surveillance signals, DHIS2-ready reports, and better national health planning.",
-  },
-];
-
 const PAPER_CHIPS = [
   { label: "Paper ledgers", rotate: -3, duration: "3.8s", delay: "0s" },
   { label: "Lab slips", rotate: 2, duration: "4.4s", delay: "0.6s" },
@@ -148,18 +119,97 @@ const STEP_DEFS = [
   { label: "Report", desc: "Encounter data rolls up into facility dashboards and DHIS2-ready reports." },
 ];
 
-const OUTCOMES = [
+const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
   {
-    title: "No duplicate records",
-    body: "Each visit adds to the same patient story, so teams stop rebuilding history from paper slips.",
+    title: "Offline first",
+    body: "Clinics keep working through power cuts and network gaps, then sync safely when connection returns.",
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6.5 18a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 16.6 8.5 4.25 4.25 0 0 1 18 16.8" />
+        <line x1="4" y1="21" x2="20" y2="4" />
+      </svg>
+    ),
   },
   {
-    title: "One source for operations",
-    body: "Clinical work, pharmacy activity, billing, and reporting all stay connected to the encounter.",
+    title: "Fingerprint registration",
+    body: "Patients without papers register once — fingerprint and photo give undocumented patients an identity that can't be lost.",
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3c-2.5 0-4.5 2-4.5 4.5V9" />
+        <path d="M12 3c2.5 0 4.5 2 4.5 4.5V11" />
+        <path d="M9.5 9.5v3.5c0 3 1 5.5 2.5 7.5" />
+        <path d="M14.5 12v2.5c0 2.4.6 4.3 1.5 5.9" />
+        <path d="M12 8.5c-1.1 0-2 .9-2 2" />
+        <path d="M12 11.5c1.1 0 2 .9 2 2v1" />
+      </svg>
+    ),
   },
   {
-    title: "Built for low connectivity",
-    body: "Facilities can keep working through network gaps and sync when the connection returns.",
+    title: "GeocodeIDs",
+    body: "Geocoded patient IDs make every record findable across facilities — referrals and transfers follow the patient.",
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 21s-6.5-5.5-6.5-10a6.5 6.5 0 0 1 13 0c0 4.5-6.5 10-6.5 10Z" />
+        <circle cx="12" cy="10.5" r="2.5" />
+      </svg>
+    ),
+  },
+  {
+    title: "One patient record",
+    body: "Every visit adds to the same story — no duplicate files, no histories rebuilt from memory at the front desk.",
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+        <path d="M16 3h3a2 2 0 0 1 2 2v3" />
+        <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+        <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+        <circle cx="12" cy="10" r="3" />
+        <path d="M7.5 17c.8-1.9 2.4-3 4.5-3s3.7 1.1 4.5 3" />
+      </svg>
+    ),
+  },
+  {
+    title: "Full clinical workflow",
+    body: "Registration, triage, consultation, lab, pharmacy, and billing — every step tied to the same visit.",
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 2 4.5 5v6c0 4.8 3.2 8.6 7.5 10 4.3-1.4 7.5-5.2 7.5-10V5L12 2Z" />
+        <path d="M9 11.5l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
+    title: "Dashboards & reporting",
+    body: "Clean records roll up into facility dashboards and DHIS2-ready national reports — no month-end tally sheets.",
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="12" width="4" height="8" rx="0.5" />
+        <rect x="10" y="8" width="4" height="12" rx="0.5" />
+        <rect x="17" y="4" width="4" height="16" rx="0.5" />
+      </svg>
+    ),
+  },
+  {
+    title: "Secure by design",
+    body: "Sensitive health data is encrypted and access-controlled at every layer, from the clinic device to the national server.",
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="4" y="10" width="16" height="10" rx="2" />
+        <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+        <circle cx="12" cy="15" r="1.6" />
+      </svg>
+    ),
+  },
+  {
+    title: "Runs on simple devices",
+    body: "Works on affordable tablets and phones with solar power — no server room, no IT department required.",
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="7" y="2.5" width="10" height="19" rx="2.2" />
+        <line x1="10.5" y1="18.5" x2="13.5" y2="18.5" />
+        <path d="M10 7.5h4" />
+      </svg>
+    ),
   },
 ];
 
@@ -276,7 +326,7 @@ const GOAL_STATS = [
 ];
 
 const TEAM = [
-  { name: "Teny Makuach", role: "Founder", image: "/assets/founder-teny.jpg" },
+  { name: "Teny Makuach", role: "Founder & Developer", image: "/assets/founder-teny.jpg" },
   { name: "Ekow Williams", role: "Community & Partnerships", image: "/assets/founder-ekow.jpg" },
   { name: "Toye Adebayo", role: "Project Manager", image: "/assets/founder-toye.jpg" },
   { name: "Mark Dosu", role: "Software Developer", image: "/assets/Mark-Dosu.jpeg" },
@@ -392,7 +442,7 @@ export default function Home() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/tamam-logo-type.svg" alt="Tamam Healthcare System" style={{ height: 15, width: "auto", filter: "brightness(0) invert(1)" }} />
           </a>
-          <div className="tm-nav-links tm-right-col" style={{ marginLeft: "auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div className="tm-nav-links" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 22 }}>
             <a href="#problem" className="tm-nav-link" style={{ color: "#C7D8F5", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em" }}>
               Problem
             </a>
@@ -403,7 +453,7 @@ export default function Home() {
               Team
             </a>
             <a href="#contact" className="tm-nav-cta" style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 13.5, fontWeight: 700, padding: "11px 22px", textDecoration: "none", letterSpacing: "0.02em" }}>
-              Book a Demo →
+              Book a Demo
             </a>
           </div>
           <button
@@ -460,6 +510,8 @@ export default function Home() {
           color: "#FFFFFF",
           overflow: "hidden",
           background: "#0B1145",
+          padding: "80px 32px 72px",
+          boxSizing: "border-box",
         }}
       >
         <Image
@@ -475,85 +527,108 @@ export default function Home() {
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(to bottom, rgba(11,17,69,0.6) 0%, rgba(11,17,69,0.15) 30%, rgba(11,17,69,0) 45%, rgba(11,17,69,0.4) 72%, rgba(11,17,69,1) 100%)",
+              "linear-gradient(to bottom, rgba(11,17,69,0.55) 0%, rgba(11,17,69,0.12) 28%, rgba(11,17,69,0) 45%, rgba(11,17,69,0.45) 74%, rgba(11,17,69,0.98) 100%)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(105deg, rgba(11,17,69,0.55) 0%, rgba(11,17,69,0.22) 34%, rgba(11,17,69,0) 60%)",
           }}
         />
 
-        {/* Right message column, aligned with the nav links */}
+        {/* Left-aligned message content */}
         <div
-          className="tm-hero-msg tm-right-col"
-          style={{
-            position: "absolute",
-            top: "50%",
-            transform: "translateY(-50%)",
-            right: "max(32px, calc((100% - 1320px) / 2))",
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-            alignItems: "flex-start",
-          }}
-        >
-          <h1
-            style={{
-              fontFamily: "'Lora', Georgia, serif",
-              fontSize: "clamp(28px, 2.7vw, 40px)",
-              fontWeight: 600,
-              lineHeight: 1.16,
-              margin: 0,
-              textShadow: "0 2px 20px rgba(0,0,0,0.55)",
-            }}
-          >
-            No power. No records.
-            <br />
-            No history.
-          </h1>
-          <p className="tm-hero-sub" style={{ fontSize: 15.5, lineHeight: 1.65, color: "#F0F5FF", margin: 0, textShadow: "0 1px 14px rgba(0,0,0,0.65)" }}>
-            South Sudan&apos;s clinics run on paper-based records that get lost, damaged, or destroyed — and when the
-            paper goes, the patient&apos;s story goes with it.{" "}
-            <strong style={{ color: "#FFFFFF" }}>Tamam brings digital records that work offline, so care never starts from zero.</strong>
-          </p>
-          <div className="tm-btn-row" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
-            <a
-              href="#problem"
-              className="tm-hero-btn-primary"
-              style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 14.5, fontWeight: 700, padding: "13px 26px", textDecoration: "none", letterSpacing: "0.02em" }}
-            >
-              Understand the crisis →
-            </a>
-            <a
-              href="#solution"
-              className="tm-hero-btn-secondary"
-              style={{ background: "rgba(254,255,249,0.92)", color: "#10195A", fontSize: 14.5, fontWeight: 700, padding: "13px 26px", textDecoration: "none", letterSpacing: "0.02em" }}
-            >
-              See our solution →
-            </a>
-          </div>
-        </div>
-
-        {/* Bottom-left giant wordmark */}
-        <div
-          className="tm-hero-pad"
+          className="tm-hero-msg"
           style={{
             position: "relative",
             width: "100%",
-            maxWidth: 1384,
-            margin: "40px auto 0",
-            padding: "0 32px 40px",
-            boxSizing: "border-box",
+            maxWidth: 1320,
+            margin: "0 auto",
             display: "flex",
             flexDirection: "column",
-            gap: 14,
+            alignItems: "flex-start",
+            gap: 36,
+            textAlign: "left",
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/tamam-logo-type.svg" alt="Tamam" style={{ width: "min(56vw, 640px)", height: "auto", filter: "brightness(0) invert(1)", display: "block" }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 14, height: 14, borderRadius: 999, background: "#2191D0", display: "inline-block" }} />
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13.5, letterSpacing: "0.22em", textTransform: "uppercase", color: "#7FC4EA", fontWeight: 500 }}>
-              Offline-ready digital health infrastructure
+          <h1
+            className="tm-hero-h1"
+            style={{
+              fontFamily: "'Lora', Georgia, serif",
+              fontSize: "clamp(36px, 4.6vw, 68px)",
+              fontWeight: 600,
+              lineHeight: 1.06,
+              margin: 0,
+              letterSpacing: "-0.015em",
+              textShadow: "0 2px 26px rgba(0,0,0,0.6)",
+            }}
+          >
+            <span style={{ display: "block", animation: "tm-rise 0.9s cubic-bezier(0.22,1,0.36,1) 0.25s both" }}>No power. No records.</span>
+            <span style={{ display: "block", animation: "tm-rise 0.9s cubic-bezier(0.22,1,0.36,1) 0.38s both" }}>
+              <em style={{ fontStyle: "italic", color: "#7FC4EA" }}>No history.</em>
             </span>
+          </h1>
+          <div
+            className="tm-hero-sub"
+            style={{
+              width: "min(620px, 100%)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 26,
+              animation: "tm-rise 0.9s cubic-bezier(0.22,1,0.36,1) 0.5s both",
+            }}
+          >
+            <p style={{ fontSize: 16, lineHeight: 1.65, color: "#F0F5FF", margin: 0, textShadow: "0 1px 14px rgba(0,0,0,0.65)" }}>
+              Most South Sudan&apos;s clinics run on paper-based records that get lost, damaged, or destroyed — and when the
+              paper goes, the patient&apos;s story goes with it.{" "}
+              <strong style={{ color: "#FFFFFF" }}>Tamam brings digital records that work offline, so care never starts from zero.</strong>
+            </p>
+            <div className="tm-btn-row" style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-start" }}>
+              <a
+                href="#problem"
+                className="tm-hero-btn-primary"
+                style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 14, fontWeight: 700, padding: "13px 26px", textDecoration: "none", letterSpacing: "0.02em" }}
+              >
+                The Crisis
+              </a>
+              <a
+                href="#solution"
+                className="tm-hero-btn-secondary"
+                style={{ background: "rgba(254,255,249,0.92)", color: "#10195A", fontSize: 14, fontWeight: 700, padding: "13px 26px", textDecoration: "none", letterSpacing: "0.02em" }}
+              >
+                Our Solutions
+              </a>
+            </div>
           </div>
         </div>
+
+        <a
+          href="#problem"
+          aria-label="Scroll to the problem"
+          style={{
+            position: "absolute",
+            bottom: 18,
+            left: "max(32px, calc((100% - 1320px) / 2))",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 10,
+            color: "rgba(255,255,255,0.85)",
+            textDecoration: "none",
+            fontFamily: "'DM Mono', monospace",
+            fontSize: 12,
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+          }}
+        >
+          Scroll{" "}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "tm-cue 1.8s ease-in-out infinite" }} aria-hidden="true">
+            <line x1="12" y1="4" x2="12" y2="19" />
+            <polyline points="6 13 12 19 18 13" />
+          </svg>
+        </a>
       </section>
 
       {/* ═══ 01 The Problem ═══ */}
@@ -656,16 +731,6 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="tm-grid-ground" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 40 }}>
-            {GROUND_STATS.map((g) => (
-              <div key={g.value} style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "4px solid #E8863A", paddingTop: 18 }}>
-                <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(52px, 5vw, 72px)", fontWeight: 600, color: "#F5A263", lineHeight: 1, letterSpacing: "-0.02em" }}>
-                  {g.value}
-                </span>
-                <span style={{ fontSize: 14, lineHeight: 1.5, fontWeight: 600, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: "0.05em" }}>{g.label}</span>
-              </div>
-            ))}
-          </div>
           <div className="tm-grid-insights" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 24 }}>
             {INSIGHTS.map((ins) => (
               <div
@@ -728,21 +793,22 @@ export default function Home() {
               </span>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
                 {PAPER_CHIPS.map((chip) => (
-                  <span
-                    key={chip.label}
-                    style={{
-                      display: "inline-block",
-                      background: "#FEFFF9",
-                      border: "1px solid #C88A5A",
-                      color: "#7A3D10",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      padding: "8px 14px",
-                      transform: `rotate(${chip.rotate}deg)`,
-                      boxShadow: "2px 2px 0 rgba(154,74,18,0.25)",
-                    }}
-                  >
-                    {chip.label}
+                  <span key={chip.label} style={{ display: "inline-block", animation: `tm-float ${chip.duration} ease-in-out infinite`, animationDelay: chip.delay }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        background: "#FEFFF9",
+                        border: "1px solid #C88A5A",
+                        color: "#7A3D10",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        padding: "8px 14px",
+                        transform: `rotate(${chip.rotate}deg)`,
+                        boxShadow: "2px 2px 0 rgba(154,74,18,0.25)",
+                      }}
+                    >
+                      {chip.label}
+                    </span>
                   </span>
                 ))}
               </div>
@@ -751,7 +817,7 @@ export default function Home() {
               </span>
             </div>
             <div
-              className="tm-compare-col"
+              className="tm-compare-col tm-compare-col-mid"
               style={{
                 flex: 0.9,
                 minWidth: 230,
@@ -766,14 +832,18 @@ export default function Home() {
                 borderRight: "1.5px solid #10195A",
               }}
             >
-              <span style={{ fontSize: 22, color: "#94A3B8" }}>→</span>
+              <span className="tm-compare-arrow-full" style={{ fontSize: 22, color: "#94A3B8" }}>→</span>
+              <span className="tm-compare-arrow-short" style={{ fontSize: 22, color: "#94A3B8" }}>↓</span>
               <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 96, height: 96 }}>
+                <span style={{ position: "absolute", inset: 0, border: "2px solid #2191D0", borderRadius: 999, animation: "tm-pulse 2.4s ease-out infinite" }} />
+                <span style={{ position: "absolute", inset: 0, border: "2px solid #2191D0", borderRadius: 999, animation: "tm-pulse 2.4s ease-out infinite", animationDelay: "1.2s" }} />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/assets/tamam-logo-mark.svg" alt="" style={{ height: 54, width: "auto", position: "relative" }} />
               </span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/assets/tamam-logo-type.svg" alt="Tamam Healthcare System" style={{ height: 16, width: "auto" }} />
-              <span style={{ fontSize: 22, color: "#94A3B8" }}>→</span>
+              <span className="tm-compare-arrow-full" style={{ fontSize: 22, color: "#94A3B8" }}>→</span>
+              <span className="tm-compare-arrow-short" style={{ fontSize: 22, color: "#94A3B8" }}>↓</span>
             </div>
             <div className="tm-compare-col" style={{ flex: 1.1, minWidth: 250, display: "flex", flexDirection: "column", gap: 18, padding: "34px 30px", background: "#DDF2FB" }}>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#015697" }}>
@@ -792,31 +862,29 @@ export default function Home() {
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div className="tm-grid-insights" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0 56px", borderTop: "1.5px solid #10195A" }}>
-              {PRINCIPLES.map((p) => (
-                <div key={p.number} style={{ display: "flex", gap: 18, alignItems: "baseline", padding: "22px 4px", borderBottom: "1px solid #E2E8F0" }}>
-                  <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 26, fontWeight: 700, color: "#2191D0", lineHeight: 1, minWidth: 40 }}>{p.number}</span>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 19, fontWeight: 600, margin: 0, lineHeight: 1.2 }}>{p.title}</h3>
-                    <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#26336F" }}>{p.body}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ background: "#EFF8FD", border: "1px solid #DDF2FB", padding: "24px 28px", display: "flex", flexDirection: "column", gap: 16, marginTop: 28 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "#015697" }}>
-                What connected records change
-              </span>
-              <div className="tm-grid-ground" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 28 }}>
-                {OUTCOMES.map((o) => (
-                  <div key={o.title} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ fontSize: 15, fontWeight: 700 }}>{o.title}</span>
-                    <span style={{ fontSize: 13.5, lineHeight: 1.55, color: "#26336F" }}>{o.body}</span>
-                  </div>
-                ))}
+          <div className="tm-grid-features" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18 }}>
+            {FEATURES.map((f) => (
+              <div
+                key={f.title}
+                className="tm-feature-card"
+                style={{
+                  background: "#FFFFFF",
+                  border: "1.5px solid #10195A",
+                  padding: "28px 24px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 14,
+                  transition: "box-shadow 0.22s ease, transform 0.22s ease",
+                }}
+              >
+                <span style={{ width: 54, height: 54, borderRadius: 999, background: "#EFF8FD", border: "1px solid #BCE4F6", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  {f.icon}
+                </span>
+                <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 18, fontWeight: 600, margin: 0, color: "#10195A", lineHeight: 1.25 }}>{f.title}</h3>
+                <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: "#26336F" }}>{f.body}</p>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -837,7 +905,7 @@ export default function Home() {
           }}
         />
         <div style={{ position: "relative", maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 52 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center", textAlign: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
               <span style={{ ...KICKER, color: "#10195A", background: "#FEFFF9" }}>The Platform</span>
             </div>
@@ -907,7 +975,7 @@ export default function Home() {
           </div>
 
           <div style={{ width: "100%", maxWidth: 1020, margin: "0 auto" }}>
-            <div className="tm-shadow-plate" style={{ border: "1px solid rgba(255,255,255,0.3)", background: "#0B1145", boxShadow: "0 48px 110px rgba(0,0,0,0.55)" }}>
+            <div className="tm-shadow-plate" style={{ border: "1px solid rgba(255,255,255,0.3)", overflow: "hidden", background: "#0B1145", boxShadow: "0 48px 110px rgba(0,0,0,0.55)" }}>
               <Image src="/assets/Dashboard.png" alt="TamamHealth platform dashboard" width={1920} height={1109} style={{ display: "block", width: "100%", height: "auto" }} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", padding: "13px 20px", borderTop: "1px solid rgba(255,255,255,0.25)", background: "#0B1145" }}>
                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "rgba(255,255,255,0.75)" }}>Facility dashboard — Wau State Hospital, demo data</span>
@@ -987,7 +1055,7 @@ export default function Home() {
               hardest conditions on Earth.
             </p>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "rgba(255,255,255,0.25)", border: "1px solid rgba(255,255,255,0.25)" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "rgba(255,255,255,0.25)", border: "1px solid rgba(255,255,255,0.25)", overflow: "hidden" }}>
             {GOAL_STATS.map((g) => (
               <div key={g.value} style={{ display: "flex", alignItems: "baseline", gap: 20, background: "#10195A", padding: "24px 28px" }}>
                 <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 54, fontWeight: 600, color: "#7FC4EA", lineHeight: 1, minWidth: 150, letterSpacing: "-0.02em" }}>
@@ -1007,7 +1075,7 @@ export default function Home() {
             <div style={{ display: "flex", alignItems: "center" }}>
               <span style={{ ...KICKER, color: "#FFFFFF", background: "#10195A" }}>The Team</span>
             </div>
-            <h2 style={H2}>Built by people who know the problem</h2>
+            <h2 style={H2}>Built by people who&apos;ve lived this</h2>
           </div>
           <div className="tm-grid-team" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 1, background: "#10195A", border: "1.5px solid #10195A" }}>
             {TEAM.map((t) => (
@@ -1027,18 +1095,25 @@ export default function Home() {
 
       {/* ═══ Contact / Get involved ═══ */}
       <section id="contact" className="tm-section" style={{ background: "#10195A", color: "#FFFFFF", padding: "110px 32px 90px" }}>
-        <div style={{ maxWidth: 960, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 18, alignItems: "center", textAlign: "center" }}>
+        <div style={{ maxWidth: 1320, margin: "0 auto" }}>
+        <div className="tm-grid-split" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 56, alignItems: "start" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "#7FC4EA" }}>
               Get involved
             </span>
-            <h2 className="tm-contact-h" style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(32px, 4.2vw, 54px)", fontWeight: 600, margin: 0, lineHeight: 1.12, maxWidth: 760 }}>
+            <h2 className="tm-contact-h" style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(32px, 4.2vw, 54px)", fontWeight: 600, margin: 0, lineHeight: 1.12 }}>
               The problem is enormous. The fix is buildable.
             </h2>
             <span style={{ width: 100, height: 3, background: "#2191D0" }} />
-            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.65, color: "#C7D8F5", maxWidth: 560 }}>
+            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.65, color: "#C7D8F5", maxWidth: 480 }}>
               Facility, NGO, funder, or just curious — tell us what you&apos;re building or how you want to help.
             </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 14, color: "#C7D8F5", marginTop: 20 }}>
+              <a href="mailto:support.tamam@gmail.com" style={{ color: "#FFFFFF", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: "3px" }}>
+                support.tamam@gmail.com
+              </a>
+              <span>Founded at Tufts University · starting in South Sudan, built to scale</span>
+            </div>
           </div>
 
           <div className="tm-form-pad" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.2)", padding: 40, display: "flex", flexDirection: "column", gap: 22 }}>
@@ -1122,14 +1197,7 @@ export default function Home() {
             </button>
             {formStatus === "error" && <p style={{ margin: 0, fontSize: 14, color: "#FFB4B4" }}>{formError}</p>}
           </div>
-
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, flexWrap: "wrap", fontSize: 14, color: "#C7D8F5" }}>
-            <a href="mailto:support.tamam@gmail.com" style={{ color: "#FFFFFF", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: "3px" }}>
-              support.tamam@gmail.com
-            </a>
-            <span style={{ color: "rgba(255,255,255,0.3)" }}>|</span>
-            <span>Founded at Tufts University · starting in South Sudan, built to scale</span>
-          </div>
+        </div>
         </div>
       </section>
       </main>

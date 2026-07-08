@@ -1,12 +1,15 @@
 import type { TourStep } from './types';
 
 // Walks a Clinical Officer through a full visit end to end: the dashboard
-// they land on after login, finding a patient, then every stage of the
-// consultation wizard in order (History -> Intake -> Examination ->
-// Assessment -> Orders -> Plan & checkout). Section anchors correspond to
-// `data-tour="consult-section-N"` on each SectionHeader in
-// `consultation/page.tsx`, and stage anchors to `data-tour-stage="N"` on the
-// wizard's step-indicator buttons.
+// they land on after login, finding a patient, then the consultation wizard
+// (History -> Intake -> Examination -> Assessment -> Orders -> Plan &
+// checkout). Section anchors correspond to `data-tour="consult-section-N"`
+// on each SectionHeader in `consultation/page.tsx`. The wizard only reveals
+// the section for its current stage, and advancing a stage requires that
+// stage's data to be filled in — so a scripted tour (with no real patient
+// data entered) can only ever spotlight the first stage's section; later
+// stages are described narratively via the Back/Next footer (`.ehr-consult-step-nav`)
+// instead of being spotlighted directly.
 export const clinicalOfficerTourSteps: TourStep[] = [
   {
     id: 'welcome',
@@ -73,74 +76,27 @@ export const clinicalOfficerTourSteps: TourStep[] = [
     placement: 'bottom',
   },
   {
-    id: 'consult-stepper',
-    route: '/consultation',
-    target: '.ehr-soap-stepper',
-    title: 'The consultation wizard',
-    body: 'A visit moves through these stages in order. Click any stage to jump there, or use Back/Next as you go.',
-    placement: 'bottom',
-  },
-  {
     id: 'consult-history',
     route: '/consultation',
     target: '[data-tour="consult-section-0"]',
     title: 'Start with history',
     body: 'Capture the chief complaint, history of present illness, past medical history, and social/family history.',
     placement: 'bottom',
-    preClickSelector: '[data-tour-stage="0"]',
   },
   {
-    id: 'consult-exam',
+    id: 'consult-wizard-flow',
     route: '/consultation',
-    target: '[data-tour="consult-section-2"]',
-    title: 'Physical exam',
-    body: 'Record exam findings by system as you go through the visit.',
-    placement: 'bottom',
-    preClickSelector: '[data-tour-stage="2"]',
-  },
-  {
-    id: 'consult-diagnosis',
-    route: '/consultation',
-    target: '[data-tour="consult-section-4"]',
-    title: 'Assessment & diagnosis',
-    body: 'Add ICD-11 diagnoses — favorites and recently used codes are one click away.',
-    placement: 'bottom',
-    preClickSelector: '[data-tour-stage="3"]',
-  },
-  {
-    id: 'consult-prescriptions',
-    route: '/consultation',
-    target: '[data-tour="consult-section-5"]',
-    title: 'Prescriptions',
-    body: 'Prescribe medications here — Pharmacy sees the order the moment you save.',
-    placement: 'bottom',
-    preClickSelector: '[data-tour-stage="4"]',
-  },
-  {
-    id: 'consult-labs',
-    route: '/consultation',
-    target: '[data-tour="consult-section-6"]',
-    title: 'Order labs',
-    body: 'Send tests straight to the lab queue. Results flow back into this same chart once they’re ready.',
-    placement: 'bottom',
-    preClickSelector: '[data-tour-stage="4"]',
-  },
-  {
-    id: 'consult-referral',
-    route: '/consultation',
-    target: '[data-tour="consult-section-10"]',
-    title: 'Refer when needed',
-    body: 'Refer to a specialist or a higher-level facility right from the visit — no separate form to fill out.',
+    target: '.ehr-consult-step-nav',
+    title: 'The rest of the visit',
+    body: 'Once history is in, Next walks you through Intake, Examination, Assessment, Orders, and Plan & checkout in order — recording vitals, exam findings, ICD-11 diagnoses, prescriptions, lab orders, and referrals along the way. Use Back anytime to revisit an earlier stage.',
     placement: 'top',
-    preClickSelector: '[data-tour-stage="5"]',
   },
   {
     id: 'finish',
     route: '/consultation',
-    target: '.ehr-soap-stepper',
+    target: '.ehr-consult-step-nav',
     title: 'You’re ready',
     body: 'That’s the full Clinical Officer workflow, start to finish. You can replay this tour anytime from your profile menu.',
-    placement: 'bottom',
-    preClickSelector: '[data-tour-stage="6"]',
+    placement: 'top',
   },
 ];

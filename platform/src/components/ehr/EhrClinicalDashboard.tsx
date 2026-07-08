@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { AppointmentDoc, AppointmentStatus } from '@/lib/db-types';
 import {
-  ArrowRightLeft,
   Calendar,
   ChevronDown,
   ChevronLeft,
@@ -14,10 +13,8 @@ import {
   ClipboardList,
   FlaskConical,
   LayoutDashboard,
-  Plus,
   Printer,
   Search,
-  SendHorizontal,
   Stethoscope,
   Video,
   X,
@@ -152,7 +149,7 @@ export default function EhrClinicalDashboard({
   const searchParams = useSearchParams();
   const { showToast } = useToast();
   // Gate the "Start consultation" action to roles that can actually consult.
-  const { canConsult, canBookAppointments } = usePermissions();
+  const { canConsult } = usePermissions();
   // Coverage lives in insurance_policy docs, not on the appointment — one
   // bulk set of covered patient ids badges every row as Insured/Not insured.
   const insuredIds = useInsuredPatientIds();
@@ -205,7 +202,6 @@ export default function EhrClinicalDashboard({
   const activeOutstanding = outstandingView
     ? outstanding.find(item => item.label === outstandingView) ?? null
     : null;
-  const referralsOutstanding = outstanding.find(item => item.label === 'Open referrals') ?? null;
 
   const openOutstanding = (item: OutstandingItem) => {
     setView('dashboard');
@@ -352,32 +348,7 @@ export default function EhrClinicalDashboard({
         <div className="ehr-schedule-primary-controls ehr-clinical-dashboard-header-main">
           <div className="ehr-greeting-row">
             <p className="ehr-care-greeting">Welcome, {clinicianName}</p>
-            <button type="button" className="ehr-greeting-print" aria-label="Print">
-              <Printer className="w-4 h-4" />
-            </button>
           </div>
-        </div>
-        <div className="ehr-schedule-actions">
-          {view === 'dashboard' && referralsOutstanding && (
-            <button
-              type="button"
-              className={`ehr-rail-toggle ${referralsOutstanding.tone === 'danger' ? 'danger' : referralsOutstanding.tone === 'warning' ? 'warning' : ''}`}
-              aria-label="Toggle referrals panel"
-              aria-expanded={outstandingView === 'Open referrals'}
-              onClick={() => openOutstanding(referralsOutstanding)}
-            >
-              <ArrowRightLeft className="w-4 h-4" /> Referral <b>{referralsOutstanding.count}</b>
-            </button>
-          )}
-          <button type="button" aria-label="Print" onClick={() => window.print()}><Printer className="w-4 h-4" /> Print</button>
-          <button type="button" aria-label="Send intake" onClick={() => router.push('/patient-intake')}>
-            <SendHorizontal className="w-4 h-4" /> Send intake
-          </button>
-          {canBookAppointments && (
-            <button type="button" className="primary" aria-label="New appointment" onClick={() => router.push('/appointments?new=1')}>
-              <Plus className="w-4 h-4" /> New appointment
-            </button>
-          )}
         </div>
       </section>
 

@@ -16,15 +16,15 @@ export const DEFAULT_BRANDING: OrgBranding = {
   accentColor: BRAND_PRIMARY,
 };
 
-/* Orgs saved before the 2026-07 rebrand stored the old header navy as their
-   primary/accent color. These runtime branding vars override --accent-primary
-   on the root element, so a stale stored navy would repaint the whole accent
-   system (buttons, floating message dock, …) even after the CSS tokens moved
-   to the new blue. Treat the legacy navy as "unset" so those installations
-   pick up the current brand color. */
-const LEGACY_NAVY = '#10195a';
+/* Orgs saved before the dark-navy rebrand stored the old #2191D0 header blue
+   as their primary/accent color. These runtime branding vars override
+   --accent-primary on the root element, so a stale stored blue would repaint
+   the whole accent system (buttons, floating message dock, …) even after the
+   CSS tokens moved to navy. Treat the previous default as "unset" so those
+   installations pick up the current brand color. */
+const LEGACY_DEFAULT_BLUE = '#2191d0';
 function modernizeColor(color?: string): string | undefined {
-  return color && color.toLowerCase() !== LEGACY_NAVY ? color : undefined;
+  return color && color.toLowerCase() !== LEGACY_DEFAULT_BLUE ? color : undefined;
 }
 
 export function getOrgBranding(org?: OrganizationDoc | null): OrgBranding {

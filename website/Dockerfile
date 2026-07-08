@@ -4,6 +4,9 @@ COPY package*.json ./
 RUN npm install --legacy-peer-deps
 COPY . .
 RUN npm run build
+# Drop devDependencies (typescript, eslint, @types/*) so the runner stage
+# only ships what `next start` needs.
+RUN npm prune --omit=dev --legacy-peer-deps
 
 FROM node:20-alpine AS runner
 WORKDIR /app

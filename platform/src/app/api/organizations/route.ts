@@ -116,7 +116,7 @@ async function postHandler(request: NextRequest) {
         slug: body.slug as string,
         contactEmail: body.contactEmail as string,
         country: body.country as string,
-        primaryColor: (body.primaryColor as string) || '#2191D0',
+        primaryColor: (body.primaryColor as string) || '#10195A',
         secondaryColor: (body.secondaryColor as string) || '#015697',
         accentColor: body.accentColor as string | undefined,
         subscriptionStatus: (body.subscriptionStatus as OrganizationDoc['subscriptionStatus']) || 'trial',

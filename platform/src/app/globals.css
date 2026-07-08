@@ -968,11 +968,15 @@
   --color-slate-900: #0F172A;
   --color-slate-950: #0A1A33;
   /* Canonical brand blue scale — shared with the marketing site's
-     --tb-blue-* tokens. Every blue in the platform derives from these. */
-  --tb-blue-900: #2191D0;  /* header blue — top rail, mission panels (was navy #10195A) */
-  --tb-blue-800: #015697;  /* deep accent — hover states, links, dark buttons */
-  --tb-blue-700: #2191D0;  /* primary accent — CTAs, active tabs, highlights */
-  --tb-blue-600: #369FDA;  /* lighter accent — borders, secondary highlights */
+     --tb-blue-* tokens. Every blue in the platform derives from these.
+     tb-blue-800 (the old separate "deep accent" hue) is now an alias for
+     navy — one of the platform's 4 main colors, not a 5th shade — so hover
+     states, links, and dark-fill buttons match the primary action color
+     instead of a slightly-different near-navy blue. */
+  --tb-blue-900: #10195A;  /* header blue — top rail, mission panels — matches the website's dark navy */
+  --tb-blue-800: var(--tb-blue-900);  /* deep accent — hover states, links, dark buttons */
+  --tb-blue-700: #2191D0;  /* secondary accent — info, borders, nav/tab highlights */
+  --tb-blue-600: #369FDA;  /* lighter tint of the secondary accent — borders, subtle highlights */
   --tb-blue-100: #DDF2FB;  /* pale tint — light backgrounds */
   --tb-blue-50:  #EFF8FD;  /* palest tint — section washes */
 
@@ -987,7 +991,7 @@
   --color-success-800: #15795C;
   --color-warning-400: #E4A84B;
   --color-warning-600: #D97706;
-  --color-warning-700: #B8741C;
+  --color-warning-700: #9C5E16;  /* darkened from #B8741C — was 3.33:1 on the warning badge bg, fails AA text */
   --color-warning-800: #8A5A0E;
   --color-danger-500: #C44536;
   --color-danger-600: #DC2626;
@@ -1022,12 +1026,29 @@
   --overlay-medium: rgba(33, 145, 208, 0.16);
   --overlay-backdrop: rgba(15, 23, 42, 0.56);
 
-  /* ── Brand blues ── */
+  /* ── The platform's 4 main colors ──
+     1. Navy    (--tb-blue-900 / --accent-primary) — primary actions, active
+        states, anything filled solid with white text.
+     2. Sky     (--tb-blue-700 / --color-brand-500) — secondary accent: info,
+        borders, tinted backgrounds paired with dark text (too light for
+        reliable white-on-fill contrast, so never used as a solid fill with
+        white text — see --nav-active-bg / the appointment modal header).
+     3. Orange  (--accent-orange) — a third, clearly distinct action color
+        (e.g. Send intake) so it doesn't read as "another blue button."
+     4. Purple  (--accent-purple) — a fourth distinct action/category color
+        (e.g. Refer).
+     Clinical safety colors (danger/warning/success — triage, allergy
+     alerts, abnormal labs) are intentionally NOT part of this set; they
+     stay their own red/amber/green regardless of the brand palette.
+     Orange/purple are darkened from the "pure" hue (#EB6834 / #8B5CF6) —
+     those fail 4.5:1 with white button text; these pass. */
   --accent-primary:  var(--tb-blue-900);
   --accent-hover:    var(--tb-blue-800);
   --accent-text:     var(--color-brand-700);
   --accent-light:    rgba(16, 25, 90, 0.08);
   --accent-border:   var(--tb-blue-900);
+  --accent-orange: #CA4D1C;
+  --accent-purple: #7847EB;
 
   /* Legacy aliases — many components reference these names directly instead
      of the canonical tokens above. Keep them pointed at the same values so
@@ -1073,11 +1094,13 @@
   --table-row-border: var(--border-light);
   --table-row-hover: rgba(33, 145, 208, 0.07);
 
-  /* Nav — dark text on light sidebar */
+  /* Nav — dark text on light sidebar. Hover/active fill white text, which
+     needs the darker navy (not the lighter secondary-accent blue) to clear
+     4.5:1 contrast. */
   --nav-text: var(--color-slate-600);
   --nav-text-hover: var(--color-white);
-  --nav-hover-bg: var(--color-brand-500);
-  --nav-active-bg: var(--color-brand-500);
+  --nav-hover-bg: var(--tb-blue-900);
+  --nav-active-bg: var(--tb-blue-900);
   --nav-active-text: var(--color-white);
 
   /* Button secondary */
@@ -1145,123 +1168,11 @@
   --ehr-danger-bg: #FCE4DE;
   --ehr-danger-text: #B93328;
   --ehr-warning-bg: #FFF1C7;
-  --ehr-warning-text: #9C640E;
+  --ehr-warning-text: #9C5E16;  /* darkened from #9C640E — was 4.40:1 on --ehr-warning-bg, fails AA text */
   --ehr-success-bg: #DDF2E9;
   --ehr-success-text: #0E7155;
   --ehr-neutral-text: #4E6477;
   --ehr-mission-bg: var(--tb-blue-900);
-}
-
-/* ============ DARK THEME ============ */
-[data-theme="dark"] {
-  /* Deep navy dark background */
-  /* App canvas stays solid navy in dark mode. */
-  --bg-app: var(--color-slate-950);
-
-  --bg-primary: var(--color-slate-950);
-  --bg-secondary: var(--color-brand-700);
-  --bg-sidebar: var(--color-dark-surface);
-  --bg-card: var(--color-dark-surface);
-  --bg-card-solid: var(--color-dark-surface);
-  --bg-card-hover: var(--color-dark-surface-hover);
-  --bg-input: var(--color-dark-surface);
-  --bg-tinted: rgba(54, 159, 218, 0.16);
-
-  /* Brand blue accent — brightened for dark backgrounds */
-  --accent-primary: var(--color-brand-500);
-  --accent-hover: var(--color-brand-400);
-  --accent-text: var(--color-brand-300);
-  --accent-light: rgba(33, 145, 208, 0.22);
-  --accent-border: var(--color-brand-500);
-
-  --tamamhealth-blue: var(--accent-primary);
-  --tamamhealth-red:  var(--color-danger);
-
-  --icon-color: #93a9d6;
-  --link-color: var(--color-brand-400);
-
-  --text-primary: #F1F5F9;
-  --text-secondary: #CBD5E1;
-  --text-muted: #94A3B8;
-
-  --border-light: var(--color-dark-border);
-  --border-medium: var(--color-dark-border-strong);
-  --border-accent: var(--color-brand-500);
-  --border-panel: var(--color-dark-border);
-
-  --overlay-subtle: var(--color-dark-overlay);
-  --overlay-light: var(--color-dark-surface);
-  --overlay-medium: var(--color-dark-surface-hover);
-  --overlay-backdrop: rgba(0, 0, 0, 0.56);
-
-  --topbar-bg: var(--color-dark-surface);
-  --topbar-border: var(--color-dark-border);
-
-  --sidebar-bg: var(--color-dark-surface);
-
-  --card-shadow: none;
-  --card-shadow-lg: none;
-  --card-shadow-xl: none;
-  --card-hover-border: var(--color-dark-border-strong);
-
-  /* ── Sharp solid surfaces (dark) ── no glass, glow, blur, or translucency. */
-  --glass-bg:        var(--color-dark-surface);
-  --glass-bg-strong: var(--color-dark-surface);
-  --glass-border:    var(--color-dark-border);
-  --glass-blur:      none;
-  --glass-highlight: none;
-  --panel-shadow:    none;
-
-  --toggle-track: var(--color-dark-border-strong);
-
-  --scrollbar-thumb: var(--color-dark-border);
-  --scrollbar-thumb-hover: var(--color-dark-border-strong);
-
-  --table-header-bg: rgba(33, 145, 208, 0.18);
-  --table-row-border: var(--border-light);
-  --table-row-hover: rgba(33, 145, 208, 0.12);
-
-  --nav-text: #93a9d6;
-  --nav-text-hover: #e6edf9;
-  --nav-hover-bg: var(--color-dark-surface);
-  --nav-active-bg: #0a1838;
-  --nav-active-text: var(--color-white);
-
-  --btn-secondary-bg: var(--color-dark-surface);
-  --btn-secondary-hover-bg: var(--color-dark-surface-hover);
-  --btn-secondary-hover-border: var(--color-dark-border-strong);
-
-  --map-bg: rgba(59, 130, 246, 0.06);
-  --map-stroke: rgba(255, 255, 255, 0.06);
-  --map-lines: rgba(255, 255, 255, 0.05);
-  --map-nile: rgba(33, 145, 208, 0.20);
-  --map-label: rgba(255, 255, 255, 0.3);
-  --map-tooltip-bg: rgba(8, 18, 40, 0.95);
-  --map-tooltip-stroke: rgba(255, 255, 255, 0.1);
-  --map-tooltip-text: #CBD5E1;
-  --map-tooltip-sub: #94A3B8;
-  --map-dot-stroke: #0a1a33;
-
-  /* Dark mode — lighter tints for readability on dark backgrounds. */
-  --color-success: #34D399;
-  --color-success-text: #6EE7B7;
-  --color-success-bg: rgba(5, 150, 105, 0.18);
-  --color-warning: #FBBF24;
-  --color-warning-text: #FBBF24;
-  --color-warning-bg: rgba(217, 119, 6, 0.18);
-  --color-danger: #F87171;
-  --color-danger-text: #FCA5A5;
-  --color-danger-bg: rgba(220, 38, 38, 0.18);
-  --color-info: var(--color-brand-500);
-  --color-info-text: var(--color-brand-300);
-  --color-info-bg: rgba(59, 130, 246, 0.16);
-
-  --color-chart-1: var(--color-brand-500);
-  --color-chart-2: #7fd9a8;
-  --color-chart-3: var(--color-warning-400);
-  --color-chart-4: #F87171;
-  --color-chart-5: #a78bfa;
-  --color-chart-6: #f472b6;
 }
 
 * { box-sizing: border-box; }
@@ -1339,7 +1250,7 @@ a, button, input, select, textarea, .card, .card-elevated, .btn, .nav-item, .bad
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  :root, [data-theme="dark"] {
+  :root {
     --glass-bg: var(--bg-card-solid);
     --glass-bg-strong: var(--bg-card-solid);
     --glass-blur: none;
@@ -1880,8 +1791,8 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .nav-item:focus-visib
 .data-table tbody tr:last-child td { border-bottom: none; }
 
 /* Light mode: stronger separators for readability */
-[data-theme="light"] .data-table tbody td { border-bottom: 1px solid var(--border-light); }
-[data-theme="light"] .data-table thead th { border-bottom: 1px solid var(--border-light); }
+.data-table tbody td { border-bottom: 1px solid var(--border-light); }
+.data-table thead th { border-bottom: 1px solid var(--border-light); }
 
 /* ============ Referrals Table — polished list styling ============ */
 /* Header sticks to the top of its scroll container so columns stay labelled
@@ -2808,7 +2719,6 @@ thead th {
   --ehr-muted: #597386;
   --ehr-blue: var(--tb-blue-900);
   --ehr-blue-light: rgba(16, 25, 90, 0.08);
-  --ehr-coral: #E96D57;
   --ehr-conflict: #FFE9ED;
   --ehr-conflict-text: #A9354B;
   --ehr-good: #1F7A67;
@@ -6748,21 +6658,6 @@ thead th {
   min-height: 0;
 }
 
-.ehr-soap-stepper {
-  background: var(--ehr-panel) !important;
-  border-radius: var(--card-radius) !important;
-}
-
-.ehr-soap-stepper .step-dot {
-  width: 26px;
-  height: 26px;
-  font-size: 12px;
-}
-
-.ehr-soap-stepper .step-line {
-  height: 2px;
-}
-
 .ehr-soap-scroll .card-elevated {
   display: flex;
   flex-direction: column;
@@ -7212,12 +7107,11 @@ thead th {
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
   align-items: start;
-  /* Center the chart: its left edge lines up under the module dropdown in
-     the top rail (12px rail padding + 174px brand column + 12px gap = 198px)
-     with the same inset mirrored on the right. The min-width floor keeps the
-     chart usable on laptop widths, collapsing to full width when the screen
-     is narrower than the floor. */
-  width: calc(100% - 2 * 198px);
+  /* Center the chart: its left edge lines up under the logo itself (the
+     rail's own 10px left padding), with the same inset mirrored on the
+     right. The min-width floor keeps the chart usable on laptop widths,
+     collapsing to full width when the screen is narrower than the floor. */
+  width: calc(100% - 2 * 10px);
   min-width: min(100%, 960px);
   margin: 0 auto;
 }
@@ -7230,6 +7124,9 @@ thead th {
   grid-column: 1;
   grid-row: auto;
   position: sticky;
+  /* Relative to .tamam-ehr-content-frame's own padding-box, which already
+     reserves the rail's height — so top:0 here lands exactly at the rail's
+     bottom edge (verified: no overlap when scrolled, no gap when not). */
   top: 0;
   z-index: 5;
   display: flex !important;
@@ -7276,7 +7173,15 @@ thead th {
   box-shadow: inset 0 -2px 0 var(--ehr-blue);
 }
 
-@media (max-width: 1380px) {
+/* Below ~1850px the 3-column header (heading + strip + actions) doesn't
+   actually fit: a later override forces min-width:500px on .ehr-chart-actions
+   plus a 500px grid-track floor, on top of the strip's own fixed 158+250px
+   columns and the heading's 300-390px track — summing to ~1250px of hard
+   minimums, more than a 1440px (or even 1600-1700px) laptop screen has left
+   after the page gutters and patient photo. Below that the tracks refuse to
+   shrink and instead overlap. Stack vertically until there's genuinely
+   enough room. */
+@media (max-width: 1850px) {
   .ehr-patient-summary {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -7334,6 +7239,230 @@ thead th {
 
 .ehr-chart-content > :last-child {
   margin-bottom: 0;
+}
+
+/* Desktop chart layout: vertical section sidebar beside the content, once
+   there's room for both (the .ehr-chart-page rail-width variable and the
+   .ehr-chart-nav-button styles below were already sitting here unused from
+   a previous sidebar version — reactivated rather than rewritten). Below
+   1025px this block is inert and the horizontal tab strip from the base
+   rules above applies instead, same as it does on MobileChartDrillIn. */
+@media (min-width: 1025px) {
+  /* Mirror the clinical dashboard's three-panel workspace: nav rail sized
+     like the dashboard's left panel, centred chart, summary rail on the
+     right (.ehr-workspace-grid uses these same column tracks). */
+  .ehr-chart-layout {
+    display: grid;
+    grid-template-columns: minmax(230px, 260px) minmax(0, 1fr) minmax(230px, 270px);
+    gap: 10px;
+    align-items: start;
+  }
+
+  /* .ehr-chart-main now holds the patient banner alongside the sidebar (it
+     used to sit above both, full-width) — its own margin/padding was sized
+     for that older full-width position and just double-indents it here. */
+  .ehr-chart-main .ehr-patient-banner {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .ehr-chart-main {
+    min-width: 0;
+  }
+
+  .ehr-chart-nav {
+    flex-direction: column;
+    align-items: stretch;
+    max-height: calc(100vh - var(--ehr-top-rail-height) - 32px);
+    margin: 0 !important;
+    padding: 8px 0 !important;
+    overflow-x: visible !important;
+    overflow-y: auto !important;
+  }
+
+  .ehr-chart-nav button {
+    flex: none !important;
+    justify-content: flex-start !important;
+    width: 100%;
+    padding: 0 16px !important;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .ehr-chart-content {
+    min-width: 0;
+    padding: 0 0 32px;
+  }
+
+  /* The active-tab indicator is a bottom underline for the horizontal bar;
+     as a left-edge accent it reads correctly in a vertical sidebar. */
+  .ehr-chart-nav button[style*="var(--accent-primary)"] {
+    box-shadow: inset 3px 0 0 var(--ehr-blue);
+  }
+
+  .ehr-chart-right-rail {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: calc(100vh - var(--ehr-top-rail-height) - 32px);
+    overflow-y: auto;
+  }
+}
+
+/* Right-rail summary cards (Demographics / Allergies) */
+.ehr-chart-right-rail {
+  min-width: 0;
+}
+
+/* The rail needs the desktop grid to have a column for it — below that the
+   layout is a single column and the same facts live in the tabs anyway. */
+@media (max-width: 1024px) {
+  .ehr-chart-right-rail {
+    display: none;
+  }
+}
+
+.ehr-chart-side-card {
+  border: 1px solid var(--ehr-border);
+  border-radius: var(--card-radius);
+  background: var(--ehr-panel);
+  box-shadow: var(--card-shadow);
+  padding: 14px 16px 16px;
+}
+
+.ehr-chart-side-card--alert {
+  border-color: color-mix(in srgb, var(--color-danger) 30%, var(--ehr-border));
+  background: color-mix(in srgb, var(--color-danger) 4%, var(--ehr-panel));
+}
+
+.ehr-chart-side-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ehr-chart-side-card-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ehr-text);
+}
+
+.ehr-chart-side-card-head .ehr-allergy-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--color-danger);
+}
+
+.ehr-chart-side-card-head button {
+  border: 0;
+  background: none;
+  padding: 2px 4px;
+  color: var(--ehr-blue);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ehr-chart-side-card-head button:hover {
+  text-decoration: underline;
+}
+
+.ehr-chart-side-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.ehr-chart-side-rows > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--ehr-border-soft);
+}
+
+.ehr-chart-side-rows dt {
+  flex-shrink: 0;
+  color: var(--ehr-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ehr-chart-side-rows dd {
+  margin: 0;
+  min-width: 0;
+  text-align: right;
+  color: var(--ehr-text);
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.ehr-chart-side-allergies {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ehr-chart-side-allergies li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--ehr-border-soft);
+}
+
+.ehr-chart-side-allergies strong {
+  color: var(--ehr-text);
+  font-size: 12.5px;
+}
+
+.ehr-chart-side-allergies span {
+  color: var(--ehr-muted);
+  font-size: 11.5px;
+  text-align: right;
+}
+
+.ehr-chart-side-empty {
+  margin: 0;
+  color: var(--ehr-muted);
+  font-size: 12.5px;
+}
+
+.ehr-chart-side-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ehr-border-soft);
+}
+
+.ehr-chart-side-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .ehr-chart-page .card-elevated > .border-b,
@@ -8961,6 +9090,55 @@ thead th {
   padding: 0 var(--ehr-chart-content-pad-x) 18px !important;
 }
 
+/* ── Patient header banner: rounded, aligned, single-line ── */
+/* The blanket `.ehr-chart-page .card-elevated { border-radius: 0 }` squares
+   every chart card; the banner is the page's headline card and reads better
+   rounded (higher specificity, so it wins over the blanket rule). */
+.ehr-chart-page .card-elevated.ehr-patient-banner {
+  border-radius: var(--card-radius) !important;
+}
+
+/* In the three-panel layout the banner already spans the centre column
+   edge-to-edge; the content below kept its own horizontal gutter and sat
+   ~18px inset from the banner's edges. Align them. */
+@media (min-width: 1025px) {
+  .ehr-chart-content {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+/* Inline the banner's contents (photo | name | payment | actions) on one
+   line. The summary block was a rigid grid whose fixed track minimums
+   overflowed the narrower centre column and forced a stacked fallback;
+   a wrapping flex row keeps everything on one line whenever it fits and
+   degrades row-by-row when it doesn't. */
+.ehr-chart-page .ehr-patient-summary {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center !important;
+  gap: 10px 18px;
+}
+
+.ehr-chart-page .ehr-patient-heading {
+  flex: 1 1 220px;
+  min-width: 0;
+  min-height: 0 !important;
+}
+
+.ehr-chart-page .ehr-patient-strip {
+  flex: 0 0 auto;
+  display: flex !important;
+  margin: 0 !important;
+}
+
+.ehr-chart-page .ehr-chart-actions {
+  flex: 0 1 auto;
+  margin-left: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+
 .ehr-chart-content > .card-elevated,
 .ehr-chart-content > .space-y-4,
 .ehr-chart-content > .space-y-5,
@@ -9734,15 +9912,6 @@ svg circle {
   border-radius: 3px !important;
 }
 
-[data-theme="dark"] .leaflet-control-attribution {
-  background: var(--overlay-subtle) !important;
-  color: var(--text-muted) !important;
-}
-
-[data-theme="dark"] .leaflet-control-attribution a {
-  color: var(--accent-primary) !important;
-}
-
 /* ============ Hide scrollbar ============ */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -10201,11 +10370,8 @@ span:has(> svg:only-child) {
   color: var(--text-primary);
 }
 
-/* Dark mode overrides */
-[data-theme="dark"] .dash-card { background: var(--glass-bg); }
-[data-theme="dark"] .dash-stat { background: var(--bg-card-solid); }
-[data-theme="light"] .dash-card { border: 1px solid var(--glass-border); }
-[data-theme="light"] .dash-stat { border: 1px solid var(--border-light); }
+.dash-card { border: 1px solid var(--glass-border); }
+.dash-stat { border: 1px solid var(--border-light); }
 
 /* Standard modal overlay */
 .modal-overlay {
@@ -10385,29 +10551,12 @@ span:has(> svg:only-child) {
 }
 
 /* ============ LIGHT MODE: Solid separators ============ */
-[data-theme="light"] .card-elevated { border: 1px solid var(--border-light); }
-[data-theme="light"] .card { border: 1px solid var(--border-light); }
-[data-theme="light"] .kpi { border: 1px solid var(--border-light); }
-[data-theme="light"] .space-y-2 > * + * { border-top: 1px solid var(--border-light); padding-top: 8px; }
-[data-theme="light"] .referral-row,
-[data-theme="light"] .alert-row { border-bottom: 1px solid var(--border-light); }
-
-/* ============ DARK MODE: Solid dark backgrounds ============ */
-[data-theme="dark"] .card-elevated { background: var(--bg-card-solid); border-color: var(--border-light); }
-[data-theme="dark"] .card { background: var(--bg-card-solid); border-color: var(--border-light); }
-[data-theme="dark"] .kpi { background: var(--bg-card-solid); border-color: var(--border-light); }
-[data-theme="dark"] .glass-section { background: var(--bg-card-solid); border-color: var(--border-light); }
-[data-theme="dark"] .glass-section-header { background: var(--overlay-subtle); border-bottom-color: var(--border-light); }
-[data-theme="dark"] input,
-[data-theme="dark"] select,
-[data-theme="dark"] textarea { background: var(--bg-input); color: var(--text-primary); border-color: var(--border-medium); }
-[data-theme="dark"] input::placeholder,
-[data-theme="dark"] textarea::placeholder { color: var(--text-muted); }
-[data-theme="dark"] .data-table thead th { background: var(--bg-card-solid); color: var(--text-muted); }
-[data-theme="dark"] .data-table tbody td { border-bottom-color: var(--table-row-border); }
-[data-theme="dark"] label { color: var(--text-secondary); }
-[data-theme="dark"] .btn-secondary { background: var(--btn-secondary-bg); color: var(--text-secondary); border-color: var(--border-medium); }
-[data-theme="dark"] .btn-secondary:hover { background: var(--btn-secondary-hover-bg); color: var(--text-primary); }
+.card-elevated { border: 1px solid var(--border-light); }
+.card { border: 1px solid var(--border-light); }
+.kpi { border: 1px solid var(--border-light); }
+.space-y-2 > * + * { border-top: 1px solid var(--border-light); padding-top: 8px; }
+.referral-row,
+.alert-row { border-bottom: 1px solid var(--border-light); }
 
 /* ============ Reduced motion preference ============ */
 @media (prefers-reduced-motion: reduce) {
@@ -10457,8 +10606,10 @@ span:has(> svg:only-child) {
 .appointment-detail-modal__header {
   flex-shrink: 0;
   padding: 16px 18px 14px;
-  background: var(--color-brand-500);
-  border-bottom: 1px solid var(--color-brand-500);
+  /* Solid fill + white text needs navy, not the lighter secondary-accent
+     blue, to clear 4.5:1 contrast (the status select text is only 11px). */
+  background: var(--tb-blue-900);
+  border-bottom: 1px solid var(--tb-blue-900);
 }
 
 .appointment-detail-modal__header-row {
@@ -10802,9 +10953,10 @@ span:has(> svg:only-child) {
 }
 
 .ehr-top-hospital-name {
-  font-size: 20px;
+  font-family: var(--font-platform);
+  font-size: 17px;
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   max-width: 380px;
 }
 
@@ -12679,33 +12831,6 @@ span:has(> svg:only-child) {
   }
 }
 
-/* Consultation stepper: at full width all 7 steps render with their text
-   labels ("Plan & checkout" etc.) side by side, which has no mobile
-   fallback and overflows badly under ~500px. Collapse to a compact
-   dot-and-line progress indicator (no labels) and scroll as a safety net
-   for anything still too wide. */
-@media (max-width: 639px) {
-  .ehr-soap-stepper {
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .ehr-soap-stepper::-webkit-scrollbar {
-    display: none;
-  }
-
-  .ehr-soap-stepper .step-dot {
-    width: 22px;
-    height: 22px;
-    font-size: 11px;
-  }
-
-  .ehr-soap-stepper button > span:last-child {
-    display: none;
-  }
-}
-
 /* Dashboard right rail on laptop widths: below full desktop width but above
    the point where the whole grid already stacks to one column (≤1023px,
    see the ".ehr-workspace-grid { grid-template-columns: 1fr }" rule), the
@@ -13475,11 +13600,6 @@ span:has(> svg:only-child) {
   --viz-outpatient: #EB6834;
 }
 
-[data-theme="dark"] .ehr-day-stats {
-  --viz-inpatient: #3987E5;
-  --viz-outpatient: #D95926;
-}
-
 .ehr-day-stats-head {
   display: flex;
   align-items: center;
@@ -13960,103 +14080,6 @@ span:has(> svg:only-child) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DARK MODE — EHR shell token overrides
-   The --ehr-* tokens drive the clinical dashboards (schedule shell, side cards,
-   worklists, mini-calendar, care rows). They were only defined in :root (light),
-   so the dashboards never darkened. These give them dark values. Additive and
-   scoped to [data-theme="dark"] — light mode is untouched.
-   ═══════════════════════════════════════════════════════════════════════════ */
-[data-theme="dark"] {
-  --ehr-page-bg: var(--color-slate-950);
-  --ehr-panel: var(--color-dark-surface);
-  --ehr-panel-soft: rgba(54, 159, 218, 0.10);
-  --ehr-table-head: rgba(54, 159, 218, 0.14);
-  --ehr-table-head-strong: rgba(54, 159, 218, 0.22);
-  --ehr-border: var(--color-dark-border);
-  --ehr-border-soft: var(--color-dark-border);
-  --ehr-text: #F1F5F9;
-  --ehr-text-body: #CBD5E1;
-  --ehr-text-title: #F1F5F9;
-  --ehr-muted: #94A3B8;
-  --ehr-neutral-text: #CBD5E1;
-  --ehr-hover: var(--color-dark-surface-hover);
-  --ehr-head: var(--color-dark-surface);
-  --ehr-soft: var(--color-dark-surface-hover);
-  --ehr-info-soft: rgba(54, 159, 218, 0.18);
-  --ehr-info-bg: rgba(54, 159, 218, 0.12);
-  --ehr-danger-bg: rgba(220, 38, 38, 0.18);
-  --ehr-danger-text: #F87171;
-  --ehr-warning-bg: rgba(251, 191, 36, 0.16);
-  --ehr-warning-text: #FBBF24;
-  --ehr-warning: rgba(251, 191, 36, 0.16);
-  --ehr-success-bg: rgba(52, 211, 153, 0.16);
-  --ehr-success-text: #34D399;
-  --ehr-blue: var(--color-brand-400);
-  --ehr-blue-strong: var(--color-brand-300);
-  --ehr-blue-light: rgba(54, 159, 218, 0.16);
-  --ehr-coral: #F0846F;
-  --ehr-conflict: rgba(220, 38, 38, 0.16);
-  --ehr-conflict-text: #F87171;
-  --ehr-good: #34D399;
-  --ehr-focus-ring: rgba(54, 159, 218, 0.28);
-  --ehr-mission-bg: var(--color-brand-700);
-}
-
-/* Dashboard shell surfaces that hardcoded #fff/white instead of --ehr-panel, so
-   they stayed light. Re-point them at the tokens in dark mode only. Kept off
-   any .active / .primary / tonal states (those keep their own colours), and
-   inputs/selects are already handled by the global dark input rule. */
-[data-theme="dark"] .ehr-side-card:not(.ehr-mission-card),
-[data-theme="dark"] .ehr-worklist-panel,
-[data-theme="dark"] .ehr-worklist-table,
-[data-theme="dark"] .ehr-appointment-list,
-[data-theme="dark"] .ehr-appointment-row,
-[data-theme="dark"] .ehr-worklist-row,
-[data-theme="dark"] .ehr-today-button,
-[data-theme="dark"] .ehr-mini-calendar,
-[data-theme="dark"] .ehr-filter-group,
-[data-theme="dark"] .ehr-day-stats,
-[data-theme="dark"] .ehr-care-detail,
-[data-theme="dark"] .ehr-care-search,
-[data-theme="dark"] .ehr-checkin-section,
-[data-theme="dark"] .ehr-encounter-card,
-[data-theme="dark"] .ehr-encounter-card__body,
-[data-theme="dark"] .ehr-care-filter:not(.active),
-[data-theme="dark"] .ehr-care-rail-action:not(.active),
-[data-theme="dark"] .ehr-empty-state button,
-[data-theme="dark"] .ehr-worklist-empty button {
-  background: var(--ehr-panel);
-  border-color: var(--ehr-border);
-  color: var(--ehr-text);
-}
-[data-theme="dark"] .ehr-worklist-row { border-bottom-color: var(--ehr-border); }
-/* Calendar day cells hardcode a pale blue on hover — darken them. */
-[data-theme="dark"] .ehr-mini-calendar-grid button:not(.selected):hover { background: var(--ehr-hover); }
-/* Card headings/labels use the (now light) text tokens for contrast on dark. */
-[data-theme="dark"] .ehr-side-card h2,
-[data-theme="dark"] .ehr-worklist-panel h3 { color: var(--ehr-text-title); }
-[data-theme="dark"] .ehr-side-card p,
-[data-theme="dark"] .ehr-worklist-panel p { color: var(--ehr-muted); }
-
-/* Patient chart re-declares --ehr-* under its own class, so it needs the same
-   dark values or it renders blinding-white in dark mode. */
-[data-theme="dark"] .ehr-chart-page {
-  --ehr-page-bg: var(--color-slate-950);
-  --ehr-panel: var(--color-dark-surface);
-  --ehr-panel-soft: rgba(54, 159, 218, 0.10);
-  --ehr-table-head: rgba(54, 159, 218, 0.14);
-  --ehr-table-head-strong: rgba(54, 159, 218, 0.22);
-  --ehr-border: var(--color-dark-border);
-  --ehr-border-soft: var(--color-dark-border);
-  --ehr-text: #F1F5F9;
-  --ehr-muted: #94A3B8;
-  --ehr-blue: var(--color-brand-400);
-  --ehr-blue-strong: var(--color-brand-300);
-  --ehr-blue-light: rgba(54, 159, 218, 0.16);
-  --ehr-focus-ring: rgba(54, 159, 218, 0.28);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
    Care-dashboard rows mirror the reference clinical appointment row:
    avatar | name + subtitle | time + priority | action(s) on the right.
    Desktop only (≥640px) so the ≤639px compact treatment above is preserved.
@@ -14140,11 +14163,21 @@ span:has(> svg:only-child) {
   stroke: currentColor !important;
 }
 
+/* Selected tab: a light tinted card (not the dark app-nav pill) so it reads
+   consistently as "selected" wherever the mouse happens to be — hover used
+   to share this rule with .is-active, which meant a tab you'd just clicked
+   (and were still hovering) flipped to the dark --nav-active-bg pill while
+   an unhovered selection stayed on this lighter look. */
 .ehr-chart-nav button:hover,
-.ehr-chart-nav-button:hover,
+.ehr-chart-nav-button:hover {
+  background: var(--ehr-panel-soft) !important;
+  color: var(--ehr-blue-strong) !important;
+}
+
 .ehr-chart-nav-button.is-active {
-  background: var(--nav-active-bg) !important;
-  color: var(--nav-active-text) !important;
+  background: var(--ehr-panel-soft) !important;
+  color: var(--ehr-blue-strong) !important;
+  font-weight: 800 !important;
 }
 
 /* Shared greeting header for non-shell dashboards (stats/form pages). Matches
@@ -14426,60 +14459,6 @@ span:has(> svg:only-child) {
 @media (max-width: 900px) {
   .th-chat { position: absolute; right: 12px; top: 64px; bottom: 90px; z-index: 5; }
   .th-self { width: 132px; height: 88px; }
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   Dark mode — visibility + uniformity for the shared clinical-dashboard
-   controls. The default icon shim paints icons brand-blue, which vanishes
-   on the dark navy surface, and the pill buttons share the panel colour so
-   they blended into the background. These overrides give every shared
-   control an elevated fill, bright text, and bright icons in dark mode.
-   ═══════════════════════════════════════════════════════════════════ */
-
-/* Keep the top rail on the deep brand navy in dark mode. */
-[data-theme="dark"] .ehr-top-rail { background: var(--tb-blue-900); }
-
-/* Shared pill/action buttons: elevated fill + bright text so they read as
-   buttons against the dark panel. (Primary/active variants keep their fill.) */
-[data-theme="dark"] .ehr-clinical-strip button:not(.primary),
-[data-theme="dark"] .ehr-schedule-actions button:not(.primary),
-[data-theme="dark"] .ehr-segmented button:not(.active),
-[data-theme="dark"] .ehr-today-button,
-[data-theme="dark"] .ehr-rail-toggle {
-  background: rgba(255, 255, 255, 0.07) !important;
-  border-color: var(--ehr-border) !important;
-  color: #F1F5F9 !important;
-}
-[data-theme="dark"] .ehr-clinical-strip button:not(.primary):hover,
-[data-theme="dark"] .ehr-schedule-actions button:not(.primary):hover,
-[data-theme="dark"] .ehr-segmented button:not(.active):hover,
-[data-theme="dark"] .ehr-today-button:hover,
-[data-theme="dark"] .ehr-rail-toggle:hover {
-  background: rgba(255, 255, 255, 0.13) !important;
-}
-
-/* Bright icons inside those buttons (overrides the brand-blue default). */
-[data-theme="dark"] .ehr-clinical-strip button svg,
-[data-theme="dark"] .ehr-clinical-strip button svg.lucide,
-[data-theme="dark"] .ehr-schedule-actions button svg,
-[data-theme="dark"] .ehr-schedule-actions button svg.lucide,
-[data-theme="dark"] .ehr-segmented button svg,
-[data-theme="dark"] .ehr-segmented button svg.lucide,
-[data-theme="dark"] .ehr-rail-toggle svg {
-  color: #E2E8F0 !important;
-  stroke: currentColor !important;
-}
-
-/* Worklist ("Assigned patients") header + rows: ensure column captions and
-   cell text stay legible on the dark surface. */
-[data-theme="dark"] .ehr-worklist-head,
-[data-theme="dark"] .ehr-worklist-head * {
-  color: var(--ehr-muted) !important;
-}
-[data-theme="dark"] .ehr-worklist-name,
-[data-theme="dark"] .ehr-worklist-room,
-[data-theme="dark"] .ehr-worklist-care {
-  color: #E2E8F0 !important;
 }
 
 /* ── Align the schedule cards with the assigned-patients worklist ──

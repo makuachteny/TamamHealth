@@ -40,10 +40,7 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#EFF8FD" },
-    { media: "(prefers-color-scheme: dark)", color: "#015697" },
-  ],
+  themeColor: "#EFF8FD",
 };
 
 export default function RootLayout({
@@ -52,7 +49,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="light" className={`${dmSans.variable} ${jetBrainsMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${dmSans.variable} ${jetBrainsMono.variable}`} suppressHydrationWarning>
       <head>
         <link rel="icon" type="image/svg+xml" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />
         <link rel="apple-touch-icon" sizes="192x192" href="/assets/logos/SVG/Tamam_Style_Guide-33.svg" />

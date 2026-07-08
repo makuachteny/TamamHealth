@@ -11,7 +11,7 @@ import {
   ShieldAlert, TestTubes, ChevronRight,
   CalendarClock, TrendingUp as TrendingUpIcon, ClipboardList,
   User as UserIcon, Building2, Search, X, Wallet, Syringe,
-  Heart, Printer, History,
+  Heart, Printer, History, Plus, SendHorizontal,
 } from '@/components/icons/lucide';
 import Badge from '@/components/Badge';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -158,7 +158,7 @@ export default function PatientDetailPage() {
   const { appointments: patientAppointments } = usePatientAppointments(patient?._id);
   const { prescriptions: allPrescriptions } = usePrescriptions();
   const { triages: patientTriages } = useTriage(patient?._id);
-  const { canConsult, canViewClinical, canOrderLabs, canPrescribe } = usePermissions();
+  const { canConsult, canViewClinical, canOrderLabs, canPrescribe, canBookAppointments } = usePermissions();
 
   // Defence in depth: if a non-clinical viewer lands on (or deep-links to) a
   // clinical tab, snap them back to the overview so clinical panels never render.
@@ -917,6 +917,35 @@ export default function PatientDetailPage() {
           </button>
 
           <div className="ehr-chart-shell">
+          <div className="ehr-chart-layout">
+          {/* Chart navigation — a left sidebar running alongside both the
+              patient header and the tab content, not just the content. */}
+          <div
+            className="ehr-chart-nav flex mb-5 no-print overflow-x-auto"
+            style={{ borderBottom: '1px solid var(--border-light)' }}
+          >
+            {tabs.map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className={isActive ? 'ehr-chart-nav-button is-active' : 'ehr-chart-nav-button'}
+                  style={{
+                    background: 'transparent',
+                    color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    borderBottom: `2px solid ${isActive ? 'var(--accent-primary)' : 'transparent'}`,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <tab.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="ehr-chart-main">
           {/* Patient Header — TamamHealth-style: avatar | name+pills+info-strip | action row */}
           {(() => {
             const initials = patientInitials(patient);
@@ -928,12 +957,6 @@ export default function PatientDetailPage() {
             const patientDemographicDisplay = `${patientAgeLabel(patient)} · ${patient.gender || '—'}`;
 
             const photoUrl = (patient as { photoUrl?: string }).photoUrl;
-            const activeAllergies = patient.structuredAllergies !== undefined
-              ? patient.structuredAllergies.filter(a => a.status === 'active')
-              : (patient.allergies || []).filter(a => a && a.toLowerCase() !== 'none known' && a.toLowerCase() !== 'none');
-            const allergySummary = activeAllergies.length
-              ? activeAllergies.map(a => typeof a === 'string' ? a : a.substance).slice(0, 2).join(', ')
-              : 'No known allergies documented';
 
             return (
               <div className="card-elevated ehr-patient-banner p-5 mb-5 relative overflow-hidden">
@@ -1080,15 +1103,6 @@ export default function PatientDetailPage() {
                           ${patientBalance.toFixed(2)} due
                         </strong>
                       </button>
-                      <button
-                        type="button"
-                        onClick={openAllergiesFromHeader}
-                        className={activeAllergies.length ? 'ehr-allergy-box has-alert' : 'ehr-allergy-box'}
-                        title="Open allergies"
-                      >
-                        <span>{activeAllergies.length > 0 && <AlertTriangle className="ehr-allergy-icon" aria-hidden />}ALLERGIES</span>
-                        <strong>{allergySummary}</strong>
-                      </button>
                     </div>
 
                     <div className="ehr-chart-actions no-print" aria-label="Patient chart actions">
@@ -1139,33 +1153,6 @@ export default function PatientDetailPage() {
             );
           })()}
 
-          <div className="ehr-chart-layout">
-          {/* Chart navigation — horizontal tab bar directly below the patient header */}
-          <div
-            className="ehr-chart-nav flex mb-5 no-print overflow-x-auto"
-            style={{ borderBottom: '1px solid var(--border-light)' }}
-          >
-            {tabs.map(tab => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  onMouseDown={(e) => e.preventDefault()}
-                              className={isActive ? 'ehr-chart-nav-button is-active' : 'ehr-chart-nav-button'}
-                              style={{
-                    background: 'transparent',
-                    color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                    borderBottom: `2px solid ${isActive ? 'var(--accent-primary)' : 'transparent'}`,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <tab.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
           <section className="ehr-chart-content">
 
           {activeTab === 'overview' && (
@@ -2487,6 +2474,91 @@ export default function PatientDetailPage() {
             </div>
           )}
           </section>
+          </div>
+
+          {/* Right rail — demographics + allergies at a glance, mirroring the
+              dashboard's three-panel layout. The allergies box that used to sit
+              in the patient header lives here now. */}
+          <aside className="ehr-chart-right-rail no-print" aria-label="Patient summary rail">
+            <div className="ehr-chart-side-card">
+              <div className="ehr-chart-side-card-head">
+                <h3>Demographics</h3>
+                <button type="button" onClick={() => setActiveTab('demographics')}>View all</button>
+              </div>
+              <dl className="ehr-chart-side-rows">
+                <div><dt>Patient ID</dt><dd>{patient.hospitalNumber || patient.geocodeId || '—'}</dd></div>
+                <div><dt>Age</dt><dd>{patientAgeLabel(patient)}</dd></div>
+                <div><dt>Gender</dt><dd>{patient.gender || '—'}</dd></div>
+                <div><dt>Date of birth</dt><dd>{patient.dateOfBirth || '—'}</dd></div>
+                <div><dt>Phone</dt><dd>{patient.phone || '—'}</dd></div>
+                <div><dt>Blood type</dt><dd>{patient.bloodType || '—'}</dd></div>
+                <div><dt>Address</dt><dd>{patient.address || [patient.boma, patient.payam, patient.county].filter(Boolean).join(', ') || '—'}</dd></div>
+                <div><dt>Language</dt><dd>{patient.primaryLanguage || '—'}</dd></div>
+              </dl>
+              <div className="ehr-chart-side-actions no-print">
+                {canViewClinical && (
+                  <button
+                    type="button"
+                    aria-label="Refer this patient"
+                    style={{ background: '#fff', borderColor: 'var(--accent-purple)', color: '#000' }}
+                    onClick={() => setShowReferModal(true)}
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" color="#000" /> Refer
+                  </button>
+                )}
+                {canBookAppointments && (
+                  <button
+                    type="button"
+                    aria-label="New appointment"
+                    style={{ background: '#fff', borderColor: 'var(--accent-primary)', color: '#000' }}
+                    onClick={() => router.push(`/appointments?new=1&patientId=${patient._id}`)}
+                  >
+                    <Plus className="w-3.5 h-3.5" color="#000" /> New appointment
+                  </button>
+                )}
+                <button
+                  type="button"
+                  aria-label="Send intake"
+                  style={{ background: 'var(--accent-orange)', borderColor: 'var(--accent-orange)', color: '#fff' }}
+                  onClick={() => router.push(`/patient-intake?patientId=${patient._id}`)}
+                >
+                  <SendHorizontal className="w-3.5 h-3.5" color="#fff" /> Send intake
+                </button>
+              </div>
+            </div>
+            {(() => {
+              const activeAllergies = patient.structuredAllergies !== undefined
+                ? patient.structuredAllergies.filter(a => a.status === 'active')
+                : (patient.allergies || []).filter(a => a && a.toLowerCase() !== 'none known' && a.toLowerCase() !== 'none');
+              return (
+                <div className={activeAllergies.length ? 'ehr-chart-side-card ehr-chart-side-card--alert' : 'ehr-chart-side-card'}>
+                  <div className="ehr-chart-side-card-head">
+                    <h3>
+                      {activeAllergies.length > 0 && <AlertTriangle className="ehr-allergy-icon" aria-hidden />}
+                      Allergies
+                    </h3>
+                    <button type="button" onClick={openAllergiesFromHeader}>View all</button>
+                  </div>
+                  {activeAllergies.length ? (
+                    <ul className="ehr-chart-side-allergies">
+                      {activeAllergies.map((a, i) => {
+                        const name = typeof a === 'string' ? a : a.substance;
+                        const detail = typeof a === 'string' ? undefined : (a.reaction || a.criticality);
+                        return (
+                          <li key={`${name}-${i}`}>
+                            <strong>{name}</strong>
+                            {detail && <span>{detail}</span>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="ehr-chart-side-empty">No known allergies documented</p>
+                  )}
+                </div>
+              );
+            })()}
+          </aside>
           </div>
           </div>
       </main>

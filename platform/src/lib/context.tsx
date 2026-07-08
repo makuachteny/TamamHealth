@@ -24,8 +24,6 @@ function isChunkLoadError(err: unknown): boolean {
   return /ChunkLoadError|Loading chunk .*failed|Failed to fetch dynamically imported module/i.test(msg);
 }
 
-export type Theme = 'light' | 'dark';
-
 interface AppUser {
   _id: string;
   username: string;
@@ -56,7 +54,6 @@ interface AppState {
   /** True when the user has explicitly paused sync via toggleOnline */
   syncPaused: boolean;
   lastSync: string;
-  theme: Theme;
   dbReady: boolean;
   globalSearch: string;
   setGlobalSearch: (s: string) => void;
@@ -67,7 +64,6 @@ interface AppState {
   login: (username: string, password: string, hospitalId?: string) => Promise<UserRole | false>;
   logout: () => void;
   toggleOnline: () => void;
-  toggleTheme: () => void;
   /** Sync state from the SyncManager (null when sync is disabled) */
   syncStatus: AggregateStatus | null;
   /** Trigger a one-shot sync across all databases */
@@ -107,7 +103,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // OS-level: is the network actually up?
   const [isNetworkUp, setIsNetworkUp] = useState<boolean>(true);
   const [lastSync, setLastSync] = useState('');
-  const [theme, setTheme] = useState<Theme>('light');
   const [dbReady, setDbReady] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -202,16 +197,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     init();
-
-    // Theme — default to light
-    const saved = localStorage.getItem('tamamhealth-theme') as Theme | null;
-    if (saved === 'light' || saved === 'dark') {
-      setTheme(saved);
-      document.documentElement.setAttribute('data-theme', saved);
-    } else {
-      setTheme('light');
-      document.documentElement.setAttribute('data-theme', 'light');
-    }
 
     // Register service worker with a cache-busting version tag so a new
     // deploy forces the browser to fetch and install the new worker instead
@@ -345,15 +330,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (syncManagerRef.current) {
       await syncManagerRef.current.syncNow();
     }
-  }, []);
-
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => {
-      const next = prev === 'light' ? 'dark' : 'light';
-      localStorage.setItem('tamamhealth-theme', next);
-      document.documentElement.setAttribute('data-theme', next);
-      return next;
-    });
   }, []);
 
   const login = useCallback(async (username: string, password: string, hospitalId?: string): Promise<UserRole | false> => {
@@ -650,16 +626,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // actions are stable, so they don't need to be in the dependency list.
   const value = useMemo<AppState>(() => ({
     isAuthenticated, currentUser, isOnline, isNetworkUp, syncPaused,
-    lastSync, theme, dbReady,
+    lastSync, dbReady,
     globalSearch, setGlobalSearch,
     sidebarOpen, setSidebarOpen,
     sidebarCollapsed, setSidebarCollapsed,
-    login, logout, toggleOnline, toggleTheme,
+    login, logout, toggleOnline,
     syncStatus, syncNow,
   }), [
     isAuthenticated, currentUser, isOnline, isNetworkUp, syncPaused,
-    lastSync, theme, dbReady, globalSearch, sidebarOpen, sidebarCollapsed,
-    syncStatus, login, logout, toggleOnline, toggleTheme, syncNow,
+    lastSync, dbReady, globalSearch, sidebarOpen, sidebarCollapsed,
+    syncStatus, login, logout, toggleOnline, syncNow,
   ]);
 
   return (

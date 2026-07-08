@@ -18,7 +18,7 @@ import FilterSelect from '@/components/filters/FilterSelect';
 import {
   Users, Building2, Plus, Edit3, KeyRound, UserX, UserCheck,
   X, Eye, EyeOff, RefreshCw, Check, Bell, LayoutDashboard, Trash2,
-  Settings as SettingsIcon, Globe, Moon, Sun, Lock, Save, User as UserIcon,
+  Settings as SettingsIcon, Globe, Lock, Save, User as UserIcon,
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
 import { FacilitySettingsView } from '@/components/settings/FacilitySettingsView';
@@ -58,7 +58,7 @@ function generatePassword(): string {
 }
 
 export default function SettingsPage() {
-  const { currentUser, theme, toggleTheme, isOnline, syncPaused, toggleOnline, syncNow, lastSync } = useApp();
+  const { currentUser, isOnline, syncPaused, toggleOnline, syncNow, lastSync } = useApp();
   const { users, loading: usersLoading, create: createUser, update: updateUser, resetPassword, deactivate } = useUsers();
   const { hospitals, loading: hospitalsLoading, create: createHospital, reload: reloadHospitals } = useHospitals();
   const { canManageUsers, canAccess } = usePermissions();
@@ -454,38 +454,6 @@ export default function SettingsPage() {
         {/* ═══════════════ PREFERENCES TAB (all users) ═══════════════ */}
         {activeTab === 'preferences' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Appearance */}
-            <div className="dash-card">
-              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="icon-box-sm"><Sun className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
-                <h3 className="font-semibold text-sm">Appearance</h3>
-              </div>
-              <div className="p-5">
-                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Theme</p>
-                <div className="flex gap-2">
-                  {[
-                    { v: 'light' as const, label: 'Light', Icon: Sun },
-                    { v: 'dark' as const, label: 'Dark', Icon: Moon },
-                  ].map(opt => {
-                    const active = theme === opt.v;
-                    return (
-                      <button
-                        key={opt.v}
-                        onClick={() => { if (theme !== opt.v) toggleTheme(); }}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                        style={active
-                          ? { background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }
-                          : { background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
-                      >
-                        <opt.Icon className="w-4 h-4" /> {opt.label}
-                        {active && <Check className="w-3.5 h-3.5" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
             {/* Language */}
             <div className="dash-card">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>

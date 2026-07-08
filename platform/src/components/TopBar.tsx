@@ -9,11 +9,11 @@ import GlobalSearchBar from '@/components/GlobalSearchBar';
 // beside the search input, distinct from `actions` which sit at the row's end.
 //
 // This used to be a second floating chrome bar (its own glass panel, avatar
-// pill, theme toggle, notifications) stacked directly under EhrTopRail — the
-// platform's one true top bar, which already carries the avatar/role menu,
-// notifications, and theme toggle. That duplication read as a "double
-// header." TopBar is now just the page title, laid out inline in the content
-// flow, plus the optional search/actions row underneath.
+// pill, notifications) stacked directly under EhrTopRail — the platform's
+// one true top bar, which already carries the avatar/role menu and
+// notifications. That duplication read as a "double header." TopBar is now
+// just the page title, laid out inline in the content flow, plus the
+// optional search/actions row underneath.
 export default function TopBar({
   title,
   titleIcon,

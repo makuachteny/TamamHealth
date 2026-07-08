@@ -77,7 +77,10 @@ export default function GetStartedCard() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/tamamhealth-logo.svg" alt="" className="h-10 w-10" />
             <div>
-              <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              <h1
+                className="text-xl font-bold"
+                style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-platform)', letterSpacing: '-0.01em' }}
+              >
                 Welcome, {firstName}!
               </h1>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>

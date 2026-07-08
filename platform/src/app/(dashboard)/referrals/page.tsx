@@ -7,7 +7,7 @@ import Modal from '@/components/Modal';
 import EmptyState from '@/components/EmptyState';
 import Badge, { toneForStatus } from '@/components/Badge';
 import {
-  ArrowRightLeft, Plus, Send, CheckCircle2,
+  ArrowRightLeft, Plus, CheckCircle2,
   AlertTriangle, ChevronDown, ChevronUp, X,
   Stethoscope, Package, FileText, Image as ImageIcon,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -17,15 +17,13 @@ import {
 } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useReferrals } from '@/lib/hooks/useReferrals';
-import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { useSettings } from '@/lib/settings/SettingsProvider';
 import { useToast } from '@/components/Toast';
-import FileUpload from '@/components/FileUpload';
 import ReferralFilters, { type ReferralFilterState } from '@/components/referrals/ReferralFilters';
 import RowActionsMenu, { type RowAction } from '@/components/referrals/RowActionsMenu';
+import ReferralFormModal from '@/components/referrals/ReferralFormModal';
 import type { Attachment, TransferPackage, ReferralDisposition } from '@/data/mock';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 
@@ -35,29 +33,18 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// Fallback list used only when the facility hasn't configured its departments
-// in Facility Settings (settings.departments drives the picker when present).
-const FALLBACK_DEPARTMENTS = [
-  'Internal Medicine', 'Pediatrics', 'Obstetrics & Gynecology', 'Surgery',
-  'Emergency', 'Cardiology', 'Orthopedics', 'Ophthalmology', 'Neurology',
-  'Dermatology', 'ENT', 'Outpatient'
-];
-
 const DISPOSITION_OPTIONS: ReferralDisposition[] = [
   'treated_discharged', 'admitted', 'referred_onward', 'did_not_arrive', 'deceased',
 ];
 
 export default function ReferralsPage() {
   const { t } = useTranslation();
-  const { referrals, createWithTransfer, accept, updateStatus, updateNotes, completeWithOutcome } = useReferrals();
+  const { referrals, accept, updateStatus, updateNotes, completeWithOutcome } = useReferrals();
   const { showToast } = useToast();
-  const { hospitals } = useHospitals();
   const { patients } = usePatients();
   const { currentUser } = useApp();
   const [localSearch, setLocalSearch] = useState('');
   const { canManageReferrals } = usePermissions();
-  const { departments: facilityDepartments } = useSettings();
-  const departments = facilityDepartments.length ? facilityDepartments : FALLBACK_DEPARTMENTS;
   const OUR_HOSPITAL_ID = currentUser?.hospitalId || '';
 
   const searchParams = useSearchParams();
@@ -77,17 +64,6 @@ export default function ReferralsPage() {
   }, [searchParams]);
   const setColFilter = (k: keyof ReferralFilterState, v: string) => setColFilters(f => ({ ...f, [k]: v }));
   const clearColFilters = () => setColFilters({ patient: '', route: '', department: '', urgency: '', status: '' });
-
-  // New referral form state
-  const [formPatient, setFormPatient] = useState('');
-  const [formPatientSearch, setFormPatientSearch] = useState('');
-  const [formHospital, setFormHospital] = useState('');
-  const [formDepartment, setFormDepartment] = useState('');
-  const [formUrgency, setFormUrgency] = useState<'routine' | 'urgent' | 'emergency'>('routine');
-  const [formReason, setFormReason] = useState('');
-  const [formNotes, setFormNotes] = useState('');
-  const [formAttachments, setFormAttachments] = useState<Attachment[]>([]);
-  const [submitting, setSubmitting] = useState(false);
 
   // Modal state for decline, complete, and add note
   const [declineModalId, setDeclineModalId] = useState<string | null>(null);
@@ -189,53 +165,6 @@ export default function ReferralsPage() {
     return map[status] || status;
   };
 
-  const handleSubmitReferral = async () => {
-    try {
-      setSubmitting(true);
-      const patient = patients.find(p => p._id === formPatient);
-      const toHospital = hospitals.find(h => h._id === formHospital);
-      const fromHospital = hospitals.find(h => h._id === OUR_HOSPITAL_ID);
-      await createWithTransfer(
-        {
-          patientId: formPatient,
-          // Guard the optional middleName — `${undefined}` would otherwise
-          // persist a literal "John undefined Doe" into the referral payload.
-          patientName: patient
-            ? `${patient.firstName} ${patient.middleName || ''} ${patient.surname}`.replace(/\s+/g, ' ').trim()
-            : '',
-          fromHospitalId: OUR_HOSPITAL_ID,
-          fromHospital: fromHospital?.name || '',
-          toHospitalId: formHospital,
-          toHospital: toHospital?.name || '',
-          department: formDepartment,
-          urgency: formUrgency,
-          reason: formReason,
-          notes: formNotes,
-          referringDoctor: currentUser?.name || '',
-          referralDate: new Date().toISOString().split('T')[0],
-          status: 'sent',
-        },
-        formAttachments,
-        currentUser?.name || 'Unknown'
-      );
-      showToast(t('referrals.toastSent'), 'success');
-      setShowNewReferral(false);
-      setFormPatient('');
-      setFormPatientSearch('');
-      setFormHospital('');
-      setFormDepartment('');
-      setFormUrgency('routine');
-      setFormReason('');
-      setFormNotes('');
-      setFormAttachments([]);
-    } catch (err) {
-      console.error('Failed to submit referral:', err);
-      showToast(t('referrals.toastSubmitFailed'), 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const handleDecline = async () => {
     if (!declineModalId || !declineReason.trim()) return;
     try {
@@ -298,22 +227,6 @@ export default function ReferralsPage() {
     }
   };
 
-  // Hierarchical referral destinations based on facility level
-  // Boma(PHCU) → Payam(PHCC), Payam(PHCC) → County/State/National,
-  // County → State/National, State → National, National → National/State
-  const currentFacilityType = currentUser?.hospital?.facilityType;
-  const ALLOWED_DESTINATION_TYPES: Record<string, string[]> = {
-    phcu: ['phcc'],
-    phcc: ['county_hospital', 'state_hospital', 'national_referral'],
-    county_hospital: ['state_hospital', 'national_referral'],
-    state_hospital: ['national_referral'],
-    national_referral: ['national_referral', 'state_hospital'],
-  };
-  const allowedTypes = currentFacilityType ? ALLOWED_DESTINATION_TYPES[currentFacilityType] : undefined;
-  const otherHospitals = hospitals.filter(h =>
-    h._id !== OUR_HOSPITAL_ID &&
-    (!allowedTypes || allowedTypes.includes(h.facilityType))
-  );
 
   const isImage = (mimeType: string) => mimeType.startsWith('image/');
 
@@ -654,205 +567,16 @@ export default function ReferralsPage() {
               />
               {canManageReferrals && (
                 <button
-                  onClick={() => setShowNewReferral(!showNewReferral)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 999, background: showNewReferral ? 'var(--bg-card-solid)' : '#2191D0', color: showNewReferral ? 'var(--text-secondary)' : '#fff', border: showNewReferral ? '1px solid var(--border-light)' : 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  onClick={() => setShowNewReferral(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 999, background: '#2191D0', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                 >
-                  {showNewReferral ? <><X className="w-4 h-4" /> {t('action.cancel')}</> : <><Plus className="w-4 h-4" /> {t('referrals.newReferral')}</>}
+                  <Plus className="w-4 h-4" /> {t('referrals.newReferral')}
                 </button>
               )}
             </div>
           </div>
           {/* Scrollable body */}
           <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-
-          {/* New Referral Form */}
-          {showNewReferral && (
-            <div className="card-elevated p-6 mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <Send className="w-5 h-5" style={{ color: 'var(--tamamhealth-blue)' }} />
-                <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  {t('referrals.createNew')}
-                </h2>
-                <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--tamamhealth-blue)' }}>
-                  {t('referrals.autoPackages')}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                {/* Patient */}
-                <div>
-                  <label>{t('referrals.patient')}</label>
-                  {(() => {
-                    const selected = formPatient ? patients.find(p => p._id === formPatient) : null;
-                    if (selected) {
-                      return (
-                        <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                          <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                            {t('referrals.selectedPrefix')} <span className="font-medium">{selected.firstName} {selected.surname}</span>
-                            <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>({selected.hospitalNumber})</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => { setFormPatient(''); setFormPatientSearch(''); }}
-                            className="text-xs underline"
-                            style={{ color: 'var(--accent-primary)' }}
-                          >
-                            {t('referrals.change')}
-                          </button>
-                        </div>
-                      );
-                    }
-                    const q = formPatientSearch.trim().toLowerCase();
-                    const matches = q.length >= 1
-                      ? patients.filter(p => {
-                          const name = `${p.firstName || ''} ${p.middleName || ''} ${p.surname || ''}`.toLowerCase();
-                          return name.includes(q)
-                            || (p.hospitalNumber || '').toLowerCase().includes(q)
-                            || (p.phone || '').toLowerCase().includes(q);
-                        }).slice(0, 8)
-                      : [];
-                    return (
-                      <div>
-                        <input
-                          type="search"
-                          value={formPatientSearch}
-                          onChange={e => setFormPatientSearch(e.target.value)}
-                          placeholder={t('referrals.patientSearchPlaceholder')}
-                          className="w-full p-2.5 rounded-lg outline-none text-sm"
-                          style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
-                        />
-                        {matches.length > 0 && (
-                          <div className="mt-1 rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card)' }}>
-                            {matches.map(p => (
-                              <button
-                                key={p._id}
-                                type="button"
-                                onClick={() => { setFormPatient(p._id); setFormPatientSearch(''); }}
-                                className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-white/5 transition-colors"
-                                style={{ borderBottom: '1px solid var(--border-light)' }}
-                              >
-                                <span className="text-sm font-medium truncate">{p.firstName} {p.surname}</span>
-                                <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {q.length >= 1 && matches.length === 0 && (
-                          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{t('referrals.noPatientsMatch')}</p>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Destination Hospital */}
-                <div>
-                  <label>{t('referrals.destinationHospital')}</label>
-                  <select value={formHospital} onChange={(e) => setFormHospital(e.target.value)}>
-                    <option value="">{t('referrals.selectHospital')}</option>
-                    {otherHospitals.map(h => (
-                      <option key={h._id} value={h._id}>
-                        {h.name} ({h.state})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Department */}
-                <div>
-                  <label>{t('referrals.department')}</label>
-                  <select value={formDepartment} onChange={(e) => setFormDepartment(e.target.value)}>
-                    <option value="">{t('referrals.selectDepartment')}</option>
-                    {departments.map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Urgency */}
-                <div>
-                  <label>{t('referrals.urgency')}</label>
-                  <div className="flex gap-3 mt-1">
-                    {(['routine', 'urgent', 'emergency'] as const).map(level => (
-                      <button
-                        key={level}
-                        type="button"
-                        onClick={() => setFormUrgency(level)}
-                        className={`badge urgency-${level} cursor-pointer px-4 py-2 text-sm transition-all`}
-                        style={{
-                          opacity: formUrgency === level ? 1 : 0.45,
-                          transform: formUrgency === level ? 'scale(1.05)' : 'scale(1)',
-                          border: formUrgency === level ? '2px solid currentColor' : '2px solid transparent',
-                          borderRadius: '4px',
-                        }}
-                      >
-                        {level === 'emergency' && <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />}
-                        {t(`referrals.urgency_${level}`)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Reason */}
-                <div className="col-span-2">
-                  <label>{t('referrals.reasonForReferral')}</label>
-                  <textarea
-                    value={formReason}
-                    onChange={(e) => setFormReason(e.target.value)}
-                    rows={2}
-                    placeholder={t('referrals.reasonPlaceholder')}
-                  />
-                </div>
-
-                {/* Clinical Notes */}
-                <div className="col-span-2">
-                  <label>{t('referral.notes')}</label>
-                  <textarea
-                    value={formNotes}
-                    onChange={(e) => setFormNotes(e.target.value)}
-                    rows={3}
-                    placeholder={t('referrals.notesPlaceholder')}
-                  />
-                </div>
-
-                {/* Referral Attachments */}
-                <div className="col-span-2">
-                  <label>{t('referrals.attachmentsOptional')}</label>
-                  <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
-                    {t('referrals.attachmentsHint')}
-                  </p>
-                  <FileUpload
-                    attachments={formAttachments}
-                    onAdd={(att) => setFormAttachments(prev => [...prev, att])}
-                    onRemove={(id) => setFormAttachments(prev => prev.filter(a => a.id !== id))}
-                    uploaderName={currentUser?.name || 'Unknown'}
-                    maxFiles={5}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-5 pt-4 border-t" style={{ borderColor: 'var(--border-light)' }}>
-                <button
-                  onClick={() => setShowNewReferral(false)}
-                  className="btn btn-secondary"
-                >
-                  {t('action.cancel')}
-                </button>
-                <button
-                  onClick={handleSubmitReferral}
-                  className="btn btn-primary"
-                  disabled={!formPatient || !formHospital || !formDepartment || !formReason || submitting}
-                  style={{
-                    opacity: (!formPatient || !formHospital || !formDepartment || !formReason || submitting) ? 0.5 : 1,
-                    cursor: (!formPatient || !formHospital || !formDepartment || !formReason || submitting) ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  <Package className="w-4 h-4" />
-                  {submitting ? t('referrals.packagingSending') : t('referrals.sendWithPackage')}
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Referrals table */}
           <div className="overflow-hidden">
@@ -1021,6 +745,10 @@ export default function ReferralsPage() {
             )}
             </div>
           </div>
+
+          {showNewReferral && (
+            <ReferralFormModal onClose={() => setShowNewReferral(false)} />
+          )}
 
           {/* Reverse status confirmation — undo an acceptance or reopen a
               declined referral. Clinical reversals are confirmed first. */}
