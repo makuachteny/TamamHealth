@@ -26,6 +26,7 @@ import dynamic from 'next/dynamic';
 import PortalModal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import { jubaDate, jubaNow, jubaTime } from '@/lib/time-juba';
+import PageInstructionCard from '@/components/PageInstructionCard';
 
 // react-big-calendar (and its CSS) is a heavy client-only library. Split it out
 // of the route's initial bundle so it loads only when the calendar view renders.
@@ -407,6 +408,7 @@ export default function AppointmentsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <PageInstructionCard />
         {/* View toggle + Filters live beside the search bar above (TopBar
             searchTrailing); the list/calendar body renders directly here. */}
 

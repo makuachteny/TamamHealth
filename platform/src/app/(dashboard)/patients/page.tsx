@@ -258,6 +258,7 @@ export default function PatientsPage() {
     <>
       <TopBar title={t('nav.patients')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <PageInstructionCard />
           <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
             {/* ── Card toolbar ── */}
             <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>

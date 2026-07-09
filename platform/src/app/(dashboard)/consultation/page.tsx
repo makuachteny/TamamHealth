@@ -56,6 +56,7 @@ import {
 import { presetForMedication } from '@/lib/data/medication-presets';
 import { saveDraft, loadDraft, dropDraft } from '@/lib/draft-storage';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import PageInstructionCard from '@/components/PageInstructionCard';
 
 // Adapt ICD-11 entries to the {code, name} shape this page consumes. Keywords
 // are carried over too — CodedSearchField matches against them, and most
@@ -1768,6 +1769,7 @@ export default function ConsultationPage() {
   return (
     <>
       <main ref={consultPageRef} className="page-container page-enter ehr-consultation-page" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <PageInstructionCard />
           <div className="flex items-center justify-between gap-3 mb-4">
             <button onClick={() => router.push('/patients')} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--accent-primary)' }}>
               <ArrowLeft className="w-4 h-4" /> {t('consultation.backToPatients')}

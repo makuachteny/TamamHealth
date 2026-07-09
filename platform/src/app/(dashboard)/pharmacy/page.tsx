@@ -16,6 +16,7 @@ import { useToast } from '@/components/Toast';
 import { medications } from '@/data/mock';
 import { classifyStockStatus } from '@/lib/services/pharmacy-inventory-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import PageInstructionCard from '@/components/PageInstructionCard';
 
 const UNITS = ['tablets', 'vials', 'bottles', 'sachets', 'tubes', 'ampoules', 'sachet', 'ml'];
 
@@ -405,6 +406,7 @@ export default function PharmacyPage() {
               </div>
             } />
       <main className="page-container page-enter">
+          <PageInstructionCard />
           {/* Tabs */}
           <div className="flex gap-0 border-b mb-4 overflow-x-auto" style={{ borderColor: 'var(--border-light)' }}>
             {([

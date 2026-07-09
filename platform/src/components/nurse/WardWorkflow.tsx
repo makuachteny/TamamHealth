@@ -161,12 +161,17 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
-        {/* Ward Patient table — same .ehr-worklist-panel card the Clinical
-            Officer's "Assigned patients" list uses, so both dashboards render
-            this list identically instead of the ward view having its own
-            bespoke bordered card. */}
-        <section className="ehr-worklist-panel" style={{ flex: 1, minHeight: 0, minWidth: 0, order: 1 }}>
+      {/* Ward Patient table — same .ehr-worklist-panel card the Clinical
+          Officer's "Assigned patients" list uses, so both dashboards render
+          this list identically instead of the ward view having its own
+          bespoke bordered card. A single top-level element here, matching
+          MarWorkflow/TriageWorkflow — EhrCareDashboard already wraps
+          `children` in its own .ehr-worklist-panel.ehr-care-workflow div, so
+          an extra wrapper here double-nests the class and breaks its width
+          (the child of .ehr-care-workflow shrinks to content width instead
+          of stretching, since the inline flex:1 needs to be on THIS element
+          directly to win over `.ehr-care-workflow > *`). */}
+      <section className="ehr-worklist-panel" style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
           {/* Inline search + structured filters — lives in the list header rather
               than the platform-wide top search bar. */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -306,9 +311,7 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
               );
             })}
           </div>
-        </section>
-
-      </div>
+      </section>
 
       {assignTarget && (
         <AssignDoctorModal

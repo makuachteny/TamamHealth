@@ -14,6 +14,7 @@ import { useWards } from '@/lib/hooks/useWards';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { AdmissionDoc } from '@/lib/db-types-ward';
+import PageInstructionCard from '@/components/PageInstructionCard';
 
 // Shared column template for the admissions table header + rows:
 // Patient · Ward · Diagnosis · Severity · Discharge action
@@ -153,7 +154,7 @@ export default function WardsPage() {
     <>
       <TopBar title={t('ward.wards')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-
+        <PageInstructionCard />
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           {/* ── Card toolbar ── */}
           <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>

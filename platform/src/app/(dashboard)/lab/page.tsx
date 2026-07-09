@@ -19,6 +19,7 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { LabOrderStatus } from '@/lib/clinical-flow/order-lifecycles';
 import { useSettings } from '@/lib/settings/SettingsProvider';
+import PageInstructionCard from '@/components/PageInstructionCard';
 
 // Human labels for the granular diagnostics lifecycle (Stage 6).
 const ORDER_STAGE_LABEL: Record<LabOrderStatus, string> = {
@@ -370,6 +371,7 @@ export default function LabPage() {
         </div>
       } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <PageInstructionCard />
           {overdueReviews.length > 0 && (
             <div className="card-elevated p-3 mb-4 flex items-start gap-2" style={{ background: 'rgba(229,46,66,0.08)', border: '1px solid var(--color-danger)' }}>
               <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-danger)' }} />
