@@ -102,7 +102,7 @@ if ! grep -q '^GH_OWNER=' .env 2>/dev/null; then
   cat "${ENV_APPEND}" >> .env
 fi
 
-./scripts/preflight.sh || true
+./scripts/preflight.sh
 
 export REPO_URL="${REPO_URL}"
 export APP_DIR="${APP_DIR}"

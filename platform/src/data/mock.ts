@@ -2155,14 +2155,6 @@ export interface MedicalRecord {
   attachments?: Attachment[];
   followUp?: { date: string; reason: string };
   syncStatus: 'synced' | 'pending';
-  aiEvaluation?: {
-    suggestedDiagnoses: { icd10Code: string; name: string; confidence: number; reasoning: string; severity: 'mild' | 'moderate' | 'severe'; suggestedTreatment?: string }[];
-    vitalSignAlerts: string[];
-    recommendedTests: string[];
-    severityAssessment: string;
-    clinicalNotes: string;
-    evaluatedAt: string;
-  };
 }
 
 const departments = ['Internal Medicine', 'Pediatrics', 'Obstetrics & Gynecology', 'Surgery', 'Emergency', 'Outpatient'];

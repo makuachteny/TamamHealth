@@ -50,6 +50,21 @@ export async function GET() {
 
     // Production mode: ONLY the bootstrap admin. Never the demo roster.
     if (!isDemo) {
+      // Gate: once the admin has changed their bootstrap password
+      // (mustChangePassword is false), stop exposing credentials from this route.
+      // This prevents the default credentials endpoint from remaining active
+      // after the operator has secured the installation.
+      try {
+        const { getUserById } = await import('@/lib/services/user-service');
+        const adminUser = await getUserById('user-admin');
+        if (adminUser && adminUser.mustChangePassword === false) {
+          return NextResponse.json({ profiles: [] });
+        }
+      } catch {
+        // If the users DB is unreachable (first boot), fall through and return
+        // the credential so the seed process can complete.
+      }
+
       const adminPassword = credentials.passwords['admin'] ?? null;
       const profiles: ProfileResponse[] = [
         { username: 'admin', password: adminPassword },

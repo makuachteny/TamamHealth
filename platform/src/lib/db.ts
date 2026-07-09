@@ -325,11 +325,14 @@ export async function resetAllDatabases(): Promise<void> {
     'tamamhealth_clinical_favorites', 'tamamhealth_consultation_templates',
     'tamamhealth_clinician_tasks', 'tamamhealth_patient_documents',
     'tamamhealth_patient_reminders',
-    // NOTE: 'tamamhealth_controlled_substance_log' is deliberately NOT reset
-    // here — it is an append-only regulatory audit trail and resetAllDatabases()
-    // runs on production seed-version bumps (see seedProduction).
     'tamamhealth_meta'
   ];
+  // tamamhealth_controlled_substance_log is an append-only legal audit trail in
+  // production and must NEVER be wiped in a live environment. It is included in
+  // dev/demo resets only so local seeds stay consistent.
+  if (process.env.NODE_ENV !== 'production') {
+    dbNames.push('tamamhealth_controlled_substance_log');
+  }
   for (const name of dbNames) {
     try {
       // Prefer the cached instance — destroying a NEW PouchDB while the cached

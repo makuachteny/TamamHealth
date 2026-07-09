@@ -62,12 +62,11 @@ export default function HomeScreen() {
 
   const load = useCallback(async () => {
     if (!patient || !keys) return;
-    const qs = `?patientId=${encodeURIComponent(patient.id)}`;
     const [r, l, a, m] = await Promise.all([
-      fetchList<MedicalRecord>(`/api/patient-portal/records${qs}`, 'records'),
-      fetchList<LabResult>(`/api/patient-portal/labs${qs}`, 'results'),
-      fetchList<Appointment>(`/api/patient-portal/appointments${qs}`, 'appointments'),
-      fetchList<Prescription>(`/api/patient-portal/prescriptions${qs}`, 'prescriptions'),
+      fetchList<MedicalRecord>('/api/patient-portal/records', 'records'),
+      fetchList<LabResult>('/api/patient-portal/labs', 'results'),
+      fetchList<Appointment>('/api/patient-portal/appointments', 'appointments'),
+      fetchList<Prescription>('/api/patient-portal/prescriptions', 'prescriptions'),
     ]);
 
     // For each endpoint: server response wins; on failure fall back to the

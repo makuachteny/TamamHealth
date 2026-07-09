@@ -101,14 +101,10 @@ async function postHandler(req: NextRequest) {
         (i) => i.Name === 'TransactionDate'
       )?.Value;
 
-      // Log the successful payment for processing
+      // Log the successful payment for processing (sensitive fields omitted).
       console.log('[M-Pesa Webhook] Payment received:', {
         checkoutRequestId,
         merchantRequestId,
-        amount,
-        mpesaReceiptNumber,
-        phoneNumber,
-        transactionDate,
         timestamp: new Date().toISOString(),
       });
 

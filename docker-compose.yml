@@ -52,27 +52,17 @@ services:
     restart: unless-stopped
     networks:
       - app-net
-    # If DOPPLER_TOKEN is present at boot, install the doppler CLI and exec
-    # `doppler run -- npm start`, which fetches secrets and exports them into
-    # the process env. If not, fall through to plain `npm start` and the
-    # env_file values are the only source of truth (unchanged legacy path).
+    # If DOPPLER_TOKEN is present at boot, exec `doppler run -- npm start`,
+    # which fetches secrets and exports them into the process env. If not,
+    # fall through to plain `npm start` and the env_file values are the only
+    # source of truth (unchanged legacy path).
     #
-    # The doppler CLI install is one-time per container start (~3s). For
-    # operators who restart frequently, bake doppler into a custom image
-    # downstream of platform/Dockerfile to skip this.
+    # The Doppler CLI is baked into platform/Dockerfile (no runtime install).
     entrypoint:
       - sh
       - -c
       - |
         if [ -n "$${DOPPLER_TOKEN:-}" ]; then
-          if ! command -v doppler >/dev/null 2>&1; then
-            echo "[entrypoint] DOPPLER_TOKEN set; installing doppler CLI"
-            apk add --no-cache curl gnupg >/dev/null 2>&1 || true
-            curl -Ls --tlsv1.2 --proto "=https" --retry 3 \
-              https://cli.doppler.com/install.sh \
-              | sh -s -- --no-package-manager >/dev/null 2>&1 \
-              || { echo "[entrypoint] doppler install failed"; exit 1; }
-          fi
           echo "[entrypoint] starting under 'doppler run'"
           exec doppler run -- npm run start
         fi
@@ -118,7 +108,7 @@ services:
       COUCHDB_PASSWORD: ${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set in .env}
       COUCHDB_HOST: couchdb
       COUCHDB_PORT: "5984"
-      BACKUP_RETAIN_DAYS: "14"
+      BACKUP_RETAIN_DAYS: ${BACKUP_RETAIN_DAYS:-14}
     volumes:
       - couchdb_backups:/backups
       - ./scripts/dump-couchdb.sh:/usr/local/bin/dump-couchdb.sh:ro
@@ -131,7 +121,8 @@ services:
       - app-net
 
   couchdb:
-    image: couchdb:3
+    # Pin to exact minor version — update deliberately after testing upgrade path
+    image: couchdb:3.3.3
     environment:
       COUCHDB_USER: ${COUCHDB_USER:?COUCHDB_USER must be set in .env}
       COUCHDB_PASSWORD: ${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set in .env}
@@ -179,7 +170,7 @@ services:
       couchdb:
         condition: service_healthy
       platform:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - app-net

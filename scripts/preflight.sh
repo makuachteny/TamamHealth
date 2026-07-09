@@ -124,16 +124,12 @@ generic_patterns=(
 generic_hits=0
 for pat in "${generic_patterns[@]}"; do
   # Exclude this script itself (the patterns appear here as strings),
-  # the .git directory, and *.md files (operator docs reference these
-  # token formats in example/instructional contexts — e.g. secrets.md
-  # shows what a Doppler service token looks like). Real leaks land in
-  # code/config files, not documentation, so the FP cost outweighs the
-  # signal of scanning .md.
+  # and the .git directory. Markdown files are included in the scan so
+  # that credentials accidentally committed to docs are caught.
   hits=$(grep -RIlnE \
            --exclude-dir=node_modules --exclude-dir=.next \
            --exclude-dir=coverage --exclude-dir=.git \
            --exclude='preflight.sh' \
-           --exclude='*.md' \
            "$pat" . 2>/dev/null || true)
   if [ -n "$hits" ]; then
     fail "credential pattern '$pat' detected in:"

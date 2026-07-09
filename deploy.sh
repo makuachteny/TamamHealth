@@ -117,6 +117,10 @@ ${DOMAIN_APP} {
 
 # CouchDB (browser-facing for live sync)
 ${DOMAIN_COUCH} {
+    # Block the CouchDB admin panel — it must never be publicly reachable
+    respond /_utils* 403
+    respond /*/_utils* 403
+
     reverse_proxy localhost:5984
     # CouchDB needs CORS for browser PouchDB replication
     header {

@@ -246,7 +246,7 @@ async function fetchChanges({ couchUrl, db, since, batchSize }) {
   const headers = {};
   if (authHeader) headers.authorization = authHeader;
 
-  const res = await fetch(url, { method: 'GET', headers });
+  const res = await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(30000) });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     // Note: never include the URL or auth header in this message — admin
@@ -266,6 +266,7 @@ async function postSync({ syncUrl, secret, db, changes }) {
       'x-tamamhealth-signature': signature,
     },
     body: payload,
+    signal: AbortSignal.timeout(60000),
   });
   const text = await res.text().catch(() => '');
   if (!res.ok) {
@@ -357,6 +358,10 @@ async function mainLoop({ env, dbs }) {
   process.on('SIGINT', () => { void shutdown('SIGINT'); });
 
   while (!stopping) {
+    // Re-check the stopping flag at the top of each iteration so that a
+    // signal received while we were sleeping causes an immediate clean exit
+    // rather than kicking off another full poll round.
+    if (stopping) return;
     const tickStart = Date.now();
     const { totalProcessed, totalErrors } = await runOnce({ env, state, dbs });
 

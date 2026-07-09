@@ -5,12 +5,8 @@
  * Two lookup modes are exposed: hospital number + phone, or
  * first/last name + DOB + phone. Either resolves to the same JWT.
  *
- * Demo accounts are rendered only when EXPO_PUBLIC_DEMO_MODE !== 'false'
+ * Demo accounts are rendered only when EXPO_PUBLIC_DEMO_MODE === 'true'
  * so production builds can ship without the seed-data hint.
- *
- * TODO (v2): wire `expo-local-authentication` for biometric unlock once
- * the package is added to mobile/package.json. The scaffold is in
- * `triggerBiometricUnlock` below.
  */
 
 import React, { useState } from 'react';
@@ -22,23 +18,13 @@ import { colors, spacing, radius, fontSize } from '../lib/theme';
 import { useAuth } from '../lib/auth';
 import TamamHealthLogo from '../components/TamamHealthLogo';
 
-const DEMO_MODE_ENABLED = process.env.EXPO_PUBLIC_DEMO_MODE !== 'false';
+const DEMO_MODE_ENABLED = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
 
 const DEMO_ACCOUNTS = [
   { id: 'JTH-000001', phone: '0912345678', name: 'Deng Mabior Garang' },
   { id: 'JTH-000002', phone: '0916111222', name: 'Nyabol Gatdet Koang' },
   { id: 'JTH-000003', phone: '0921333444', name: 'Achol Mayen Deng' },
 ];
-
-/**
- * Stub for biometric unlock. Returns true if biometric auth succeeded.
- * Currently a no-op because expo-local-authentication is not installed —
- * see TODO at top of file.
- */
-async function triggerBiometricUnlock(): Promise<boolean> {
-  // Intentionally false: feature gated until the package lands.
-  return false;
-}
 
 export default function LoginScreen() {
   const { signIn, isLoading } = useAuth();
@@ -96,13 +82,6 @@ export default function LoginScreen() {
       Alert.alert('Login Failed', message);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleBiometric = async () => {
-    const ok = await triggerBiometricUnlock();
-    if (!ok) {
-      Alert.alert('Unavailable', 'Biometric unlock is not enabled on this build.');
     }
   };
 
@@ -212,14 +191,6 @@ export default function LoginScreen() {
               <Text style={styles.buttonText}>Sign In</Text>
             )}
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.biometricButton}
-            onPress={handleBiometric}
-            disabled={busy}
-          >
-            <Text style={styles.biometricText}>Use Biometric Unlock</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Demo accounts — gated on EXPO_PUBLIC_DEMO_MODE */}
@@ -287,12 +258,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: colors.white, fontSize: fontSize.lg, fontWeight: '700' },
-  biometricButton: {
-    alignItems: 'center', paddingVertical: spacing.sm, marginTop: spacing.sm,
-  },
-  biometricText: {
-    fontSize: fontSize.sm, color: colors.teal, fontWeight: '600',
-  },
   demoSection: {
     marginTop: spacing.xl, paddingTop: spacing.md,
     borderTopWidth: 1, borderTopColor: colors.cream300,

@@ -52,12 +52,12 @@ let _db: any = null;
 
 /**
  * Demo seed gate. We only seed the local SQLite cache with the example
- * `pat-00001` Deng Mabior records when EXPO_PUBLIC_DEMO_MODE is anything
- * other than 'false'. In production the seed is suppressed so a freshly
+ * `pat-00001` Deng Mabior records when EXPO_PUBLIC_DEMO_MODE is explicitly
+ * set to 'true'. Production builds default to no seeding so a freshly
  * installed app starts empty and waits for a real sync from the platform —
  * no patient ever sees somebody else's records by default.
  */
-const SEED_DEMO_DATA = process.env.EXPO_PUBLIC_DEMO_MODE !== 'false';
+const SEED_DEMO_DATA = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
 
 export async function getDatabase(): Promise<any> {
   if (!IS_NATIVE || !SQLite) return null; // web fallback

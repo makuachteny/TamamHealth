@@ -75,14 +75,29 @@ function isLoopbackHost(hostHeader) {
   return LOOPBACK_HOSTS.has(hostOf(hostHeader));
 }
 
-/** True when the request's Origin is allowed (or no Origin header is present). */
-function isOriginAllowed(origin) {
-  if (!origin) return true; // non-browser / same-origin requests carry no Origin
+/**
+ * True when the request's Origin is allowed.
+ * If no Origin header is present, the caller must supply the shared token
+ * unconditionally — non-browser requests without an Origin are NOT trusted
+ * by default, because a missing Origin can also indicate a crafted request
+ * that deliberately omits the header to bypass the allowlist check.
+ */
+function isOriginAllowed(origin, req) {
+  if (!origin) {
+    // No Origin header: require the shared token to be present and correct.
+    const token = bridgeToken();
+    if (!token) return true; // no token configured — fall back to legacy behaviour
+    return req.headers['x-bridge-token'] === token;
+  }
   const allow = allowedOrigins();
   return allow.includes('*') || allow.includes(origin);
 }
 
 export async function loadAdapter(name = DRIVER) {
+  const ALLOWED_ADAPTERS = new Set(['mock', 'suprema', 'zkteco', 'dermalog'])
+  if (!ALLOWED_ADAPTERS.has(name)) {
+    throw new Error('Unknown fingerprint adapter: ' + name)
+  }
   const mod = await import(`./adapters/${name}.mjs`);
   if (typeof mod.createAdapter !== 'function') {
     throw new Error(`[fingerprint-bridge] adapter "${name}" does not export createAdapter()`);
@@ -147,7 +162,7 @@ export function createServer(adapter) {
     }
 
     // Reject disallowed browser origins BEFORE any scanner side-effect.
-    if (!isOriginAllowed(origin)) {
+    if (!isOriginAllowed(origin, req)) {
       sendJSON(res, 403, { error: 'origin not allowed' }, origin);
       return;
     }
@@ -230,6 +245,11 @@ async function main() {
   }
   if (allowedOrigins().includes('*')) {
     console.warn('[fingerprint-bridge] WARNING: FINGERPRINT_BRIDGE_ALLOWED_ORIGIN="*" lets any website call the bridge. Pin it to your app origin.');
+  }
+
+  if (process.env.NODE_ENV === 'production' && !process.env.FINGERPRINT_BRIDGE_TOKEN) {
+    console.error('[SECURITY] FINGERPRINT_BRIDGE_TOKEN must be set in production. Refusing to start.')
+    process.exit(1)
   }
 
   const adapter = await loadAdapter();

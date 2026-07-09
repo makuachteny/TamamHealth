@@ -111,6 +111,14 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
 
+      # Generate PROD_SSH_KNOWN_HOST with: ssh-keyscan -H <host>
+      - name: Set up SSH known hosts
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KNOWN_HOST }}" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
       - name: Pull + restart stack
         if: steps.gate.outputs.ready == 'true'
         env:
@@ -120,7 +128,6 @@ jobs:
           SHA: ${{ needs.promote-image.outputs.sha }}
           GH_OWNER: ${{ github.repository_owner }}
         run: |
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
           ssh "$USER@$HOST" \
             "cd $APP_DIR && \
              export GH_OWNER='$GH_OWNER' IMAGE_TAG=production && \

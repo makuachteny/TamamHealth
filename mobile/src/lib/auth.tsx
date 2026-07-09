@@ -81,6 +81,22 @@ const AuthContext = createContext<AuthState>({
 const PATIENT_CACHE_KEY = 'tamamhealth.session.patient';
 
 /**
+ * Returns true if the JWT is expired or structurally invalid.
+ * Parses the payload's `exp` claim client-side to avoid restoring
+ * a session that the server would immediately reject with a 401.
+ */
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return true
+    const payload = JSON.parse(atob(parts[1]))
+    return !payload.exp || Date.now() > payload.exp * 1000
+  } catch {
+    return true
+  }
+}
+
+/**
  * Translate raw error strings from the login endpoint into messages we can
  * safely show end-users. We never want to surface stack traces or internal
  * error codes verbatim.
@@ -129,6 +145,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const token = await loadStoredToken();
         if (!token) {
+          if (!cancelled) setIsLoading(false);
+          return;
+        }
+        // Reject expired tokens immediately so we never restore a session
+        // that the server would refuse on the first API call.
+        if (isTokenExpired(token)) {
+          await clearSession();
+          await SecureStore.deleteItemAsync(PATIENT_CACHE_KEY).catch(() => {});
           if (!cancelled) setIsLoading(false);
           return;
         }
