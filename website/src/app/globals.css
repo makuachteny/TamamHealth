@@ -5,7 +5,7 @@ body {
   /* Matches the hero/footer navy rather than the page's cream sections, so
      mobile Safari's elastic overscroll (or any Android rubber-band/bounce)
      never flashes white above the hero or below the footer. */
-  background: #0b1145;
+  background: #015697;
   overflow-x: hidden;
 }
 
@@ -24,50 +24,6 @@ textarea::placeholder {
 
 .tm-compare-arrow-short {
   display: none;
-}
-
-@keyframes tm-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-7px);
-  }
-}
-
-@keyframes tm-pulse {
-  0% {
-    transform: scale(0.85);
-    opacity: 0.65;
-  }
-  100% {
-    transform: scale(1.7);
-    opacity: 0;
-  }
-}
-
-@keyframes tm-rise {
-  from {
-    opacity: 0;
-    transform: translateY(28px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes tm-cue {
-  0%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.9;
-  }
-  50% {
-    transform: translateY(7px);
-    opacity: 0.5;
-  }
 }
 
 /* ── Breakpoints: desktop ≥1024 · tablet 640–1023 · mobile ≤639 ── */
@@ -110,10 +66,6 @@ textarea::placeholder {
 }
 
 @media (max-width: 639px) {
-  #platform .tm-step-node-btn {
-    padding: 0 10px !important;
-    min-width: 74px !important;
-  }
   .tm-section {
     padding: 64px 16px !important;
   }
@@ -153,8 +105,8 @@ textarea::placeholder {
   .tm-compare-col-mid {
     border-left: none !important;
     border-right: none !important;
-    border-top: 1.5px solid #10195a !important;
-    border-bottom: 1.5px solid #10195a !important;
+    border-top: 1.5px solid #015697 !important;
+    border-bottom: 1.5px solid #015697 !important;
   }
   .tm-compare-arrow-full {
     display: none;
@@ -204,25 +156,29 @@ textarea::placeholder {
   background: #369fda !important;
 }
 .tm-hero-btn-secondary:hover {
-  background: #fefff9 !important;
+  background: #eff8fd !important;
 }
 .tm-insight-card:hover {
   box-shadow: 12px 12px 0 var(--tm-insight-shadow) !important;
-  transform: translate(-4px, -4px);
 }
 .tm-product-card:hover {
-  box-shadow: 10px 10px 0 #ddf2fb !important;
-  transform: translate(-4px, -4px);
+  box-shadow: 10px 10px 0 var(--tm-product-shadow) !important;
 }
 .tm-feature-card:hover {
-  box-shadow: 5px 5px 0 #10195a !important;
-  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 #015697 !important;
 }
 .tm-team-card:hover {
-  background: #eff8fd !important;
+  background: #f4f4f8 !important;
 }
 .tm-form-input:focus {
   border-color: #2191d0 !important;
+}
+/* The inline style sets outline: none (it clashed with the border-color
+   swap above with no offset room); restore a real focus indicator via
+   :focus-visible so keyboard users still get one. */
+.tm-form-input:focus-visible {
+  outline: 2px solid #98cfee !important;
+  outline-offset: 2px;
 }
 .tm-submit-btn:hover {
   background: #369fda !important;

@@ -16,7 +16,7 @@ import { useOnboarding } from '@/lib/hooks/useOnboarding';
 import { getDefaultDashboard } from '@/lib/permissions';
 import type { OnboardingSection, OnboardingStep } from '@/lib/onboarding/steps';
 import {
-  Check, Lock, X, ArrowRight, Play, FileText, Star, ChevronUp,
+  Check, Lock, X, ArrowRight, Star, ChevronUp,
 } from '@/components/icons/lucide';
 
 export default function GetStartedCard() {
@@ -108,32 +108,24 @@ export default function GetStartedCard() {
 
         {allDone && <AllDoneBanner onFinish={finish} />}
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          {/* Checklist */}
-          <div className="space-y-4 lg:col-span-2">
-            {plan.sections.map((section, i) => {
-              const unlocked = isSectionUnlocked(plan.sections, i, completedStepIds);
-              return (
-                <SectionCard
-                  key={section.id}
-                  section={section}
-                  defaultOpen={i === 0}
-                  unlocked={unlocked}
-                  completedStepIds={completedStepIds}
-                  onStart={(step) => {
-                    completeStep(step.id);
-                    if (step.href && step.href !== pathname) router.push(step.href);
-                  }}
-                  onToggle={completeStep}
-                />
-              );
-            })}
-          </div>
-
-          {/* Helpful resources */}
-          <div className="lg:col-span-1">
-            <ResourcesPanel resources={plan.resources} />
-          </div>
+        <div className="mx-auto max-w-3xl space-y-4">
+          {plan.sections.map((section, i) => {
+            const unlocked = isSectionUnlocked(plan.sections, i, completedStepIds);
+            return (
+              <SectionCard
+                key={section.id}
+                section={section}
+                defaultOpen={i === 0}
+                unlocked={unlocked}
+                completedStepIds={completedStepIds}
+                onStart={(step) => {
+                  completeStep(step.id);
+                  if (step.href && step.href !== pathname) router.push(step.href);
+                }}
+                onToggle={completeStep}
+              />
+            );
+          })}
         </div>
       </div>
     </div>
@@ -272,58 +264,6 @@ function SectionCard({
           })}
         </ul>
       )}
-    </div>
-  );
-}
-
-function ResourcesPanel({ resources }: { resources: { id: string; title: string; type: 'video' | 'article'; href: string; meta: string }[] }) {
-  const [tab, setTab] = useState<'video' | 'article'>('video');
-  const items = resources.filter(r => r.type === tab);
-  return (
-    <div className="rounded-xl border" style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-card-solid)' }}>
-      <div className="px-4 py-3">
-        <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Helpful resources</h3>
-      </div>
-      <div className="flex gap-1 px-4">
-        {(['video', 'article'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className="rounded-t-lg px-3 py-1.5 text-xs font-semibold capitalize"
-            style={{
-              color: tab === t ? 'var(--accent-primary)' : 'var(--text-muted)',
-              borderBottom: tab === t ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            }}
-          >
-            {t === 'video' ? 'Videos' : 'Articles'}
-          </button>
-        ))}
-      </div>
-      <ul className="divide-y p-2" style={{ borderColor: 'var(--border-light)' }}>
-        {items.map(r => (
-          <li key={r.id}>
-            <a
-              href={r.href}
-              target={r.href.startsWith('#') ? undefined : '_blank'}
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-black/5"
-            >
-              <span
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
-                style={{ background: 'rgba(0,119,215,0.10)' }}
-              >
-                {r.type === 'video'
-                  ? <Play className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  : <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{r.title}</p>
-                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{r.meta}</p>
-              </div>
-            </a>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

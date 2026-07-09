@@ -162,15 +162,19 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
   return (
     <>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
-        {/* Ward Patient table */}
-        <div className="dash-card mb-4 overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0, minWidth: 0, order: 1 }}>
+        {/* Ward Patient table — same .ehr-worklist-panel card the Clinical
+            Officer's "Assigned patients" list uses, so both dashboards render
+            this list identically instead of the ward view having its own
+            bespoke bordered card. */}
+        <section className="ehr-worklist-panel" style={{ flex: 1, minHeight: 0, minWidth: 0, order: 1 }}>
           {/* Inline search + structured filters — lives in the list header rather
               than the platform-wide top search bar. */}
-          <div className="px-3 py-2.5 flex items-center gap-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="flex-shrink-0">Ward patients</h3>
             <ListSearch value={search} onChange={setSearch} placeholder={t('nurse.searchPatientPlaceholder')} />
             <WardFilters filters={filters} setFilters={setFilters} />
           </div>
-          <div className="ehr-worklist-table" style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'auto' }}>
+          <div className="ehr-worklist-table">
             {displayedPatients.length > 0 && (
               <div className="ehr-worklist-head" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr)', minWidth: 0 }}>
                 <span>{t('nurse.colPatientName')}</span>
@@ -302,7 +306,7 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
               );
             })}
           </div>
-        </div>
+        </section>
 
       </div>
 

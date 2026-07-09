@@ -203,9 +203,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // of serving stale assets from the previous CACHE_NAME. Skipped in local
     // dev — its cache-first strategy for /_next/static/ otherwise serves
     // stale CSS/JS across reloads and fights the dev server's hot-reload.
-    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-      const buildId = process.env.NEXT_PUBLIC_BUILD_ID || 'dev';
-      navigator.serviceWorker.register(`/sw.js?v=${buildId}`).catch(() => {});
+    if ('serviceWorker' in navigator) {
+      if (process.env.NODE_ENV === 'production') {
+        const buildId = process.env.NEXT_PUBLIC_BUILD_ID || 'dev';
+        navigator.serviceWorker.register(`/sw.js?v=${buildId}`).catch(() => {});
+      } else {
+        // A worker registered by an earlier production build/test on this
+        // origin (e.g. `next start` on the same port) outlives that session
+        // and keeps cache-first-serving stale /_next/static/ + precached
+        // pages forever, since dev mode never re-registers to replace it.
+        // Clear any leftover registration so dev always hits the live server.
+        navigator.serviceWorker.getRegistrations()
+          .then(registrations => registrations.forEach(registration => registration.unregister()))
+          .catch(() => {});
+      }
     }
 
     // Hydrate user-preference from localStorage so the sync-paused choice

@@ -19,6 +19,7 @@ import { useFavorites } from '@/lib/hooks/useFavorites';
 import { FavoritesBar, FavoriteStar } from '@/components/consultation/FavoritesBar';
 import SearchInput from '@/components/filters/SearchInput';
 import SearchAddField from '@/components/consultation/SearchAddField';
+import CodedSearchField from '@/components/CodedSearchField';
 import { medications } from '@/data/mock';
 import type { Attachment } from '@/data/mock';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
@@ -39,14 +40,12 @@ import { useApp } from '@/lib/context';
 import { isProviderRole, isClinicalAuthorRole } from '@/lib/clinical-roles';
 import type { SuperbillPreview } from '@/lib/services/superbill-service';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { patientAgeLabel, patientFullName, patientInitials, avatarColor } from '@/lib/patient-utils';
+import { patientAgeLabel, patientFullName } from '@/lib/patient-utils';
 import { formatMoney } from '@/lib/format-utils';
-import { Icon as DuotoneInfoIcon } from '@/components/icons';
 import { useToast } from '@/components/Toast';
 import {
   CONSULT_SECTION,
   SYMPTOM_CATALOG,
-  EXAM_FINDINGS_CATALOG,
   COMMON_TREATMENT_PLANS,
   COMMON_FOLLOWUP_REASONS,
   COMMON_REFERRAL_REASONS,
@@ -58,8 +57,11 @@ import { presetForMedication } from '@/lib/data/medication-presets';
 import { saveDraft, loadDraft, dropDraft } from '@/lib/draft-storage';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
-// Adapt ICD-11 entries to the {code, name} shape this page consumes.
-const icdCodes = COMMON_ICD11_CODES.map(c => ({ code: c.code, name: c.title }));
+// Adapt ICD-11 entries to the {code, name} shape this page consumes. Keywords
+// are carried over too — CodedSearchField matches against them, and most
+// natural search terms (e.g. "cough", "pain") only appear there, not in the
+// formal ICD title text.
+const icdCodes = COMMON_ICD11_CODES.map(c => ({ code: c.code, name: c.title, keywords: c.keywords }));
 
 interface DiagnosisEntry {
   code: string;
@@ -297,8 +299,15 @@ export default function ConsultationPage() {
   });
 
   // Physical Examination
-  const [examPickerField, setExamPickerField] = useState<keyof typeof EXAM_FINDINGS_CATALOG | null>(null);
   const [physExam, setPhysExam] = useState({
+    general: '',
+    cardiovascular: '',
+    respiratory: '',
+    abdominal: '',
+    neurological: '',
+  });
+  // Per-field ICD search text for the "Add findings" search bars below.
+  const [examSearch, setExamSearch] = useState({
     general: '',
     cardiovascular: '',
     respiratory: '',
@@ -309,7 +318,6 @@ export default function ConsultationPage() {
   // Diagnosis
   const [diagSearch, setDiagSearch] = useState('');
   const [diagnoses, setDiagnoses] = useState<DiagnosisEntry[]>([]);
-  const [showDiagDropdown, setShowDiagDropdown] = useState(false);
 
   // Per-clinician favorites — one-tap diagnosis & medicine picks.
   const favDx = useFavorites(currentUser?._id, 'diagnosis');
@@ -578,14 +586,6 @@ export default function ConsultationPage() {
     );
   }
 
-  // ICD-11 filtering
-  const filteredICD = diagSearch.length >= 1
-    ? icdCodes.filter(c =>
-        c.code.toLowerCase().includes(diagSearch.toLowerCase()) ||
-        c.name.toLowerCase().includes(diagSearch.toLowerCase())
-      ).slice(0, 8)
-    : [];
-
   // Medication filtering
   const filteredMeds = rxMedSearch.length >= 1
     ? medications.filter(m =>
@@ -604,7 +604,6 @@ export default function ConsultationPage() {
       severity: sev || 'moderate',
     }]);
     setDiagSearch('');
-    setShowDiagDropdown(false);
   };
 
   const removeDiagnosis = (index: number) => {
@@ -1829,61 +1828,25 @@ export default function ConsultationPage() {
               backdrop-filter, so without this the later cards paint on top. */}
           <div className="card-elevated p-3 mb-3 relative z-50 ehr-consult-patient-picker">
             <div className="flex items-center gap-3">
-            {selectedPatientData ? (() => {
-              const demoBits: { icon: 'qr' | 'patient' | 'mapPin'; value: string; accent: string; mono?: boolean }[] = [
-                ...(selectedPatientData.hospitalNumber ? [{ icon: 'qr' as const, value: selectedPatientData.hospitalNumber, accent: '#015697', mono: true }] : []),
-                { icon: 'patient', value: `${patientAgeLabel(selectedPatientData)} · ${selectedPatientData.gender || '—'}`, accent: 'var(--accent-primary)' },
-                ...(selectedPatientData.state ? [{ icon: 'mapPin' as const, value: selectedPatientData.state, accent: '#1F9D6F' }] : []),
-              ];
-              return (
-              <div className="ehr-consult-patient-summary">
-                <div className="ehr-consult-patient-avatar" aria-hidden="true" style={{ background: avatarColor(patientFullName(selectedPatientData)), color: '#fff' }}>{patientInitials(selectedPatientData)}</div>
-                <div className="ehr-consult-patient-identity">
-                  <button
-                    onClick={() => router.push(`/patients/${selectedPatientData._id}`)}
-                    className="ehr-consult-patient-name"
-                    title={t('payments.openPatientRecord')}
-                  >
-                    {formatPatientName(selectedPatientData)}
-                  </button>
-                  <div className="ehr-consult-patient-chips">
-                    {demoBits.map(bit => (
-                      <span
-                        key={bit.value}
-                        className="ehr-consult-chip"
-                      >
-                        <DuotoneInfoIcon name={bit.icon} size={13} color={bit.accent} accent={bit.accent} />
-                        <span
-                          title={bit.value}
-                          className="truncate"
-                          style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: bit.mono ? 'var(--font-platform-mono)' : 'inherit' }}
-                        >
-                          {bit.value}
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="ehr-consult-visit-controls">
-                  <label>
-                    Assigned to
-                    <select value={currentUser?.name || ''} onChange={() => undefined} aria-label="Assigned to">
-                      <option>{currentUser?.name || 'Tamam clinician'}</option>
-                    </select>
-                  </label>
-                  <label>
-                    Note type
-                    <select value="SOAP" onChange={() => undefined} aria-label="Note type">
-                      <option>SOAP</option>
-                    </select>
-                  </label>
-                </div>
+            {selectedPatientData ? (
+              // The rich identity display (avatar, hospital number, age/gender,
+              // location) now lives entirely in the right-hand patient summary
+              // card — duplicating it here just to switch patients wasted a
+              // whole row. Keep only the name (still a link to the chart) and
+              // the control to pick someone else.
+              <div className="ehr-consult-patient-summary ehr-consult-patient-summary--slim">
+                <button
+                  onClick={() => router.push(`/patients/${selectedPatientData._id}`)}
+                  className="ehr-consult-patient-name"
+                  title={t('payments.openPatientRecord')}
+                >
+                  {formatPatientName(selectedPatientData)}
+                </button>
                 <button onClick={() => { setSelectedPatient(null); setPatientSearch(''); }} className="ehr-consult-change-btn">
                   {t('consultation.change')}
                 </button>
               </div>
-              );
-            })() : (
+            ) : (
               <div className="relative flex-1">
                 <input
                   type="search"
@@ -2094,12 +2057,17 @@ export default function ConsultationPage() {
                     { key: 'neurological', label: t('consultation.examNeurological'), placeholder: t('consultation.examNeurologicalPlaceholder') },
                   ] as const).map(field => (
                     <div key={field.key} className="rounded-2xl border p-4 ehr-exam-row" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-card)' }}>
-                      <div className="flex flex-col items-start gap-2">
-                        <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{field.label}</label>
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setExamPickerField(field.key)}>
-                          <Plus className="w-4 h-4" /> Add findings
-                        </button>
-                      </div>
+                      <CodedSearchField
+                        label={field.label}
+                        placeholder="Search ICD findings…"
+                        options={icdCodes}
+                        value={examSearch[field.key]}
+                        onChange={v => setExamSearch(prev => ({ ...prev, [field.key]: v }))}
+                        onSelect={c => {
+                          appendExamFinding(field.key, `${c.code} - ${c.name}`);
+                          setExamSearch(prev => ({ ...prev, [field.key]: '' }));
+                        }}
+                      />
                       <textarea
                         value={physExam[field.key]}
                         onChange={e => setPhysExam(prev => ({ ...prev, [field.key]: e.target.value }))}
@@ -2108,16 +2076,6 @@ export default function ConsultationPage() {
                       />
                     </div>
                   ))}
-                  {examPickerField && (
-                    <SymptomPicker
-                      title={`${examPickerField.charAt(0).toUpperCase()}${examPickerField.slice(1)} findings`}
-                      categoryHint="Choose an area"
-                      groups={EXAM_FINDINGS_CATALOG[examPickerField]}
-                      selected={physExam[examPickerField]}
-                      onPick={value => appendExamFinding(examPickerField, value)}
-                      onClose={() => setExamPickerField(null)}
-                    />
-                  )}
                 </div>
               )}
             </div>
@@ -2230,36 +2188,17 @@ export default function ConsultationPage() {
                     label="Favorite diagnoses"
                     onPick={(fav) => { addDiagnosis(fav.code, fav.label); favDx.bumpUse('diagnosis', fav.code); }}
                   />
-                  {/* ICD-10 Search */}
-                  <div className="relative mb-4">
-                    <label>{t('consultation.searchIcdLabel')}</label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                      <input
-                        type="search"
-                        placeholder={t('consultation.searchIcdPlaceholder')}
-                        value={diagSearch}
-                        onChange={e => { setDiagSearch(e.target.value); setShowDiagDropdown(true); }}
-                        onFocus={() => setShowDiagDropdown(true)}
-                        className="pl-9 search-icon-input"
-                        style={{ background: 'var(--overlay-subtle)' }}
-                      />
-                    </div>
-                    {showDiagDropdown && filteredICD.length > 0 && (
-                      <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)', boxShadow: 'none' }}>
-                        {filteredICD.map(c => (
-                          <button
-                            key={c.code}
-                            onClick={() => addDiagnosis(c.code, c.name)}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
-                            style={{ borderBottom: '1px solid var(--border-light)' }}
-                          >
-                            <span className="font-mono text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(59, 130, 246,0.10)', color: 'var(--accent-primary)' }}>{c.code}</span>
-                            <span className="text-sm">{c.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  {/* ICD-11 Search */}
+                  <div className="mb-4">
+                    <CodedSearchField
+                      label={t('consultation.searchIcdLabel')}
+                      placeholder={t('consultation.searchIcdPlaceholder')}
+                      options={icdCodes}
+                      value={diagSearch}
+                      onChange={setDiagSearch}
+                      onSelect={c => addDiagnosis(c.code, c.name)}
+                      excludeCodes={diagnoses.map(d => d.code)}
+                    />
                   </div>
 
                   {/* Added Diagnoses */}
@@ -2872,8 +2811,16 @@ export default function ConsultationPage() {
               </div>
             )}
 
-            {/* Step navigation — Back / Next, with Complete on the final step */}
-            <div className="flex items-center justify-between pt-6 pb-4 border-t ehr-consult-step-nav" style={{ borderColor: 'var(--border-light)' }}>
+            </div>
+
+            {/* Step navigation — Back / Next, with Complete on the final step.
+                Deliberately outside .ehr-soap-scroll (a sibling, not the last
+                scrolling child) so it's pinned to the bottom of the panel at
+                a fixed height instead of trailing wherever the step's content
+                happens to end — short steps (e.g. Intake with no patient
+                selected yet) previously left a dead gap between the content
+                and the nav bar, with the nav floating above empty space. */}
+            <div className="flex items-center justify-between pt-4 pb-1 border-t ehr-consult-step-nav" style={{ borderColor: 'var(--border-light)' }}>
               <button onClick={() => step > 0 ? goBack() : router.push('/patients')} className="btn btn-secondary btn-sm">
                 <ArrowLeft className="w-4 h-4" /> {step === 0 ? t('action.cancel') : t('patientNew.previous')}
               </button>
@@ -2898,7 +2845,6 @@ export default function ConsultationPage() {
                 </div>
               )}
             </div>
-            </div>
           </div>
 
           {/* Right: Patient summary panel */}
@@ -2920,6 +2866,7 @@ export default function ConsultationPage() {
                     </div>
                     <div className="space-y-2">
                       {[
+                        { label: 'Assigned to', value: currentUser?.name || 'Tamam clinician' },
                         { label: t('patient.gender'), value: selectedPatientData.gender },
                         { label: t('patient.age'), value: patientAgeLabel(selectedPatientData) },
                         { label: t('patient.bloodType'), value: selectedPatientData.bloodType || t('consultation.unknown') },

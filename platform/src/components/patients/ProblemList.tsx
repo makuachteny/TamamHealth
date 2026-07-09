@@ -12,12 +12,13 @@
 
 import { useMemo, useState } from 'react';
 import {
-  Plus, X, CheckCircle2, Activity, Search, Edit3, Trash2,
+  Plus, X, CheckCircle2, Activity, Edit3, Trash2,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useProblems } from '@/lib/hooks/useProblems';
 import { useToast } from '@/components/Toast';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
+import CodedSearchField from '@/components/CodedSearchField';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { ProblemStatus, ProblemDoc } from '@/lib/db-types';
 
@@ -229,15 +230,7 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const matches = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
-    return COMMON_ICD11_CODES.filter(c =>
-      c.title.toLowerCase().includes(q) ||
-      c.code.toLowerCase().includes(q) ||
-      (c.keywords || []).some(k => k.includes(q))
-    ).slice(0, 8);
-  }, [search]);
+  const icdOptions = useMemo(() => COMMON_ICD11_CODES.map(c => ({ code: c.code, name: c.title, meta: c.chapter, keywords: c.keywords })), []);
 
   const reset = () => {
     setAdding(false);
@@ -386,49 +379,15 @@ export default function ProblemList({ patientId, patientName }: ProblemListProps
                 </button>
               </div>
             ) : (
-              <div>
-                <label className="block text-xs font-bold uppercase mb-1.5" style={{
-                  color: 'var(--text-muted)', letterSpacing: '0.06em',
-                }}>
-                  {t('problemList.diagnosis')}
-                </label>
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full"
-                    style={{ paddingLeft: 36 }}
-                    placeholder={t('problemList.searchPlaceholder')}
-                    autoFocus
-                  />
-                </div>
-                {matches.length > 0 && (
-                  <ul className="mt-2 max-h-56 overflow-y-auto rounded-lg" style={{
-                    border: '1px solid var(--border-light)',
-                    background: 'var(--bg-card-solid)',
-                  }}>
-                    {matches.map(c => (
-                      <li key={c.code}>
-                        <button
-                          type="button"
-                          onClick={() => { setPickedCode({ code: c.code, title: c.title, chapter: c.chapter }); setSearch(''); }}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-50"
-                          style={{ borderBottom: '1px solid var(--border-light)' }}
-                        >
-                          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                            {c.title}
-                          </div>
-                          <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                            {c.code} · {c.chapter}
-                          </div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <CodedSearchField
+                label={t('problemList.diagnosis')}
+                placeholder={t('problemList.searchPlaceholder')}
+                options={icdOptions}
+                value={search}
+                onChange={setSearch}
+                onSelect={c => { setPickedCode({ code: c.code, title: c.name, chapter: c.meta || '' }); setSearch(''); }}
+                autoFocus
+              />
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

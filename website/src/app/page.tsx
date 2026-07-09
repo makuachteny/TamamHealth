@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth — One-Page Website
@@ -67,7 +67,7 @@ const INSIGHTS = [
     number: "01",
     kicker: "From the wards",
     title: "Medical experts",
-    bg: "#0B1145",
+    bg: "#0F4C81",
     fg: "#FFFFFF",
     shadow: "#E8863A",
     borderColor: "rgba(232,134,58,0.6)",
@@ -84,10 +84,10 @@ const INSIGHTS = [
     number: "02",
     kicker: "From the waiting line",
     title: "Patients",
-    bg: "#FEFFF9",
-    fg: "#10195A",
+    bg: "#E2EDF7",
+    fg: "#0F4C81",
     shadow: "rgba(232,134,58,0.45)",
-    borderColor: "#FEFFF9",
+    borderColor: "#EFF8FD",
     kickerColor: "#C2571B",
     numColor: "rgba(232,134,58,0.18)",
     rule: "#E2E8F0",
@@ -100,24 +100,14 @@ const INSIGHTS = [
 ];
 
 const PAPER_CHIPS = [
-  { label: "Paper ledgers", rotate: -3, duration: "3.8s", delay: "0s" },
-  { label: "Lab slips", rotate: 2, duration: "4.4s", delay: "0.6s" },
-  { label: "Referral notes", rotate: -2, duration: "4.1s", delay: "1.1s" },
-  { label: "Pharmacy logs", rotate: 3, duration: "3.6s", delay: "0.3s" },
-  { label: "Vaccination cards", rotate: -1, duration: "4.7s", delay: "0.9s" },
+  { label: "Paper ledgers", rotate: -3 },
+  { label: "Lab slips", rotate: 2 },
+  { label: "Referral notes", rotate: -2 },
+  { label: "Pharmacy logs", rotate: 3 },
+  { label: "Vaccination cards", rotate: -1 },
 ];
 
 const TAMAM_CHECKS = ["One patient record", "Facility dashboard", "DHIS2-ready national reports"];
-
-const STEP_DEFS = [
-  { label: "Register", desc: "Patient identity captured once — reused on every future visit." },
-  { label: "Triage", desc: "Vitals and priority recorded straight into the encounter." },
-  { label: "Consult", desc: "The clinician sees the full history before the first question." },
-  { label: "Order", desc: "Lab and imaging orders flow directly to the bench worklist." },
-  { label: "Dispense", desc: "Pharmacy fills against the electronic prescription — batch and expiry tracked." },
-  { label: "Bill", desc: "Charges accumulate automatically from everything done in the visit." },
-  { label: "Report", desc: "Encounter data rolls up into facility dashboards and DHIS2-ready reports." },
-];
 
 const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
   {
@@ -216,6 +206,7 @@ const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
 const PRODUCTS = [
   {
     acronym: "HMIS",
+    accent: "#1C7AAF",
     title: "Hospital Management System",
     tagline: "For State, County & Referral hospitals",
     description:
@@ -236,6 +227,7 @@ const PRODUCTS = [
   },
   {
     acronym: "CMS",
+    accent: "#0B6E5C",
     title: "Clinic Management System",
     tagline: "For PHCUs, private practices & faith-based clinics",
     description:
@@ -253,6 +245,7 @@ const PRODUCTS = [
   },
   {
     acronym: "LIS",
+    accent: "#7847EB",
     title: "Laboratory Information System",
     tagline: "For diagnostic centres & hospital labs",
     description:
@@ -270,6 +263,7 @@ const PRODUCTS = [
   },
   {
     acronym: "RIS",
+    accent: "#A0670D",
     title: "Radiology Information System",
     tagline: "For radiology centres & imaging departments",
     description:
@@ -286,6 +280,7 @@ const PRODUCTS = [
   },
   {
     acronym: "PMS",
+    accent: "#C23B6B",
     title: "Pharmacy Management System",
     tagline: "For retail & hospital pharmacies",
     description:
@@ -303,6 +298,7 @@ const PRODUCTS = [
   },
   {
     acronym: "PPS",
+    accent: "#27844C",
     title: "Patient Portal",
     tagline: "Patients' window into their own care",
     description:
@@ -350,8 +346,45 @@ const H2: React.CSSProperties = {
   lineHeight: 1.1,
 };
 
+/* Oversized, faint logo mark bled into a section's background — decorative
+   only, so it's aria-hidden and never intercepts clicks. `tone` picks
+   whether the mark reads as white (dark section) or a neutral charcoal
+   (light section); the source SVG's own fill is baked-in blue, so both
+   tones go through a filter rather than a color prop. */
+function SectionMark({
+  size = 460,
+  corner,
+  tone = "white",
+  opacity = 0.07,
+  rotate = 0,
+}: {
+  size?: number;
+  corner: React.CSSProperties;
+  tone?: "white" | "dark";
+  opacity?: number;
+  rotate?: number;
+}) {
+  return (
+    <img
+      src="/assets/tamam-logo-mark.svg"
+      alt=""
+      aria-hidden="true"
+      style={{
+        position: "absolute",
+        width: size,
+        height: size,
+        opacity,
+        filter: tone === "white" ? "brightness(0) invert(1)" : "brightness(0) invert(0.15)",
+        transform: `rotate(${rotate}deg)`,
+        pointerEvents: "none",
+        zIndex: 0,
+        ...corner,
+      }}
+    />
+  );
+}
+
 export default function Home() {
-  const [activeStep, setActiveStep] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [formName, setFormName] = useState("");
   const [formEmail, setFormEmail] = useState("");
@@ -359,22 +392,6 @@ export default function Home() {
   const [formMessage, setFormMessage] = useState("");
   const [formStatus, setFormStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [formError, setFormError] = useState("");
-  const stepTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startStepTimer = () => {
-    if (stepTimer.current) clearInterval(stepTimer.current);
-    stepTimer.current = setInterval(() => {
-      setActiveStep((s) => (s + 1) % STEP_DEFS.length);
-    }, 3200);
-  };
-
-  useEffect(() => {
-    startStepTimer();
-    return () => {
-      if (stepTimer.current) clearInterval(stepTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const sendMessage = async () => {
     if (!formMessage.trim()) {
@@ -419,7 +436,7 @@ export default function Home() {
   const crisisRest = CRISIS_STATS.slice(1);
 
   return (
-    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", color: "#10195A", background: "#FEFFF9" }}>
+    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", color: "#015697", background: "#EFF8FD" }}>
       {/* ═══ Nav ═══ */}
       <nav
         style={{
@@ -428,7 +445,7 @@ export default function Home() {
           left: 0,
           right: 0,
           zIndex: 50,
-          background: "rgba(11,17,69,0.9)",
+          background: "rgba(1,86,151,0.9)",
           backdropFilter: "blur(12px)",
           color: "#FFFFFF",
           padding: "0 32px",
@@ -459,7 +476,8 @@ export default function Home() {
           <button
             className="tm-nav-burger"
             onClick={() => setMenuOpen((o) => !o)}
-            aria-label="Open menu"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
             style={{
               display: "none",
               marginLeft: "auto",
@@ -479,7 +497,7 @@ export default function Home() {
           </button>
         </div>
         {menuOpen && (
-          <div className="tm-nav-drawer" style={{ display: "flex", flexDirection: "column", background: "#0B1145", borderTop: "1px solid rgba(255,255,255,0.12)", padding: "8px 0 16px", margin: "0 -32px" }}>
+          <div className="tm-nav-drawer" style={{ display: "flex", flexDirection: "column", background: "#015697", borderTop: "1px solid rgba(255,255,255,0.12)", padding: "8px 0 16px", margin: "0 -32px" }}>
             <a href="#problem" onClick={() => setMenuOpen(false)} style={{ color: "#FFFFFF", textDecoration: "none", fontSize: 16, fontWeight: 600, padding: "14px 32px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
               Problem
             </a>
@@ -509,7 +527,7 @@ export default function Home() {
           justifyContent: "flex-end",
           color: "#FFFFFF",
           overflow: "hidden",
-          background: "#0B1145",
+          background: "#0E2A4A",
           padding: "80px 32px 72px",
           boxSizing: "border-box",
         }}
@@ -527,14 +545,7 @@ export default function Home() {
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(to bottom, rgba(11,17,69,0.55) 0%, rgba(11,17,69,0.12) 28%, rgba(11,17,69,0) 45%, rgba(11,17,69,0.45) 74%, rgba(11,17,69,0.98) 100%)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "linear-gradient(105deg, rgba(11,17,69,0.55) 0%, rgba(11,17,69,0.22) 34%, rgba(11,17,69,0) 60%)",
+              "linear-gradient(to bottom, rgba(14,42,74,0) 0%, rgba(14,42,74,0) 82%, rgba(14,42,74,0.5) 92%, rgba(14,42,74,0.98) 100%)",
           }}
         />
 
@@ -565,8 +576,8 @@ export default function Home() {
               textShadow: "0 2px 26px rgba(0,0,0,0.6)",
             }}
           >
-            <span style={{ display: "block", animation: "tm-rise 0.9s cubic-bezier(0.22,1,0.36,1) 0.25s both" }}>No power. No records.</span>
-            <span style={{ display: "block", animation: "tm-rise 0.9s cubic-bezier(0.22,1,0.36,1) 0.38s both" }}>
+            <span style={{ display: "block" }}>No power. No records.</span>
+            <span style={{ display: "block" }}>
               <em style={{ fontStyle: "italic", color: "#7FC4EA" }}>No history.</em>
             </span>
           </h1>
@@ -578,7 +589,6 @@ export default function Home() {
               flexDirection: "column",
               alignItems: "flex-start",
               gap: 26,
-              animation: "tm-rise 0.9s cubic-bezier(0.22,1,0.36,1) 0.5s both",
             }}
           >
             <p style={{ fontSize: 16, lineHeight: 1.65, color: "#F0F5FF", margin: 0, textShadow: "0 1px 14px rgba(0,0,0,0.65)" }}>
@@ -597,7 +607,7 @@ export default function Home() {
               <a
                 href="#solution"
                 className="tm-hero-btn-secondary"
-                style={{ background: "rgba(254,255,249,0.92)", color: "#10195A", fontSize: 14, fontWeight: 700, padding: "13px 26px", textDecoration: "none", letterSpacing: "0.02em" }}
+                style={{ background: "rgba(254,255,249,0.92)", color: "#015697", fontSize: 14, fontWeight: 700, padding: "13px 26px", textDecoration: "none", letterSpacing: "0.02em" }}
               >
                 Our Solutions
               </a>
@@ -624,7 +634,7 @@ export default function Home() {
           }}
         >
           Scroll{" "}
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "tm-cue 1.8s ease-in-out infinite" }} aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <line x1="12" y1="4" x2="12" y2="19" />
             <polyline points="6 13 12 19 18 13" />
           </svg>
@@ -632,11 +642,12 @@ export default function Home() {
       </section>
 
       {/* ═══ 01 The Problem ═══ */}
-      <section id="problem" className="tm-section" style={{ background: "linear-gradient(to bottom, #0B1145 0%, #10195A 480px)", color: "#FFFFFF", padding: "100px 32px" }}>
-        <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
+      <section id="problem" className="tm-section" style={{ position: "relative", background: "linear-gradient(to bottom, #0E2A4A 0%, #1B4470 480px)", color: "#FFFFFF", padding: "100px 32px", overflow: "hidden" }}>
+        <SectionMark corner={{ top: -80, right: -60 }} size={480} tone="white" opacity={0.06} rotate={-6} />
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
-              <span style={{ ...KICKER, color: "#10195A", background: "#E8863A" }}>The Problem</span>
+              <span style={{ ...KICKER, color: "#0E2A4A", background: "#E8863A" }}>The Problem</span>
             </div>
             <h2 style={H2}>A health system asked to do the impossible</h2>
             <p style={{ fontSize: 17, lineHeight: 1.65, color: "rgba(255,255,255,0.84)", margin: 0, maxWidth: 680 }}>
@@ -648,7 +659,7 @@ export default function Home() {
           <div className="tm-grid-split" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 40, alignItems: "stretch" }}>
             <div
               style={{
-                background: "linear-gradient(135deg, rgba(232,134,58,0.16) 0%, rgba(11,17,69,0) 55%), #0B1145",
+                background: "linear-gradient(135deg, rgba(232,134,58,0.2) 0%, rgba(14,42,74,0) 55%), #0E2A4A",
                 padding: "44px 40px",
                 display: "flex",
                 flexDirection: "column",
@@ -692,9 +703,9 @@ export default function Home() {
             </div>
             <div className="tm-grid-breakdown" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
               {BREAKDOWN_STEPS.map((b) => (
-                <div key={b.title} className="tm-breakdown-card" style={{ position: "relative", overflow: "hidden", minHeight: 380, display: "flex", alignItems: "flex-end", background: "#0B1145" }}>
+                <div key={b.title} className="tm-breakdown-card" style={{ position: "relative", overflow: "hidden", minHeight: 380, display: "flex", alignItems: "flex-end", background: "#0E2A4A" }}>
                   <Image src={b.image} alt={b.alt} fill sizes="(max-width: 1023px) 100vw, 33vw" style={{ objectFit: "cover" }} />
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,17,69,0.95) 0%, rgba(11,17,69,0.2) 55%, rgba(11,17,69,0) 100%)" }} />
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(14,42,74,0.95) 0%, rgba(14,42,74,0.2) 55%, rgba(14,42,74,0) 100%)" }} />
                   <div
                     style={{
                       position: "relative",
@@ -702,7 +713,7 @@ export default function Home() {
                       flexDirection: "column",
                       gap: 8,
                       margin: "0 20px 20px 20px",
-                      background: "rgba(11,17,69,0.55)",
+                      background: "rgba(14,42,74,0.55)",
                       backdropFilter: "blur(4px)",
                       padding: "18px 20px",
                     }}
@@ -718,11 +729,28 @@ export default function Home() {
       </section>
 
       {/* ═══ 02 Research ═══ */}
-      <section id="research" className="tm-section" style={{ padding: "0 32px 100px", background: "#10195A", color: "#FFFFFF" }}>
-        <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 72 }}>
+      <section id="research" className="tm-section" style={{ position: "relative", padding: "0 32px 100px", background: "#0F4C81", color: "#FFFFFF", overflow: "hidden" }}>
+        {/* Problem (charcoal) hands off directly into this section with no
+            white section between them, so blend the seam the same way the
+            hero does into Problem: fade the tail of Problem's colour in
+            from the top instead of cutting hard. */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 160,
+            background: "linear-gradient(to bottom, #1B4470 0%, rgba(27,68,112,0) 100%)",
+            pointerEvents: "none",
+          }}
+        />
+        <SectionMark corner={{ bottom: -70, left: -70 }} size={440} tone="white" opacity={0.06} rotate={8} />
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 72 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
-              <span style={{ ...KICKER, color: "#10195A", background: "#E8863A" }}>Ground Truth</span>
+              <span style={{ ...KICKER, color: "#0F4C81", background: "#E2EDF7" }}>Ground Truth</span>
             </div>
             <h2 style={H2}>The daily reality inside South Sudan&apos;s facilities</h2>
             <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "rgba(255,255,255,0.84)", maxWidth: 680 }}>
@@ -745,7 +773,6 @@ export default function Home() {
                   flexDirection: "column",
                   gap: 22,
                   boxShadow: `8px 8px 0 ${ins.shadow}`,
-                  transition: "box-shadow 0.22s ease, transform 0.22s ease",
                   ["--tm-insight-shadow" as string]: ins.shadow,
                 }}
               >
@@ -773,11 +800,12 @@ export default function Home() {
       </section>
 
       {/* ═══ 03 The Solution ═══ */}
-      <section id="solution" className="tm-section" style={{ padding: "100px 32px", background: "#FFFFFF", borderTop: "1.5px solid #10195A" }}>
-        <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
+      <section id="solution" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#EFF6FB", borderTop: "1.5px solid #015697", overflow: "hidden" }}>
+        <SectionMark corner={{ top: -60, right: -80 }} size={420} tone="dark" opacity={0.035} rotate={-4} />
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
-              <span style={{ ...KICKER, color: "#FFFFFF", background: "#10195A" }}>The Solution</span>
+              <span style={{ ...KICKER, color: "#FFFFFF", background: "#015697" }}>The Solution</span>
             </div>
             <h2 style={H2}>Simple enough for the front desk. Strong enough for the nation.</h2>
             <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#64748B", maxWidth: 680 }}>
@@ -786,18 +814,18 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="tm-compare-strip" style={{ display: "flex", alignItems: "stretch", gap: 0, flexWrap: "wrap", border: "1.5px solid #10195A" }}>
+          <div className="tm-compare-strip" style={{ display: "flex", alignItems: "stretch", gap: 0, flexWrap: "wrap", border: "1.5px solid #015697" }}>
             <div className="tm-compare-col" style={{ flex: 1.1, minWidth: 250, display: "flex", flexDirection: "column", gap: 18, padding: "34px 30px", background: "#F8E3D2" }}>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#9A4A12" }}>
                 Today — fragmented on paper
               </span>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
                 {PAPER_CHIPS.map((chip) => (
-                  <span key={chip.label} style={{ display: "inline-block", animation: `tm-float ${chip.duration} ease-in-out infinite`, animationDelay: chip.delay }}>
+                  <span key={chip.label} style={{ display: "inline-block" }}>
                     <span
                       style={{
                         display: "inline-block",
-                        background: "#FEFFF9",
+                        background: "#EFF8FD",
                         border: "1px solid #C88A5A",
                         color: "#7A3D10",
                         fontSize: 13,
@@ -827,16 +855,15 @@ export default function Home() {
                 alignItems: "center",
                 gap: 14,
                 padding: "34px 26px",
-                background: "#FEFFF9",
-                borderLeft: "1.5px solid #10195A",
-                borderRight: "1.5px solid #10195A",
+                background: "#EFF8FD",
+                borderLeft: "1.5px solid #015697",
+                borderRight: "1.5px solid #015697",
               }}
             >
               <span className="tm-compare-arrow-full" style={{ fontSize: 22, color: "#94A3B8" }}>→</span>
               <span className="tm-compare-arrow-short" style={{ fontSize: 22, color: "#94A3B8" }}>↓</span>
               <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 96, height: 96 }}>
-                <span style={{ position: "absolute", inset: 0, border: "2px solid #2191D0", borderRadius: 999, animation: "tm-pulse 2.4s ease-out infinite" }} />
-                <span style={{ position: "absolute", inset: 0, border: "2px solid #2191D0", borderRadius: 999, animation: "tm-pulse 2.4s ease-out infinite", animationDelay: "1.2s" }} />
+                <span style={{ position: "absolute", inset: 0, border: "2px solid #2191D0", borderRadius: 999 }} />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/assets/tamam-logo-mark.svg" alt="" style={{ height: 54, width: "auto", position: "relative" }} />
               </span>
@@ -851,7 +878,7 @@ export default function Home() {
               </span>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {TAMAM_CHECKS.map((c) => (
-                  <span key={c} style={{ background: "#FEFFF9", border: "1px solid #2191D0", color: "#015697", fontSize: 13, fontWeight: 600, padding: "9px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <span key={c} style={{ background: "#EFF8FD", border: "1px solid #2191D0", color: "#015697", fontSize: 13, fontWeight: 600, padding: "9px 14px", display: "flex", alignItems: "center", gap: 10 }}>
                     <span style={{ color: "#2191D0" }}>✓</span> {c}
                   </span>
                 ))}
@@ -869,129 +896,32 @@ export default function Home() {
                 className="tm-feature-card"
                 style={{
                   background: "#FFFFFF",
-                  border: "1.5px solid #10195A",
+                  border: "1.5px solid #015697",
                   padding: "28px 24px",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "flex-start",
                   gap: 14,
-                  transition: "box-shadow 0.22s ease, transform 0.22s ease",
                 }}
               >
                 <span style={{ width: 54, height: 54, borderRadius: 999, background: "#EFF8FD", border: "1px solid #BCE4F6", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                   {f.icon}
                 </span>
-                <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 18, fontWeight: 600, margin: 0, color: "#10195A", lineHeight: 1.25 }}>{f.title}</h3>
-                <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: "#26336F" }}>{f.body}</p>
+                <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 18, fontWeight: 600, margin: 0, color: "#015697", lineHeight: 1.25 }}>{f.title}</h3>
+                <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: "#015697" }}>{f.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ═══ 04 The Platform ═══ */}
-      <section id="platform" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#10195A", color: "#FFFFFF", overflow: "hidden" }}>
-        <div
-          style={{
-            position: "absolute",
-            top: "30%",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: 900,
-            height: 600,
-            borderRadius: 999,
-            background: "radial-gradient(ellipse, rgba(33,145,208,0.22) 0%, rgba(33,145,208,0) 65%)",
-            pointerEvents: "none",
-          }}
-        />
-        <div style={{ position: "relative", maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 52 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <span style={{ ...KICKER, color: "#10195A", background: "#FEFFF9" }}>The Platform</span>
-            </div>
-            <h2 style={{ ...H2, maxWidth: 800 }}>One patient record, from front desk to national report</h2>
-            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.65, color: "rgba(255,255,255,0.84)", maxWidth: 640 }}>
-              Follow a single visit through the platform — every step feeds the same encounter, and the encounter feeds
-              the nation&apos;s picture of health.
-            </p>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 28, alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "center", flexWrap: "wrap", rowGap: 20 }}>
-              {STEP_DEFS.map((s, i) => {
-                const active = i === activeStep;
-                return (
-                  <button
-                    key={s.label}
-                    onClick={() => {
-                      startStepTimer();
-                      setActiveStep(i);
-                    }}
-                    className="tm-step-node-btn"
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 20px", minWidth: 92 }}
-                  >
-                    <span
-                      style={{
-                        width: 46,
-                        height: 46,
-                        borderRadius: 999,
-                        border: `1.5px solid ${active ? "#2191D0" : "rgba(255,255,255,0.55)"}`,
-                        background: active ? "#2191D0" : "transparent",
-                        color: active ? "#FFFFFF" : "rgba(255,255,255,0.82)",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: 13,
-                        transition: "all 0.3s ease",
-                        boxShadow: active ? "0 0 24px rgba(33,145,208,0.55)" : "none",
-                      }}
-                    >
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <span style={{ fontSize: 13.5, fontWeight: 600, color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)", transition: "color 0.3s ease" }}>{s.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 14,
-                flexWrap: "wrap",
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.18)",
-                padding: "14px 24px",
-                maxWidth: 720,
-                margin: "0 auto",
-              }}
-            >
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7FC4EA", whiteSpace: "nowrap" }}>
-                {STEP_DEFS[activeStep].label}
-              </span>
-              <span style={{ fontSize: 15, lineHeight: 1.55, color: "#E4EEFB" }}>{STEP_DEFS[activeStep].desc}</span>
-            </div>
-          </div>
-
-          <div style={{ width: "100%", maxWidth: 1020, margin: "0 auto" }}>
-            <div className="tm-shadow-plate" style={{ border: "1px solid rgba(255,255,255,0.3)", overflow: "hidden", background: "#0B1145", boxShadow: "0 48px 110px rgba(0,0,0,0.55)" }}>
-              <Image src="/assets/Dashboard.png" alt="TamamHealth platform dashboard" width={1920} height={1109} style={{ display: "block", width: "100%", height: "auto" }} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", padding: "13px 20px", borderTop: "1px solid rgba(255,255,255,0.25)", background: "#0B1145" }}>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "rgba(255,255,255,0.75)" }}>Facility dashboard — Wau State Hospital, demo data</span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#7FC4EA" }}>● Offline-first · syncs when connected</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ═══ 05 Products ═══ */}
-      <section id="products" className="tm-section" style={{ padding: "100px 32px", background: "#FFFFFF", borderTop: "1.5px solid #10195A" }}>
-        <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
+      <section id="products" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#F5FAFD", borderTop: "1.5px solid #015697", overflow: "hidden" }}>
+        <SectionMark corner={{ bottom: -90, left: -70 }} size={460} tone="dark" opacity={0.035} rotate={5} />
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
-              <span style={{ ...KICKER, color: "#FFFFFF", background: "#10195A" }}>The Products</span>
+              <span style={{ ...KICKER, color: "#FFFFFF", background: "#015697" }}>The Products</span>
             </div>
             <h2 style={H2}>Six products, one connected encounter</h2>
             <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#64748B", maxWidth: 680 }}>
@@ -1001,8 +931,8 @@ export default function Home() {
           </div>
           <div className="tm-grid-products" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 24 }}>
             {PRODUCTS.map((prod) => (
-              <div key={prod.acronym} className="tm-product-card" style={{ background: "#FEFFF9", border: "1.5px solid #10195A", display: "flex", flexDirection: "column", transition: "box-shadow 0.22s ease, transform 0.22s ease" }}>
-                <div style={{ position: "relative", borderBottom: "1.5px solid #10195A" }}>
+              <div key={prod.acronym} className="tm-product-card" style={{ background: "#FBFBFD", border: `1.5px solid ${prod.accent}`, display: "flex", flexDirection: "column", ["--tm-product-shadow" as string]: prod.accent }}>
+                <div style={{ position: "relative", borderBottom: `1.5px solid ${prod.accent}` }}>
                   <div style={{ position: "relative", width: "100%", height: 200 }}>
                     <Image src={prod.image} alt={prod.imageAlt} fill sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw" style={{ objectFit: "cover", objectPosition: "center 25%" }} />
                   </div>
@@ -1015,7 +945,7 @@ export default function Home() {
                       fontSize: 13,
                       fontWeight: 500,
                       letterSpacing: "0.08em",
-                      background: "#10195A",
+                      background: prod.accent,
                       color: "#FFFFFF",
                       padding: "8px 16px",
                     }}
@@ -1024,12 +954,12 @@ export default function Home() {
                   </span>
                 </div>
                 <div style={{ padding: "24px 26px 28px", display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
-                  <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, margin: 0, lineHeight: 1.15 }}>{prod.title}</h3>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#015697", textTransform: "uppercase", letterSpacing: "0.04em" }}>{prod.tagline}</p>
-                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#26336F" }}>{prod.description}</p>
+                  <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, margin: 0, lineHeight: 1.15, color: "#1A2233" }}>{prod.title}</h3>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: prod.accent, textTransform: "uppercase", letterSpacing: "0.04em" }}>{prod.tagline}</p>
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#475569" }}>{prod.description}</p>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: "auto", paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
                     {prod.modules.map((m) => (
-                      <span key={m} style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, color: "#26336F", background: "#EFF8FD", padding: "4px 10px" }}>
+                      <span key={m} style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, color: prod.accent, background: "#F4F4F8", padding: "4px 10px" }}>
                         {m}
                       </span>
                     ))}
@@ -1042,26 +972,27 @@ export default function Home() {
       </section>
 
       {/* ═══ 06 The Goal ═══ */}
-      <section id="goal" className="tm-section" style={{ padding: "100px 32px", background: "#10195A", color: "#FFFFFF" }}>
-        <div className="tm-grid-split" style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 56, alignItems: "center" }}>
+      <section id="goal" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#0C5C78", color: "#FFFFFF", overflow: "hidden" }}>
+        <SectionMark corner={{ top: -70, right: -50 }} size={420} tone="white" opacity={0.07} rotate={10} />
+        <div className="tm-grid-split" style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 56, alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
-              <span style={{ ...KICKER, color: "#10195A", background: "#FEFFF9" }}>The Goal</span>
+              <span style={{ ...KICKER, color: "#0C5C78", background: "#DCEEF3" }}>The Goal</span>
             </div>
             <h2 style={H2}>Prove it works, then bring it to every clinic that needs it</h2>
             <p style={{ margin: 0, fontSize: 17, lineHeight: 1.65, color: "rgba(255,255,255,0.84)" }}>
-              We&apos;re raising <strong style={{ color: "#7FC4EA" }}>$100,000</strong> to launch TamamHealth in 10
+              We&apos;re raising <strong style={{ color: "#8FD9EC" }}>$100,000</strong> to launch TamamHealth in 10
               clinics across Juba and greater South Sudan — proof that offline-first digital records can work in the
               hardest conditions on Earth.
             </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "rgba(255,255,255,0.25)", border: "1px solid rgba(255,255,255,0.25)", overflow: "hidden" }}>
             {GOAL_STATS.map((g) => (
-              <div key={g.value} style={{ display: "flex", alignItems: "baseline", gap: 20, background: "#10195A", padding: "24px 28px" }}>
-                <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 54, fontWeight: 600, color: "#7FC4EA", lineHeight: 1, minWidth: 150, letterSpacing: "-0.02em" }}>
+              <div key={g.value} style={{ display: "flex", alignItems: "baseline", gap: 20, background: "#0C5C78", padding: "24px 28px" }}>
+                <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 54, fontWeight: 600, color: "#8FD9EC", lineHeight: 1, minWidth: 150, letterSpacing: "-0.02em" }}>
                   {g.value}
                 </span>
-                <span style={{ fontSize: 14.5, lineHeight: 1.45, color: "#E4EEFB", fontWeight: 500 }}>{g.label}</span>
+                <span style={{ fontSize: 14.5, lineHeight: 1.45, color: "#DCEEF3", fontWeight: 500 }}>{g.label}</span>
               </div>
             ))}
           </div>
@@ -1069,18 +1000,19 @@ export default function Home() {
       </section>
 
       {/* ═══ 07 Team ═══ */}
-      <section id="team" className="tm-section" style={{ padding: "100px 32px", background: "#FEFFF9" }}>
-        <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
+      <section id="team" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#EAF2F7", overflow: "hidden" }}>
+        <SectionMark corner={{ top: -70, left: -70 }} size={420} tone="dark" opacity={0.035} rotate={-7} />
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
-              <span style={{ ...KICKER, color: "#FFFFFF", background: "#10195A" }}>The Team</span>
+              <span style={{ ...KICKER, color: "#FFFFFF", background: "#1A2233" }}>The Team</span>
             </div>
             <h2 style={H2}>Built by people who&apos;ve lived this</h2>
           </div>
-          <div className="tm-grid-team" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 1, background: "#10195A", border: "1.5px solid #10195A" }}>
+          <div className="tm-grid-team" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 1, background: "#E2E8F0", border: "1.5px solid #E2E8F0" }}>
             {TEAM.map((t) => (
-              <div key={t.name} className="tm-team-card" style={{ background: "#FEFFF9", display: "flex", flexDirection: "column" }}>
-                <div style={{ position: "relative", width: "100%", aspectRatio: "1", borderBottom: "1.5px solid #10195A" }}>
+              <div key={t.name} className="tm-team-card" style={{ background: "#FFFFFF", display: "flex", flexDirection: "column" }}>
+                <div style={{ position: "relative", width: "100%", aspectRatio: "1", borderBottom: "1.5px solid #E2E8F0" }}>
                   <Image src={t.image} alt={t.name} fill sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 220px" style={{ objectFit: "cover" }} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "16px 18px 18px" }}>
@@ -1094,11 +1026,12 @@ export default function Home() {
       </section>
 
       {/* ═══ Contact / Get involved ═══ */}
-      <section id="contact" className="tm-section" style={{ background: "#10195A", color: "#FFFFFF", padding: "110px 32px 90px" }}>
-        <div style={{ maxWidth: 1320, margin: "0 auto" }}>
+      <section id="contact" className="tm-section" style={{ position: "relative", background: "#015697", color: "#FFFFFF", padding: "110px 32px 90px", overflow: "hidden" }}>
+        <SectionMark corner={{ bottom: -140, right: -140 }} size={480} tone="white" opacity={0.05} rotate={-10} />
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto" }}>
         <div className="tm-grid-split" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 56, alignItems: "start" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "#7FC4EA" }}>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "#98CFEE" }}>
               Get involved
             </span>
             <h2 className="tm-contact-h" style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(32px, 4.2vw, 54px)", fontWeight: 600, margin: 0, lineHeight: 1.12 }}>
@@ -1203,7 +1136,7 @@ export default function Home() {
       </main>
 
       {/* ═══ Footer ═══ */}
-      <footer style={{ background: "#0B1145", color: "#C7D8F5", borderTop: "1px solid rgba(255,255,255,0.15)", padding: "28px 32px" }}>
+      <footer style={{ background: "#01466F", color: "#C7D8F5", borderTop: "1px solid rgba(255,255,255,0.15)", padding: "28px 32px" }}>
         <div className="tm-footer-row" style={{ maxWidth: 1320, margin: "0 auto", display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", fontSize: 13, alignItems: "center" }}>
           <div className="tm-footer-brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}

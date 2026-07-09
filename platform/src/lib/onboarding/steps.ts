@@ -32,22 +32,12 @@ export interface OnboardingSection {
   steps: OnboardingStep[];
 }
 
-export interface ResourceLink {
-  id: string;
-  title: string;
-  type: 'video' | 'article';
-  href: string;
-  /** e.g. "2:34" for videos, "3 min read" for articles. */
-  meta: string;
-}
-
 export interface OnboardingPlan {
   /** Friendly role label, e.g. "Nurse". */
   roleLabel: string;
   /** The route the role lands on — their home dashboard. */
   defaultDashboard: string;
   sections: OnboardingSection[];
-  resources: ResourceLink[];
 }
 
 /** Curated per-route teaching copy. `verb` becomes the step title. */
@@ -90,6 +80,22 @@ const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: number }> 
   '/org-admin/branding': { verb: 'Brand your workspace', desc: 'Add your logo and colours so the app feels like yours.', est: 2 },
   '/org-admin/analytics': { verb: 'Review org analytics', desc: 'See performance across your organization’s facilities.', est: 2 },
   '/org-admin/settings': { verb: 'Configure org settings', desc: 'Set defaults, security, and preferences for your org.', est: 2 },
+  '/org-admin': { verb: 'Open your organization dashboard', desc: 'See org-wide stats, compare facilities, and jump to users, hospitals, and settings.', est: 2 },
+  '/org-admin/pricing': { verb: 'Set your service pricing', desc: 'Add and edit the fee schedule for consultations, labs, pharmacy, and procedures.', est: 2 },
+  // Front desk / clinical intake
+  '/check-in': { verb: 'Check in a patient', desc: 'Find a patient, record their arrival, chief complaint, and acuity, and start their visit.', est: 2 },
+  '/patient-intake': { verb: 'Review patient intake forms', desc: 'Check submitted intake forms and merge the details straight into the patient chart.', est: 2 },
+  '/alerts': { verb: 'Review clinical alerts', desc: 'See critical lab, immunization, and outbreak alerts in one feed and jump straight to the record.', est: 2 },
+  // Pharmacy / lab
+  '/blood-bank': { verb: 'Manage the blood bank', desc: 'Track blood units by group and status, and log newly donated units before they expire.', est: 2 },
+  '/controlled-substances': { verb: 'Log a controlled substance', desc: 'Record intake, dispensing, or waste of scheduled medications with witness sign-off.', est: 2 },
+  // Facility / emergency
+  '/emergency-preparedness': { verb: 'Manage emergency plans', desc: 'Create and activate response plans for outbreaks, disasters, and mass-casualty events.', est: 2 },
+  // Nurse station tabs
+  '/dashboard/nurse/ward': { verb: 'Review the ward roster', desc: 'See admitted patients, record vitals, and assign a doctor from one list.', est: 2 },
+  '/dashboard/nurse/mar': { verb: 'Administer medications', desc: 'Work through due and overdue doses and record what was given, held, or refused.', est: 2 },
+  '/dashboard/nurse/triage': { verb: 'Triage a patient', desc: 'Record ABCC and vitals to get an auto-calculated priority — RED, YELLOW, or GREEN.', est: 2 },
+  '/dashboard/nurse/handoff': { verb: 'Hand off your shift', desc: 'Write SBAR notes on critical patients and sign a handoff report for the next nurse.', est: 2 },
 };
 
 /** Routes that the basics section already covers, so we don't repeat them. */
@@ -195,20 +201,7 @@ export function getOnboardingPlan(role: UserRole): OnboardingPlan {
     roleLabel: config.label,
     defaultDashboard,
     sections,
-    resources: getResources(),
   };
-}
-
-// Placeholder "Helpful resources" — wire these to real videos/docs later.
-function getResources(): ResourceLink[] {
-  return [
-    { id: 'tour', title: 'Welcome to TamamHealth (full tour)', type: 'video', href: '#', meta: '2:34' },
-    { id: 'offline', title: 'Working offline & syncing your data', type: 'video', href: '#', meta: '2:59' },
-    { id: 'patients', title: 'Registering and finding patients', type: 'video', href: '#', meta: '3:58' },
-    { id: 'security', title: 'Keeping patient data secure', type: 'article', href: '#', meta: '3 min read' },
-    { id: 'shortcuts', title: 'Keyboard shortcuts cheat-sheet', type: 'article', href: '#', meta: '2 min read' },
-    { id: 'reporting', title: 'How reporting & DHIS2 export work', type: 'article', href: '#', meta: '4 min read' },
-  ];
 }
 
 /** Flatten all step IDs in a plan — handy for totals/percent. */

@@ -139,6 +139,27 @@ export function validatePatientData(data: Record<string, unknown>): Record<strin
     errors.state = 'State is required';
   }
 
+  // Required fields must mirror the registration form (patients/new) so a direct
+  // API POST cannot persist an incomplete record that the UI would have rejected.
+  const primaryLanguage = sanitizeString(data.primaryLanguage);
+  if (!primaryLanguage) {
+    errors.primaryLanguage = 'Primary language is required';
+  }
+  // County is required whenever a state is provided (form couples the two).
+  if (data.state && !sanitizeString(data.county)) {
+    errors.county = 'County is required';
+  }
+  const nokName = sanitizeString(data.nokName);
+  if (!nokName) {
+    errors.nokName = 'Next-of-kin name is required';
+  }
+  if (!sanitizeString(data.nokRelationship)) {
+    errors.nokRelationship = 'Next-of-kin relationship is required';
+  }
+  if (!sanitizeString(data.nokPhone)) {
+    errors.nokPhone = 'Next-of-kin phone number is required';
+  }
+
   // Validate boma code format when provided
   if (data.bomaCode && typeof data.bomaCode === 'string') {
     const code = data.bomaCode.toUpperCase().replace(/[^A-Z0-9]/g, '');

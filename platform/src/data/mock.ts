@@ -2446,43 +2446,6 @@ export const casesByState = [
   { state: 'E. Equatoria', malaria: 1980, cholera: 18, measles: 45, tb: 67, hiv: 310 },
 ];
 
-// ICD-10 codes for search
-export const icd10Codes = [
-  { code: 'A00', name: 'Cholera' },
-  { code: 'A01', name: 'Typhoid and paratyphoid fevers' },
-  { code: 'A06', name: 'Amoebiasis' },
-  { code: 'A09', name: 'Other gastroenteritis and colitis' },
-  { code: 'A15', name: 'Respiratory tuberculosis' },
-  { code: 'A50', name: 'Congenital syphilis' },
-  { code: 'B05', name: 'Measles' },
-  { code: 'B15', name: 'Acute hepatitis A' },
-  { code: 'B16', name: 'Acute hepatitis B' },
-  { code: 'B17', name: 'Other acute viral hepatitis' },
-  { code: 'B20', name: 'HIV disease' },
-  { code: 'B50', name: 'Plasmodium falciparum malaria' },
-  { code: 'B51', name: 'Plasmodium vivax malaria' },
-  { code: 'B55', name: 'Leishmaniasis (Kala-azar)' },
-  { code: 'D57', name: 'Sickle-cell disorders' },
-  { code: 'E11', name: 'Type 2 diabetes mellitus' },
-  { code: 'E40', name: 'Kwashiorkor' },
-  { code: 'E43', name: 'Severe protein-energy malnutrition' },
-  { code: 'G40', name: 'Epilepsy' },
-  { code: 'I10', name: 'Essential hypertension' },
-  { code: 'I50', name: 'Heart failure' },
-  { code: 'J06', name: 'Upper respiratory tract infection' },
-  { code: 'J18', name: 'Pneumonia' },
-  { code: 'J45', name: 'Asthma' },
-  { code: 'K35', name: 'Acute appendicitis' },
-  { code: 'L02', name: 'Cutaneous abscess, furuncle and carbuncle' },
-  { code: 'N39', name: 'Urinary tract infection' },
-  { code: 'O80', name: 'Normal delivery' },
-  { code: 'O82', name: 'Delivery by caesarean section' },
-  { code: 'R50', name: 'Fever of unknown origin' },
-  { code: 'S06', name: 'Intracranial injury' },
-  { code: 'T30', name: 'Burn and corrosion' },
-  { code: 'T63', name: 'Toxic effect of venomous animal' },
-];
-
 // Common medications for prescription
 // Medications are sourced from the bundled WHO EML formulary (single source of
 // truth, ATC-coded) rather than hardcoded here.

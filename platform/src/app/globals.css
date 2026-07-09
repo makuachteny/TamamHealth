@@ -968,13 +968,9 @@
   --color-slate-900: #0F172A;
   --color-slate-950: #0A1A33;
   /* Canonical brand blue scale — shared with the marketing site's
-     --tb-blue-* tokens. Every blue in the platform derives from these.
-     tb-blue-800 (the old separate "deep accent" hue) is now an alias for
-     navy — one of the platform's 4 main colors, not a 5th shade — so hover
-     states, links, and dark-fill buttons match the primary action color
-     instead of a slightly-different near-navy blue. */
-  --tb-blue-900: #10195A;  /* header blue — top rail, mission panels — matches the website's dark navy */
-  --tb-blue-800: var(--tb-blue-900);  /* deep accent — hover states, links, dark buttons */
+     --tb-blue-* tokens. Every blue in the platform derives from these. */
+  --tb-blue-900: #2191D0;  /* header blue — top rail, mission panels, primary accent */
+  --tb-blue-800: #015697;  /* deep accent — hover states, links, dark buttons */
   --tb-blue-700: #2191D0;  /* secondary accent — info, borders, nav/tab highlights */
   --tb-blue-600: #369FDA;  /* lighter tint of the secondary accent — borders, subtle highlights */
   --tb-blue-100: #DDF2FB;  /* pale tint — light backgrounds */
@@ -1013,13 +1009,13 @@
 /* ============ LIGHT THEME — Blue & White Palette ============ */
 :root {
   /* ── App canvas ── */
-  --bg-app:        var(--color-cream-25);
-  --bg-primary:    var(--color-cream-25);
+  --bg-app:        var(--tb-blue-50);
+  --bg-primary:    var(--tb-blue-50);
   --bg-secondary:  rgba(33, 145, 208, 0.08);
   --bg-card:       var(--color-white);
   --bg-card-solid: var(--color-white);
   --bg-card-hover: var(--color-cream-75);
-  --bg-input:      var(--color-cream-25);
+  --bg-input:      var(--color-white);
   --bg-sidebar:    var(--color-white);
   --overlay-subtle: rgba(33, 145, 208, 0.07);
   --overlay-light:  rgba(33, 145, 208, 0.10);
@@ -1027,12 +1023,10 @@
   --overlay-backdrop: rgba(15, 23, 42, 0.56);
 
   /* ── The platform's 4 main colors ──
-     1. Navy    (--tb-blue-900 / --accent-primary) — primary actions, active
-        states, anything filled solid with white text.
-     2. Sky     (--tb-blue-700 / --color-brand-500) — secondary accent: info,
-        borders, tinted backgrounds paired with dark text (too light for
-        reliable white-on-fill contrast, so never used as a solid fill with
-        white text — see --nav-active-bg / the appointment modal header).
+     1. Sky     (--tb-blue-900 / --tb-blue-700 / --accent-primary) — primary
+        actions, active states, anything filled solid with white text.
+     2. Deep blue (--tb-blue-800 / --accent-hover) — hover/pressed states
+        and links; a darker step of the same blue, not a separate hue.
      3. Orange  (--accent-orange) — a third, clearly distinct action color
         (e.g. Send intake) so it doesn't read as "another blue button."
      4. Purple  (--accent-purple) — a fourth distinct action/category color
@@ -5388,7 +5382,11 @@ thead th {
 }
 
 .ehr-care-dashboard .ehr-schedule-header {
-  grid-template-columns: minmax(230px, 260px) minmax(0, 1fr) max-content;
+  /* First column reads the shared --rail-col variable (not a hardcoded
+     minmax) so the Dashboard/Calendar toggle always matches the actual
+     rail column width below it, including at breakpoints where --rail-col
+     shrinks. */
+  grid-template-columns: var(--rail-col, minmax(230px, 260px)) minmax(0, 1fr) max-content;
   align-items: start;
   gap: 10px;
   padding-bottom: 12px;
@@ -6216,12 +6214,6 @@ thead th {
     gap: 10px;
   }
 
-  .ehr-consult-visit-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: 100%;
-    margin-left: 0;
-  }
-
   .tamam-page-action-strip {
     align-items: stretch;
     padding: 10px;
@@ -6375,17 +6367,6 @@ thead th {
     gap: 10px;
   }
 
-  .ehr-consult-patient-identity {
-    flex: 1 1 auto;
-    flex-wrap: wrap;
-  }
-
-  .ehr-consult-visit-controls {
-    grid-template-columns: 1fr;
-    width: 100%;
-    margin-left: 0;
-  }
-
   .ehr-schedule-header h1 {
     font-size: 18px;
   }
@@ -6470,27 +6451,6 @@ thead th {
   background: color-mix(in srgb, var(--ehr-blue) 5%, var(--ehr-panel));
 }
 
-.ehr-consult-patient-avatar {
-  flex: 0 0 auto;
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--accent-light);
-  color: var(--accent-primary);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.ehr-consult-patient-identity {
-  flex: 1 1 320px;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .ehr-consult-patient-name {
   flex: 0 0 auto;
   max-width: 260px;
@@ -6512,72 +6472,10 @@ thead th {
   text-underline-offset: 2px;
 }
 
-.ehr-consult-patient-chips {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.ehr-consult-chip {
-  min-width: 0;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 9px;
-  border: 1px solid var(--ehr-border);
-  border-radius: 5px;
-  background: var(--ehr-panel);
-}
-
-.ehr-consult-chip--danger {
-  flex: 0 1 auto;
-  border-color: color-mix(in srgb, var(--color-danger) 32%, transparent);
-  background: var(--color-danger-bg);
-  color: var(--color-danger-text);
-}
-
-.ehr-consult-chip--danger svg {
-  color: var(--color-danger-text);
-  flex-shrink: 0;
-}
-
-.ehr-consult-visit-controls {
-  display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(120px, 160px);
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  flex: 0 0 auto;
-}
-
-.ehr-consult-visit-controls label {
-  display: grid;
-  grid-template-rows: 10px 30px;
-  gap: 1px;
-  color: var(--ehr-muted);
-  font-size: 9px;
-  font-weight: 800;
-  text-transform: uppercase;
-  line-height: 1;
-}
-
-.ehr-consult-visit-controls select {
-  height: 30px;
-  border: 1px solid var(--ehr-border);
-  border-radius: 4px;
-  background: white;
-  color: var(--ehr-text);
-  font-size: 12px;
-  font-weight: 800;
-  padding: 0 9px;
-}
-
 .ehr-consult-change-btn {
   height: 34px;
   min-width: 76px;
+  margin-left: auto;
   border: 1px solid var(--ehr-border);
   border-radius: 5px;
   background: var(--ehr-panel);
@@ -9534,17 +9432,6 @@ thead th {
     align-items: stretch;
   }
 
-  .ehr-consult-visit-controls {
-    grid-template-columns: 1fr 1fr;
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .ehr-consult-patient-identity {
-    flex: 1 1 auto;
-    flex-wrap: wrap;
-  }
-
   .ehr-consult-meta-strip {
     grid-template-columns: 1fr 1fr auto;
     justify-content: stretch;
@@ -9566,10 +9453,6 @@ thead th {
   }
 
   .ehr-consult-meta-strip {
-    grid-template-columns: 1fr;
-  }
-
-  .ehr-consult-visit-controls {
     grid-template-columns: 1fr;
   }
 
@@ -12227,72 +12110,10 @@ span:has(> svg:only-child) {
     display: none;
   }
 
-  .ehr-consult-patient-identity {
-    flex: 1 1 auto;
-    min-width: 0;
-    flex-wrap: nowrap;
-    gap: 6px;
-  }
-
   .ehr-consult-patient-name {
     flex: 0 1 auto;
     max-width: clamp(120px, 28vw, 180px);
     font-size: 12px;
-  }
-
-  .ehr-consult-patient-chips {
-    flex: 0 0 auto;
-    flex-wrap: nowrap;
-    gap: 4px;
-  }
-
-  .ehr-consult-chip {
-    height: 26px;
-    max-width: 190px;
-    gap: 5px;
-    padding: 0 7px;
-  }
-
-  .ehr-consult-chip span {
-    max-width: 150px;
-    font-size: 11px !important;
-  }
-
-  .ehr-consult-visit-controls {
-    width: auto;
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 5px;
-    margin-left: 0;
-  }
-
-  .ehr-consult-visit-controls label {
-    display: block;
-    min-width: 0;
-    color: transparent;
-    font-size: 0;
-    line-height: 0;
-  }
-
-  .ehr-consult-visit-controls label::before {
-    display: none;
-  }
-
-  .ehr-consult-visit-controls select {
-    height: 26px;
-    max-width: 148px;
-    padding: 0 7px;
-    font-size: 11px;
-    line-height: 1;
-  }
-
-  .ehr-consult-visit-controls label:first-child select {
-    width: 148px;
-  }
-
-  .ehr-consult-visit-controls label:last-child select {
-    width: 68px;
   }
 
   .ehr-consult-change-btn {
@@ -12319,29 +12140,6 @@ span:has(> svg:only-child) {
 
   .ehr-consult-patient-name {
     max-width: 116px;
-  }
-
-  .ehr-consult-chip {
-    height: 24px;
-    max-width: 128px;
-    padding: 0 6px;
-  }
-
-  .ehr-consult-chip span {
-    max-width: 94px;
-    font-size: 10px !important;
-  }
-
-  .ehr-consult-patient-chips .ehr-consult-chip:nth-child(3) {
-    display: none;
-  }
-
-  .ehr-consult-visit-controls label:first-child select {
-    width: 126px;
-  }
-
-  .ehr-consult-visit-controls label:last-child select {
-    width: 60px;
   }
 
   .ehr-consult-change-btn {
@@ -12402,32 +12200,6 @@ span:has(> svg:only-child) {
   .ehr-consult-patient-name {
     max-width: 98px;
     font-size: 11px;
-  }
-
-  .ehr-consult-chip {
-    max-width: 104px;
-    padding: 0 5px;
-  }
-
-  .ehr-consult-chip span {
-    max-width: 72px;
-  }
-
-  .ehr-consult-patient-chips .ehr-consult-chip:nth-child(2) {
-    display: none;
-  }
-
-  .ehr-consult-visit-controls select {
-    height: 24px;
-    font-size: 10px;
-  }
-
-  .ehr-consult-visit-controls label:first-child select {
-    width: 110px;
-  }
-
-  .ehr-consult-visit-controls label:last-child select {
-    width: 54px;
   }
 
   .ehr-consult-change-btn {

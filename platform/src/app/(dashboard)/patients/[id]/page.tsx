@@ -11,7 +11,7 @@ import {
   ShieldAlert, TestTubes, ChevronRight,
   CalendarClock, TrendingUp as TrendingUpIcon, ClipboardList,
   User as UserIcon, Building2, Search, X, Wallet, Syringe,
-  Heart, Printer, History, Plus, SendHorizontal,
+  Heart, Printer, History, Plus, Calendar,
 } from '@/components/icons/lucide';
 import Badge from '@/components/Badge';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -72,7 +72,7 @@ import { OrderLabModal, PrescribeModal, ReferModal } from '@/components/patients
 // Receptionist) may see — the "minimum necessary" rule: contact details,
 // referral follow-up, and billing/scheduling, but NOT clinical notes, test
 // results, diagnoses, vitals, or medications.
-const ADMIN_TAB_IDS = ['overview', 'demographics', 'billing', 'documents', 'recall'];
+const ADMIN_TAB_IDS = ['overview', 'appointments', 'demographics', 'billing', 'documents', 'recall'];
 type FacesheetPanelId = 'medications' | 'problems' | 'vitals' | 'history' | 'labs' | 'recommendations';
 
 const FACESHEET_PANEL_OPTIONS: Array<{ id: FacesheetPanelId; label: string }> = [
@@ -365,6 +365,7 @@ export default function PatientDetailPage() {
 
   const allTabs = [
     { id: 'overview', label: 'Facesheet', icon: Heart },
+    { id: 'appointments', label: 'Appointments', icon: Calendar },
     { id: 'history', label: 'History', icon: FileText },
     { id: 'problems', label: 'Problems', icon: AlertTriangle },
     { id: 'prescriptions', label: 'Medications', icon: Pill },
@@ -1172,6 +1173,62 @@ export default function PatientDetailPage() {
               onTogglePanel={toggleFacesheetPanel}
               onResetPanels={() => setFacesheetPanels(new Set(DEFAULT_FACESHEET_PANELS))}
             />
+          )}
+
+          {activeTab === 'appointments' && patient && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Appointments</h2>
+                  {nextAppt ? (
+                    <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                      Next: {formatDate(nextAppt.appointmentDate)} {nextAppt.appointmentTime || ''} · {nextAppt.providerName || 'Unassigned'}
+                    </p>
+                  ) : (
+                    <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>No upcoming appointments.</p>
+                  )}
+                </div>
+                {canBookAppointments && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => router.push(`/appointments?new=1&patientId=${patient._id}`)}
+                  >
+                    <Plus className="w-3.5 h-3.5" /> New appointment
+                  </button>
+                )}
+              </div>
+              <div className="card-elevated overflow-hidden">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Time</th>
+                      <th>Provider</th>
+                      <th>Reason</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {patientAppointments.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
+                          No appointments recorded for this patient.
+                        </td>
+                      </tr>
+                    ) : [...patientAppointments].sort((a, b) => apptTs(b) - apptTs(a)).map(appt => (
+                      <tr key={appt._id}>
+                        <td className="font-mono text-xs">{formatDate(appt.appointmentDate)}</td>
+                        <td>{appt.appointmentTime || '—'}</td>
+                        <td>{appt.providerName || '—'}</td>
+                        <td>{appt.reason || appt.department || 'Follow-up'}</td>
+                        <td><span className="badge badge-normal text-[10px]">{appt.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
 
           {/* Overview Tab — full clinical overview (clinical roles only) */}
@@ -2495,36 +2552,6 @@ export default function PatientDetailPage() {
                 <div><dt>Address</dt><dd>{patient.address || [patient.boma, patient.payam, patient.county].filter(Boolean).join(', ') || '—'}</dd></div>
                 <div><dt>Language</dt><dd>{patient.primaryLanguage || '—'}</dd></div>
               </dl>
-              <div className="ehr-chart-side-actions no-print">
-                {canViewClinical && (
-                  <button
-                    type="button"
-                    aria-label="Refer this patient"
-                    style={{ background: '#fff', borderColor: 'var(--accent-purple)', color: '#000' }}
-                    onClick={() => setShowReferModal(true)}
-                  >
-                    <ArrowRightLeft className="w-3.5 h-3.5" color="#000" /> Refer
-                  </button>
-                )}
-                {canBookAppointments && (
-                  <button
-                    type="button"
-                    aria-label="New appointment"
-                    style={{ background: '#fff', borderColor: 'var(--accent-primary)', color: '#000' }}
-                    onClick={() => router.push(`/appointments?new=1&patientId=${patient._id}`)}
-                  >
-                    <Plus className="w-3.5 h-3.5" color="#000" /> New appointment
-                  </button>
-                )}
-                <button
-                  type="button"
-                  aria-label="Send intake"
-                  style={{ background: 'var(--accent-orange)', borderColor: 'var(--accent-orange)', color: '#fff' }}
-                  onClick={() => router.push(`/patient-intake?patientId=${patient._id}`)}
-                >
-                  <SendHorizontal className="w-3.5 h-3.5" color="#fff" /> Send intake
-                </button>
-              </div>
             </div>
             {(() => {
               const activeAllergies = patient.structuredAllergies !== undefined

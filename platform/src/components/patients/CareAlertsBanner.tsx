@@ -5,15 +5,7 @@ import { useApp } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import type { CareAlertCategory } from '@/data/mock';
 import { AlertTriangle, Plus, X } from '@/components/icons/lucide';
-
-const CATEGORY_LABELS: Record<CareAlertCategory, string> = {
-  clinical_risk: 'Clinical risk',
-  safety: 'Safety',
-  infection_control: 'Infection control',
-  administrative: 'Administrative',
-  other: 'Other',
-};
-const CATEGORY_OPTIONS = Object.keys(CATEGORY_LABELS) as CareAlertCategory[];
+import CareAlertFields, { CARE_ALERT_CATEGORY_LABELS } from '@/components/patients/CareAlertFields';
 
 /**
  * Chart-permanent care alerts (P1.2). Active alerts render as a prominent
@@ -83,7 +75,7 @@ export default function CareAlertsBanner({ patient, hideAddButton = false }: { p
             <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color }} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: '#fff', color }}>{CATEGORY_LABELS[a.category]}</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: '#fff', color }}>{CARE_ALERT_CATEGORY_LABELS[a.category]}</span>
                 <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{a.message}</span>
               </div>
               {a.recordedByName && <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Added by {a.recordedByName}</span>}
@@ -119,23 +111,13 @@ export default function CareAlertsBanner({ patient, hideAddButton = false }: { p
         )
       ) : (
         <div className="card-elevated p-3 space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as CareAlertCategory })}
-              className="p-2 rounded-md text-[12px]" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
-              {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-            </select>
-            <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as 'high' | 'normal' })}
-              className="p-2 rounded-md text-[12px]" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}>
-              <option value="high">High priority</option>
-              <option value="normal">Normal</option>
-            </select>
-          </div>
-          <input
-            value={form.message}
-            onChange={(e) => setForm({ ...form, message: e.target.value })}
-            placeholder="Alert (e.g. High fall risk; do not use right arm for BP)"
-            className="w-full p-2 rounded-md text-[13px]"
-            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+          <CareAlertFields
+            category={form.category}
+            priority={form.priority}
+            message={form.message}
+            onCategoryChange={category => setForm({ ...form, category })}
+            onPriorityChange={priority => setForm({ ...form, priority })}
+            onMessageChange={message => setForm({ ...form, message })}
           />
           <div className="flex items-center gap-2">
             <button className="btn btn-sm btn-primary" disabled={busy || form.message.trim().length === 0} onClick={() => run(doAdd)}>Save alert</button>

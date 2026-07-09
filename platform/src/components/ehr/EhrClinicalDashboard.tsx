@@ -13,8 +13,10 @@ import {
   ClipboardList,
   FlaskConical,
   LayoutDashboard,
+  Plus,
   Printer,
   Search,
+  SendHorizontal,
   Stethoscope,
   Video,
   X,
@@ -149,7 +151,7 @@ export default function EhrClinicalDashboard({
   const searchParams = useSearchParams();
   const { showToast } = useToast();
   // Gate the "Start consultation" action to roles that can actually consult.
-  const { canConsult } = usePermissions();
+  const { canConsult, canBookAppointments } = usePermissions();
   // Coverage lives in insurance_policy docs, not on the appointment — one
   // bulk set of covered patient ids badges every row as Insured/Not insured.
   const insuredIds = useInsuredPatientIds();
@@ -349,6 +351,26 @@ export default function EhrClinicalDashboard({
           <div className="ehr-greeting-row">
             <p className="ehr-care-greeting">Welcome, {clinicianName}</p>
           </div>
+        </div>
+        <div className="ehr-schedule-actions">
+          {canBookAppointments && (
+            <button
+              type="button"
+              className="primary"
+              aria-label="New appointment"
+              onClick={() => router.push('/appointments?new=1')}
+            >
+              <Plus className="w-4 h-4" /> New appointment
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label="Send intake"
+            style={{ background: 'var(--accent-orange)', borderColor: 'var(--accent-orange)', color: '#fff' }}
+            onClick={() => router.push('/patient-intake')}
+          >
+            <SendHorizontal className="w-4 h-4" color="#fff" /> Send intake
+          </button>
         </div>
       </section>
 

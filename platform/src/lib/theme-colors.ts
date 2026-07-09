@@ -1,14 +1,12 @@
-// The platform's 4 main colors: navy (primary), sky blue (--info, secondary
-// accent), orange and purple (distinct third/fourth action colors). Clinical
+// The platform's 4 main colors: sky blue (primary/--info), a darker blue
+// (secondary — feeds org branding's --accent-hover, pairs with white button
+// text), orange and purple (distinct third/fourth action colors). Clinical
 // safety colors (success/warning/danger) are intentionally kept separate
 // from this set — they're status signals, not brand colors.
-// brandSecondary feeds org branding's --accent-hover (pairs with white
-// button text), so it stays navy-dark rather than the lighter sky accent —
-// see INFO below for the actual sky-blue token.
 export const THEME_COLORS = {
-  brandPrimary: '#10195A',
-  brandSecondary: '#10195A',
-  brandDarker: '#10195A',
+  brandPrimary: '#2191D0',
+  brandSecondary: '#015697',
+  brandDarker: '#2191D0',
   brandOrange: '#CA4D1C',
   brandPurple: '#7847EB',
   info: '#2191D0',

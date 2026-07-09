@@ -65,6 +65,15 @@ async function patchHandler(
     delete body.createdAt;
     const { sanitizePayload } = await import('@/lib/validation');
     const sanitized = sanitizePayload(body);
+    // A partial edit form may serialize untouched inputs as empty strings. Merging
+    // those over the stored record would silently wipe existing demographics
+    // (e.g. nokPhone: ''). Drop empty/undefined keys so PATCH only updates fields
+    // the caller actually provided a value for. To clear a field, send an explicit
+    // null.
+    for (const key of Object.keys(sanitized)) {
+      const v = sanitized[key];
+      if (v === undefined || v === '') delete sanitized[key];
+    }
     const { updatePatient, getPatientById } = await import('@/lib/services/patient-service');
     const existing = await getPatientById(id);
     if (!existing) return NextResponse.json({ error: 'Patient not found' }, { status: 404 });

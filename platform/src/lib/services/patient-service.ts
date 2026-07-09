@@ -258,7 +258,17 @@ export async function updatePatient(id: string, rawData: Partial<PatientDoc>): P
   }
   const resp = await db.put(updated);
   updated._rev = resp.rev;
-  await logAuditSafe('UPDATE_PATIENT', undefined, undefined, `Updated patient ${id}`);
+  // Record which fields changed (names only, no PII values) so patient-record
+  // edits are attributable at the field level for audit/compliance.
+  const changedFields = Object.keys(data).filter(
+    (k) => !['_id', '_rev', 'updatedAt'].includes(k),
+  );
+  await logAuditSafe(
+    'UPDATE_PATIENT',
+    undefined,
+    undefined,
+    `Updated patient ${id}${changedFields.length ? ` — fields: ${changedFields.join(', ')}` : ''}`,
+  );
   emitSyncEvent({
     resourceType: 'patient',
     resourceId: updated._id,
