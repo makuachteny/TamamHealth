@@ -21,6 +21,7 @@ import FingerprintIdentifyModal from '@/components/FingerprintIdentifyModal';
 import { isFingerprintEnabled } from '@/lib/services/fingerprint-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import EmptyState from '@/components/EmptyState';
+import PageInstructionCard from '@/components/PageInstructionCard';
 
 // Pagination cap — capped to keep DOM-node count manageable on low-end devices.
 // Each row produces ~20 DOM nodes; 100 rows ≈ 2k nodes which renders smoothly.

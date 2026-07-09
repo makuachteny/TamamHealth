@@ -3807,31 +3807,6 @@ thead th {
   position: relative;
 }
 
-.ehr-top-hospital-name {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  min-width: 0;
-  max-width: min(46vw, 360px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-align: center;
-  pointer-events: none;
-}
-
-.ehr-top-hospital-name span {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .ehr-top-modules button,
 .ehr-top-actions button {
   width: 38px;
@@ -5257,6 +5232,33 @@ thead th {
 .ehr-side-card > button.danger b {
   background: #FFE0D8;
   color: #B43921;
+}
+
+/* Icon + label shortcut rows appended under a card's metric buttons (e.g.
+   "View Referrals", "Appointments" in the Today card) — same row height/
+   weight as the metric buttons above, just an icon-led span instead of a
+   label/value pair, and a divider so they read as a distinct group. */
+.ehr-side-card-icon-row {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ehr-border);
+}
+
+.ehr-side-card-icon-row + .ehr-side-card-icon-row {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ehr-side-card-icon-row span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ehr-side-card-icon-row svg {
+  flex-shrink: 0;
+  color: var(--accent-primary);
 }
 
 .ehr-outstanding-chips {
@@ -10835,14 +10837,6 @@ span:has(> svg:only-child) {
   width: 120px;
 }
 
-.ehr-top-hospital-name {
-  font-family: var(--font-platform);
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: -0.015em;
-  max-width: 380px;
-}
-
 .ehr-top-modules button,
 .ehr-top-actions button {
   width: 30px;
@@ -11110,10 +11104,6 @@ span:has(> svg:only-child) {
     width: 104px;
   }
 
-  .ehr-top-hospital-name {
-    display: none;
-  }
-
   .ehr-top-modules button,
   .ehr-top-actions button {
     width: 28px;
@@ -11213,12 +11203,6 @@ span:has(> svg:only-child) {
     width: 32px !important;
   }
 
-  .ehr-top-hospital-name {
-    justify-content: flex-start;
-    font-size: 11px;
-    line-height: 1.1;
-  }
-
   .ehr-mobile-search-trigger {
     display: inline-flex !important;
   }
@@ -11239,7 +11223,6 @@ span:has(> svg:only-child) {
 
   .ehr-top-rail.is-searching .ehr-top-brand,
   .ehr-top-rail.is-searching .ehr-top-modules,
-  .ehr-top-rail.is-searching .ehr-top-hospital-name,
   .ehr-top-rail.is-searching .ehr-top-actions {
     display: none;
   }
@@ -11624,13 +11607,6 @@ span:has(> svg:only-child) {
     width: 32px !important;
   }
 
-  .ehr-top-hospital-name {
-    justify-content: flex-start;
-    min-width: 0;
-    font-size: 11px;
-    line-height: 1.1;
-  }
-
   .ehr-mobile-search-trigger {
     display: inline-flex !important;
   }
@@ -11653,7 +11629,6 @@ span:has(> svg:only-child) {
 
   .ehr-top-rail.is-searching .ehr-top-brand,
   .ehr-top-rail.is-searching .ehr-top-modules,
-  .ehr-top-rail.is-searching .ehr-top-hospital-name,
   .ehr-top-rail.is-searching .ehr-top-actions {
     display: none;
   }
@@ -12478,14 +12453,6 @@ span:has(> svg:only-child) {
   .ehr-top-brand {
     max-width: 100%;
     overflow: hidden;
-  }
-
-  .ehr-top-hospital-name {
-    min-width: 0;
-    justify-content: flex-start;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .ehr-top-search-menu,
@@ -13959,7 +13926,7 @@ span:has(> svg:only-child) {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin: 10px 10px 14px;
 }
 .dashboard-greeting-copy { min-width: 0; }
@@ -13973,7 +13940,17 @@ span:has(> svg:only-child) {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+/* Below tablet width there isn't room to keep the greeting and its actions
+   on one line without clipping — fall back to wrapping there only. */
+@media (max-width: 639px) {
+  .dashboard-greeting-header,
+  .dashboard-greeting-actions {
+    flex-wrap: wrap;
+  }
 }
 
 /* ── Outstanding-item worklists in the centre panel ───────────────

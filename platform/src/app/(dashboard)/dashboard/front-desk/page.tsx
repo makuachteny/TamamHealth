@@ -556,6 +556,11 @@ export default function FrontDeskDashboardPage() {
     ...(canUseRoute('/check-in') ? [{ label: 'Check in', icon: ClipboardCheck, onClick: () => setCheckInOpen(true), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patient-intake') ? [{ label: 'Send intake', icon: SendHorizontal, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patients') ? [{ label: t('frontDesk.registerNewPatient'), icon: UserPlus, onClick: () => setRegisterOpen(true) }] : []),
+  ]), [canUseRoute, router, t]);
+
+  // "View Referrals" / "Appointments" — shown as icon shortcuts inside the
+  // Reception today card instead of the left rail.
+  const metricsActions = useMemo<EhrCareDashboardAction[]>(() => ([
     ...(canUseRoute('/referrals') ? [{ label: t('frontDesk.viewReferrals'), icon: ArrowRightLeft, onClick: () => router.push('/referrals') }] : []),
     ...(canUseRoute('/appointments') ? [{ label: t('nav.appointments'), icon: Calendar, onClick: () => router.push('/appointments') }] : []),
   ]), [canUseRoute, router, t]);
@@ -856,6 +861,7 @@ export default function FrontDeskDashboardPage() {
           actionStrip={actionStrip}
           rows={frontDeskRows}
           metrics={metrics}
+          metricsActions={metricsActions}
           checklist={checklist}
           calendarEventDates={appointments.map(appointment => appointment.appointmentDate)}
           metricsTitle="Reception today"

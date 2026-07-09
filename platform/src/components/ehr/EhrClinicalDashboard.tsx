@@ -356,17 +356,17 @@ export default function EhrClinicalDashboard({
           {canBookAppointments && (
             <button
               type="button"
-              className="primary"
               aria-label="New appointment"
+              style={{ background: '#fff', borderColor: 'var(--border-light)', color: '#000' }}
               onClick={() => router.push('/appointments?new=1')}
             >
-              <Plus className="w-4 h-4" /> New appointment
+              <Plus className="w-4 h-4" color="#000" /> New appointment
             </button>
           )}
           <button
             type="button"
             aria-label="Send intake"
-            style={{ background: 'var(--accent-orange)', borderColor: 'var(--accent-orange)', color: '#fff' }}
+            style={{ background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: '#fff' }}
             onClick={() => router.push('/patient-intake')}
           >
             <SendHorizontal className="w-4 h-4" color="#fff" /> Send intake

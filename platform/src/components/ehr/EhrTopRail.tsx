@@ -231,12 +231,6 @@ export default function EhrTopRail() {
         <EhrTopActions items={quickActionItems.slice(0, 6)} navLabel={navLabel} onOpenModule={openModule} />
       </nav>
 
-      {currentUser && (
-        <div className="ehr-top-hospital-name">
-          <span>{currentUser.hospitalName || currentUser.branding.name}</span>
-        </div>
-      )}
-
       <button
         type="button"
         className="ehr-top-calendar-button"

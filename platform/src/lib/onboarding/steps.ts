@@ -40,8 +40,10 @@ export interface OnboardingPlan {
   sections: OnboardingSection[];
 }
 
-/** Curated per-route teaching copy. `verb` becomes the step title. */
-const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: number }> = {
+/** Curated per-route teaching copy. `verb` becomes the step title.
+ *  Exported so page-level instruction cards (PageInstructionCard) can reuse
+ *  the same copy instead of duplicating it. */
+export const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: number }> = {
   '/patients': { verb: 'Register your first patient', desc: 'Add a patient and open their record to see their history, vitals, and visits.', est: 2 },
   '/consultation': { verb: 'Document a consultation', desc: 'Write a SOAP note, record a diagnosis, and order labs or prescriptions.', est: 3 },
   '/wards': { verb: 'Manage your wards', desc: 'Admit, transfer, and discharge patients and track bed availability.', est: 2 },

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
+import { Calendar, CheckCircle2, ChevronLeft, ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import EhrMiniCalendar, { formatDateTitle, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { initials, stateColor } from '@/lib/patient-utils';
 
@@ -87,6 +87,7 @@ export default function EhrCareDashboard({
   actionStrip,
   rows,
   metrics,
+  metricsActions,
   checklist,
   showCalendar = true,
   calendarEventDates,
@@ -125,6 +126,10 @@ export default function EhrCareDashboard({
   actionStrip?: EhrCareDashboardAction[];
   rows: EhrCareDashboardRow[];
   metrics: EhrCareDashboardMetric[];
+  /** Icon + label shortcuts rendered at the bottom of the metrics ("Today")
+   *  card — e.g. "View Referrals", "Appointments". Same shape as `actions`,
+   *  just placed in the sidebar instead of the header/rail. */
+  metricsActions?: EhrCareDashboardAction[];
   checklist: EhrCareDashboardChecklistItem[];
   showCalendar?: boolean;
   calendarEventDates?: string[];
@@ -248,19 +253,21 @@ export default function EhrCareDashboard({
               </button>
             ))}
           </div>
-          <div className="ehr-filter-group">
-            {railActions.map(action => (
-              <button
-                key={action.label}
-                type="button"
-                className={`ehr-care-rail-action ${action.active ? 'active' : ''}`}
-                onClick={action.onClick}
-              >
-                <action.icon className="w-4 h-4" />
-                <span>{action.label}</span>
-              </button>
-            ))}
-          </div>
+          {railActions.length > 0 && (
+            <div className="ehr-filter-group">
+              {railActions.map(action => (
+                <button
+                  key={action.label}
+                  type="button"
+                  className={`ehr-care-rail-action ${action.active ? 'active' : ''}`}
+                  onClick={action.onClick}
+                >
+                  <action.icon className="w-4 h-4" />
+                  <span>{action.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </aside>
 
         <section className="ehr-center-panel">
@@ -351,6 +358,19 @@ export default function EhrCareDashboard({
                 <b>{metric.value}</b>
               </button>
             ))}
+            {metricsActions?.map(action => (
+              <button
+                key={action.label}
+                type="button"
+                className="ehr-side-card-icon-row"
+                onClick={action.onClick}
+              >
+                <span>
+                  <action.icon className="w-4 h-4" />
+                  {action.label}
+                </span>
+              </button>
+            ))}
           </div>
           <div className="ehr-side-card">
             <div className="ehr-side-card-head">
@@ -359,10 +379,10 @@ export default function EhrCareDashboard({
             </div>
             {checklistDescription && <p>{checklistDescription}</p>}
             {checklist.map(item => (
-              <button key={item.label} type="button" onClick={item.onClick || (item.href ? () => router.push(item.href as string) : undefined)}>
-                <span>{item.label}</span>
-                {item.done ? <CheckCircle2 className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
+              <label key={item.label} onClick={item.onClick || (item.href ? () => router.push(item.href as string) : undefined)}>
+                <input type="checkbox" checked={!!item.done} readOnly />
+                {item.label}
+              </label>
             ))}
           </div>
           {showMissionCard && missionTitle && missionDescription && (
