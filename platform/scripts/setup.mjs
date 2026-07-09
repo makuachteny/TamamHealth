@@ -210,11 +210,11 @@ async function main() {
     // Add license key
     envContent = `# License key (issued by TamamHealth Health Technologies)\nTAMAMHEALTH_LICENSE_KEY=${licenseKey}\n\n${envContent}`;
 
-    // Generate a random JWT secret
+    // Generate a random JWT secret (server-side only — never NEXT_PUBLIC_*)
     const jwtSecret = randomBytes(48).toString('base64');
     envContent = envContent.replace(
-      'NEXT_PUBLIC_JWT_SECRET=change-me-to-a-random-secret',
-      `NEXT_PUBLIC_JWT_SECRET=${jwtSecret}`
+      'JWT_SECRET=',
+      `JWT_SECRET=${jwtSecret}`
     );
 
     // Set org name from license

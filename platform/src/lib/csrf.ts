@@ -28,9 +28,10 @@ export const CSRF_HEADER_NAME = 'x-csrf-token';
 const HARDCODED_FALLBACK = 'tamamhealth-south-sudan-health-2026-secret-key';
 
 function getSecret(): string {
-  const s = process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET || HARDCODED_FALLBACK;
-  if (process.env.NODE_ENV === 'production' && s === HARDCODED_FALLBACK) {
-    throw new Error('[CSRF] JWT_SECRET must be set in production.');
+  const s = process.env.JWT_SECRET || HARDCODED_FALLBACK;
+  const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  if (!isDemo && s === HARDCODED_FALLBACK) {
+    throw new Error('[CSRF] JWT_SECRET must be set in any non-demo deployment.');
   }
   return s;
 }

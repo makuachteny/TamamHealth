@@ -1,31 +1,27 @@
 import { SignJWT, jwtVerify } from 'jose';
 
-// Server-side secret (never leaves Node). All authoritative token creation and
-// verification runs server-side, so the client never needs the signing key.
-// NOTE: NEXT_PUBLIC_JWT_SECRET is still read as a last-resort fallback so the
-// offline client can verify self-issued dev tokens, but the server refuses to
-// start with a default secret in production.
+// Server-side secret only — NEXT_PUBLIC_* variables are baked into the browser
+// bundle at build time, so a NEXT_PUBLIC_JWT_SECRET would be readable by any
+// visitor. JWT_SECRET is the only accepted env var; use the hardcoded fallback
+// only in local demo mode.
 const HARDCODED_FALLBACK = 'tamamhealth-south-sudan-health-2026-secret-key';
-const secret =
-  process.env.JWT_SECRET ||
-  process.env.NEXT_PUBLIC_JWT_SECRET ||
-  HARDCODED_FALLBACK;
+const secret = process.env.JWT_SECRET || HARDCODED_FALLBACK;
 
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const IS_SERVER = typeof window === 'undefined';
+// Guard fires whenever demo mode is explicitly off — catches staging, CI, and
+// production deployments regardless of NODE_ENV.
+const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
-if (IS_SERVER && IS_PRODUCTION && secret === HARDCODED_FALLBACK) {
-  // Fail loudly instead of silently running with a public default. Any
-  // production deploy MUST set JWT_SECRET (at least 32 bytes of entropy).
+if (IS_SERVER && !IS_DEMO && secret === HARDCODED_FALLBACK) {
   throw new Error(
-    '[SECURITY] JWT_SECRET environment variable must be set in production. ' +
-    'Refusing to start with the default fallback secret.'
+    '[SECURITY] JWT_SECRET environment variable must be set in any non-demo deployment. ' +
+    'Generate one with: openssl rand -base64 48'
   );
 }
 
-if (IS_SERVER && IS_PRODUCTION && secret.length < 32) {
+if (IS_SERVER && !IS_DEMO && secret.length < 32) {
   throw new Error(
-    '[SECURITY] JWT_SECRET must be at least 32 characters in production ' +
+    '[SECURITY] JWT_SECRET must be at least 32 characters ' +
     `(got ${secret.length}). Generate one with: openssl rand -hex 32`
   );
 }
@@ -45,14 +41,14 @@ function hasCryptoSubtle(): boolean {
 }
 
 /**
- * Fallback token for non-secure contexts (DEVELOPMENT ONLY).
+ * Fallback token for non-secure contexts (DEMO / DEVELOPMENT ONLY).
  * Uses base64-encoded JSON — NOT cryptographically secure.
- * In production this path is refused: we fail closed rather than accept
- * unsigned tokens on the wire.
+ * In non-demo deployments this path is refused: we fail closed rather than
+ * accept unsigned tokens on the wire.
  */
 function createFallbackToken(payload: Record<string, unknown>): string {
-  if (IS_PRODUCTION) {
-    throw new Error('[SECURITY] Refusing to issue unsigned fallback token in production');
+  if (!IS_DEMO) {
+    throw new Error('[SECURITY] Refusing to issue unsigned fallback token in non-demo deployment');
   }
   const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' }));
   const body = btoa(JSON.stringify({
@@ -66,10 +62,9 @@ function createFallbackToken(payload: Record<string, unknown>): string {
 }
 
 function verifyFallbackToken(token: string): Record<string, unknown> | null {
-  // Refuse unsigned tokens in production. The only way a token carrying the
-  // literal "dev-fallback" signature could reach a production verifier is
-  // token forgery, so reject unconditionally.
-  if (IS_PRODUCTION) return null;
+  // Refuse unsigned tokens in non-demo deployments. A token with the literal
+  // "dev-fallback" signature reaching a deployed verifier is token forgery.
+  if (!IS_DEMO) return null;
   try {
     const parts = token.split('.');
     if (parts.length !== 3 || parts[2] !== 'dev-fallback') return null;

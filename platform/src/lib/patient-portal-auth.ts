@@ -6,27 +6,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SignJWT, jwtVerify } from 'jose';
 
-// Mirrors the JWT_SECRET resolution + production refusal in lib/auth-token.ts
-// so the patient portal can't accidentally run with the hardcoded default.
+// Mirrors the JWT_SECRET resolution + guard in lib/auth-token.ts.
+// NEXT_PUBLIC_* vars are baked into the browser bundle — never use one for secrets.
 const HARDCODED_FALLBACK = 'tamamhealth-south-sudan-health-2026-secret-key';
-const secret =
-  process.env.JWT_SECRET ||
-  process.env.NEXT_PUBLIC_JWT_SECRET ||
-  HARDCODED_FALLBACK;
+const secret = process.env.JWT_SECRET || HARDCODED_FALLBACK;
 
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const IS_SERVER = typeof window === 'undefined';
+const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
-if (IS_SERVER && IS_PRODUCTION && secret === HARDCODED_FALLBACK) {
+if (IS_SERVER && !IS_DEMO && secret === HARDCODED_FALLBACK) {
   throw new Error(
-    '[SECURITY] JWT_SECRET environment variable must be set in production. ' +
-    'Refusing to start with the default fallback secret.'
+    '[SECURITY] JWT_SECRET environment variable must be set in any non-demo deployment. ' +
+    'Generate one with: openssl rand -base64 48'
   );
 }
 
-if (IS_SERVER && IS_PRODUCTION && secret.length < 32) {
+if (IS_SERVER && !IS_DEMO && secret.length < 32) {
   throw new Error(
-    '[SECURITY] JWT_SECRET must be at least 32 characters in production ' +
+    '[SECURITY] JWT_SECRET must be at least 32 characters ' +
     `(got ${secret.length}). Generate one with: openssl rand -hex 32`
   );
 }
