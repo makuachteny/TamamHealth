@@ -45,6 +45,7 @@ export interface OnboardingPlan {
  *  the same copy instead of duplicating it. */
 export const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: number }> = {
   '/patients': { verb: 'Register your first patient', desc: 'Add a patient and open their record to see their history, vitals, and visits.', est: 2 },
+  '/telehealth': { verb: 'Start a telehealth visit', desc: 'Launch a secure video consultation and document it against the patient’s record.', est: 2 },
   '/consultation': { verb: 'Document a consultation', desc: 'Write a SOAP note, record a diagnosis, and order labs or prescriptions.', est: 3 },
   '/wards': { verb: 'Manage your wards', desc: 'Admit, transfer, and discharge patients and track bed availability.', est: 2 },
   '/referrals': { verb: 'Create a referral', desc: 'Refer a patient to another facility and track the referral chain.', est: 2 },
@@ -150,6 +151,18 @@ export function getOnboardingPlan(role: UserRole): OnboardingPlan {
       estMinutes: 1,
     },
   ];
+  // The patient information screen — the full chart/record — is reached by
+  // opening a patient, so it's not a sidebar nav item and wouldn't otherwise
+  // get a tour card. Teach it explicitly for every role that can open patients.
+  if (config.allowedRoutes.includes('/patients')) {
+    basics.push({
+      id: 'patient-record',
+      title: 'Open a patient information screen',
+      description: 'Open a patient to see their full record — history, problems, medications, vitals, labs, and past visits.',
+      href: '/patients',
+      estMinutes: 1,
+    });
+  }
   if (config.allowedRoutes.includes('/settings')) {
     basics.push({
       id: 'route:/settings',
@@ -180,6 +193,7 @@ export function getOnboardingPlan(role: UserRole): OnboardingPlan {
 
   for (const item of nav) {
     if (usedHrefs.has(item.href)) continue;
+    usedHrefs.add(item.href);
     const sectionKey = item.section ?? 'MORE';
     if (!grouped.has(sectionKey)) {
       grouped.set(sectionKey, []);
@@ -196,6 +210,27 @@ export function getOnboardingPlan(role: UserRole): OnboardingPlan {
       title: titleCaseSection(key),
       subtitle: `Learn the ${titleCaseSection(key).toLowerCase()} tools you’ll use`,
       steps,
+    });
+  }
+
+  // ── Accessible tools with no sidebar nav item ───────────────────────────────
+  // Some routes a role can reach (e.g. /telehealth) aren't in the sidebar, so
+  // the nav-derived sections miss them. Sweep the role's allowed routes and add
+  // a card for any that has curated guidance but wasn't already covered, so the
+  // tour truly reaches every place the role can go.
+  const extraSteps: OnboardingStep[] = [];
+  for (const route of config.allowedRoutes) {
+    if (usedHrefs.has(route)) continue;
+    if (!ROUTE_GUIDE[route]) continue;
+    usedHrefs.add(route);
+    extraSteps.push(stepFromNav({ href: route, label: route } as NavItem));
+  }
+  if (extraSteps.length > 0) {
+    sections.push({
+      id: 'nav:MORE-TOOLS',
+      title: 'More tools',
+      subtitle: 'Extra tools you can reach',
+      steps: extraSteps,
     });
   }
 

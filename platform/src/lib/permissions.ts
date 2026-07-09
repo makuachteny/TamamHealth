@@ -604,7 +604,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
   },
 
   clinician: {
-    label: 'Clinician',
+    label: 'Doctor',
     defaultDashboard: ROLE_ROUTE_TABLE.clinician.defaultDashboard,
     allowedRoutes: [...ROLE_ROUTE_TABLE.clinician.allowed],
     navItems: [
@@ -624,7 +624,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
       { href: '/deaths', label: 'Deaths', icon: UserX, section: 'VITAL EVENTS' },
       { href: '/messages', label: 'Messages', icon: MessageSquare, section: 'MORE' },
     ],
-    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'Clinician',
+    color: BRAND_PRIMARY, gradientFrom: BRAND_SECONDARY, gradientTo: BRAND_PRIMARY, badgeLabel: 'Doctor',
   },
 
   records_hmis_officer: {

@@ -1,9 +1,4 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
-import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
-
 // Admin-oriented landing for the Medical Superintendent — the clinical
 // administrator who runs the hospital. Unlike the doctor/clinical-officer
 // `/dashboard` (SOAP / prescribe / lab quick-actions), this surfaces the
@@ -16,8 +11,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import {
-  Users, Stethoscope, HeartPulse, BedDouble, Wallet, Package,
-  ClipboardCheck, BarChart3, Activity, AlertTriangle, SendHorizontal,
+  Users, Stethoscope, HeartPulse, BedDouble,
+  ClipboardCheck, Activity, AlertTriangle, SendHorizontal,
   ChevronRight, ArrowRight,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
@@ -28,22 +23,6 @@ import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import type { LeaveRequestDoc } from '@/lib/db-types-hr';
 
 const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
-
-interface QuickAction {
-  href: string;
-  labelKey: string;
-  descKey: string;
-  Icon: typeof Users;
-}
-
-const QUICK_ACTIONS: QuickAction[] = [
-  { href: '/hr', labelKey: 'superintendent.qaHrLabel', descKey: 'superintendent.qaHrDesc', Icon: Users },
-  { href: '/wards', labelKey: 'superintendent.qaWardsLabel', descKey: 'superintendent.qaWardsDesc', Icon: BedDouble },
-  { href: '/payments', labelKey: 'superintendent.qaBillsLabel', descKey: 'superintendent.qaBillsDesc', Icon: Wallet },
-  { href: '/facility-assessments', labelKey: 'superintendent.qaFacilityLabel', descKey: 'superintendent.qaFacilityDesc', Icon: ClipboardCheck },
-  { href: '/equipment', labelKey: 'superintendent.qaEquipmentLabel', descKey: 'superintendent.qaEquipmentDesc', Icon: Package },
-  { href: '/reports', labelKey: 'superintendent.qaReportsLabel', descKey: 'superintendent.qaReportsDesc', Icon: BarChart3 },
-];
 
 export default function SuperintendentDashboard() {
   const { t } = useTranslation();
@@ -104,23 +83,6 @@ export default function SuperintendentDashboard() {
     <>
       <TopBar title={t('superintendent.topBarTitle')} />
       <main className="page-container page-enter">
-        <DashboardGreetingHeader />
-
-        <DashboardHero
-          className="mb-5"
-          stats={[
-            { label: 'Staff', value: facilityUsers.length },
-            { label: 'Pending Referrals', value: pendingReferrals.length },
-            { label: 'Active Alerts', value: activeAlerts.length },
-            { label: 'Pending Leave', value: pendingLeave.length },
-          ]}
-        />
-
-        <DashboardActionsRow
-          className="mb-5"
-          actions={QUICK_ACTIONS.slice(0, 4).map(a => ({ label: t(a.labelKey), icon: a.Icon, href: a.href }))}
-          secondaryCard={<SpotlightCard title="Active Alerts" value={activeAlerts.length} caption={`${pendingReferrals.length} pending referrals`} href="/surveillance" />}
-        />
         {/* ═══ KPI ROW ═══ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
           {kpis.map(k => (

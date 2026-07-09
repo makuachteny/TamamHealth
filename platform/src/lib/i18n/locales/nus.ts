@@ -3969,7 +3969,7 @@ const nus: TranslationMap = {
   'adminUsers.role_clinic_clerk': 'Raan Gɔ̱ɔ̱r Kliinik',
   'adminUsers.role_triage_nurse': 'Akïïm Kɔ̱n Triaj',
   'adminUsers.role_rooming_nurse': 'Akïïm Kɔ̱n Tök',
-  'adminUsers.role_clinician': 'Akïïm Loop',
+  'adminUsers.role_clinician': 'Akïïm',
   'adminUsers.role_records_hmis_officer': 'Raan Gɔ̱ɔ̱r Loop / HMIS',
   'adminUsers.role_facility_administrator': 'Raandït Aɣɔ̱k',
   'orgAdmin.pageTitle': 'Dashboard Org',

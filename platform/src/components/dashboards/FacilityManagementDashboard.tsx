@@ -1,8 +1,5 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import TodaysAppointmentsCard from '@/components/dashboard/TodaysAppointmentsCard';
-import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -20,7 +17,7 @@ import {
 import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick, AreaGradients } from '@/components/ChartCard';
 import {
   Stethoscope, Users, HeartPulse, BedDouble, ChevronRight,
-  Edit3, Trash2, Eye, ChevronDown, BarChart3,
+  Edit3, Trash2, Eye, ChevronDown,
 } from '@/components/icons/lucide';
 import { formatMoney } from '@/lib/format-utils';
 import type { MessageDoc } from '@/lib/db-types';
@@ -167,26 +164,9 @@ export default function FacilityManagementDashboard() {
       <main className="page-container page-enter">
         <div className="flex flex-col gap-5">
 
-          <DashboardGreetingHeader />
-
-          <DashboardHero
-            stats={[
-              { label: 'Patients', value: patients.length },
-              { label: 'Doctors', value: doctors.length },
-              { label: 'Nurses', value: nurses.length },
-              { label: 'Available Beds', value: availableBeds },
-            ]}
-          />
-
-          <DashboardActionsRow
-            actions={[
-              { label: 'Patients', icon: Users, href: '/patients' },
-              { label: 'Doctors & Staff', icon: Stethoscope, href: '/hr', color: '#0D9488' },
-              { label: 'Bed Management', icon: BedDouble, href: '/wards', color: 'var(--accent-primary)' },
-              { label: 'Reports', icon: BarChart3, href: '/reports', color: '#F59E0B' },
-            ]}
-            secondaryCard={<TodaysAppointmentsCard />}
-          />
+          <div style={{ maxWidth: 360 }}>
+            <TodaysAppointmentsCard />
+          </div>
 
           {/* ═══ ROW 1 — Cash Flow · Stat cards · Weekly activity ═══ */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

@@ -3949,7 +3949,7 @@ const am: TranslationMap = {
   'adminUsers.role_clinic_clerk': 'የክሊኒክ ጸሐፊ',
   'adminUsers.role_triage_nurse': 'የትሪያጅ ነርስ',
   'adminUsers.role_rooming_nurse': 'የመቀበያ ነርስ',
-  'adminUsers.role_clinician': 'ክሊኒሺያን',
+  'adminUsers.role_clinician': 'ሐኪም',
   'adminUsers.role_records_hmis_officer': 'የመዝገብ / HMIS ኦፊሰር',
   'adminUsers.role_facility_administrator': 'የተቋም አስተዳዳሪ',
   'orgAdmin.pageTitle': 'የድርጅት ዳሽቦርድ',

@@ -158,7 +158,7 @@ const en: TranslationMap = {
   'adminUsers.role_clinic_clerk': 'Clinic Clerk',
   'adminUsers.role_triage_nurse': 'Triage Nurse',
   'adminUsers.role_rooming_nurse': 'Rooming Nurse',
-  'adminUsers.role_clinician': 'Clinician',
+  'adminUsers.role_clinician': 'Doctor',
   'adminUsers.role_records_hmis_officer': 'Records / HMIS Officer',
   'adminUsers.role_facility_administrator': 'Facility Administrator',
   'adminUsers.role_medical_superintendent': 'Medical Superintendent',

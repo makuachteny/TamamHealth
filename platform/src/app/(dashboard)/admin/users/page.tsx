@@ -36,7 +36,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   clinic_clerk: 'Clinic Clerk',
   triage_nurse: 'Triage Nurse',
   rooming_nurse: 'Rooming Nurse',
-  clinician: 'Clinician',
+  clinician: 'Doctor',
   records_hmis_officer: 'Records / HMIS Officer',
   facility_administrator: 'Facility Administrator',
 };

@@ -3970,7 +3970,7 @@ const ar: TranslationMap = {
   'adminUsers.role_clinic_clerk': 'كاتب العيادة',
   'adminUsers.role_triage_nurse': 'ممرض الفرز',
   'adminUsers.role_rooming_nurse': 'ممرض الاستقبال',
-  'adminUsers.role_clinician': 'طبيب سريري',
+  'adminUsers.role_clinician': 'طبيب',
   'adminUsers.role_records_hmis_officer': 'مسؤول السجلات / نظام المعلومات الصحية',
   'adminUsers.role_facility_administrator': 'مدير المرفق',
   'orgAdmin.pageTitle': 'لوحة تحكم المؤسسة',

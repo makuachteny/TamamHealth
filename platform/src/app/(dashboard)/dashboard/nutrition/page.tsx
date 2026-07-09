@@ -1,22 +1,16 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
-import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
-
 import { useMemo, useState } from 'react';
 import TopBar from '@/components/TopBar';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { isPathAllowed } from '@/lib/role-routes';
 import { useNutritionScreenings } from '@/lib/hooks/useNutritionScreenings';
 import { classifyScreening, MUAC_THRESHOLDS } from '@/lib/services/nutrition-screening-service';
 import {
   AlertTriangle, CheckCircle2, TrendingDown,
   Baby, HeartPulse, BarChart3, Activity, Scale,
-  Utensils, Droplets, Users, MessageSquare, Plus, X,
+  Utensils, Droplets, Plus, X,
 } from '@/components/icons/lucide';
 
 // Use the platform accent token so this dashboard matches the reference
@@ -164,29 +158,6 @@ export default function NutritionDashboard() {
     <>
       <TopBar title={t('nutrition.title')} />
       <main className="page-container page-enter">
-
-        <DashboardGreetingHeader />
-
-        <DashboardHero
-          className="mb-5"
-          stats={[
-            { label: 'Screenings', value: stats.total },
-            { label: 'SAM', value: stats.sam },
-            { label: 'MAM', value: stats.mam },
-            { label: 'At Risk', value: stats.atRisk },
-          ]}
-        />
-
-        <DashboardActionsRow
-          className="mb-5"
-          actions={[
-            { label: 'All Patients', icon: Users, href: '/patients' },
-            { label: 'ANC Visits', icon: HeartPulse, href: '/anc', color: '#EC4899' },
-            { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
-            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#0D9488' },
-          ].filter(action => isPathAllowed(currentUser.role, action.href))}
-          secondaryCard={<SpotlightCard title="Acute Malnutrition (SAM)" value={stats.sam} caption={`${stats.mam} MAM · ${stats.atRisk} at risk`} />}
-        />
 
         {IS_DEMO && <DemoModeBanner />}
 

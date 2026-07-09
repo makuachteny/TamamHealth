@@ -3971,7 +3971,7 @@ const sw: TranslationMap = {
   'adminUsers.role_clinic_clerk': 'Karani wa Kliniki',
   'adminUsers.role_triage_nurse': 'Muuguzi wa Triaji',
   'adminUsers.role_rooming_nurse': 'Muuguzi wa Mapokezi',
-  'adminUsers.role_clinician': 'Mtaalamu wa Tiba',
+  'adminUsers.role_clinician': 'Daktari',
   'adminUsers.role_records_hmis_officer': 'Afisa wa Rekodi / HMIS',
   'adminUsers.role_facility_administrator': 'Msimamizi wa Kituo',
   'orgAdmin.pageTitle': 'Dashibodi ya Shirika',

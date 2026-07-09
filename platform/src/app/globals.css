@@ -5368,18 +5368,18 @@ thead th {
 .ehr-clinical-dashboard-header .ehr-care-greeting {
   margin: 0;
   white-space: nowrap;
-  min-height: 36px;
+  min-height: 32px;
   display: flex;
   align-items: center;
   font-family: var(--font-platform);
   font-weight: 700;
-  font-size: 24px;
+  font-size: 18px;
   line-height: 1;
   letter-spacing: 0;
 }
 
 .ehr-clinical-dashboard-header .ehr-greeting-row {
-  min-height: 36px;
+  min-height: 32px;
   align-items: center;
 }
 

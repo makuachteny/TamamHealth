@@ -3972,7 +3972,7 @@ const fr: TranslationMap = {
   'adminUsers.role_clinic_clerk': 'Agent de clinique',
   'adminUsers.role_triage_nurse': 'Infirmier de triage',
   'adminUsers.role_rooming_nurse': 'Infirmier d\'accueil',
-  'adminUsers.role_clinician': 'Clinicien',
+  'adminUsers.role_clinician': 'Médecin',
   'adminUsers.role_records_hmis_officer': 'Responsable des dossiers / SIS',
   'adminUsers.role_facility_administrator': 'Administrateur de l\'établissement',
   'orgAdmin.pageTitle': 'Tableau de bord de l\'organisation',

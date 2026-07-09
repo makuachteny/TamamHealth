@@ -15,10 +15,10 @@ import { getSettings, subscribeSettings } from '@/lib/settings/settings-store';
 
 const LOCK_TIMEOUT_KEY = 'tamamhealth-lock-timeout';
 const PIN_HASH_KEY = 'tamamhealth-pin-hash';
-/** Default idle timeout before auto-lock. 2 minutes balances clinical
+/** Default idle timeout before auto-lock. 10 minutes balances clinical
  *  workflow (providers don't get locked mid-consult) against shared-device
  *  risk (shift change in a ward). Override via org config or localStorage. */
-const DEFAULT_TIMEOUT_MS = 120_000;
+const DEFAULT_TIMEOUT_MS = 600_000;
 
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll'] as const;
 

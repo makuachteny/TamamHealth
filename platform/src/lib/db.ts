@@ -261,7 +261,11 @@ export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
 // today bookings draw from a shared slot allocator (and the handful of static
 // rows that collided were re-timed), so the day calendar shows one
 // appointment per slot.
-export const SEED_VERSION = 44;
+// Bumped to 45: added an active inpatient admission at Wau State Hospital
+// (admission-6 / bed-9, pat-00063) — that facility previously had zero
+// currently-admitted patients, so the day-activity chart always read
+// "0 inpatient" for the Clinical Officer demo account.
+export const SEED_VERSION = 45;
 
 export async function isSeeded(): Promise<boolean> {
   try {

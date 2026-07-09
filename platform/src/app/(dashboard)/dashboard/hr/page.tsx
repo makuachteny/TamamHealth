@@ -1,6 +1,4 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -8,7 +6,7 @@ import Link from 'next/link';
 import TopBar from '@/components/TopBar';
 import {
   Users, Calendar, Clock, CheckCircle2, AlertCircle, ChevronRight,
-  Plus, ArrowRight, Wallet, Activity, BarChart3,
+  Plus, ArrowRight, Wallet, Activity,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -99,26 +97,9 @@ export default function HRDashboardPage() {
     <>
       <TopBar title={t('hr.dashboardTitle')} />
       <main className="page-container page-enter">
-        <DashboardHero
-          className="mb-5"
-          stats={[
-            { label: 'Staff', value: facilityUsers.length },
-            { label: 'Present Today', value: presentToday },
-            { label: 'On Leave', value: onLeaveToday.length },
-            { label: 'On Call', value: onCallToday },
-          ]}
-        />
-
-        <DashboardActionsRow
-          className="mb-5"
-          actions={[
-            { label: 'Staff Directory', icon: Users, href: '/hr' },
-            { label: 'Schedules', icon: Calendar, href: '/hr?tab=schedule', color: 'var(--accent-primary)' },
-            { label: 'Payroll', icon: Wallet, href: '/payments', color: '#0D9488' },
-            { label: 'Reports', icon: BarChart3, href: '/reports', color: '#F59E0B' },
-          ]}
-          secondaryCard={<SpotlightCard title="Pending Leave" value={pendingLeave.length} caption={`${onLeaveToday.length} on leave today`} href="/hr?tab=leave" />}
-        />
+        <div className="mb-5" style={{ maxWidth: 360 }}>
+          <SpotlightCard title="Pending Leave" value={pendingLeave.length} caption={`${onLeaveToday.length} on leave today`} href="/hr?tab=leave" />
+        </div>
         <div className="flex items-end justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
           <div>
             <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>{t('hr.dashboardTitle')}</h1>

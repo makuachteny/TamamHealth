@@ -1,14 +1,9 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
-import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
-
 import { useApp } from '@/lib/context';
 import TopBar from '@/components/TopBar';
 import RoleGuard from '@/components/RoleGuard';
 import {
-  Baby, Skull, HeartPulse, Syringe, Building2, MapPin, Activity, BarChart3,
+  Baby, Skull, HeartPulse, Syringe, MapPin, Building2,
 } from '@/components/icons/lucide';
 import { useMCHAnalytics } from '@/lib/hooks/useMCHAnalytics';
 import { useBirths } from '@/lib/hooks/useBirths';
@@ -82,33 +77,11 @@ export default function StateDashboardPage() {
       <TopBar title={t('state.title')} />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
-        <DashboardGreetingHeader />
-
-        <DashboardHero
-          className="mb-5"
-          stats={[
-            { label: 'Births (mo)', value: stateBirthsThisMonth },
-            { label: 'Deaths (mo)', value: stateDeathsThisMonth },
-            { label: 'Facilities', value: facilitiesInState.length },
-            { label: 'ANC-1 Rate', value: `${anc1Rate}%` },
-          ]}
-        />
-
-        <DashboardActionsRow
-          className="mb-5"
-          actions={[
-            { label: 'Hospitals', icon: Building2, href: '/hospitals' },
-            { label: 'MCH Analytics', icon: HeartPulse, href: '/mch-analytics', color: '#EC4899' },
-            { label: 'Surveillance', icon: Activity, href: '/surveillance', color: 'var(--color-danger-500)' },
-            { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
-          ]}
-          secondaryCard={<SpotlightCard title="ANC-1 Coverage" value={`${anc1Rate}%`} caption={`${facilitiesInState.length} facilities in state`} href="/mch-analytics" />}
-        />
-
         {/* ═══ KPI TILES ═══ */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-4">
           <Kpi label={t('state.birthsThisMonth')} value={stateBirthsThisMonth} icon={Baby} />
           <Kpi label={t('state.deathsThisMonth')} value={stateDeathsThisMonth} icon={Skull} />
+          <Kpi label="Facilities" value={facilitiesInState.length} icon={Building2} />
           <Kpi label={t('state.anc1Coverage')} value={`${anc1Rate}%`} icon={HeartPulse} />
           <Kpi label={t('state.immunizationsYtd')} value={immStats?.totalVaccinations ?? 0} icon={Syringe} />
         </div>

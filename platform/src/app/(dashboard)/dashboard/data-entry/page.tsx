@@ -1,9 +1,4 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
-import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
-
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
@@ -11,7 +6,6 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useToast } from '@/components/Toast';
-import { isPathAllowed } from '@/lib/role-routes';
 import {
   ClipboardCheck, Baby, Skull, Syringe, HeartPulse,
   Database, Building2, ArrowRight, CheckCircle2, AlertTriangle,
@@ -259,31 +253,6 @@ export default function DataEntryDashboard() {
       <TopBar title={t('dataEntry.title')} />
       <main className="page-container page-enter">
 
-        <DashboardGreetingHeader />
-
-        <DashboardHero
-          className="mb-5"
-          stats={[
-            { label: 'Beds', value: myHospital?.totalBeds ?? 0 },
-            { label: 'Doctors', value: myHospital?.doctors ?? 0 },
-            { label: 'Nurses', value: myHospital?.nurses ?? 0 },
-            { label: 'Profile', value: `${facilityStats?.pct ?? 0}%` },
-          ]}
-        />
-
-        <DashboardActionsRow
-          className="mb-5"
-          actions={[
-            { label: 'My Facility', icon: Building2, href: '/my-facility' },
-            { label: 'All Patients', icon: Users, href: '/patients', color: '#0D9488' },
-            { label: 'Data Quality', icon: ClipboardCheck, href: '/data-quality', color: 'var(--accent-primary)' },
-            { label: 'Reports', icon: BarChart3, href: '/reports', color: '#F59E0B' },
-          ].filter(action => isPathAllowed(currentUser.role, action.href))}
-          secondaryCard={isPathAllowed(currentUser.role, '/my-facility') ? (
-            <SpotlightCard title="Profile Completeness" value={`${facilityStats?.pct ?? 0}%`} caption="facility profile filled" href="/my-facility" />
-          ) : undefined}
-        />
-
         {/* Facility banner */}
         {myHospital && (
           <div className="dash-card mb-4">
@@ -320,6 +289,9 @@ export default function DataEntryDashboard() {
             { label: t('dashboard.bedOccupancy'), value: latest ? `${bedOccupancy}%` : '--', icon: BedDouble, color: bedOccupancy > 90 ? 'var(--color-danger)' : bedOccupancy > 70 ? 'var(--color-warning)' : 'var(--color-success)' },
             { label: t('dataEntry.kpiMedicineAvail'), value: latest ? `${medAvailability}%` : '--', icon: Pill, color: medAvailability >= 80 ? 'var(--color-success)' : medAvailability >= 50 ? 'var(--color-warning)' : 'var(--color-danger)' },
             { label: t('dataEntry.kpiReportsFiled'), value: savedReports.length, icon: FileText, color: ACCENT },
+            { label: 'Beds', value: myHospital?.totalBeds ?? 0, icon: BedDouble, color: ACCENT },
+            { label: 'Doctors', value: myHospital?.doctors ?? 0, icon: Stethoscope, color: ACCENT },
+            { label: 'Nurses', value: myHospital?.nurses ?? 0, icon: Users, color: ACCENT },
           ].map(k => (
             <div key={k.label} className="dash-card" style={{ padding: '14px 16px' }}>
               <div className="flex items-center gap-2 mb-2">

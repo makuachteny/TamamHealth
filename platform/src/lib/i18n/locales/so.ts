@@ -3949,7 +3949,7 @@ const so: TranslationMap = {
   'adminUsers.role_clinic_clerk': 'Karraani Rugta Caafimaad',
   'adminUsers.role_triage_nurse': 'Kalkaaliye Qiimaynta',
   'adminUsers.role_rooming_nurse': 'Kalkaaliye Soo-dhaweynta',
-  'adminUsers.role_clinician': 'Dhakhtar Caafimaad',
+  'adminUsers.role_clinician': 'Dhakhtar',
   'adminUsers.role_records_hmis_officer': 'Sarkaalka Diiwaanka / HMIS',
   'adminUsers.role_facility_administrator': 'Maamulaha Xarunta',
   'orgAdmin.pageTitle': 'Dashboard-ka Hay\'adda',

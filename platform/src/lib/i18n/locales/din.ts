@@ -3967,7 +3967,7 @@ const din: TranslationMap = {
   'adminUsers.role_clinic_clerk': 'Raan Taau de Kliinik',
   'adminUsers.role_triage_nurse': 'Akïm de Kony de Triaj',
   'adminUsers.role_rooming_nurse': 'Akïm de Kony de Loor',
-  'adminUsers.role_clinician': 'Akïm de Aciɛɛn',
+  'adminUsers.role_clinician': 'Akïm',
   'adminUsers.role_records_hmis_officer': 'Raan Tiit de Wɛ̈t / HMIS',
   'adminUsers.role_facility_administrator': 'Raandït de Aciɛɛn',
   'orgAdmin.pageTitle': 'Dashboard de Akut',

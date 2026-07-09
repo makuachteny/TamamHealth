@@ -3949,7 +3949,7 @@ const pt: TranslationMap = {
   'adminUsers.role_clinic_clerk': 'Auxiliar de Clínica',
   'adminUsers.role_triage_nurse': 'Enfermeiro de Triagem',
   'adminUsers.role_rooming_nurse': 'Enfermeiro de Acolhimento',
-  'adminUsers.role_clinician': 'Clínico',
+  'adminUsers.role_clinician': 'Médico',
   'adminUsers.role_records_hmis_officer': 'Oficial de Registos / SIS',
   'adminUsers.role_facility_administrator': 'Administrador da Unidade',
   'orgAdmin.pageTitle': 'Painel da Organização',

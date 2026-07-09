@@ -1,9 +1,4 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
-import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
-
 import { useState, useMemo, useRef } from 'react';
 import TopBar from '@/components/TopBar';
 import DemoModeBanner from '@/components/DemoModeBanner';
@@ -13,11 +8,10 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
 import { addPatientDocument } from '@/lib/services/patient-document-service';
-import { isPathAllowed } from '@/lib/role-routes';
 import {
   Scan, Upload, CheckCircle2, Clock, AlertTriangle,
   FileText, BarChart3, TrendingUp, Eye,
-  Image, Activity, Users, MessageSquare,
+  Image, Activity,
 } from '@/components/icons/lucide';
 import PatientName from '@/components/PatientName';
 
@@ -228,29 +222,6 @@ export default function RadiologyDashboard() {
         style={{ display: 'none' }}
       />
       <main className="page-container page-enter">
-
-        <DashboardGreetingHeader />
-
-        <DashboardHero
-          className="mb-5"
-          stats={[
-            { label: 'Studies', value: stats.total },
-            { label: 'Pending', value: stats.pending },
-            { label: 'In Progress', value: stats.inProgress },
-            { label: 'Urgent', value: stats.urgent },
-          ]}
-        />
-
-        <DashboardActionsRow
-          className="mb-5"
-          actions={[
-            { label: 'All Patients', icon: Users, href: '/patients' },
-            { label: 'Imaging Queue', icon: Scan, href: '/lab', color: 'var(--accent-primary)' },
-            { label: 'Reports', icon: BarChart3, href: '/reports', color: '#0D9488' },
-            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#F59E0B' },
-          ].filter(action => isPathAllowed(currentUser.role, action.href))}
-          secondaryCard={<SpotlightCard title="Urgent Studies" value={stats.urgent} caption={`${stats.pending} pending · ${stats.inProgress} in progress`} />}
-        />
 
         {IS_DEMO && <DemoModeBanner />}
 

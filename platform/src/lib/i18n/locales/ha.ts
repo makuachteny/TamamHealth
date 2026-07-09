@@ -3949,7 +3949,7 @@ const ha: TranslationMap = {
   'adminUsers.role_clinic_clerk': 'Magatakardar Asibiti',
   'adminUsers.role_triage_nurse': 'Nas na Tantancewa',
   'adminUsers.role_rooming_nurse': 'Nas na Karɓar Marasa Lafiya',
-  'adminUsers.role_clinician': 'Ma\'aikacin Jinya',
+  'adminUsers.role_clinician': 'Likita',
   'adminUsers.role_records_hmis_officer': 'Jami\'in Bayanai / HMIS',
   'adminUsers.role_facility_administrator': 'Manajan Cibiya',
   'orgAdmin.pageTitle': 'Dashboard na Ƙungiya',
