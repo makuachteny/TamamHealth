@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, CheckCircle2, ChevronLeft, ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
+import { CheckCircle2, ChevronLeft, ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import EhrMiniCalendar, { formatDateTitle, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { initials, stateColor } from '@/lib/patient-utils';
 
@@ -74,8 +74,6 @@ export default function EhrCareDashboard({
   title,
   greetingName,
   dateLabel,
-  activeView = 'dashboard',
-  onViewChange,
   tabs,
   activeTab,
   onTabChange,
@@ -110,8 +108,6 @@ export default function EhrCareDashboard({
   eyebrow?: string;
   greetingName?: string;
   dateLabel: string;
-  activeView?: 'dashboard' | 'calendar';
-  onViewChange?: (view: 'dashboard' | 'calendar') => void;
   tabs: EhrCareDashboardTab[];
   activeTab: string;
   onTabChange: (tab: string) => void;
@@ -150,8 +146,10 @@ export default function EhrCareDashboard({
 }) {
   const router = useRouter();
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
-  const [internalView, setInternalView] = useState<'dashboard' | 'calendar'>(activeView);
-  const effectiveView = onViewChange ? activeView : internalView;
+  // The calendar main-view toggle was removed — the dashboard is the only view
+  // for all users. Typed as the union so the (now-inert) calendar branches below
+  // still compile; the mini-calendar sidebar (showCalendar) is unaffected.
+  const effectiveView = 'dashboard' as 'dashboard' | 'calendar';
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
   // Clicking a row opens a right-side detail slider where the actions live,
@@ -165,10 +163,6 @@ export default function EhrCareDashboard({
     if (!showCalendar || effectiveView !== 'calendar' || rowEventDates.length === 0) return rows;
     return rows.filter(row => row.date === selectedDate);
   }, [effectiveView, rowEventDates.length, rows, selectedDate, showCalendar]);
-  const setView = (view: 'dashboard' | 'calendar') => {
-    setInternalView(view);
-    onViewChange?.(view);
-  };
   const selectedDateLabel = showCalendar ? formatDateTitle(selectedDate) : dateLabel;
   const headerActions = actions.slice(0, 3);
   const railActions = actions.slice(3);
@@ -178,12 +172,9 @@ export default function EhrCareDashboard({
     <div className="ehr-schedule-shell ehr-care-dashboard">
       <section className="ehr-schedule-header ehr-clinical-dashboard-header ehr-care-dashboard-header">
         <div className="ehr-clinical-dashboard-tabs">
-          <div className="ehr-segmented" aria-label="Dashboard view" role="tablist">
-            <button type="button" className={effectiveView === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>
+          <div className="ehr-segmented ehr-segmented-single" aria-label="Dashboard view" role="tablist">
+            <button type="button" className="active">
               <CheckCircle2 className="w-4 h-4" />Dashboard
-            </button>
-            <button type="button" className={effectiveView === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')}>
-              <Calendar className="w-4 h-4" />Calendar
             </button>
           </div>
         </div>

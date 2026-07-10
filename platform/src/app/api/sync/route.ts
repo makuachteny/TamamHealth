@@ -76,13 +76,10 @@
  *                                     staff review/merge into the chart.
  *                                     Facility-operational workflow state, not
  *                                     a national analytics target.
- *   - tamamhealth_nutrition_screenings  TODO(national-analytics): malnutrition
- *                                     (SAM/MAM) IS a national/DHIS2 MCH
- *                                     indicator and SHOULD eventually reach the
- *                                     national store. Excluded for now because
- *                                     no writeback table/mapper exists yet;
- *                                     wire up a DB_TABLE_MAP + FIELD_MAPPER +
- *                                     sync-worker entry to promote it.
+ *
+ * (tamamhealth_nutrition_screenings now HAS a national projection —
+ * SAM/MAM is a DHIS2 MCH indicator — via DB_TABLE_MAP + FIELD_MAPPER +
+ * migration 0008, so it is no longer excluded.)
  *
  * All remaining databases land in DB_TABLE_MAP below; a missing entry causes a
  * 400 from this route, so the sync-worker surfaces a hard failure rather than
@@ -180,6 +177,9 @@ const DB_TABLE_MAP: Record<string, string> = {
   tamamhealth_payment_plans: 'payment_plans',
   tamamhealth_invoices: 'invoices',
   tamamhealth_ledger: 'ledger_entries',
+  // Nutrition screening — SAM/MAM is a national/DHIS2 MCH indicator.
+  // Table definition lives in `0008_nutrition_screenings_writeback.sql`.
+  tamamhealth_nutrition_screenings: 'nutrition_screenings',
 };
 
 // A few CouchDB databases co-locate several doc `type`s in one database. The
@@ -368,6 +368,27 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
     state: doc.state,
     county: doc.county,
     certificate_number: doc.certificateNumber,
+    org_id: doc.orgId,
+    created_at: doc.createdAt,
+    updated_at: doc.updatedAt,
+  }),
+
+  nutrition_screenings: (doc) => ({
+    id: doc._id,
+    patient_id: doc.patientId,
+    patient_name: doc.patientName,
+    age: doc.age,
+    sex: doc.sex,
+    muac: doc.muac,
+    weight_kg: doc.weightKg,
+    height_cm: doc.heightCm,
+    edema: doc.edema,
+    is_anc: doc.isAnc,
+    status: doc.status,
+    screening_date: doc.screeningDate,
+    screened_by_id: doc.screenedById,
+    screened_by_name: doc.screenedByName,
+    hospital_id: doc.hospitalId,
     org_id: doc.orgId,
     created_at: doc.createdAt,
     updated_at: doc.updatedAt,

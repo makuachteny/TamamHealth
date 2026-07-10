@@ -90,6 +90,8 @@ const ALLOWED_TABLES = new Set<string>([
   // every bed/admission upsert was rejected and dropped — revived here.
   'beds',
   'admissions',
+  // Nutrition screening writeback (see migrations/0008_nutrition_screenings_writeback.sql).
+  'nutrition_screenings',
   'blood_bank',
   'emergency_plans',
   'assets',
@@ -227,6 +229,9 @@ const ALLOWED_COLUMNS = new Set<string>([
   'discharge_date', 'discharge_type', 'discharge_diagnosis', 'discharged_by',
   'discharged_by_name', 'follow_up_date', 'length_of_stay', 'transferred_from',
   'transferred_to',
+  // Nutrition screening writeback (migrations/0008_nutrition_screenings_writeback.sql).
+  'sex', 'muac', 'weight_kg', 'height_cm', 'edema', 'is_anc', 'screening_date',
+  'screened_by_id', 'screened_by_name',
 ]);
 
 // Final defence: every identifier must match a strict pattern. This catches
@@ -352,6 +357,7 @@ export const TABLE_CONFLICT_POLICY: Record<string, ConflictPolicy> = {
   // national tables (inpatient occupancy & admission/discharge analytics).
   beds: ConflictPolicy.LAST_WRITE_WINS,
   admissions: ConflictPolicy.LAST_WRITE_WINS,
+  nutrition_screenings: ConflictPolicy.LAST_WRITE_WINS,
   blood_bank: ConflictPolicy.LAST_WRITE_WINS,
   assets: ConflictPolicy.LAST_WRITE_WINS,
   staff_schedules: ConflictPolicy.LAST_WRITE_WINS,

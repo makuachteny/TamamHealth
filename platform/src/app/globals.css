@@ -4444,6 +4444,14 @@ thead th {
   border-radius: 999px;
 }
 
+/* Calendar view was removed: the toggle is now a single Dashboard pill, so drop
+   the surrounding segmented track and let the lone pill stand on its own. */
+.ehr-segmented.ehr-segmented-single {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
 .ehr-segmented button,
 .ehr-schedule-actions button,
 .ehr-clinical-strip button {

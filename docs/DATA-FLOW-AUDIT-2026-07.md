@@ -89,14 +89,18 @@ the aggregated store, or (b) formally retire the unused Postgres writeback and a
   (`sync-worker/index.mjs`) now holds the checkpoint and retries a batch that reported errors; after a
   bounded number of attempts it advances past and **loudly dead-letters** (logs the dropped docs) so a
   single permanently-bad doc can't stall the stream forever, and transient failures are no longer silently lost.
-- [ ] **Nutrition SAM/MAM has no national path and no dashboard.** `nutrition_screenings` is captured but
-  has no writeback table/mapper (deferred TODO) and no dashboard reads it — malnutrition, a DHIS2 MCH
-  indicator, is invisible nationally. Refs: `sync/route.ts` exclusion TODO.
+- [x] **Nutrition SAM/MAM has no national path.** `nutrition_screenings` was captured but had no writeback
+  table/mapper (deferred TODO) — malnutrition, a DHIS2 MCH indicator, was invisible nationally. FIXED
+  2026-07: added the `nutrition_screenings` projection table (migration `0008`), a `FIELD_MAPPER` + `DB_TABLE_MAP`
+  entry (`sync/route.ts`), the `postgres.ts` allowlist/conflict-policy entries, the sync-worker `FALLBACK_DBS`
+  entry, and removed it from the national-sync exclusions (coverage guard now enforces the path). *Read side
+  still pending the national-analytics read-path decision — this completes capture→Postgres, not a dashboard.*
 - [ ] **Field-completeness drops in mappers:** death cause-of-death chain (WHO antecedent/contributing
   causes), immunization AEFI detail, triage vitals, facility IPC/WASH readiness are all dropped before
   Postgres. Refs: `sync/route.ts` mappers vs `db-types.ts` docs.
 - [ ] **Orphans/drift:** `patient_feedback` (Postgres table + policy + FALLBACK entry, but no sync-config
-  source and no mapper); `FALLBACK_DBS` still lists dropped `boma_visits`. Refs: `sync-worker/index.mjs`.
+  source and no mapper) — still open. ~~`FALLBACK_DBS` still lists dropped `boma_visits`~~ FIXED 2026-07:
+  removed the dead `boma_visits` entry from the sync-worker `FALLBACK_DBS`. Refs: `sync-worker/index.mjs`.
 
 ---
 

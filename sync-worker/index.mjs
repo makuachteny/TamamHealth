@@ -57,7 +57,6 @@ const FALLBACK_DBS = Object.freeze([
   'tamamhealth_deaths',
   'tamamhealth_immunizations',
   'tamamhealth_anc',
-  'tamamhealth_boma_visits',
   'tamamhealth_facility_assessments',
   'tamamhealth_audit_log',
   'tamamhealth_organizations',
@@ -93,6 +92,9 @@ const FALLBACK_DBS = Object.freeze([
   'tamamhealth_payment_plans',
   'tamamhealth_invoices',
   'tamamhealth_ledger',
+  // Nutrition screening writeback (SAM/MAM MCH indicator). Keep aligned with
+  // DB_TABLE_MAP in platform/src/app/api/sync/route.ts.
+  'tamamhealth_nutrition_screenings',
 ]);
 
 /**

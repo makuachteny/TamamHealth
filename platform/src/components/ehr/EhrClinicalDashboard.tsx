@@ -264,7 +264,8 @@ export default function EhrClinicalDashboard({
   }, [providerOptions]);
 
   useEffect(() => {
-    setView(searchParams.get('view') === 'calendar' ? 'calendar' : 'dashboard');
+    // Calendar view was removed — the dashboard is the only view for all users.
+    setView('dashboard');
   }, [searchParams]);
 
   const matchesProviderFilter = useCallback((appointment: AppointmentDoc) => {
@@ -338,12 +339,9 @@ export default function EhrClinicalDashboard({
     <div className="ehr-schedule-shell">
       <section className="ehr-schedule-header ehr-clinical-dashboard-header">
         <div className="ehr-clinical-dashboard-tabs">
-          <div className="ehr-segmented" role="tablist">
-            <button type="button" className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')} aria-label="Dashboard">
+          <div className="ehr-segmented ehr-segmented-single">
+            <button type="button" className="active" aria-label="Dashboard">
               <LayoutDashboard className="w-4 h-4" /> Dashboard
-            </button>
-            <button type="button" className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')} aria-label="Calendar">
-              <Calendar className="w-4 h-4" /> Calendar
             </button>
           </div>
         </div>
