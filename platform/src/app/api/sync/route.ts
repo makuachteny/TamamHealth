@@ -244,19 +244,30 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
     updated_at: doc.updatedAt,
   }),
 
-  medical_records: (doc) => ({
-    id: doc._id,
-    patient_id: doc.patientId,
-    hospital_id: doc.hospitalId,
-    record_type: doc.recordType,
-    diagnosis: doc.diagnosis,
-    icd11_code: doc.icd11Code,
-    severity: doc.severity,
-    visit_date: doc.visitDate,
-    org_id: doc.orgId,
-    created_at: doc.createdAt,
-    updated_at: doc.updatedAt,
-  }),
+  medical_records: (doc) => {
+    // A medical record carries a `diagnoses: Diagnosis[]` array, not top-level
+    // diagnosis scalars. Flatten the primary diagnosis (fall back to the first)
+    // so national morbidity analytics get the coded diagnosis instead of NULLs.
+    const diagnoses = Array.isArray(doc.diagnoses)
+      ? (doc.diagnoses as Array<Record<string, unknown>>)
+      : [];
+    const primary = diagnoses.find((d) => d.type === 'primary') ?? diagnoses[0];
+    return {
+      id: doc._id,
+      patient_id: doc.patientId,
+      hospital_id: doc.hospitalId,
+      record_type: doc.visitType,
+      diagnosis: primary?.name,
+      // The platform codes in ICD-11; the value lives in either slot depending
+      // on write path, so prefer icd11Code and fall back to icd10Code.
+      icd11_code: primary?.icd11Code ?? primary?.icd10Code,
+      severity: primary?.severity,
+      visit_date: doc.visitDate,
+      org_id: doc.orgId,
+      created_at: doc.createdAt,
+      updated_at: doc.updatedAt,
+    };
+  },
 
   lab_results: (doc) => ({
     id: doc._id,

@@ -85,6 +85,11 @@ const ALLOWED_TABLES = new Set<string>([
   'pharmacy_inventory',
   'telehealth_sessions',
   'wards',
+  // Ward inpatient writeback (see migrations/0006_ward_inpatient_writeback.sql).
+  // The FIELD_MAPPERS + migration existed but these were never allowlisted, so
+  // every bed/admission upsert was rejected and dropped — revived here.
+  'beds',
+  'admissions',
   'blood_bank',
   'emergency_plans',
   'assets',
@@ -211,6 +216,17 @@ const ALLOWED_COLUMNS = new Set<string>([
   'total_due', 'issued_date', 'due_date', 'sent_via', 'viewed_at',
   'paid_at',
   'entry_type', 'running_balance', 'reference_id', 'reference_type', // ledger_entries
+  // Ward inpatient writeback (migrations/0006_ward_inpatient_writeback.sql).
+  // beds:
+  'bed_number', 'ward_id', 'ward_name', 'current_patient_id',
+  'current_patient_name', 'current_admission_id', 'last_cleaned_at',
+  // admissions:
+  'admission_date', 'admitting_diagnosis', 'admitted_by', 'admitted_by_name',
+  'bed_id', 'attending_physician', 'attending_physician_name', 'nurse_assigned',
+  'nurse_assigned_name', 'isolation_required', 'isolation_reason',
+  'discharge_date', 'discharge_type', 'discharge_diagnosis', 'discharged_by',
+  'discharged_by_name', 'follow_up_date', 'length_of_stay', 'transferred_from',
+  'transferred_to',
 ]);
 
 // Final defence: every identifier must match a strict pattern. This catches

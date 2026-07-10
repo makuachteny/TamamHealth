@@ -2040,7 +2040,14 @@ export interface VitalSigns {
 }
 
 export interface Diagnosis {
+  /** Legacy/compat code field. NOTE: the consultation writes the ICD-11 code
+   *  here too (many readers key off `icd10Code`), so prefer `icd11Code` +
+   *  `codeSystem` below when the coding system matters (interop / DHIS2). */
   icd10Code: string;
+  /** ICD-11 (MMS) code — the system this platform actually codes in. */
+  icd11Code?: string;
+  /** Coding system for the codes above, e.g. 'ICD-11-MMS'. */
+  codeSystem?: string;
   name: string;
   type: 'primary' | 'secondary' | 'differential';
   certainty: 'confirmed' | 'suspected';

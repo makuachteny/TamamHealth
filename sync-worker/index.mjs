@@ -310,7 +310,28 @@ async function pollDatabase({ env, state, db }) {
 
   // CouchDB's `last_seq` is authoritative; fall back to the final entry's seq.
   const newSeq = String(result.last_seq ?? mapped[mapped.length - 1]?.seq ?? since);
-  state[db] = { seq: newSeq, lastUpdated: new Date().toISOString() };
+
+  // Fail-forward guard: if /api/sync reported per-doc errors, do NOT silently
+  // advance the checkpoint past them — that was permanent, un-retried data
+  // loss (a mapper/schema mismatch dropped every affected doc once, forever).
+  // Instead hold the checkpoint so the batch retries next tick; after a bounded
+  // number of attempts, advance past and loudly dead-letter it, so a single
+  // permanently-bad doc can't stall the whole database's stream forever.
+  const errorCount = resp && typeof resp.errors === 'number' ? resp.errors : 0;
+  if (errorCount > 0) {
+    const MAX_ERROR_RETRIES = 5;
+    const retries = (state[db]?.errorRetries || 0) + 1;
+    if (retries < MAX_ERROR_RETRIES) {
+      log('error', `${db}: /api/sync reported ${errorCount} error(s); holding checkpoint for retry`, { since, retry: retries, max: MAX_ERROR_RETRIES });
+      state[db] = { seq: since, errorRetries: retries, lastUpdated: new Date().toISOString() };
+      return { db, processed: changes.length, advancedTo: since, response: resp, heldForRetry: true };
+    }
+    log('error', `${db}: DEAD-LETTER — ${errorCount} doc(s) failed ${MAX_ERROR_RETRIES} retries; advancing past to unblock the stream. Those docs did NOT reach national analytics — investigate /api/sync logs`, { from: since, to: newSeq });
+    state[db] = { seq: newSeq, errorRetries: 0, lastUpdated: new Date().toISOString() };
+    return { db, processed: changes.length, advancedTo: newSeq, response: resp, deadLettered: errorCount };
+  }
+
+  state[db] = { seq: newSeq, errorRetries: 0, lastUpdated: new Date().toISOString() };
   return { db, processed: changes.length, advancedTo: newSeq, response: resp };
 }
 

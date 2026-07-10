@@ -8,7 +8,7 @@ sync/mapping, read/dashboards, and workflow handoffs + tenant scoping.
 
 There are **two disconnected national pipelines**:
 
-```
+```text
 WRITE:  capture → local PouchDB → CouchDB → sync-worker → /api/sync → PostgreSQL   ⟶ (nothing reads it)
 READ:   CouchDB → local PouchDB → client-side aggregation → "national" dashboards
 ```
@@ -60,10 +60,12 @@ the aggregated store, or (b) formally retire the unused Postgres writeback and a
 - [ ] **Geographic scoping defined but never enforced.** `county/payam/state` are dropped by both
   `useDataScope` and `filterByScope`; a `county_health_director` with no orgId falls through both
   filters → over-broad PHI access. Refs: `data-scope.ts:42-103`, `useDataScope.ts:20-24`.
-- [ ] **ICD-11 codes stored in the `icd10Code` field.** `consultation/page.tsx` writes the ICD-11
-  value into a slot named `icd10Code`, with `codeSystem`/`icd11Code` invisible to typed readers →
-  coding/interop corruption (affects DHIS2 export). `Diagnosis` type has no `icd11Code`/`codeSystem`.
-  Refs: `consultation/page.tsx` diagnoses map, `mock.ts` `Diagnosis`.
+- [x] **ICD-11 codes stored in the `icd10Code` field.** The consultation already wrote both
+  `icd11Code` and `codeSystem` at runtime, but the `Diagnosis` type didn't declare them, so typed
+  readers/exports saw an ICD-11 value only under `icd10Code`. FIXED 2026-07: added optional
+  `icd11Code` and `codeSystem`
+  to the `Diagnosis` type (`src/data/mock.ts`); `icd10Code` kept as a compat field for existing readers.
+  (Note: the separate national `medical_records` mapper NULL-diagnosis issue below is still open.)
 - [ ] **Unified patient-flow queue is orphaned.** `patient-queue-service.buildQueueFromTriage` has no
   page consumers; walk-in → clinician routing depends on a manual `AssignDoctorModal` write to
   `patient.assignedDoctor` (triage alone doesn't surface the patient on the worklist). Refs:
@@ -71,19 +73,22 @@ the aggregated store, or (b) formally retire the unused Postgres writeback and a
 
 ## P2 — latent, blocks national analytics the moment Postgres is read
 
-- [ ] **beds/admissions national writeback is dead on arrival.** Mappers, migration 0006, and
-  conflict policy exist, but `ALLOWED_TABLES`/`ALLOWED_COLUMNS` in `postgres.ts` were never updated,
-  so `assertSafeTable` throws on every bed/admission upsert. LOS, in-hospital mortality, transfers,
-  bed occupancy never reach the store. Fix: add `beds`,`admissions` + their columns to the allowlists.
-  Refs: `sync/route.ts:202-208,656-713`, `postgres.ts:61-214`.
-- [ ] **`medical_records` mapper reads fields that don't exist** (`doc.diagnosis/icd11Code/severity/recordType`
-  — real data is `diagnoses[]`) → national diagnosis/ICD/severity columns always NULL. With `encounters`
-  excluded, coded morbidity has no national path at all. Fix: flatten primary diagnosis in the mapper.
-  Refs: `sync/route.ts:247-259`.
-- [ ] **Sync-worker fails forward.** It advances the CouchDB `seq` even when `/api/sync` reports per-doc
-  errors, so any mapping/schema mismatch = permanent, un-retried loss (no dead-letter/replay). This
-  amplifies the two items above from "fixable" to "silently gone." Fix: return non-2xx (or park failures)
-  and don't advance `seq` past unresolved errors. Refs: `sync-worker/index.mjs` `pollDatabase`/`postSync`.
+- [x] **beds/admissions national writeback is dead on arrival.** Mappers, migration 0006, and
+  conflict policy existed, but `ALLOWED_TABLES`/`ALLOWED_COLUMNS` in `postgres.ts` were never updated,
+  so `assertSafeTable` threw on every bed/admission upsert. FIXED 2026-07: added `beds`/`admissions` +
+  all their columns to the allowlists (`postgres.ts`), and added a regression guard in
+  `national-sync-coverage.test.ts` asserting every FIELD_MAPPER target table is allowlisted — so this
+  whole class (mapper writes a table the guard rejects) fails the build instead of silently dropping data.
+- [x] **`medical_records` mapper reads fields that don't exist** (`doc.diagnosis/icd11Code/severity/recordType`
+  — real data is `diagnoses[]`) → national diagnosis/ICD/severity columns were always NULL. FIXED 2026-07:
+  the mapper now flattens the primary diagnosis (falls back to the first) from `diagnoses[]` — name →
+  `diagnosis`, `icd11Code ?? icd10Code` → `icd11_code`, `severity`, and `visitType` → `record_type`
+  (`sync/route.ts`). (`encounters` remain excluded, but coded morbidity now has a national path via records.)
+- [x] **Sync-worker fails forward.** It advanced the CouchDB `seq` even when `/api/sync` reported per-doc
+  errors, so any mapping/schema mismatch = permanent, un-retried loss. FIXED 2026-07: `pollDatabase`
+  (`sync-worker/index.mjs`) now holds the checkpoint and retries a batch that reported errors; after a
+  bounded number of attempts it advances past and **loudly dead-letters** (logs the dropped docs) so a
+  single permanently-bad doc can't stall the stream forever, and transient failures are no longer silently lost.
 - [ ] **Nutrition SAM/MAM has no national path and no dashboard.** `nutrition_screenings` is captured but
   has no writeback table/mapper (deferred TODO) and no dashboard reads it — malnutrition, a DHIS2 MCH
   indicator, is invisible nationally. Refs: `sync/route.ts` exclusion TODO.

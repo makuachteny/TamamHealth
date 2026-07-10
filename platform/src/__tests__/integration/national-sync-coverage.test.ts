@@ -102,6 +102,14 @@ function extractWardsDbTables(): Record<string, string> {
   return out;
 }
 
+/** The Postgres `ALLOWED_TABLES` SQL-injection allowlist in lib/db/postgres.ts. */
+function extractAllowedTables(): Set<string> {
+  const src = readSource('src/lib/db/postgres.ts');
+  const block = src.match(/const ALLOWED_TABLES = new Set<string>\(\[([\s\S]*?)\]\);/);
+  if (!block) throw new Error('Could not locate ALLOWED_TABLES in lib/db/postgres.ts');
+  return new Set([...block[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]));
+}
+
 describe('national sync coverage', () => {
   const dbTableMapKeys = new Set(extractDbTableMapKeys());
   const syncConfigDbs = DATABASE_SYNC_CONFIGS.map((c) => c.localName);
@@ -151,5 +159,20 @@ describe('national sync coverage', () => {
       expect(table).toBeTruthy();
       expect(mapperKeys.has(table)).toBe(true);
     }
+  });
+
+  // Regression guard: every table a FIELD_MAPPER writes to MUST be in the
+  // Postgres `ALLOWED_TABLES` allowlist, or `assertSafeTable` throws on every
+  // upsert and the sync-worker silently drops those docs (this is exactly how
+  // beds/admissions writeback was dead for a release — mapper + migration
+  // existed, allowlist didn't). Catches the whole class at build time.
+  test('every national writeback target table is in the Postgres ALLOWED_TABLES guard', () => {
+    const allowed = extractAllowedTables();
+    const targets = [
+      ...extractFieldMapperKeys(),
+      ...Object.values(extractWardsDbTables()),
+    ];
+    const unlisted = targets.filter((t) => !allowed.has(t));
+    expect(unlisted).toEqual([]);
   });
 });
