@@ -29,6 +29,7 @@ async function makePatient() {
     gender: 'Male',
     phone: '0911111111',
     state: 'Jonglei',
+    county: 'Bor South',
     tribe: 'Nuer',
     primaryLanguage: 'Nuer',
     bloodType: 'A+',

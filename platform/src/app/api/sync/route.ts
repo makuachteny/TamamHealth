@@ -72,6 +72,17 @@
  *   - tamamhealth_patient_reminders   Queued patient reminders. Facility-
  *                                     operational, not a national analytics
  *                                     target.
+ *   - tamamhealth_intake_forms        Patient-submitted intake forms awaiting
+ *                                     staff review/merge into the chart.
+ *                                     Facility-operational workflow state, not
+ *                                     a national analytics target.
+ *   - tamamhealth_nutrition_screenings  TODO(national-analytics): malnutrition
+ *                                     (SAM/MAM) IS a national/DHIS2 MCH
+ *                                     indicator and SHOULD eventually reach the
+ *                                     national store. Excluded for now because
+ *                                     no writeback table/mapper exists yet;
+ *                                     wire up a DB_TABLE_MAP + FIELD_MAPPER +
+ *                                     sync-worker entry to promote it.
  *
  * All remaining databases land in DB_TABLE_MAP below; a missing entry causes a
  * 400 from this route, so the sync-worker surfaces a hard failure rather than

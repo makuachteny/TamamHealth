@@ -26,6 +26,7 @@ async function makePatient() {
     gender: 'Female',
     phone: '0922222222',
     state: 'Lakes',
+    county: 'Rumbek Centre',
     tribe: 'Dinka',
     primaryLanguage: 'Dinka',
     bloodType: 'B+',

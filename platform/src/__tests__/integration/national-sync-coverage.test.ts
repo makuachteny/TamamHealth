@@ -46,6 +46,8 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
   'tamamhealth_clinician_tasks',       // per-clinician personal to-dos — personal/operational data, not national analytics
   'tamamhealth_patient_documents',     // scanned chart documents (films, letters, IDs) — facility-operational PHI blobs, not national analytics
   'tamamhealth_patient_reminders',     // queued patient reminders — facility-operational, not national analytics
+  'tamamhealth_intake_forms',          // patient-submitted intake forms awaiting review/merge — facility-operational workflow, not national analytics
+  'tamamhealth_nutrition_screenings',  // TODO(national-analytics): SAM/MAM IS a national/DHIS2 MCH indicator — excluded only until a writeback table+mapper exists; promote later
 ]);
 
 // Local-only databases that never participate in sync at all.

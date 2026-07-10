@@ -30,6 +30,7 @@ async function makePatient(overrides: Record<string, unknown> = {}) {
     gender: 'Female',
     phone: '0900000000',
     state: 'Central Equatoria',
+    county: 'Juba',
     tribe: 'Dinka',
     primaryLanguage: 'Dinka',
     bloodType: 'O+',
