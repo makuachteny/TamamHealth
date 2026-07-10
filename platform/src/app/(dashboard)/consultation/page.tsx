@@ -969,6 +969,16 @@ export default function ConsultationPage() {
       return;
     }
 
+    // Every prescription needs a medication + dose + frequency (the same fields
+    // validatePrescription enforces server-side). Catch it here, before the
+    // staged commit, so an incomplete row shows a clear message instead of
+    // throwing mid-save and aborting after the record/labs were already written.
+    const incompleteRx = prescriptions.find(rx => !rx.medication?.trim() || !rx.dose?.trim() || !rx.frequency?.trim());
+    if (incompleteRx) {
+      showToast(`Complete the dose and frequency for "${incompleteRx.medication || 'the prescription'}" before saving.`, 'error');
+      return;
+    }
+
     // If the clinician opted to attach a referral, the destination + reason
     // are required. Catching this on submit (rather than silently dropping
     // the referral) prevents emergency hand-offs from being lost.
@@ -1150,6 +1160,15 @@ export default function ConsultationPage() {
           gcs: parseInt(vitals.gcs) || undefined,
           recordedAt: now,
         },
+        // Physical examination — persist the findings captured in the exam
+        // step (the save is gated on at least one system being filled). Only
+        // non-empty systems are stored so the record stays clean.
+        physicalExamination: (() => {
+          const filled = Object.fromEntries(
+            Object.entries(physExam).filter(([, v]) => v.trim())
+          );
+          return Object.keys(filled).length > 0 ? filled : undefined;
+        })(),
         // Codes come from the ICD-11 (MMS) reference module. Store `icd11Code`
         // (correct system) and keep `icd10Code` populated for legacy readers.
         diagnoses: diagnoses.map(d => ({ icd11Code: d.code, icd10Code: d.code, codeSystem: 'ICD-11-MMS', name: d.name, type: d.type, certainty: d.certainty, severity: d.severity })),

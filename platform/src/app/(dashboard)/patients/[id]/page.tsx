@@ -11,7 +11,7 @@ import {
   ShieldAlert, TestTubes, ChevronRight,
   CalendarClock, TrendingUp as TrendingUpIcon, ClipboardList,
   User as UserIcon, Building2, Search, X, Wallet, Syringe,
-  Heart, Printer, History, Plus, Calendar,
+  Heart, Printer, History, Plus, Calendar, Stethoscope,
 } from '@/components/icons/lucide';
 import Badge from '@/components/Badge';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -677,6 +677,15 @@ export default function PatientDetailPage() {
                         </div>
                         {latestRecord.chiefComplaint && <div className="rx-field"><b>Chief complaint:</b> {latestRecord.chiefComplaint}</div>}
                         {latestRecord.historyOfPresentIllness && <div className="rx-field" style={{ marginTop: 4 }}><b>History of present illness:</b> {latestRecord.historyOfPresentIllness}</div>}
+                        {latestRecord.physicalExamination && Object.entries(latestRecord.physicalExamination).filter(([, v]) => v).length > 0 && (
+                          <div className="rx-field" style={{ marginTop: 4 }}>
+                            <b>Physical examination:</b>{' '}
+                            {Object.entries(latestRecord.physicalExamination)
+                              .filter(([, v]) => v)
+                              .map(([sys, v]) => `${sys.charAt(0).toUpperCase()}${sys.slice(1)}: ${v}`)
+                              .join('; ')}
+                          </div>
+                        )}
                         {latestRecord.treatmentPlan && <div className="rx-field" style={{ marginTop: 4 }}><b>Treatment plan:</b> {latestRecord.treatmentPlan}</div>}
                       </div>
                     </div>
@@ -2038,6 +2047,19 @@ export default function PatientDetailPage() {
                                       <p className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{v.l}</p>
                                       <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{v.v}</p>
                                     </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {rec.physicalExamination && Object.entries(rec.physicalExamination).filter(([, v]) => v).length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                                  <Stethoscope className="w-3 h-3" style={{ color: 'var(--tamamhealth-blue)' }} />
+                                  Physical examination
+                                </p>
+                                <div className="text-xs leading-relaxed p-2.5 rounded-lg space-y-1" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}>
+                                  {Object.entries(rec.physicalExamination).filter(([, v]) => v).map(([sys, v]) => (
+                                    <p key={sys}><span className="font-semibold capitalize">{sys}:</span> {v}</p>
                                   ))}
                                 </div>
                               </div>

@@ -2148,6 +2148,15 @@ export interface MedicalRecord {
     respiratoryRate?: string; oxygenSaturation?: string; weight?: string;
     muac?: string; bloodGlucose?: string; capturedAt?: string; capturedBy?: string;
   };
+  /** Physical examination findings by system, captured in the consultation
+   *  exam step. Additive/optional; only populated systems are stored. */
+  physicalExamination?: {
+    general?: string;
+    cardiovascular?: string;
+    respiratory?: string;
+    abdominal?: string;
+    neurological?: string;
+  };
   diagnoses: Diagnosis[];
   prescriptions: Prescription[];
   labResults: LabResult[];
