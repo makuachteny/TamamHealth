@@ -1,16 +1,13 @@
 'use client';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import TopBar from '@/components/TopBar';
-import {
-  Users, Calendar, Clock, CheckCircle2, AlertCircle, ChevronRight,
-  Plus, ArrowRight, Wallet, Activity,
-} from '@/components/icons/lucide';
+import { useRouter } from 'next/navigation';
+import { Users, Plus, Clock, Calendar, Activity } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useUsers } from '@/lib/hooks/useUsers';
+import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import type { LeaveRequestDoc } from '@/lib/db-types-hr';
 import type { StaffScheduleDoc } from '@/lib/db-types';
 
@@ -18,15 +15,22 @@ import type { StaffScheduleDoc } from '@/lib/db-types';
  * HR home — Records & people-ops landing page for HRIO and medical
  * superintendents. Surfaces today's roster status + the queue of
  * pending leave decisions so the day starts with action items, not
- * a wall of charts.
+ * a wall of charts. Rendered on the shared EhrCareDashboard shell so
+ * it matches the Clinical Officer / Lab / Radiology look.
  */
 export default function HRDashboardPage() {
+  const router = useRouter();
   const { t } = useTranslation();
   const { currentUser } = useApp();
   const { users } = useUsers();
   const [leave, setLeave] = useState<LeaveRequestDoc[]>([]);
   const [schedules, setSchedules] = useState<StaffScheduleDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  // Single work list (pending leave decisions) rendered as shell rows; the tab
+  // is kept as state so the shared shell's tab bar stays interactive.
+  const [leaveTab, setLeaveTab] = useState('pending');
+  const [selectedLeave, setSelectedLeave] = useState<string | null>(null);
+  const [staffSearch, setStaffSearch] = useState('');
 
   const today = new Date().toISOString().slice(0, 10);
   const facilityId = currentUser?.hospitalId;
@@ -67,6 +71,7 @@ export default function HRDashboardPage() {
     .filter(l => l.status === 'approved' && l.startDate > today)
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .slice(0, 5);
+  const upcomingApprovedCount = leave.filter(l => l.status === 'approved' && l.startDate > today).length;
 
   const presentToday = facilityUsers.length - onLeaveToday.length;
   const onCallToday = schedules.filter(s => s.isOnCall).length;
@@ -79,168 +84,158 @@ export default function HRDashboardPage() {
     return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
   }, [facilityUsers]);
 
+  const dateLabel = formatDateTitle(toIsoDate(new Date()));
+
+  // Search filters the pending-decisions work list by staff name / role / type.
+  const query = staffSearch.trim().toLowerCase();
+  const filteredPending = query
+    ? pendingLeave.filter(r =>
+        (r.userName || '').toLowerCase().includes(query) ||
+        (r.role || '').toLowerCase().includes(query) ||
+        (r.leaveType || '').toLowerCase().includes(query))
+    : pendingLeave;
+
+  // Expandable per-row detail (leave window, role, reason) shown inline beneath
+  // the row via EhrCareDashboard's `row.detail` slot, gated on the selected row.
+  const renderLeaveDetail = (r: LeaveRequestDoc) => (
+    <div style={{ margin: '0 0 8px', padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-semibold capitalize" style={{ color: 'var(--text-primary)' }}>{r.leaveType} · {r.days}d</span>
+        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{r.startDate} → {r.endDate}</span>
+      </div>
+      <p className="text-[11px] capitalize" style={{ color: 'var(--text-secondary)' }}>{r.role.replace(/_/g, ' ')}</p>
+      {r.reason && <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>“{r.reason}”</p>}
+    </div>
+  );
+
   if (loading) {
     return (
-      <>
-        <TopBar title={t('hr.dashboardTitle')} />
-        <main className="page-container page-enter">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320, color: 'var(--text-muted)' }}>
-            <Activity size={44} style={{ marginRight: 8, animation: 'spin 1s linear infinite' }} />
-            <span>{t('hr.loadingData')}</span>
-          </div>
-        </main>
-      </>
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320, color: 'var(--text-muted)' }}>
+          <Activity size={44} style={{ marginRight: 8, animation: 'spin 1s linear infinite' }} />
+          <span>{t('hr.loadingData')}</span>
+        </div>
+      </main>
     );
   }
 
   return (
-    <>
-      <TopBar title={t('hr.dashboardTitle')} />
-      <main className="page-container page-enter">
-        <div className="mb-5" style={{ maxWidth: 360 }}>
-          <SpotlightCard title="Pending Leave" value={pendingLeave.length} caption={`${onLeaveToday.length} on leave today`} href="/hr?tab=leave" />
-        </div>
-        <div className="flex items-end justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: -0.3 }}>{t('hr.dashboardTitle')}</h1>
-            <p className="text-[12px]" style={{ color: 'var(--text-muted)', marginTop: 2 }}>
-              {t('hr.facilityWelcome', { facility: facilityName, name: currentUser?.name || t('hr.hrOfficer') })}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Link href="/hr" className="btn btn-secondary">
-              <Users className="w-4 h-4" /> {t('hr.manageStaff')}
-            </Link>
-            <Link href="/hr?tab=leave" className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('hr.newLeaveRequest')}
-            </Link>
-          </div>
-        </div>
-
-        {/* KPI strip */}
-        <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', alignItems: 'stretch' }}>
-          {[
-            { id: 'activeStaff', label: t('hr.kpiActiveStaff'), value: facilityUsers.length, accent: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
-            { id: 'presentToday', label: t('hr.kpiPresentToday'), value: presentToday, accent: '#15795C', bg: 'rgba(27, 158, 119, 0.10)', border: 'rgba(27, 158, 119, 0.26)' },
-            { id: 'onLeaveToday', label: t('hr.kpiOnLeaveToday'), value: onLeaveToday.length, accent: onLeaveToday.length > 0 ? '#B8741C' : 'var(--accent-primary)', bg: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.12)' : 'rgba(33, 145, 208, 0.08)', border: onLeaveToday.length > 0 ? 'rgba(228, 168, 75, 0.30)' : 'rgba(59, 130, 246, 0.22)' },
-            { id: 'pendingDecisions', label: t('hr.kpiPendingDecisions'), value: pendingLeave.length, accent: pendingLeave.length > 0 ? '#C44536' : 'var(--accent-primary)', bg: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.10)' : 'rgba(33, 145, 208, 0.08)', border: pendingLeave.length > 0 ? 'rgba(196, 69, 54, 0.28)' : 'rgba(59, 130, 246, 0.22)' },
-            { id: 'onCallToday', label: t('hr.kpiOnCallToday'), value: onCallToday, accent: '#2191D0', bg: 'rgba(33, 145, 208, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
-          ].map(k => (
-            <div key={k.id} style={{ padding: '14px 16px', borderRadius: 10, background: k.bg, border: `1px solid ${k.border}`, position: 'relative' }}>
-              {k.id === 'pendingDecisions' && pendingLeave.length > 0 && <span className="data-tile__alarm-pulse" aria-hidden="true" />}
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: k.accent }}>{k.label}</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, marginTop: 2 }}>{k.value}</div>
+    <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <EhrCareDashboard
+        title={t('hr.dashboardTitle')}
+        greetingName={currentUser?.name}
+        dateLabel={dateLabel}
+        centerTitle={t('hr.pendingLeaveDecisions')}
+        tabs={[
+          { key: 'pending', label: t('hr.kpiPendingDecisions'), count: pendingLeave.length },
+        ]}
+        activeTab={leaveTab}
+        onTabChange={setLeaveTab}
+        searchValue={staffSearch}
+        searchPlaceholder={t('topbar.searchPlaceholder')}
+        onSearchChange={setStaffSearch}
+        filters={[]}
+        actions={[
+          { label: t('hr.manageStaff'), icon: Users, onClick: () => router.push('/hr') },
+          { label: t('hr.newLeaveRequest'), icon: Plus, onClick: () => router.push('/hr?tab=leave'), tone: 'primary' },
+        ]}
+        rows={filteredPending.map((r): EhrCareDashboardRow => {
+          const isOpen = selectedLeave === r._id;
+          return {
+            id: r._id,
+            title: r.userName,
+            subtitle: `${r.leaveType} · ${r.days}d · ${r.startDate} → ${r.endDate}`,
+            compactMeta: `${r.days}d`,
+            status: r.leaveType,
+            statusTone: 'warning',
+            onClick: () => setSelectedLeave(isOpen ? null : r._id),
+            detail: isOpen ? renderLeaveDetail(r) : undefined,
+          };
+        })}
+        metrics={[
+          { label: t('hr.kpiActiveStaff'), value: facilityUsers.length },
+          { label: t('hr.kpiPresentToday'), value: presentToday, tone: 'success' },
+          { label: t('hr.kpiOnLeaveToday'), value: onLeaveToday.length, tone: onLeaveToday.length > 0 ? 'warning' : 'neutral' },
+          { label: t('hr.kpiPendingDecisions'), value: pendingLeave.length, tone: pendingLeave.length > 0 ? 'danger' : 'neutral' },
+          { label: t('hr.kpiOnCallToday'), value: onCallToday },
+        ]}
+        metricsTitle={t('hr.dashboardTitle')}
+        checklist={[
+          { label: `${t('hr.staffRoster')} · ${t('hr.staffCount', { count: facilityUsers.length })}`, done: facilityUsers.length > 0, href: '/hr?tab=roster' },
+          { label: `${t('hr.leaveQueue')} · ${t('hr.pendingCount', { count: pendingLeave.length })}`, done: pendingLeave.length === 0, href: '/hr?tab=leave' },
+          { label: `${t('hr.scheduleShifts')} · ${t('hr.todayCount', { count: schedules.length })}`, done: schedules.length > 0, href: '/hr?tab=schedule' },
+          { label: `${t('hr.payrollRegister')} · ${t('hr.monthlyPayroll')}`, done: false, href: '/hr?tab=payroll' },
+        ]}
+        checklistTitle={t('hr.quickActions')}
+        missionTitle={t('hr.dashboardTitle')}
+        missionDescription={t('hr.facilityWelcome', { facility: facilityName, name: currentUser?.name || t('hr.hrOfficer') })}
+        emptyTitle={t('hr.noPendingLeave')}
+        emptyActionLabel={t('hr.viewAll')}
+        onEmptyAction={() => router.push('/hr?tab=leave')}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3" style={{ minWidth: 0 }}>
+          {/* Today's shifts */}
+          <div className="dash-card">
+            <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <Clock className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('hr.todaysShifts')}</span>
             </div>
-          ))}
-        </div>
-
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)' }}>
-          {/* Pending decisions queue (bigger column) */}
-          <div className="dash-card overflow-hidden">
-            <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-              <h3 className="font-semibold text-sm">{t('hr.pendingLeaveDecisions')}</h3>
-              <Link href="/hr?tab=leave" className="text-[11px] font-bold inline-flex items-center gap-1" style={{ color: 'var(--accent-primary)' }}>
-                {t('hr.viewAll')} <ChevronRight className="w-3 h-3" />
-              </Link>
+            <div className="p-4 space-y-2">
+              <ShiftRow label={t('hr.shiftMorning')} count={morningStaff} accent="#15795C" />
+              <ShiftRow label={t('hr.shiftAfternoon')} count={schedules.filter(s => s.shiftType === 'afternoon').length} accent="#E4A84B" />
+              <ShiftRow label={t('hr.shiftNight')} count={nightStaff} accent="#015697" />
+              <ShiftRow label={t('hr.shiftOnCall')} count={onCallToday} accent="#2191D0" />
             </div>
-            {pendingLeave.length === 0 ? (
-              <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
-                <CheckCircle2 className="w-8 h-8 mx-auto mb-2" style={{ color: '#15795C', opacity: 0.6 }} />
-                {t('hr.noPendingLeave')}
+          </div>
+
+          {/* Upcoming leave */}
+          <div className="dash-card">
+            <div className="flex items-center justify-between mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('hr.upcomingLeave')}</span>
               </div>
+              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('hr.countApproved', { count: upcomingApprovedCount })}</span>
+            </div>
+            {upcomingLeave.length === 0 ? (
+              <div className="p-6 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>{t('hr.noUpcomingLeave')}</div>
             ) : (
-              <div>
-                {pendingLeave.slice(0, 8).map(r => {
-                  const initials = r.userName.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
-                  return (
-                    <Link key={r._id} href="/hr?tab=leave" className="data-row data-row--warning">
-                      <div className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white" style={{ background: 'linear-gradient(135deg, #2191D0 0%, #015697 100%)' }}>{initials || '?'}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{r.userName}</span>
-                          <span className="text-[10.5px] capitalize" style={{ color: 'var(--text-muted)' }}>{r.role.replace(/_/g, ' ')}</span>
-                        </div>
-                        <div className="text-[11.5px] mt-0.5" style={{ color: '#B8741C' }}>
-                          <span className="capitalize font-semibold">{r.leaveType}</span> · {r.days}d · {r.startDate} → {r.endDate}
-                        </div>
-                        {r.reason && <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>“{r.reason}”</div>}
+              <div className="p-2">
+                {upcomingLeave.map(l => (
+                  <div key={l._id} className="data-row" style={{ padding: '10px 14px' }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12.5px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{l.userName}</div>
+                      <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                        <span className="capitalize">{l.leaveType}</span> · {l.startDate}
                       </div>
-                      <ArrowRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
-                    </Link>
-                  );
-                })}
+                    </div>
+                    <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.14)', color: '#2191D0' }}>{l.days}d</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          {/* Right column: Today shifts + Upcoming leave + Role breakdown */}
-          <div className="space-y-4">
-            <div className="dash-card overflow-hidden">
-              <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                <h3 className="font-semibold text-sm">{t('hr.todaysShifts')}</h3>
-              </div>
-              <div className="p-4 space-y-2">
-                <ShiftRow label={t('hr.shiftMorning')} count={morningStaff} accent="#15795C" />
-                <ShiftRow label={t('hr.shiftAfternoon')} count={schedules.filter(s => s.shiftType === 'afternoon').length} accent="#E4A84B" />
-                <ShiftRow label={t('hr.shiftNight')} count={nightStaff} accent="#015697" />
-                <ShiftRow label={t('hr.shiftOnCall')} count={onCallToday} accent="#2191D0" />
-              </div>
+          {/* Roster by role */}
+          <div className="dash-card">
+            <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('hr.rosterByRole')}</span>
             </div>
-
-            <div className="dash-card overflow-hidden">
-              <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-                <h3 className="font-semibold text-sm">{t('hr.upcomingLeave')}</h3>
-                <Link href="/hr?tab=leave" className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('hr.countApproved', { count: leave.filter(l => l.status === 'approved' && l.startDate > today).length })}</Link>
-              </div>
-              {upcomingLeave.length === 0 ? (
-                <div className="p-6 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>{t('hr.noUpcomingLeave')}</div>
-              ) : (
-                <div>
-                  {upcomingLeave.map(l => (
-                    <div key={l._id} className="data-row" style={{ padding: '10px 14px' }}>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[12.5px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{l.userName}</div>
-                        <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
-                          <span className="capitalize">{l.leaveType}</span> · {l.startDate}
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(33, 145, 208, 0.14)', color: '#2191D0' }}>{l.days}d</span>
-                    </div>
-                  ))}
+            <div className="p-4 space-y-2">
+              {roleCounts.length === 0 ? (
+                <div className="text-[12px] text-center" style={{ color: 'var(--text-muted)' }}>{t('hr.noStaffRegistered')}</div>
+              ) : roleCounts.map(([role, count]) => (
+                <div key={role} className="flex items-center justify-between text-[12.5px]">
+                  <span className="capitalize" style={{ color: 'var(--text-secondary)' }}>{role.replace(/_/g, ' ')}</span>
+                  <span className="font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{count}</span>
                 </div>
-              )}
-            </div>
-
-            <div className="dash-card overflow-hidden">
-              <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                <h3 className="font-semibold text-sm">{t('hr.rosterByRole')}</h3>
-              </div>
-              <div className="p-4 space-y-2">
-                {roleCounts.length === 0 ? (
-                  <div className="text-[12px] text-center" style={{ color: 'var(--text-muted)' }}>{t('hr.noStaffRegistered')}</div>
-                ) : roleCounts.map(([role, count]) => (
-                  <div key={role} className="flex items-center justify-between text-[12.5px]">
-                    <span className="capitalize" style={{ color: 'var(--text-secondary)' }}>{role.replace(/_/g, ' ')}</span>
-                    <span className="font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{count}</span>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
         </div>
-
-        {/* Quick actions */}
-        <div className="dash-card mt-4 p-4">
-          <h3 className="font-semibold text-sm mb-3">{t('hr.quickActions')}</h3>
-          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', alignItems: 'stretch' }}>
-            <QuickAction href="/hr?tab=roster" icon={<Users className="w-[22px] h-[22px]" />} label={t('hr.staffRoster')} subtitle={t('hr.staffCount', { count: facilityUsers.length })} />
-            <QuickAction href="/hr?tab=leave" icon={<Calendar className="w-[22px] h-[22px]" />} label={t('hr.leaveQueue')} subtitle={t('hr.pendingCount', { count: pendingLeave.length })} alarm={pendingLeave.length > 0} />
-            <QuickAction href="/hr?tab=schedule" icon={<Clock className="w-[22px] h-[22px]" />} label={t('hr.scheduleShifts')} subtitle={t('hr.todayCount', { count: schedules.length })} />
-            <QuickAction href="/hr?tab=payroll" icon={<Wallet className="w-[22px] h-[22px]" />} label={t('hr.payrollRegister')} subtitle={t('hr.monthlyPayroll')} />
-          </div>
-        </div>
-      </main>
-    </>
+      </EhrCareDashboard>
+    </main>
   );
 }
 
@@ -253,33 +248,5 @@ function ShiftRow({ label, count, accent }: { label: string; count: number; acce
       </span>
       <span className="font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{count}</span>
     </div>
-  );
-}
-
-function QuickAction({ href, icon, label, subtitle, alarm }: { href: string; icon: React.ReactNode; label: string; subtitle: string; alarm?: boolean }) {
-  return (
-    <Link
-      href={href}
-      className="card-elevated flex items-center gap-3 px-3 py-2.5 transition-colors"
-      style={alarm ? {
-        background: 'rgba(196, 69, 54, 0.06)',
-        borderColor: 'rgba(196, 69, 54, 0.28)',
-      } : undefined}
-    >
-      <span className="flex-shrink-0 inline-flex items-center justify-center" style={{
-        color: alarm ? '#C44536' : 'var(--accent-primary)',
-      }}>
-        {icon}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</div>
-        <div className="text-[10.5px]" style={{ color: alarm ? '#8B2E24' : 'var(--text-muted)' }}>{subtitle}</div>
-      </div>
-      {alarm ? (
-        <AlertCircle className="w-4 h-4" style={{ color: '#C44536' }} />
-      ) : (
-        <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-      )}
-    </Link>
   );
 }

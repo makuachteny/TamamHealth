@@ -88,6 +88,9 @@ export default function EhrCareDashboard({
   metricsActions,
   checklist,
   showCalendar = true,
+  chart,
+  chartTitle = 'Activity',
+  showChart = true,
   calendarEventDates,
   metricsTitle = 'Today',
   checklistTitle = 'Workflow',
@@ -128,6 +131,11 @@ export default function EhrCareDashboard({
   metricsActions?: EhrCareDashboardAction[];
   checklist: EhrCareDashboardChecklistItem[];
   showCalendar?: boolean;
+  /** Explicit left-rail chart. When omitted, a compact bar chart is
+   *  auto-derived from this dashboard's own tabs/filters/metrics. */
+  chart?: ReactNode;
+  chartTitle?: string;
+  showChart?: boolean;
   calendarEventDates?: string[];
   metricsTitle?: string;
   checklistTitle?: string;
@@ -159,6 +167,22 @@ export default function EhrCareDashboard({
   const openDetail = (row: EhrCareDashboardRow) => { setDetailTab('visit'); setOpenRow(row); };
   const rowEventDates = useMemo(() => rows.map(row => row.date).filter((date): date is string => Boolean(date)), [rows]);
   const eventDates = calendarEventDates || rowEventDates;
+  // A compact left-rail bar chart matching the Clinical Officer "Day statistics"
+  // widget, auto-derived from whichever of this dashboard's own data is richest:
+  // its status tabs, else its filters, else its metrics. Non-numeric ("45 min")
+  // and total ("All") entries are dropped.
+  const autoChartSeries = useMemo(() => {
+    const toSeries = (items: { label: string; count?: number; value?: number | string }[]) =>
+      items
+        .filter(it => !['all', 'view all'].includes((it.label || '').trim().toLowerCase()))
+        .map(it => ({ label: it.label, value: Number(it.count ?? it.value) }))
+        .filter((it): it is { label: string; value: number } => Number.isFinite(it.value));
+    const fromTabs = toSeries(tabs.filter(tab => tab.key !== 'all'));
+    if (fromTabs.length) return fromTabs;
+    const fromFilters = toSeries(filters);
+    if (fromFilters.length) return fromFilters;
+    return toSeries(metrics);
+  }, [tabs, filters, metrics]);
   const visibleRows = useMemo(() => {
     if (!showCalendar || effectiveView !== 'calendar' || rowEventDates.length === 0) return rows;
     return rows.filter(row => row.date === selectedDate);
@@ -220,6 +244,7 @@ export default function EhrCareDashboard({
               onDateSelect={setSelectedDate}
             />
           )}
+          {showChart && (chart ?? <CareStatsChart title={chartTitle} series={autoChartSeries} />)}
           <div className="ehr-filter-group">
             <div className="ehr-care-search">
               <Search className="w-4 h-4" />
@@ -481,6 +506,70 @@ export default function EhrCareDashboard({
             </div>
           </aside>
         </>
+      )}
+    </div>
+  );
+}
+
+/* ─── Care stats chart (left rail) ───
+   Compact single-series bar chart mirroring the Clinical Officer "Day
+   statistics" widget (same ehr-day-stats styling and geometry), but generic:
+   it renders whatever category series the dashboard supplies (queue by status,
+   screenings by class, counties by KPI, …). Bar colour comes from the shared
+   --viz-inpatient token so dark mode swaps a validated step. */
+function CareStatsChart({ title, series }: { title: string; series: { label: string; value: number }[] }) {
+  const total = series.reduce((sum, item) => sum + item.value, 0);
+  const peak = series.reduce((max, item) => Math.max(max, item.value), 0);
+  // Even headroom so the midpoint gridline lands on a whole number.
+  const yMax = Math.max(4, Math.ceil(peak / 2) * 2);
+  const plotTop = 8;
+  const baseline = 112;
+  const plotHeight = baseline - plotTop;
+  const barY = (value: number) => baseline - (value / yMax) * plotHeight;
+  const ticks = [0, yMax / 2, yMax];
+  const plotLeft = 20;
+  const plotRight = 212;
+  const slot = (plotRight - plotLeft) / Math.max(series.length, 1);
+  const barWidth = Math.min(18, slot * 0.55);
+
+  return (
+    <div className="ehr-day-stats">
+      <div className="ehr-day-stats-head">
+        <h3>{title}</h3>
+      </div>
+      {total === 0 ? (
+        <p className="ehr-day-stats-empty">No activity yet.</p>
+      ) : (
+        <svg viewBox="0 0 216 132" role="img" aria-label={`${title}: ${series.map(item => `${item.value} ${item.label}`).join(', ')}`}>
+          {ticks.map(tick => (
+            <g key={tick}>
+              <line x1={20} x2={212} y1={barY(tick)} y2={barY(tick)} stroke="var(--ehr-border)" strokeWidth={1} />
+              <text x={16} y={barY(tick) + 2.5} textAnchor="end" fontSize={8} fill="var(--ehr-muted)">{tick}</text>
+            </g>
+          ))}
+          {series.map((item, index) => {
+            const center = plotLeft + slot * index + slot / 2;
+            const short = item.label.length > 7 ? `${item.label.slice(0, 6)}…` : item.label;
+            return (
+              <g key={item.label}>
+                {item.value > 0 && (
+                  <rect
+                    className="ehr-day-stats-bar"
+                    x={center - barWidth / 2}
+                    y={barY(item.value)}
+                    width={barWidth}
+                    height={baseline - barY(item.value)}
+                    rx={2}
+                    fill="var(--viz-inpatient)"
+                  >
+                    <title>{`${item.label}: ${item.value}`}</title>
+                  </rect>
+                )}
+                <text x={center} y={126} textAnchor="middle" fontSize={7} fill="var(--ehr-muted)">{short}</text>
+              </g>
+            );
+          })}
+        </svg>
       )}
     </div>
   );

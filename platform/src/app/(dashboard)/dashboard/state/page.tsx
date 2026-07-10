@@ -1,10 +1,7 @@
 'use client';
+import { useState } from 'react';
 import { useApp } from '@/lib/context';
-import TopBar from '@/components/TopBar';
 import RoleGuard from '@/components/RoleGuard';
-import {
-  Baby, Skull, HeartPulse, Syringe, MapPin, Building2,
-} from '@/components/icons/lucide';
 import { useMCHAnalytics } from '@/lib/hooks/useMCHAnalytics';
 import { useBirths } from '@/lib/hooks/useBirths';
 import { useDeaths } from '@/lib/hooks/useDeaths';
@@ -12,6 +9,8 @@ import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { jubaYearMonth } from '@/lib/time-juba';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 
 function countByState(
   agg: Record<string, number> | undefined,
@@ -31,6 +30,11 @@ export default function StateDashboardPage() {
   const { deaths } = useDeaths();
   const { stats: immStats } = useImmunizations();
   const { hospitals } = useHospitals();
+
+  // Shell state: single-tab work list plus a county-name search. Search is new
+  // here — the bespoke layout had none — so it's a pure improvement.
+  const [activeTab, setActiveTab] = useState('all');
+  const [search, setSearch] = useState('');
 
   const thisMonth = jubaYearMonth();
   const stateBirthsThisMonth = births.filter(
@@ -72,68 +76,49 @@ export default function StateDashboardPage() {
   }
   counties.sort((a, b) => a.county.localeCompare(b.county));
 
+  const query = search.trim().toLowerCase();
+  const visibleCounties = query
+    ? counties.filter(c => c.county.toLowerCase().includes(query))
+    : counties;
+
+  const dateLabel = formatDateTitle(toIsoDate(new Date()));
+
   return (
     <RoleGuard>
-      <TopBar title={t('state.title')} />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-
-        {/* ═══ KPI TILES ═══ */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-4">
-          <Kpi label={t('state.birthsThisMonth')} value={stateBirthsThisMonth} icon={Baby} />
-          <Kpi label={t('state.deathsThisMonth')} value={stateDeathsThisMonth} icon={Skull} />
-          <Kpi label="Facilities" value={facilitiesInState.length} icon={Building2} />
-          <Kpi label={t('state.anc1Coverage')} value={`${anc1Rate}%`} icon={HeartPulse} />
-          <Kpi label={t('state.immunizationsYtd')} value={immStats?.totalVaccinations ?? 0} icon={Syringe} />
-        </div>
-
-        {/* ═══ COUNTIES ═══ */}
-        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          <div className="flex items-center gap-2 p-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            <MapPin className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('state.countiesIn', { state: stateName || '—' })}</h3>
-          </div>
-          {mchLoading && counties.length === 0 ? (
-            <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
-              <MapPin className="w-8 h-8 mx-auto mb-2" style={{ opacity: 0.6 }} /> {t('status.loading')}
-            </div>
-          ) : counties.length === 0 ? (
-            <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
-              <MapPin className="w-8 h-8 mx-auto mb-2" style={{ opacity: 0.6 }} /> {t('state.noCountyData')}
-            </div>
-          ) : (
-            <div className="p-4 space-y-2" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-              {counties.map(c => (
-                <div
-                  key={c.county}
-                  className="w-full flex items-center justify-between p-3 rounded-xl text-left"
-                  style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}
-                >
-                  <div>
-                    <p className="font-medium text-sm">{c.county}</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {t('state.countyStats', { births: c.birthCount, deaths: c.deathCount, anc: c.ancTotal })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <EhrCareDashboard
+          title={t('state.title')}
+          greetingName={currentUser?.name}
+          dateLabel={dateLabel}
+          tabs={[
+            { key: 'all', label: t('state.countiesIn', { state: stateName || '—' }), count: counties.length },
+          ]}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          searchValue={search}
+          searchPlaceholder={t('topbar.searchPlaceholder')}
+          onSearchChange={setSearch}
+          filters={[]}
+          actions={[]}
+          rows={visibleCounties.map((c): EhrCareDashboardRow => ({
+            id: c.county,
+            title: c.county,
+            subtitle: t('state.countyStats', { births: c.birthCount, deaths: c.deathCount, anc: c.ancTotal }),
+          }))}
+          metrics={[
+            { label: t('state.birthsThisMonth'), value: stateBirthsThisMonth },
+            { label: t('state.deathsThisMonth'), value: stateDeathsThisMonth },
+            { label: 'Facilities', value: facilitiesInState.length },
+            { label: t('state.anc1Coverage'), value: `${anc1Rate}%` },
+            { label: t('state.immunizationsYtd'), value: immStats?.totalVaccinations ?? 0 },
+          ]}
+          metricsTitle={t('state.title')}
+          checklist={[]}
+          missionTitle={t('state.title')}
+          missionDescription={t('state.subtitle', { facilities: facilitiesInState.length, counties: counties.length })}
+          emptyTitle={mchLoading && counties.length === 0 ? t('status.loading') : t('state.noCountyData')}
+        />
       </main>
     </RoleGuard>
-  );
-}
-
-function Kpi({ label, value, icon: Icon }: { label: string; value: string | number; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }) {
-  return (
-    <div className="dash-card" style={{ padding: '14px 16px' }}>
-      <div className="flex items-center gap-2 mb-2">
-        <div className="icon-box-sm">
-          <Icon className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-        </div>
-        <span className="kpi-card-title">{label}</span>
-      </div>
-      <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{value}</div>
-    </div>
   );
 }
