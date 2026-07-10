@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import { useMCHAnalytics } from '@/lib/hooks/useMCHAnalytics';
 import {
   HeartPulse, Baby, Syringe, AlertTriangle,
@@ -60,23 +61,23 @@ export default function MCHAnalyticsPage() {
 
   return (
     <>
-      <TopBar title="MCH Analytics" actions={
-        <>
-          <div className="px-4 py-2 rounded-md flex items-center gap-2" style={{
-            background: grade.bg,
-            border: `1px solid ${grade.text}30`,
-          }}>
-            <Shield className="w-4 h-4" style={{ color: grade.text }} />
-            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: grade.text }}>
-              {t('mch.gradePrefix', { grade: summary.overallGrade })}
-            </span>
-          </div>
-          <div className="px-3 py-2 rounded-md" style={{ background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.15)' }}>
-            <p className="text-[10px] font-semibold" style={{ color: '#EC4899' }}>{t('mch.highRiskCount', { count: summary.highRiskCount })}</p>
-          </div>
-        </>
-      } />
       <main className="page-container page-enter">
+        <DashboardGreetingHeader actions={
+          <>
+            <div className="px-4 py-2 rounded-md flex items-center gap-2" style={{
+              background: grade.bg,
+              border: `1px solid ${grade.text}30`,
+            }}>
+              <Shield className="w-4 h-4" style={{ color: grade.text }} />
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: grade.text }}>
+                {t('mch.gradePrefix', { grade: summary.overallGrade })}
+              </span>
+            </div>
+            <div className="px-3 py-2 rounded-md" style={{ background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.15)' }}>
+              <p className="text-[10px] font-semibold" style={{ color: '#EC4899' }}>{t('mch.highRiskCount', { count: summary.highRiskCount })}</p>
+            </div>
+          </>
+        } />
 
         {/* ═══ KPI STRIP ═══ */}
         <div className="kpi-grid mb-4">

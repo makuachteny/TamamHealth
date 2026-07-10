@@ -3,7 +3,7 @@ import TodaysAppointmentsCard from '@/components/dashboard/TodaysAppointmentsCar
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import { useApp } from '@/lib/context';
 import { useDataScope } from '@/lib/hooks/useDataScope';
 import { useUsers } from '@/lib/hooks/useUsers';
@@ -160,8 +160,8 @@ export default function FacilityManagementDashboard() {
 
   return (
     <>
-      <TopBar title="Dashboard" />
       <main className="page-container page-enter">
+        <DashboardGreetingHeader />
         <div className="flex flex-col gap-5">
 
           <div style={{ maxWidth: 360 }}>

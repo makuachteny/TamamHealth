@@ -16,6 +16,7 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
 import RoleGuard from '@/components/RoleGuard';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useBirths } from '@/lib/hooks/useBirths';
 import { useDeaths } from '@/lib/hooks/useDeaths';
@@ -139,8 +140,8 @@ function FacilityOverview() {
 
   return (
     <>
-      <TopBar title="Facility Overview" />
       <main className="page-container page-enter">
+        <DashboardGreetingHeader />
         {/* ═══ MINISTRY OF HEALTH SUBMISSION GATE ═══ */}
         <div className="card-elevated p-5 mb-4">
           <div className="flex items-start justify-between gap-4 flex-wrap">

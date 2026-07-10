@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import {
   Users, Stethoscope, HeartPulse, BedDouble,
   ClipboardCheck, Activity, AlertTriangle, SendHorizontal,
@@ -81,8 +81,8 @@ export default function SuperintendentDashboard() {
 
   return (
     <>
-      <TopBar title={t('superintendent.topBarTitle')} />
       <main className="page-container page-enter">
+        <DashboardGreetingHeader />
         {/* ═══ KPI ROW ═══ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
           {kpis.map(k => (

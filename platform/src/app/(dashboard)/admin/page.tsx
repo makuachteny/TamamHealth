@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
@@ -205,8 +205,8 @@ export default function AdminDashboardPage() {
 
   return (
     <>
-      <TopBar title={t('admin.topBarTitle')} />
       <main className="page-container page-enter">
+        <DashboardGreetingHeader />
 
         {/* KPI stat cards removed per design cleanup — org/user/patient/
             subscription counts live on their own pages (/admin/organizations,
