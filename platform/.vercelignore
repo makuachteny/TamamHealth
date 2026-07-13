@@ -1,0 +1,10 @@
+# Local/dev env files must never be uploaded to Vercel — the project's own
+# environment variables are the source of truth in the cloud build. Uploading
+# .env / .env.local leaks dev-only keys (e.g. NEXT_PUBLIC_JWT_SECRET, an offline
+# dev fallback) into the production build, which the auth-token security guard
+# rejects. deploy-v4.sh imports the real env from .env.v4.local into the project.
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
