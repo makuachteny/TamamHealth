@@ -6,7 +6,7 @@ import DemoModeBanner from '@/components/DemoModeBanner';
 import {
   CreditCard, Smartphone, Building2, CheckCircle,
   Shield, Receipt,
-  ArrowRight, Wallet, Copy, Check
+  ArrowRight, Wallet, Copy, Check, Loader2, AlertCircle
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -597,15 +597,32 @@ export default function PatientPortalPage() {
                       </button>
                     </div>
 
+                    {completeError && (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        background: 'var(--color-danger-bg)', border: '1px solid var(--color-danger-500)',
+                        borderRadius: 8, padding: '10px 14px', marginBottom: 14,
+                      }}>
+                        <AlertCircle size={16} style={{ color: 'var(--color-danger-500)', flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-danger-text)' }}>{completeError}</span>
+                      </div>
+                    )}
+
                     <button
                       onClick={handleCompletePayment}
+                      disabled={completing}
                       style={{
-                        width: '100%', padding: '14px 24px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                        width: '100%', padding: '14px 24px', borderRadius: 10, border: 'none',
+                        cursor: completing ? 'not-allowed' : 'pointer',
                         background: `linear-gradient(135deg, ${method.color}, ${method.color}CC)`,
-                        color: '#fff', fontSize: '0.9375rem', fontWeight: 700,
+                        color: '#fff', fontSize: '0.9375rem', fontWeight: 700, opacity: completing ? 0.75 : 1,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                       }}
                     >
-                      {paymentMethod === 'card' ? t('portal.payNowFlutterwave') : t('portal.sentPayment')}
+                      {completing && <Loader2 size={16} className="animate-spin" />}
+                      {completing
+                        ? 'Recording…'
+                        : (paymentMethod === 'card' ? 'Record card payment (pending verification)' : t('portal.sentPayment'))}
                     </button>
 
                     <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: 12 }}>

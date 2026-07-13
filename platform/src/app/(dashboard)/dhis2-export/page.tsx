@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import TopBar from '@/components/TopBar';
 import {
   RefreshCw, CheckCircle, Clock, AlertTriangle,
@@ -13,27 +13,22 @@ import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { useANC } from '@/lib/hooks/useANC';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import {
+  getDhis2SyncLog, recordDhis2SyncResult, appendDhis2LogEntry,
+  isDhis2Configured, getDhis2BaseUrlHost, groupDhis2DataValues, getMetric,
+  type Dhis2SyncLogDoc,
+} from '@/lib/services/dhis2-sync-log-service';
 
-// ── DHIS2 Data Element definitions (South Sudan HMIS) ──
-const DHIS2_DATA_ELEMENTS = [
-  { id: 'DE001', name: 'OPD Attendance - New', dhis2Id: 'fbfJHSPpUQD', category: 'Service Delivery', synced: true, lastSync: '2026-02-22 08:00' },
-  { id: 'DE002', name: 'Malaria Cases (Confirmed)', dhis2Id: 'qnR8r7cZRyA', category: 'Disease Surveillance', synced: true, lastSync: '2026-02-22 08:00' },
-  { id: 'DE003', name: 'TB Cases (New & Relapse)', dhis2Id: 't5amVP7HJBA', category: 'Disease Surveillance', synced: false, lastSync: '2026-02-20 14:30' },
-  { id: 'DE004', name: 'HIV Tests Performed', dhis2Id: 'K6f2C7Rz4mB', category: 'HIV/AIDS', synced: true, lastSync: '2026-02-22 08:00' },
-  { id: 'DE005', name: 'ANC First Visit', dhis2Id: 'pq2XI5Q7sOz', category: 'Maternal Health', synced: true, lastSync: '2026-02-22 08:00' },
-  { id: 'DE006', name: 'Immunizations Given', dhis2Id: 'mC7R3q0PwXk', category: 'EPI', synced: false, lastSync: '2026-02-19 16:45' },
-  { id: 'DE007', name: 'Drug Stock - Antimalarials', dhis2Id: 'vN5cR8zWqFj', category: 'Commodities', synced: true, lastSync: '2026-02-22 08:00' },
-  { id: 'DE008', name: 'Deaths (Facility)', dhis2Id: 'bQ4R6x3YhNp', category: 'Vital Events', synced: true, lastSync: '2026-02-22 08:00' },
-  { id: 'DE009', name: 'Births Registered', dhis2Id: 'xL9dR2kWmNq', category: 'Vital Events', synced: true, lastSync: '2026-02-22 08:00' },
-  { id: 'DE010', name: 'Referrals Sent', dhis2Id: 'jP3sT7vYqBx', category: 'Service Delivery', synced: true, lastSync: '2026-02-22 08:00' },
-];
-
-const DHIS2_REPORTS = [
-  { name: 'Monthly HMIS Report (105)', period: 'Feb 2026', status: 'draft' as const, completeness: 78, dueDate: '2026-03-05' },
-  { name: 'Weekly Epidemiological Report', period: 'Wk 8 2026', status: 'submitted' as const, completeness: 100, dueDate: '2026-02-23' },
-  { name: 'Quarterly HIV Report', period: 'Q1 2026', status: 'draft' as const, completeness: 45, dueDate: '2026-04-10' },
-  { name: 'Monthly Maternal Health', period: 'Feb 2026', status: 'not_started' as const, completeness: 0, dueDate: '2026-03-05' },
-  { name: 'Immunization Coverage Report', period: 'Feb 2026', status: 'draft' as const, completeness: 62, dueDate: '2026-03-05' },
+// ── HMIS report catalog (South Sudan standard report names/cadence). This is
+// structural metadata, not per-record data — the completeness/status shown
+// for each is derived from the real, persisted sync log below, not fabricated
+// per report. ──
+const REPORT_TYPES = [
+  { name: 'Monthly HMIS Report (105)' },
+  { name: 'Weekly Epidemiological Report' },
+  { name: 'Quarterly HIV Report' },
+  { name: 'Monthly Maternal Health' },
+  { name: 'Immunization Coverage Report' },
 ];
 
 export default function DHIS2ExportPage() {
