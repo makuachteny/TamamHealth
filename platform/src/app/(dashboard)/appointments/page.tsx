@@ -9,7 +9,8 @@ import {
   AlertTriangle, RefreshCw,
   Video, Stethoscope, Syringe, HeartPulse, FlaskConical,
   Building2, X, UserPlus, ClipboardList,
-  Filter, ExternalLink, ChevronLeft, ChevronRight,
+  ExternalLink, ChevronLeft, ChevronRight,
+  Search, Download,
 } from '@/components/icons/lucide';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -78,6 +79,25 @@ const timeSlots = Array.from({ length: 24 }, (_, h) =>
   ['00', '30'].map(m => `${h.toString().padStart(2, '0')}:${m}`)
 ).flat().filter(t => { const h = parseInt(t.split(':')[0]); return h >= 7 && h <= 18; });
 
+// "Today, 05:10 AM" for the current day, otherwise "12-Jul-2026, 09:02 PM".
+function formatWhen(dateStr: string, timeStr: string, today: string) {
+  const d = new Date(`${dateStr}T${(timeStr || '00:00')}:00`);
+  if (Number.isNaN(d.getTime())) return `${dateStr} ${timeStr}`;
+  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  if (dateStr === today) return `Today, ${time}`;
+  const day = String(d.getDate()).padStart(2, '0');
+  const mon = d.toLocaleDateString('en-US', { month: 'short' });
+  return `${day}-${mon}-${d.getFullYear()}, ${time}`;
+}
+
+// Visit start = the checked-in timestamp, shown as a time; "--" until check-in.
+function formatVisitStart(iso?: string) {
+  if (!iso) return '--';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '--';
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
 /* ─── Page ─── */
 export default function AppointmentsPage() {
   const { appointments, create, updateStatus, reschedule, update } = useAppointments();
@@ -117,10 +137,14 @@ export default function AppointmentsPage() {
 
   const router = useRouter();
   const [calView, setCalView] = useState<'month' | 'week' | 'day'>('month');
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list');
   const [listSearch, setListSearch] = useState('');
   const [listStatus, setListStatus] = useState('all');
-  const [listSort, setListSort] = useState<'date_asc' | 'date_desc' | 'name' | 'priority'>('date_asc');
+  // The day the redesigned list view is scoped to (header date picker); stat
+  // cards + table both reflect just this day. Defaults to Africa/Juba "today".
+  const [listDate, setListDate] = useState(() => jubaDate());
+  // Header "service type" filter (appointment type), applied to the table only.
+  const [serviceFilter, setServiceFilter] = useState<AppointmentType | 'all'>('all');
   // Appointment opened in the click-to-view detail popup.
   const [eventApt, setEventApt] = useState<typeof appointments[0] | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -130,7 +154,6 @@ export default function AppointmentsPage() {
   const [editingApt, setEditingApt] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [showFilters, setShowFilters] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Deep link: TopBar "+ → Schedule appointment" routes here with ?new=1 to
@@ -387,33 +410,241 @@ export default function AppointmentsPage() {
     catch { showToast(t('appointments.toastFailedCancel'), 'error'); }
   };
 
-  // List view — filtered + sorted appointments
-  const listAppointments = useMemo(() => {
-    const q = listSearch.toLowerCase();
-    let result = appointments.filter(a => {
-      const matchSearch = !q || a.patientName.toLowerCase().includes(q) || a.reason.toLowerCase().includes(q);
-      const matchStatus = listStatus === 'all' || a.status === listStatus;
-      return matchSearch && matchStatus;
-    });
-    if (listSort === 'date_asc') result = result.sort((a, b) => `${a.appointmentDate}${a.appointmentTime}`.localeCompare(`${b.appointmentDate}${b.appointmentTime}`));
-    else if (listSort === 'date_desc') result = result.sort((a, b) => `${b.appointmentDate}${b.appointmentTime}`.localeCompare(`${a.appointmentDate}${a.appointmentTime}`));
-    else if (listSort === 'name') result = result.sort((a, b) => a.patientName.localeCompare(b.patientName));
-    else if (listSort === 'priority') {
-      const order: Record<string, number> = { emergency: 0, urgent: 1, routine: 2 };
-      result = result.sort((a, b) => (order[a.priority] ?? 2) - (order[b.priority] ?? 2));
-    }
-    return result;
-  }, [appointments, listSearch, listStatus, listSort]);
+  // ── Redesigned list view (stat cards + day table) ──
+  const patientById = useMemo(() => {
+    const map = new Map<string, typeof patients[0]>();
+    for (const p of patients) map.set(p._id, p);
+    return map;
+  }, [patients]);
+
+  // Everything in the redesigned list view is scoped to the header's date.
+  const dayList = useMemo(
+    () => appointments.filter(a => a.appointmentDate === listDate),
+    [appointments, listDate]
+  );
+
+  const dayStats = useMemo(() => {
+    const checkedIn = dayList.filter(a => a.status === 'checked_in' || a.status === 'in_progress' || a.status === 'completed').length;
+    const notArrived = dayList.filter(a => a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'requested').length;
+    const svcCounts = new Map<AppointmentType, number>();
+    for (const a of dayList) svcCounts.set(a.appointmentType, (svcCounts.get(a.appointmentType) || 0) + 1);
+    let topService: { type: AppointmentType; count: number } | null = null;
+    for (const [type, count] of svcCounts) if (!topService || count > topService.count) topService = { type, count };
+    const providers = new Set(dayList.filter(a => a.status !== 'cancelled').map(a => a.providerName).filter(Boolean));
+    return { total: dayList.length, checkedIn, notArrived, topService, providers: providers.size };
+  }, [dayList]);
+
+  const tableRows = useMemo(() => {
+    const q = listSearch.trim().toLowerCase();
+    return dayList
+      .filter(a => serviceFilter === 'all' || a.appointmentType === serviceFilter)
+      .filter(a => listStatus === 'all' || a.status === listStatus)
+      .filter(a => {
+        if (!q) return true;
+        const identifier = patientById.get(a.patientId)?.hospitalNumber || '';
+        return a.patientName.toLowerCase().includes(q) || a.reason.toLowerCase().includes(q) ||
+          identifier.toLowerCase().includes(q) || a.department.toLowerCase().includes(q);
+      })
+      .sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || ''));
+  }, [dayList, serviceFilter, listStatus, listSearch, patientById]);
+
+  const dayLabel = listDate === today
+    ? 'Today'
+    : new Date(listDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  const handleDownloadCsv = useCallback(() => {
+    const header = ['Patient name', 'Identifier', 'Location', 'Service type', 'Appointment time', 'Visit start time', 'Status'];
+    const rows = tableRows.map(a => [
+      a.patientName,
+      patientById.get(a.patientId)?.hospitalNumber || '',
+      a.department,
+      appointmentTypes.find(ti => ti.value === a.appointmentType)?.label || a.appointmentType,
+      `${a.appointmentDate} ${a.appointmentTime}`,
+      a.checkedInAt ? new Date(a.checkedInAt).toLocaleString('en-US') : '',
+      t(statusLabelKey[a.status]),
+    ]);
+    const csv = [header, ...rows]
+      .map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `appointments-${listDate}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [tableRows, patientById, listDate, t, statusLabelKey]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <PageInstructionCard />
-        {/* View toggle + Filters live beside the search bar above (TopBar
-            searchTrailing); the list/calendar body renders directly here. */}
+        {/* ═══ Page header ═══ */}
+        <div className="listpage-header">
+          <div className="listpage-header-title">
+            <div className="listpage-header-icon"><Calendar size={22} /></div>
+            <div>
+              <p className="listpage-eyebrow">{currentUser?.hospitalName || 'Clinic'}</p>
+              <h1 className="listpage-title">{t('appointments.title')}</h1>
+            </div>
+          </div>
+          <div className="listpage-header-controls">
+            <input
+              type="date"
+              value={listDate}
+              onChange={e => setListDate(e.target.value || today)}
+              className="listpage-date-input"
+              aria-label={t('appointments.labelDate')}
+            />
+            <select
+              value={serviceFilter}
+              onChange={e => setServiceFilter(e.target.value as AppointmentType | 'all')}
+              className="listpage-service-select"
+              aria-label="Filter appointments by service type"
+            >
+              <option value="all">Filter appointments by service type</option>
+              {appointmentTypes.map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}
+            </select>
+          </div>
+        </div>
 
-        {/* Filters bar */}
-        {showFilters && (
+        {/* ═══ View toggle + create ═══ */}
+        <div className="listpage-actions-row">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ gap: 8, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }}
+            onClick={() => setViewMode(v => (v === 'calendar' ? 'list' : 'calendar'))}
+          >
+            <Calendar size={16} /> {viewMode === 'calendar' ? 'Appointments list' : 'Appointments calendar'}
+          </button>
+          {canBookAppointments && (
+            <button type="button" className="btn btn-primary" style={{ gap: 8 }} onClick={() => setShowNewForm(true)}>
+              <Plus size={16} /> Create new appointment
+            </button>
+          )}
+        </div>
+
+        {/* ═══ LIST VIEW ═══ */}
+        {viewMode === 'list' && (
+          <>
+            {/* Table card */}
+            <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+              <div className="listpage-table-toolbar" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                {/* Title + day stats (inline, right-aligned — mirrors the wards
+                    "Current Admissions" header instead of separate stat cards). */}
+                <div className="flex items-end justify-between gap-3 flex-wrap">
+                  <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
+                    Appointments for: {dayLabel}
+                  </span>
+                  <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
+                    {[
+                      { label: 'Appointments', value: dayStats.total, color: 'var(--text-muted)' },
+                      { label: 'Checked in', value: dayStats.checkedIn, color: '#15795C' },
+                      { label: 'Not arrived', value: dayStats.notArrived, color: '#C44536' },
+                      { label: dayStats.topService ? (appointmentTypes.find(ti => ti.value === dayStats.topService!.type)?.label || dayStats.topService.type) : 'No appointments', value: dayStats.topService?.count ?? 0, color: '#2191D0' },
+                      { label: 'Providers', value: dayStats.providers, color: '#D97706' },
+                    ].map((s, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                        {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div className="listpage-table-search">
+                    <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    <input
+                      type="search"
+                      value={listSearch}
+                      onChange={e => setListSearch(e.target.value)}
+                      placeholder="Filter table"
+                      aria-label="Filter table"
+                    />
+                  </div>
+                  <select
+                    value={listStatus}
+                    onChange={e => setListStatus(e.target.value)}
+                    className="listpage-status-select"
+                    aria-label="Filter appointments by status"
+                  >
+                    <option value="all">Filter appointments by status</option>
+                    {(Object.keys(statusConfig) as AppointmentStatus[]).map(k => (
+                      <option key={k} value={k}>{t(statusLabelKey[k])}</option>
+                    ))}
+                  </select>
+                  <button type="button" className="btn btn-secondary btn-sm" style={{ gap: 6 }} onClick={handleDownloadCsv}>
+                    <Download size={15} /> Download
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+                <table className="data-table listpage-table" style={{ minWidth: 980 }}>
+                  <thead>
+                    <tr>
+                      {['Patient name', 'Identifier', 'Location', 'Service type', 'Appointment time', 'Visit start time', 'Status', 'Actions'].map(h => (
+                        <th key={h} className="text-left px-4 py-2.5" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableRows.length === 0 ? (
+                      <tr><td colSpan={8} className="px-4 py-12 text-center" style={{ color: 'var(--text-muted)', fontSize: 13 }}>No appointments for {dayLabel.toLowerCase()}.</td></tr>
+                    ) : tableRows.map(apt => {
+                      const sc = statusConfig[apt.status];
+                      const svc = appointmentTypes.find(ti => ti.value === apt.appointmentType);
+                      const identifier = patientById.get(apt.patientId)?.hospitalNumber;
+                      const canCheckIn = apt.status === 'scheduled' || apt.status === 'confirmed' || apt.status === 'requested';
+                      const canCheckOut = apt.status === 'checked_in' || apt.status === 'in_progress';
+                      return (
+                        <tr
+                          key={apt._id}
+                          className="cursor-pointer hover:bg-[var(--table-row-hover)]"
+                          onClick={() => setEventApt(apt)}
+                          style={{ borderBottom: '1px solid var(--border-light)' }}
+                        >
+                          <td className="px-4 py-3">
+                            {apt.patientId ? (
+                              <Link href={`/patients/${apt.patientId}`} onClick={e => e.stopPropagation()} className="hover:underline" style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-primary)' }}>{apt.patientName}</Link>
+                            ) : (
+                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{apt.patientName}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3" style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-platform-mono)' }}>{identifier || '—'}</td>
+                          <td className="px-4 py-3" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{apt.department || '—'}</td>
+                          <td className="px-4 py-3">
+                            {svc ? (
+                              <span style={{ fontSize: 11, fontWeight: 600, color: svc.color, background: svc.bg, borderRadius: 6, padding: '2px 8px' }}>{svc.label}</span>
+                            ) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
+                          </td>
+                          <td className="px-4 py-3" style={{ fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{formatWhen(apt.appointmentDate, apt.appointmentTime, today)}</td>
+                          <td className="px-4 py-3" style={{ fontSize: 13, color: apt.checkedInAt ? 'var(--text-primary)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatVisitStart(apt.checkedInAt)}</td>
+                          <td className="px-4 py-3">
+                            <span style={{ fontSize: 11, fontWeight: 700, color: sc.color, background: sc.bg, borderRadius: 6, padding: '2px 8px', whiteSpace: 'nowrap' }}>{t(statusLabelKey[apt.status])}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                              {canCheckIn && (
+                                <button onClick={() => handleStatusChange(apt._id, 'checked_in')} className="btn btn-sm btn-secondary" style={{ fontSize: 11, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }}>Check In</button>
+                              )}
+                              {canCheckOut && (
+                                <button onClick={() => handleStatusChange(apt._id, 'completed')} className="btn btn-sm btn-secondary" style={{ fontSize: 11, color: 'var(--color-danger)', borderColor: 'color-mix(in srgb, var(--color-danger) 35%, transparent)' }}>Check out</button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Calendar filters — status + search feed the react-big-calendar view */}
+        {viewMode === 'calendar' && (
           <FilterBar>
             <SearchInput value={search} onChange={setSearch} placeholder={t('appointments.searchPlaceholder')} />
             <FilterSelect
@@ -431,116 +662,6 @@ export default function AppointmentsPage() {
               </button>
             )}
           </FilterBar>
-        )}
-
-        {/* ═══ LIST VIEW ═══ */}
-        {viewMode === 'list' && (
-          <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-            {/* Toolbar — matches "Patients assigned to you" design */}
-            <div className="flex items-center gap-3 px-4 py-3 flex-wrap flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <input
-                type="search"
-                value={listSearch}
-                onChange={e => setListSearch(e.target.value)}
-                placeholder="Search by name or reason…"
-                className="flex-1 min-w-[200px]"
-                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 18px', fontSize: 13 }}
-              />
-              <select
-                value={listStatus}
-                onChange={e => setListStatus(e.target.value)}
-                className="w-full sm:w-44"
-                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 16px', fontSize: 13 }}
-                aria-label="Filter by status"
-              >
-                <option value="all">All Status</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="no_show">No Show</option>
-              </select>
-              <select
-                value={listSort}
-                onChange={e => setListSort(e.target.value as typeof listSort)}
-                className="w-full sm:w-44"
-                style={{ borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', padding: '9px 16px', fontSize: 13 }}
-                aria-label="Sort"
-              >
-                <option value="date_asc">Date (earliest first)</option>
-                <option value="date_desc">Date (latest first)</option>
-                <option value="name">Name (A–Z)</option>
-                <option value="priority">Priority (urgent first)</option>
-              </select>
-            </div>
-
-            {/* Table */}
-            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-              <table className="data-table" style={{ minWidth: 860 }}>
-                <thead>
-                  <tr>
-                    {['Patient', 'Reason', 'Date & Time', 'Type', 'Priority', 'Insurance', 'Status', 'Actions'].map(h => (
-                      <th key={h} className="text-left px-4 py-2.5" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {listAppointments.length === 0 ? (
-                    <tr><td colSpan={8} className="px-4 py-12 text-center" style={{ color: 'var(--text-muted)', fontSize: 13 }}>No appointments match your search.</td></tr>
-                  ) : listAppointments.map(apt => {
-                    const sc = statusConfig[apt.status];
-                    const pc = priorityConfig[apt.priority];
-                    const typeInfo = appointmentTypes.find(ti => ti.value === apt.appointmentType);
-                    return (
-                      <tr
-                        key={apt._id}
-                        className="cursor-pointer hover:bg-[var(--table-row-hover)]"
-                        onClick={() => setEventApt(apt)}
-                        style={{ borderBottom: '1px solid var(--border-light)' }}
-                      >
-                        <td className="px-4 py-3">
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{apt.patientName}</div>
-                          {apt.providerName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{apt.providerName}</div>}
-                        </td>
-                        <td className="px-4 py-3" style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 220 }}>
-                          <div className="truncate">{apt.reason || '—'}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-platform-mono)' }}>{apt.appointmentDate}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{apt.appointmentTime} · {apt.duration}min</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {typeInfo ? (
-                            <span style={{ fontSize: 11, fontWeight: 600, color: typeInfo.color, background: typeInfo.bg, borderRadius: 6, padding: '2px 8px' }}>{typeInfo.label}</span>
-                          ) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span style={{ fontSize: 11, fontWeight: 700, color: pc.color, background: `${pc.color}15`, borderRadius: 6, padding: '2px 8px' }}>{t(priorityLabelKey[apt.priority])}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <InsuranceBadge insured={insuredIds.has(apt.patientId)} />
-                        </td>
-                        <td className="px-4 py-3">
-                          <span style={{ fontSize: 11, fontWeight: 700, color: sc.color, background: sc.bg, borderRadius: 6, padding: '2px 8px' }}>{t(statusLabelKey[apt.status])}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                            {apt.status === 'scheduled' && (
-                              <button onClick={() => handleStatusChange(apt._id, 'confirmed')} className="btn btn-sm btn-secondary" style={{ fontSize: 11 }}>Confirm</button>
-                            )}
-                            {apt.status === 'confirmed' && (
-                              <button onClick={() => handleStatusChange(apt._id, 'completed')} className="btn btn-sm btn-primary" style={{ fontSize: 11 }}>Complete</button>
-                            )}
-                            <button onClick={() => { setEditingApt(apt._id); loadEditForm(apt); }} className="btn btn-sm btn-secondary" style={{ fontSize: 11 }}>Edit</button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
         )}
 
         {/* ═══ Calendar (react-big-calendar) — the only appointments view ═══ */}

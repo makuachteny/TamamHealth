@@ -230,16 +230,6 @@ export default function EhrCareDashboard({
 
       <div className={`ehr-workspace-grid ${effectiveView === 'calendar' ? 'is-calendar' : 'is-dashboard'}`}>
         <aside className="ehr-left-rail">
-          <button
-            type="button"
-            className="ehr-today-button"
-            onClick={() => {
-              setSelectedDate(todayIso);
-              setCalendarMonth(startOfMonth(new Date()));
-            }}
-          >
-            Go to today
-          </button>
           {showCalendar && (
             <EhrMiniCalendar
               month={calendarMonth}

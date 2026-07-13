@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, Plus, Edit3, Building2, RefreshCw } from '@/components/icons/lucide';
+import { Shield, Plus, Edit3, RefreshCw } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
@@ -111,11 +111,8 @@ export default function InsuranceSnapshot({ patientId, editable, onAddInsurance,
           padding: '12px 16px', borderRadius: 12,
           background: 'var(--bg-card)',
           border: `1px solid ${policy.isPrimary ? 'var(--accent)' : 'var(--border-medium)'}`,
-          display: 'flex', alignItems: 'center', gap: 12,
+          display: 'flex', alignItems: 'flex-start', gap: 12,
         }}>
-          <span className="icon-box-sm" style={{ color: 'var(--teal, #2191D0)', flexShrink: 0 }}>
-            <Building2 size={44} />
-          </span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{policy.payerName}</span>

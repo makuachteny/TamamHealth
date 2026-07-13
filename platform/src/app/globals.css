@@ -4529,6 +4529,11 @@ thead th {
   overflow: hidden;
 }
 
+/* Positioning context for the appointment detail slider (.ehr-right-rail-overlay). */
+.ehr-right-rail {
+  position: relative;
+}
+
 .ehr-left-rail,
 .ehr-side-card,
 .ehr-worklist-panel,
@@ -5040,6 +5045,113 @@ thead th {
   min-height: 0;
   overflow: auto;
 }
+
+/* ── Ward patients summary strip ─────────────────────────────────────────
+   At-a-glance acuity + status counts above the ward roster. The acuity and
+   status chips also act as one-tap filters (see WardWorkflow). */
+.ward-summary {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+.ward-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid var(--ehr-border, var(--border-light));
+  border-radius: 10px;
+  background: var(--ehr-panel, #fff);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+button.ward-summary-chip:hover {
+  background: var(--overlay-subtle);
+}
+.ward-summary-chip.is-total {
+  cursor: default;
+  background: transparent;
+  border-style: dashed;
+}
+.ward-summary-count {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ehr-text, var(--text-primary));
+}
+.ward-summary-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ehr-muted, var(--text-muted));
+  white-space: nowrap;
+}
+.ward-summary-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ward-summary-chip.acuity-red .ward-summary-dot { background: #DC2626; }
+.ward-summary-chip.acuity-yellow .ward-summary-dot { background: #D97706; }
+.ward-summary-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--ehr-border, var(--border-light));
+}
+.ward-summary-chip.is-active {
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  box-shadow: inset 0 0 0 1px var(--accent-primary);
+}
+.ward-summary-chip.acuity-red.is-active {
+  border-color: #DC2626;
+  background: rgba(220, 38, 38, 0.08);
+  box-shadow: inset 0 0 0 1px #DC2626;
+}
+.ward-summary-chip.acuity-yellow.is-active {
+  border-color: #D97706;
+  background: rgba(217, 119, 6, 0.10);
+  box-shadow: inset 0 0 0 1px #D97706;
+}
+.ward-summary-chip.is-active .ward-summary-label {
+  color: var(--ehr-text, var(--text-primary));
+}
+
+/* Location column: ward · bed, muted em-dash when the patient isn't admitted. */
+.ward-location-cell {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ehr-text, var(--text-primary));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ward-location-cell.is-empty {
+  color: var(--ehr-muted, var(--text-muted));
+  font-weight: 600;
+}
+
+/* Ward filter select in the list header. */
+.ward-location-select {
+  height: 34px;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--ehr-border, var(--border-light));
+  border-radius: 10px;
+  background: var(--ehr-panel, #fff);
+  color: var(--ehr-text, var(--text-primary));
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2372839a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+.ward-location-select:hover { background-color: var(--overlay-subtle); }
 
 .ehr-worklist-head,
 .ehr-worklist-row {
@@ -9573,6 +9685,10 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   from { opacity: 0; transform: translateY(12px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+@keyframes modalSlideInRight {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
 
 /* ============ Empty State ============ */
 .empty-state {
@@ -10159,6 +10275,115 @@ span:has(> svg:only-child) {
 .modal-panel--sm { max-width: min(420px, calc(100vw - 32px)); }
 .modal-panel--md { max-width: min(560px, calc(100vw - 32px)); }
 .modal-panel--lg { max-width: min(720px, calc(100vw - 32px)); }
+
+/* Appointment detail slider: fills the right rail column exactly, sliding in
+   from the right over the outstanding-items cards. */
+.ehr-right-rail-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  animation: modalSlideInRight 0.24s ease-out;
+}
+.appointment-detail-panel {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  border-radius: 6px;
+  box-shadow: -8px 0 24px rgba(15, 31, 29, 0.14);
+  animation: none;
+}
+/* Calendar view has no right rail — the panel then rides inside a full-height
+   drawer Modal, so let it stretch to fill that. */
+.modal-panel.appointment-detail-panel {
+  max-height: 100vh;
+}
+
+/* The rail column is only ~250px wide, so the header and footer laid out for the
+   wide modal have to reflow: stack the header, and stack the action buttons so
+   "Create Clinical Note" isn't clipped. Scoped to the rail so the calendar-view
+   drawer keeps its roomy two-across layout. */
+.ehr-right-rail-overlay .appointment-detail-modal__header {
+  position: relative;
+  padding: 14px 14px 12px;
+}
+.ehr-right-rail-overlay .appointment-detail-modal__header-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.ehr-right-rail-overlay .appointment-detail-modal__time {
+  font-size: 17px;
+  white-space: nowrap;
+  /* Leave room for the absolutely-positioned close button in the corner. */
+  padding-right: 34px;
+}
+/* Close sits in the top-right corner (on the time row); the status select then
+   takes the full width of the row below it. */
+.ehr-right-rail-overlay .appointment-detail-modal__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+.ehr-right-rail-overlay .appointment-detail-modal__status-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ehr-right-rail-overlay .appointment-detail-modal__body {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+/* Footer: two compact, icon-only actions side by side. The text labels and the
+   note-menu caret are hidden here (the wide calendar drawer keeps them). */
+.ehr-right-rail-overlay .appointment-detail-modal__actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 14px;
+}
+.ehr-right-rail-overlay .appointment-detail-modal__btn-label {
+  display: none;
+}
+.ehr-right-rail-overlay .appointment-detail-modal__split-toggle {
+  display: none;
+}
+.ehr-right-rail-overlay .appointment-detail-modal__split {
+  flex: 1 1 0;
+}
+.ehr-right-rail-overlay .appointment-detail-modal__split-main {
+  border-radius: 7px;
+  padding: 0;
+}
+.ehr-right-rail-overlay .appointment-detail-modal__more-toggle {
+  border-radius: 7px;
+  padding: 0;
+  gap: 2px;
+}
+/* Telehealth "Join" (when present) stays a full-width row above the pair. */
+.ehr-right-rail-overlay .appointment-detail-join-btn {
+  flex: 1 1 100%;
+}
+
+/* The lucide icons default to a hard-coded brand-blue stroke; on the blue
+   primary button that renders invisible, so force it white for this action. */
+.appointment-detail-modal__split-main svg.lucide {
+  color: var(--color-white) !important;
+  stroke: currentColor !important;
+}
+
+/* Stretch the rail (normally sized to its cards via align-self: start) to the
+   full grid height while the detail slider is open, so it reaches the bottom of
+   the workspace instead of stopping at the cards' height. */
+.ehr-right-rail.has-detail {
+  align-self: stretch;
+}
 
 /* ============ Circular progress ring for stat cards ============ */
 .progress-ring {
@@ -12944,6 +13169,15 @@ span:has(> svg:only-child) {
   background: var(--ehr-hover);
 }
 
+/* Triage acuity accent: fill the 4px left slot reserved above. All rows carry a
+   transparent border so widths stay identical; RED/YELLOW rows get a color. */
+.ehr-worklist-row {
+  border-left-style: solid;
+  border-left-color: transparent;
+}
+.ehr-worklist-row[data-triage="RED"] { border-left-color: #DC2626; }
+.ehr-worklist-row[data-triage="YELLOW"] { border-left-color: #D97706; }
+
 .ehr-worklist-name {
   gap: 12px;
 }
@@ -14426,6 +14660,69 @@ span:has(> svg:only-child) {
   color: var(--ehr-text);
 }
 
+.ehr-rail-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.ehr-rail-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--ehr-muted);
+  pointer-events: none;
+}
+
+.ehr-rail-search input {
+  width: 100%;
+  height: 40px;
+  padding: 0 36px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 999px;
+  background: var(--ehr-panel);
+  color: var(--ehr-text);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ehr-rail-search input::placeholder {
+  color: var(--ehr-muted);
+}
+
+.ehr-rail-search input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 18%, transparent);
+}
+
+/* Hide the native WebKit search clear control in favour of our own button. */
+.ehr-rail-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.ehr-rail-search-clear {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ehr-border);
+  color: var(--ehr-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ehr-rail-search-clear:hover {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
 .ehr-find-patient-input {
   display: flex;
   align-items: center;
@@ -14540,4 +14837,119 @@ span:has(> svg:only-child) {
   .ehr-appointment-row {
     break-inside: avoid;
   }
+}
+
+/* ═══════════ Shared list-page structure (header + KPI cards + table) ═══════════
+   First used by /appointments; reused across list pages (/patients, …). */
+.listpage-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+.listpage-header-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.listpage-header-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(33, 145, 208, 0.10);
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+.listpage-eyebrow { font-size: 12px; color: var(--text-muted); margin: 0 0 2px; }
+.listpage-title { font-size: 26px; font-weight: 700; color: var(--text-primary); margin: 0; line-height: 1.1; }
+.listpage-header-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.listpage-date-input,
+.listpage-service-select {
+  border: 1px solid var(--border-light);
+  background: var(--bg-card-solid);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  min-width: 240px;
+}
+.listpage-actions-row { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+
+.listpage-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.listpage-stat-card { padding: 18px 20px; display: flex; flex-direction: column; gap: 4px; }
+.listpage-stat-label { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0 0 10px; }
+.listpage-stat-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.listpage-stat-sub { font-size: 12px; color: var(--text-muted); }
+.listpage-stat-number { font-size: 40px; font-weight: 700; color: var(--text-primary); line-height: 1; margin-top: 4px; }
+.listpage-stat-breakdown { display: flex; gap: 28px; }
+.listpage-stat-breakdown > div { display: flex; flex-direction: column; gap: 2px; }
+.listpage-stat-mini-label { font-size: 11px; color: var(--text-muted); }
+.listpage-stat-mini { font-size: 22px; font-weight: 700; line-height: 1; }
+
+.listpage-section-head { margin-bottom: 12px; }
+.listpage-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: inline-block;
+  padding-bottom: 8px;
+  border-bottom: 3px solid var(--accent-primary);
+}
+
+.listpage-table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+.listpage-table-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--border-light);
+  background: var(--bg-card-solid);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.listpage-table-search input {
+  border: none;
+  outline: none;
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.listpage-status-select {
+  border: 1px solid var(--border-light);
+  background: var(--bg-card-solid);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  flex: 0 1 230px;
+  min-width: 0;
+}
+.listpage-table-toolbar .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .listpage-header-controls { align-items: stretch; width: 100%; }
+  .listpage-date-input,
+  .listpage-service-select { min-width: 0; width: 100%; }
+  .listpage-status-select { min-width: 0; flex: 1; }
 }

@@ -7,8 +7,7 @@ import PatientName from '@/components/PatientName';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
-import { FlaskConical, AlertTriangle, X, Plus, Radio, CheckCircle2, Filter } from '@/components/icons/lucide';
+import { FlaskConical, AlertTriangle, X, Plus, Radio, CheckCircle2, Filter, Search, Download } from '@/components/icons/lucide';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { evaluateCritical } from '@/lib/services/lab-critical-flag';
 import { parseInstrumentPayload, type ParsedInstrumentResult } from '@/lib/services/instrument-intake-service';
@@ -83,7 +82,11 @@ export default function LabPage() {
   }, [searchParams]);
   const setColFilter = (k: string, v: string) => setColFilters(f => ({ ...f, [k]: v }));
   const anyColFilter = Object.values(colFilters).some(Boolean);
-  const clearColFilters = () => setColFilters({ patient: '', test: '', specimen: '', status: '', result: '', orderedBy: '' });
+  // Quick free-text search box in the table toolbar (in addition to the
+  // existing per-column filter funnels below).
+  const [quickSearch, setQuickSearch] = useState('');
+  const anyFilterActive = anyColFilter || !!quickSearch;
+  const clearColFilters = () => { setColFilters({ patient: '', test: '', specimen: '', status: '', result: '', orderedBy: '' }); setQuickSearch(''); };
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const filterRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -237,6 +240,7 @@ export default function LabPage() {
   const filtered = labResults.filter(o => {
     const f = colFilters;
     if (globalSearch && !((o.patientName || '').toLowerCase().includes(globalSearch.toLowerCase()) || (o.testName || '').toLowerCase().includes(globalSearch.toLowerCase()))) return false;
+    if (quickSearch && !`${o.patientName || ''} ${o.hospitalNumber || ''} ${o.testName || ''} ${o.orderedBy || ''}`.toLowerCase().includes(quickSearch.toLowerCase())) return false;
     if (f.patient && !`${o.patientName || ''} ${o.hospitalNumber || ''}`.toLowerCase().includes(f.patient.toLowerCase())) return false;
     if (f.test && !(o.testName || '').toLowerCase().includes(f.test.toLowerCase())) return false;
     if (f.specimen && !(o.specimen || '').toLowerCase().includes(f.specimen.toLowerCase())) return false;
@@ -245,6 +249,43 @@ export default function LabPage() {
     if (f.orderedBy && !(o.orderedBy || '').toLowerCase().includes(f.orderedBy.toLowerCase())) return false;
     return true;
   });
+
+  // KPI stat cards — scoped to the full lab queue (not narrowed by the table's
+  // own filters, so the header numbers stay a stable "whole queue" summary).
+  const labStats = {
+    total: labResults.length,
+    completed: labResults.filter(o => o.status === 'completed').length,
+    critical: labResults.filter(o => o.critical).length,
+    awaiting: labResults.filter(o => o.status === 'pending' || o.status === 'in_progress').length,
+  };
+
+  // Distinct test names present in the queue, for the header's "test type" filter.
+  const testTypeOptions = Array.from(new Set(labResults.map(o => o.testName).filter(Boolean))).sort();
+
+  // Export the currently filtered/visible orders to CSV.
+  const handleDownloadCsv = () => {
+    const header = ['Patient', 'Hospital number', 'Test', 'Specimen', 'Status', 'Result', 'Ordered by', 'Ordered at', 'Completed at'];
+    const rows = filtered.map(o => [
+      o.patientName || '',
+      o.hospitalNumber || '',
+      o.testName || '',
+      o.specimen || '',
+      ORDER_STAGE_LABEL[effOrderStatus(o)],
+      o.result || '',
+      o.orderedBy || '',
+      o.orderedAt || '',
+      o.completedAt || '',
+    ]);
+    const csv = [header, ...rows]
+      .map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'lab-orders.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Per-column filter controls + column config (funnel dropdown per header).
   type ColFilter = { field: keyof typeof colFilters; node: React.ReactNode };
@@ -350,28 +391,51 @@ export default function LabPage() {
 
   return (
     <>
-      <TopBar title={t('lab.laboratory')} actions={
-        <div className="flex items-center gap-2">
-          {anyColFilter && (
-            <button onClick={clearColFilters} className="btn btn-secondary" title={t('nurse.clearAllFilters')} aria-label={t('nurse.clearAllFilters')}>
-              <X className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('nurse.clearAllFilters')}</span>
-            </button>
-          )}
-          {canEnterLabResults && (
-            <button onClick={() => setShowImportModal(true)} className="btn btn-secondary">
-              <Radio className="w-4 h-4" /> Import from analyzer
-            </button>
-          )}
-          {canOrderLabs && (
-            <button onClick={() => setShowOrderModal(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('lab.newOrder')}
-            </button>
-          )}
-        </div>
-      } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <PageInstructionCard />
+
+          {/* ── Page header ── */}
+          <div className="listpage-header">
+            <div className="listpage-header-title">
+              <div className="listpage-header-icon"><FlaskConical size={22} /></div>
+              <div>
+                <p className="listpage-eyebrow">{currentUser?.hospitalName || 'Clinic'}</p>
+                <h1 className="listpage-title">{t('lab.laboratory')}</h1>
+              </div>
+            </div>
+            <div className="listpage-header-controls">
+              <select
+                value={colFilters.test}
+                onChange={e => setColFilter('test', e.target.value)}
+                className="listpage-service-select"
+                aria-label="Filter lab orders by test type"
+              >
+                <option value="">Filter lab orders by test type</option>
+                {testTypeOptions.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* ── Actions row ── */}
+          <div className="listpage-actions-row">
+            {anyFilterActive && (
+              <button onClick={clearColFilters} className="btn btn-secondary" title={t('nurse.clearAllFilters')} aria-label={t('nurse.clearAllFilters')}>
+                <X className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('nurse.clearAllFilters')}</span>
+              </button>
+            )}
+            {canEnterLabResults && (
+              <button onClick={() => setShowImportModal(true)} className="btn btn-secondary">
+                <Radio className="w-4 h-4" /> Import from analyzer
+              </button>
+            )}
+            {canOrderLabs && (
+              <button onClick={() => setShowOrderModal(true)} className="btn btn-primary">
+                <Plus className="w-4 h-4" /> {t('lab.newOrder')}
+              </button>
+            )}
+          </div>
+
           {overdueReviews.length > 0 && (
             <div className="card-elevated p-3 mb-4 flex items-start gap-2" style={{ background: 'rgba(229,46,66,0.08)', border: '1px solid var(--color-danger)' }}>
               <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-danger)' }} />
@@ -598,7 +662,55 @@ export default function LabPage() {
           )}
 
           {/* Lab Orders Table */}
-          <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+            {/* Title + inline stat pills (mirrors the Patients/Wards list-card header) */}
+            <div style={{ padding: '14px 16px 0' }}>
+              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+                <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
+                  Lab orders
+                </span>
+                <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
+                  {[
+                    { label: 'Total lab orders', value: labStats.total, color: 'var(--text-muted)' },
+                    { label: 'Completed', value: labStats.completed, color: 'var(--color-success)' },
+                    { label: 'Critical', value: labStats.critical, color: 'var(--color-danger)' },
+                    { label: 'Awaiting results', value: labStats.awaiting, color: '#B8741C' },
+                    { label: 'Overdue clinician review', value: overdueReviews.length, color: '#C44536' },
+                  ].map((s, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                      {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="listpage-table-toolbar">
+              <div className="listpage-table-search">
+                <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                <input
+                  type="search"
+                  value={quickSearch}
+                  onChange={e => setQuickSearch(e.target.value)}
+                  placeholder="Filter table"
+                  aria-label="Filter table"
+                />
+              </div>
+              <select
+                value={colFilters.status}
+                onChange={e => setColFilter('status', e.target.value)}
+                className="listpage-status-select"
+                aria-label="Filter lab orders by status"
+              >
+                <option value="">Filter lab orders by status</option>
+                <option value="pending">{t('lab.filterPending')}</option>
+                <option value="in_progress">{t('lab.inProgress')}</option>
+                <option value="completed">{t('referral.completed')}</option>
+              </select>
+              <button type="button" className="btn btn-secondary btn-sm" style={{ gap: 6 }} onClick={handleDownloadCsv}>
+                <Download size={15} /> Download
+              </button>
+            </div>
             <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             <table className="data-table" style={{ minWidth: 960 }}>
               <thead>
@@ -761,7 +873,7 @@ export default function LabPage() {
               <EmptyState
                 icon={FlaskConical}
                 title={t('lab.noPendingOrders')}
-                message={anyColFilter ? t('lab.noPatientsMatch') : t('lab.infoSystemSubtitle')}
+                message={anyFilterActive ? t('lab.noPatientsMatch') : t('lab.infoSystemSubtitle')}
               />
             )}
             </div>

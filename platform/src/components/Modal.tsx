@@ -10,6 +10,11 @@ interface ModalProps {
   width?: number;
   /** Vertical alignment of the dialog. Default 'center'. */
   align?: 'center' | 'top';
+  /**
+   * Layout variant. 'dialog' (default) is the centered popup; 'drawer' slides
+   * in as a full-height panel anchored to the right edge of the screen.
+   */
+  variant?: 'dialog' | 'drawer';
   /** When true, clicking the backdrop does not close the modal. Default false. */
   disableBackdropClose?: boolean;
   /** id of the element labelling the dialog (for a11y). */
@@ -32,9 +37,11 @@ export default function Modal({
   children,
   width = 600,
   align = 'center',
+  variant = 'dialog',
   disableBackdropClose = false,
   labelledBy,
 }: ModalProps) {
+  const isDrawer = variant === 'drawer';
   const [mounted, setMounted] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -69,12 +76,12 @@ export default function Modal({
         inset: 0,
         zIndex: 2000,
         display: 'flex',
-        alignItems: align === 'top' ? 'flex-start' : 'center',
-        justifyContent: 'center',
-        padding: 16,
+        alignItems: isDrawer ? 'stretch' : align === 'top' ? 'flex-start' : 'center',
+        justifyContent: isDrawer ? 'flex-end' : 'center',
+        padding: isDrawer ? 0 : 16,
         background: 'rgba(15, 31, 29, 0.70)',
         animation: 'modalFadeIn 0.2s ease-out',
-        overflowY: 'auto',
+        overflowY: isDrawer ? 'hidden' : 'auto',
       }}
     >
       <div
@@ -87,12 +94,13 @@ export default function Modal({
         style={{
           width: '100%',
           maxWidth: width,
-          maxHeight: 'calc(100vh - 32px)',
+          maxHeight: isDrawer ? '100vh' : 'calc(100vh - 32px)',
+          height: isDrawer ? '100vh' : undefined,
           display: 'flex',
           flexDirection: 'column',
           outline: 'none',
-          margin: align === 'top' ? '24px 0' : 0,
-          animation: 'modalSlideUp 0.25s ease-out',
+          margin: isDrawer ? 0 : align === 'top' ? '24px 0' : 0,
+          animation: isDrawer ? 'modalSlideInRight 0.28s ease-out' : 'modalSlideUp 0.25s ease-out',
         }}
       >
         {children}

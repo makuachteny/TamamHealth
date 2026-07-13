@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import EmptyState from '@/components/EmptyState';
 import PatientName from '@/components/PatientName';
 import Badge, { type BadgeTone } from '@/components/Badge';
@@ -18,7 +17,7 @@ import type { ImmunizationDefaulter } from '@/lib/services/immunization-service'
 import type { ImmunizationDoc } from '@/lib/db-types';
 import {
   Syringe, Search, Plus, X, CheckCircle2, Clock, AlertTriangle,
-  XCircle, ChevronDown, ChevronUp, Users, ExternalLink, Edit3,
+  XCircle, ChevronDown, ChevronUp, Users, ExternalLink, Edit3, Download,
 } from '@/components/icons/lucide';
 
 const VACCINES = ['BCG', 'OPV', 'Penta', 'PCV', 'Rota', 'Measles', 'Yellow Fever', 'Vitamin A'];
@@ -42,9 +41,15 @@ export default function ImmunizationsPage() {
   // a population-health view for facility management and the Ministry of Health.
   // Clinical roles (doctors, nurses, etc.) just work the records and defaulters.
   const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
-  // Text search comes from the shared global search bar (TopBar).
-  const search = globalSearch;
   const [showModal, setShowModal] = useState(false);
+  // Header "vaccine" filter — scopes both the KPI stat cards and the main
+  // per-child table to a single antigen. 'all' = no filter.
+  const [vaccineFilter, setVaccineFilter] = useState<string>('all');
+  // Table toolbar: local search over child name (combined with the shared
+  // global search bar, same pattern as /appointments and /patients) and a
+  // status filter over whether a child has any overdue/missed dose.
+  const [tableSearch, setTableSearch] = useState('');
+  const [childStatusFilter, setChildStatusFilter] = useState<'all' | 'up_to_date' | 'has_overdue'>('all');
   // Edit/correct affordance for a saved dose. Clinical records are corrected
   // (via updateImmunization), never hard-deleted, so a fix preserves audit/sync.
   const [editDose, setEditDose] = useState<ImmunizationDoc | null>(null);
@@ -137,13 +142,62 @@ export default function ImmunizationsPage() {
     return groups;
   }, [immunizations]);
 
+  // Text search: local table search combined with the shared global search bar.
+  const combinedSearch = `${tableSearch} ${globalSearch}`.trim();
+
   const filteredChildren = useMemo(() => {
     const entries = Array.from(childGroups.entries());
-    const q = search.toLowerCase();
-    return entries.filter(([, records]) =>
-      !search || records[0]?.patientName?.toLowerCase().includes(q)
-    );
-  }, [childGroups, search]);
+    const q = combinedSearch.toLowerCase();
+    return entries.filter(([, records]) => {
+      if (vaccineFilter !== 'all' && !records.some(r => r.vaccine === vaccineFilter)) return false;
+      if (q && !records[0]?.patientName?.toLowerCase().includes(q)) return false;
+      if (childStatusFilter !== 'all') {
+        const hasOverdue = records.some(r => r.status === 'overdue' || r.status === 'missed');
+        if (childStatusFilter === 'has_overdue' && !hasOverdue) return false;
+        if (childStatusFilter === 'up_to_date' && hasOverdue) return false;
+      }
+      return true;
+    });
+  }, [childGroups, combinedSearch, vaccineFilter, childStatusFilter]);
+
+  // Whether the empty state should show "no matches" (vs. "no records at all").
+  const hasActiveFilters = !!combinedSearch || vaccineFilter !== 'all' || childStatusFilter !== 'all';
+
+  // KPI stat cards — scoped to the selected vaccine where it makes sense
+  // (total doses / given-today / overdue); facility-wide otherwise.
+  const today = new Date().toISOString().slice(0, 10);
+  const vaccineFilteredImms = useMemo(
+    () => (vaccineFilter === 'all' ? immunizations : immunizations.filter(i => i.vaccine === vaccineFilter)),
+    [immunizations, vaccineFilter]
+  );
+  const vaccineFilteredDefaulters = useMemo(
+    () => (vaccineFilter === 'all' ? defaulters : defaulters.filter(d => d.vaccine === vaccineFilter)),
+    [defaulters, vaccineFilter]
+  );
+  const totalDosesGiven = useMemo(() => vaccineFilteredImms.filter(i => i.status === 'completed').length, [vaccineFilteredImms]);
+  const givenToday = useMemo(() => vaccineFilteredImms.filter(i => i.status === 'completed' && i.dateGiven === today).length, [vaccineFilteredImms, today]);
+  const selectedCoverage = vaccineFilter !== 'all' ? coverage?.find(c => c.vaccine === vaccineFilter) : undefined;
+
+  // Export the currently filtered per-child table as CSV — one summary row per child.
+  const handleDownloadCsv = () => {
+    const header = ['Child name', 'Date of birth', 'Gender', 'Facility', 'Completed doses', 'Overdue doses'];
+    const rows = filteredChildren.map(([, records]) => {
+      const child = records[0];
+      const scoped = vaccineFilter === 'all' ? records : records.filter(r => r.vaccine === vaccineFilter);
+      const completed = scoped.filter(r => r.status === 'completed').length;
+      const overdue = scoped.filter(r => r.status === 'overdue' || r.status === 'missed').length;
+      return [child?.patientName || '', child?.dateOfBirth || '', child?.gender || '', child?.facilityName || '', completed, overdue];
+    });
+    const csv = [header, ...rows]
+      .map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `immunizations-${vaccineFilter === 'all' ? 'all' : vaccineFilter.toLowerCase().replace(/\s+/g, '-')}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,55 +247,75 @@ export default function ImmunizationsPage() {
 
   if (loading) {
     return (
-      <>
-        <TopBar title={t('immun.title')} />
-        <main className="page-container page-enter">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('immun.loadingRecords')}</p>
-            </div>
+      <main className="page-container page-enter">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('immun.loadingRecords')}</p>
           </div>
-        </main>
-      </>
+        </div>
+      </main>
     );
   }
 
   return (
-    <>
-      <TopBar title={t('immun.title')} actions={
-        canRecordVitalEvents && (
-          <button onClick={() => setShowModal(true)} className="btn btn-primary">
+    <main className="page-container page-enter">
+      {/* ═══ Page header ═══ */}
+      <div className="listpage-header">
+        <div className="listpage-header-title">
+          <div className="listpage-header-icon"><Syringe size={22} /></div>
+          <div>
+            <p className="listpage-eyebrow">{currentUser?.hospitalName || 'Clinic'}</p>
+            <h1 className="listpage-title">{t('immun.title')}</h1>
+          </div>
+        </div>
+        <div className="listpage-header-controls">
+          <select
+            value={vaccineFilter}
+            onChange={e => setVaccineFilter(e.target.value)}
+            className="listpage-service-select"
+            aria-label="Filter by vaccine"
+          >
+            <option value="all">Filter by vaccine</option>
+            {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Tab switcher */}
+      <div className="flex gap-0 border-b mt-4 mb-1 overflow-x-auto" style={{ borderColor: 'var(--border-light)' }}>
+        <button onClick={() => setActiveTab('records')}
+          className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${activeTab === 'records' ? 'tab-active' : ''}`}
+          style={{ color: activeTab === 'records' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+          {t('immun.tabRecords', { count: stats?.totalChildren || 0 })}
+        </button>
+        {canViewCoverage && (
+          <button onClick={() => setActiveTab('by_vaccine')}
+            className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${activeTab === 'by_vaccine' ? 'tab-active' : ''}`}
+            style={{ color: activeTab === 'by_vaccine' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+            By Vaccine
+          </button>
+        )}
+        <button onClick={() => setActiveTab('defaulters')}
+          className={`px-4 py-3 text-sm font-medium flex items-center gap-2 whitespace-nowrap ${activeTab === 'defaulters' ? 'tab-active' : ''}`}
+          style={{ color: activeTab === 'defaulters' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+          {t('immun.tabDefaulters', { count: defaulterStats?.uniqueChildren || 0 })}
+          {defaulterStats && defaulterStats.critical > 0 && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(229,46,66,0.15)', color: 'var(--color-danger)' }}>
+              {t('immun.criticalBadge', { count: defaulterStats.critical })}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ═══ Actions row ═══ */}
+      <div className="listpage-actions-row">
+        {canRecordVitalEvents && (
+          <button onClick={() => setShowModal(true)} className="btn btn-primary" style={{ gap: 8 }}>
             <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}
           </button>
-        )
-      } />
-      <main className="page-container page-enter">
-        {/* Tab switcher */}
-        <div className="flex gap-0 border-b mb-5 overflow-x-auto" style={{ borderColor: 'var(--border-light)' }}>
-          <button onClick={() => setActiveTab('records')}
-            className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${activeTab === 'records' ? 'tab-active' : ''}`}
-            style={{ color: activeTab === 'records' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-            {t('immun.tabRecords', { count: stats?.totalChildren || 0 })}
-          </button>
-          {canViewCoverage && (
-            <button onClick={() => setActiveTab('by_vaccine')}
-              className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${activeTab === 'by_vaccine' ? 'tab-active' : ''}`}
-              style={{ color: activeTab === 'by_vaccine' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-              By Vaccine
-            </button>
-          )}
-          <button onClick={() => setActiveTab('defaulters')}
-            className={`px-4 py-3 text-sm font-medium flex items-center gap-2 whitespace-nowrap ${activeTab === 'defaulters' ? 'tab-active' : ''}`}
-            style={{ color: activeTab === 'defaulters' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-            {t('immun.tabDefaulters', { count: defaulterStats?.uniqueChildren || 0 })}
-            {defaulterStats && defaulterStats.critical > 0 && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(229,46,66,0.15)', color: 'var(--color-danger)' }}>
-                {t('immun.criticalBadge', { count: defaulterStats.critical })}
-              </span>
-            )}
-          </button>
-        </div>
+        )}
+      </div>
 
         {/* By Vaccine — population-level outreach view */}
         {activeTab === 'by_vaccine' && canViewCoverage && (
@@ -509,20 +583,59 @@ export default function ImmunizationsPage() {
         {/* Vaccine Schedule Table — Grouped by Child */}
         {activeTab === 'records' && (
         <div className="card-elevated overflow-hidden">
-          <div className="p-4 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-            <span className="icon-box-sm">
-              <Syringe className="w-4 h-4" style={{ color: '#059669' }} />
-            </span>
-            <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+          {/* Title + inline vaccination stat pills (mirrors the Patients/Wards header pattern) */}
+          <div className="flex items-end justify-between gap-3 mb-3 flex-wrap px-4 pt-4">
+            <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
               {t('immun.vaccinationRecords', { count: filteredChildren.length })}
-            </h3>
+            </span>
+            <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
+              {[
+                { label: `Doses${vaccineFilter !== 'all' ? ` · ${vaccineFilter}` : ''}`, value: totalDosesGiven, color: 'var(--text-muted)' },
+                { label: 'Given today', value: givenToday, color: '#15795C' },
+                { label: 'Overdue', value: vaccineFilteredDefaulters.length, color: '#C44536' },
+                { label: 'Children with overdue doses', value: defaulterStats?.uniqueChildren || 0, color: '#B8741C' },
+                { label: vaccineFilter === 'all' ? 'Children tracked' : `${vaccineFilter} coverage`, value: vaccineFilter === 'all' ? (stats?.totalChildren || 0) : `${selectedCoverage?.percentage ?? 0}%`, color: '#2191D0' },
+              ].map((s, i) => (
+                <span key={i} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                  {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="listpage-table-toolbar">
+            <div className="listpage-table-search">
+              <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              <input
+                type="search"
+                value={tableSearch}
+                onChange={e => setTableSearch(e.target.value)}
+                placeholder="Filter by child name"
+                aria-label="Filter by child name"
+              />
+            </div>
+            <select
+              value={childStatusFilter}
+              onChange={e => setChildStatusFilter(e.target.value as 'all' | 'up_to_date' | 'has_overdue')}
+              className="listpage-status-select"
+              aria-label="Filter children by immunization status"
+            >
+              <option value="all">All children</option>
+              <option value="up_to_date">Up to date</option>
+              <option value="has_overdue">Has overdue doses</option>
+            </select>
+            <button type="button" className="btn btn-secondary btn-sm" style={{ gap: 6 }} onClick={handleDownloadCsv}>
+              <Download size={15} /> Download
+            </button>
           </div>
 
           {filteredChildren.map(([childId, records]) => {
             const child = records[0];
             const isExpanded = expandedChild === childId;
-            const completedCount = records.filter(r => r.status === 'completed').length;
-            const overdueCount = records.filter(r => r.status === 'overdue' || r.status === 'missed').length;
+            const scopedRecords = vaccineFilter === 'all' ? records : records.filter(r => r.vaccine === vaccineFilter);
+            const vaccinesToShow = vaccineFilter === 'all' ? VACCINES : [vaccineFilter];
+            const completedCount = scopedRecords.filter(r => r.status === 'completed').length;
+            const overdueCount = scopedRecords.filter(r => r.status === 'overdue' || r.status === 'missed').length;
 
             const toggle = () => setExpandedChild(isExpanded ? null : childId);
             return (
@@ -561,8 +674,8 @@ export default function ImmunizationsPage() {
                 {isExpanded && (
                   <div className="px-4 pb-4">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 data-row-divider-sm">
-                      {VACCINES.map(vac => {
-                        const doses = records.filter(r => r.vaccine === vac);
+                      {vaccinesToShow.map(vac => {
+                        const doses = scopedRecords.filter(r => r.vaccine === vac);
                         if (doses.length === 0) return (
                           <div key={vac} className="p-2 rounded-lg border" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
                             <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{vac}</p>
@@ -605,11 +718,11 @@ export default function ImmunizationsPage() {
           {filteredChildren.length === 0 && (
             <EmptyState
               icon={Syringe}
-              title={search ? t('immun.noMatchingChildren') : t('immun.noRecordsYet')}
-              message={search
+              title={hasActiveFilters ? t('immun.noMatchingChildren') : t('immun.noRecordsYet')}
+              message={hasActiveFilters
                 ? t('immun.noMatchingMessage')
                 : t('immun.noRecordsMessage')}
-              action={!search && canRecordVitalEvents ? { label: t('immun.recordVaccinationAction'), onClick: () => setShowModal(true) } : undefined}
+              action={!hasActiveFilters && canRecordVitalEvents ? { label: t('immun.recordVaccinationAction'), onClick: () => setShowModal(true) } : undefined}
             />
           )}
         </div>
@@ -819,7 +932,6 @@ export default function ImmunizationsPage() {
             </div>
           </div>
         )}
-      </main>
-    </>
+    </main>
   );
 }

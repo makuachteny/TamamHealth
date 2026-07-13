@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from '@/components/Modal';
 import { useSearchParams, useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import {
-  Users, Plus, X, Trash2, Search,
+  Users, Plus, X, Trash2, Search, Download,
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
 import { useApp } from '@/lib/context';
@@ -163,6 +162,27 @@ export default function HRPage() {
     });
   }, [facilityUsers, rosterSearch, rosterRole]);
 
+  // Export the currently filtered roster to CSV.
+  const handleDownloadCsv = () => {
+    const header = ['Name', 'Role', 'Username', 'Facility', 'Status'];
+    const rows = filteredRosterUsers.map(u => [
+      u.name,
+      u.role.replace(/_/g, ' '),
+      u.username,
+      u.hospitalName || '',
+      u.isActive === false ? 'Inactive' : 'Active',
+    ]);
+    const csv = [header, ...rows]
+      .map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'staff-roster.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   // ── Handlers ────────────────────────────────────────────────────────
   const handleRequestLeave = async () => {
     if (!leaveForm.userId) { showToast(t('hr.selectStaffMember'), 'error'); return; }
@@ -288,47 +308,68 @@ export default function HRPage() {
     }
   };
 
+  const activeStaffCount = facilityUsers.filter(u => u.isActive !== false).length;
+  const inactiveStaffCount = facilityUsers.filter(u => u.isActive === false).length;
+
+  const sectionTitles: Record<TabId, string> = {
+    roster: 'All staff',
+    leave: 'Leave requests',
+    schedule: 'Shift schedule',
+    payroll: 'Payroll register',
+  };
+
   return (
     <>
-      <TopBar title={t('hr.topBarTitle')} actions={
-        <div className="flex gap-2">
-          {tab === 'leave' && (
-            <button onClick={() => setLeaveOpen(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('hr.requestLeave')}
-            </button>
-          )}
-          {tab === 'schedule' && (
-            <button onClick={() => setScheduleOpen(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('hr.scheduleShift')}
-            </button>
-          )}
-          {tab === 'payroll' && (
-            <button onClick={() => setPayrollOpen(true)} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> {t('hr.addPayrollEntry')}
-            </button>
-          )}
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+        {/* ── Page header ── */}
+        <div className="listpage-header">
+          <div className="listpage-header-title">
+            <div className="listpage-header-icon"><Users size={22} /></div>
+            <div>
+              <p className="listpage-eyebrow">{currentUser?.hospitalName || 'Clinic'}</p>
+              <h1 className="listpage-title">Staff &amp; HR</h1>
+            </div>
+          </div>
+          <div className="listpage-header-controls">
+            <select
+              value={rosterRole}
+              onChange={e => setRosterRole(e.target.value)}
+              className="listpage-service-select"
+              aria-label={t('hr.colRole')}
+            >
+              <option value="all">{t('hr.allRoles')} ({facilityUsers.length})</option>
+              {Object.entries(roleCounts).sort((a, b) => a[0].localeCompare(b[0])).map(([role, count]) => (
+                <option key={role} value={role} className="capitalize">
+                  {role.replace(/_/g, ' ')} ({count})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-      } />
-      <main className="page-container page-enter">
-        {/* Summary KPIs (leave-focused — stays useful across tabs) */}
-        {leaveSummary && (
-          <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch' }}>
-            {[
-              { label: t('hr.kpiActiveStaff'), value: facilityUsers.length, accent: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
-              { label: t('hr.kpiPendingLeave'), value: leaveSummary.pending, accent: 'var(--color-warning-text)', bg: 'rgba(228, 168, 75, 0.12)', border: 'rgba(228, 168, 75, 0.30)' },
-              { label: t('hr.kpiApprovedUpcoming'), value: leaveSummary.upcoming, accent: 'var(--accent-primary)', bg: 'rgba(33, 145, 208, 0.10)', border: 'rgba(59, 130, 246, 0.26)' },
-              { label: t('hr.kpiDaysOffThisMonth'), value: leaveSummary.daysApprovedThisMonth, accent: 'var(--color-success-text)', bg: 'rgba(27, 158, 119, 0.10)', border: 'rgba(27, 158, 119, 0.26)' },
-            ].map(k => (
-              <div key={k.label} style={{ padding: '14px 16px', borderRadius: 10, background: k.bg, border: `1px solid ${k.border}` }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: k.accent }}>{k.label}</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, marginTop: 2 }}>{k.value}</div>
-              </div>
-            ))}
+
+        {/* ── Actions row ── */}
+        {tab !== 'roster' && (
+          <div className="listpage-actions-row">
+            {tab === 'leave' && (
+              <button onClick={() => setLeaveOpen(true)} className="btn btn-primary">
+                <Plus className="w-4 h-4" /> {t('hr.requestLeave')}
+              </button>
+            )}
+            {tab === 'schedule' && (
+              <button onClick={() => setScheduleOpen(true)} className="btn btn-primary">
+                <Plus className="w-4 h-4" /> {t('hr.scheduleShift')}
+              </button>
+            )}
+            {tab === 'payroll' && (
+              <button onClick={() => setPayrollOpen(true)} className="btn btn-primary">
+                <Plus className="w-4 h-4" /> {t('hr.addPayrollEntry')}
+              </button>
+            )}
           </div>
         )}
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-4 flex-wrap">
+        <div className="flex gap-2 mb-4 flex-wrap" style={{ marginTop: tab === 'roster' ? 16 : 0 }}>
           {([
             { id: 'roster', label: t('hr.staffRoster') },
             { id: 'leave', label: t('hr.leaveRequests') },
@@ -356,39 +397,42 @@ export default function HRPage() {
         {/* ── ROSTER ──────────────────────────────────────── */}
         {tab === 'roster' && (
           <div className="dash-card overflow-hidden">
-            <div className="p-4 pb-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('hr.activeRoster')}</h3>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-                    <input
-                      type="text"
-                      value={rosterSearch}
-                      onChange={e => setRosterSearch(e.target.value)}
-                      placeholder={t('hr.searchStaffPlaceholder')}
-                      className="text-[12px] rounded-full pl-7 pr-3 py-1.5 outline-none"
-                      style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', minWidth: 200 }}
-                    />
-                  </div>
-                  <select
-                    value={rosterRole}
-                    onChange={e => setRosterRole(e.target.value)}
-                    className="text-[12px] font-medium capitalize rounded-full px-3 py-1.5 outline-none"
-                    style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
-                  >
-                    <option value="all">{t('hr.allRoles')} ({facilityUsers.length})</option>
-                    {Object.entries(roleCounts).sort((a, b) => a[0].localeCompare(b[0])).map(([role, count]) => (
-                      <option key={role} value={role} className="capitalize">
-                        {role.replace(/_/g, ' ')} ({count})
-                      </option>
-                    ))}
-                  </select>
+            <div className="px-4 pt-4">
+              {/* Title + staff/leave/shift stats (inline, right-aligned — mirrors the
+                  wards "Current Admissions" header instead of separate stat cards). */}
+              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+                <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
+                  {sectionTitles[tab]}
+                </span>
+                <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
+                  {[
+                    { label: 'Total staff', value: facilityUsers.length, color: 'var(--text-muted)' },
+                    { label: 'Active', value: activeStaffCount, color: 'var(--color-success)' },
+                    { label: 'Inactive', value: inactiveStaffCount, color: 'var(--color-danger)' },
+                    { label: 'Pending leave requests', value: leaveSummary?.pending ?? 0, color: '#B8741C' },
+                    { label: 'Shifts scheduled today', value: schedules.length, color: '#2191D0' },
+                  ].map((s, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                      {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
+                    </span>
+                  ))}
                 </div>
               </div>
+            </div>
+            <div className="listpage-table-toolbar">
+              <div className="listpage-table-search">
+                <Search className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                <input
+                  type="text"
+                  value={rosterSearch}
+                  onChange={e => setRosterSearch(e.target.value)}
+                  placeholder={t('hr.searchStaffPlaceholder')}
+                />
+              </div>
+              <button type="button" onClick={handleDownloadCsv} className="btn btn-secondary btn-sm">
+                <Download className="w-4 h-4" /> Download
+              </button>
             </div>
             <div className="overflow-x-auto">
             <table className="data-table" style={{ minWidth: 600 }}>

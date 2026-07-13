@@ -14,6 +14,7 @@ import {
   User, Activity, FlaskConical, Paperclip, XCircle, MessageSquarePlus,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ClipboardCheck, Bell, RotateCcw,
+  Search, Download,
 } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useReferrals } from '@/lib/hooks/useReferrals';
@@ -164,6 +165,37 @@ export default function ReferralsPage() {
       cancelled: t('referral.cancelled'),
     };
     return map[status] || status;
+  };
+
+  // KPI counts for the header stat cards — scoped to the active tab so the
+  // numbers update as the clinician switches between incoming and outgoing.
+  const acceptedCount = activeReferrals.filter(r => r.status === 'seen' || r.status === 'completed').length;
+  const declinedCount = activeReferrals.filter(r => r.status === 'cancelled').length;
+  const pendingCount = activeReferrals.filter(r => r.status === 'sent' || r.status === 'received').length;
+  const completedCount = activeReferrals.filter(r => r.status === 'completed').length;
+
+  // Export the currently filtered rows (tab + search + structured filters applied)
+  // to CSV, modeled on the patients/appointments list-page download.
+  const handleDownloadCsv = () => {
+    const header = ['Patient', 'Hospital ID', 'Route', 'Department', 'Urgency', 'Status', 'Date'];
+    const rows = filteredReferrals.map(ref => [
+      ref.patientName,
+      hospitalNoFor(ref.patientId),
+      `${ref.fromHospital} → ${ref.toHospital}`,
+      ref.department,
+      t(`referrals.urgency_${ref.urgency}`),
+      getStatusLabel(ref.status),
+      ref.referralDate,
+    ]);
+    const csv = [header, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `referrals-${activeTab}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleDecline = async () => {
@@ -502,86 +534,97 @@ export default function ReferralsPage() {
   };
 
   return (
-    <>
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <PageInstructionCard />
-        <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          {/* ── Card toolbar ── */}
-          <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            {/* Tabs as big titles + stats on right */}
-            <div className="flex items-end justify-between gap-3 mb-3">
-              <div className="flex items-end gap-6">
-                <button
-                  onClick={() => setActiveTab('incoming')}
-                  className="transition-colors focus:outline-none"
-                  style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'incoming' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-                >
-                  {t('referrals.incoming')}
-                  {newIncomingCount > 0 && (
-                    <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: 'var(--color-danger)', color: '#fff', verticalAlign: 'middle' }}>
-                      {newIncomingCount}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => setActiveTab('outgoing')}
-                  className="transition-colors focus:outline-none"
-                  style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: activeTab === 'outgoing' ? '#000000' : 'rgba(0,0,0,0.30)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-                >
-                  {t('referrals.outgoing')}
-                </button>
-              </div>
-              <div className="flex items-center gap-3 flex-shrink-0 pb-0.5">
-                <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#2191D0' }} />
-                  Incoming ({incomingReferrals.length})
-                </span>
-                <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#D97706' }} />
-                  Outgoing ({outgoingReferrals.length})
-                </span>
-              </div>
-            </div>
-            {/* Search + filter row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <input
-                  type="text"
-                  value={localSearch}
-                  onChange={e => setLocalSearch(e.target.value)}
-                  placeholder="Search by patient, hospital, or department…"
-                  style={{ padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
-                />
-              </div>
-              <ReferralFilters
-                filters={colFilters}
-                setFilter={setColFilter}
-                clearAll={clearColFilters}
-                urgencyOptions={urgencyOptions}
-                statusOptions={[
-                  { v: 'sent', l: getStatusLabel('sent') },
-                  { v: 'received', l: getStatusLabel('received') },
-                  { v: 'seen', l: getStatusLabel('seen') },
-                  { v: 'completed', l: getStatusLabel('completed') },
-                  { v: 'cancelled', l: getStatusLabel('cancelled') },
-                ]}
-              />
-              {canManageReferrals && (
-                <button
-                  onClick={() => setShowNewReferral(true)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 999, background: '#2191D0', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                >
-                  <Plus className="w-4 h-4" /> {t('referrals.newReferral')}
-                </button>
-              )}
+
+        {/* ═══ Page header ═══ */}
+        <div className="listpage-header">
+          <div className="listpage-header-title">
+            <div className="listpage-header-icon"><ArrowRightLeft size={22} /></div>
+            <div>
+              <p className="listpage-eyebrow">{currentUser?.hospitalName || 'Clinic'}</p>
+              <h1 className="listpage-title">{t('referrals.pageTitle')}</h1>
             </div>
           </div>
-          {/* Scrollable body */}
-          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <div className="listpage-header-controls">
+            <select
+              value={activeTab}
+              onChange={e => setActiveTab(e.target.value as 'incoming' | 'outgoing')}
+              className="listpage-service-select"
+              aria-label="Filter referrals by direction"
+            >
+              <option value="incoming">{`Incoming referrals${newIncomingCount > 0 ? ` (${newIncomingCount} new)` : ''}`}</option>
+              <option value="outgoing">Outgoing referrals</option>
+            </select>
+          </div>
+        </div>
 
-          {/* Referrals table */}
-          <div className="overflow-hidden">
-            <div style={{ overflowX: 'auto' }}>
+        {/* ═══ New referral action ═══ */}
+        {canManageReferrals && (
+          <div className="listpage-actions-row">
+            <button type="button" className="btn btn-primary" style={{ gap: 8 }} onClick={() => setShowNewReferral(true)}>
+              <Plus size={16} /> {t('referrals.newReferral')}
+            </button>
+          </div>
+        )}
+
+        {/* ═══ Table card ═══ */}
+        <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          {/* Title + referral stats (inline, right-aligned — mirrors the wards
+              "Current Admissions" / patients "All patients" header instead of
+              separate stat cards). */}
+          <div className="px-4 pt-4">
+            <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+              <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
+                {activeTab === 'incoming' ? 'Incoming' : 'Outgoing'} referrals
+              </span>
+              <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
+                {[
+                  { label: 'Total referrals', value: activeReferrals.length, color: 'var(--text-muted)' },
+                  { label: 'Accepted', value: acceptedCount, color: '#15795C' },
+                  { label: 'Declined', value: declinedCount, color: '#C44536' },
+                  { label: 'Pending / awaiting response', value: pendingCount, color: '#B8741C' },
+                  { label: 'Completed', value: completedCount, color: '#2191D0' },
+                ].map(s => (
+                  <span key={s.label} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                    {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="listpage-table-toolbar">
+            <div className="listpage-table-search">
+              <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              <input
+                type="search"
+                value={localSearch}
+                onChange={e => setLocalSearch(e.target.value)}
+                placeholder="Search by patient, hospital, or department…"
+                aria-label="Filter table"
+              />
+            </div>
+            <ReferralFilters
+              filters={colFilters}
+              setFilter={setColFilter}
+              clearAll={clearColFilters}
+              urgencyOptions={urgencyOptions}
+              statusOptions={[
+                { v: 'sent', l: getStatusLabel('sent') },
+                { v: 'received', l: getStatusLabel('received') },
+                { v: 'seen', l: getStatusLabel('seen') },
+                { v: 'completed', l: getStatusLabel('completed') },
+                { v: 'cancelled', l: getStatusLabel('cancelled') },
+              ]}
+            />
+            <button type="button" className="btn btn-secondary btn-sm" style={{ gap: 6 }} onClick={handleDownloadCsv}>
+              <Download size={15} /> Download
+            </button>
+          </div>
+
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             {filteredReferrals.length === 0 ? (
               <div className="p-8">
                 <EmptyState
@@ -744,201 +787,199 @@ export default function ReferralsPage() {
               </tbody>
             </table>
             )}
+          </div>
+        </div>
+
+        {showNewReferral && (
+          <ReferralFormModal onClose={() => setShowNewReferral(false)} />
+        )}
+
+        {/* Reverse status confirmation — undo an acceptance or reopen a
+            declined referral. Clinical reversals are confirmed first. */}
+        {reverseModal && (
+          <Modal onClose={() => setReverseModal(null)}>
+            <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('action.reverse')}</h3>
+                <button onClick={() => setReverseModal(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                {reverseModal.name} &middot; {getStatusLabel(reverseModal.to)}
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => setReverseModal(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
+                <button onClick={handleReverseStatus} disabled={actionSubmitting} className="btn btn-primary flex-1">
+                  {actionSubmitting ? t('referrals.saving') : t('action.confirm')}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* Add Note Modal */}
+        {noteModalId && (
+          <Modal onClose={() => setNoteModalId(null)}>
+            <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('action.addNote')}</h3>
+                <button onClick={() => setNoteModalId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+                {t('referrals.addNoteHint')}
+              </p>
+              <textarea
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+                rows={4}
+                placeholder={t('referrals.notePlaceholder')}
+                className="w-full mb-4"
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
+              />
+              <div className="flex gap-2">
+                <button onClick={() => setNoteModalId(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
+                <button onClick={handleAddNote} disabled={!noteText.trim() || actionSubmitting} className="btn btn-primary flex-1" style={{ opacity: !noteText.trim() ? 0.5 : 1 }}>
+                  {actionSubmitting ? t('referrals.saving') : t('action.addNote')}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* Decline Modal */}
+        {declineModalId && (
+          <Modal onClose={() => setDeclineModalId(null)}>
+            <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referrals.declineReferral')}</h3>
+                <button onClick={() => setDeclineModalId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+                {t('referrals.declineHint')}
+              </p>
+              <textarea
+                value={declineReason}
+                onChange={e => setDeclineReason(e.target.value)}
+                rows={3}
+                placeholder={t('referrals.declinePlaceholder')}
+                className="w-full mb-4"
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
+              />
+              <div className="flex gap-2">
+                <button onClick={() => setDeclineModalId(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
+                <button onClick={handleDecline} disabled={!declineReason.trim() || actionSubmitting} className="btn btn-primary flex-1" style={{ opacity: !declineReason.trim() ? 0.5 : 1, background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}>
+                  {actionSubmitting ? t('referrals.declining') : t('referrals.confirmDecline')}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* Complete Modal */}
+        {completeModalId && (
+          <Modal onClose={() => setCompleteModalId(null)}>
+            <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referrals.completeReferral')}</h3>
+                <button onClick={() => setCompleteModalId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+                {t('referrals.completeHint')}
+              </p>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('referrals.outcomeDisposition')}</label>
+              <select
+                value={completeDisposition}
+                onChange={e => setCompleteDisposition(e.target.value as ReferralDisposition)}
+                className="w-full mb-3"
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
+              >
+                {DISPOSITION_OPTIONS.map(d => (
+                  <option key={d} value={d}>{t(`referrals.disposition_${d}`)}</option>
+                ))}
+              </select>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('referrals.outcomeSummary')}</label>
+              <textarea
+                value={completeOutcome}
+                onChange={e => setCompleteOutcome(e.target.value)}
+                rows={3}
+                placeholder={t('referrals.completePlaceholder')}
+                className="w-full mb-3"
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
+              />
+              <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('referrals.outcomeFollowUp')}</label>
+              <textarea
+                value={completeFollowUp}
+                onChange={e => setCompleteFollowUp(e.target.value)}
+                rows={2}
+                placeholder={t('referrals.outcomeFollowUpPlaceholder')}
+                className="w-full mb-4"
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
+              />
+              <div className="flex gap-2">
+                <button onClick={() => setCompleteModalId(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
+                <button onClick={handleComplete} disabled={!completeOutcome.trim() || actionSubmitting} className="btn btn-primary flex-1" style={{ opacity: !completeOutcome.trim() ? 0.5 : 1, background: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
+                  {actionSubmitting ? t('referrals.completing') : t('referrals.markComplete')}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* Preview Modal for attachments */}
+        {previewAttachment && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-8"
+            style={{ background: 'rgba(0,0,0,0.75)' }}
+            onClick={() => setPreviewAttachment(null)}
+          >
+            <div
+              className="relative max-w-4xl max-h-[90vh] rounded-xl overflow-hidden"
+              style={{ background: 'var(--bg-card)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="flex items-center gap-2">
+                  {isImage(previewAttachment.mimeType) ? <ImageIcon className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} /> : <FileText className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />}
+                  <span className="text-sm font-medium">{previewAttachment.name}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatFileSize(previewAttachment.sizeBytes)}</span>
+                </div>
+                <button onClick={() => setPreviewAttachment(null)} className="p-1 rounded" style={{ background: 'var(--overlay-subtle)' }}>
+                  <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                </button>
+              </div>
+              <div className="p-4 overflow-auto" style={{ maxHeight: 'calc(90vh - 60px)' }}>
+                {isImage(previewAttachment.mimeType) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`data:${previewAttachment.mimeType};base64,${previewAttachment.base64Data}`}
+                    alt={previewAttachment.name}
+                    className="max-w-full h-auto rounded"
+                  />
+                ) : previewAttachment.mimeType === 'application/pdf' ? (
+                  <iframe
+                    src={`data:application/pdf;base64,${previewAttachment.base64Data}`}
+                    className="w-full rounded"
+                    style={{ height: '70vh' }}
+                    title={previewAttachment.name}
+                  />
+                ) : (
+                  <div className="text-center py-12">
+                    <FileText className="w-16 h-16 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('referrals.previewNotAvailable')}</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-
-          {showNewReferral && (
-            <ReferralFormModal onClose={() => setShowNewReferral(false)} />
-          )}
-
-          {/* Reverse status confirmation — undo an acceptance or reopen a
-              declined referral. Clinical reversals are confirmed first. */}
-          {reverseModal && (
-            <Modal onClose={() => setReverseModal(null)}>
-              <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('action.reverse')}</h3>
-                  <button onClick={() => setReverseModal(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
-                  {reverseModal.name} &middot; {getStatusLabel(reverseModal.to)}
-                </p>
-                <div className="flex gap-2">
-                  <button onClick={() => setReverseModal(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
-                  <button onClick={handleReverseStatus} disabled={actionSubmitting} className="btn btn-primary flex-1">
-                    {actionSubmitting ? t('referrals.saving') : t('action.confirm')}
-                  </button>
-                </div>
-              </div>
-            </Modal>
-          )}
-
-          {/* Add Note Modal */}
-          {noteModalId && (
-            <Modal onClose={() => setNoteModalId(null)}>
-              <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('action.addNote')}</h3>
-                  <button onClick={() => setNoteModalId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                  {t('referrals.addNoteHint')}
-                </p>
-                <textarea
-                  value={noteText}
-                  onChange={e => setNoteText(e.target.value)}
-                  rows={4}
-                  placeholder={t('referrals.notePlaceholder')}
-                  className="w-full mb-4"
-                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
-                />
-                <div className="flex gap-2">
-                  <button onClick={() => setNoteModalId(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
-                  <button onClick={handleAddNote} disabled={!noteText.trim() || actionSubmitting} className="btn btn-primary flex-1" style={{ opacity: !noteText.trim() ? 0.5 : 1 }}>
-                    {actionSubmitting ? t('referrals.saving') : t('action.addNote')}
-                  </button>
-                </div>
-              </div>
-            </Modal>
-          )}
-
-          {/* Decline Modal */}
-          {declineModalId && (
-            <Modal onClose={() => setDeclineModalId(null)}>
-              <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referrals.declineReferral')}</h3>
-                  <button onClick={() => setDeclineModalId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                  {t('referrals.declineHint')}
-                </p>
-                <textarea
-                  value={declineReason}
-                  onChange={e => setDeclineReason(e.target.value)}
-                  rows={3}
-                  placeholder={t('referrals.declinePlaceholder')}
-                  className="w-full mb-4"
-                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
-                />
-                <div className="flex gap-2">
-                  <button onClick={() => setDeclineModalId(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
-                  <button onClick={handleDecline} disabled={!declineReason.trim() || actionSubmitting} className="btn btn-primary flex-1" style={{ opacity: !declineReason.trim() ? 0.5 : 1, background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}>
-                    {actionSubmitting ? t('referrals.declining') : t('referrals.confirmDecline')}
-                  </button>
-                </div>
-              </div>
-            </Modal>
-          )}
-
-          {/* Complete Modal */}
-          {completeModalId && (
-            <Modal onClose={() => setCompleteModalId(null)}>
-              <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('referrals.completeReferral')}</h3>
-                  <button onClick={() => setCompleteModalId(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                  {t('referrals.completeHint')}
-                </p>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('referrals.outcomeDisposition')}</label>
-                <select
-                  value={completeDisposition}
-                  onChange={e => setCompleteDisposition(e.target.value as ReferralDisposition)}
-                  className="w-full mb-3"
-                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
-                >
-                  {DISPOSITION_OPTIONS.map(d => (
-                    <option key={d} value={d}>{t(`referrals.disposition_${d}`)}</option>
-                  ))}
-                </select>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('referrals.outcomeSummary')}</label>
-                <textarea
-                  value={completeOutcome}
-                  onChange={e => setCompleteOutcome(e.target.value)}
-                  rows={3}
-                  placeholder={t('referrals.completePlaceholder')}
-                  className="w-full mb-3"
-                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
-                />
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('referrals.outcomeFollowUp')}</label>
-                <textarea
-                  value={completeFollowUp}
-                  onChange={e => setCompleteFollowUp(e.target.value)}
-                  rows={2}
-                  placeholder={t('referrals.outcomeFollowUpPlaceholder')}
-                  className="w-full mb-4"
-                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13 }}
-                />
-                <div className="flex gap-2">
-                  <button onClick={() => setCompleteModalId(null)} className="btn btn-secondary flex-1">{t('action.cancel')}</button>
-                  <button onClick={handleComplete} disabled={!completeOutcome.trim() || actionSubmitting} className="btn btn-primary flex-1" style={{ opacity: !completeOutcome.trim() ? 0.5 : 1, background: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
-                    {actionSubmitting ? t('referrals.completing') : t('referrals.markComplete')}
-                  </button>
-                </div>
-              </div>
-            </Modal>
-          )}
-
-          {/* Preview Modal for attachments */}
-          {previewAttachment && (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center p-8"
-              style={{ background: 'rgba(0,0,0,0.75)' }}
-              onClick={() => setPreviewAttachment(null)}
-            >
-              <div
-                className="relative max-w-4xl max-h-[90vh] rounded-xl overflow-hidden"
-                style={{ background: 'var(--bg-card)' }}
-                onClick={e => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                  <div className="flex items-center gap-2">
-                    {isImage(previewAttachment.mimeType) ? <ImageIcon className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} /> : <FileText className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />}
-                    <span className="text-sm font-medium">{previewAttachment.name}</span>
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatFileSize(previewAttachment.sizeBytes)}</span>
-                  </div>
-                  <button onClick={() => setPreviewAttachment(null)} className="p-1 rounded" style={{ background: 'var(--overlay-subtle)' }}>
-                    <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                  </button>
-                </div>
-                <div className="p-4 overflow-auto" style={{ maxHeight: 'calc(90vh - 60px)' }}>
-                  {isImage(previewAttachment.mimeType) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={`data:${previewAttachment.mimeType};base64,${previewAttachment.base64Data}`}
-                      alt={previewAttachment.name}
-                      className="max-w-full h-auto rounded"
-                    />
-                  ) : previewAttachment.mimeType === 'application/pdf' ? (
-                    <iframe
-                      src={`data:application/pdf;base64,${previewAttachment.base64Data}`}
-                      className="w-full rounded"
-                      style={{ height: '70vh' }}
-                      title={previewAttachment.name}
-                    />
-                  ) : (
-                    <div className="text-center py-12">
-                      <FileText className="w-16 h-16 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-                      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('referrals.previewNotAvailable')}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-          </div>{/* end scrollable body */}
-        </div>{/* end dash-card */}
+        )}
       </main>
-    </>
+    </div>
   );
 }
