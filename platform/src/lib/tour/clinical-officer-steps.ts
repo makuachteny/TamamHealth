@@ -32,7 +32,7 @@ export const clinicalOfficerTourSteps: TourStep[] = [
     route: '/dashboard',
     target: '.ehr-left-rail .ehr-mini-calendar',
     title: 'Jump to any day',
-    body: 'Pick a date to see who is booked, or use "Go to today" to snap back to now.',
+    body: 'Pick a date to see who is booked with you that day.',
     placement: 'right',
   },
   {

@@ -12,7 +12,6 @@ import {
   ClipboardCheck,
   ClipboardList,
   FlaskConical,
-  LayoutDashboard,
   Plus,
   Printer,
   Search,
@@ -194,12 +193,46 @@ export default function EhrClinicalDashboard({
   // A fresh appointment (or none) shouldn't inherit the previous one's open menu.
   useEffect(() => { setDetailMenuOpen(null); }, [openAppointment?._id]);
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
-  const [locationFilter, setLocationFilter] = useState('all');
+  const [locationFilter] = useState('all');
   const [providerFilter, setProviderFilter] = useState<string[]>([]);
   const [worklistSearch, setWorklistSearch] = useState('');
   // Which outstanding item's worklist occupies the centre panel (null = the
   // normal schedule). Keyed by item label.
   const [outstandingView, setOutstandingView] = useState<string | null>(null);
+
+  // "Find patient" header action — searches the full patient register (not
+  // just today's worklist) and jumps straight to the chart.
+  const [findPatientOpen, setFindPatientOpen] = useState(false);
+  const [findPatientQuery, setFindPatientQuery] = useState('');
+  const findPatientInputRef = useRef<HTMLInputElement>(null);
+  // Modal renders its children a tick after open (portal mount) and then
+  // focuses its dialog, so autoFocus — and a 0ms refocus — both lose the
+  // race. Focus the input once the dialog has settled.
+  useEffect(() => {
+    if (!findPatientOpen) return;
+    const id = window.setTimeout(() => findPatientInputRef.current?.focus(), 120);
+    return () => window.clearTimeout(id);
+  }, [findPatientOpen]);
+
+  const findPatientResults = useMemo(() => {
+    const query = findPatientQuery.trim().toLowerCase();
+    if (!query) return [];
+    return patientDocs
+      .filter(patient => {
+        const name = [patient.firstName, patient.middleName, patient.surname].filter(Boolean).join(' ').toLowerCase();
+        return (
+          name.includes(query) ||
+          patient.hospitalNumber?.toLowerCase().includes(query) ||
+          patient.phone?.toLowerCase().includes(query)
+        );
+      })
+      .slice(0, 8);
+  }, [findPatientQuery, patientDocs]);
+
+  const openFoundPatient = (patientId: string) => {
+    setFindPatientOpen(false);
+    router.push(`/patients/${patientId}`);
+  };
 
   const activeOutstanding = outstandingView
     ? outstanding.find(item => item.label === outstandingView) ?? null
@@ -240,13 +273,6 @@ export default function EhrClinicalDashboard({
     }
     if (entry.href) router.push(entry.href);
   };
-
-  const locationOptions = useMemo(() => {
-    const names = appointments
-      .map(appointment => appointment.facilityName || facilityName)
-      .filter((name): name is string => Boolean(name));
-    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
-  }, [appointments, facilityName]);
 
   const providerOptions = useMemo(() => {
     const names = [clinicianName, ...appointments.map(appointment => appointment.providerName)]
@@ -339,11 +365,13 @@ export default function EhrClinicalDashboard({
     <div className="ehr-schedule-shell">
       <section className="ehr-schedule-header ehr-clinical-dashboard-header">
         <div className="ehr-clinical-dashboard-tabs">
-          <div className="ehr-segmented ehr-segmented-single">
-            <button type="button" className="active" aria-label="Dashboard">
-              <LayoutDashboard className="w-4 h-4" /> Dashboard
-            </button>
-          </div>
+          {canBookAppointments && (
+            <div className="ehr-segmented ehr-segmented-single">
+              <button type="button" className="active" aria-label="New appointments" onClick={() => router.push('/appointments?new=1')}>
+                <Plus className="w-4 h-4" /> New appointments
+              </button>
+            </div>
+          )}
         </div>
         <div className="ehr-schedule-primary-controls ehr-clinical-dashboard-header-main">
           <div className="ehr-greeting-row">
@@ -351,16 +379,22 @@ export default function EhrClinicalDashboard({
           </div>
         </div>
         <div className="ehr-schedule-actions">
-          {canBookAppointments && (
-            <button
-              type="button"
-              aria-label="New appointment"
-              style={{ background: '#fff', borderColor: 'var(--border-light)', color: '#000' }}
-              onClick={() => router.push('/appointments?new=1')}
-            >
-              <Plus className="w-4 h-4" color="#000" /> New appointment
-            </button>
-          )}
+          <button
+            type="button"
+            aria-label="Find patient"
+            style={{ background: '#fff', borderColor: 'var(--border-light)', color: '#000' }}
+            onClick={() => { setFindPatientQuery(''); setFindPatientOpen(true); }}
+          >
+            <Search className="w-4 h-4" color="#000" /> Find patient
+          </button>
+          <button
+            type="button"
+            aria-label="Print today's schedule"
+            style={{ background: '#fff', borderColor: 'var(--border-light)', color: '#000' }}
+            onClick={() => window.print()}
+          >
+            <Printer className="w-4 h-4" color="#000" /> Print
+          </button>
           <button
             type="button"
             aria-label="Send intake"
@@ -374,17 +408,6 @@ export default function EhrClinicalDashboard({
 
       <section className={`ehr-workspace-grid ${view === 'dashboard' ? 'is-dashboard' : 'is-calendar'}`}>
         <aside className="ehr-left-rail">
-          <button
-            type="button"
-            className="ehr-today-button"
-            onClick={() => {
-              setSelectedDate(todayIso);
-              setAppointmentLane('scheduled');
-              setCalendarMonth(startOfMonth(new Date()));
-            }}
-          >
-            Go to today
-          </button>
           <div className="ehr-mini-calendar">
             <div className="ehr-mini-calendar-title">
               <button type="button" onClick={() => setCalendarMonth(current => addMonths(current, -1))} aria-label="Previous month">
@@ -422,50 +445,6 @@ export default function EhrClinicalDashboard({
             </div>
           </div>
 
-          <div className="ehr-filter-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={providerOptions.length === 0 || providerFilter.length === providerOptions.length}
-                onChange={event => setProviderFilter(event.target.checked ? providerOptions : [])}
-              />
-              Providers
-            </label>
-            {providerOptions.map(provider => (
-              <label key={provider}>
-                <input
-                  type="checkbox"
-                  checked={providerFilter.includes(provider)}
-                  onChange={() => setProviderFilter(current => (
-                    current.includes(provider)
-                      ? current.filter(item => item !== provider)
-                      : [...current, provider]
-                  ))}
-                />
-                {provider}
-              </label>
-            ))}
-          </div>
-          <div className="ehr-filter-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={locationFilter === 'all'}
-                onChange={() => setLocationFilter('all')}
-              />
-              All service locations
-            </label>
-            {(locationOptions.length ? locationOptions : [facilityName || 'Tamam facility']).map(location => (
-              <label key={location}>
-                <input
-                  type="checkbox"
-                  checked={locationFilter === 'all' || locationFilter === location}
-                  onChange={() => setLocationFilter(locationFilter === location ? 'all' : location)}
-                />
-                {location}
-              </label>
-            ))}
-          </div>
           <DayActivityChart appointments={filteredAppointments} selectedDate={selectedDate} todayIso={todayIso} admittedPatientIds={admittedPatientIds} />
         </aside>
 
@@ -530,7 +509,7 @@ export default function EhrClinicalDashboard({
                         <div className="ehr-appointment-identity">
                           <div className="ehr-patient-icon" style={{ background: stateColor(appointmentTriage(appointment.priority)), color: '#fff' }}>{initials(appointment.patientName)}</div>
                           <div className="ehr-appointment-main">
-                            <button type="button" onClick={event => { event.stopPropagation(); openPatientRecord(appointment); }}>
+                            <button type="button" className="print-visible" onClick={event => { event.stopPropagation(); openPatientRecord(appointment); }}>
                               {appointment.patientName}
                             </button>
                             <p>{appointment.reason || 'Telehealth visit'}</p>
@@ -650,7 +629,7 @@ export default function EhrClinicalDashboard({
                     <div className="ehr-appointment-identity">
                       <div className="ehr-patient-icon" style={{ background: stateColor(appointmentTriage(appointment.priority)), color: '#fff' }}>{initials(appointment.patientName)}</div>
                       <div className="ehr-appointment-main">
-                        <button type="button" onClick={(event) => {
+                        <button type="button" className="print-visible" onClick={(event) => {
                           event.stopPropagation();
                           openPatientRecord(appointment);
                         }}>
@@ -963,6 +942,52 @@ export default function EhrClinicalDashboard({
                     )}
                   </div>
                 </div>
+              </div>
+            </Modal>
+          )}
+
+          {findPatientOpen && (
+            <Modal onClose={() => setFindPatientOpen(false)} width={480} align="top" labelledBy="find-patient-title">
+              <div className="ehr-find-patient">
+                <h3 id="find-patient-title">Find patient</h3>
+                <div className="ehr-find-patient-input">
+                  <Search className="w-4 h-4" />
+                  <input
+                    ref={findPatientInputRef}
+                    type="search"
+                    placeholder="Search by name, hospital number, or phone"
+                    value={findPatientQuery}
+                    onChange={event => setFindPatientQuery(event.target.value)}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter' && findPatientResults.length > 0) {
+                        event.preventDefault();
+                        openFoundPatient(findPatientResults[0]._id);
+                      }
+                    }}
+                  />
+                </div>
+                {findPatientQuery.trim() === '' ? (
+                  <p className="ehr-find-patient-hint">Start typing to search the patient register.</p>
+                ) : findPatientResults.length === 0 ? (
+                  <p className="ehr-find-patient-hint">No patients match &ldquo;{findPatientQuery.trim()}&rdquo;.</p>
+                ) : (
+                  <ul className="ehr-find-patient-results">
+                    {findPatientResults.map(patient => {
+                      const name = [patient.firstName, patient.middleName, patient.surname].filter(Boolean).join(' ');
+                      return (
+                        <li key={patient._id}>
+                          <button type="button" onClick={() => openFoundPatient(patient._id)}>
+                            <span className="ehr-patient-icon" style={{ background: 'var(--accent-primary)', color: '#fff' }}>{initials(name)}</span>
+                            <span className="ehr-find-patient-identity">
+                              <strong>{name}</strong>
+                              <small>{[patient.hospitalNumber, patient.gender, patient.phone].filter(Boolean).join(' · ')}</small>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             </Modal>
           )}

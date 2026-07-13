@@ -171,11 +171,12 @@ export const LAB_PANELS: { name: string; tests: string[] }[] = [
   { name: 'Anaemia work-up', tests: ['Full Blood Count', 'Blood Film', 'Sickling Test', 'Renal Function'] },
 ];
 
-/** Signs & symptoms catalogue for the chief-complaint picker — organised by
- *  system and weighted toward South Sudan's recorded disease burden (malaria,
- *  typhoid, cholera/AWD, measles, meningitis, visceral leishmaniasis, TB/HIV,
- *  hepatitis E, schistosomiasis, malnutrition, snakebite, obstetric
- *  emergencies). Clinicians can add anything not listed from the picker. */
+/** Signs & symptoms catalogue for the chief-complaint search bar — organised
+ *  by system and weighted toward South Sudan's recorded disease burden
+ *  (malaria, typhoid, cholera/AWD, measles, meningitis, visceral
+ *  leishmaniasis, TB/HIV, hepatitis E, schistosomiasis, malnutrition,
+ *  snakebite, obstetric emergencies). Clinicians can add anything not listed
+ *  from the dropdown's free-text row. */
 export const SYMPTOM_CATALOG: { label: string; options: string[] }[] = [
   { label: 'General & febrile', options: [
     'Fever', 'Chills and rigors', 'Night sweats', 'Fatigue / weakness', 'Weight loss',
@@ -245,10 +246,11 @@ export const SYMPTOM_CATALOG: { label: string; options: string[] }[] = [
 ];
 
 /** Physical-examination findings catalogue — one grouped list per exam system
- *  for the centred findings popup. Mixes normal and abnormal findings and
- *  keeps South Sudan-relevant signs prominent (severe dehydration for
- *  cholera/AWD, hepatosplenomegaly for kala-azar, kwashiorkor oedema,
- *  meningeal signs). Anything not listed can be added from the popup. */
+ *  for the per-system findings search bars. Mixes normal and abnormal
+ *  findings and keeps South Sudan-relevant signs prominent (severe
+ *  dehydration for cholera/AWD, hepatosplenomegaly for kala-azar, kwashiorkor
+ *  oedema, meningeal signs). Anything not listed can be added from the
+ *  dropdown's free-text row. */
 export const EXAM_FINDINGS_CATALOG: Record<
   'general' | 'cardiovascular' | 'respiratory' | 'abdominal' | 'neurological',
   { label: string; options: string[] }[]

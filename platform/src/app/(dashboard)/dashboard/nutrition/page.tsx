@@ -236,20 +236,20 @@ export default function NutritionDashboard() {
         title={t('nutrition.title')}
         greetingName={currentUser?.name}
         dateLabel={dateLabel}
-        tabs={[
-          { key: 'all', label: t('nutrition.kpiScreenings'), count: stats.total },
-          { key: 'sam', label: t('nutrition.kpiSamCases'), count: stats.sam },
-          { key: 'mam', label: t('nutrition.kpiMamCases'), count: stats.mam },
-          { key: 'at_risk', label: t('nutrition.kpiAtRisk'), count: stats.atRisk },
-          { key: 'normal', label: t('nutrition.kpiNormal'), count: stats.normal },
-        ]}
+        tabs={[]}
         activeTab={filterStatus}
         onTabChange={setFilterStatus}
         centerSubtitle={t('nutrition.totalCount', { count: stats.total })}
         searchValue={queueSearch}
         searchPlaceholder={t('topbar.searchPlaceholder')}
         onSearchChange={setQueueSearch}
-        filters={[]}
+        filters={[
+          { label: t('nutrition.kpiScreenings'), value: stats.total, active: filterStatus === 'all', onClick: () => setFilterStatus('all') },
+          { label: t('nutrition.kpiSamCases'), value: stats.sam, active: filterStatus === 'sam', onClick: () => setFilterStatus(filterStatus === 'sam' ? 'all' : 'sam') },
+          { label: t('nutrition.kpiMamCases'), value: stats.mam, active: filterStatus === 'mam', onClick: () => setFilterStatus(filterStatus === 'mam' ? 'all' : 'mam') },
+          { label: t('nutrition.kpiAtRisk'), value: stats.atRisk, active: filterStatus === 'at_risk', onClick: () => setFilterStatus(filterStatus === 'at_risk' ? 'all' : 'at_risk') },
+          { label: t('nutrition.kpiNormal'), value: stats.normal, active: filterStatus === 'normal', onClick: () => setFilterStatus(filterStatus === 'normal' ? 'all' : 'normal') },
+        ]}
         actions={[
           {
             label: showForm ? t('nutrition.formCancel') : t('nutrition.newScreening'),

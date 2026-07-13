@@ -46,12 +46,19 @@ export async function GET(request: NextRequest) {
     if (!auth) return unauthorized();
     if (!hasRole(auth, READ_ROLES)) return forbidden();
     const { getDB } = await import('@/lib/db');
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
     const db = getDB('tamamhealth_triage');
     const result = await db.allDocs({ include_docs: true });
-    let docs = result.rows
-      .map(r => r.doc as TriageDoc)
-      .filter(d => d && d.type === 'triage')
-      .sort((a, b) => (b.triagedAt || '').localeCompare(a.triagedAt || ''));
+    // Scope to the caller's org/facility before returning. Without this the
+    // route returned every tenant's triage records (clinical PHI) to any
+    // read-eligible role — a cross-tenant leak. filterByScope exempts
+    // super_admin / national government, matching the other list routes.
+    let docs = filterByScope(
+      result.rows
+        .map(r => r.doc as TriageDoc)
+        .filter(d => d && d.type === 'triage'),
+      buildScopeFromAuth(auth),
+    ).sort((a, b) => (b.triagedAt || '').localeCompare(a.triagedAt || ''));
     const url = new URL(request.url);
     const status = url.searchParams.get('status');
     const patientId = url.searchParams.get('patientId');

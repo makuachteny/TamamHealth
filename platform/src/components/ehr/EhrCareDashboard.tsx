@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, ChevronLeft, ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
+import { ChevronLeft, ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import EhrMiniCalendar, { formatDateTitle, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import { initials, stateColor } from '@/lib/patient-utils';
 
@@ -188,19 +188,25 @@ export default function EhrCareDashboard({
     return rows.filter(row => row.date === selectedDate);
   }, [effectiveView, rowEventDates.length, rows, selectedDate, showCalendar]);
   const selectedDateLabel = showCalendar ? formatDateTitle(selectedDate) : dateLabel;
-  const headerActions = actions.slice(0, 3);
-  const railActions = actions.slice(3);
+  // The dashboard's primary action (first entry) is promoted to the header's
+  // top-left slot as the Clinical Officer-style "+" CTA; the rest split into
+  // the right-hand action row and then the left-rail action list.
+  const primaryAction = actions[0];
+  const headerActions = actions.slice(1, 4);
+  const railActions = actions.slice(4);
   const headerTitle = greetingName ? `Welcome, ${greetingName}` : title;
 
   return (
     <div className="ehr-schedule-shell ehr-care-dashboard">
       <section className="ehr-schedule-header ehr-clinical-dashboard-header ehr-care-dashboard-header">
         <div className="ehr-clinical-dashboard-tabs">
-          <div className="ehr-segmented ehr-segmented-single" aria-label="Dashboard view" role="tablist">
-            <button type="button" className="active">
-              <CheckCircle2 className="w-4 h-4" />Dashboard
-            </button>
-          </div>
+          {primaryAction && (
+            <div className="ehr-segmented ehr-segmented-single">
+              <button type="button" className="active" aria-label={primaryAction.label} onClick={primaryAction.onClick}>
+                <primaryAction.icon className="w-4 h-4" /> {primaryAction.label}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="ehr-schedule-primary-controls ehr-clinical-dashboard-header-main">

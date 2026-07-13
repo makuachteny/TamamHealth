@@ -6585,6 +6585,7 @@ thead th {
   padding-bottom: 14px;
 }
 
+
 .ehr-soap-scroll .card-elevated > button,
 .ehr-soap-scroll .card-elevated > div:first-child,
 .ehr-soap-scroll .glass-section-header {
@@ -6619,6 +6620,14 @@ thead th {
   border: 1px solid var(--border-light) !important;
   border-radius: var(--card-radius) !important;
   box-shadow: var(--card-shadow) !important;
+  min-height: 0;
+}
+
+/* The scribe's header row reads as a section header, same as the bar on
+   every step card, so the three columns look like one family of cards. */
+.ehr-consult-sidecar > div > div:first-child {
+  background: var(--ehr-table-head);
+  min-height: 44px;
 }
 
 .ehr-consult-summary-grid {
@@ -7156,12 +7165,12 @@ thead th {
    1025px this block is inert and the horizontal tab strip from the base
    rules above applies instead, same as it does on MobileChartDrillIn. */
 @media (min-width: 1025px) {
-  /* Mirror the clinical dashboard's three-panel workspace: nav rail sized
-     like the dashboard's left panel, centred chart, summary rail on the
-     right (.ehr-workspace-grid uses these same column tracks). */
+  /* Nav rail sized like the dashboard's left panel, with the chart content
+     taking the full remaining width (the demographics/allergies summary
+     rail was folded into the facesheet panels). */
   .ehr-chart-layout {
     display: grid;
-    grid-template-columns: minmax(230px, 260px) minmax(0, 1fr) minmax(230px, 270px);
+    grid-template-columns: minmax(230px, 260px) minmax(0, 1fr);
     gap: 10px;
     align-items: start;
   }
@@ -7207,170 +7216,6 @@ thead th {
   .ehr-chart-nav button[style*="var(--accent-primary)"] {
     box-shadow: inset 3px 0 0 var(--ehr-blue);
   }
-
-  .ehr-chart-right-rail {
-    position: sticky;
-    top: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    max-height: calc(100vh - var(--ehr-top-rail-height) - 32px);
-    overflow-y: auto;
-  }
-}
-
-/* Right-rail summary cards (Demographics / Allergies) */
-.ehr-chart-right-rail {
-  min-width: 0;
-}
-
-/* The rail needs the desktop grid to have a column for it — below that the
-   layout is a single column and the same facts live in the tabs anyway. */
-@media (max-width: 1024px) {
-  .ehr-chart-right-rail {
-    display: none;
-  }
-}
-
-.ehr-chart-side-card {
-  border: 1px solid var(--ehr-border);
-  border-radius: var(--card-radius);
-  background: var(--ehr-panel);
-  box-shadow: var(--card-shadow);
-  padding: 14px 16px 16px;
-}
-
-.ehr-chart-side-card--alert {
-  border-color: color-mix(in srgb, var(--color-danger) 30%, var(--ehr-border));
-  background: color-mix(in srgb, var(--color-danger) 4%, var(--ehr-panel));
-}
-
-.ehr-chart-side-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.ehr-chart-side-card-head h3 {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ehr-text);
-}
-
-.ehr-chart-side-card-head .ehr-allergy-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--color-danger);
-}
-
-.ehr-chart-side-card-head button {
-  border: 0;
-  background: none;
-  padding: 2px 4px;
-  color: var(--ehr-blue);
-  font-size: 11.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.ehr-chart-side-card-head button:hover {
-  text-decoration: underline;
-}
-
-.ehr-chart-side-rows {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-}
-
-.ehr-chart-side-rows > div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 0;
-  border-top: 1px solid var(--ehr-border-soft);
-}
-
-.ehr-chart-side-rows dt {
-  flex-shrink: 0;
-  color: var(--ehr-muted);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.ehr-chart-side-rows dd {
-  margin: 0;
-  min-width: 0;
-  text-align: right;
-  color: var(--ehr-text);
-  font-size: 12.5px;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.ehr-chart-side-allergies {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.ehr-chart-side-allergies li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 0;
-  border-top: 1px solid var(--ehr-border-soft);
-}
-
-.ehr-chart-side-allergies strong {
-  color: var(--ehr-text);
-  font-size: 12.5px;
-}
-
-.ehr-chart-side-allergies span {
-  color: var(--ehr-muted);
-  font-size: 11.5px;
-  text-align: right;
-}
-
-.ehr-chart-side-empty {
-  margin: 0;
-  color: var(--ehr-muted);
-  font-size: 12.5px;
-}
-
-.ehr-chart-side-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--ehr-border-soft);
-}
-
-.ehr-chart-side-actions button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--ehr-border);
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
 }
 
 .ehr-chart-page .card-elevated > .border-b,
@@ -8274,6 +8119,20 @@ thead th {
   border: 1px solid var(--ehr-border);
   border-radius: var(--card-radius);
   background: var(--ehr-panel);
+}
+
+/* Headings inside those synthetic header cards (e.g. the Appointments tab)
+   match the section-title style every .card-elevated header already gets —
+   one card-header look across every chart tab. */
+.ehr-chart-content > .space-y-4 > .flex.items-center.justify-between :is(h2, h3),
+.ehr-chart-content > .space-y-3 > .flex.items-center.justify-between :is(h2, h3),
+.ehr-chart-content > .space-y-5 > .flex.items-center.justify-between :is(h2, h3) {
+  color: var(--ehr-text) !important;
+  font-family: var(--font-platform) !important;
+  font-size: var(--type-size-section-title) !important;
+  font-weight: var(--type-weight-bold) !important;
+  letter-spacing: var(--type-letter-title) !important;
+  line-height: var(--type-leading-title) !important;
 }
 
 .ehr-chart-page .card-elevated > .border-b,
@@ -9460,6 +9319,11 @@ thead th {
   .ehr-consult-workspace {
     flex-direction: column;
     overflow: visible;
+  }
+
+  /* Stacked layout: the scribe sidecar becomes a full-width card. */
+  .ehr-consult-workspace > .ehr-consult-sidecar {
+    width: 100% !important;
   }
 
   .ehr-consult-meta-strip {
@@ -10828,12 +10692,16 @@ span:has(> svg:only-child) {
    existing Tamam visual system while reducing the oversized tablet/mobile feel. */
 .tamam-ehr-app {
   --ehr-top-rail-height: 60px;
+  /* Single source of truth for the app's outer gutter: the top rail and every
+     page-container read this, so the avatar pill's right edge sits flush with
+     the body cards below it for every role. */
+  --ehr-page-inset: 6px;
 }
 
 .ehr-top-rail {
   grid-template-columns: 158px max-content 1fr auto;
   gap: 10px;
-  padding: 0 10px;
+  padding: 0 var(--ehr-page-inset);
 }
 
 .ehr-top-brand {
@@ -10887,7 +10755,7 @@ span:has(> svg:only-child) {
 }
 
 .tamam-ehr-app .page-container {
-  padding: 6px;
+  padding: var(--ehr-page-inset);
 }
 
 .ehr-schedule-header {
@@ -11098,7 +10966,7 @@ span:has(> svg:only-child) {
     grid-template-columns: 118px minmax(0, auto) minmax(120px, 1fr) auto;
     grid-auto-rows: 30px 32px;
     gap: 6px 8px;
-    padding: 6px 8px 8px;
+    padding: 6px var(--ehr-page-inset) 8px;
   }
 
   .ehr-top-brand {
@@ -11181,7 +11049,7 @@ span:has(> svg:only-child) {
     grid-template-columns: 32px 34px minmax(0, 1fr) auto;
     grid-auto-rows: 32px;
     gap: 4px 6px;
-    padding: 6px 8px;
+    padding: 6px var(--ehr-page-inset);
     align-items: center;
   }
 
@@ -11560,6 +11428,7 @@ span:has(> svg:only-child) {
 @media (max-width: 767px) {
   .tamam-ehr-app {
     --ehr-top-rail-height: 44px;
+    --ehr-page-inset: 5px;
     overflow: hidden;
   }
 
@@ -11581,7 +11450,7 @@ span:has(> svg:only-child) {
     grid-auto-rows: 32px;
     align-items: center;
     gap: 4px 6px;
-    padding: 6px 8px;
+    padding: 6px var(--ehr-page-inset);
   }
 
   .ehr-top-brand {
@@ -11657,7 +11526,7 @@ span:has(> svg:only-child) {
   .tamam-ehr-app .page-container {
     width: 100%;
     max-width: 100%;
-    padding: 5px;
+    padding: var(--ehr-page-inset);
     overflow-x: hidden;
   }
 
@@ -14488,9 +14357,16 @@ span:has(> svg:only-child) {
    overflow to the card body: the section header bar stays put and just
    the contents scroll. ≤860px keeps normal page scrolling. */
 @media (min-width: 861px) {
+  /* grow 1: the visible step's cards also stretch to fill the workspace, so
+     short steps (e.g. Assessment before a diagnosis is added) don't end
+     mid-page with a dead gap above the pinned step nav. */
   .ehr-soap-scroll > .card-elevated {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     min-height: 0;
+  }
+
+  .ehr-soap-scroll > .ehr-order-launchers {
+    flex: 1 0 auto;
   }
 
   .ehr-soap-scroll > .card-elevated > button,
@@ -14504,6 +14380,21 @@ span:has(> svg:only-child) {
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+
+  /* Compact cards (the plan step's four, visit disposition, visit charges):
+     grow to help fill the step but never shrink — a tall sibling must not
+     crush their body behind a sliver of internal scrollbar. When a step's
+     cards genuinely exceed the workspace, the step region scrolls instead. */
+  .ehr-soap-scroll > .card-elevated.ehr-card-fit {
+    flex: 1 0 auto;
+    min-height: auto;
+  }
+
+  .ehr-soap-scroll > .card-elevated.ehr-card-fit > div:not(:first-child) {
+    flex: 1 0 auto;
+    min-height: auto;
+    overflow-y: visible;
+  }
 }
 
 /* Consultation right rail: scrolls independently so the running "Visit
@@ -14513,5 +14404,140 @@ span:has(> svg:only-child) {
     align-self: stretch;
     min-height: 0;
     overflow-y: auto;
+  }
+}
+
+/* ============ Clinical dashboard: Find patient modal ============ */
+/* Modal renders a bare dialog — the content brings its own card. */
+.ehr-find-patient {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--ehr-panel);
+  border: 1px solid var(--ehr-border);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 18px 40px rgba(15, 31, 29, 0.25);
+}
+
+.ehr-find-patient h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--ehr-text);
+}
+
+.ehr-find-patient-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--ehr-border);
+  border-radius: 10px;
+  background: var(--ehr-panel);
+  color: var(--ehr-muted);
+}
+
+.ehr-find-patient-input:focus-within {
+  border-color: var(--accent-primary);
+}
+
+.ehr-find-patient-input input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  color: var(--ehr-text);
+}
+
+.ehr-find-patient-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ehr-muted);
+}
+
+.ehr-find-patient-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.ehr-find-patient-results button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.ehr-find-patient-results button:hover,
+.ehr-find-patient-results button:focus-visible {
+  background: var(--accent-light);
+}
+
+.ehr-find-patient-identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ehr-find-patient-identity strong {
+  color: var(--ehr-text);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehr-find-patient-identity small {
+  color: var(--ehr-muted);
+  font-size: 0.78rem;
+}
+
+/* ============ Clinical dashboard: print = just the day schedule ============
+   The header chrome, both rails, and the assigned-patients table drop out so
+   the printed page is the date heading plus the appointment rows (patient
+   names carry .print-visible in the markup to survive the global button
+   hide above). */
+@media print {
+  .ehr-top-rail,
+  .ehr-clinical-dashboard-header,
+  .ehr-left-rail,
+  .ehr-right-rail,
+  .ehr-rail-backdrop,
+  .ehr-worklist-panel {
+    display: none !important;
+  }
+  .ehr-schedule-shell,
+  .ehr-workspace-grid,
+  .ehr-center-panel {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: var(--color-white) !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  .ehr-appointment-list {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  .ehr-appointment-row {
+    break-inside: avoid;
   }
 }

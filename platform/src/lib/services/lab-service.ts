@@ -124,6 +124,18 @@ export async function createLabResult(
   return plaintextDoc;
 }
 
+/**
+ * Fetch a single decrypted lab result by id, or null if absent. Used by the
+ * `/api/lab/[id]` route to enforce tenant scope before mutating.
+ */
+export async function getLabResultById(id: string): Promise<LabResultDoc | null> {
+  try {
+    return decryptLabResult(await labResultsDB().get(id) as LabResultDoc);
+  } catch {
+    return null;
+  }
+}
+
 export async function updateLabResult(id: string, data: Partial<LabResultDoc>): Promise<LabResultDoc | null> {
   const db = labResultsDB();
   try {

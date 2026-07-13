@@ -73,15 +73,17 @@ import { OrderLabModal, PrescribeModal, ReferModal } from '@/components/patients
 // referral follow-up, and billing/scheduling, but NOT clinical notes, test
 // results, diagnoses, vitals, or medications.
 const ADMIN_TAB_IDS = ['overview', 'appointments', 'demographics', 'billing', 'documents', 'recall'];
-type FacesheetPanelId = 'medications' | 'problems' | 'vitals' | 'history' | 'labs' | 'recommendations';
+type FacesheetPanelId = 'medications' | 'problems' | 'allergies' | 'vitals' | 'history' | 'labs' | 'recommendations' | 'demographics';
 
 const FACESHEET_PANEL_OPTIONS: Array<{ id: FacesheetPanelId; label: string }> = [
   { id: 'medications', label: 'Medications' },
   { id: 'problems', label: 'Problems' },
+  { id: 'allergies', label: 'Allergies' },
   { id: 'vitals', label: 'Vitals' },
   { id: 'history', label: 'History' },
   { id: 'labs', label: 'Labs/Studies' },
   { id: 'recommendations', label: 'Clinical Recommendations' },
+  { id: 'demographics', label: 'Demographics' },
 ];
 
 const DEFAULT_FACESHEET_PANELS = FACESHEET_PANEL_OPTIONS.map(panel => panel.id);
@@ -233,10 +235,6 @@ export default function PatientDetailPage() {
   const openPaymentFromHeader = () => {
     setActiveTab('billing');
     setShowPaymentPanel(true);
-  };
-
-  const openAllergiesFromHeader = () => {
-    setActiveTab(canViewClinical ? 'allergies' : 'overview');
   };
 
   const handleEditSubmit = async () => {
@@ -2554,60 +2552,6 @@ export default function PatientDetailPage() {
           )}
           </section>
           </div>
-
-          {/* Right rail — demographics + allergies at a glance, mirroring the
-              dashboard's three-panel layout. The allergies box that used to sit
-              in the patient header lives here now. */}
-          <aside className="ehr-chart-right-rail no-print" aria-label="Patient summary rail">
-            <div className="ehr-chart-side-card">
-              <div className="ehr-chart-side-card-head">
-                <h3>Demographics</h3>
-                <button type="button" onClick={() => setActiveTab('demographics')}>View all</button>
-              </div>
-              <dl className="ehr-chart-side-rows">
-                <div><dt>Patient ID</dt><dd>{patient.hospitalNumber || patient.geocodeId || '—'}</dd></div>
-                <div><dt>Age</dt><dd>{patientAgeLabel(patient)}</dd></div>
-                <div><dt>Gender</dt><dd>{patient.gender || '—'}</dd></div>
-                <div><dt>Date of birth</dt><dd>{patient.dateOfBirth || '—'}</dd></div>
-                <div><dt>Phone</dt><dd>{patient.phone || '—'}</dd></div>
-                <div><dt>Blood type</dt><dd>{patient.bloodType || '—'}</dd></div>
-                <div><dt>Address</dt><dd>{patient.address || [patient.boma, patient.payam, patient.county].filter(Boolean).join(', ') || '—'}</dd></div>
-                <div><dt>Language</dt><dd>{patient.primaryLanguage || '—'}</dd></div>
-              </dl>
-            </div>
-            {(() => {
-              const activeAllergies = patient.structuredAllergies !== undefined
-                ? patient.structuredAllergies.filter(a => a.status === 'active')
-                : (patient.allergies || []).filter(a => a && a.toLowerCase() !== 'none known' && a.toLowerCase() !== 'none');
-              return (
-                <div className={activeAllergies.length ? 'ehr-chart-side-card ehr-chart-side-card--alert' : 'ehr-chart-side-card'}>
-                  <div className="ehr-chart-side-card-head">
-                    <h3>
-                      {activeAllergies.length > 0 && <AlertTriangle className="ehr-allergy-icon" aria-hidden />}
-                      Allergies
-                    </h3>
-                    <button type="button" onClick={openAllergiesFromHeader}>View all</button>
-                  </div>
-                  {activeAllergies.length ? (
-                    <ul className="ehr-chart-side-allergies">
-                      {activeAllergies.map((a, i) => {
-                        const name = typeof a === 'string' ? a : a.substance;
-                        const detail = typeof a === 'string' ? undefined : (a.reaction || a.criticality);
-                        return (
-                          <li key={`${name}-${i}`}>
-                            <strong>{name}</strong>
-                            {detail && <span>{detail}</span>}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="ehr-chart-side-empty">No known allergies documented</p>
-                  )}
-                </div>
-              );
-            })()}
-          </aside>
           </div>
           </div>
       </main>
@@ -2901,6 +2845,29 @@ function PatientFacesheetView({
       </section>
       )}
 
+      {showPanel('allergies') && (() => {
+        const activeAllergies = patient.structuredAllergies !== undefined
+          ? patient.structuredAllergies.filter(a => a.status === 'active').map(a => ({ name: a.substance, detail: a.reaction || a.criticality }))
+          : (patient.allergies || [])
+              .filter(a => a && a.toLowerCase() !== 'none known' && a.toLowerCase() !== 'none')
+              .map(a => ({ name: a, detail: undefined as string | undefined }));
+        return (
+      <section className="tebra-panel" onClick={() => onOpenTab('allergies')}>
+        <h2><ShieldAlert className="tebra-panel-icon" aria-hidden /> Allergies</h2>
+        {activeAllergies.length ? (
+          <div className="tebra-list">
+            {activeAllergies.slice(0, 6).map((a, i) => (
+              <div key={`${a.name}-${i}`} className="tebra-list-row">
+                <strong>{a.name}</strong>
+                {a.detail && <span>{a.detail}</span>}
+              </div>
+            ))}
+          </div>
+        ) : <p className="tebra-none">(No known allergies documented)</p>}
+      </section>
+        );
+      })()}
+
       {showPanel('vitals') && (() => {
         const bpElevated = !!(latestVitals?.systolic && latestVitals.systolic >= 140) || !!(latestVitals?.diastolic && latestVitals.diastolic >= 90);
         const tempElevated = !!(latestVitals?.temperature && latestVitals.temperature >= 38);
@@ -2971,6 +2938,29 @@ function PatientFacesheetView({
                 <small>{item.category}</small>
                 <strong>{item.title}</strong>
               </div>
+            </div>
+          ))}
+        </div>
+      </section>
+      )}
+
+      {showPanel('demographics') && (
+      <section className="tebra-panel" onClick={() => onOpenTab('demographics')}>
+        <h2><UserIcon className="tebra-panel-icon" aria-hidden /> Demographics</h2>
+        <div className="tebra-list">
+          {[
+            { label: 'Patient ID', value: patient.hospitalNumber || patient.geocodeId || '—' },
+            { label: 'Age', value: patientAgeLabel(patient) },
+            { label: 'Gender', value: patient.gender || '—' },
+            { label: 'Date of birth', value: patient.dateOfBirth || '—' },
+            { label: 'Phone', value: patient.phone || '—' },
+            { label: 'Blood type', value: patient.bloodType || '—' },
+            { label: 'Address', value: patient.address || [patient.boma, patient.payam, patient.county].filter(Boolean).join(', ') || '—' },
+            { label: 'Language', value: patient.primaryLanguage || '—' },
+          ].map(row => (
+            <div key={row.label} className="tebra-list-row">
+              <strong>{row.label}</strong>
+              <span>{row.value}</span>
             </div>
           ))}
         </div>

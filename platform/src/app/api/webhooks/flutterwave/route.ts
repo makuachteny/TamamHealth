@@ -78,14 +78,11 @@ async function postHandler(req: NextRequest) {
     // Handle charge.completed events
     if (eventType === 'charge.completed') {
       if (data.status === 'successful') {
-        // Successful payment
+        // Log only opaque correlators — never the amount or customer email
+        // (financial data / PII in stdout).
         console.log('[Flutterwave Webhook] Payment received:', {
           flutterWaveId: data.id,
           txRef: data.tx_ref,
-          amount: data.amount,
-          currency: data.currency,
-          paymentType: data.payment_type,
-          customerEmail: data.customer.email,
           timestamp: new Date().toISOString(),
         });
 

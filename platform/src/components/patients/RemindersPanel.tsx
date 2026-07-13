@@ -65,7 +65,7 @@ export default function RemindersPanel({ patient }: { patient: PatientDoc }) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-          <h3 className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Reminders</h3>
+          <h3 className="font-semibold text-sm">Reminders</h3>
           {queued.length > 0 && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>{queued.length} queued</span>
           )}

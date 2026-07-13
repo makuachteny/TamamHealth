@@ -16,6 +16,26 @@ const READ_ROLES: UserRole[] = [
 const WRITE_ROLES: UserRole[] = [
   'super_admin', 'org_admin',
 ];
+// Platform-wide / national (cross-tenant) roles. A user holding one of these
+// bypasses org scoping in filterByScope, so only a platform operator
+// (super_admin) may grant them. Without this guard a tenant's org_admin could
+// create — or promote themselves into — a super_admin/government account and
+// read every other organization's PHI (privilege-escalation → tenant breakout).
+const PRIVILEGED_ASSIGNABLE_ROLES: UserRole[] = ['super_admin', 'government', 'county_health_director'];
+
+/**
+ * Return a 403 if `actorRole` is not allowed to assign `targetRole`.
+ * super_admin may assign anything; everyone else (i.e. org_admin) is confined
+ * to non-privileged roles within their own tenant.
+ */
+function assignableRoleError(actorRole: UserRole, targetRole: UserRole | undefined): NextResponse | null {
+  if (!targetRole) return null;
+  if (actorRole === 'super_admin') return null;
+  if (PRIVILEGED_ASSIGNABLE_ROLES.includes(targetRole)) {
+    return forbidden('You are not permitted to assign platform or national roles.');
+  }
+  return null;
+}
 export async function GET(request: NextRequest) {
   try {
     const auth = await getAuthPayload(request);
@@ -92,6 +112,8 @@ async function postHandler(request: NextRequest) {
     }
     // Update existing user
     if (action === 'update' && body.userId) {
+      const roleError = assignableRoleError(auth.role, body.role as UserRole | undefined);
+      if (roleError) return roleError;
       const existingUser = await getUserById(body.userId as string);
       if (auth.role === 'org_admin') {
         if (existingUser && existingUser.orgId && auth.orgId && existingUser.orgId !== auth.orgId) {
@@ -132,6 +154,8 @@ async function postHandler(request: NextRequest) {
         { status: 400 }
       );
     }
+    const createRoleError = assignableRoleError(auth.role, body.role as UserRole);
+    if (createRoleError) return createRoleError;
     if (auth.role === 'org_admin') {
       const targetOrgId = body.orgId as string | undefined;
       if (targetOrgId && auth.orgId && targetOrgId !== auth.orgId) {

@@ -33,6 +33,19 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
+    // Tenant guard: the transfer package aggregates the ENTIRE chart (demographics,
+    // all medical records, labs, attachments). Verify the caller's org/facility
+    // can actually see this patient before assembling it — otherwise any clinician
+    // could pull any patient's full dossier by id (cross-tenant IDOR).
+    const { getPatientById } = await import('@/lib/services/patient-service');
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+    const patient = await getPatientById(patientId);
+    if (!patient) {
+      return NextResponse.json({ error: `Patient ${patientId} not found` }, { status: 404 });
+    }
+    if (filterByScope([patient], buildScopeFromAuth(auth)).length === 0) {
+      return forbidden('This patient is outside your facility or organization.');
+    }
     const { assembleTransferPackage } = await import('@/lib/services/transfer-service');
     let transferPackage;
     try {

@@ -74,7 +74,7 @@ export default function ScreeningsPanel({ patient }: { patient: PatientDoc }) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <ClipboardList className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-          <h3 className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Screenings due</h3>
+          <h3 className="font-semibold text-sm">Screenings due</h3>
           {due.length > 0 && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>{due.length}</span>
           )}

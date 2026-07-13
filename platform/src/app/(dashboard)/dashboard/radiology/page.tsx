@@ -342,18 +342,18 @@ export default function RadiologyDashboard() {
         title={t('radiology.title')}
         greetingName={currentUser?.name}
         dateLabel={dateLabel}
-        tabs={[
-          { key: 'all', label: t('radiology.filter_all'), count: stats.total },
-          { key: 'pending', label: t('radiology.filter_pending'), count: stats.pending },
-          { key: 'in_progress', label: t('radiology.filter_in_progress'), count: stats.inProgress },
-          { key: 'completed', label: t('radiology.filter_completed'), count: stats.completed },
-        ]}
+        tabs={[]}
         activeTab={filterStatus}
         onTabChange={setFilterStatus}
         searchValue={queueSearch}
         searchPlaceholder={t('radiology.imagingWorklist')}
         onSearchChange={setQueueSearch}
-        filters={[]}
+        filters={[
+          { label: t('radiology.filter_all'), value: stats.total, active: filterStatus === 'all', onClick: () => setFilterStatus('all') },
+          { label: t('radiology.filter_pending'), value: stats.pending, active: filterStatus === 'pending', onClick: () => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending') },
+          { label: t('radiology.filter_in_progress'), value: stats.inProgress, active: filterStatus === 'in_progress', onClick: () => setFilterStatus(filterStatus === 'in_progress' ? 'all' : 'in_progress') },
+          { label: t('radiology.filter_completed'), value: stats.completed, active: filterStatus === 'completed', onClick: () => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed') },
+        ]}
         actions={[]}
         rows={filtered.map((study): EhrCareDashboardRow => {
           const isOpen = selectedStudy === study.id;

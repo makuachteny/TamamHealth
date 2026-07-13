@@ -33,7 +33,18 @@ async function patchHandler(
     delete body.createdAt;
     const { sanitizePayload } = await import('@/lib/validation');
     const sanitized = sanitizePayload(body);
-    const { updateLabResult } = await import('@/lib/services/lab-service');
+    const { updateLabResult, getLabResultById } = await import('@/lib/services/lab-service');
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+    // Tenant guard: only mutate/read-back a result the caller's org/facility
+    // owns. Without this, any lab_tech/clinician could PATCH another tenant's
+    // result by id and receive its decrypted value + clinical notes back.
+    const existing = await getLabResultById(id);
+    if (!existing) {
+      return NextResponse.json({ error: 'Lab result not found' }, { status: 404 });
+    }
+    if (filterByScope([existing], buildScopeFromAuth(auth)).length === 0) {
+      return forbidden('Access denied to this lab result.');
+    }
     const updated = await updateLabResult(id, sanitized);
     if (!updated) {
       return NextResponse.json({ error: 'Lab result not found' }, { status: 404 });

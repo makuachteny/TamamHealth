@@ -127,10 +127,9 @@ async function postHandler(req: NextRequest) {
       patientId,
     };
 
+    // Correlator only — no patientId / amount (PHI + financial data in logs).
     console.log('[Payment Link API] Payment link created:', {
       linkId,
-      patientId,
-      amount,
       expiresAt: expiresAt.toISOString(),
       timestamp: createdAt.toISOString(),
     });

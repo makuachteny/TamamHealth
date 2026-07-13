@@ -13,7 +13,7 @@ import {
   FlaskConical, Pill, Calendar, Building2, FileText,
   X, AlertTriangle, UserSearch, Brain,
   ShieldAlert, Paperclip,
-  Mic, Wallet, Plus,
+  Mic, Wallet,
 } from '@/components/icons/lucide';
 import { useFavorites } from '@/lib/hooks/useFavorites';
 import { FavoritesBar, FavoriteStar } from '@/components/consultation/FavoritesBar';
@@ -35,7 +35,6 @@ import { useOrderSets } from '@/lib/hooks/useOrderSets';
 import { checkInteractions, checkAllergies, checkAllergiesStructured, findDuplicateMedications } from '@/lib/services/drug-interaction-service';
 import Modal from '@/components/Modal';
 import PopupSelect from '@/components/PopupSelect';
-import SymptomPicker from '@/components/SymptomPicker';
 import { useApp } from '@/lib/context';
 import { isProviderRole, isClinicalAuthorRole } from '@/lib/clinical-roles';
 import type { SuperbillPreview } from '@/lib/services/superbill-service';
@@ -46,6 +45,7 @@ import { useToast } from '@/components/Toast';
 import {
   CONSULT_SECTION,
   SYMPTOM_CATALOG,
+  EXAM_FINDINGS_CATALOG,
   COMMON_TREATMENT_PLANS,
   COMMON_FOLLOWUP_REASONS,
   COMMON_REFERRAL_REASONS,
@@ -63,6 +63,19 @@ import PageInstructionCard from '@/components/PageInstructionCard';
 // natural search terms (e.g. "cough", "pain") only appear there, not in the
 // formal ICD title text.
 const icdCodes = COMMON_ICD11_CODES.map(c => ({ code: c.code, name: c.title, keywords: c.keywords }));
+
+// The symptom / exam-finding catalogues flattened for the CodedSearchField
+// dropdowns. The group label rides along as `code` (searchable — typing
+// "respiratory" surfaces that whole group) and as `meta` (shown under each
+// row); the code badge itself is hidden since these aren't coded entries.
+const symptomOptions = SYMPTOM_CATALOG.flatMap(g =>
+  g.options.map(name => ({ code: g.label, name, meta: g.label })));
+const examFindingOptions = Object.fromEntries(
+  Object.entries(EXAM_FINDINGS_CATALOG).map(([system, groups]) => [
+    system,
+    groups.flatMap(g => g.options.map(name => ({ code: g.label, name, meta: g.label }))),
+  ]),
+) as Record<keyof typeof EXAM_FINDINGS_CATALOG, { code: string; name: string; meta: string }[]>;
 
 interface DiagnosisEntry {
   code: string;
@@ -262,8 +275,8 @@ export default function ConsultationPage() {
 
   // Chief Complaint
   const [chiefComplaint, setChiefComplaint] = useState('');
-  // Signs & symptoms popup for the chief complaint box.
-  const [symptomPickerOpen, setSymptomPickerOpen] = useState(false);
+  // Search text for the signs & symptoms search bar above the complaint box.
+  const [symptomSearch, setSymptomSearch] = useState('');
   // Legacy list kept for drafts saved before the free-text complaint box.
   // `chiefComplaint` (string) stays the joined value used everywhere downstream.
   const [complaints, setComplaints] = useState<string[]>([]);
@@ -307,7 +320,7 @@ export default function ConsultationPage() {
     abdominal: '',
     neurological: '',
   });
-  // Per-field ICD search text for the "Add findings" search bars below.
+  // Per-field search text for the findings search bars below.
   const [examSearch, setExamSearch] = useState({
     general: '',
     cardiovascular: '',
@@ -331,6 +344,17 @@ export default function ConsultationPage() {
       ...prev,
       [field]: prev[field].trim() ? `${prev[field].trim()}\n${text}` : text,
     }));
+  };
+  // Append a picked symptom to the complaint text (comma-joined, deduped) —
+  // the box itself stays freely editable.
+  const addSymptom = (symptom: string) => {
+    const text = symptom.trim();
+    if (!text) return;
+    setChiefComplaint(prev => {
+      if (prev.toLowerCase().includes(text.toLowerCase())) return prev;
+      const base = prev.trim().replace(/,\s*$/, '');
+      return base ? `${base}, ${text}` : text;
+    });
   };
   const appendWorkflowText = (
     setter: Dispatch<SetStateAction<string>>,
@@ -1843,11 +1867,14 @@ export default function ConsultationPage() {
           )}
 
 
-          {/* Patient Selector — elevated above the following cards so the patient
-              search dropdown (which overflows the card) is never hidden behind
-              them. Each .card-elevated makes its own stacking context via
-              backdrop-filter, so without this the later cards paint on top. */}
-          <div className="card-elevated p-3 mb-3 relative z-50 ehr-consult-patient-picker">
+          {/* Patient Selector — on xl+ screens selection lives in the right-hand
+              patient summary card instead (search bar when nobody is selected,
+              Change button in the card header once someone is), so this bar only
+              renders below xl where that rail is hidden. Kept elevated above the
+              following cards so the patient search dropdown (which overflows the
+              card) is never hidden behind them — each .card-elevated makes its own
+              stacking context via backdrop-filter. */}
+          <div className="card-elevated p-3 mb-3 relative z-50 ehr-consult-patient-picker xl:hidden">
             <div className="flex items-center gap-3">
             {selectedPatientData ? (
               // The rich identity display (avatar, hospital number, age/gender,
@@ -1903,10 +1930,12 @@ export default function ConsultationPage() {
           </div>
 
           <div className="flex gap-3 flex-1 min-h-0 ehr-consult-workspace">
-          {/* AI Clinical Scribe Panel */}
+          {/* AI Clinical Scribe Panel — a stretched flex sibling of the form
+              column, so its top and bottom track the step cards and nav
+              exactly (the old sticky + calc(100vh - 180px) guessed the chrome
+              height and overshot the workspace). */}
           {scribeOpen && (
-            <div className="w-[380px] flex-shrink-0 sticky top-6 self-start rounded-2xl overflow-hidden ehr-consult-sidecar" style={{
-              height: 'calc(100vh - 180px)',
+            <div className="w-[380px] flex-shrink-0 rounded-2xl overflow-hidden ehr-consult-sidecar" style={{
               border: '1px solid var(--border-light)',
               boxShadow: 'none',
             }}>
@@ -1921,7 +1950,10 @@ export default function ConsultationPage() {
           <div className="flex-1 min-w-0 flex flex-col min-h-0">
             {/* Scrolling step content — only this region scrolls; the header,
                 patient selector and step indicator above stay fixed. */}
-            <div className="space-y-3 pr-1 ehr-soap-scroll">
+            {/* No space-y here — the flex gap spaces the visible cards; a
+                margin utility would also fire on cards after display:none
+                siblings and push the first visible card out of line. */}
+            <div className="pr-1 ehr-soap-scroll">
             {/* Section 1: Intake + Vital Signs */}
             <div className="card-elevated overflow-hidden" style={{ display: stepHas(1) ? undefined : 'none' }}>
               <SectionHeader index={1} />
@@ -1943,16 +1975,17 @@ export default function ConsultationPage() {
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Triaged today — vitals carried over below.</span>
                     </div>
                   )}
-                  <div className="flex items-center justify-between gap-3">
-                    <label>{t('consultation.chiefComplaintLabel')}</label>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => setSymptomPickerOpen(true)}
-                    >
-                      <Plus className="w-4 h-4" /> Add signs &amp; symptoms
-                    </button>
-                  </div>
+                  <CodedSearchField
+                    label={t('consultation.chiefComplaintLabel')}
+                    placeholder="Search signs & symptoms…"
+                    options={symptomOptions}
+                    value={symptomSearch}
+                    onChange={setSymptomSearch}
+                    onSelect={c => { addSymptom(c.name); setSymptomSearch(''); }}
+                    onAddCustom={text => { addSymptom(text); setSymptomSearch(''); }}
+                    showCodeBadge={false}
+                    maxResults={10}
+                  />
                   {/* One editable box — picked symptoms append here and can be
                       reworded, reordered, or deleted freely. */}
                   <textarea
@@ -1961,20 +1994,6 @@ export default function ConsultationPage() {
                     onChange={e => setChiefComplaint(e.target.value)}
                     placeholder="e.g. Fever, watery diarrhoea, vomiting — or pick from the symptom list"
                   />
-                  {symptomPickerOpen && (
-                    <SymptomPicker
-                      groups={SYMPTOM_CATALOG}
-                      selected={chiefComplaint}
-                      onClose={() => setSymptomPickerOpen(false)}
-                      onPick={(symptom) => {
-                        setChiefComplaint(prev => {
-                          if (prev.toLowerCase().includes(symptom.toLowerCase())) return prev;
-                          const base = prev.trim().replace(/,\s*$/, '');
-                          return base ? `${base}, ${symptom}` : symptom;
-                        });
-                      }}
-                    />
-                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label>{t('consultation.vitalTemperature')}</label>
@@ -2080,14 +2099,20 @@ export default function ConsultationPage() {
                     <div key={field.key} className="rounded-2xl border p-4 ehr-exam-row" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-card)' }}>
                       <CodedSearchField
                         label={field.label}
-                        placeholder="Search ICD findings…"
-                        options={icdCodes}
+                        placeholder="Search findings…"
+                        options={examFindingOptions[field.key]}
                         value={examSearch[field.key]}
                         onChange={v => setExamSearch(prev => ({ ...prev, [field.key]: v }))}
                         onSelect={c => {
-                          appendExamFinding(field.key, `${c.code} - ${c.name}`);
+                          appendExamFinding(field.key, c.name);
                           setExamSearch(prev => ({ ...prev, [field.key]: '' }));
                         }}
+                        onAddCustom={text => {
+                          appendExamFinding(field.key, text);
+                          setExamSearch(prev => ({ ...prev, [field.key]: '' }));
+                        }}
+                        showCodeBadge={false}
+                        maxResults={10}
                       />
                       <textarea
                         value={physExam[field.key]}
@@ -2624,7 +2649,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 7: Treatment Plan */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(5) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden ehr-card-fit" style={{ display: stepHas(5) ? undefined : 'none' }}>
               <SectionHeader index={7} />
               {openSections[7] && (
                 <div className="p-5 space-y-3">
@@ -2648,7 +2673,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 8: Attachments / Scans */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(5) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden ehr-card-fit" style={{ display: stepHas(5) ? undefined : 'none' }}>
               <SectionHeader index={8} />
               {openSections[8] && (
                 <div className="p-5">
@@ -2667,7 +2692,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 9: Follow-up */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(5) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden ehr-card-fit" style={{ display: stepHas(5) ? undefined : 'none' }}>
               <SectionHeader index={9} />
               {openSections[9] && (
                 <div className="p-5 space-y-3">
@@ -2693,7 +2718,7 @@ export default function ConsultationPage() {
             </div>
 
             {/* Section 10: Referral */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(5) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden ehr-card-fit" style={{ display: stepHas(5) ? undefined : 'none' }}>
               <SectionHeader index={10} />
               {openSections[10] && (
                 <div className="p-5">
@@ -2768,11 +2793,15 @@ export default function ConsultationPage() {
             {/* Visit charges (fee ticket) review — shown before completing so the
                 clinician sees what will be billed (P2.3 consultation checkout). */}
             {isLastStep && (
-              <div className="rounded-xl p-4 mb-2" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                <div className="mb-3">
-                  <h4 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Visit disposition</h4>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Choose the next station after this clinical note is completed.</p>
+              <div className="card-elevated overflow-hidden ehr-card-fit">
+                <div className="flex items-center gap-3 p-4">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
+                    <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Visit disposition</span>
                 </div>
+                <div className="p-4">
+                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Choose the next station after this clinical note is completed.</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   {[
                     { value: 'checkout', label: 'Checkout / pharmacy', note: 'Send to desk, billing, pharmacy, then dismissal' },
@@ -2802,15 +2831,22 @@ export default function ConsultationPage() {
                     );
                   })}
                 </div>
+                </div>
               </div>
             )}
 
             {isLastStep && chargePreview && chargePreview.lines.length > 0 && (
-              <div className="rounded-xl p-4 mb-2" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-semibold inline-flex items-center gap-2"><Wallet className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} /> Visit charges</h4>
+              <div className="card-elevated overflow-hidden ehr-card-fit">
+                <div className="flex items-center justify-between gap-3 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
+                      <Wallet className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                    </div>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Visit charges</span>
+                  </div>
                   <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Posted when you complete the visit</span>
                 </div>
+                <div className="p-4">
                 <table className="w-full text-[12px]">
                   <tbody>
                     {chargePreview.lines.map((l, i) => (
@@ -2829,6 +2865,7 @@ export default function ConsultationPage() {
                 {chargePreview.unpricedCount > 0 && (
                   <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>Items without a catalog price are not billed automatically — add a fee schedule entry to charge them.</p>
                 )}
+                </div>
               </div>
             )}
 
@@ -2873,17 +2910,26 @@ export default function ConsultationPage() {
             <div className="space-y-3">
               {selectedPatientData ? (
                 <>
-                  {/* Patient card */}
+                  {/* Patient card — also hosts patient switching on xl+ (the top
+                      picker bar is xl:hidden): name links to the chart, Change
+                      clears the selection and brings back the search card. */}
                   <div className="card-elevated p-5">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div>
-                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {selectedPatientData.firstName} {selectedPatientData.surname}
-                        </p>
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div className="min-w-0">
+                        <button
+                          onClick={() => router.push(`/patients/${selectedPatientData._id}`)}
+                          className="ehr-consult-patient-name"
+                          title={t('payments.openPatientRecord')}
+                        >
+                          {formatPatientName(selectedPatientData)}
+                        </button>
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                           {selectedPatientData.hospitalNumber}
                         </p>
                       </div>
+                      <button onClick={() => { setSelectedPatient(null); setPatientSearch(''); }} className="ehr-consult-change-btn">
+                        {t('consultation.change')}
+                      </button>
                     </div>
                     <div className="space-y-2">
                       {[
@@ -3019,10 +3065,41 @@ export default function ConsultationPage() {
 
                 </>
               ) : (
-                <div className="card-elevated p-6 text-center">
-                  <UserSearch className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
-                  <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>{t('consultation.noPatientSelected')}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('consultation.noPatientSelectedHint')}</p>
+                /* No patient yet — the search bar sits on top of the card and the
+                   matches render inside it (a floating dropdown would be clipped by
+                   this rail's overflow-y: auto), replacing the empty-state hint. */
+                <div className="card-elevated p-6">
+                  <input
+                    type="search"
+                    placeholder={t('consultation.selectPatient')}
+                    value={patientSearch}
+                    onChange={e => { setPatientSearch(e.target.value); setShowPatientDropdown(true); }}
+                    className="search-icon-input"
+                    style={{ background: 'var(--overlay-subtle)' }}
+                  />
+                  {showPatientDropdown && filteredPatients.length > 0 ? (
+                    <div className="rounded-lg border overflow-hidden" style={{ borderColor: 'var(--border-light)', maxHeight: 320, overflowY: 'auto' }}>
+                      {filteredPatients.map(p => (
+                        <button
+                          key={p._id}
+                          onClick={() => { setSelectedPatient(p._id); setShowPatientDropdown(false); setPatientSearch(''); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                          style={{ borderBottom: '1px solid var(--border-light)' }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{formatPatientName(p)}</p>
+                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber} &middot; {patientAgeLabel(p)} &middot; {p.gender} &middot; {p.tribe}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center pt-2 pb-1">
+                      <UserSearch className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
+                      <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>{t('consultation.noPatientSelected')}</p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('consultation.noPatientSelectedHint')}</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

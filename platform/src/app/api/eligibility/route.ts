@@ -61,28 +61,27 @@ async function postHandler(req: NextRequest) {
     // Use provided service date or today
     const checkDate = serviceDate || formatDate(new Date());
 
-    // In production, this would make an EDI 270/271 request to the payer
-    // For now, return a simulated response based on a simple eligibility check
-    // Example integration:
-    // const eligibilityData = await PayerEDIService.check270(patientId, policyId, checkDate)
-
+    // No real payer EDI (270/271) integration is wired up yet. We must NOT
+    // fabricate a "verified" result with invented copay/coinsurance figures —
+    // a clinician or biller would treat that as confirmed coverage before a
+    // procedure. Return an honest "pending / manual verification required"
+    // with no fabricated financials until a real payer connector exists.
+    // When integrated, replace this with:
+    //   const eligibilityData = await PayerEDIService.check270(patientId, policyId, checkDate)
     const eligibilityResult: EligibilityResult = {
-      status: 'verified',
+      status: 'pending',
       source: 'api',
       checkedAt: new Date().toISOString(),
       patientId,
       policyId,
       serviceDate: checkDate,
-      copayAmount: 500, // SSP (South Sudanese Pound)
-      coinsurancePct: 20,
-      deductibleRemaining: 2000,
-      notes: 'Coverage verified via API. Patient is eligible for services.',
+      copayAmount: 0,
+      coinsurancePct: 0,
+      deductibleRemaining: 0,
+      notes: 'Automated payer verification is not configured — confirm coverage manually with the payer before relying on it.',
     };
 
     console.log('[Eligibility API] Eligibility check completed:', {
-      patientId,
-      policyId,
-      serviceDate: checkDate,
       status: eligibilityResult.status,
       timestamp: new Date().toISOString(),
     });
@@ -110,23 +109,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Return latest eligibility status for the patient
-    // In production, this would query the database for the most recent eligibility check
-    const lastCheckedDate = new Date();
-    lastCheckedDate.setDate(lastCheckedDate.getDate() - 1); // Example: checked yesterday
-
+    // No stored eligibility history yet (no payer connector). Report an honest
+    // "pending" rather than a fabricated "verified" status.
     const response = {
       patientId,
-      status: 'verified',
-      lastChecked: lastCheckedDate.toISOString(),
+      status: 'pending',
+      lastChecked: null,
       message:
-        'Use POST method to perform a new eligibility check with policyId and serviceDate',
+        'Automated payer verification is not configured. Use POST with policyId and serviceDate once a payer connector is available; until then confirm coverage manually.',
     };
-
-    console.log('[Eligibility API] GET request for patient:', {
-      patientId,
-      timestamp: new Date().toISOString(),
-    });
 
     return NextResponse.json(response);
   } catch (error) {

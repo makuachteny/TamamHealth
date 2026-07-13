@@ -1036,7 +1036,7 @@ export default function GovernmentDashboardPage() {
     return (
       <>
         <TopBar title={t('government.nationalDashboard')} />
-        <div className="page-container page-enter flex flex-col flex-1 min-h-0" style={{ padding: '12px 16px' }}>
+        <div className="page-container page-enter flex flex-col flex-1 min-h-0">
           {expandedContent}
         </div>
       </>
