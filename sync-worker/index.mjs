@@ -95,6 +95,9 @@ const FALLBACK_DBS = Object.freeze([
   // Nutrition screening writeback (SAM/MAM MCH indicator). Keep aligned with
   // DB_TABLE_MAP in platform/src/app/api/sync/route.ts.
   'tamamhealth_nutrition_screenings',
+  // Program enrollment writeback (ART/TB/PMTCT/ANC/Nutrition/EPI/NCD care-cascade
+  // indicators). Keep aligned with DB_TABLE_MAP in platform/src/app/api/sync/route.ts.
+  'tamamhealth_program_enrollments',
 ]);
 
 /**

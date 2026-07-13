@@ -480,6 +480,76 @@ export interface ProblemDoc extends BaseDoc {
   orgId?: string;
 }
 
+/**
+ * Care-program enrollment — clinical programs a patient is enrolled in
+ * (ART/HIV care, TB, PMTCT, ANC, Nutrition, EPI/Immunization, NCD clinic, or
+ * a free-text "other"). Anchored to the patient like the Problem List.
+ *
+ * Distinct from `Patient.payorInfo.programEnrollment`, which is an unrelated
+ * insurance/NGO-coverage string captured at registration.
+ */
+export type ProgramKey =
+  | 'art_hiv_care'
+  | 'tb_ds'
+  | 'tb_dr'
+  | 'pmtct'
+  | 'anc'
+  | 'nutrition_otp'
+  | 'nutrition_sfp'
+  | 'epi_immunization'
+  | 'ncd_hypertension_diabetes'
+  | 'other';
+
+export type ProgramEnrollmentStatus = 'active' | 'completed' | 'transferred_out' | 'lost_to_follow_up' | 'discontinued';
+
+export interface ProgramEnrollmentDoc extends BaseDoc {
+  type: 'program_enrollment';
+  patientId: string;
+  patientName?: string;
+  programKey: ProgramKey;
+  /** Display label — the curated program name, or the clinician's free text when programKey === 'other'. */
+  programName: string;
+  status: ProgramEnrollmentStatus;
+  /** Date the patient was enrolled (YYYY-MM-DD) */
+  enrollmentDate: string;
+  /** Date the enrollment ended (completed/transferred/discontinued/LTFU), if any (YYYY-MM-DD) */
+  outcomeDate?: string;
+  notes?: string;
+  recordedBy?: string;
+  recordedByName?: string;
+  hospitalId?: string;
+  hospitalName?: string;
+  orgId?: string;
+}
+
+/**
+ * Procedure performed on a patient (bedside or theatre) — e.g. wound
+ * debridement, incision & drainage, suturing, IUD insertion. Previously no
+ * procedure data model existed; procedures done during a visit were only
+ * captured as free text inside the consultation note.
+ */
+export interface ProcedureDoc extends BaseDoc {
+  type: 'procedure';
+  patientId: string;
+  patientName?: string;
+  /** Encounter that this procedure was performed during, if any */
+  encounterId?: string;
+  /** Display name (e.g. "Incision and drainage of abscess") */
+  name: string;
+  /** Optional procedure code — free text (not validated against a coding system today) */
+  code?: string;
+  /** Date the procedure was performed (YYYY-MM-DD) */
+  date: string;
+  performedBy?: string;
+  performedByName?: string;
+  bodySite?: string;
+  outcome?: string;
+  notes?: string;
+  hospitalId?: string;
+  hospitalName?: string;
+  orgId?: string;
+}
+
 export interface AuditLogDoc extends BaseDoc {
   type: 'audit_log';
   action: string;

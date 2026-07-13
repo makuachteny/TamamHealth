@@ -9,8 +9,8 @@
  * uses for `patientNotes`) rather than standing up a new data layer.
  */
 
-import { useMemo, useState } from 'react';
-import { Image as ImageIcon } from '@/components/icons/lucide';
+import { useMemo, useRef, useState } from 'react';
+import { Image as ImageIcon, X } from '@/components/icons/lucide';
 import CodedSearchField from '@/components/CodedSearchField';
 import { useToast } from '@/components/Toast';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
@@ -38,6 +38,33 @@ export default function VisitNotePanel({ patient, currentUser, canConsult, onClo
   const [secondaryDx, setSecondaryDx] = useState<PickedDx | null>(null);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Images picked for this note — persisted to the patient_documents store on
+  // save (same flow the radiology queue uses), so they survive the session and
+  // show on the chart's documents/attachments views.
+  const [images, setImages] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB — PouchDB doc budget
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = String(reader.result || '');
+        resolve(dataUrl.slice(dataUrl.indexOf(',') + 1)); // strip data: prefix
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const handleImagesChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ''; // allow re-selecting the same file
+    const oversized = files.filter(f => f.size > MAX_IMAGE_BYTES);
+    if (oversized.length > 0) {
+      showToast(`Skipped ${oversized.length} file(s) over 5MB`, 'error');
+    }
+    setImages(prev => [...prev, ...files.filter(f => f.size <= MAX_IMAGE_BYTES)]);
+  };
 
   if (!canConsult) {
     return (
@@ -59,6 +86,7 @@ export default function VisitNotePanel({ patient, currentUser, canConsult, onClo
       if (primaryDx) lines.push(`Primary diagnosis: ${primaryDx.title} (ICD-11 ${primaryDx.code})`);
       if (secondaryDx) lines.push(`Secondary diagnosis: ${secondaryDx.title} (ICD-11 ${secondaryDx.code})`);
       if (note.trim()) lines.push(note.trim());
+      if (images.length > 0) lines.push(`Attached images: ${images.map(f => f.name).join(', ')}`);
       const { createPatientNote } = await import('@/lib/services/patient-note-service');
       await createPatientNote({
         patientId: patient._id,
@@ -69,7 +97,34 @@ export default function VisitNotePanel({ patient, currentUser, canConsult, onClo
         orgId: currentUser?.orgId,
         hospitalId: currentUser?.hospitalId,
       });
-      showToast('Visit note saved', 'success');
+      // Persist picked images to the synced patient_documents store (the same
+      // place radiology films land) so they outlive this session.
+      let imageFailures = 0;
+      if (images.length > 0) {
+        const { addPatientDocument } = await import('@/lib/services/patient-document-service');
+        for (const file of images) {
+          try {
+            const base64Data = await fileToBase64(file);
+            await addPatientDocument({
+              patientId: patient._id,
+              title: `Visit note image — ${file.name}`,
+              category: 'scanned_record',
+              fileName: file.name,
+              mimeType: file.type || 'application/octet-stream',
+              base64Data,
+              sizeBytes: file.size,
+              note: 'Attached from a visit note',
+              uploadedById: currentUser?._id,
+              uploadedByName: currentUser?.name,
+              hospitalId: currentUser?.hospitalId,
+              orgId: currentUser?.orgId,
+            });
+          } catch {
+            imageFailures++;
+          }
+        }
+      }
+      showToast(imageFailures > 0 ? `Visit note saved — ${imageFailures} image(s) failed to attach` : 'Visit note saved', imageFailures > 0 ? 'error' : 'success');
       onSaved?.();
       onClose();
     } catch (err) {
@@ -136,7 +191,28 @@ export default function VisitNotePanel({ patient, currentUser, canConsult, onClo
           />
         </div>
 
-        <button type="button" className="omrs-panel-add-btn" disabled title="Image attachments aren't supported yet">
+        {images.length > 0 && (
+          <div className="omrs-panel-field">
+            <label className="omrs-panel-label">Images</label>
+            {images.map((file, i) => (
+              <div className="omrs-panel-picked-chip" key={`${file.name}-${i}`}>
+                <span>{file.name} <span style={{ opacity: 0.7 }}>· {(file.size / 1024).toFixed(0)} KB</span></span>
+                <button type="button" onClick={() => setImages(prev => prev.filter((_, j) => j !== i))} aria-label={`Remove ${file.name}`}>
+                  <X size={12} /> Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={handleImagesChosen}
+        />
+        <button type="button" className="omrs-panel-add-btn" onClick={() => fileInputRef.current?.click()}>
           <ImageIcon /> Add image
         </button>
       </div>

@@ -10,7 +10,6 @@
 
 import { useState } from 'react';
 import { Plus, ChevronDown, Pill, FlaskConical } from '@/components/icons/lucide';
-import { useToast } from '@/components/Toast';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import type { PatientDoc } from '@/lib/db-types';
@@ -27,7 +26,6 @@ interface OrderBasketPanelProps {
 export default function OrderBasketPanel({
   patient, canPrescribe, canOrderLabs, onAddDrugOrder, onAddLabOrder, onClose,
 }: OrderBasketPanelProps) {
-  const { showToast } = useToast();
   const { prescriptions } = usePrescriptions();
   const { results } = useLabResults();
   const [drugsOpen, setDrugsOpen] = useState(true);
@@ -35,11 +33,6 @@ export default function OrderBasketPanel({
 
   const activeDrugOrders = (prescriptions || []).filter(rx => rx.patientId === patient._id && rx.status !== 'dispensed');
   const activeLabOrders = (results || []).filter(l => l.patientId === patient._id && l.status !== 'completed');
-
-  const signAndClose = () => {
-    showToast('Orders signed', 'success');
-    onClose();
-  };
 
   return (
     <>
@@ -125,8 +118,13 @@ export default function OrderBasketPanel({
         </div>
       </div>
       <div className="omrs-drawer-footer">
-        <button type="button" className="omrs-btn-ghost" onClick={onClose}>Cancel</button>
-        <button type="button" className="omrs-btn-primary" onClick={signAndClose}>Sign and close</button>
+        {/* Orders persist the moment they're added via the Prescribe/OrderLab
+            modals — there is no separate signing step in the data model, so a
+            "Sign and close" affordance here would be a no-op lie. */}
+        <span className="omrs-panel-row-sub" style={{ marginRight: 'auto', alignSelf: 'center' }}>
+          Orders are saved as soon as they&rsquo;re added.
+        </span>
+        <button type="button" className="omrs-btn-primary" onClick={onClose}>Done</button>
       </div>
     </>
   );

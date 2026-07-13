@@ -188,6 +188,10 @@ export const leaveRequestsDB = () => getDB('tamamhealth_leave_requests');
 export const payrollEntriesDB = () => getDB('tamamhealth_payroll_entries');
 export const controlledSubstanceLogDB = () => getDB('tamamhealth_controlled_substance_log');
 export const problemsDB = () => getDB('tamamhealth_problems');
+// Care-program enrollment (ART/HIV, TB, PMTCT, ANC, Nutrition, EPI, NCD, other).
+export const programEnrollmentsDB = () => getDB('tamamhealth_program_enrollments');
+// Procedures performed on a patient (bedside/theatre) — anchored to the patient.
+export const proceduresDB = () => getDB('tamamhealth_procedures');
 // Order sets / clinical protocols (reference data) — reusable bundles of
 // labs + medications keyed to a presenting condition (WHO/IMCI/ETAT/STG).
 export const orderSetsDB = () => getDB('tamamhealth_order_sets');
@@ -216,6 +220,9 @@ export const patientRemindersDB = () => getDB('tamamhealth_patient_reminders');
 
 // MUAC nutrition screenings (children 6–59m + ANC mothers).
 export const nutritionScreeningsDB = () => getDB('tamamhealth_nutrition_screenings');
+
+// Nutrition supply inventory (RUTF, therapeutic milk, ORS, micronutrients, ...).
+export const nutritionSuppliesDB = () => getDB('tamamhealth_nutrition_supplies');
 
 // Sync + conflict databases (Phase 1 closeout)
 export const syncEventsDB = () => getDB('tamamhealth_sync_events');
@@ -317,6 +324,7 @@ export async function resetAllDatabases(): Promise<void> {
     'tamamhealth_saved_payment_methods', 'tamamhealth_payment_plans', 'tamamhealth_invoices', 'tamamhealth_ledger',
     'tamamhealth_sync_events', 'tamamhealth_conflict_queue',
     'tamamhealth_problems', 'tamamhealth_encounters', 'tamamhealth_biometric_templates',
+    'tamamhealth_program_enrollments', 'tamamhealth_procedures',
     'tamamhealth_handoffs', 'tamamhealth_order_sets', 'tamamhealth_phone_notes', 'tamamhealth_assessments',
     // Operational DBs that were created + synced but previously missed here,
     // leaving stale data behind on reset/re-seed.
@@ -326,7 +334,7 @@ export async function resetAllDatabases(): Promise<void> {
     'tamamhealth_clinical_favorites', 'tamamhealth_consultation_templates',
     'tamamhealth_clinician_tasks', 'tamamhealth_patient_documents',
     'tamamhealth_patient_reminders', 'tamamhealth_intake_forms',
-    'tamamhealth_nutrition_screenings',
+    'tamamhealth_nutrition_screenings', 'tamamhealth_nutrition_supplies',
     // NOTE: 'tamamhealth_controlled_substance_log' is deliberately NOT reset
     // here — it is an append-only regulatory audit trail and resetAllDatabases()
     // runs on production seed-version bumps (see seedProduction).

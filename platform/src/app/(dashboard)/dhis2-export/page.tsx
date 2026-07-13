@@ -39,14 +39,12 @@ export default function DHIS2ExportPage() {
   const [exportLevel, setExportLevel] = useState<'facility' | 'payam' | 'county' | 'state' | 'national'>('facility');
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState<{ format: string; rows: number; date: string } | null>(null);
-  const [syncLog, setSyncLog] = useState([
-    { time: '08:00', message: t('dhis2.logAutoSync', { synced: 8, total: 10 }), status: 'success' as const },
-    { time: '07:55', message: t('dhis2.logConnecting'), status: 'info' as const },
-    { time: 'Feb 21 16:45', message: t('dhis2.logManualSync'), status: 'success' as const },
-    { time: 'Feb 21 14:30', message: t('dhis2.logSyncFailedTb'), status: 'error' as const },
-    { time: 'Feb 21 08:00', message: t('dhis2.logAutoSync', { synced: 7, total: 10 }), status: 'success' as const },
-    { time: 'Feb 20 08:00', message: t('dhis2.logAutoSync', { synced: 10, total: 10 }), status: 'success' as const },
-  ]);
+  // Persisted sync state (last push, dataset snapshot, history) — replaces the
+  // fabricated per-element statuses and seeded log lines this page used to show.
+  const [log, setLog] = useState<Dhis2SyncLogDoc | null>(null);
+  useEffect(() => {
+    getDhis2SyncLog().then(setLog).catch(() => setLog(null));
+  }, []);
 
   const { patients } = usePatients();
   const { alerts: diseaseAlerts } = useSurveillance();
@@ -54,8 +52,24 @@ export default function DHIS2ExportPage() {
   const { stats: ancStats } = useANC();
   const { currentUser } = useApp();
 
-  const syncedCount = DHIS2_DATA_ELEMENTS.filter(d => d.synced).length;
   const hospitalName = currentUser?.hospital?.name || currentUser?.hospitalName || '';
+
+  // Everything below derives from the REAL persisted log — honest empty states
+  // ("Never synced", "Not configured") when nothing has run yet.
+  const dhis2Configured = isDhis2Configured();
+  const dhis2Host = getDhis2BaseUrlHost();
+  const lastPushSucceeded = log?.lastPush?.status === 'pushed';
+  const snapshotValues = log?.lastDataset?.dataValues;
+  const elementGroups = useMemo(() => (snapshotValues ? groupDhis2DataValues(snapshotValues) : []), [snapshotValues]);
+  const elementCount = snapshotValues?.length ?? 0;
+  const lastSyncedLabel = log?.lastSyncedAt ? new Date(log.lastSyncedAt).toLocaleString() : null;
+  const lastSyncShort = log?.lastSyncedAt ? new Date(log.lastSyncedAt).toLocaleDateString() : '—';
+  const reportCompleteness = getMetric(snapshotValues, 'REPORTING_COMPLETENESS') ?? getMetric(snapshotValues, 'DATA_QUALITY_SCORE') ?? (lastPushSucceeded ? 100 : 0);
+  // `lastDataset.period` is persisted normalized (dash-stripped by
+  // normalizeDhis2Period, e.g. "202607"); the picker holds "YYYY-MM". Compare
+  // against the same normalized form, else this is always false and the
+  // "reports submitted" state never triggers.
+  const reportsSubmitted = lastPushSucceeded && log?.lastDataset?.period === period.replace(/-/g, '');
 
   // Resolve which tier of data to export. Each option picks the field(s) that
   // anchor the scope; the service derives the orgUnit from those.
@@ -76,27 +90,19 @@ export default function DHIS2ExportPage() {
 
   const handleSync = async () => {
     setSyncing(true);
-    setSyncLog(prev => [
-      { time: 'Now', message: t('dhis2.logInitiatingSync'), status: 'info' as const },
-      ...prev,
-    ]);
     try {
+      const initiated = await appendDhis2LogEntry(t('dhis2.logInitiatingSync'), 'info');
+      setLog(initiated);
       const { generateDHIS2Export, pushDataSetToDHIS2 } = await import('@/lib/services/dhis2-export-service');
       const dataset = await generateDHIS2Export(period, buildExportScope());
       const result = await pushDataSetToDHIS2(dataset);
-      const status: 'success' | 'error' | 'info' =
-        result.status === 'pushed' ? 'success'
-        : result.status === 'failed' ? 'error'
-        : 'info';
-      setSyncLog(prev => [
-        { time: 'Now', message: result.message, status },
-        ...prev,
-      ]);
+      // Persist the attempt (entry + lastPush + dataset snapshot); only a real
+      // successful push advances lastSyncedAt.
+      const updated = await recordDhis2SyncResult({ dataset, push: result });
+      setLog(updated);
     } catch (err) {
-      setSyncLog(prev => [
-        { time: 'Now', message: t('dhis2.logSyncFailed', { msg: (err as Error).message }), status: 'error' as const },
-        ...prev,
-      ]);
+      const updated = await appendDhis2LogEntry(t('dhis2.logSyncFailed', { msg: (err as Error).message }), 'error').catch(() => null);
+      if (updated) setLog(updated);
     } finally {
       setSyncing(false);
     }
@@ -163,10 +169,12 @@ export default function DHIS2ExportPage() {
         {/* Status Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           {[
-            { label: t('dhis2.statConnection'), value: t('dhis2.statConnectionActive'), icon: Wifi, color: '#10B944', sub: 'hmis.southsudan.health' },
-            { label: t('dhis2.tabDataElements'), value: `${syncedCount}/${DHIS2_DATA_ELEMENTS.length}`, icon: Database, color: 'var(--accent-primary)', sub: t('sync.synced') },
-            { label: t('dhis2.statReportsDue'), value: String(DHIS2_REPORTS.filter(r => r.status !== 'submitted').length), icon: FileText, color: 'var(--color-warning)', sub: t('dhis2.statPendingCompletion') },
-            { label: t('dhis2.statLastSync'), value: t('dhis2.statLastSyncValue'), icon: Clock, color: '#015697', sub: 'Feb 22, 2026' },
+            dhis2Configured
+              ? { label: t('dhis2.statConnection'), value: t('dhis2.statConnectionActive'), icon: Wifi, color: '#10B944', sub: dhis2Host || '' }
+              : { label: t('dhis2.statConnection'), value: 'Not configured', icon: Wifi, color: 'var(--color-warning)', sub: 'Set NEXT_PUBLIC_DHIS2_BASE_URL' },
+            { label: t('dhis2.tabDataElements'), value: snapshotValues ? `${lastPushSucceeded ? elementCount : 0}/${elementCount}` : '—', icon: Database, color: 'var(--accent-primary)', sub: snapshotValues ? t('sync.synced') : 'No sync run yet' },
+            { label: t('dhis2.statReportsDue'), value: String(reportsSubmitted ? 0 : REPORT_TYPES.length), icon: FileText, color: 'var(--color-warning)', sub: t('dhis2.statPendingCompletion') },
+            { label: t('dhis2.statLastSync'), value: lastSyncedLabel ? lastSyncShort : 'Never', icon: Clock, color: '#015697', sub: lastSyncedLabel || 'Run a sync to push data' },
           ].map((stat) => (
             <div key={stat.label} className="card-elevated p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -200,63 +208,74 @@ export default function DHIS2ExportPage() {
         {/* ── DATA ELEMENTS TAB ── */}
         {activeTab === 'overview' && (
           <div className="card-elevated overflow-hidden">
-            <div className="hidden sm:grid" style={{
-              gridTemplateColumns: '2fr 1.3fr 1.2fr 0.8fr 1.2fr',
-              padding: '10px 20px',
-              borderBottom: '1px solid var(--border-light)',
-            }}>
-              {[t('dhis2.colDataElement'), t('dhis2.colDhis2Uid'), t('pharmacy.category'), t('lab.status'), t('dhis2.statLastSync')].map(h => (
-                <span key={h} className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</span>
-              ))}
-            </div>
-            {DHIS2_DATA_ELEMENTS.map((de) => (
-              <div
-                key={de.id}
-                className="sm:grid items-center transition-colors"
-                style={{
-                  gridTemplateColumns: '2fr 1.3fr 1.2fr 0.8fr 1.2fr',
-                  padding: '12px 20px',
-                  borderBottom: '1px solid var(--border-light)',
-                }}
-              >
-                <div className="flex items-center gap-2 mb-1 sm:mb-0">
-                  <span className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>{de.name}</span>
-                </div>
-                <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{de.dhis2Id}</span>
-                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{de.category}</span>
-                <div>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                    de.synced ? 'badge-normal' : 'badge-warning'
-                  }`}>
-                    {de.synced ? t('sync.synced') : t('lab.filterPending')}
-                  </span>
-                </div>
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{de.lastSync}</span>
+            {!snapshotValues ? (
+              <div className="text-center py-12">
+                <Database className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>No sync has run yet</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Press “{t('dhis2.syncNow')}” to generate the current dataset and push it to DHIS2 — the real data elements will appear here.
+                </p>
               </div>
-            ))}
+            ) : (
+              <>
+                <div className="hidden sm:grid" style={{
+                  gridTemplateColumns: '2fr 1fr 1.2fr 0.8fr 1.2fr',
+                  padding: '10px 20px',
+                  borderBottom: '1px solid var(--border-light)',
+                }}>
+                  {[t('dhis2.colDataElement'), 'Value', t('pharmacy.category'), t('lab.status'), t('dhis2.statLastSync')].map(h => (
+                    <span key={h} className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</span>
+                  ))}
+                </div>
+                {elementGroups.flatMap(group => group.elements.map(de => (
+                  <div
+                    key={`${group.label}-${de.dataElement}`}
+                    className="sm:grid items-center transition-colors"
+                    style={{
+                      gridTemplateColumns: '2fr 1fr 1.2fr 0.8fr 1.2fr',
+                      padding: '12px 20px',
+                      borderBottom: '1px solid var(--border-light)',
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-1 sm:mb-0">
+                      <span className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>
+                        {de.dataElement.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{de.value}</span>
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{group.label}</span>
+                    <div>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                        lastPushSucceeded ? 'badge-normal' : 'badge-warning'
+                      }`}>
+                        {lastPushSucceeded ? t('sync.synced') : t('lab.filterPending')}
+                      </span>
+                    </div>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{lastSyncedLabel || '—'}</span>
+                  </div>
+                )))}
+              </>
+            )}
           </div>
         )}
 
         {/* ── HMIS REPORTS TAB ── */}
         {activeTab === 'reports' && (
           <div className="space-y-3">
-            {DHIS2_REPORTS.map((report, i) => (
-              <div key={i} className="card-elevated p-5">
+            {/* Every HMIS report here is fed by the same aggregate dataset push,
+                so status/completeness derive from the REAL last sync for the
+                selected period — not per-report fabrications. */}
+            {REPORT_TYPES.map((report) => (
+              <div key={report.name} className="card-elevated p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{report.name}</h3>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{report.period} · {t('dhis2.due')}: {report.dueDate}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{period}{lastSyncedLabel ? ` · ${t('dhis2.statLastSync')}: ${lastSyncedLabel}` : ''}</p>
                   </div>
                   <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-md ${
-                    report.status === 'submitted' ? 'badge-normal' :
-                    report.status === 'draft' ? 'badge-info' :
-                    'badge-muted'
-                  }`} style={
-                    report.status === 'submitted' ? {} :
-                    report.status === 'draft' ? { background: 'var(--accent-light)', color: 'var(--accent-primary)' } :
-                    { background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }
-                  }>
-                    {report.status.replace('_', ' ')}
+                    reportsSubmitted ? 'badge-normal' : 'badge-muted'
+                  }`} style={reportsSubmitted ? {} : { background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
+                    {reportsSubmitted ? 'submitted' : 'pending'}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -264,16 +283,16 @@ export default function DHIS2ExportPage() {
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{
-                        width: `${report.completeness}%`,
-                        background: report.completeness === 100 ? '#10B944' : report.completeness > 50 ? 'var(--accent-primary)' : 'var(--color-warning)',
+                        width: `${reportCompleteness}%`,
+                        background: reportCompleteness === 100 ? '#10B944' : reportCompleteness > 50 ? 'var(--accent-primary)' : 'var(--color-warning)',
                       }}
                     />
                   </div>
                   <span className="text-sm font-bold font-mono" style={{ color: 'var(--text-primary)', minWidth: '36px' }}>
-                    {report.completeness}%
+                    {reportCompleteness}%
                   </span>
                 </div>
-                {report.status !== 'submitted' && (
+                {!reportsSubmitted && (
                   <div className="flex items-center gap-2 mt-3">
                     <button
                       onClick={() => setActiveTab('aggregate')}
@@ -286,21 +305,19 @@ export default function DHIS2ExportPage() {
                     >
                       <FileText className="w-3 h-3" /> {t('dhis2.reviewData')}
                     </button>
-                    {report.completeness > 80 && (
-                      <button
-                        onClick={handleSync}
-                        disabled={syncing}
-                        className="text-xs font-medium flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                        style={{
-                          background: 'rgba(16,185,68,0.08)',
-                          color: '#10B944',
-                          border: '1px solid rgba(16,185,68,0.15)',
-                          cursor: syncing ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        <Upload className="w-3 h-3" /> {syncing ? t('dhis2.submitting') : t('action.submit')}
-                      </button>
-                    )}
+                    <button
+                      onClick={handleSync}
+                      disabled={syncing}
+                      className="text-xs font-medium flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      style={{
+                        background: 'rgba(16,185,68,0.08)',
+                        color: '#10B944',
+                        border: '1px solid rgba(16,185,68,0.15)',
+                        cursor: syncing ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <Upload className="w-3 h-3" /> {syncing ? t('dhis2.submitting') : t('action.submit')}
+                    </button>
                   </div>
                 )}
               </div>
@@ -461,9 +478,9 @@ export default function DHIS2ExportPage() {
         {/* ── SYNC LOG TAB ── */}
         {activeTab === 'log' && (
           <div className="card-elevated overflow-hidden">
-            {syncLog.map((log, i) => (
+            {(log?.entries ?? []).map((entry, i) => (
               <div
-                key={i}
+                key={`${entry.time}-${i}`}
                 className="flex items-center gap-3 px-5 py-3 transition-colors"
                 style={{
                   borderBottom: '1px solid var(--border-light)',
@@ -471,15 +488,15 @@ export default function DHIS2ExportPage() {
                 }}
               >
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{
-                  background: log.status === 'success' ? '#10B944' : log.status === 'error' ? 'var(--color-danger)' : 'var(--accent-primary)',
+                  background: entry.status === 'success' ? '#10B944' : entry.status === 'error' ? 'var(--color-danger)' : 'var(--accent-primary)',
                 }} />
-                <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-muted)', minWidth: '110px' }}>{log.time}</span>
+                <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-muted)', minWidth: '150px' }}>{new Date(entry.time).toLocaleString()}</span>
                 <span className="text-sm" style={{
-                  color: log.status === 'error' ? 'var(--color-danger)' : 'var(--text-secondary)',
-                }}>{log.message}</span>
+                  color: entry.status === 'error' ? 'var(--color-danger)' : 'var(--text-secondary)',
+                }}>{entry.message}</span>
               </div>
             ))}
-            {syncLog.length === 0 && (
+            {(log?.entries ?? []).length === 0 && (
               <div className="text-center py-12">
                 <Clock className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('dhis2.noSyncActivity')}</p>

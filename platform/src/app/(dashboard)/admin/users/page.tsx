@@ -6,9 +6,10 @@ import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
+import { useHospitals } from '@/lib/hooks/useHospitals';
 import type { UserDoc, UserRole } from '@/lib/db-types';
 import {
-  Users, Search, UserX, UserCheck, Shield, Filter
+  Users, Search, UserX, UserCheck, UserPlus, Shield, Filter
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
 
@@ -75,6 +76,14 @@ export default function AdminUsersPage() {
   const [changeRoleUser, setChangeRoleUser] = useState<UserDoc | null>(null);
   const [newRole, setNewRole] = useState<UserRole>('nurse');
   const [changingRole, setChangingRole] = useState(false);
+  // "Add user" modal — super_admin can create users directly here instead of
+  // detouring to /settings or /org-admin/users.
+  const { hospitals } = useHospitals();
+  const emptyAddForm = { name: '', username: '', password: '', role: 'nurse' as UserRole, orgId: '', hospitalId: '' };
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [addForm, setAddForm] = useState(emptyAddForm);
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   // Access control
   useEffect(() => {
@@ -121,6 +130,36 @@ export default function AdminUsersPage() {
       console.error(err);
     } finally {
       setChangingRole(false);
+    }
+  };
+
+  const handleAddUser = async () => {
+    if (!currentUser) return;
+    if (!addForm.name.trim() || !addForm.username.trim() || !addForm.password) {
+      setAddError('Name, username, and password are required');
+      return;
+    }
+    setAddSaving(true);
+    setAddError(null);
+    try {
+      const { createUser } = await import('@/lib/services/user-service');
+      const hospital = hospitals.find(h => h._id === addForm.hospitalId);
+      const created = await createUser({
+        name: addForm.name.trim(),
+        username: addForm.username.trim(),
+        password: addForm.password,
+        role: addForm.role,
+        orgId: addForm.orgId || undefined,
+        hospitalId: addForm.hospitalId || undefined,
+        hospitalName: hospital?.name,
+      }, currentUser._id, currentUser.username);
+      setUsers(prev => [created, ...prev]);
+      setShowAddUser(false);
+      setAddForm(emptyAddForm);
+    } catch (err) {
+      setAddError((err as Error).message || 'Failed to create user');
+    } finally {
+      setAddSaving(false);
     }
   };
 
@@ -212,6 +251,9 @@ export default function AdminUsersPage() {
             <Filter className="w-3.5 h-3.5" />
             {filteredUsers.length} of {users.length}
           </div>
+          <button type="button" className="btn btn-primary" style={{ gap: 6, marginLeft: 'auto' }} onClick={() => { setAddForm(emptyAddForm); setAddError(null); setShowAddUser(true); }}>
+            <UserPlus className="w-4 h-4" /> Add user
+          </button>
         </div>
 
         {/* Table */}
@@ -338,6 +380,67 @@ export default function AdminUsersPage() {
           </div>
         </div>
       </main>
+
+      {/* Add User Modal */}
+      {showAddUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="rounded-2xl shadow-2xl w-full max-w-md" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-light)' }}>
+              <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Add user</h2>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Create a platform account and hand the credentials to the staff member.</p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Full name</label>
+                <input type="text" value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Username</label>
+                  <input type="text" value={addForm.username} onChange={e => setAddForm(f => ({ ...f, username: e.target.value }))} style={inputStyle} autoComplete="off" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Password</label>
+                  <input type="password" value={addForm.password} onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))} style={inputStyle} autoComplete="new-password" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Role</label>
+                <select value={addForm.role} onChange={e => setAddForm(f => ({ ...f, role: e.target.value as UserRole }))} style={selectStyle}>
+                  {(Object.keys(ROLE_LABELS) as UserRole[]).filter(r => r !== 'super_admin').map(r => (
+                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Organization</label>
+                <select value={addForm.orgId} onChange={e => setAddForm(f => ({ ...f, orgId: e.target.value, hospitalId: '' }))} style={selectStyle}>
+                  <option value="">— None (platform-level role) —</option>
+                  {organizations.map(o => <option key={o._id} value={o._id}>{o.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Facility</label>
+                <select value={addForm.hospitalId} onChange={e => setAddForm(f => ({ ...f, hospitalId: e.target.value }))} style={selectStyle}>
+                  <option value="">— None —</option>
+                  {hospitals.filter(h => !addForm.orgId || h.orgId === addForm.orgId).map(h => (
+                    <option key={h._id} value={h._id}>{h.name}</option>
+                  ))}
+                </select>
+              </div>
+              {addError && (
+                <p className="text-xs" style={{ color: 'var(--color-danger)' }}>{addError}</p>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t flex justify-end gap-2" style={{ borderColor: 'var(--border-light)' }}>
+              <button onClick={() => setShowAddUser(false)} className="btn btn-secondary" disabled={addSaving}>Cancel</button>
+              <button onClick={handleAddUser} className="btn btn-primary" disabled={addSaving}>
+                {addSaving ? 'Creating…' : 'Create user'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Change Role Modal */}
       {changeRoleUser && (

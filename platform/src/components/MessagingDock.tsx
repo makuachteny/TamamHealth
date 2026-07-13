@@ -16,7 +16,7 @@ import { getRoleConfig } from '@/lib/permissions';
 import { initials } from '@/lib/patient-utils';
 import { ROLE_LABEL } from '@/lib/role-display';
 import { BRAND_PRIMARY, BRAND_SECONDARY } from '@/lib/theme-colors';
-import type { ConversationDoc, UserRole } from '@/lib/db-types';
+import type { ConversationDoc, UserRole, StaffPresence } from '@/lib/db-types';
 import {
   MessageSquare, Minus, Plus, Search, Send, ArrowLeft, Users as UsersIcon,
   Paperclip, X, AlertTriangle,
@@ -24,23 +24,24 @@ import {
 
 type Attachment = { name: string; mimeType: string; base64Data: string; sizeBytes: number };
 
-const AVAILABILITY_LABELS: Record<string, string> = {
-  available: 'Available',
+// Same StaffPresence vocabulary + colors the full /messages page uses, so the
+// dock's picker persists real presence (visible to other staff) instead of the
+// old local-only status that reset on every reload.
+const AVAILABILITY_LABELS: Record<StaffPresence, string> = {
+  active: 'Active',
   busy: 'Busy',
-  in_procedure: 'In Procedure',
-  in_emergency: 'In Emergency',
-  in_theatre: 'In Theatre',
-  on_rounds: 'On Rounds',
   away: 'Away',
+  on_call: 'On Call',
+  in_clinic: 'In Clinic',
+  offline: 'Offline',
 };
-const AVAILABILITY_COLORS: Record<string, string> = {
-  available:    'var(--color-success-600)',
-  busy:         'var(--color-warning-600)',
-  in_procedure: 'var(--accent-primary)',
-  in_emergency: '#DC2626',
-  in_theatre:   '#015697',
-  on_rounds:    '#015697',
-  away:         'var(--text-muted)',
+const AVAILABILITY_COLORS: Record<StaffPresence, string> = {
+  active:    'var(--color-success)',
+  busy:      'var(--color-danger)',
+  away:      'var(--color-warning)',
+  on_call:   'var(--accent-primary)',
+  in_clinic: 'var(--accent-primary)',
+  offline:   'var(--text-muted)',
 };
 
 const AVATAR_PALETTE = ['var(--accent-primary)', BRAND_SECONDARY, '#369FDA', '#2191D0', '#015697', '#015697', '#015697', '#475569'];
@@ -93,7 +94,15 @@ export default function MessagingDock() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [phiWarning, setPhiWarning] = useState(false);
   const [showAvailability, setShowAvailability] = useState(false);
-  const [availability, setAvailability] = useState<string>('available');
+  // Presence is persisted on the user doc (visible to other staff, survives
+  // reload). Local state is only an optimistic mirror while the write lands.
+  const persistedPresence = (users.find(u => u._id === currentUser?._id)?.presence as StaffPresence | undefined) || 'active';
+  const [availabilityOverride, setAvailabilityOverride] = useState<StaffPresence | null>(null);
+  const availability: StaffPresence = availabilityOverride ?? persistedPresence;
+  const pickAvailability = (next: StaffPresence) => {
+    setAvailabilityOverride(next);
+    chat.setPresence(next).catch(err => console.warn('Failed to persist presence', err));
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Conversations the user has opened in this session — used to clear the unread
   // dot locally as soon as they're read (the conversation doc has no per-user
@@ -331,10 +340,10 @@ export default function MessagingDock() {
               </button>
               {showAvailability && (
                 <div className="absolute right-0 top-full mt-1 z-50 py-1 rounded-xl shadow-xl min-w-[160px]" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)' }}>
-                  {Object.entries(AVAILABILITY_LABELS).map(([key, label]) => (
+                  {(Object.entries(AVAILABILITY_LABELS) as [StaffPresence, string][]).map(([key, label]) => (
                     <button
                       key={key}
-                      onClick={() => { setAvailability(key); setShowAvailability(false); }}
+                      onClick={() => { pickAvailability(key); setShowAvailability(false); }}
                       className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--overlay-subtle)]"
                     >
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: AVAILABILITY_COLORS[key] }} />

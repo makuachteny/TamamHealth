@@ -111,15 +111,18 @@ export function printReceipt(receipt: ReceiptData): void {
   }
 }
 
+/**
+ * Email a receipt via /api/receipts/email (SendGrid/Resend/SMTP behind an
+ * EMAIL_PROVIDER switch; a dev-only "log" provider counts as delivered).
+ *
+ * Returns the route's honest `delivered` flag — callers must gate their
+ * "Receipt sent" UI on it. A cashier being told an email went out when it
+ * didn't is worse than surfacing the failure.
+ */
 export async function emailReceipt(receipt: ReceiptData, toEmail: string): Promise<boolean> {
-  // In production, this would POST to an email API endpoint
-  // For now, log to console and return success
-  console.log(`[Receipt Service] Sending receipt ${receipt.receiptNumber} to ${toEmail}`);
-  console.log(`[Receipt Service] Receipt HTML length: ${generateReceiptHTML(receipt).length} chars`);
-
   try {
-    // Attempt to call the email API (would exist in production). Goes through
-    // apiFetch so the CSRF token from the session cookie is auto-attached.
+    // Goes through apiFetch so the CSRF token from the session cookie is
+    // auto-attached.
     const { apiFetch } = await import('@/lib/api-fetch');
     const response = await apiFetch('/api/receipts/email', {
       method: 'POST',
@@ -134,12 +137,14 @@ export async function emailReceipt(receipt: ReceiptData, toEmail: string): Promi
       }),
     });
 
-    if (response.ok) return true;
-    // If API doesn't exist yet, that's fine — gracefully fail
-    console.log('[Receipt Service] Email API not available — receipt logged for manual delivery');
-    return true;
-  } catch {
-    console.log('[Receipt Service] Email API not available — receipt logged for manual delivery');
-    return true; // Don't fail the payment flow for email issues
+    if (!response.ok) {
+      console.warn(`[Receipt Service] Email API returned ${response.status} for receipt ${receipt.receiptNumber}`);
+      return false;
+    }
+    const body = await response.json().catch(() => null) as { delivered?: boolean } | null;
+    return body?.delivered === true;
+  } catch (err) {
+    console.warn('[Receipt Service] Email send failed', err);
+    return false;
   }
 }

@@ -90,7 +90,7 @@ export default function ChartHeader({
           )}
         </div>
         <div className="omrs-header-meta">
-          {patientAgeLabel(patient)} &middot; {formatDobOmrs(patient.dateOfBirth)} &middot; OpenMRS ID: {patientIdDisplay}
+          {patientAgeLabel(patient)} &middot; {formatDobOmrs(patient.dateOfBirth)} &middot; TamamHealth ID: {patientIdDisplay}
         </div>
 
         {showMore && (

@@ -190,7 +190,8 @@ export default function PatientIntakePage() {
     if (!sendPatient || !sendProviderId || sendForms.length === 0) return;
     setSending(true);
     try {
-      await sendRequest(
+      const willSendSms = sendSms && !!sendPatient.phone;
+      const smsResult = await sendRequest(
         sendPatient._id,
         patientFullName(sendPatient),
         sendForms.map(f => ({ label: f, value: 'Requested' })),
@@ -201,8 +202,21 @@ export default function PatientIntakePage() {
           hospitalId: currentUser?.hospitalId,
           orgId: currentUser?.orgId,
         },
+        {
+          send: willSendSms,
+          phone: sendPatient.phone,
+          facilityName: currentUser?.hospitalName,
+        },
       );
-      showToast(`Intake forms sent to ${patientFullName(sendPatient)}.`, 'success');
+      if (willSendSms) {
+        if (smsResult?.ok) {
+          showToast(`Intake forms sent to ${patientFullName(sendPatient)} and an SMS was delivered.`, 'success');
+        } else {
+          showToast(`Intake request saved, but the SMS to ${patientFullName(sendPatient)} failed to send.`, 'error');
+        }
+      } else {
+        showToast(`Intake forms sent to ${patientFullName(sendPatient)}.`, 'success');
+      }
       resetSend();
       setSendOpen(false);
     } catch {

@@ -170,7 +170,9 @@ export default function EhrTopRail() {
 
   const openProfilePage = () => {
     setUserOpen(false);
-    router.push('/profile');
+    // No standalone /profile route exists — the profile form lives on the
+    // Settings page's default (preferences) tab.
+    router.push('/settings');
   };
 
   const openSettingsPage = () => {

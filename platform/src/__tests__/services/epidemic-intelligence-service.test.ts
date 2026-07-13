@@ -86,6 +86,11 @@ describe('epidemic-intelligence-service', () => {
 
   test('Rt estimates calculated from epidemic curves', async () => {
     const db = diseaseAlertsDB();
+    // Older-week baseline (5 weeks ago) plus a recent-week alert, so both
+    // Rt windows are populated and the ratio is a genuine computation.
+    const fiveWeeksAgo = new Date();
+    fiveWeeksAgo.setDate(fiveWeeksAgo.getDate() - 35);
+    await db.put(makeDiseaseAlert({ disease: 'Cholera', cases: 20, deaths: 2, reportDate: fiveWeeksAgo.toISOString().slice(0, 10) }));
     await db.put(makeDiseaseAlert({ disease: 'Cholera', cases: 20, deaths: 2 }));
 
     const data = await getEpidemicIntelligence();
@@ -93,16 +98,31 @@ describe('epidemic-intelligence-service', () => {
     expect(data.rtEstimates.length).toBeGreaterThan(0);
     for (const rt of data.rtEstimates) {
       expect(rt.disease).toBeDefined();
-      expect(typeof rt.rt).toBe('number');
-      expect(rt.rt).toBeGreaterThanOrEqual(0);
-      expect(rt.rt).toBeLessThanOrEqual(5);
-      expect(['growing', 'stable', 'declining']).toContain(rt.trend);
+      if (rt.rt !== null) {
+        expect(rt.rt).toBeGreaterThanOrEqual(0);
+        expect(rt.rt).toBeLessThanOrEqual(5);
+      }
+      expect(['growing', 'stable', 'declining', 'insufficient_data']).toContain(rt.trend);
       expect(['low', 'medium', 'high']).toContain(rt.confidence);
       expect(typeof rt.weeklyChange).toBe('number');
     }
   });
 
-  test('Rt estimates sorted by rt descending', async () => {
+  test('Rt returns insufficient_data when there is no older-week baseline', async () => {
+    const db = diseaseAlertsDB();
+    // A single current-week alert has no older-week case count to divide by
+    // — must be honestly flagged rather than defaulted to a fake Rt=1.
+    await db.put(makeDiseaseAlert({ disease: 'Cholera', cases: 20, deaths: 2 }));
+
+    const data = await getEpidemicIntelligence();
+
+    const cholerRt = data.rtEstimates.find(r => r.disease === 'Cholera');
+    expect(cholerRt).toBeDefined();
+    expect(cholerRt!.rt).toBeNull();
+    expect(cholerRt!.trend).toBe('insufficient_data');
+  });
+
+  test('Rt estimates sorted by rt descending (known values first, insufficient-data last)', async () => {
     const db = diseaseAlertsDB();
     await db.put(makeDiseaseAlert({ disease: 'Malaria', cases: 100 }));
     await db.put(makeDiseaseAlert({ disease: 'Cholera', cases: 10 }));
@@ -111,7 +131,9 @@ describe('epidemic-intelligence-service', () => {
 
     if (data.rtEstimates.length > 1) {
       for (let i = 0; i < data.rtEstimates.length - 1; i++) {
-        expect(data.rtEstimates[i].rt).toBeGreaterThanOrEqual(data.rtEstimates[i + 1].rt);
+        const a = data.rtEstimates[i].rt ?? -1;
+        const b = data.rtEstimates[i + 1].rt ?? -1;
+        expect(a).toBeGreaterThanOrEqual(b);
       }
     }
   });
@@ -251,17 +273,32 @@ describe('epidemic-intelligence-service', () => {
     expect(['low', 'moderate', 'high', 'critical']).toContain(data.summary.overallRiskLevel);
   });
 
-  test('highest Rt included in summary', async () => {
+  test('highest Rt is null in summary when no disease has a real historical baseline', async () => {
     const db = diseaseAlertsDB();
+    // Single current-week alert only — no older-week baseline anywhere, so
+    // there is no genuine Rt to report as "highest".
     await db.put(makeDiseaseAlert({ disease: 'Malaria', cases: 100, trend: 'increasing' }));
 
     const data = await getEpidemicIntelligence();
 
-    if (data.rtEstimates.length > 0) {
-      expect(data.summary.highestRt).toBeDefined();
-      expect(data.summary.highestRt!.disease).toBe(data.rtEstimates[0].disease);
-      expect(data.summary.highestRt!.value).toBe(data.rtEstimates[0].rt);
-    }
+    expect(data.summary.highestRt).toBeNull();
+  });
+
+  test('highest Rt reflects the genuine ratio when a historical baseline exists', async () => {
+    const db = diseaseAlertsDB();
+    const fiveWeeksAgo = new Date();
+    fiveWeeksAgo.setDate(fiveWeeksAgo.getDate() - 35);
+    await db.put(makeDiseaseAlert({ disease: 'Malaria', cases: 50, reportDate: fiveWeeksAgo.toISOString().slice(0, 10) }));
+    await db.put(makeDiseaseAlert({ disease: 'Malaria', cases: 100, trend: 'increasing' }));
+
+    const data = await getEpidemicIntelligence();
+
+    const malariaRt = data.rtEstimates.find(r => r.disease === 'Malaria');
+    expect(malariaRt).toBeDefined();
+    expect(malariaRt!.rt).not.toBeNull();
+    expect(data.summary.highestRt).not.toBeNull();
+    expect(data.summary.highestRt!.disease).toBe('Malaria');
+    expect(data.summary.highestRt!.value).toBe(malariaRt!.rt);
   });
 
   test('summary totals accumulate correctly', async () => {
@@ -297,22 +334,30 @@ describe('epidemic-intelligence-service', () => {
 
   // ---- Additional branch coverage for uncovered lines ----
 
-  test('Rt estimate shows declining trend (line 188)', async () => {
+  test('Rt estimate shows declining trend with a real historical baseline', async () => {
     const db = diseaseAlertsDB();
-    // Create declining alert
+    // Real weekly case counts: a much larger count 6 weeks ago than in the
+    // current week, so the recent/older ratio is genuinely < 0.8.
+    const sixWeeksAgo = new Date();
+    sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
     await db.put(makeDiseaseAlert({
       disease: 'Cholera',
-      cases: 50,
-      deaths: 5,
-      trend: 'decreasing'
+      cases: 100,
+      deaths: 10,
+      reportDate: sixWeeksAgo.toISOString().slice(0, 10),
+    }));
+    await db.put(makeDiseaseAlert({
+      disease: 'Cholera',
+      cases: 20,
+      deaths: 2,
+      trend: 'decreasing',
     }));
 
     const data = await getEpidemicIntelligence();
     const cholerRt = data.rtEstimates.find(r => r.disease === 'Cholera');
-    // If Rt is low enough, trend should be declining
-    if (cholerRt) {
-      expect(['growing', 'stable', 'declining']).toContain(cholerRt.trend);
-    }
+    expect(cholerRt).toBeDefined();
+    expect(cholerRt!.rt).not.toBeNull();
+    expect(cholerRt!.trend).toBe('declining');
   });
 
   test('syndromicAlerts with previous week calculation (lines 204-208)', async () => {

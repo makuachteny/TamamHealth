@@ -6,11 +6,23 @@ body {
      mobile Safari's elastic overscroll (or any Android rubber-band/bounce)
      never flashes white above the hero or below the footer. */
   background: #015697;
-  overflow-x: hidden;
 }
 
 html {
   scroll-behavior: smooth;
+  /* html is the single scroll root. overflow-x: hidden here clips horizontal
+     overflow without turning <body> into its own scroll container. */
+  overflow-x: hidden;
+  /* Kill the elastic rubber-band/bounce so the page can't be dragged past the
+     top of the hero or the bottom of the footer to reveal the colour behind
+     them — normal in-page scrolling is unaffected. */
+  overscroll-behavior-y: none;
+}
+
+body {
+  /* clip (not hidden) hides horizontal overflow WITHOUT making <body> a scroll
+     container — that quirk was trapping vertical scroll. */
+  overflow-x: clip;
 }
 
 section[id] {
@@ -148,6 +160,7 @@ textarea::placeholder {
    never fire without it. */
 .tm-nav-link:hover {
   color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.14) !important;
 }
 .tm-nav-cta:hover {
   background: #369fda !important;

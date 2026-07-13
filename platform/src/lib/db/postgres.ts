@@ -92,6 +92,8 @@ const ALLOWED_TABLES = new Set<string>([
   'admissions',
   // Nutrition screening writeback (see migrations/0008_nutrition_screenings_writeback.sql).
   'nutrition_screenings',
+  // Program enrollment writeback (see migrations/0009_program_enrollments_writeback.sql).
+  'program_enrollments',
   'blood_bank',
   'emergency_plans',
   'assets',
@@ -232,6 +234,10 @@ const ALLOWED_COLUMNS = new Set<string>([
   // Nutrition screening writeback (migrations/0008_nutrition_screenings_writeback.sql).
   'sex', 'muac', 'weight_kg', 'height_cm', 'edema', 'is_anc', 'screening_date',
   'screened_by_id', 'screened_by_name',
+  // Program enrollment writeback (migrations/0009_program_enrollments_writeback.sql).
+  // `notes` intentionally omitted — free-text PHI must not reach national analytics.
+  'program_key', 'program_name', 'enrollment_date', 'outcome_date',
+  'recorded_by', 'recorded_by_name',
 ]);
 
 // Final defence: every identifier must match a strict pattern. This catches
@@ -358,6 +364,12 @@ export const TABLE_CONFLICT_POLICY: Record<string, ConflictPolicy> = {
   beds: ConflictPolicy.LAST_WRITE_WINS,
   admissions: ConflictPolicy.LAST_WRITE_WINS,
   nutrition_screenings: ConflictPolicy.LAST_WRITE_WINS,
+  // Program enrollment: status moves active -> completed/transferred_out/
+  // lost_to_follow_up/discontinued, but the canonical flow can re-open a
+  // lost-to-follow-up enrollment (patient returns to care) just like
+  // `problems` re-opens a resolved condition — so LAST_WRITE_WINS, not
+  // CLINICAL_FINALIZED.
+  program_enrollments: ConflictPolicy.LAST_WRITE_WINS,
   blood_bank: ConflictPolicy.LAST_WRITE_WINS,
   assets: ConflictPolicy.LAST_WRITE_WINS,
   staff_schedules: ConflictPolicy.LAST_WRITE_WINS,

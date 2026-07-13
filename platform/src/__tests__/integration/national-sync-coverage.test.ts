@@ -47,8 +47,12 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
   'tamamhealth_patient_documents',     // scanned chart documents (films, letters, IDs) — facility-operational PHI blobs, not national analytics
   'tamamhealth_patient_reminders',     // queued patient reminders — facility-operational, not national analytics
   'tamamhealth_intake_forms',          // patient-submitted intake forms awaiting review/merge — facility-operational workflow, not national analytics
+  'tamamhealth_procedures',            // bedside/theatre procedures — facility-operational clinical detail, not a national/DHIS2 indicator today
+  'tamamhealth_nutrition_supplies',    // facility supply stock levels (RUTF/F-75/…) — facility-operational logistics, not national analytics
   // (tamamhealth_nutrition_screenings is NOT excluded — SAM/MAM now writes back
-  //  to the `nutrition_screenings` national table via DB_TABLE_MAP + mapper.)
+  //  to the `nutrition_screenings` national table via DB_TABLE_MAP + mapper.
+  //  tamamhealth_program_enrollments is NOT excluded either — ART/TB/PMTCT/
+  //  ANC/Nutrition/EPI/NCD enrollment writes back to `program_enrollments`.)
 ]);
 
 // Local-only databases that never participate in sync at all.

@@ -95,6 +95,34 @@ export async function appendDhis2LogEntry(message: string, status: Dhis2LogStatu
 }
 
 /**
+ * Record an attempt that failed BEFORE a real push result existed — e.g.
+ * generateDHIS2Export() threw. Marks lastPush as failed and stamps
+ * lastAttemptAt so the Settings/Export banners reflect the error instead of
+ * showing a stale "synced" state from a previous success. lastSyncedAt and
+ * lastDataset are intentionally preserved (the last *good* sync still stands).
+ */
+export async function recordDhis2SyncFailure(message: string): Promise<Dhis2SyncLogDoc> {
+  const db = platformConfigDB();
+  const existing = await getDocOrNull();
+  const now = new Date().toISOString();
+  const failedPush: DHIS2PushResult = { ok: false, status: 'failed', message };
+  const entries = [{ time: now, message, status: 'error' as const }, ...(existing?.entries ?? [])].slice(0, MAX_ENTRIES);
+  const doc: Dhis2SyncLogDoc = {
+    ...(existing ?? EMPTY_LOG),
+    _id: DOC_ID,
+    _rev: existing?._rev,
+    type: 'dhis2_sync_log',
+    lastAttemptAt: now,
+    lastPush: failedPush,
+    entries,
+    updatedAt: now,
+  };
+  const resp = await db.put(doc);
+  doc._rev = resp.rev;
+  return doc;
+}
+
+/**
  * Record the outcome of a real generateDHIS2Export() + pushDataSetToDHIS2()
  * attempt. Always logs an entry and updates lastAttemptAt/lastPush/lastDataset;
  * only advances lastSyncedAt when the push actually succeeded.

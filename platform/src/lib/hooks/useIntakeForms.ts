@@ -5,6 +5,13 @@ import { makeCoalescer } from './live-reload';
 import type { IntakeFormField, PatientIntakeFormDoc } from '../db-types';
 import { intakeFormsDB } from '../db';
 import { useApp } from '../context';
+import type { SmsSendResult } from '../sms';
+
+// Extra field persisted on the intake doc when an SMS notification is
+// attempted alongside the request — mirrors the `smsResult` pattern used on
+// MessageDoc (see appointment-reminder-service.ts) without needing to widen
+// the shared PatientIntakeFormDoc type for a best-effort side channel.
+type IntakeFormWithSms = PatientIntakeFormDoc & { smsResult?: SmsSendResult };
 
 export function useIntakeForms() {
   const [forms, setForms] = useState<PatientIntakeFormDoc[]>([]);
@@ -63,11 +70,49 @@ export function useIntakeForms() {
     patientId: string | undefined,
     patientName: string,
     fields: IntakeFormField[],
-    data: Partial<Pick<PatientIntakeFormDoc, 'hospitalNumber' | 'providerId' | 'providerName' | 'hospitalId' | 'orgId'>> = {}
-  ) => {
+    data: Partial<Pick<PatientIntakeFormDoc, 'hospitalNumber' | 'providerId' | 'providerName' | 'hospitalId' | 'orgId'>> = {},
+    // Optional: dispatch an SMS notification alongside the request. Best-effort —
+    // a delivery failure never blocks the intake request itself from being created.
+    smsOptions?: { send: boolean; phone?: string; facilityName?: string },
+  ): Promise<SmsSendResult | undefined> => {
     const { sendIntakeFormRequest } = await import('../services/intake-form-service');
-    await sendIntakeFormRequest(patientId, patientName, fields, data);
+    const created = await sendIntakeFormRequest(patientId, patientName, fields, data);
+
+    let smsResult: SmsSendResult | undefined;
+    if (smsOptions?.send && smsOptions.phone) {
+      const formList = fields.map(f => f.label).join(', ');
+      const facility = smsOptions.facilityName || 'Your clinic';
+      const body = `${facility}: please complete your intake forms (${formList}) at reception or on your next visit.`;
+      try {
+        const { sendSms } = await import('../sms');
+        smsResult = await sendSms({ to: smsOptions.phone, body });
+      } catch (err) {
+        smsResult = { ok: false, providerId: 'error', error: err instanceof Error ? err.message : 'unknown_error' };
+      }
+
+      // Persist the raw send result on the intake doc (same field name/shape as
+      // MessageDoc.smsResult) so staff can see delivery status; swallow any
+      // persistence failure since the SMS attempt itself already happened.
+      try {
+        const db = intakeFormsDB();
+        const doc = await db.get(created._id) as IntakeFormWithSms;
+        const updated: IntakeFormWithSms = { ...doc, smsResult, updatedAt: new Date().toISOString() };
+        const resp = await db.put(updated);
+        updated._rev = resp.rev;
+        const { emitSyncEvent } = await import('../services/sync-event-service');
+        emitSyncEvent({
+          resourceType: 'patient_intake_form',
+          resourceId: updated._id,
+          operation: 'update',
+          resourceVersion: updated._rev,
+          orgId: updated.orgId,
+          hospitalId: updated.hospitalId,
+        });
+      } catch { /* best-effort; do not surface as a send failure */ }
+    }
+
     await loadForms();
+    return smsResult;
   }, [loadForms]);
 
   return { forms, loading, error, merge, reject, sendRequest, reload: loadForms };

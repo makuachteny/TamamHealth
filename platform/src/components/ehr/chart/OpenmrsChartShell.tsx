@@ -82,12 +82,15 @@ export default function OpenmrsChartShell({
   onOpenPrescribeModal, onOpenOrderLabModal, onNoteSaved,
 }: OpenmrsChartShellProps) {
   const [openPanel, setOpenPanel] = useState<string | null>(null);
+  // Drawer expand toggle — widens the workspace drawer to near-full-width.
+  const [drawerMaximized, setDrawerMaximized] = useState(false);
   const activePanel = DRAWER_PANELS.find(p => p.id === openPanel) || null;
 
   const togglePanel = (id: string) => {
     setOpenPanel(prev => (prev === id ? null : id));
+    setDrawerMaximized(false);
   };
-  const closeDrawer = () => setOpenPanel(null);
+  const closeDrawer = () => { setOpenPanel(null); setDrawerMaximized(false); };
 
   const goToRecallTab = () => {
     setActiveTab('recall');
@@ -226,11 +229,17 @@ export default function OpenmrsChartShell({
       {activePanel && (
         <>
           <div className="omrs-drawer-backdrop no-print" onClick={closeDrawer} />
-          <div className="omrs-drawer no-print" role="dialog" aria-label={activePanel.title}>
+          <div className={`omrs-drawer no-print ${drawerMaximized ? 'is-maximized' : ''}`} role="dialog" aria-label={activePanel.title}>
             <div className="omrs-drawer-header">
               <span className="omrs-drawer-title">{activePanel.title}</span>
               <div className="omrs-drawer-controls">
-                <button type="button" title="Maximize" aria-label="Maximize panel">
+                <button
+                  type="button"
+                  title={drawerMaximized ? 'Restore panel size' : 'Maximize'}
+                  aria-label={drawerMaximized ? 'Restore panel size' : 'Maximize panel'}
+                  aria-pressed={drawerMaximized}
+                  onClick={() => setDrawerMaximized(v => !v)}
+                >
                   <Maximize2 />
                 </button>
                 <button type="button" title="Close" aria-label="Close panel" onClick={closeDrawer}>

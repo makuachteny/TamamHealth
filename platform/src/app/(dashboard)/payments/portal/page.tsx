@@ -11,6 +11,7 @@ import {
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { BillingDoc } from '@/lib/db-types-billing';
+import type { PaymentMethodType, PaymentStatus } from '@/lib/db-types-payments';
 import { formatMoney } from '@/lib/format-utils';
 
 // Demo gate. In production (NEXT_PUBLIC_DEMO_MODE=false) the portal never
@@ -20,8 +21,17 @@ const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 // Shape the portal renders against — independent of underlying BillingDoc so
 // we can keep the demo fallback when a patient has no real bills yet.
+// Carries patientId/patientName/facilityId/currency through from the source
+// BillingDoc — currentUser here is the *staff* member running this
+// assisted-portal flow (see role-routes.ts: only cashier/medical_biller can
+// reach /payments/portal), never the patient, so a recorded payment MUST be
+// attributed using the bill's own patient/facility, not currentUser.
 interface PortalBill {
   id: string;
+  patientId: string;
+  patientName: string;
+  facilityId?: string;
+  currency?: string;
   date: string;
   description: string;
   amount: number;
@@ -34,6 +44,10 @@ const billStatus = (totalAmount: number, paid: number): PortalBill['status'] =>
 
 const fromBillingDoc = (b: BillingDoc): PortalBill => ({
   id: b.invoiceNumber || b._id,
+  patientId: b.patientId,
+  patientName: b.patientName,
+  facilityId: b.facilityId,
+  currency: b.currency,
   date: (b.encounterDate || (b as { createdAt?: string }).createdAt || '').slice(0, 10),
   description:
     (b.items && b.items.length > 0 ? b.items.map(i => i.description).slice(0, 2).join(', ') : null)
@@ -42,6 +56,12 @@ const fromBillingDoc = (b: BillingDoc): PortalBill => ({
   paid: b.amountPaid,
   status: billStatus(b.totalAmount, b.amountPaid),
 });
+
+// Demo bills have no real patient behind them — tag them with a stable,
+// clearly-demo patient id/name so a "recorded" demo payment never gets
+// silently attributed to a real person.
+const DEMO_PATIENT_ID = 'demo-patient-portal';
+const DEMO_PATIENT_NAME = 'Demo Patient';
 
 /* ═══════════════════════════════════════════════════════════════
    Patient Payment Portal
@@ -52,14 +72,30 @@ const fromBillingDoc = (b: BillingDoc): PortalBill => ({
 // Demo fallback — only shown when the patient has no real bills on file
 // (e.g. brand-new account or local-only deploy without seeded data).
 const DEMO_BILLS: PortalBill[] = [
-  { id: 'INV-DEMO-0041', date: '2026-04-10', description: 'General Consultation + Lab Work', amount: 15000, paid: 0, status: 'unpaid' },
-  { id: 'INV-DEMO-0038', date: '2026-04-03', description: 'Follow-up Visit — Dr. Achol', amount: 8000, paid: 8000, status: 'paid' },
-  { id: 'INV-DEMO-0032', date: '2026-03-20', description: 'X-Ray + Radiology Report', amount: 24000, paid: 12000, status: 'partial' },
-  { id: 'INV-DEMO-0025', date: '2026-03-10', description: 'Pharmacy — Antibiotics (5-day)', amount: 4000, paid: 4000, status: 'paid' },
-  { id: 'INV-DEMO-0019', date: '2026-02-28', description: 'Emergency Visit + Sutures', amount: 36000, paid: 36000, status: 'paid' },
+  { id: 'INV-DEMO-0041', patientId: DEMO_PATIENT_ID, patientName: DEMO_PATIENT_NAME, date: '2026-04-10', description: 'General Consultation + Lab Work', amount: 15000, paid: 0, status: 'unpaid' },
+  { id: 'INV-DEMO-0038', patientId: DEMO_PATIENT_ID, patientName: DEMO_PATIENT_NAME, date: '2026-04-03', description: 'Follow-up Visit — Dr. Achol', amount: 8000, paid: 8000, status: 'paid' },
+  { id: 'INV-DEMO-0032', patientId: DEMO_PATIENT_ID, patientName: DEMO_PATIENT_NAME, date: '2026-03-20', description: 'X-Ray + Radiology Report', amount: 24000, paid: 12000, status: 'partial' },
+  { id: 'INV-DEMO-0025', patientId: DEMO_PATIENT_ID, patientName: DEMO_PATIENT_NAME, date: '2026-03-10', description: 'Pharmacy — Antibiotics (5-day)', amount: 4000, paid: 4000, status: 'paid' },
+  { id: 'INV-DEMO-0019', patientId: DEMO_PATIENT_ID, patientName: DEMO_PATIENT_NAME, date: '2026-02-28', description: 'Emergency Visit + Sutures', amount: 36000, paid: 36000, status: 'paid' },
 ];
 
 type PaymentMethod = 'mgurush' | 'mpesa' | 'mtn' | 'airtel' | 'card' | 'bank';
+
+// There is no live payment-gateway integration wired up for this portal (no
+// Flutterwave/M-Pesa/Airtel redirect or webhook exists for it) — every method
+// here is recorded as a `pending` PaymentDoc awaiting finance verification,
+// exactly like the pay-by-link (`/api/checkout`) and patient-token
+// (`/api/patient-portal/payments`) flows do. This map only translates the
+// portal's UI method keys onto the canonical PaymentMethodType union so the
+// recorded payment is reconcilable with the rest of the system.
+const METHOD_TO_PAYMENT_TYPE: Record<PaymentMethod, PaymentMethodType> = {
+  mgurush: 'm_gurush',
+  mpesa: 'mpesa',
+  mtn: 'mtn_momo',
+  airtel: 'airtel',
+  card: 'card',
+  bank: 'bank_transfer',
+};
 
 // Bank-transfer instructions are sourced from the org's `bankDetails` settings
 // field (set by the org admin on the branding page). When the org hasn't filled
@@ -81,7 +117,7 @@ const buildPaymentMethods = (bankDetails?: string): PaymentMethodDef[] => [
   { id: 'mpesa', label: 'M-Pesa', desc: 'Pay via Safaricom M-Pesa', icon: Smartphone, color: '#4CAF50', instructions: 'Go to M-Pesa > Lipa na M-Pesa > Pay Bill\nBusiness Number: 247247\nAccount: Your Invoice #' },
   { id: 'mtn', label: 'MTN Mobile Money', desc: 'Pay via MTN MoMo', icon: Smartphone, color: '#FFCB05', instructions: 'Dial *165# > Pay Bill\nMerchant Code: TamamHealth\nReference: Your Invoice #' },
   { id: 'airtel', label: 'Airtel Money', desc: 'Pay via Airtel Money', icon: Smartphone, color: '#ED1C24', instructions: 'Dial *185# > Pay Bill\nBusiness Name: TamamHealth HEALTH\nReference: Your Invoice #' },
-  { id: 'card', label: 'Visa / Mastercard', desc: 'Secure card payment via Flutterwave', icon: CreditCard, color: '#6366f1', instructions: 'Click "Pay Now" to be redirected to our secure payment gateway powered by Flutterwave.' },
+  { id: 'card', label: 'Visa / Mastercard', desc: 'Card payment (manually verified)', icon: CreditCard, color: '#6366f1', instructions: 'Enter your card details with our billing team, or provide a transaction reference. The charge is recorded here and verified by finance before it posts.' },
   { id: 'bank', label: 'Bank Transfer', desc: 'Direct bank deposit', icon: Building2, color: 'var(--accent-primary)', instructions: resolveBankInstructions(bankDetails) },
 ];
 
@@ -93,6 +129,11 @@ export default function PatientPortalPage() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentStep, setPaymentStep] = useState<'select' | 'method' | 'confirm' | 'success'>('select');
   const [copied, setCopied] = useState(false);
+  // Persisting the payment (writing the PouchDB doc) before we can show the
+  // success step — surface a spinner + a real error if the write fails.
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState('');
+  const [completedReference, setCompletedReference] = useState('');
 
   // Bank-transfer instructions come from the org's configured bankDetails
   // (set on the org-admin branding page). Falls back to a "contact billing"
@@ -155,8 +196,83 @@ export default function PatientPortalPage() {
     setPaymentStep('confirm');
   };
 
-  const handleCompletePayment = () => {
-    setPaymentStep('success');
+  const handleCompletePayment = async () => {
+    if (!selectedBill || !paymentMethod || completing) return;
+    const numericAmount = Number(paymentAmount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setCompleteError('Enter a valid amount before continuing.');
+      return;
+    }
+    if (!selectedBill.patientId) {
+      setCompleteError('Unable to identify the patient for this bill — please reopen it from the bill list.');
+      return;
+    }
+
+    setCompleting(true);
+    setCompleteError('');
+    try {
+      // No live payment-gateway (Flutterwave/M-Pesa/Airtel) redirect or
+      // webhook is wired up for this portal, so we can't claim the money has
+      // actually arrived. Every method here writes a `pending` PaymentDoc —
+      // the same shape/semantics the pay-by-link (`/api/checkout`) and
+      // patient-token (`/api/patient-portal/payments`) routes already use —
+      // and finance must approve it (Payments page → Pending verification)
+      // before it posts. This mirrors those routes rather than calling
+      // `collectPayment` (which posts immediately), since we have no
+      // confirmation that funds actually moved.
+      const { paymentsDB } = await import('@/lib/db');
+      const db = paymentsDB();
+      const now = new Date().toISOString();
+      const uuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const reference = `PORTAL-${uuid.slice(0, 8).toUpperCase()}`;
+
+      const doc = {
+        _id: `pmt-${uuid.slice(0, 10)}`,
+        type: 'payment' as const,
+        patientId: selectedBill.patientId,
+        patientName: selectedBill.patientName || currentUser?.name || t('portal.patient'),
+        method: METHOD_TO_PAYMENT_TYPE[paymentMethod],
+        amount: numericAmount,
+        currency: selectedBill.currency || 'SSP',
+        reference,
+        status: 'pending' as PaymentStatus,
+        processedAt: now,
+        processedBy: currentUser?._id || 'patient-portal',
+        processedByName: currentUser?.name || 'Patient portal',
+        notes: `[PATIENT_PORTAL] pending_verification — awaiting finance approval. Invoice ${selectedBill.id}.`,
+        facilityId: selectedBill.facilityId || currentUser?.hospitalId || '',
+        orgId: currentUser?.orgId,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: currentUser?._id || 'patient-portal',
+      };
+
+      const resp = await db.put(doc);
+
+      const { logAuditSafe } = await import('@/lib/services/audit-service');
+      await logAuditSafe(
+        'PATIENT_SUBMIT_PAYMENT', doc.processedBy, doc.processedByName,
+        `Portal payment ${doc._id} for ${doc.amount} ${doc.currency} from ${doc.patientName} (ref: ${reference}, pending finance approval)`
+      );
+
+      const { emitSyncEvent } = await import('@/lib/services/sync-event-service');
+      emitSyncEvent({
+        resourceType: 'payment',
+        resourceId: doc._id,
+        operation: 'create',
+        resourceVersion: resp.rev,
+        orgId: doc.orgId,
+        hospitalId: doc.facilityId,
+      });
+
+      setCompletedReference(reference);
+      setPaymentStep('success');
+    } catch (err) {
+      console.error('[PatientPortal] Failed to record payment', err);
+      setCompleteError('Could not record the payment. Please try again.');
+    } finally {
+      setCompleting(false);
+    }
   };
 
   const handleCopyRef = (text: string) => {
@@ -170,6 +286,8 @@ export default function PatientPortalPage() {
     setPaymentMethod(null);
     setPaymentAmount('');
     setPaymentStep('select');
+    setCompleteError('');
+    setCompletedReference('');
   };
 
   return (
@@ -348,7 +466,18 @@ export default function PatientPortalPage() {
                   <hr className="section-divider" />
                   <button
                     onClick={() => {
-                      setSelectedBill({ id: 'ALL', date: '', description: t('portal.allOutstandingBills'), amount: totalOwed, paid: 0, status: 'unpaid' });
+                      // All bills in this portal session belong to the same
+                      // patient (they came from one getBillsByPatient query),
+                      // so any unpaid bill's identity fields are representative.
+                      const rep = unpaidBills[0] || bills[0];
+                      setSelectedBill({
+                        id: 'ALL',
+                        patientId: rep?.patientId || '',
+                        patientName: rep?.patientName || '',
+                        facilityId: rep?.facilityId,
+                        currency: rep?.currency,
+                        date: '', description: t('portal.allOutstandingBills'), amount: totalOwed, paid: 0, status: 'unpaid',
+                      });
                       setPaymentAmount(String(totalOwed));
                       setPaymentStep('method');
                     }}

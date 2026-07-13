@@ -6,6 +6,8 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useNutritionScreenings } from '@/lib/hooks/useNutritionScreenings';
 import { classifyScreening, MUAC_THRESHOLDS } from '@/lib/services/nutrition-screening-service';
+import { useNutritionSupplies } from '@/lib/hooks/useNutritionSupplies';
+import { classifySupplyStatus } from '@/lib/services/nutrition-supply-service';
 import {
   AlertTriangle, CheckCircle2, TrendingDown,
   BarChart3, Utensils, Plus, X,
@@ -41,16 +43,22 @@ const SAMPLE_SCREENINGS = [
   { id: 'ns-008', name: 'Nyamal Gatdet Both', age: '11m', sex: 'F', muac: 12.3, weight: 6.8, height: 68, edema: false, status: 'MAM', date: '2026-02-07' },
 ];
 
-const SUPPLY_ITEMS = [
-  { name: 'RUTF (Plumpy\'Nut)', stock: 120, unit: 'sachets', threshold: 50, status: 'ok' },
-  { name: 'F-75 Therapeutic Milk', stock: 8, unit: 'tins', threshold: 15, status: 'low' },
-  { name: 'F-100 Therapeutic Milk', stock: 22, unit: 'tins', threshold: 10, status: 'ok' },
-  { name: 'ReSoMal (ORS)', stock: 3, unit: 'packets', threshold: 10, status: 'critical' },
-  { name: 'Vitamin A Capsules', stock: 200, unit: 'capsules', threshold: 50, status: 'ok' },
-  { name: 'Iron/Folate Tabs', stock: 150, unit: 'tabs', threshold: 30, status: 'ok' },
-  { name: 'MUAC Tapes', stock: 5, unit: 'tapes', threshold: 10, status: 'low' },
-  { name: 'Weighing Scale', stock: 2, unit: 'units', threshold: 1, status: 'ok' },
+// Starter items persisted once as real docs (via seedSuppliesIfEmpty) when the
+// nutrition_supply store is empty in demo mode — see useNutritionSupplies.
+// Production deploys never see this list; an empty facility renders the
+// empty state and staff add real stock via "Add supply item".
+const DEMO_SUPPLY_SEED = [
+  { name: 'RUTF (Plumpy\'Nut)', unit: 'sachets', currentLevel: 120, reorderLevel: 50 },
+  { name: 'F-75 Therapeutic Milk', unit: 'tins', currentLevel: 8, reorderLevel: 15 },
+  { name: 'F-100 Therapeutic Milk', unit: 'tins', currentLevel: 22, reorderLevel: 10 },
+  { name: 'ReSoMal (ORS)', unit: 'packets', currentLevel: 3, reorderLevel: 10 },
+  { name: 'Vitamin A Capsules', unit: 'capsules', currentLevel: 200, reorderLevel: 50 },
+  { name: 'Iron/Folate Tabs', unit: 'tabs', currentLevel: 150, reorderLevel: 30 },
+  { name: 'MUAC Tapes', unit: 'tapes', currentLevel: 5, reorderLevel: 10 },
+  { name: 'Weighing Scale', unit: 'units', currentLevel: 2, reorderLevel: 1 },
 ];
+
+const EMPTY_SUPPLY_FORM = { name: '', unit: '', currentLevel: '', reorderLevel: '' };
 
 // Worklist tab → screening-status predicate. The "At Risk" tab folds in the
 // 'Underweight' status the same way the KPI/stat count does, so the tab count
@@ -97,25 +105,61 @@ export default function NutritionDashboard() {
     ],
     [savedScreenings],
   );
-  // Supplies are adjustable in-session (+/− receipt and consumption) so the
-  // card is recordable, not display-only. Status re-derives from thresholds.
-  const [supplyLevels, setSupplyLevels] = useState<Record<string, number>>({});
+  // Supplies now persist to the synced nutrition_supply store (real +/-
+  // receipt and consumption, not a useState list lost on reload). Status
+  // re-derives from each item's reorderLevel.
+  const { items: supplyDocs, create: createSupply, adjust: adjustSupplyLevel } =
+    useNutritionSupplies({ demoSeed: IS_DEMO ? DEMO_SUPPLY_SEED : undefined });
+  const [showSupplyForm, setShowSupplyForm] = useState(false);
+  const [supplyForm, setSupplyForm] = useState(EMPTY_SUPPLY_FORM);
+  const [supplyFormError, setSupplyFormError] = useState('');
+
   const supplies = useMemo(
     () =>
-      (IS_DEMO ? SUPPLY_ITEMS : []).map(item => {
-        const stock = supplyLevels[item.name] ?? item.stock;
-        const status = stock <= item.threshold / 2 ? 'critical' : stock <= item.threshold ? 'low' : 'ok';
-        return { ...item, stock, status };
-      }),
-    [supplyLevels],
+      supplyDocs.map(item => ({
+        id: item._id,
+        name: item.name,
+        unit: item.unit,
+        stock: item.currentLevel,
+        threshold: item.reorderLevel,
+        status: classifySupplyStatus(item),
+      })),
+    [supplyDocs],
   );
 
-  const adjustSupply = (name: string, delta: number) => {
-    setSupplyLevels(prev => {
-      const item = SUPPLY_ITEMS.find(s => s.name === name);
-      const current = prev[name] ?? item?.stock ?? 0;
-      return { ...prev, [name]: Math.max(0, current + delta) };
+  const adjustSupply = (id: string, delta: number) => {
+    adjustSupplyLevel(id, delta, { id: currentUser?._id, name: currentUser?.name }).catch(err => {
+      console.error('Failed to adjust supply level', err);
     });
+  };
+
+  const submitSupplyItem = async () => {
+    const currentLevel = parseFloat(supplyForm.currentLevel);
+    const reorderLevel = parseFloat(supplyForm.reorderLevel);
+    if (!supplyForm.name.trim() || !supplyForm.unit.trim()) {
+      setSupplyFormError(t('nutrition.supplyFormErrorRequired'));
+      return;
+    }
+    if (!Number.isFinite(currentLevel) || currentLevel < 0) {
+      setSupplyFormError(t('nutrition.supplyFormErrorLevel'));
+      return;
+    }
+    try {
+      await createSupply({
+        name: supplyForm.name.trim(),
+        unit: supplyForm.unit.trim(),
+        currentLevel,
+        reorderLevel: Number.isFinite(reorderLevel) ? Math.max(0, reorderLevel) : 0,
+        hospitalId: currentUser?.hospitalId,
+        orgId: currentUser?.orgId,
+        createdBy: currentUser?._id,
+      });
+      setSupplyForm(EMPTY_SUPPLY_FORM);
+      setSupplyFormError('');
+      setShowSupplyForm(false);
+    } catch (err) {
+      setSupplyFormError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   const submitScreening = async () => {
@@ -410,10 +454,68 @@ export default function NutritionDashboard() {
 
             {/* Supply status */}
             <div className="dash-card">
-              <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <Utensils className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nutrition.supplies')}</span>
+              <div className="flex items-center justify-between mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <div className="flex items-center gap-2">
+                  <Utensils className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nutrition.supplies')}</span>
+                </div>
+                <button
+                  onClick={() => { setShowSupplyForm(v => !v); setSupplyFormError(''); }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold"
+                  style={{ background: showSupplyForm ? 'var(--overlay-subtle)' : ACCENT, color: showSupplyForm ? 'var(--text-secondary)' : '#fff', border: '1px solid var(--border-medium)', cursor: 'pointer' }}
+                >
+                  {showSupplyForm ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                  {showSupplyForm ? t('nutrition.formCancel') : t('nutrition.addSupplyItem')}
+                </button>
               </div>
+
+              {showSupplyForm && (
+                <div className="px-3 pb-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={supplyForm.name}
+                      onChange={e => setSupplyForm(f => ({ ...f, name: e.target.value }))}
+                      placeholder={t('nutrition.supplyFormName')}
+                      className="px-2 py-1.5 rounded-md text-xs col-span-2"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+                    />
+                    <input
+                      value={supplyForm.unit}
+                      onChange={e => setSupplyForm(f => ({ ...f, unit: e.target.value }))}
+                      placeholder={t('nutrition.supplyFormUnit')}
+                      className="px-2 py-1.5 rounded-md text-xs"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+                    />
+                    <input
+                      type="number" min="0" step="1"
+                      value={supplyForm.currentLevel}
+                      onChange={e => setSupplyForm(f => ({ ...f, currentLevel: e.target.value }))}
+                      placeholder={t('nutrition.supplyFormCurrentLevel')}
+                      className="px-2 py-1.5 rounded-md text-xs"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+                    />
+                    <input
+                      type="number" min="0" step="1"
+                      value={supplyForm.reorderLevel}
+                      onChange={e => setSupplyForm(f => ({ ...f, reorderLevel: e.target.value }))}
+                      placeholder={t('nutrition.supplyFormReorderLevel')}
+                      className="px-2 py-1.5 rounded-md text-xs col-span-2"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                  {supplyFormError && (
+                    <p className="text-xs mt-1.5 font-semibold" style={{ color: 'var(--color-danger)' }}>{supplyFormError}</p>
+                  )}
+                  <button
+                    onClick={submitSupplyItem}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold mt-2"
+                    style={{ background: ACCENT, color: '#fff', border: 'none', cursor: 'pointer' }}
+                  >
+                    <CheckCircle2 className="w-3 h-3" /> {t('nutrition.supplyFormSave')}
+                  </button>
+                </div>
+              )}
+
               <div className="p-3 space-y-1">
                 {supplies.length === 0 && (
                   <p
@@ -424,7 +526,16 @@ export default function NutritionDashboard() {
                   </p>
                 )}
                 {supplies.map(item => (
-                  <div key={item.name} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between py-2 px-2 rounded"
+                    style={{
+                      borderBottom: '1px solid var(--border-light)',
+                      background: item.status === 'critical' ? 'color-mix(in srgb, var(--color-danger) 8%, transparent)'
+                        : item.status === 'low' ? 'color-mix(in srgb, var(--color-warning) 8%, transparent)'
+                        : 'transparent',
+                    }}
+                  >
                     <div className="flex items-center gap-2">
                       {item.status === 'critical' ? <AlertTriangle className="w-3 h-3" style={{ color: 'var(--color-danger)' }} /> :
                        item.status === 'low' ? <TrendingDown className="w-3 h-3" style={{ color: 'var(--color-warning)' }} /> :
@@ -433,7 +544,7 @@ export default function NutritionDashboard() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <button
-                        onClick={() => adjustSupply(item.name, -1)}
+                        onClick={() => adjustSupply(item.id, -1)}
                         aria-label={`Decrease ${item.name}`}
                         className="flex items-center justify-center rounded"
                         style={{ width: 18, height: 18, background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)', cursor: 'pointer', fontSize: 12, lineHeight: 1 }}
@@ -443,7 +554,7 @@ export default function NutritionDashboard() {
                         minWidth: 64, textAlign: 'center',
                       }}>{item.stock} {item.unit}</span>
                       <button
-                        onClick={() => adjustSupply(item.name, 1)}
+                        onClick={() => adjustSupply(item.id, 1)}
                         aria-label={`Increase ${item.name}`}
                         className="flex items-center justify-center rounded"
                         style={{ width: 18, height: 18, background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)', cursor: 'pointer', fontSize: 12, lineHeight: 1 }}

@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { FollowUpDoc } from '../db-types';
 import { useDataScope } from './useDataScope';
+import { makeCoalescer } from './live-reload';
+import { followUpsDB } from '../db';
 
 export function useFollowUps(workerId?: string) {
   const [followUps, setFollowUps] = useState<FollowUpDoc[]>([]);
@@ -30,6 +32,21 @@ export function useFollowUps(workerId?: string) {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Live PouchDB subscription — reflect writes arriving from sync/other tabs,
+  // not just this hook's own mutations (same pattern as useMessages).
+  useEffect(() => {
+    let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) load(); });
+    const changes = followUpsDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => reload.trigger())
+      .on('error', () => { /* transient feed errors; next load resyncs */ });
+    return () => {
+      cancelled = true;
+      reload.cancel();
+      try { changes.cancel(); } catch { /* noop */ }
+    };
   }, [load]);
 
   const createFollowUp = useCallback(async (

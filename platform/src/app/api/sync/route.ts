@@ -76,10 +76,17 @@
  *                                     staff review/merge into the chart.
  *                                     Facility-operational workflow state, not
  *                                     a national analytics target.
+ *   - tamamhealth_procedures          Bedside/theatre procedures performed on
+ *                                     a patient. Facility-operational clinical
+ *                                     detail (like patient_notes/phone_notes);
+ *                                     not a national/DHIS2 indicator today.
  *
  * (tamamhealth_nutrition_screenings now HAS a national projection —
  * SAM/MAM is a DHIS2 MCH indicator — via DB_TABLE_MAP + FIELD_MAPPER +
- * migration 0008, so it is no longer excluded.)
+ * migration 0008, so it is no longer excluded. tamamhealth_program_enrollments
+ * likewise HAS a national projection — ART/TB/PMTCT/ANC/Nutrition/EPI/NCD
+ * enrollment are core DHIS2 care-cascade indicators — via DB_TABLE_MAP +
+ * FIELD_MAPPER + migration 0009.)
  *
  * All remaining databases land in DB_TABLE_MAP below; a missing entry causes a
  * 400 from this route, so the sync-worker surfaces a hard failure rather than
@@ -180,6 +187,10 @@ const DB_TABLE_MAP: Record<string, string> = {
   // Nutrition screening — SAM/MAM is a national/DHIS2 MCH indicator.
   // Table definition lives in `0008_nutrition_screenings_writeback.sql`.
   tamamhealth_nutrition_screenings: 'nutrition_screenings',
+  // Program enrollment — ART/TB/PMTCT/ANC/Nutrition/EPI/NCD are core national/
+  // DHIS2 care-cascade indicators. Table definition lives in
+  // `0009_program_enrollments_writeback.sql`.
+  tamamhealth_program_enrollments: 'program_enrollments',
 };
 
 // A few CouchDB databases co-locate several doc `type`s in one database. The
@@ -388,6 +399,29 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
     screening_date: doc.screeningDate,
     screened_by_id: doc.screenedById,
     screened_by_name: doc.screenedByName,
+    hospital_id: doc.hospitalId,
+    org_id: doc.orgId,
+    created_at: doc.createdAt,
+    updated_at: doc.updatedAt,
+  }),
+
+  program_enrollments: (doc) => ({
+    id: doc._id,
+    patient_id: doc.patientId,
+    patient_name: doc.patientName,
+    program_key: doc.programKey,
+    program_name: doc.programName,
+    status: doc.status,
+    enrollment_date: doc.enrollmentDate,
+    outcome_date: doc.outcomeDate,
+    // NB: free-text `notes` is deliberately NOT projected to national
+    // analytics. Enrollment in art_hiv_care/tb_dr/pmtct already encodes
+    // stigmatizing status against a named patient; narrative notes would add
+    // uncontrolled PHI to the broader-access national tier. Care-cascade
+    // indicators need status/dates/keys, not free text — same stance as the
+    // patient_notes / phone_notes / assessments national-sync exclusions.
+    recorded_by: doc.recordedBy,
+    recorded_by_name: doc.recordedByName,
     hospital_id: doc.hospitalId,
     org_id: doc.orgId,
     created_at: doc.createdAt,

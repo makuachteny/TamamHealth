@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 /* ═══════════════════════════════════════════════════════════════════
    TamamHealth — One-Page Website
@@ -392,6 +392,16 @@ export default function Home() {
   const [formMessage, setFormMessage] = useState("");
   const [formStatus, setFormStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [formError, setFormError] = useState("");
+  // Nav is transparent over the hero and fades in a solid background once the
+  // user scrolls past the top, so the white logo/links stay readable over the
+  // light content sections below.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const sendMessage = async () => {
     if (!formMessage.trim()) {
@@ -445,31 +455,41 @@ export default function Home() {
           left: 0,
           right: 0,
           zIndex: 50,
-          background: "rgba(1,86,151,0.9)",
-          backdropFilter: "blur(12px)",
+          background: scrolled ? "rgba(1,86,151,0.92)" : "transparent",
+          backdropFilter: scrolled ? "blur(12px)" : "none",
+          WebkitBackdropFilter: scrolled ? "blur(12px)" : "none",
+          borderBottom: scrolled ? "1px solid rgba(255,255,255,0.12)" : "1px solid transparent",
           color: "#FFFFFF",
-          padding: "0 32px",
-          borderBottom: "1px solid rgba(255,255,255,0.12)",
+          padding: scrolled ? "12px 32px" : "22px 32px 0",
+          transition: "background 0.25s ease, padding 0.25s ease, border-color 0.25s ease",
         }}
       >
-        <div style={{ maxWidth: 1320, margin: "0 auto", height: 66, display: "flex", alignItems: "center", gap: 28 }}>
+        <div style={{ maxWidth: 1320, margin: "0 auto", height: 56, display: "flex", alignItems: "center", gap: 28 }}>
           <a href="#top" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", color: "#FFFFFF" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/tamam-logo-mark.svg" alt="" style={{ height: 22, width: "auto", filter: "brightness(0) invert(1)" }} />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/tamam-logo-type.svg" alt="Tamam Healthcare System" style={{ height: 15, width: "auto", filter: "brightness(0) invert(1)" }} />
           </a>
-          <div className="tm-nav-links" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 22 }}>
-            <a href="#problem" className="tm-nav-link" style={{ color: "#C7D8F5", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em" }}>
-              Problem
-            </a>
-            <a href="#solution" className="tm-nav-link" style={{ color: "#C7D8F5", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em" }}>
+          <div
+            className="tm-nav-links"
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <a href="#solution" className="tm-nav-link" style={{ color: "rgba(255,255,255,0.92)", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em", padding: "9px 18px", borderRadius: 0 }}>
               Solution
             </a>
-            <a href="#team" className="tm-nav-link" style={{ color: "#C7D8F5", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em" }}>
+            <a href="#team" className="tm-nav-link" style={{ color: "rgba(255,255,255,0.92)", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em", padding: "9px 18px", borderRadius: 0 }}>
               Team
             </a>
-            <a href="#contact" className="tm-nav-cta" style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 13.5, fontWeight: 700, padding: "11px 22px", textDecoration: "none", letterSpacing: "0.02em" }}>
+            <a href="#contact" className="tm-nav-link" style={{ color: "rgba(255,255,255,0.92)", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em", padding: "9px 18px", borderRadius: 0 }}>
+              Contact
+            </a>
+            <a href="#contact" className="tm-nav-cta" style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 13.5, fontWeight: 700, padding: "10px 22px", textDecoration: "none", letterSpacing: "0.02em", borderRadius: 999 }}>
               Book a Demo
             </a>
           </div>
@@ -498,14 +518,14 @@ export default function Home() {
         </div>
         {menuOpen && (
           <div className="tm-nav-drawer" style={{ display: "flex", flexDirection: "column", background: "#015697", borderTop: "1px solid rgba(255,255,255,0.12)", padding: "8px 0 16px", margin: "0 -32px" }}>
-            <a href="#problem" onClick={() => setMenuOpen(false)} style={{ color: "#FFFFFF", textDecoration: "none", fontSize: 16, fontWeight: 600, padding: "14px 32px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-              Problem
-            </a>
             <a href="#solution" onClick={() => setMenuOpen(false)} style={{ color: "#FFFFFF", textDecoration: "none", fontSize: 16, fontWeight: 600, padding: "14px 32px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
               Solution
             </a>
             <a href="#team" onClick={() => setMenuOpen(false)} style={{ color: "#FFFFFF", textDecoration: "none", fontSize: 16, fontWeight: 600, padding: "14px 32px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
               Team
+            </a>
+            <a href="#contact" onClick={() => setMenuOpen(false)} style={{ color: "#FFFFFF", textDecoration: "none", fontSize: 16, fontWeight: 600, padding: "14px 32px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+              Contact
             </a>
             <a href="#contact" onClick={() => setMenuOpen(false)} style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 15, fontWeight: 700, padding: "14px 32px", textDecoration: "none", margin: "12px 32px 0", textAlign: "center" }}>
               Book a Demo →
@@ -533,19 +553,19 @@ export default function Home() {
         }}
       >
         <Image
-          src="/assets/landing-img.jpg"
-          alt="A team of South Sudanese midwives outside a maternity tent"
+          src="/assets/new-landing.png"
+          alt="A South Sudanese midwife examining a child with a stethoscope at a rural clinic"
           fill
           priority
           sizes="100vw"
-          style={{ objectFit: "cover", objectPosition: "center 30%" }}
+          style={{ objectFit: "cover", objectPosition: "center 35%" }}
         />
         <div
           style={{
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(to bottom, rgba(14,42,74,0) 0%, rgba(14,42,74,0) 82%, rgba(14,42,74,0.5) 92%, rgba(14,42,74,0.98) 100%)",
+              "linear-gradient(180deg, rgba(17, 48, 85, 0.6) 0%, rgba(25, 48, 71, 0.4) 14.46%, rgba(17, 48, 85, 0.2) 52.03%, rgba(17, 48, 85, 0.8) 87.29%, #113055 96.71%)",
           }}
         />
 
@@ -592,9 +612,9 @@ export default function Home() {
             }}
           >
             <p style={{ fontSize: 16, lineHeight: 1.65, color: "#F0F5FF", margin: 0, textShadow: "0 1px 14px rgba(0,0,0,0.65)" }}>
-              Most South Sudan&apos;s clinics run on paper-based records that get lost, damaged, or destroyed — and when the
-              paper goes, the patient&apos;s story goes with it.{" "}
-              <strong style={{ color: "#FFFFFF" }}>Tamam brings digital records that work offline, so care never starts from zero.</strong>
+              Most of South Sudan&apos;s clinics run on paper-based records that get lost, damaged, or destroyed — and when the
+              paper goes, the patient&apos;s story goes with it. Tamam brings digital records that work offline, so care never starts from zero —{" "}
+              <strong style={{ color: "#FFFFFF" }}>one system built to hold every community&apos;s story, not just one clinic&apos;s.</strong>
             </p>
             <div className="tm-btn-row" style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-start" }}>
               <a
@@ -609,7 +629,7 @@ export default function Home() {
                 className="tm-hero-btn-secondary"
                 style={{ background: "rgba(254,255,249,0.92)", color: "#015697", fontSize: 14, fontWeight: 700, padding: "13px 26px", textDecoration: "none", letterSpacing: "0.02em" }}
               >
-                Our Solutions
+                Our Solution
               </a>
             </div>
           </div>
@@ -642,7 +662,7 @@ export default function Home() {
       </section>
 
       {/* ═══ 01 The Problem ═══ */}
-      <section id="problem" className="tm-section" style={{ position: "relative", background: "linear-gradient(to bottom, #0E2A4A 0%, #1B4470 480px)", color: "#FFFFFF", padding: "100px 32px", overflow: "hidden" }}>
+      <section id="problem" className="tm-section" style={{ position: "relative", background: "#0E2A4A", color: "#FFFFFF", padding: "100px 32px", overflow: "hidden" }}>
         <SectionMark corner={{ top: -80, right: -60 }} size={480} tone="white" opacity={0.06} rotate={-6} />
         <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 820 }}>
@@ -659,7 +679,8 @@ export default function Home() {
           <div className="tm-grid-split" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 40, alignItems: "stretch" }}>
             <div
               style={{
-                background: "linear-gradient(135deg, rgba(232,134,58,0.2) 0%, rgba(14,42,74,0) 55%), #0E2A4A",
+                background: "#0B2440",
+                borderLeft: "4px solid #E8863A",
                 padding: "44px 40px",
                 display: "flex",
                 flexDirection: "column",
@@ -730,22 +751,6 @@ export default function Home() {
 
       {/* ═══ 02 Research ═══ */}
       <section id="research" className="tm-section" style={{ position: "relative", padding: "0 32px 100px", background: "#0F4C81", color: "#FFFFFF", overflow: "hidden" }}>
-        {/* Problem (charcoal) hands off directly into this section with no
-            white section between them, so blend the seam the same way the
-            hero does into Problem: fade the tail of Problem's colour in
-            from the top instead of cutting hard. */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 160,
-            background: "linear-gradient(to bottom, #1B4470 0%, rgba(27,68,112,0) 100%)",
-            pointerEvents: "none",
-          }}
-        />
         <SectionMark corner={{ bottom: -70, left: -70 }} size={440} tone="white" opacity={0.06} rotate={8} />
         <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 72 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
@@ -972,7 +977,7 @@ export default function Home() {
       </section>
 
       {/* ═══ 06 The Goal ═══ */}
-      <section id="goal" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#0C5C78", color: "#FFFFFF", overflow: "hidden" }}>
+      <section id="goal" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#013D6B", color: "#FFFFFF", overflow: "hidden" }}>
         <SectionMark corner={{ top: -70, right: -50 }} size={420} tone="white" opacity={0.07} rotate={10} />
         <div className="tm-grid-split" style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 56, alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

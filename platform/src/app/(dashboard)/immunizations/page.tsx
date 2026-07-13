@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import EmptyState from '@/components/EmptyState';
 import PatientName from '@/components/PatientName';
 import Badge, { type BadgeTone } from '@/components/Badge';
+import { useToast } from '@/components/Toast';
 import { useImmunizations } from '@/lib/hooks/useImmunizations';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { patientAge } from '@/lib/patient-utils';
@@ -18,6 +19,7 @@ import type { ImmunizationDoc } from '@/lib/db-types';
 import {
   Syringe, Search, Plus, X, CheckCircle2, Clock, AlertTriangle,
   XCircle, ChevronDown, ChevronUp, Users, ExternalLink, Edit3, Download,
+  MessageSquare, Send,
 } from '@/components/icons/lucide';
 
 const VACCINES = ['BCG', 'OPV', 'Penta', 'PCV', 'Rota', 'Measles', 'Yellow Fever', 'Vitamin A'];
@@ -33,6 +35,8 @@ const statusConfig = {
 export default function ImmunizationsPage() {
   const { t } = useTranslation();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { showToast } = useToast();
   const { currentUser, globalSearch } = useApp();
   const { immunizations, stats, coverage, loading, register, update } = useImmunizations();
   const { patients } = usePatients();
@@ -63,6 +67,13 @@ export default function ImmunizationsPage() {
   const [defaulterStats, setDefaulterStats] = useState<{ totalDefaulters: number; uniqueChildren: number; critical: number; high: number; medium: number; byVaccine: Record<string, number> } | null>(null);
   const [defaulterFilter, setDefaulterFilter] = useState<'all' | 'critical' | 'high' | 'medium'>('all');
   const [cohortRows, setCohortRows] = useState<Array<{ vaccine: string; cohort: string; covered: number; total: number; percentage: number }>>([]);
+  // Per-row "send SMS recall" state, keyed by the same row key used below
+  // (`${patientId}-${vaccine}-${index}`), plus a bulk "Remind all" in-flight flag.
+  const [sendingRecall, setSendingRecall] = useState<Record<string, boolean>>({});
+  const [bulkSendingRecall, setBulkSendingRecall] = useState(false);
+  // Guards the ?patientId= prefill (see effect below) so it only opens the
+  // record-dose modal once per page load, not every time `patients` reloads.
+  const patientIdPrefillDone = useRef(false);
 
   // Load defaulter list + cohort coverage whenever immunization data changes
   useEffect(() => {
@@ -130,6 +141,91 @@ export default function ImmunizationsPage() {
       dateOfBirth: p.dateOfBirth || f.dateOfBirth,
     }));
     setPatientLookup('');
+  };
+
+  // Deep-link support: `/immunizations?patientId=...` (e.g. from the chart's
+  // Immunizations tab "Add" action) opens the record-dose modal preselected
+  // to that patient. Runs once per page load — guarded by a ref so it
+  // doesn't reopen the modal if the caller closes it and `patients` reloads.
+  useEffect(() => {
+    if (patientIdPrefillDone.current) return;
+    const patientId = searchParams.get('patientId');
+    if (!patientId || patients.length === 0) return;
+    const p = patients.find(x => x._id === patientId);
+    if (!p) return;
+    patientIdPrefillDone.current = true;
+    setForm(f => ({
+      ...f,
+      patientId: p._id,
+      patientName: `${p.firstName || ''} ${p.surname || ''}`.trim(),
+      gender: (p.gender as 'Male' | 'Female') || f.gender,
+      dateOfBirth: p.dateOfBirth || f.dateOfBirth,
+    }));
+    setShowModal(true);
+  }, [searchParams, patients]);
+
+  // Best phone number available for a defaulter's caregiver: the patient's
+  // own phone first (in practice the reachable number for young children),
+  // falling back to the recorded next-of-kin phone.
+  const phoneForDefaulter = (patientId: string): string | undefined => {
+    const p = patients.find(x => x._id === patientId);
+    return p?.phone || p?.nokPhone || undefined;
+  };
+
+  const recallMessage = (d: ImmunizationDefaulter): string => {
+    const facility = currentUser?.hospitalName || 'Your clinic';
+    return `${facility}: ${d.patientName} is overdue for ${d.vaccine} (dose #${d.doseNumber}). Please bring them in for their immunization.`;
+  };
+
+  // Per-row recall: send one SMS to the caregiver of a single overdue child.
+  const handleSendRecall = async (d: ImmunizationDefaulter, key: string) => {
+    const phone = phoneForDefaulter(d.patientId);
+    if (!phone) {
+      showToast(`No phone on file for ${d.patientName}.`, 'error');
+      return;
+    }
+    setSendingRecall(s => ({ ...s, [key]: true }));
+    try {
+      const { sendSms } = await import('@/lib/sms');
+      const result = await sendSms({ to: phone, body: recallMessage(d) });
+      if (result.ok) {
+        showToast(`Recall SMS sent for ${d.patientName}.`, 'success');
+      } else {
+        showToast(`Could not send recall SMS for ${d.patientName}.`, 'error');
+      }
+    } catch {
+      showToast(`Could not send recall SMS for ${d.patientName}.`, 'error');
+    } finally {
+      setSendingRecall(s => ({ ...s, [key]: false }));
+    }
+  };
+
+  // Bulk recall: sweep the currently filtered defaulter list and send a
+  // recall SMS to every caregiver with a phone on file.
+  const handleRemindAll = async () => {
+    const list = defaulters.filter(d => defaulterFilter === 'all' || d.urgency === defaulterFilter);
+    if (list.length === 0) return;
+    setBulkSendingRecall(true);
+    try {
+      const { sendSms } = await import('@/lib/sms');
+      let sent = 0, failed = 0, skipped = 0;
+      for (const d of list) {
+        const phone = phoneForDefaulter(d.patientId);
+        if (!phone) { skipped++; continue; }
+        try {
+          const result = await sendSms({ to: phone, body: recallMessage(d) });
+          if (result.ok) sent++; else failed++;
+        } catch {
+          failed++;
+        }
+      }
+      showToast(
+        `Reminders sent: ${sent}. Failed: ${failed}. No phone on file: ${skipped}.`,
+        sent > 0 ? 'success' : 'error',
+      );
+    } finally {
+      setBulkSendingRecall(false);
+    }
   };
 
   // Group immunizations by child
@@ -530,9 +626,24 @@ export default function ImmunizationsPage() {
                     {t('immun.defaultersTitle')} {defaulterFilter !== 'all' && `· ${defaulterFilter}`}
                   </h3>
                 </div>
-                {defaulterFilter !== 'all' && (
-                  <button onClick={() => setDefaulterFilter('all')} className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>{t('immun.clearFilter')}</button>
-                )}
+                <div className="flex items-center gap-3">
+                  {defaulterFilter !== 'all' && (
+                    <button onClick={() => setDefaulterFilter('all')} className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>{t('immun.clearFilter')}</button>
+                  )}
+                  {canRecordVitalEvents && defaulters.filter(d => defaulterFilter === 'all' || d.urgency === defaulterFilter).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleRemindAll}
+                      disabled={bulkSendingRecall}
+                      className="btn btn-secondary btn-sm"
+                      style={{ gap: 6 }}
+                      title="Send a recall SMS to every caregiver with a phone on file in the current view"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {bulkSendingRecall ? 'Sending…' : 'Remind all'}
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="overflow-x-auto">
               <table className="data-table" style={{ minWidth: 1080 }}>
@@ -547,18 +658,21 @@ export default function ImmunizationsPage() {
                     <th>{t('immun.colDaysOverdue')}</th>
                     <th>{t('immun.colFacility')}</th>
                     <th>{t('immun.colUrgency')}</th>
+                    <th className="text-right">Recall</th>
                   </tr>
                 </thead>
                 <tbody>
                   {defaulters.filter(d => defaulterFilter === 'all' || d.urgency === defaulterFilter).length === 0 ? (
-                    <tr><td colSpan={9} className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
+                    <tr><td colSpan={10} className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
                       {t('immun.noDefaultersInCategory')}
                     </td></tr>
                   ) : defaulters.filter(d => defaulterFilter === 'all' || d.urgency === defaulterFilter).map((d, i) => {
                     const urgencyColor = d.urgency === 'critical' ? 'var(--color-danger)' : d.urgency === 'high' ? 'var(--color-warning)' : 'var(--accent-primary)';
                     const urgencyTone: BadgeTone = d.urgency === 'critical' ? 'danger' : d.urgency === 'high' ? 'warning' : 'info';
+                    const rowKey = `${d.patientId}-${d.vaccine}-${i}`;
+                    const hasPhone = !!phoneForDefaulter(d.patientId);
                     return (
-                      <tr key={`${d.patientId}-${d.vaccine}-${i}`} className="cursor-pointer" onClick={() => router.push(`/patients/${d.patientId}`)}>
+                      <tr key={rowKey} className="cursor-pointer" onClick={() => router.push(`/patients/${d.patientId}`)}>
                         <td><PatientName patientId={d.patientId} name={d.patientName} gender={d.gender} nameClassName="font-medium text-sm" /></td>
                         <td className="text-xs">{Math.floor(d.ageMonths / 12)}y {d.ageMonths % 12}m</td>
                         <td className="text-xs">{d.gender}</td>
@@ -569,6 +683,19 @@ export default function ImmunizationsPage() {
                         <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>{d.facilityName}</td>
                         <td>
                           <Badge tone={urgencyTone} uppercase>{d.urgency}</Badge>
+                        </td>
+                        <td className="text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleSendRecall(d, rowKey); }}
+                            disabled={!hasPhone || !!sendingRecall[rowKey]}
+                            className="btn btn-secondary btn-sm"
+                            style={{ gap: 6 }}
+                            title={hasPhone ? 'Send a recall SMS to this child’s caregiver' : 'No phone on file'}
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            {sendingRecall[rowKey] ? 'Sending…' : 'Send SMS recall'}
+                          </button>
                         </td>
                       </tr>
                     );

@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { HospitalDoc } from '../db-types';
 import { useApp } from '../context';
+import { makeCoalescer } from './live-reload';
+import { hospitalsDB } from '../db';
 
 export function useHospitals() {
   const [hospitals, setHospitals] = useState<HospitalDoc[]>([]);
@@ -30,6 +32,20 @@ export function useHospitals() {
 
   useEffect(() => {
     loadHospitals();
+  }, [loadHospitals]);
+
+  // Live PouchDB subscription — reflect writes arriving from sync/other tabs.
+  useEffect(() => {
+    let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) loadHospitals(); });
+    const changes = hospitalsDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => reload.trigger())
+      .on('error', () => { /* transient feed errors; next load resyncs */ });
+    return () => {
+      cancelled = true;
+      reload.cancel();
+      try { changes.cancel(); } catch { /* noop */ }
+    };
   }, [loadHospitals]);
 
   const create = useCallback(async (

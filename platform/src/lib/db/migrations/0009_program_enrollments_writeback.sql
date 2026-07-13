@@ -23,7 +23,10 @@ CREATE TABLE IF NOT EXISTS program_enrollments (
   status TEXT,                                  -- active | completed | transferred_out | lost_to_follow_up | discontinued
   enrollment_date DATE,
   outcome_date DATE,
-  notes TEXT,
+  -- NB: no free-text `notes` column. Narrative clinical notes are PHI that
+  -- must not flow to national analytics (same exclusion as patient_notes /
+  -- phone_notes / assessments); the care-cascade projection carries only
+  -- status/dates/program keys. /api/sync does not map `notes` either.
   recorded_by TEXT,
   recorded_by_name TEXT,
   hospital_id TEXT,

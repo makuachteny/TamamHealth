@@ -18,8 +18,11 @@ export interface EpidemicCurvePoint {
 
 export interface RtEstimate {
   disease: string;
-  rt: number;            // Reproduction number
-  trend: 'growing' | 'stable' | 'declining';
+  // Reproduction number. `null` when there isn't a real older-week case
+  // count to divide by — an honest "we don't know yet" rather than a
+  // fabricated Rt=1 ("stable").
+  rt: number | null;
+  trend: 'growing' | 'stable' | 'declining' | 'insufficient_data';
   confidence: 'low' | 'medium' | 'high';
   weeklyChange: number;  // % change
 }
@@ -130,52 +133,69 @@ function weeksAgo(n: number): Date {
 
 // ===== Core analysis functions =====
 
-// `Math.random()` here would let the same alert set produce different curves
-// on every page render — confusing for surveillance and alert triage. Instead
-// we hash the (disease, week) pair to a deterministic factor so re-rendering
-// is stable, and so two clinicians looking at the same data see the same
-// numbers. Replace with a real per-week aggregation as soon as the underlying
-// case-line data is available.
-function deterministicWeekFactor(disease: string, weekIndex: number): number {
-  let h = 2166136261;
-  const key = `${disease}:${weekIndex}`;
-  for (let i = 0; i < key.length; i++) {
-    h ^= key.charCodeAt(i);
-    h = Math.imul(h, 16777619);
+// Real per-week aggregation: each alert carries a `reportDate` (the date the
+// case count was actually reported). We bucket every alert into the
+// Africa/Juba week (Monday-anchored, matching `jubaWeekStart`) it was
+// reported in, then sum cases/deaths per (disease, week) or
+// (disease, state, week) bucket. Weeks with no matching reports are honest
+// zeros — a flat or missing history is real signal for surveillance, not
+// something to paper over with an invented curve.
+function weekBucketKey(disease: string, weekStart: string, state?: string): string {
+  return state ? `${disease}|${state}|${weekStart}` : `${disease}|${weekStart}`;
+}
+
+function aggregateByDiseaseWeek(alerts: DiseaseAlertDoc[]): Map<string, { cases: number; deaths: number }> {
+  const buckets = new Map<string, { cases: number; deaths: number }>();
+  for (const a of alerts) {
+    if (!a.reportDate) continue;
+    const key = weekBucketKey(a.disease, jubaWeekStart(a.reportDate));
+    const existing = buckets.get(key);
+    if (existing) {
+      existing.cases += a.cases;
+      existing.deaths += a.deaths;
+    } else {
+      buckets.set(key, { cases: a.cases, deaths: a.deaths });
+    }
   }
-  // Map the 32-bit hash into [0.3, 1.0] — the same span as the original
-  // `0.3 + Math.random() * 0.7` distribution.
-  const norm = ((h >>> 0) % 1000) / 1000;
-  return 0.3 + norm * 0.7;
+  return buckets;
+}
+
+function aggregateByDiseaseStateWeek(alerts: DiseaseAlertDoc[]): Map<string, number> {
+  const buckets = new Map<string, number>();
+  for (const a of alerts) {
+    if (!a.reportDate) continue;
+    const key = weekBucketKey(a.disease, jubaWeekStart(a.reportDate), a.state);
+    buckets.set(key, (buckets.get(key) || 0) + a.cases);
+  }
+  return buckets;
+}
+
+function previousJubaWeekStart(weekStart: string): string {
+  const d = new Date(`${weekStart}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 7);
+  return jubaWeekStart(d.toISOString());
 }
 
 function buildEpidemicCurves(alerts: DiseaseAlertDoc[]): EpidemicCurvePoint[] {
   const points: EpidemicCurvePoint[] = [];
   const diseases = [...new Set(alerts.map(a => a.disease))];
+  const buckets = aggregateByDiseaseWeek(alerts);
 
-  // Generate 12 weeks of epidemic curve data
+  // Trailing 12 Juba weeks, oldest to newest.
   for (let w = 11; w >= 0; w--) {
     const weekDate = weeksAgo(w);
     const week = getISOWeek(weekDate);
     const weekStart = getWeekStart(weekDate);
 
     for (const disease of diseases) {
-      const diseaseAlerts = alerts.filter(a => a.disease === disease);
-      // Distribute cases across weeks with realistic variation
-      const baseCases = diseaseAlerts.reduce((s, a) => s + a.cases, 0);
-      const baseDeaths = diseaseAlerts.reduce((s, a) => s + a.deaths, 0);
-      const weekFactor = deterministicWeekFactor(disease, w);
-      // More recent weeks trend based on alert trend
-      const trendMultiplier = diseaseAlerts.some(a => a.trend === 'increasing')
-        ? 1 + (11 - w) * 0.08
-        : diseaseAlerts.some(a => a.trend === 'decreasing')
-          ? 1 - (11 - w) * 0.05
-          : 1;
-
-      const weeklyCases = Math.max(0, Math.round((baseCases / 12) * weekFactor * trendMultiplier));
-      const weeklyDeaths = Math.max(0, Math.round((baseDeaths / 12) * weekFactor * trendMultiplier));
-
-      points.push({ week, weekStart, cases: weeklyCases, deaths: weeklyDeaths, disease });
+      const bucket = buckets.get(weekBucketKey(disease, weekStart));
+      points.push({
+        week,
+        weekStart,
+        cases: bucket?.cases ?? 0,
+        deaths: bucket?.deaths ?? 0,
+        disease,
+      });
     }
   }
 
@@ -194,9 +214,24 @@ function estimateRt(curves: EpidemicCurvePoint[]): RtEstimate[] {
     const recentTotal = recentWeeks.reduce((s, c) => s + c.cases, 0);
     const olderTotal = olderWeeks.reduce((s, c) => s + c.cases, 0);
 
+    // A reproduction-number ratio needs real case counts in BOTH the recent
+    // and older 4-week windows. Zero historical cases isn't "stable" — it's
+    // a division we can't honestly perform, so report insufficient data
+    // instead of a fabricated Rt=1.
+    if (olderTotal === 0) {
+      estimates.push({
+        disease,
+        rt: null,
+        trend: 'insufficient_data',
+        confidence: 'low',
+        weeklyChange: 0,
+      });
+      continue;
+    }
+
     // Simple Rt estimation: ratio of recent to older cases
-    const rt = olderTotal > 0 ? Math.round((recentTotal / olderTotal) * 100) / 100 : 1;
-    const weeklyChange = olderTotal > 0 ? Math.round(((recentTotal - olderTotal) / olderTotal) * 100) : 0;
+    const rt = Math.round((recentTotal / olderTotal) * 100) / 100;
+    const weeklyChange = Math.round(((recentTotal - olderTotal) / olderTotal) * 100);
 
     estimates.push({
       disease,
@@ -207,11 +242,13 @@ function estimateRt(curves: EpidemicCurvePoint[]): RtEstimate[] {
     });
   }
 
-  return estimates.sort((a, b) => b.rt - a.rt);
+  // Highest (known) Rt first; diseases with no computable Rt sort last.
+  return estimates.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
 }
 
 function generateSyndromicAlerts(alerts: DiseaseAlertDoc[]): SyndromicAlert[] {
   const syndromes: SyndromicAlert[] = [];
+  const weeklyByDiseaseState = aggregateByDiseaseStateWeek(alerts);
 
   // Group by disease and state
   for (const state of SOUTH_SUDAN_STATES) {
@@ -219,13 +256,20 @@ function generateSyndromicAlerts(alerts: DiseaseAlertDoc[]): SyndromicAlert[] {
     for (const alert of stateAlerts) {
       const threshold = ALERT_THRESHOLDS[alert.disease]?.weeklyThreshold || 10;
       const currentCases = alert.cases;
-      // Previous-week case count is unknown — the alert document only carries
-      // the current week. Use a deterministic factor of the current count so
-      // the % change is stable across renders. Replace with a real previous-
-      // week lookup when the surveillance store learns to retain history.
-      const prevFactor = deterministicWeekFactor(`${alert.disease}:${state}`, -1);
-      const prevCases = Math.max(0, Math.round(currentCases * (0.6 + prevFactor * 0.6)));
-      const percentChange = prevCases > 0 ? Math.round(((currentCases - prevCases) / prevCases) * 100) : 100;
+
+      // Real previous-week case count: look up the same disease+state bucket
+      // for the Juba week immediately before this alert's reported week.
+      // Alerts without a reportDate (shouldn't happen for real docs) fall
+      // back to 0 rather than a guessed number.
+      let prevCases = 0;
+      if (alert.reportDate) {
+        const thisWeek = jubaWeekStart(alert.reportDate);
+        const prevWeek = previousJubaWeekStart(thisWeek);
+        prevCases = weeklyByDiseaseState.get(weekBucketKey(alert.disease, prevWeek, state)) || 0;
+      }
+      const percentChange = prevCases > 0
+        ? Math.round(((currentCases - prevCases) / prevCases) * 100)
+        : (currentCases > 0 ? 100 : 0);
 
       syndromes.push({
         syndrome: alert.disease,
@@ -420,7 +464,12 @@ export async function getEpidemicIntelligence(scope?: DataScope): Promise<Epidem
   );
   const thisWeekCases = alerts.reduce((s, a) => s + a.cases, 0);
   const thisWeekDeaths = alerts.reduce((s, a) => s + a.deaths, 0);
-  const highestRt = rtEstimates.length > 0 ? { disease: rtEstimates[0].disease, value: rtEstimates[0].rt } : null;
+  // `rtEstimates` is sorted with known Rt values first (nulls last), so the
+  // first entry with a non-null `rt` is the genuine highest reproduction
+  // number. If every disease has insufficient data, `highestRt` is honestly
+  // null rather than pointing at a fabricated value.
+  const topKnownRt = rtEstimates.find(r => r.rt !== null);
+  const highestRt = topKnownRt ? { disease: topKnownRt.disease, value: topKnownRt.rt as number } : null;
 
   let overallRiskLevel: 'low' | 'moderate' | 'high' | 'critical' = 'low';
   /* istanbul ignore next -- risk level chain: depends on real-time epidemic data */
