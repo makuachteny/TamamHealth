@@ -190,12 +190,24 @@ export async function seedSuppliesIfEmpty(
   items: SeedSupplyItem[],
   ctx: { hospitalId?: string; orgId?: string },
 ): Promise<void> {
-  const existing = await getAllSupplies();
-  if (existing.length > 0) return;
+  // Seed only when THIS facility's store is empty — an unscoped check would
+  // see another facility's supplies (the store is org-scoped and syncs across
+  // facilities in an org) and wrongly skip seeding, leaving a genuinely-empty
+  // facility blank forever.
+  const all = await getAllSupplies();
+  const alreadySeeded = all.some(s =>
+    (ctx.hospitalId ? s.hospitalId === ctx.hospitalId : true) &&
+    (ctx.orgId ? s.orgId === ctx.orgId : true),
+  );
+  if (alreadySeeded) return;
   const db = nutritionSuppliesDB();
   const now = new Date().toISOString();
+  // Scope the _id to the facility/org too — a bare `nsup-<name>` would collide
+  // across facilities in the same synced org, so a second facility's seed of
+  // the same item would be rejected and silently never appear.
+  const scopeKey = ctx.hospitalId ?? ctx.orgId ?? 'global';
   const docs: NutritionSupplyDoc[] = items.map(item => ({
-    _id: `nsup-${slugify(item.name)}`,
+    _id: `nsup-${scopeKey}-${slugify(item.name)}`,
     type: 'nutrition_supply',
     name: item.name,
     unit: item.unit,

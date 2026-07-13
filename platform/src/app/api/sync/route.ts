@@ -410,7 +410,11 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
     patient_id: doc.patientId,
     patient_name: doc.patientName,
     program_key: doc.programKey,
-    program_name: doc.programName,
+    // `program_name` is a curated display label for the known program_keys,
+    // but arbitrary clinician-typed free text when program_key === 'other' —
+    // i.e. uncontrolled PHI. Project the curated label only; suppress the
+    // free-text 'other' case (same stance as the excluded `notes` field).
+    program_name: doc.programKey === 'other' ? null : doc.programName,
     status: doc.status,
     enrollment_date: doc.enrollmentDate,
     outcome_date: doc.outcomeDate,

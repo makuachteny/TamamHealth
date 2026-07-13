@@ -108,7 +108,7 @@ export default function FrontDeskDashboardPage() {
   const roomOptions = rooms.length ? rooms : ROOM_OPTIONS;
 
   const [queueFilter, setQueueFilter] = useState<'all' | 'walk-in' | 'appointment' | 'referral'>('all');
-  const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered'>('all');
+  const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered' | 'waiting' | 'walkin' | 'completed'>('all');
   const queueSort: 'priority' | 'name' | 'time' | 'status' = 'priority';
   const [queueSearch, setQueueSearch] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -558,12 +558,8 @@ export default function FrontDeskDashboardPage() {
     ...(canUseRoute('/patients') ? [{ label: t('frontDesk.registerNewPatient'), icon: UserPlus, onClick: () => setRegisterOpen(true) }] : []),
   ]), [canUseRoute, router, t]);
 
-  // "View Referrals" / "Appointments" — shown as icon shortcuts inside the
-  // Reception today card instead of the left rail.
-  const metricsActions = useMemo<EhrCareDashboardAction[]>(() => ([
-    ...(canUseRoute('/referrals') ? [{ label: t('frontDesk.viewReferrals'), icon: ArrowRightLeft, onClick: () => router.push('/referrals') }] : []),
-    ...(canUseRoute('/appointments') ? [{ label: t('nav.appointments'), icon: Calendar, onClick: () => router.push('/appointments') }] : []),
-  ]), [canUseRoute, router, t]);
+  // "View Referrals" / "Appointments" now live as labeled nav links in the top
+  // rail (next to the module dropdown), not as shortcuts inside this card.
 
   // Quick-navigation strip mirroring the Clinical Officer dashboard's clinical
   // strip. Route-guarded so a clinic clerk never sees a shortcut they can't open.
@@ -726,6 +722,9 @@ export default function FrontDeskDashboardPage() {
     });
 
     if (panelView === 'pending') return appointmentRows;
+    if (panelView === 'waiting') return queueRows.filter(row => row.status === 'waiting');
+    if (panelView === 'walkin') return queueRows;
+    if (panelView === 'completed') return queueRows.filter(row => row.status === 'done');
     if (panelView === 'queue') return queueRows;
     if (panelView === 'registered') return registeredRows;
     return [...appointmentRows, ...queueRows];
@@ -778,6 +777,33 @@ export default function FrontDeskDashboardPage() {
       },
     },
     {
+      label: 'Waiting',
+      value: queue.filter(item => item.status === 'WAITING').length,
+      active: panelView === 'waiting',
+      onClick: () => {
+        setQueueFilter('all');
+        setPanelView('waiting');
+      },
+    },
+    {
+      label: 'Walk-ins',
+      value: queue.filter(item => item.type === 'walk-in').length,
+      active: panelView === 'walkin',
+      onClick: () => {
+        setQueueFilter('walk-in');
+        setPanelView('walkin');
+      },
+    },
+    {
+      label: 'Completed',
+      value: queue.filter(item => item.status === 'DONE').length,
+      active: panelView === 'completed',
+      onClick: () => {
+        setQueueFilter('all');
+        setPanelView('completed');
+      },
+    },
+    {
       label: 'Registered patients',
       value: patients.length,
       active: panelView === 'registered',
@@ -785,7 +811,7 @@ export default function FrontDeskDashboardPage() {
         setPanelView('registered');
       },
     },
-  ]), [panelView, pendingAppointments.length, patients.length, queue.length, todaysAppointments.length]);
+  ]), [panelView, pendingAppointments.length, patients.length, queue, todaysAppointments.length]);
 
   const centerCopy = useMemo(() => {
     if (panelView === 'appointments') {
@@ -809,6 +835,30 @@ export default function FrontDeskDashboardPage() {
         title: 'Live queue',
         subtitle: `${frontDeskRows.length} patient${frontDeskRows.length === 1 ? '' : 's'} ready for desk action`,
         emptyTitle: t('frontDesk.noPatientsInQueue'),
+        emptyActionLabel: 'Register patient',
+      };
+    }
+    if (panelView === 'waiting') {
+      return {
+        title: 'Waiting',
+        subtitle: `${frontDeskRows.length} patient${frontDeskRows.length === 1 ? '' : 's'} waiting to be seen`,
+        emptyTitle: 'No patients waiting',
+        emptyActionLabel: 'Register patient',
+      };
+    }
+    if (panelView === 'walkin') {
+      return {
+        title: 'Walk-ins',
+        subtitle: `${frontDeskRows.length} walk-in${frontDeskRows.length === 1 ? '' : 's'} in the queue`,
+        emptyTitle: 'No walk-ins',
+        emptyActionLabel: 'Register patient',
+      };
+    }
+    if (panelView === 'completed') {
+      return {
+        title: 'Completed',
+        subtitle: `${frontDeskRows.length} completed visit${frontDeskRows.length === 1 ? '' : 's'} today`,
+        emptyTitle: 'No completed visits',
         emptyActionLabel: 'Register patient',
       };
     }
@@ -851,17 +901,11 @@ export default function FrontDeskDashboardPage() {
           searchValue={queueSearch}
           searchPlaceholder="Search patients, reasons, departments"
           onSearchChange={setQueueSearch}
-          filters={[
-            { label: 'Waiting', value: queue.filter(item => item.status === 'WAITING').length, active: queueFilter === 'all' && panelView !== 'registered', onClick: () => { setQueueFilter('all'); setPanelView('all'); } },
-            { label: 'Arrivals', value: pendingAppointments.length, active: panelView === 'pending', onClick: () => { setQueueFilter('appointment'); setPanelView('pending'); } },
-            { label: 'Walk-ins', value: queue.filter(item => item.type === 'walk-in').length, active: queueFilter === 'walk-in' && panelView === 'queue', onClick: () => { setQueueFilter('walk-in'); setPanelView('queue'); } },
-            { label: 'Completed', value: queue.filter(item => item.status === 'DONE').length, onClick: () => { setQueueFilter('all'); setPanelView('queue'); } },
-          ]}
+          filters={[]}
           actions={actions}
           actionStrip={actionStrip}
           rows={frontDeskRows}
           metrics={metrics}
-          metricsActions={metricsActions}
           checklist={checklist}
           calendarEventDates={appointments.map(appointment => appointment.appointmentDate)}
           metricsTitle="Reception today"

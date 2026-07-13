@@ -698,7 +698,14 @@ async function syncBillInsuranceStatus(
     const db = billingDB();
     const bill = await db.get(billingId) as BillingDoc;
     bill.insuranceClaimStatus = status;
-    if (approvedAmount !== undefined) bill.insuranceApprovedAmount = approvedAmount;
+    if (approvedAmount !== undefined) {
+      bill.insuranceApprovedAmount = approvedAmount;
+    } else if (status === 'submitted') {
+      // A freshly (re)submitted claim is pending adjudication — clear any
+      // approved amount left over from a prior claim on the same bill, so the
+      // bill never shows "submitted" alongside a stale approved figure.
+      bill.insuranceApprovedAmount = undefined;
+    }
     bill.updatedAt = new Date().toISOString();
     const resp = await db.put(bill);
     emitSyncEvent({

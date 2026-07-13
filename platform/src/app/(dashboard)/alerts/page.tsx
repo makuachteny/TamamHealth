@@ -1,11 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import EmptyState from '@/components/EmptyState';
 import Badge, { type BadgeTone } from '@/components/Badge';
-import { FilterBar, FilterTabs } from '@/components/filters';
 import {
   AlertTriangle, FlaskConical, Syringe, ChevronRight, CheckCircle2,
 } from '@/components/icons/lucide';
@@ -111,7 +110,6 @@ export default function AlertsPage() {
     [labResults],
   );
 
-  const [severityFilter, setSeverityFilter] = useState<'all' | Severity>('all');
 
   const allAlerts = useMemo<AlertItem[]>(() => {
     const items: AlertItem[] = [];
@@ -169,10 +167,7 @@ export default function AlertsPage() {
     return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [diseaseAlerts, overdueImmunizations, criticalLabResults]);
 
-  const visibleAlerts = useMemo(() => {
-    if (severityFilter === 'all') return allAlerts;
-    return allAlerts.filter(a => a.severity === severityFilter);
-  }, [allAlerts, severityFilter]);
+  const visibleAlerts = allAlerts;
 
   const buckets = useMemo(() => bucketByRecency(visibleAlerts), [visibleAlerts]);
   const counts = useMemo(() => ({
@@ -261,64 +256,27 @@ export default function AlertsPage() {
 
   return (
     <>
-      <TopBar title="Clinical Alerts" />
+      <TopBar />
       <main className="page-container page-enter">
-        {/* Severity summary tiles */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-5">
-          {([
-            { key: 'all',      label: 'Total',    count: counts.all,      sev: null as Severity | null },
-            { key: 'critical', label: 'Critical', count: counts.critical, sev: 'critical' as Severity },
-            { key: 'warning',  label: 'Warning',  count: counts.warning,  sev: 'warning'  as Severity },
-            { key: 'info',     label: 'Info',     count: counts.info,     sev: 'info'     as Severity },
-          ] as const).map(s => {
-            const styles = s.sev ? SEVERITY_STYLES[s.sev] : null;
-            const isActive = severityFilter === s.key;
-            return (
-              <button
-                key={s.key}
-                onClick={() => setSeverityFilter(s.key === 'all' ? 'all' : (s.sev as Severity))}
-                className="dash-card text-left transition-all"
-                style={{
-                  padding: '14px 16px',
-                  borderColor: isActive ? (styles?.color || 'var(--accent-primary)') : 'var(--border-light)',
-                  borderWidth: 1.5,
-                  background: isActive && styles ? styles.bg : 'var(--bg-card-solid)',
-                  cursor: 'pointer',
-                }}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: styles?.color || 'var(--text-muted)' }}>
-                    {s.label}
-                  </span>
-                  {styles && (
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ background: styles.color }}
-                    />
-                  )}
-                </div>
-                <div className="stat-value text-3xl font-bold" style={{ color: 'var(--text-primary)', lineHeight: 1 }}>
-                  {s.count}
-                </div>
-              </button>
-            );
-          })}
+        {/* Severity summary — inline stats (patient-list style, no cards) */}
+        <div className="flex items-end justify-between gap-3 mb-4 flex-wrap">
+          <span style={{ fontFamily: 'var(--font-platform)', fontWeight: 500, fontSize: 20, lineHeight: 1, color: 'var(--text-primary)' }}>
+            All alerts
+          </span>
+          <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
+            {[
+              { label: 'Total',    value: counts.all,      color: 'var(--text-muted)' },
+              { label: 'Critical', value: counts.critical, color: 'var(--color-danger)' },
+              { label: 'Warning',  value: counts.warning,  color: '#B8741C' },
+              { label: 'Info',     value: counts.info,     color: 'var(--accent-primary)' },
+            ].map(s => (
+              <span key={s.label} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                {s.label} ({s.value.toLocaleString()})
+              </span>
+            ))}
+          </div>
         </div>
-
-        {/* Severity filter */}
-        <FilterBar>
-          <FilterTabs
-            ariaLabel="Filter alerts by severity"
-            active={severityFilter}
-            onChange={key => setSeverityFilter(key === 'all' ? 'all' : (key as Severity))}
-            tabs={[
-              { key: 'all',      label: 'All',      count: counts.all },
-              { key: 'critical', label: 'Critical', count: counts.critical },
-              { key: 'warning',  label: 'Warning',  count: counts.warning },
-              { key: 'info',     label: 'Info',     count: counts.info },
-            ]}
-          />
-        </FilterBar>
 
         {/* Alerts feed */}
         {visibleAlerts.length === 0 ? (
@@ -326,11 +284,7 @@ export default function AlertsPage() {
             <EmptyState
               icon={CheckCircle2}
               title="All clear"
-              message={
-                severityFilter === 'all'
-                  ? 'No active clinical alerts. We will notify you the moment something needs attention.'
-                  : `No ${severityFilter} alerts right now.`
-              }
+              message="No active clinical alerts. We will notify you the moment something needs attention."
             />
           </div>
         ) : (

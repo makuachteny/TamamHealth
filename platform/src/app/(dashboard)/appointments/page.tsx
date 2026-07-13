@@ -10,7 +10,7 @@ import {
   Video, Stethoscope, Syringe, HeartPulse, FlaskConical,
   Building2, X, UserPlus, ClipboardList,
   ExternalLink, ChevronLeft, ChevronRight,
-  Search, Download,
+  Search, Download, Filter,
 } from '@/components/icons/lucide';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -144,7 +144,6 @@ export default function AppointmentsPage() {
   // cards + table both reflect just this day. Defaults to Africa/Juba "today".
   const [listDate, setListDate] = useState(() => jubaDate());
   // Header "service type" filter (appointment type), applied to the table only.
-  const [serviceFilter, setServiceFilter] = useState<AppointmentType | 'all'>('all');
   // Appointment opened in the click-to-view detail popup.
   const [eventApt, setEventApt] = useState<typeof appointments[0] | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -437,7 +436,6 @@ export default function AppointmentsPage() {
   const tableRows = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
     return dayList
-      .filter(a => serviceFilter === 'all' || a.appointmentType === serviceFilter)
       .filter(a => listStatus === 'all' || a.status === listStatus)
       .filter(a => {
         if (!q) return true;
@@ -446,7 +444,7 @@ export default function AppointmentsPage() {
           identifier.toLowerCase().includes(q) || a.department.toLowerCase().includes(q);
       })
       .sort((a, b) => (a.appointmentTime || '').localeCompare(b.appointmentTime || ''));
-  }, [dayList, serviceFilter, listStatus, listSearch, patientById]);
+  }, [dayList, listStatus, listSearch, patientById]);
 
   const dayLabel = listDate === today
     ? 'Today'
@@ -478,51 +476,6 @@ export default function AppointmentsPage() {
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <PageInstructionCard />
-        {/* ═══ Page header ═══ */}
-        <div className="listpage-header">
-          <div className="listpage-header-title">
-            <div className="listpage-header-icon"><Calendar size={22} /></div>
-            <div>
-              <p className="listpage-eyebrow">{currentUser?.hospitalName || 'Clinic'}</p>
-              <h1 className="listpage-title">{t('appointments.title')}</h1>
-            </div>
-          </div>
-          <div className="listpage-header-controls">
-            <input
-              type="date"
-              value={listDate}
-              onChange={e => setListDate(e.target.value || today)}
-              className="listpage-date-input"
-              aria-label={t('appointments.labelDate')}
-            />
-            <select
-              value={serviceFilter}
-              onChange={e => setServiceFilter(e.target.value as AppointmentType | 'all')}
-              className="listpage-service-select"
-              aria-label="Filter appointments by service type"
-            >
-              <option value="all">Filter appointments by service type</option>
-              {appointmentTypes.map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {/* ═══ View toggle + create ═══ */}
-        <div className="listpage-actions-row">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            style={{ gap: 8, color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }}
-            onClick={() => setViewMode(v => (v === 'calendar' ? 'list' : 'calendar'))}
-          >
-            <Calendar size={16} /> {viewMode === 'calendar' ? 'Appointments list' : 'Appointments calendar'}
-          </button>
-          {canBookAppointments && (
-            <button type="button" className="btn btn-primary" style={{ gap: 8 }} onClick={() => setShowNewForm(true)}>
-              <Plus size={16} /> Create new appointment
-            </button>
-          )}
-        </div>
 
         {/* ═══ LIST VIEW ═══ */}
         {viewMode === 'list' && (
@@ -562,20 +515,44 @@ export default function AppointmentsPage() {
                       aria-label="Filter table"
                     />
                   </div>
-                  <select
-                    value={listStatus}
-                    onChange={e => setListStatus(e.target.value)}
-                    className="listpage-status-select"
-                    aria-label="Filter appointments by status"
-                  >
-                    <option value="all">Filter appointments by status</option>
-                    {(Object.keys(statusConfig) as AppointmentStatus[]).map(k => (
-                      <option key={k} value={k}>{t(statusLabelKey[k])}</option>
-                    ))}
-                  </select>
-                  <button type="button" className="btn btn-secondary btn-sm" style={{ gap: 6 }} onClick={handleDownloadCsv}>
-                    <Download size={15} /> Download
+                  <input
+                    type="date"
+                    value={listDate}
+                    onChange={e => setListDate(e.target.value || today)}
+                    className="listpage-toolbar-date"
+                    style={{ width: 150, flex: '0 0 auto' }}
+                    aria-label={t('appointments.labelDate')}
+                  />
+                  <div className={`listpage-icon-select ${listStatus !== 'all' ? 'is-active' : ''}`} title="Filter appointments by status">
+                    <Filter size={16} />
+                    <select
+                      value={listStatus}
+                      onChange={e => setListStatus(e.target.value)}
+                      aria-label="Filter appointments by status"
+                    >
+                      <option value="all">All statuses</option>
+                      {(Object.keys(statusConfig) as AppointmentStatus[]).map(k => (
+                        <option key={k} value={k}>{t(statusLabelKey[k])}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button type="button" className="listpage-icon-btn" onClick={handleDownloadCsv} title="Download" aria-label="Download">
+                    <Download size={16} />
                   </button>
+                  <button
+                    type="button"
+                    className="listpage-icon-btn"
+                    onClick={() => setViewMode('calendar')}
+                    title="Appointments calendar"
+                    aria-label="Appointments calendar"
+                  >
+                    <Calendar size={16} />
+                  </button>
+                  {canBookAppointments && (
+                    <button type="button" className="listpage-icon-btn listpage-icon-btn-primary" onClick={() => setShowNewForm(true)} title="Create new appointment" aria-label="Create new appointment">
+                      <Plus size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -659,6 +636,20 @@ export default function AppointmentsPage() {
             {selectedDate && (
               <button onClick={() => setSelectedDate(null)} className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
                 <X size={12} /> {t('appointments.clearDate')}
+              </button>
+            )}
+            <button
+              type="button"
+              className="listpage-icon-btn"
+              onClick={() => setViewMode('list')}
+              title="Appointments list"
+              aria-label="Appointments list"
+            >
+              <ClipboardList size={16} />
+            </button>
+            {canBookAppointments && (
+              <button type="button" className="listpage-icon-btn listpage-icon-btn-primary" onClick={() => setShowNewForm(true)} title="Create new appointment" aria-label="Create new appointment">
+                <Plus size={16} />
               </button>
             )}
           </FilterBar>

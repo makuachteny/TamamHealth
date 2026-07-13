@@ -252,19 +252,21 @@ export default function EhrCareDashboard({
               />
             </div>
           </div>
-          <div className="ehr-filter-group">
-            {filters.map(filter => (
-              <button
-                key={filter.label}
-                type="button"
-                className={`ehr-care-filter ${filter.active ? 'active' : ''}`}
-                onClick={filter.onClick}
-              >
-                <span>{filter.label}</span>
-                <b>{filter.value}</b>
-              </button>
-            ))}
-          </div>
+          {filters.length > 0 && (
+            <div className="ehr-filter-group">
+              {filters.map(filter => (
+                <button
+                  key={filter.label}
+                  type="button"
+                  className={`ehr-care-filter ${filter.active ? 'active' : ''}`}
+                  onClick={filter.onClick}
+                >
+                  <span>{filter.label}</span>
+                  <b>{filter.value}</b>
+                </button>
+              ))}
+            </div>
+          )}
           {railActions.length > 0 && (
             <div className="ehr-filter-group">
               {railActions.map(action => (

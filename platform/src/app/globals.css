@@ -3842,6 +3842,44 @@ thead th {
   color: #fff;
 }
 
+/* Icon quick-nav sitting next to the module dropdown (Referrals, Appointments).
+   Same 38px circular icon button as the rest of the top rail. Hidden on narrow
+   screens where the mobile tab bar takes over. */
+.ehr-top-navlinks {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ehr-top-navlinks button {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ehr-top-navlinks button svg.lucide {
+  width: 20px;
+  height: 20px;
+}
+
+.ehr-top-navlinks button:hover,
+.ehr-top-navlinks button.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+@media (max-width: 1024px) {
+  .ehr-top-navlinks { display: none; }
+}
+
 .ehr-module-trigger {
   width: 42px !important;
   gap: 1px;
@@ -5509,7 +5547,11 @@ button.ward-summary-chip:hover {
      rail column width below it, including at breakpoints where --rail-col
      shrinks. */
   grid-template-columns: var(--rail-col, minmax(230px, 260px)) minmax(0, 1fr) max-content;
-  align-items: start;
+  /* Centre the three columns so the Check-in toggle, the "Welcome, {name}"
+     greeting, and the action buttons all sit on one line. (This header renders
+     only the single-line greeting — no subtitle — so there's no tall middle
+     column to top-align against.) */
+  align-items: center;
   gap: 10px;
   padding-bottom: 12px;
 }
@@ -5524,7 +5566,9 @@ button.ward-summary-chip:hover {
 }
 
 .ehr-care-dashboard .ehr-clinical-dashboard-header-main {
-  padding-top: 6px;
+  /* No top offset — the header row is centre-aligned, so the greeting must
+     not be nudged down out of line with the buttons. */
+  padding-top: 0;
 }
 
 .ehr-care-dashboard .ehr-greeting-row {
@@ -14945,6 +14989,87 @@ span:has(> svg:only-child) {
 .listpage-table-toolbar .btn {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+/* Compact date input on the table toolbar line — self-contained so it doesn't
+   inherit the wide header date-input min-width. */
+.listpage-toolbar-date {
+  flex: 0 0 auto;
+  width: 150px;
+  min-width: 0;
+  border: 1px solid var(--border-light);
+  background: var(--bg-card-solid);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  height: 38px;
+}
+
+/* Square icon buttons for the table toolbar actions (download, view toggle,
+   create). Icon-only; the label lives in title/aria-label. */
+.listpage-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-light);
+  background: var(--bg-card-solid);
+  border-radius: 8px;
+  color: var(--accent-primary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, filter 0.15s;
+}
+.listpage-icon-btn:hover {
+  background: rgba(33, 145, 208, 0.08);
+  border-color: var(--accent-border);
+}
+.listpage-icon-btn-primary {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+.listpage-icon-btn-primary:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  filter: brightness(0.94);
+}
+
+/* Filter shown as an icon: a square button with a native <select> laid over it
+   at zero opacity, so clicking the funnel opens the native status dropdown. */
+.listpage-icon-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-light);
+  background: var(--bg-card-solid);
+  border-radius: 8px;
+  color: var(--accent-primary);
+  cursor: pointer;
+}
+.listpage-icon-select:hover { border-color: var(--accent-border); }
+.listpage-icon-select.is-active {
+  border-color: var(--accent-primary);
+  background: rgba(33, 145, 208, 0.10);
+}
+.listpage-icon-select select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 @media (max-width: 640px) {
