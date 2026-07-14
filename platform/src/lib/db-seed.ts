@@ -1641,7 +1641,7 @@ export async function seedDatabase(): Promise<void> {
     {
       _id: 'intake-demo-02', type: 'patient_intake_form',
       patientId: 'pat-00058', patientName: 'Nyakuoth Koang Jal', hospitalNumber: 'BSH-000003',
-      providerId: 'user-nurse.wau', providerName: 'Nurse Stella Keji Lemi',
+      providerId: 'user-nurse.wau', providerName: 'Nurse Grace Achai Lual',
       status: 'pending_review',
       requestedAt: daysAgo(6), receivedAt: daysAgo(5),
       fields: [
@@ -1658,7 +1658,7 @@ export async function seedDatabase(): Promise<void> {
     {
       _id: 'intake-demo-03', type: 'patient_intake_form',
       patientId: 'pat-00059', patientName: 'Abuk Deng Mading', hospitalNumber: 'WSH-000002',
-      providerId: 'user-co.deng', providerName: 'Clinical Officer Deng Mabior Kuol',
+      providerId: 'user-co.deng', providerName: 'CO Deng Mabior Kuol',
       status: 'not_submitted',
       requestedAt: daysAgo(10),
       fields: [
@@ -1671,7 +1671,7 @@ export async function seedDatabase(): Promise<void> {
     {
       _id: 'intake-demo-04', type: 'patient_intake_form',
       patientId: 'pat-00060', patientName: 'Nyandit Dut Malual', hospitalNumber: 'MTH-000002',
-      providerId: 'user-dr.wau', providerName: 'Dr. Peter Garang Deng',
+      providerId: 'user-dr.wau', providerName: 'Dr. Mary Akuol Deng',
       status: 'merged',
       requestedAt: daysAgo(21), receivedAt: daysAgo(20), mergedAt: daysAgo(19), mergedBy: 'Grace Poni Lukudu',
       fields: [
@@ -2573,7 +2573,10 @@ export async function seedDatabase(): Promise<void> {
 
   const ledDB = ledgerDB();
   for (const led of seedLedgerEntries) {
-    await safePut(ledDB, led as unknown as Record<string, unknown>);
+    // seedLedgerEntries literals carry no orgId; without it filterByScope
+    // rejects them for every scoped user and the five showcase billing
+    // patients render empty ledgers (generated ledger rows below DO set it).
+    await safePut(ledDB, { ...led, orgId: PUBLIC_ORG_ID } as unknown as Record<string, unknown>);
   }
 
   // ─── Generated billing for the remaining demo patients ───────────────────

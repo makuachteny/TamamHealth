@@ -19,6 +19,7 @@
 import { patientsDB } from '../db';
 import type { PatientDoc } from '../db-types';
 import { findByType } from './db-query';
+import { filterByScope, type DataScope } from './data-scope';
 
 export interface MpiCandidate {
   patient: PatientDoc;
@@ -94,9 +95,12 @@ export function jaroWinkler(a: string, b: string): number {
  * by descending confidence. A score ≥ 0.90 is a likely match; 0.70 – 0.90
  * is worth reviewing; below 0.70 is probably not the same person.
  */
-export async function matchPatient(query: MpiQuery, limit = 10): Promise<MpiCandidate[]> {
+export async function matchPatient(query: MpiQuery, limit = 10, scope?: DataScope): Promise<MpiCandidate[]> {
   const db = patientsDB();
-  const patients = await findByType<PatientDoc>(db, 'patient');
+  let patients = await findByType<PatientDoc>(db, 'patient');
+  // Tenant/facility isolation: without this every caller could probe the FULL
+  // multi-tenant patient index (names, national IDs, phones) across orgs.
+  if (scope) patients = filterByScope(patients, scope);
 
   const candidates: MpiCandidate[] = [];
 

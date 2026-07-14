@@ -42,6 +42,7 @@ async function postHandler(request: NextRequest) {
     }
 
     const { matchPatient } = await import('@/lib/services/mpi-service');
+    const { buildScopeFromAuth } = await import('@/lib/services/data-scope');
     const candidates = await matchPatient({
       firstName: body.firstName,
       surname: body.surname,
@@ -51,7 +52,7 @@ async function postHandler(request: NextRequest) {
       geocodeId: body.geocodeId,
       hospitalNumber: body.hospitalNumber,
       countryId: body.countryId,
-    });
+    }, 10, buildScopeFromAuth(auth));
 
     return NextResponse.json({ candidates });
   } catch (err) {

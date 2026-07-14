@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { nutritionScreeningsDB } from '../db';
 import type { NutritionScreeningDoc, NutritionStatus } from '../db-types';
 import { findByType } from './db-query';
+import { filterByScope, type DataScope } from './data-scope';
 import { logAuditSafe } from './audit-service';
 import { emitSyncEvent } from './sync-event-service';
 
@@ -27,9 +28,10 @@ export function classifyScreening(muac: number, edema: boolean, isAnc: boolean):
   return 'Normal';
 }
 
-/** All screenings, newest first. */
-export async function getAllNutritionScreenings(): Promise<NutritionScreeningDoc[]> {
-  const rows = await findByType<NutritionScreeningDoc>(nutritionScreeningsDB(), 'nutrition_screening');
+/** All screenings visible to the caller's scope, newest first. */
+export async function getAllNutritionScreenings(scope?: DataScope): Promise<NutritionScreeningDoc[]> {
+  let rows = await findByType<NutritionScreeningDoc>(nutritionScreeningsDB(), 'nutrition_screening');
+  if (scope) rows = filterByScope(rows, scope);
   return rows.sort((a, b) =>
     (b.screeningDate || '').localeCompare(a.screeningDate || '') ||
     new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime()

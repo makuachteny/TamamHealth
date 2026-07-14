@@ -5,22 +5,24 @@ import { makeCoalescer } from './live-reload';
 import type { NutritionScreeningDoc } from '../db-types';
 import { nutritionScreeningsDB } from '../db';
 import type { AddNutritionScreeningInput } from '../services/nutrition-screening-service';
+import { useDataScope } from './useDataScope';
 
-/** All nutrition screenings, newest first, live-reloaded on changes. */
+/** Nutrition screenings in the current user's scope, newest first, live-reloaded on changes. */
 export function useNutritionScreenings() {
   const [screenings, setScreenings] = useState<NutritionScreeningDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const scope = useDataScope();
 
   const load = useCallback(async () => {
     try {
       const { getAllNutritionScreenings } = await import('../services/nutrition-screening-service');
-      setScreenings(await getAllNutritionScreenings());
+      setScreenings(await getAllNutritionScreenings(scope));
     } catch {
       setScreenings([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => { load(); }, [load]);
 

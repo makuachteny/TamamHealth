@@ -65,13 +65,18 @@ export function filterByScope<T extends Record<string, any>>(
         d.lastVisitHospital === hospId ||
         d.fromHospitalId === hospId ||
         d.toHospitalId === hospId ||
+        d.recipientHospitalId === hospId ||
         d.facilityId === hospId;
       if (matches) return true;
 
       // No-hospital docs: tightened to close the cross-facility leak where ANY
-      // hospital-less record was visible to EVERY scoped user.
+      // hospital-less record was visible to EVERY scoped user. A doc whose only
+      // facility tie is recipientHospitalId (inbound messages) is hospital-tied,
+      // not org-wide — without this check it fell through to the org fallback
+      // and was visible to every facility in the org.
       const noHospital =
-        !d.hospitalId && !d.registrationHospital && !d.facilityId;
+        !d.hospitalId && !d.registrationHospital && !d.facilityId &&
+        !d.recipientHospitalId && !d.fromHospitalId;
       if (!noHospital) return false;
 
       // (a) Genuinely global reference types (organization/hospital/

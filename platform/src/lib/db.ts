@@ -279,7 +279,11 @@ export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
 // showed an all-zero availability grid), and date-only seed fields use the
 // browser's local calendar instead of UTC so "today's" bookings land on the
 // dashboards' local today.
-export const SEED_VERSION = 48;
+// Bumped to 49: data-flow audit fixes — hand-crafted ledger entries now carry
+// orgId (they were invisible to every scoped user, so the five showcase
+// billing patients had empty ledgers) and three intake-form providerName
+// denorms corrected to match their providerId's user doc.
+export const SEED_VERSION = 49;
 
 export async function isSeeded(): Promise<boolean> {
   try {
