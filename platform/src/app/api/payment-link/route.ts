@@ -12,6 +12,10 @@ import type { UserRole } from '@/lib/db-types';
 const PAYMENT_LINK_ROLES: UserRole[] = [
   'super_admin', 'org_admin', 'medical_superintendent',
   'front_desk', 'doctor', 'clinical_officer', 'nurse',
+  // Billing staff — the "Send payment link" button lives on the Billing tab
+  // and is the core billing action; without these the primary billing roles
+  // hit a 403 on their own feature.
+  'cashier', 'medical_biller',
 ];
 
 interface PaymentLinkRequest {
@@ -127,10 +131,9 @@ async function postHandler(req: NextRequest) {
       patientId,
     };
 
+    // Correlator only — no patientId / amount (PHI + financial data in logs).
     console.log('[Payment Link API] Payment link created:', {
       linkId,
-      patientId,
-      amount,
       expiresAt: expiresAt.toISOString(),
       timestamp: createdAt.toISOString(),
     });

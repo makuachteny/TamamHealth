@@ -47,8 +47,52 @@ const TEAM_AVATARS = [
   '/assets/patients/african-nurse.jpg',
 ];
 
-const demoAccounts = DEMO_LOGIN_ACCOUNTS;
-type Account = DemoLoginAccount;
+// Demo roster — passwords are fetched at runtime from /api/demo-credentials.
+// One login per distinct role: no duplicates. The workflow-station roles from
+// the EHR Clinical Flow doc are the source of truth; the older overlapping
+// roles (Doctor, HRIO, Med. Superintendent) map onto Clinician, Records/HMIS
+// Officer, and Facility Administrator respectively. The Medical Receptionist
+// (front_desk) is surfaced explicitly so its Reception dashboard is reachable.
+// Ordered along the care & data flow: community → front desk → clinical →
+// diagnostics → records/admin → sub-national → national. The `group` drives the
+// section headers in the picker.
+const demoAccounts: { role: string; roleKey: UserRole; user: string; desc: string; hospital: string; group: string }[] = [
+  // 1 ── Front desk & billing: register, check in, collect, bill.
+  { group: 'Front desk & billing',     role: 'Medical Receptionist',   roleKey: 'front_desk',                 user: 'desk.amira',       desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Front desk & billing',     role: 'Registration Clerk',     roleKey: 'central_registration_clerk', user: 'reg.clerk',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Front desk & billing',     role: 'Clinic Clerk',           roleKey: 'clinic_clerk',               user: 'clinic.clerk',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Front desk & billing',     role: 'Cashier',                roleKey: 'cashier',                    user: 'cashier.deng',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Front desk & billing',     role: 'Medical Biller',         roleKey: 'medical_biller',             user: 'biller.nyandeng',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+
+  // 3 ── Clinical care: triage → rooming → nursing/midwifery → clinician.
+  { group: 'Clinical care',            role: 'Triage Nurse',           roleKey: 'triage_nurse',               user: 'triage.mary',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Clinical care',            role: 'Rooming Nurse',          roleKey: 'rooming_nurse',              user: 'rooming.sara',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Clinical care',            role: 'Nurse',                  roleKey: 'nurse',                      user: 'nurse.stella',     desc: 'Malakal Teaching Hospital', hospital: 'hosp-003' },
+  { group: 'Clinical care',            role: 'Midwife',                roleKey: 'midwife',                    user: 'midwife.nyakong',  desc: 'Malakal Teaching Hospital', hospital: 'hosp-003' },
+  { group: 'Clinical care',            role: 'Clinical Officer',       roleKey: 'clinical_officer',           user: 'co.deng',          desc: 'Wau State Hospital',        hospital: 'hosp-002' },
+  { group: 'Clinical care',            role: 'Doctor',                 roleKey: 'clinician',                  user: 'clinician.peter',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+
+  // 4 ── Diagnostics & pharmacy.
+  { group: 'Diagnostics & pharmacy',   role: 'Lab Tech',               roleKey: 'lab_tech',                   user: 'lab.gatluak',      desc: 'Bentiu State Hospital',     hospital: 'hosp-004' },
+  { group: 'Diagnostics & pharmacy',   role: 'Radiologist',            roleKey: 'radiologist',                user: 'rad.tamamhealth',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Diagnostics & pharmacy',   role: 'Pharmacist',             roleKey: 'pharmacist',                 user: 'pharma.rose',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Diagnostics & pharmacy',   role: 'Nutritionist',           roleKey: 'nutritionist',               user: 'nutr.nyabol',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+
+  // 5 ── Records & administration: capture, quality, oversight.
+  { group: 'Records & administration', role: 'Data Entry Clerk',       roleKey: 'data_entry_clerk',           user: 'data.ayen',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Records & administration', role: 'Records / HMIS Officer', roleKey: 'records_hmis_officer',       user: 'hmis.john',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Records & administration', role: 'Facility Administrator', roleKey: 'facility_administrator',     user: 'facadmin.rita',    desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Records & administration', role: 'Org Admin',              roleKey: 'org_admin',                  user: 'org.admin',        desc: 'Mercy Hospital Group',      hospital: '' },
+
+  // 6 ── Sub-national oversight: data aggregates up to county.
+  { group: 'Sub-national oversight',   role: 'County Health Director', roleKey: 'county_health_director',      user: 'county.lopez',     desc: 'County Health Office',      hospital: '' },
+
+  // 7 ── National & platform: MoH reporting and platform administration.
+  { group: 'National & platform',      role: 'Government',             roleKey: 'government',                  user: 'admin',            desc: 'National MoH oversight',    hospital: '' },
+  { group: 'National & platform',      role: 'Super Admin',            roleKey: 'super_admin',                user: 'superadmin',       desc: 'Platform-wide access',      hospital: '' },
+];
+
+type Account = typeof demoAccounts[number];
 
 const imageForIndex = (i: number) => IMAGE_POOL[i % IMAGE_POOL.length];
 const emailFor = (user: string) => `${user}@tamamhealth.ss`;

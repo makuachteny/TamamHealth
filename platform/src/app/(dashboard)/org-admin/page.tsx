@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import RoleGuard from '@/components/RoleGuard';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
@@ -257,7 +258,8 @@ function OrgAdminDashboard() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <TopBar title={t('orgAdmin.pageTitle')} actions={org?.subscriptionPlan ? (
+      <main className="page-container page-enter">
+        <DashboardGreetingHeader actions={org?.subscriptionPlan ? (
             <div
               className="px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider"
               style={{
@@ -269,8 +271,6 @@ function OrgAdminDashboard() {
               {t('orgAdmin.planBadge', { plan: planLabels[org.subscriptionPlan] || org.subscriptionPlan })}
             </div>
           ) : null} />
-
-      <div className="page-container page-enter">
         {/* Stat Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           {statCards.map((card) => {
@@ -631,7 +631,7 @@ function OrgAdminDashboard() {
             })}
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

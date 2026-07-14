@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { UserDoc, UserRole } from '../db-types';
 import { useDataScope } from './useDataScope';
+import { makeCoalescer } from './live-reload';
+import { usersDB } from '../db';
 
 export function useUsers() {
   const [users, setUsers] = useState<UserDoc[]>([]);
@@ -26,6 +28,20 @@ export function useUsers() {
 
   useEffect(() => {
     loadUsers();
+  }, [loadUsers]);
+
+  // Live PouchDB subscription — reflect writes arriving from sync/other tabs.
+  useEffect(() => {
+    let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) loadUsers(); });
+    const changes = usersDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => reload.trigger())
+      .on('error', () => { /* transient feed errors; next load resyncs */ });
+    return () => {
+      cancelled = true;
+      reload.cancel();
+      try { changes.cancel(); } catch { /* noop */ }
+    };
   }, [loadUsers]);
 
   const create = useCallback(async (data: {

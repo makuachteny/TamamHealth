@@ -170,6 +170,39 @@ export function useInsurancePolicies(patientId?: string) {
   return { policies, loading, error, reload: loadInsurancePolicies };
 }
 
+/** Patient ids holding at least one active insurance policy — powers the
+ *  Insured / Not insured badge on appointment lists without per-row queries. */
+export function useInsuredPatientIds(): Set<string> {
+  const [insuredIds, setInsuredIds] = useState<Set<string>>(new Set());
+
+  const load = useCallback(async () => {
+    try {
+      const { getInsuredPatientIds } = await import('../services/payment-service');
+      setInsuredIds(await getInsuredPatientIds());
+    } catch { /* leave empty — rows fall back to Not insured */ }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Live PouchDB subscription
+  useEffect(() => {
+    let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) load(); });
+    const changes = insurancePoliciesDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => reload.trigger())
+      .on('error', () => { /* swallow */ });
+    return () => {
+      cancelled = true;
+      reload.cancel();
+      try { changes.cancel(); } catch { /* noop */ }
+    };
+  }, [load]);
+
+  return insuredIds;
+}
+
 export function useClaims() {
   const [claims, setClaims] = useState<ClaimDoc[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,7 +1,7 @@
 'use client';
 
 // Floating staff-messaging dock — a Messenger/Intercom-style launcher that lives
-// bottom-right on every dashboard screen so staff can read and reply to internal
+// bottom-left on every dashboard screen so staff can read and reply to internal
 // chat WITHOUT navigating away from their current task. It reuses the same
 // `useStaffChat` data layer (and styling tokens) as the full /messages page, so
 // the two stay in sync; the full page remains for power features (groups,
@@ -13,8 +13,10 @@ import { useStaffChat } from '@/lib/hooks/useStaffChat';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { useMessagingDock } from '@/lib/messaging-dock-context';
 import { getRoleConfig } from '@/lib/permissions';
+import { initials } from '@/lib/patient-utils';
 import { ROLE_LABEL } from '@/lib/role-display';
-import type { ConversationDoc, UserRole } from '@/lib/db-types';
+import { BRAND_PRIMARY, BRAND_SECONDARY } from '@/lib/theme-colors';
+import type { ConversationDoc, UserRole, StaffPresence } from '@/lib/db-types';
 import {
   MessageSquare, Minus, Plus, Search, Send, ArrowLeft, Users as UsersIcon,
   Paperclip, X, AlertTriangle,
@@ -22,35 +24,33 @@ import {
 
 type Attachment = { name: string; mimeType: string; base64Data: string; sizeBytes: number };
 
-const AVAILABILITY_LABELS: Record<string, string> = {
-  available: 'Available',
+// Same StaffPresence vocabulary + colors the full /messages page uses, so the
+// dock's picker persists real presence (visible to other staff) instead of the
+// old local-only status that reset on every reload.
+const AVAILABILITY_LABELS: Record<StaffPresence, string> = {
+  active: 'Active',
   busy: 'Busy',
-  in_procedure: 'In Procedure',
-  in_emergency: 'In Emergency',
-  in_theatre: 'In Theatre',
-  on_rounds: 'On Rounds',
   away: 'Away',
+  on_call: 'On Call',
+  in_clinic: 'In Clinic',
+  offline: 'Offline',
 };
-const AVAILABILITY_COLORS: Record<string, string> = {
-  available:    '#059669',
-  busy:         '#D97706',
-  in_procedure: 'var(--accent-primary)',
-  in_emergency: '#DC2626',
-  in_theatre:   '#0E7490',
-  on_rounds:    '#0369A1',
-  away:         '#64748B',
+const AVAILABILITY_COLORS: Record<StaffPresence, string> = {
+  active:    'var(--color-success)',
+  busy:      'var(--color-danger)',
+  away:      'var(--color-warning)',
+  on_call:   'var(--accent-primary)',
+  in_clinic: 'var(--accent-primary)',
+  offline:   'var(--text-muted)',
 };
 
-const AVATAR_PALETTE = ['var(--accent-primary)', '#015697', '#0EA5E9', '#0891B2', '#1D4ED8', '#0369A1', '#1E40AF', '#475569'];
+const AVATAR_PALETTE = ['var(--accent-primary)', BRAND_SECONDARY, '#369FDA', '#2191D0', '#015697', '#015697', '#015697', '#475569'];
 const NON_MESSAGEABLE_ROLES: UserRole[] = ['super_admin', 'government'];
 
 function colorFor(seed: string): string {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
   return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
-}
-function initials(name: string): string {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
 }
 function relTime(iso?: string): string {
   if (!iso) return '';
@@ -94,13 +94,75 @@ export default function MessagingDock() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [phiWarning, setPhiWarning] = useState(false);
   const [showAvailability, setShowAvailability] = useState(false);
-  const [availability, setAvailability] = useState<string>('available');
+  // Presence is persisted on the user doc (visible to other staff, survives
+  // reload). Local state is only an optimistic mirror while the write lands.
+  const persistedPresence = (users.find(u => u._id === currentUser?._id)?.presence as StaffPresence | undefined) || 'active';
+  const [availabilityOverride, setAvailabilityOverride] = useState<StaffPresence | null>(null);
+  const availability: StaffPresence = availabilityOverride ?? persistedPresence;
+  const pickAvailability = (next: StaffPresence) => {
+    setAvailabilityOverride(next);
+    chat.setPresence(next).catch(err => console.warn('Failed to persist presence', err));
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Conversations the user has opened in this session — used to clear the unread
   // dot locally as soon as they're read (the conversation doc has no per-user
   // read cursor, so this mirrors the read action client-side).
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const threadRef = useRef<HTMLDivElement>(null);
+
+  // Drag-to-reposition for the floating launcher. The dock stays anchored at
+  // its default bottom-left corner (left: 20, bottom: 20) and this offset is
+  // applied on top via a transform, so dragging never touches layout — just a
+  // translate, which is what lets us drag in real time without re-rendering.
+  // The offset lives in state (not just a ref) so the expanded panel opens
+  // from wherever the launcher was last left instead of snapping back to the
+  // corner.
+  const [dockOffset, setDockOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+  const draggedRef = useRef(false);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+
+  const clampDockOffset = (x: number, y: number) => {
+    const size = 56;
+    const margin = 20;
+    const originLeft = margin;
+    const originTop = window.innerHeight - margin - size;
+    return {
+      x: Math.min(Math.max(x, -originLeft), window.innerWidth - size - originLeft),
+      y: Math.min(Math.max(y, -originTop), window.innerHeight - size - originTop),
+    };
+  };
+
+  const handleLauncherPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, originX: dockOffset.x, originY: dockOffset.y };
+    draggedRef.current = false;
+  };
+  const handleLauncherPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) draggedRef.current = true;
+    const { x, y } = clampDockOffset(drag.originX + dx, drag.originY + dy);
+    // Mutate the DOM directly while dragging (no React re-render per pointermove)
+    // for a 1:1, lag-free follow; the offset is only committed to state on release.
+    if (launcherRef.current) launcherRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  };
+  const handleLauncherPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    setDockOffset(clampDockOffset(drag.originX + dx, drag.originY + dy));
+    dragRef.current = null;
+  };
+  const handleLauncherClick = () => {
+    // A drag ending on release also fires a click — swallow it so dragging
+    // the icon doesn't also pop the panel open.
+    if (draggedRef.current) { draggedRef.current = false; return; }
+    openDock();
+  };
 
   const meId = currentUser?._id || '';
   const meName = currentUser?.name || '';
@@ -199,10 +261,18 @@ export default function MessagingDock() {
   if (!open) {
     return (
       <button
-        onClick={openDock}
+        ref={launcherRef}
+        onClick={handleLauncherClick}
+        onPointerDown={handleLauncherPointerDown}
+        onPointerMove={handleLauncherPointerMove}
+        onPointerUp={handleLauncherPointerUp}
+        onPointerCancel={handleLauncherPointerUp}
         aria-label="Open messages"
-        className="fixed z-[60] flex items-center justify-center rounded-full text-white shadow-lg transition-transform"
-        style={{ right: 20, bottom: 20, width: 56, height: 56, background: 'var(--accent-primary)', boxShadow: 'var(--card-shadow-lg)' }}
+        className="fixed z-[60] flex items-center justify-center rounded-full text-white shadow-lg"
+        style={{
+          left: 20, bottom: 20, width: 56, height: 56, background: 'var(--accent-primary)', boxShadow: 'var(--card-shadow-lg)',
+          transform: `translate3d(${dockOffset.x}px, ${dockOffset.y}px, 0)`, touchAction: 'none', cursor: 'grab',
+        }}
       >
         <MessageSquare className="w-6 h-6" color="#FFFFFF" />
         {unreadCount > 0 && (
@@ -224,10 +294,13 @@ export default function MessagingDock() {
     <div
       className="fixed z-[60] flex flex-col overflow-hidden"
       style={{
-        right: 20, bottom: 20, width: 372, height: 540, maxHeight: 'calc(100vh - 40px)', maxWidth: 'calc(100vw - 40px)',
+        left: 20, bottom: 20, width: 372, height: 540, maxHeight: 'calc(100vh - 40px)', maxWidth: 'calc(100vw - 40px)',
         borderRadius: 'var(--card-radius)', border: '1px solid var(--glass-border)',
-        background: 'var(--glass-bg-strong)',
-        boxShadow: 'none',
+        background: 'var(--glass-bg-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
+        boxShadow: 'var(--panel-shadow), var(--glass-highlight)',
+        // Opens from wherever the launcher was last dragged to, instead of
+        // snapping back to the default corner.
+        transform: `translate3d(${dockOffset.x}px, ${dockOffset.y}px, 0)`,
       }}
     >
       {/* Header */}
@@ -263,14 +336,14 @@ export default function MessagingDock() {
                 className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 hover:bg-[var(--overlay-subtle)]"
                 title={`Status: ${AVAILABILITY_LABELS[availability]}`}
               >
-                <span className="w-3 h-3 rounded-full" style={{ background: AVAILABILITY_COLORS[availability] || '#059669' }} />
+                <span className="w-3 h-3 rounded-full" style={{ background: AVAILABILITY_COLORS[availability] || 'var(--color-success-600)' }} />
               </button>
               {showAvailability && (
                 <div className="absolute right-0 top-full mt-1 z-50 py-1 rounded-xl shadow-xl min-w-[160px]" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-light)' }}>
-                  {Object.entries(AVAILABILITY_LABELS).map(([key, label]) => (
+                  {(Object.entries(AVAILABILITY_LABELS) as [StaffPresence, string][]).map(([key, label]) => (
                     <button
                       key={key}
-                      onClick={() => { setAvailability(key); setShowAvailability(false); }}
+                      onClick={() => { pickAvailability(key); setShowAvailability(false); }}
                       className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--overlay-subtle)]"
                     >
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: AVAILABILITY_COLORS[key] }} />
@@ -367,7 +440,7 @@ export default function MessagingDock() {
             {phiWarning && (
               <div className="mx-2.5 mt-2.5 p-2.5 rounded-lg" style={{ background: 'rgba(217,119,6,0.12)', border: '1px solid rgba(217,119,6,0.3)' }}>
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: '#D97706' }} />
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-warning-600)' }} />
                   <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
                     This message may contain patient-identifiable information (PHI). Only share with authorized staff. Do you confirm?
                   </p>

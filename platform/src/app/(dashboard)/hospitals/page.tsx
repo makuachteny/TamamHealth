@@ -237,7 +237,7 @@ function HospitalsPageInner() {
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* ── KPIs ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5" style={{ marginBottom: 12 }}>
-          <KpiCard label={t('hospitals.kpiFacilities')} value={kpis.total} icon={Building2} color="#3B82F6" />
+          <KpiCard label={t('hospitals.kpiFacilities')} value={kpis.total} icon={Building2} color="#2191D0" />
           <KpiCard label={t('hospitals.kpiFunctional')} value={`${kpis.pctFunctional}%`} icon={ShieldCheck} color={getPerformanceColor(kpis.pctFunctional)} />
           <KpiCard label={t('hospitals.kpiReporting')} value={`${kpis.avgReporting}%`} icon={Activity} color={getPerformanceColor(kpis.avgReporting)} />
           <KpiCard label={t('hospitals.kpiReadiness')} value={`${kpis.avgReadiness}%`} icon={Stethoscope} color={getPerformanceColor(kpis.avgReadiness)} />
@@ -485,7 +485,7 @@ function FacilityProfile({ hospital, onClose, canManage }: {
               <Settings style={{ width: 13, height: 13 }} /> {t('hospitals.manage')}
             </Link>
           )}
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button onClick={onClose} aria-label="Close" style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X style={{ width: 14, height: 14, color: 'var(--text-muted)' }} />
           </button>
         </div>
@@ -562,7 +562,7 @@ function FacilityProfile({ hospital, onClose, canManage }: {
             {[
               { label: t('hospitals.bedsIcu'), value: hospital.icuBeds, color: 'var(--color-danger)' },
               { label: t('hospitals.bedsMaternity'), value: hospital.maternityBeds, color: '#EC4899' },
-              { label: t('hospitals.bedsPediatric'), value: hospital.pediatricBeds, color: '#2563EB' },
+              { label: t('hospitals.bedsPediatric'), value: hospital.pediatricBeds, color: '#2191D0' },
               { label: t('hospitals.bedsGeneral'), value: Math.max(0, hospital.totalBeds - hospital.icuBeds - hospital.maternityBeds - hospital.pediatricBeds), color: 'var(--text-muted)' },
             ].map(b => (
               <div key={b.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
@@ -609,7 +609,7 @@ function FacilityProfile({ hospital, onClose, canManage }: {
               : <InfraBadge icon={ZapOff} label={t('hospitals.infraNoPower')} color="#8A9E9A" bg="rgba(100,116,139,0.10)" />}
             {hospital.hasGenerator && <InfraBadge icon={Activity} label={t('hospitals.infraGenerator')} color="#1F9D6F" bg="rgba(31, 157, 111,0.10)" />}
             {hospital.hasSolar && <InfraBadge icon={Sun} label={t('hospitals.infraSolar')} color="#FCD34D" bg="rgba(252,211,77,0.08)" />}
-            {hospital.hasInternet ? <InfraBadge icon={Signal} label={hospital.internetType} color="#2563EB" bg="rgba(96,165,250,0.10)" />
+            {hospital.hasInternet ? <InfraBadge icon={Signal} label={hospital.internetType} color="#2191D0" bg="rgba(96,165,250,0.10)" />
               : <InfraBadge icon={WifiOff} label={t('hospitals.infraNoInternet')} color="#8A9E9A" bg="rgba(100,116,139,0.10)" />}
             {hospital.hasAmbulance && <InfraBadge icon={Truck} label={t('hospitals.infraAmbulance')} color="#EF4444" bg="rgba(239,68,68,0.08)" />}
             {hospital.emergency24hr && <InfraBadge icon={HeartPulse} label={t('hospitals.infra24hrEr')} color="#EF4444" bg="rgba(239,68,68,0.08)" />}

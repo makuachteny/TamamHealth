@@ -110,5 +110,38 @@ export const COMMON_ICD11_CODES: ICD11CodeEntry[] = [
   // ===== STIs =====
   { code: '1A60', title: 'Syphilis', chapter: 'Infectious diseases', minLevel: 'payam', notifiable: true, keywords: ['syphilis'] },
   { code: '1A61', title: 'Gonorrhoea', chapter: 'Infectious diseases', minLevel: 'payam', keywords: ['gonorrhea', 'discharge'] },
+  // ===== ADDITIONAL COMMON PRESENTATIONS =====
+  { code: 'RA01', title: 'COVID-19', chapter: 'Infectious diseases', minLevel: 'payam', notifiable: true, keywords: ['covid', 'coronavirus', 'sars-cov-2'] },
+  { code: '1G40', title: 'Sepsis', chapter: 'Infectious diseases', minLevel: 'county', causeOfDeath: true, keywords: ['sepsis', 'septicaemia', 'blood infection'] },
+  { code: '1F86', title: 'Schistosomiasis (Bilharzia)', chapter: 'Infectious diseases', minLevel: 'county', notifiable: true, keywords: ['schistosomiasis', 'bilharzia'] },
+  { code: '3A51', title: 'Sickle cell disorders', chapter: 'Blood disorders', minLevel: 'county', causeOfDeath: true, keywords: ['sickle cell', 'crisis', 'anaemia'] },
+  { code: 'BD1Z', title: 'Heart failure, unspecified', chapter: 'Circulatory', minLevel: 'county', causeOfDeath: true, keywords: ['heart failure', 'oedema', 'breathlessness'] },
+  { code: '8A80', title: 'Migraine', chapter: 'Nervous system', minLevel: 'payam', keywords: ['migraine', 'headache'] },
+  { code: '6B00', title: 'Generalised anxiety disorder', chapter: 'Mental health', minLevel: 'payam', keywords: ['anxiety', 'worry'] },
+  { code: 'EA80', title: 'Atopic eczema (dermatitis)', chapter: 'Skin', minLevel: 'boma', keywords: ['eczema', 'dermatitis', 'rash', 'itch'] },
+  { code: 'DA42', title: 'Gastritis', chapter: 'Digestive', minLevel: 'payam', keywords: ['gastritis', 'epigastric pain'] },
+  { code: 'MG26', title: 'Fever of unknown origin', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['fever', 'pyrexia'] },
+
+  // ===== SYMPTOMS & SIGNS — physical exam findings (ICD-11 Chapter 21) =====
+  // Verified against the WHO ICD-11 MMS browser (via findacode.com), not
+  // inferred — these back the physical-exam "Search ICD findings" fields in
+  // the consultation flow, so accuracy matters more than usual here.
+  { code: 'MG22', title: 'Fatigue', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['fatigue', 'tiredness', 'lethargy'] },
+  { code: 'MG29', title: 'Oedema', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['edema', 'oedema', 'swelling'] },
+  { code: 'MG45', title: 'Syncope or collapse', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['syncope', 'fainting', 'collapse', 'passed out'] },
+  { code: 'MC16', title: 'Pallor conjunctiva', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['pallor', 'pale', 'anaemia sign'] },
+  { code: 'MC83.Z', title: 'Cardiac murmurs or sounds, unspecified', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['murmur', 'heart sound', 'cardiac bruit'] },
+  { code: 'MC81.0', title: 'Tachycardia, unspecified', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['tachycardia', 'fast heart rate', 'rapid pulse'] },
+  { code: 'MC81.1', title: 'Bradycardia, unspecified', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['bradycardia', 'slow heart rate', 'slow pulse'] },
+  { code: 'ME64.1', title: 'Cyanosis', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['cyanosis', 'bluish skin', 'blue lips'] },
+  { code: 'MD11.C', title: 'Wheezing', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['wheeze', 'wheezing'] },
+  { code: 'MD11.5', title: 'Dyspnoea', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['dyspnea', 'dyspnoea', 'shortness of breath', 'breathlessness'] },
+  { code: 'MD12', title: 'Cough', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['cough'] },
+  { code: 'MD81.4', title: 'Other and unspecified abdominal pain', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['abdominal pain', 'stomach pain', 'belly pain'] },
+  { code: 'ME10.00', title: 'Hepatomegaly, not elsewhere classified', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['hepatomegaly', 'enlarged liver'] },
+  { code: 'ME10.01', title: 'Splenomegaly, not elsewhere classified', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['splenomegaly', 'enlarged spleen'] },
+  { code: 'MB4D', title: 'Headache, not elsewhere classified', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['headache'] },
+  { code: 'MB47', title: 'Abnormality of tonus or reflex', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['reflex', 'abnormal reflex', 'tone', 'hypertonia', 'hypotonia'] },
+  { code: 'MB20.2', title: 'Clouding of consciousness', chapter: 'Symptoms & signs', minLevel: 'boma', keywords: ['altered consciousness', 'confusion', 'obtunded'] },
 ];
 

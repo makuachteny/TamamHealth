@@ -80,9 +80,6 @@ async function postHandler(req: NextRequest) {
       status_code,
       message,
       airtel_money_id,
-      transaction_amount,
-      transaction_currency_code,
-      payment_date,
     } = transaction;
 
     // Airtel Money success status codes
@@ -90,13 +87,11 @@ async function postHandler(req: NextRequest) {
     const isSuccessful = successCodes.includes(status_code);
 
     if (isSuccessful) {
-      // Successful payment
+      // Log only opaque transaction correlators — never the amount or payer
+      // details (financial data / PII in stdout).
       console.log('[Airtel Webhook] Payment received:', {
         transactionId: id,
         airtelMoneyId: airtel_money_id,
-        amount: transaction_amount,
-        currency: transaction_currency_code,
-        paymentDate: payment_date,
         timestamp: new Date().toISOString(),
       });
 

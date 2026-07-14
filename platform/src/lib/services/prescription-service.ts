@@ -132,6 +132,18 @@ export async function createPrescription(
   return { prescription: doc, interactionWarnings };
 }
 
+/**
+ * Fetch a single prescription by id, or null if absent. Used by the
+ * `/api/prescriptions/[id]` route to enforce tenant scope before mutating.
+ */
+export async function getPrescriptionById(id: string): Promise<PrescriptionDoc | null> {
+  try {
+    return await prescriptionsDB().get(id) as PrescriptionDoc;
+  } catch {
+    return null;
+  }
+}
+
 export async function updatePrescription(id: string, data: Partial<PrescriptionDoc>): Promise<PrescriptionDoc | null> {
   const db = prescriptionsDB();
   try {

@@ -12,15 +12,23 @@ import LockScreen from '@/components/LockScreen';
 import ConnectivityNotice from '@/components/ConnectivityNotice';
 import MessagingDock from '@/components/MessagingDock';
 import { MessagingDockProvider } from '@/lib/messaging-dock-context';
+import { TourProvider } from '@/lib/tour/tour-context';
+import GetStartedCard from '@/components/onboarding/GetStartedCard';
 import ForcePasswordChange from '@/components/ForcePasswordChange';
 import { useAutoLock } from '@/lib/hooks/useAutoLock';
 import { Loader2 } from '@/components/icons/lucide';
+import { useIsMobileViewport } from '@/lib/hooks/useIsMobileViewport';
+import { getMobileShellArchetype } from '@/lib/mobile-shell/dashboard-strategy';
+import MobileAppShell from '@/components/mobile/MobileAppShell';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated, currentUser, dbReady, logout } = useApp();
   const orgTimeout = currentUser?.organization?.lockTimeoutMinutes;
   const { isLocked, hasPin, unlock, verifyPin, setPin } = useAutoLock(isAuthenticated, orgTimeout);
+  const isMobile = useIsMobileViewport();
+  const mobileArchetype = currentUser ? getMobileShellArchetype(currentUser.role) : undefined;
+  const useShell = isMobile && !!mobileArchetype;
 
   useEffect(() => {
     if (dbReady && !isAuthenticated) {
@@ -52,6 +60,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <SettingsProvider>
     <MessagingDockProvider>
+    <TourProvider>
     <div className="flex h-screen overflow-hidden tamam-solid-bg tamam-ehr-app">
       {isLocked && currentUser && (
         <LockScreen
@@ -64,21 +73,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       )}
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      <EhrTopRail />
-      <div
-        className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10 transition-all duration-300 ease-in-out tamam-ehr-content-frame"
-      >
-        <div className="dashboard-content-area flex-1 flex flex-col min-w-0 overflow-hidden">
-          <main id="main-content" className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
-            <RoleGuard>{children}</RoleGuard>
-          </main>
-        </div>
-      </div>
+      {useShell ? (
+        <MobileAppShell archetype={mobileArchetype!}>
+          <RoleGuard>{children}</RoleGuard>
+        </MobileAppShell>
+      ) : (
+        <>
+          <EhrTopRail />
+          <div
+            className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10 transition-all duration-300 ease-in-out tamam-ehr-content-frame"
+          >
+            <div className="dashboard-content-area flex-1 flex flex-col min-w-0 overflow-hidden">
+              <main id="main-content" className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
+                <RoleGuard>{children}</RoleGuard>
+                <GetStartedCard />
+              </main>
+            </div>
+          </div>
+        </>
+      )}
       <PreferenceEffects />
       <KeyboardShortcuts />
       <ConnectivityNotice />
-      <MessagingDock />
+      {/* MessagingDock's floating bottom-right launcher collides with the
+          mobile shell's tab bar, and staff-to-staff chat has no equivalent
+          slot in the mockup — the shell's Inbox tab is the mobile messaging
+          entry point instead. */}
+      {!useShell && <MessagingDock />}
     </div>
+    </TourProvider>
     </MessagingDockProvider>
     </SettingsProvider>
   );

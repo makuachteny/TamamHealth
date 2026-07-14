@@ -41,8 +41,8 @@ export default function EmptyState({ icon: Icon = Inbox, title, message, action 
           onClick={action.onClick}
           className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all"
           style={{
-            background: 'var(--accent-primary)',
-            boxShadow: 'none',
+            background: 'linear-gradient(135deg, #2191D0, #015697)',
+            boxShadow: '0 2px 8px rgba(33, 145, 208, 0.3)',
           }}
         >
           {action.label}

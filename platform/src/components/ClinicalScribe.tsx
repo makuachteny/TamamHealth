@@ -271,7 +271,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             </FieldSection>
 
             <FieldSection
-              icon={Thermometer} label={t('scribe.sectionVitals')} color="#2563EB"
+              icon={Thermometer} label={t('scribe.sectionVitals')} color="#2191D0"
               expanded={expandedSections.has('vitals')}
               onToggle={() => toggleSection('vitals')}
               empty={!Object.values(scribe.extraction.vitals).some(v => v)}
@@ -382,7 +382,7 @@ export default function ClinicalScribe({ onApply, onClose }: ClinicalScribeProps
             </FieldSection>
 
             <FieldSection
-              icon={FlaskConical} label={t('scribe.sectionLabOrders')} color="#06B6D4"
+              icon={FlaskConical} label={t('scribe.sectionLabOrders')} color="#369FDA"
               expanded={expandedSections.has('labs')}
               onToggle={() => toggleSection('labs')}
               empty={scribe.extraction.labOrders.length === 0}

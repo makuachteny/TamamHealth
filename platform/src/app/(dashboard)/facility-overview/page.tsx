@@ -16,6 +16,7 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import TopBar from '@/components/TopBar';
 import RoleGuard from '@/components/RoleGuard';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useBirths } from '@/lib/hooks/useBirths';
 import { useDeaths } from '@/lib/hooks/useDeaths';
@@ -139,8 +140,8 @@ function FacilityOverview() {
 
   return (
     <>
-      <TopBar title="Facility Overview" />
       <main className="page-container page-enter">
+        <DashboardGreetingHeader />
         {/* ═══ MINISTRY OF HEALTH SUBMISSION GATE ═══ */}
         <div className="card-elevated p-5 mb-4">
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -181,8 +182,8 @@ function FacilityOverview() {
                 disabled={submitting || (!!submittedAt && !hasPendingChanges)}
                 className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  background: submitting ? 'var(--text-muted)' : 'var(--accent-primary)',
-                  boxShadow: 'none',
+                  background: submitting ? 'var(--text-muted)' : 'linear-gradient(135deg, #2191D0, #015697)',
+                  boxShadow: '0 2px 8px rgba(0,119,215,0.3)',
                 }}
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

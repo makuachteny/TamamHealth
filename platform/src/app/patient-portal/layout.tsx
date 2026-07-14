@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { Menu, X, User, Moon, Sun, LogOut } from '@/components/icons/lucide';
-import { useApp } from '@/lib/context';
+import { Menu, X, User, LogOut } from '@/components/icons/lucide';
 
 const PATIENT_PORTAL_SESSION_KEY = 'tamamhealth-patient-portal-session';
 
@@ -12,7 +11,6 @@ export default function PatientPortalLayout({ children }: { children: React.Reac
   const [mobileNav, setMobileNav] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const router = useRouter();
-  const { theme, toggleTheme } = useApp();
 
   useEffect(() => {
     const check = () => setIsLoggedIn(!!sessionStorage.getItem(PATIENT_PORTAL_SESSION_KEY));
@@ -51,14 +49,6 @@ export default function PatientPortalLayout({ children }: { children: React.Reac
           </Link>
 
           <div style={{ flex: 1 }} />
-
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-            style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', borderRadius: 6, padding: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 36, minHeight: 36 }}
-          >
-            {theme === 'light' ? <Moon size={16} style={{ color: 'var(--text-secondary)' }} /> : <Sun size={16} style={{ color: 'var(--text-secondary)' }} />}
-          </button>
 
           {isLoggedIn ? (
             <button onClick={handleLogout} aria-label="Sign out" style={{

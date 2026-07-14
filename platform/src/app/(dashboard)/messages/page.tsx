@@ -6,6 +6,7 @@ import Modal from '@/components/Modal';
 import { useStaffChat } from '@/lib/hooks/useStaffChat';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { ROLE_LABEL } from '@/lib/role-display';
+import { initials } from '@/lib/patient-utils';
 import type { ConversationDoc, MessageDoc, UserRole, StaffPresence } from '@/lib/db-types';
 import {
   MessageSquare, Plus, Search, Send, Users as UsersIcon,
@@ -15,7 +16,7 @@ import {
 
 /* ─────────────────────────── constants ─────────────────────────── */
 
-const AVATAR_PALETTE = ['#2191D0', '#015697', '#0E7490', '#1D4ED8', '#0369A1', '#1E40AF', '#0891B2', '#475569'];
+const AVATAR_PALETTE = ['#2191D0', '#015697', '#015697', '#015697', '#015697', '#015697', '#2191D0', '#475569'];
 const PRESENCE: Record<StaffPresence, { label: string; color: string }> = {
   active: { label: 'Active', color: 'var(--color-success)' },
   busy: { label: 'Busy', color: 'var(--color-danger)' },
@@ -32,9 +33,6 @@ function colorFor(seed: string): string {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
   return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
-}
-function initials(name: string): string {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
 }
 function relTime(iso?: string): string {
   if (!iso) return '';
@@ -319,7 +317,7 @@ export default function MessagesPage() {
 
               <div className="flex-1 min-h-0 flex">
                 {/* Messages */}
-                <div ref={threadRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{ minHeight: 0, background: 'var(--bg-app)' }}>
+                <div ref={threadRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{ minHeight: 0, background: 'var(--bg-secondary)' }}>
                   {runs.map((run, ri) => {
                     const mine = run.fromId === meId;
                     return (

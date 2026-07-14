@@ -11,12 +11,14 @@ import { useState } from 'react';
 import { useApp } from '@/lib/context';
 import type { PatientDoc } from '@/lib/db-types';
 import { ClipboardList, Plus, Check, X, Clock } from '@/components/icons/lucide';
+import CodedSearchField from '@/components/CodedSearchField';
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 const COMMON_SCREENINGS = ['Blood pressure', 'HIV test', 'Cervical cancer (VIA)', 'Diabetes (blood glucose)', 'TB symptom screen', 'Well-child check', 'Nutrition (MUAC)'];
+const screeningOptions = COMMON_SCREENINGS.map(s => ({ code: '', name: s }));
 
 export default function ScreeningsPanel({ patient }: { patient: PatientDoc }) {
   const { currentUser } = useApp();
@@ -72,7 +74,7 @@ export default function ScreeningsPanel({ patient }: { patient: PatientDoc }) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <ClipboardList className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-          <h3 className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Screenings due</h3>
+          <h3 className="font-semibold text-sm">Screenings due</h3>
           {due.length > 0 && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>{due.length}</span>
           )}
@@ -114,17 +116,16 @@ export default function ScreeningsPanel({ patient }: { patient: PatientDoc }) {
 
       {adding && (
         <div className="mt-2 space-y-2">
-          <input
-            list="screening-types"
+          <CodedSearchField
+            label="Screening"
+            placeholder="Search or type a screening (e.g. Blood pressure)"
+            options={screeningOptions}
             value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value })}
-            placeholder="Screening (e.g. Blood pressure)"
-            className="w-full p-2 rounded-md text-[13px]"
-            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+            onChange={type => setForm({ ...form, type })}
+            onSelect={o => setForm({ ...form, type: o.name })}
+            showCodeBadge={false}
+            autoFocus
           />
-          <datalist id="screening-types">
-            {COMMON_SCREENINGS.map((s) => <option key={s} value={s} />)}
-          </datalist>
           <div className="grid grid-cols-2 gap-2">
             <label className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
               Due date

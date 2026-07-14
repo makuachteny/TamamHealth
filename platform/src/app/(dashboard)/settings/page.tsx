@@ -18,10 +18,15 @@ import FilterSelect from '@/components/filters/FilterSelect';
 import {
   Users, Building2, Plus, Edit3, KeyRound, UserX, UserCheck,
   X, Eye, EyeOff, RefreshCw, Check, Bell, LayoutDashboard, Trash2,
-  Settings as SettingsIcon, Globe, Moon, Sun, Lock, Save, User as UserIcon,
+  Settings as SettingsIcon, Globe, Lock, Save, User as UserIcon,
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
 import { FacilitySettingsView } from '@/components/settings/FacilitySettingsView';
+import {
+  getDhis2SyncLog, recordDhis2SyncResult, recordDhis2SyncFailure, isDhis2Configured,
+  groupDhis2DataValues, type Dhis2SyncLogDoc,
+} from '@/lib/services/dhis2-sync-log-service';
+import type { DHIS2ExportScope } from '@/lib/services/dhis2-export-service';
 
 const ROLES: { value: UserRole; label: string }[] = [
   { value: 'doctor', label: 'Doctor' },
@@ -58,7 +63,7 @@ function generatePassword(): string {
 }
 
 export default function SettingsPage() {
-  const { currentUser, theme, toggleTheme, isOnline, syncPaused, toggleOnline, syncNow, lastSync } = useApp();
+  const { currentUser, isOnline, syncPaused, toggleOnline, syncNow, lastSync } = useApp();
   const { users, loading: usersLoading, create: createUser, update: updateUser, resetPassword, deactivate } = useUsers();
   const { hospitals, loading: hospitalsLoading, create: createHospital, reload: reloadHospitals } = useHospitals();
   const { canManageUsers, canAccess } = usePermissions();
@@ -67,29 +72,51 @@ export default function SettingsPage() {
 
   const [activeTab, setActiveTab] = useState<'preferences' | 'facility' | 'users' | 'hospitals' | 'sync'>('preferences');
 
-  // ── Facility Sync ──
-  const SYNC_ELEMENTS: { name: string; status: 'synced' | 'syncing' | 'pending' | 'error'; error?: string }[] = [
-    { name: 'OPD Attendance', status: 'synced' },
-    { name: 'Malaria Cases', status: 'synced' },
-    { name: 'ANC Visits', status: 'synced' },
-    { name: 'Immunizations', status: 'synced' },
-    { name: 'Births', status: 'synced' },
-    { name: 'Deaths', status: 'synced' },
-    { name: 'Lab Results', status: 'synced' },
-    { name: 'Referrals', status: 'synced' },
-    { name: 'Inpatient Admissions', status: 'pending' },
-    { name: 'Drug Stock Levels', status: 'error', error: 'Connection timeout — DHIS2 server unreachable' },
-  ];
+  // ── Facility Sync (DHIS2) ──
   const [syncRunning, setSyncRunning] = useState(false);
-  const [syncDone, setSyncDone] = useState(false);
-  const syncedCount = SYNC_ELEMENTS.filter(e => e.status === 'synced').length;
-  const pendingItems = SYNC_ELEMENTS.filter(e => e.status === 'pending');
-  const errorItems = SYNC_ELEMENTS.filter(e => e.status === 'error');
+  const [dhis2Log, setDhis2Log] = useState<Dhis2SyncLogDoc | null>(null);
+  const [dhis2LogLoaded, setDhis2LogLoaded] = useState(false);
 
-  const handleRunSync = () => {
+  useEffect(() => {
+    let cancelled = false;
+    getDhis2SyncLog().then(log => { if (!cancelled) { setDhis2Log(log); setDhis2LogLoaded(true); } });
+    return () => { cancelled = true; };
+  }, []);
+
+  const dhis2Configured = isDhis2Configured();
+  const lastPush = dhis2Log?.lastPush;
+  const overallStatus: 'synced' | 'error' | 'pending' =
+    !lastPush ? 'pending'
+    : lastPush.status === 'pushed' ? 'synced'
+    : lastPush.status === 'failed' ? 'error'
+    : 'pending';
+  const elementGroups = useMemo(
+    () => dhis2Log?.lastDataset ? groupDhis2DataValues(dhis2Log.lastDataset.dataValues) : [],
+    [dhis2Log]
+  );
+  const lastSyncedLabel = dhis2Log?.lastSyncedAt
+    ? new Date(dhis2Log.lastSyncedAt).toLocaleString()
+    : 'Never synced';
+
+  const handleRunSync = async () => {
+    if (!currentUser) return;
     setSyncRunning(true);
-    setSyncDone(false);
-    setTimeout(() => { setSyncRunning(false); setSyncDone(true); }, 3000);
+    try {
+      const { generateDHIS2Export, pushDataSetToDHIS2 } = await import('@/lib/services/dhis2-export-service');
+      const period = new Date().toISOString().slice(0, 7);
+      const scope: DHIS2ExportScope = { role: currentUser.role, orgId: currentUser.orgId, hospitalId: currentUser.hospitalId };
+      const dataset = await generateDHIS2Export(period, scope);
+      const push = await pushDataSetToDHIS2(dataset);
+      const log = await recordDhis2SyncResult({ dataset, push });
+      setDhis2Log(log);
+    } catch (err) {
+      // Mark the attempt failed (not just a log line) so the Facility Sync
+      // banner shows "error" instead of a stale "synced" from a prior success.
+      const log = await recordDhis2SyncFailure((err as Error).message || 'Sync failed');
+      setDhis2Log(log);
+    } finally {
+      setSyncRunning(false);
+    }
   };
 
   // ── My account / preferences ──
@@ -441,7 +468,7 @@ export default function SettingsPage() {
               className="flex items-center gap-2 px-5 py-3 font-medium text-sm transition-colors"
               style={{
                 color: activeTab === tab.key ? 'var(--accent-primary)' : 'var(--text-muted)',
-                borderBottom: activeTab === tab.key ? '2px solid #3b82f6' : '2px solid transparent',
+                borderBottom: activeTab === tab.key ? '2px solid #2191D0' : '2px solid transparent',
                 marginBottom: '-1px',
                 background: 'transparent', border: 'none', borderBottomStyle: 'solid',
                 borderBottomWidth: '2px',
@@ -461,38 +488,6 @@ export default function SettingsPage() {
         {/* ═══════════════ PREFERENCES TAB (all users) ═══════════════ */}
         {activeTab === 'preferences' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Appearance */}
-            <div className="dash-card">
-              <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="icon-box-sm"><Sun className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /></div>
-                <h3 className="font-semibold text-sm">Appearance</h3>
-              </div>
-              <div className="p-5">
-                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Theme</p>
-                <div className="flex gap-2">
-                  {[
-                    { v: 'light' as const, label: 'Light', Icon: Sun },
-                    { v: 'dark' as const, label: 'Dark', Icon: Moon },
-                  ].map(opt => {
-                    const active = theme === opt.v;
-                    return (
-                      <button
-                        key={opt.v}
-                        onClick={() => { if (theme !== opt.v) toggleTheme(); }}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                        style={active
-                          ? { background: 'var(--accent-light)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }
-                          : { background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
-                      >
-                        <opt.Icon className="w-4 h-4" /> {opt.label}
-                        {active && <Check className="w-3.5 h-3.5" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
             {/* Language */}
             <div className="dash-card">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
@@ -915,8 +910,13 @@ export default function SettingsPage() {
                 <div>
                   <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>Facility Sync</h2>
                   <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Push facility data to the national HMIS (DHIS2). Last synced: {new Date().toLocaleString()}.
+                    Push facility data to the national HMIS (DHIS2). Last synced: {lastSyncedLabel}.
                   </p>
+                  {!dhis2Configured && (
+                    <p style={{ fontSize: 12, color: 'var(--color-warning)', marginTop: 4 }}>
+                      DHIS2 not configured — Sync Now prepares the export locally but won&apos;t reach a server until NEXT_PUBLIC_DHIS2_BASE_URL is set.
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={handleRunSync}
@@ -930,63 +930,75 @@ export default function SettingsPage() {
               </div>
 
               {/* Status message */}
-              {syncDone && (
-                <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: 'rgba(5,150,105,0.08)', border: '1px solid rgba(5,150,105,0.2)' }}>
-                  <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#059669' }} />
-                  <span style={{ fontSize: 13, color: '#059669', fontWeight: 500 }}>
-                    {errorItems.length === 0
-                      ? `Fully synced — all ${SYNC_ELEMENTS.length} data sets are up to date.`
-                      : `Sync completed with ${errorItems.length} error${errorItems.length > 1 ? 's' : ''}.`}
-                  </span>
-                </div>
-              )}
-              {syncRunning && (
+              {syncRunning ? (
                 <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(33,145,208,0.07)', border: '1px solid rgba(33,145,208,0.2)' }}>
                   <RefreshCw className="w-4 h-4 animate-spin flex-shrink-0" style={{ color: 'var(--tamamhealth-blue)' }} />
                   <span style={{ fontSize: 13, color: 'var(--tamamhealth-blue)', fontWeight: 500 }}>Syncing data to DHIS2…</span>
+                </div>
+              ) : lastPush && (
+                <div
+                  className="mt-4 flex items-center gap-2 px-4 py-3 rounded-xl"
+                  style={
+                    overallStatus === 'synced' ? { background: 'rgba(5,150,105,0.08)', border: '1px solid rgba(5,150,105,0.2)' }
+                    : overallStatus === 'error' ? { background: 'rgba(196,69,54,0.08)', border: '1px solid rgba(196,69,54,0.2)' }
+                    : { background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }
+                  }
+                >
+                  {overallStatus === 'synced'
+                    ? <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#059669' }} />
+                    : <RefreshCw className="w-4 h-4 flex-shrink-0" style={{ color: overallStatus === 'error' ? 'var(--color-danger)' : 'var(--text-muted)' }} />}
+                  <span style={{ fontSize: 13, fontWeight: 500, color: overallStatus === 'synced' ? '#059669' : overallStatus === 'error' ? 'var(--color-danger)' : 'var(--text-secondary)' }}>
+                    {lastPush.message}
+                  </span>
                 </div>
               )}
             </div>
 
             {/* Progress overview */}
             <div className="card-elevated p-5 space-y-1">
-              <div className="flex items-center justify-between mb-3">
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {syncedCount} / {SYNC_ELEMENTS.length} data sets synced
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {pendingItems.length > 0 && `${pendingItems.length} pending`}
-                  {pendingItems.length > 0 && errorItems.length > 0 && ' · '}
-                  {errorItems.length > 0 && <span style={{ color: 'var(--color-danger)' }}>{errorItems.length} error{errorItems.length > 1 ? 's' : ''}</span>}
-                </span>
-              </div>
-              {/* Progress bar */}
-              <div style={{ height: 6, borderRadius: 3, background: 'var(--border-light)', overflow: 'hidden', marginBottom: 16 }}>
-                <div style={{ height: '100%', width: `${(syncedCount / SYNC_ELEMENTS.length) * 100}%`, background: errorItems.length > 0 ? '#F59E0B' : '#059669', borderRadius: 3, transition: 'width 0.6s ease' }} />
-              </div>
-
-              {SYNC_ELEMENTS.map(el => {
-                const statusColors: Record<string, { bg: string; fg: string; label: string }> = {
-                  synced:  { bg: 'rgba(5,150,105,0.1)',  fg: '#059669',  label: 'Synced' },
-                  syncing: { bg: 'rgba(33,145,208,0.1)', fg: '#2191D0',  label: 'Syncing' },
-                  pending: { bg: 'rgba(245,158,11,0.1)', fg: '#D97706',  label: 'Pending' },
-                  error:   { bg: 'rgba(196,69,54,0.1)',  fg: '#C44536',  label: 'Error' },
-                };
-                const s = statusColors[el.status];
-                return (
-                  <div key={el.name} className="flex items-start justify-between py-2.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <div className="min-w-0">
-                      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{el.name}</span>
-                      {el.error && (
-                        <p style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 2 }}>{el.error}</p>
-                      )}
-                    </div>
-                    <span className="flex-shrink-0 ml-3 text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{ background: s.bg, color: s.fg }}>
-                      {s.label}
+              {!dhis2LogLoaded ? (
+                <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading sync status…</p>
+              ) : elementGroups.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  No sync has been run yet on this device. Click Sync Now to push this facility&apos;s data to DHIS2.
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-3">
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {elementGroups.length} data groups from last sync ({dhis2Log?.lastDataset?.period})
+                    </span>
+                    <span style={{ fontSize: 12, color: overallStatus === 'error' ? 'var(--color-danger)' : 'var(--text-muted)' }}>
+                      {overallStatus === 'synced' ? 'All pushed' : overallStatus === 'error' ? 'Push failed' : 'Prepared, not pushed'}
                     </span>
                   </div>
-                );
-              })}
+                  {/* Progress bar — one atomic push covers every group, so it's all-or-nothing */}
+                  <div style={{ height: 6, borderRadius: 3, background: 'var(--border-light)', overflow: 'hidden', marginBottom: 16 }}>
+                    <div style={{ height: '100%', width: overallStatus === 'synced' ? '100%' : '0%', background: overallStatus === 'error' ? '#C44536' : '#059669', borderRadius: 3, transition: 'width 0.6s ease' }} />
+                  </div>
+
+                  {elementGroups.map(g => {
+                    const s =
+                      overallStatus === 'synced' ? { bg: 'rgba(5,150,105,0.1)', fg: '#059669', label: 'Synced' }
+                      : overallStatus === 'error' ? { bg: 'rgba(196,69,54,0.1)', fg: '#C44536', label: 'Error' }
+                      : { bg: 'rgba(245,158,11,0.1)', fg: '#D97706', label: 'Pending' };
+                    return (
+                      <div key={g.label} className="flex items-start justify-between py-2.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                        <div className="min-w-0">
+                          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{g.label}</span>
+                          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{g.elements.length} indicator{g.elements.length > 1 ? 's' : ''}</p>
+                          {overallStatus === 'error' && lastPush && (
+                            <p style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 2 }}>{lastPush.message}</p>
+                          )}
+                        </div>
+                        <span className="flex-shrink-0 ml-3 text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{ background: s.bg, color: s.fg }}>
+                          {s.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1238,7 +1250,7 @@ export default function SettingsPage() {
                       <input type="checkbox"
                         checked={hospitalForm[f.key as keyof typeof hospitalForm] as boolean}
                         onChange={e => setHospitalForm(p => ({ ...p, [f.key]: e.target.checked }))}
-                        className="w-4 h-4 rounded accent-[#3b82f6]"
+                        className="w-4 h-4 rounded accent-[#2191D0]"
                       />
                       {f.label}
                     </label>

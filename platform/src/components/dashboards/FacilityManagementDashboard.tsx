@@ -1,11 +1,9 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
 import TodaysAppointmentsCard from '@/components/dashboard/TodaysAppointmentsCard';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
+import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import { useApp } from '@/lib/context';
 import { useDataScope } from '@/lib/hooks/useDataScope';
 import { useUsers } from '@/lib/hooks/useUsers';
@@ -19,12 +17,12 @@ import {
 import ChartCard, { tooltipStyle as chartTooltipStyle, axisTick, AreaGradients } from '@/components/ChartCard';
 import {
   Stethoscope, Users, HeartPulse, BedDouble, ChevronRight,
-  Edit3, Trash2, Eye, ChevronDown, BarChart3,
+  Edit3, Trash2, Eye, ChevronDown,
 } from '@/components/icons/lucide';
 import { formatMoney } from '@/lib/format-utils';
 import type { MessageDoc } from '@/lib/db-types';
 
-const TEAL = '#06B6D4';
+const TEAL = 'var(--color-brand-400)';
 const PURPLE = 'var(--accent-primary)';
 const CORAL = '#FB923C';
 
@@ -162,28 +160,13 @@ export default function FacilityManagementDashboard() {
 
   return (
     <>
-      <TopBar title="Dashboard" />
       <main className="page-container page-enter">
+        <DashboardGreetingHeader />
         <div className="flex flex-col gap-5">
 
-          <DashboardHero
-            stats={[
-              { label: 'Patients', value: patients.length },
-              { label: 'Doctors', value: doctors.length },
-              { label: 'Nurses', value: nurses.length },
-              { label: 'Available Beds', value: availableBeds },
-            ]}
-          />
-
-          <DashboardActionsRow
-            actions={[
-              { label: 'Patients', icon: Users, href: '/patients' },
-              { label: 'Doctors & Staff', icon: Stethoscope, href: '/hr', color: '#0D9488' },
-              { label: 'Bed Management', icon: BedDouble, href: '/wards', color: 'var(--accent-primary)' },
-              { label: 'Reports', icon: BarChart3, href: '/reports', color: '#F59E0B' },
-            ]}
-            secondaryCard={<TodaysAppointmentsCard />}
-          />
+          <div style={{ maxWidth: 360 }}>
+            <TodaysAppointmentsCard />
+          </div>
 
           {/* ═══ ROW 1 — Cash Flow · Stat cards · Weekly activity ═══ */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

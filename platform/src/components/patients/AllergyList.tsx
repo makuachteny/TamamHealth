@@ -7,7 +7,7 @@ import type { AllergyEntry } from '@/data/mock';
 import { AlertTriangle, Plus, Edit3, Trash2, X } from '@/components/icons/lucide';
 import { isNoAllergySentinel } from '@/lib/clinical-roles';
 import Modal from '@/components/Modal';
-import Badge, { type BadgeTone } from '@/components/Badge';
+import AddAllergyModal from '@/components/patients/AddAllergyModal';
 
 const CRIT_STYLE: Record<string, { tone: BadgeTone; label: string }> = {
   severe:   { tone: 'danger',  label: 'Severe'   },
@@ -29,7 +29,6 @@ export default function AllergyList({ patient, hideAddButton = false }: { patien
   const [editingEntry, setEditingEntry] = useState<AllergyEntry | null>(null);
   const [removingEntry, setRemovingEntry] = useState<AllergyEntry | null>(null);
   const [removalReason, setRemovalReason] = useState('');
-  const [addForm, setAddForm] = useState(EMPTY_FORM);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
 
   const entries = useMemo<AllergyEntry[]>(() => {
@@ -79,7 +78,7 @@ export default function AllergyList({ patient, hideAddButton = false }: { patien
           <AlertTriangle className="w-3 h-3" style={{ color: 'var(--color-danger)' }} /> Allergies
         </p>
         {!hideAddButton && (
-          <button className="p-1 rounded transition-colors hover:bg-blue-50" disabled={busy} title="Add allergy" onClick={() => { setAdding(true); setAddForm(EMPTY_FORM); setError(null); }} style={{ color: 'var(--accent-primary)' }}>
+          <button className="p-1 rounded transition-colors hover:bg-blue-50" disabled={busy} title="Add allergy" onClick={() => { setAdding(true); setError(null); }} style={{ color: 'var(--accent-primary)' }}>
             <Plus className="w-3.5 h-3.5" />
           </button>
         )}
@@ -118,35 +117,13 @@ export default function AllergyList({ patient, hideAddButton = false }: { patien
 
       {/* Add modal */}
       {adding && (
-        <Modal onClose={() => setAdding(false)} width={480} labelledBy="add-allergy-title">
-          <div className="rounded-xl p-5 space-y-4" style={modalCard}>
-            <div className="flex items-center justify-between">
-              <h2 id="add-allergy-title" className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>Add Allergy</h2>
-              <button className="p-1 rounded hover:bg-red-50 transition-colors" onClick={() => setAdding(false)} style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
-            </div>
-            <input autoFocus value={addForm.substance} onChange={(e) => setAddForm({ ...addForm, substance: e.target.value })} placeholder="Substance (e.g. Penicillin)" className={inputCls} style={inputStyle} />
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Classification</label>
-                <select value={addForm.classification} onChange={(e) => setAddForm({ ...addForm, classification: e.target.value as AllergyEntry['classification'] })} className="p-2.5 rounded-md text-[12px]" style={inputStyle}>
-                  {CLASSIFICATIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Criticality</label>
-                <select value={addForm.criticality} onChange={(e) => setAddForm({ ...addForm, criticality: e.target.value as NonNullable<AllergyEntry['criticality']> })} className="p-2.5 rounded-md text-[12px]" style={inputStyle}>
-                  {CRITICALITIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
-            <input value={addForm.reaction} onChange={(e) => setAddForm({ ...addForm, reaction: e.target.value })} placeholder="Reaction (e.g. anaphylaxis, rash)" className={inputCls} style={inputStyle} />
-            {error && <p className="text-[11px]" style={{ color: 'var(--color-danger)' }}>{error}</p>}
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setAdding(false)}>Cancel</button>
-              <button className="btn btn-sm btn-primary" disabled={busy || addForm.substance.trim().length === 0} onClick={() => run(async () => { const svc = await import('@/lib/services/allergy-service'); await svc.addAllergy(patient._id, { ...addForm, ...author }); }, () => setAdding(false))}>Save allergy</button>
-            </div>
-          </div>
-        </Modal>
+        <AddAllergyModal
+          onClose={() => setAdding(false)}
+          onSave={async input => {
+            const svc = await import('@/lib/services/allergy-service');
+            await svc.addAllergy(patient._id, { ...input, ...author });
+          }}
+        />
       )}
 
       {/* Edit modal */}

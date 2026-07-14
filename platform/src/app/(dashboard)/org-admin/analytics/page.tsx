@@ -21,7 +21,7 @@ const RechartsOrgChart = dynamic(
     const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line, AreaChart, Area } = mod;
 
     function ChartComponent({ data, brandColor, chartType }: { data: { name: string; patients: number }[]; brandColor: string; chartType: ChartType }) {
-      const barColors = [brandColor, 'var(--accent-primary)', 'var(--color-success)', 'var(--color-warning)', '#EC4899', '#06B6D4', '#8B5CF6', '#3B82F6'];
+      const barColors = [brandColor, 'var(--accent-primary)', 'var(--color-success)', 'var(--color-warning)', '#EC4899', '#369FDA', '#8B5CF6', '#2191D0'];
       const commonProps = { data, margin: { top: 5, right: 20, left: 0, bottom: 60 } };
       const xProps = { dataKey: 'name', tick: { fontSize: 10, fill: '#888' }, angle: -35, textAnchor: 'end' as const, height: 80, interval: 0 };
       const tooltipProps = { contentStyle: { background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 12 }, labelStyle: { color: 'var(--text-primary)', fontWeight: 600 } };
@@ -144,7 +144,7 @@ export default function OrgAnalyticsPage() {
       label: t('orgAnalytics.labResults'),
       value: labResults.length,
       icon: FlaskConical,
-      color: '#06B6D4',
+      color: '#369FDA',
       trend: t('orgAnalytics.trendCompleted', { count: labResults.filter(l => l.status === 'completed').length }),
       trendUp: true,
     },

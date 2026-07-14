@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyPatientToken } from '@/lib/patient-portal-auth';
 import { logAuditSafe } from '@/lib/services/audit-service';
 import type { MessageDoc } from '@/lib/db-types';
+import { demoFallbackEnabled, getDemoMessagesByPatient, recordDemoMessage } from '@/lib/patient-portal-demo';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyPatientToken(req);
@@ -12,6 +13,10 @@ export async function GET(req: NextRequest) {
     const messages = await getMessagesByPatient(auth.sub);
     return NextResponse.json({ messages });
   } catch (err) {
+    if (demoFallbackEnabled()) {
+      console.warn('[patient-portal/messages] DB unreachable, using demo fallback', err);
+      return NextResponse.json({ messages: await getDemoMessagesByPatient(auth.sub) });
+    }
     console.error('[patient-portal/messages]', err);
     return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
   }
@@ -30,29 +35,32 @@ export async function POST(req: NextRequest) {
 
   // Patient → staff message. Direction + sender are forced server-side so a
   // patient cannot impersonate a clinician via the mobile push.
-  try {
-    const now = new Date().toISOString();
-    const { createMessage } = await import('@/lib/services/message-service');
+  const now = new Date().toISOString();
+  const messageInput = {
+    recipientType: 'staff' as const,
+    direction: 'patient_to_staff' as const,
+    patientId: auth.sub,
+    patientName: auth.name,
+    patientPhone: typeof body.patientPhone === 'string' ? body.patientPhone : '',
+    recipientHospitalId: typeof body.recipientHospitalId === 'string' ? body.recipientHospitalId : undefined,
+    recipientHospitalName: typeof body.recipientHospitalName === 'string' ? body.recipientHospitalName
+      : (typeof body.fromHospitalName === 'string' ? body.fromHospitalName : undefined),
+    fromDoctorId: 'patient',
+    fromDoctorName: auth.name,
+    fromHospitalName: typeof body.fromHospitalName === 'string' ? body.fromHospitalName : '',
+    fromHospitalId: typeof body.fromHospitalId === 'string' ? body.fromHospitalId : undefined,
+    subject: typeof body.subject === 'string' ? body.subject : '(no subject)',
+    body: typeof body.body === 'string' ? body.body : '',
+    channel: 'app' as const,
+    sentAt: typeof body.sentAt === 'string' ? body.sentAt : now,
+    createdBy: auth.sub,
+  };
 
-    const doc = await createMessage({
-      recipientType: 'staff',
-      direction: 'patient_to_staff',
-      patientId: auth.sub,
-      patientName: auth.name,
-      patientPhone: typeof body.patientPhone === 'string' ? body.patientPhone : '',
-      recipientHospitalId: typeof body.recipientHospitalId === 'string' ? body.recipientHospitalId : undefined,
-      recipientHospitalName: typeof body.recipientHospitalName === 'string' ? body.recipientHospitalName
-        : (typeof body.fromHospitalName === 'string' ? body.fromHospitalName : undefined),
-      fromDoctorId: 'patient',
-      fromDoctorName: auth.name,
-      fromHospitalName: typeof body.fromHospitalName === 'string' ? body.fromHospitalName : '',
-      fromHospitalId: typeof body.fromHospitalId === 'string' ? body.fromHospitalId : undefined,
-      subject: typeof body.subject === 'string' ? body.subject : '(no subject)',
-      body: typeof body.body === 'string' ? body.body : '',
-      channel: 'app',
-      sentAt: typeof body.sentAt === 'string' ? body.sentAt : now,
-      createdBy: auth.sub,
-    } as Omit<MessageDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'status'>);
+  try {
+    const { createMessage } = await import('@/lib/services/message-service');
+    const doc = await createMessage(
+      messageInput as Omit<MessageDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'status'>
+    );
 
     await logAuditSafe(
       'PATIENT_SEND_MESSAGE', auth.sub, auth.name,
@@ -61,6 +69,19 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, id: doc._id, message: doc }, { status: 201 });
   } catch (err) {
+    if (demoFallbackEnabled()) {
+      console.warn('[patient-portal/messages POST] DB unreachable, using demo fallback', err);
+      const doc: MessageDoc = {
+        _id: `msg-demo-${Date.now().toString(36)}`,
+        type: 'message',
+        status: 'sent',
+        createdAt: now,
+        updatedAt: now,
+        ...messageInput,
+      };
+      recordDemoMessage(doc);
+      return NextResponse.json({ ok: true, id: doc._id, message: doc }, { status: 201 });
+    }
     console.error('[patient-portal/messages POST]', err);
     return NextResponse.json({ error: 'Failed to create message' }, { status: 500 });
   }

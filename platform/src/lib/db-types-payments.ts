@@ -107,7 +107,13 @@ export interface ChargeDoc extends BaseDoc {
 
 export interface ClaimDoc extends BaseDoc {
   type: 'claim';
-  encounterId: string;
+  // Optional: some claims (e.g. submitted directly against a BillingDoc that
+  // has no linked clinical encounter) have no real encounter to reference.
+  // Referential integrity for encounterId is NOT enforced by submitClaim.
+  encounterId?: string;
+  // Links back to the BillingDoc this claim was raised against, when the
+  // claim was created from the billing/claims UI rather than seeded directly.
+  billingId?: string;
   patientId: string;
   patientName: string;
   policyId: string;
@@ -127,6 +133,17 @@ export interface ClaimDoc extends BaseDoc {
   denialReasons?: string[];
   remarkCodes?: string[];
   eraReference?: string;        // ERA/835 document reference
+  // Adjudication accountability/notes — who decided and any free-text context
+  // (distinct from denialReasons, which are payer-facing reason codes/text).
+  adjudicatedBy?: string;
+  adjudicationNotes?: string;
+  // Appeal / resubmission lifecycle (denied -> appealed -> resubmitted).
+  appealNote?: string;
+  appealedAt?: string;
+  appealedBy?: string;
+  resubmissionCount?: number;
+  lastResubmittedAt?: string;
+  lastResubmittedBy?: string;
   // Donor claim fields
   donorReportingPeriod?: string;
   // Admin

@@ -3,6 +3,7 @@
 import { forwardRef } from 'react';
 import type { CSSProperties, ForwardRefExoticComponent, RefAttributes, SVGProps } from 'react';
 import * as Lucide from 'lucide-react';
+import { BRAND_PRIMARY } from '@/lib/theme-colors';
 
 export type IconName = string;
 
@@ -19,7 +20,7 @@ export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'color' | 'ref'
   ref?: React.Ref<SVGSVGElement>;
 }
 
-export const BLUE_LINE_ICON = '#2191D0';
+export const BLUE_LINE_ICON = BRAND_PRIMARY;
 
 export const CATEGORY_ACCENTS: Record<string, string> = {
   clinical: BLUE_LINE_ICON,

@@ -1,23 +1,31 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
-
-import { useMemo } from 'react';
-import TopBar from '@/components/TopBar';
+import { useMemo, useState } from 'react';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { useApp } from '@/lib/context';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useNutritionScreenings } from '@/lib/hooks/useNutritionScreenings';
+import { classifyScreening, MUAC_THRESHOLDS } from '@/lib/services/nutrition-screening-service';
+import { useNutritionSupplies } from '@/lib/hooks/useNutritionSupplies';
+import { classifySupplyStatus } from '@/lib/services/nutrition-supply-service';
 import {
   AlertTriangle, CheckCircle2, TrendingDown,
-  Baby, HeartPulse, BarChart3, Activity, Scale,
-  Utensils, Droplets, Users, MessageSquare,
+  BarChart3, Utensils, Plus, X,
 } from '@/components/icons/lucide';
+import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 
-const ACCENT = '#EA580C';
+// Use the platform accent token so this dashboard matches the reference
+// Clinical Officer design instead of a one-off hardcoded hex.
+const ACCENT = 'var(--accent-primary)';
 
-const MUAC_THRESHOLDS = { severe: 11.5, moderate: 12.5, normal: 13.5 };
+type Screening = {
+  id: string; name: string; age: string; sex: string;
+  muac: number; weight: number; height: number; edema: boolean;
+  status: string; date: string;
+};
+
+const EMPTY_FORM = { name: '', age: '', sex: 'F', muac: '', weight: '', height: '', edema: false, isAnc: false };
 
 // Demo-only screenings + supply inventory. Gated on NEXT_PUBLIC_DEMO_MODE so
 // production deploys render empty states instead of confusing staff with
@@ -35,25 +43,153 @@ const SAMPLE_SCREENINGS = [
   { id: 'ns-008', name: 'Nyamal Gatdet Both', age: '11m', sex: 'F', muac: 12.3, weight: 6.8, height: 68, edema: false, status: 'MAM', date: '2026-02-07' },
 ];
 
-const SUPPLY_ITEMS = [
-  { name: 'RUTF (Plumpy\'Nut)', stock: 120, unit: 'sachets', threshold: 50, status: 'ok' },
-  { name: 'F-75 Therapeutic Milk', stock: 8, unit: 'tins', threshold: 15, status: 'low' },
-  { name: 'F-100 Therapeutic Milk', stock: 22, unit: 'tins', threshold: 10, status: 'ok' },
-  { name: 'ReSoMal (ORS)', stock: 3, unit: 'packets', threshold: 10, status: 'critical' },
-  { name: 'Vitamin A Capsules', stock: 200, unit: 'capsules', threshold: 50, status: 'ok' },
-  { name: 'Iron/Folate Tabs', stock: 150, unit: 'tabs', threshold: 30, status: 'ok' },
-  { name: 'MUAC Tapes', stock: 5, unit: 'tapes', threshold: 10, status: 'low' },
-  { name: 'Weighing Scale', stock: 2, unit: 'units', threshold: 1, status: 'ok' },
+// Starter items persisted once as real docs (via seedSuppliesIfEmpty) when the
+// nutrition_supply store is empty in demo mode — see useNutritionSupplies.
+// Production deploys never see this list; an empty facility renders the
+// empty state and staff add real stock via "Add supply item".
+const DEMO_SUPPLY_SEED = [
+  { name: 'RUTF (Plumpy\'Nut)', unit: 'sachets', currentLevel: 120, reorderLevel: 50 },
+  { name: 'F-75 Therapeutic Milk', unit: 'tins', currentLevel: 8, reorderLevel: 15 },
+  { name: 'F-100 Therapeutic Milk', unit: 'tins', currentLevel: 22, reorderLevel: 10 },
+  { name: 'ReSoMal (ORS)', unit: 'packets', currentLevel: 3, reorderLevel: 10 },
+  { name: 'Vitamin A Capsules', unit: 'capsules', currentLevel: 200, reorderLevel: 50 },
+  { name: 'Iron/Folate Tabs', unit: 'tabs', currentLevel: 150, reorderLevel: 30 },
+  { name: 'MUAC Tapes', unit: 'tapes', currentLevel: 5, reorderLevel: 10 },
+  { name: 'Weighing Scale', unit: 'units', currentLevel: 2, reorderLevel: 1 },
 ];
+
+const EMPTY_SUPPLY_FORM = { name: '', unit: '', currentLevel: '', reorderLevel: '' };
+
+// Worklist tab → screening-status predicate. The "At Risk" tab folds in the
+// 'Underweight' status the same way the KPI/stat count does, so the tab count
+// and the filtered rows stay in sync.
+const matchesTab = (status: string, tab: string): boolean => {
+  if (tab === 'all') return true;
+  if (tab === 'sam') return status === 'SAM';
+  if (tab === 'mam') return status === 'MAM';
+  if (tab === 'at_risk') return status === 'At Risk' || status === 'Underweight';
+  if (tab === 'normal') return status === 'Normal';
+  return true;
+};
 
 export default function NutritionDashboard() {
   const { currentUser } = useApp();
   const { t } = useTranslation();
   usePatients();
 
-  // Stable references so the stats memo below doesn't re-run every render.
-  const screenings = useMemo(() => (IS_DEMO ? SAMPLE_SCREENINGS : []), []);
-  const supplies = useMemo(() => (IS_DEMO ? SUPPLY_ITEMS : []), []);
+  // Real screenings persist to the synced nutrition_screenings store; demo
+  // rows fill in behind them in demo mode only.
+  const { screenings: savedScreenings, add: addScreening } = useNutritionScreenings();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [formError, setFormError] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [queueSearch, setQueueSearch] = useState('');
+  const [selectedScreening, setSelectedScreening] = useState<string | null>(null);
+
+  const screenings = useMemo<Screening[]>(
+    () => [
+      ...savedScreenings.map(s => ({
+        id: s._id,
+        name: s.patientName,
+        age: s.age,
+        sex: s.sex,
+        muac: s.muac,
+        weight: s.weightKg ?? 0,
+        height: s.heightCm ?? 0,
+        edema: s.edema,
+        status: s.status,
+        date: s.screeningDate,
+      })),
+      ...(IS_DEMO ? SAMPLE_SCREENINGS : []),
+    ],
+    [savedScreenings],
+  );
+  // Supplies now persist to the synced nutrition_supply store (real +/-
+  // receipt and consumption, not a useState list lost on reload). Status
+  // re-derives from each item's reorderLevel.
+  const { items: supplyDocs, create: createSupply, adjust: adjustSupplyLevel } =
+    useNutritionSupplies({ demoSeed: IS_DEMO ? DEMO_SUPPLY_SEED : undefined });
+  const [showSupplyForm, setShowSupplyForm] = useState(false);
+  const [supplyForm, setSupplyForm] = useState(EMPTY_SUPPLY_FORM);
+  const [supplyFormError, setSupplyFormError] = useState('');
+
+  const supplies = useMemo(
+    () =>
+      supplyDocs.map(item => ({
+        id: item._id,
+        name: item.name,
+        unit: item.unit,
+        stock: item.currentLevel,
+        threshold: item.reorderLevel,
+        status: classifySupplyStatus(item),
+      })),
+    [supplyDocs],
+  );
+
+  const adjustSupply = (id: string, delta: number) => {
+    adjustSupplyLevel(id, delta, { id: currentUser?._id, name: currentUser?.name }).catch(err => {
+      console.error('Failed to adjust supply level', err);
+    });
+  };
+
+  const submitSupplyItem = async () => {
+    const currentLevel = parseFloat(supplyForm.currentLevel);
+    const reorderLevel = parseFloat(supplyForm.reorderLevel);
+    if (!supplyForm.name.trim() || !supplyForm.unit.trim()) {
+      setSupplyFormError(t('nutrition.supplyFormErrorRequired'));
+      return;
+    }
+    if (!Number.isFinite(currentLevel) || currentLevel < 0) {
+      setSupplyFormError(t('nutrition.supplyFormErrorLevel'));
+      return;
+    }
+    try {
+      await createSupply({
+        name: supplyForm.name.trim(),
+        unit: supplyForm.unit.trim(),
+        currentLevel,
+        reorderLevel: Number.isFinite(reorderLevel) ? Math.max(0, reorderLevel) : 0,
+        hospitalId: currentUser?.hospitalId,
+        orgId: currentUser?.orgId,
+        createdBy: currentUser?._id,
+      });
+      setSupplyForm(EMPTY_SUPPLY_FORM);
+      setSupplyFormError('');
+      setShowSupplyForm(false);
+    } catch (err) {
+      setSupplyFormError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const submitScreening = async () => {
+    const muac = parseFloat(form.muac);
+    const weight = parseFloat(form.weight);
+    const height = parseFloat(form.height);
+    if (!form.name.trim() || !form.age.trim()) { setFormError(t('nutrition.formErrorNameAge')); return; }
+    if (!Number.isFinite(muac) || muac <= 0 || muac > 40) { setFormError(t('nutrition.formErrorMuac')); return; }
+    try {
+      await addScreening({
+        patientName: form.name.trim(),
+        age: form.isAnc && !form.age.toUpperCase().includes('ANC') ? `${form.age.trim()} ANC` : form.age.trim(),
+        sex: form.isAnc ? 'F' : form.sex,
+        muac,
+        weightKg: Number.isFinite(weight) ? weight : undefined,
+        heightCm: Number.isFinite(height) ? height : undefined,
+        edema: form.edema,
+        isAnc: form.isAnc,
+        screenedById: currentUser?._id,
+        screenedByName: currentUser?.name,
+        hospitalId: currentUser?.hospitalId,
+        orgId: currentUser?.orgId,
+      });
+      setForm(EMPTY_FORM);
+      setFormError('');
+      setShowForm(false);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   const stats = useMemo(() => {
     return {
@@ -75,143 +211,216 @@ export default function NutritionDashboard() {
     return 'var(--color-success)';
   };
 
+  // Worklist rows: apply the active status tab, then the free-text search over
+  // name / age / status. Same shape as radiology's `filtered` memo.
+  const filteredScreenings = useMemo(() => {
+    const q = queueSearch.trim().toLowerCase();
+    return screenings.filter(s => {
+      if (!matchesTab(s.status, filterStatus)) return false;
+      if (!q) return true;
+      return [s.name, s.age, s.status].some(v => (v || '').toLowerCase().includes(q));
+    });
+  }, [screenings, filterStatus, queueSearch]);
+
+  const dateLabel = formatDateTitle(toIsoDate(new Date()));
+
+  // Expandable per-screening detail (MUAC / anthropometry / edema / status /
+  // date). Rendered inline beneath the row via EhrCareDashboard's `row.detail`
+  // slot, mirroring radiology's `renderStudyDetail`.
+  const renderScreeningDetail = (s: Screening) => (
+    <div style={{ margin: '0 0 8px', padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
+      <div className="grid grid-cols-3 gap-3 mb-3">
+        <div>
+          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colPatient')}</span>
+          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{s.name}</p>
+        </div>
+        <div>
+          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colAgeType')}</span>
+          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{s.age} · {s.sex}</p>
+        </div>
+        <div>
+          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colStatus')}</span>
+          <p><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${getStatusColor(s.status)}15`, color: getStatusColor(s.status) }}>{s.status}</span></p>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3 mb-3">
+        <div>
+          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colMuac')}</span>
+          <p className="text-xs font-bold" style={{ color: s.muac < MUAC_THRESHOLDS.severe ? 'var(--color-danger)' : s.muac < MUAC_THRESHOLDS.moderate ? 'var(--color-warning)' : 'var(--text-primary)' }}>{s.muac}</p>
+        </div>
+        <div>
+          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colWeight')}</span>
+          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{s.weight}</p>
+        </div>
+        <div>
+          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colHeight')}</span>
+          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{s.height}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colEdema')}</span>
+          <p className="text-xs font-semibold">{s.edema ? <span style={{ color: 'var(--color-danger)' }}>{t('nutrition.edemaYes')}</span> : <span style={{ color: 'var(--text-muted)' }}>{t('nutrition.edemaNo')}</span>}</p>
+        </div>
+        <div>
+          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('nutrition.colDate')}</span>
+          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{s.date}</p>
+        </div>
+      </div>
+    </div>
+  );
+
   if (!currentUser) return null;
 
   return (
-    <>
-      <TopBar title={t('nutrition.title')} />
-      <main className="page-container page-enter">
+    <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {IS_DEMO && <DemoModeBanner />}
 
-        <DashboardHero
-          className="mb-5"
-          stats={[
-            { label: 'Screenings', value: stats.total },
-            { label: 'SAM', value: stats.sam },
-            { label: 'MAM', value: stats.mam },
-            { label: 'At Risk', value: stats.atRisk },
-          ]}
-        />
+      <EhrCareDashboard
+        title={t('nutrition.title')}
+        greetingName={currentUser?.name}
+        dateLabel={dateLabel}
+        tabs={[]}
+        activeTab={filterStatus}
+        onTabChange={setFilterStatus}
+        centerSubtitle={t('nutrition.totalCount', { count: stats.total })}
+        searchValue={queueSearch}
+        searchPlaceholder={t('topbar.searchPlaceholder')}
+        onSearchChange={setQueueSearch}
+        filters={[
+          { label: t('nutrition.kpiScreenings'), value: stats.total, active: filterStatus === 'all', onClick: () => setFilterStatus('all') },
+          { label: t('nutrition.kpiSamCases'), value: stats.sam, active: filterStatus === 'sam', onClick: () => setFilterStatus(filterStatus === 'sam' ? 'all' : 'sam') },
+          { label: t('nutrition.kpiMamCases'), value: stats.mam, active: filterStatus === 'mam', onClick: () => setFilterStatus(filterStatus === 'mam' ? 'all' : 'mam') },
+          { label: t('nutrition.kpiAtRisk'), value: stats.atRisk, active: filterStatus === 'at_risk', onClick: () => setFilterStatus(filterStatus === 'at_risk' ? 'all' : 'at_risk') },
+          { label: t('nutrition.kpiNormal'), value: stats.normal, active: filterStatus === 'normal', onClick: () => setFilterStatus(filterStatus === 'normal' ? 'all' : 'normal') },
+        ]}
+        actions={[
+          {
+            label: showForm ? t('nutrition.formCancel') : t('nutrition.newScreening'),
+            icon: showForm ? X : Plus,
+            onClick: () => { setShowForm(v => !v); setFormError(''); },
+            tone: showForm ? 'neutral' : 'primary',
+          },
+        ]}
+        rows={filteredScreenings.map((s): EhrCareDashboardRow => {
+          const isOpen = selectedScreening === s.id;
+          return {
+            id: s.id,
+            title: s.name,
+            subtitle: `${s.age} · ${s.sex}`,
+            compactMeta: s.date,
+            date: s.date,
+            status: s.status,
+            statusTone: s.status === 'SAM' ? 'danger'
+              : s.status === 'MAM' ? 'warning'
+              : (s.status === 'At Risk' || s.status === 'Underweight') ? 'warning'
+              : 'done',
+            onClick: () => setSelectedScreening(isOpen ? null : s.id),
+            detail: isOpen ? renderScreeningDetail(s) : undefined,
+          };
+        })}
+        metrics={[
+          { label: t('nutrition.kpiScreenings'), value: stats.total, active: filterStatus === 'all', onClick: () => setFilterStatus('all') },
+          { label: t('nutrition.kpiSamCases'), value: stats.sam, tone: 'danger', active: filterStatus === 'sam', onClick: () => setFilterStatus(filterStatus === 'sam' ? 'all' : 'sam') },
+          { label: t('nutrition.kpiMamCases'), value: stats.mam, tone: 'warning', active: filterStatus === 'mam', onClick: () => setFilterStatus(filterStatus === 'mam' ? 'all' : 'mam') },
+          { label: t('nutrition.kpiAtRisk'), value: stats.atRisk, tone: 'warning', active: filterStatus === 'at_risk', onClick: () => setFilterStatus(filterStatus === 'at_risk' ? 'all' : 'at_risk') },
+          { label: t('nutrition.kpiNormal'), value: stats.normal, tone: 'success', active: filterStatus === 'normal', onClick: () => setFilterStatus(filterStatus === 'normal' ? 'all' : 'normal') },
+          { label: t('nutrition.kpiChildrenUnder5'), value: stats.children },
+          { label: t('nutrition.kpiAncMothers'), value: stats.anc },
+          { label: t('nutrition.kpiSupplyAlerts'), value: stats.criticalSupply, tone: stats.criticalSupply > 0 ? 'danger' : 'success' },
+        ]}
+        metricsTitle={t('nutrition.title')}
+        checklist={[
+          { label: t('nutrition.newScreening'), done: stats.total > 0, onClick: () => { setShowForm(true); setFormError(''); } },
+          { label: t('nutrition.kpiSamCases'), done: stats.sam === 0, onClick: () => setFilterStatus('sam') },
+          { label: t('nutrition.kpiSupplyAlerts'), done: stats.criticalSupply === 0 },
+        ]}
+        checklistTitle={t('nutrition.screenings')}
+        missionTitle={t('nutrition.title')}
+        missionDescription={t('nutrition.noScreeningsDesc')}
+        emptyTitle={t('nutrition.noScreenings')}
+      >
+        <div className="flex flex-col gap-3" style={{ minWidth: 0 }}>
 
-        <DashboardActionsRow
-          className="mb-5"
-          actions={[
-            { label: 'All Patients', icon: Users, href: '/patients' },
-            { label: 'ANC Visits', icon: HeartPulse, href: '/anc', color: '#EC4899' },
-            { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
-            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#0D9488' },
-          ]}
-          secondaryCard={<SpotlightCard title="Acute Malnutrition (SAM)" value={stats.sam} caption={`${stats.mam} MAM · ${stats.atRisk} at risk`} />}
-        />
-
-        {IS_DEMO && <DemoModeBanner />}
-
-        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
-        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
-              <Utensils className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('nutrition.title')}</h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {currentUser.hospitalName || currentUser.hospital?.name || ''}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
-          {[
-            { label: t('nutrition.kpiScreenings'), value: stats.total, icon: Scale, color: ACCENT },
-            { label: t('nutrition.kpiSamCases'), value: stats.sam, icon: AlertTriangle, color: 'var(--color-danger)' },
-            { label: t('nutrition.kpiMamCases'), value: stats.mam, icon: TrendingDown, color: 'var(--color-warning)' },
-            { label: t('nutrition.kpiAtRisk'), value: stats.atRisk, icon: Activity, color: 'var(--color-warning)' },
-            { label: t('nutrition.kpiNormal'), value: stats.normal, icon: CheckCircle2, color: 'var(--color-success)' },
-            { label: t('nutrition.kpiChildrenUnder5'), value: stats.children, icon: Baby, color: 'var(--accent-primary)' },
-            { label: t('nutrition.kpiAncMothers'), value: stats.anc, icon: HeartPulse, color: '#EC4899' },
-            { label: t('nutrition.kpiSupplyAlerts'), value: stats.criticalSupply, icon: Droplets, color: stats.criticalSupply > 0 ? 'var(--color-danger)' : 'var(--color-success)' },
-          ].map(k => (
-            <div key={k.label} className="dash-card" style={{ padding: '14px 16px' }}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="icon-box-sm">
-                  <k.icon className="w-3.5 h-3.5" style={{ color: k.color }} />
+          {/* ── New screening entry form ── */}
+          {showForm && (
+            <div className="p-4 rounded-lg dash-card" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formName')}</label>
+                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-md text-xs"
+                    style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }} />
                 </div>
-                <span className="kpi-card-title">{k.label}</span>
+                <div>
+                  <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formAge')}</label>
+                  <input value={form.age} onChange={e => setForm(f => ({ ...f, age: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-md text-xs"
+                    style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formSex')}</label>
+                  <select value={form.isAnc ? 'F' : form.sex} disabled={form.isAnc}
+                    onChange={e => setForm(f => ({ ...f, sex: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-md text-xs"
+                    style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}>
+                    <option value="F">F</option>
+                    <option value="M">M</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formMuac')}</label>
+                  <input type="number" step="0.1" min="0" value={form.muac} onChange={e => setForm(f => ({ ...f, muac: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-md text-xs"
+                    style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formWeight')}</label>
+                  <input type="number" step="0.1" min="0" value={form.weight} onChange={e => setForm(f => ({ ...f, weight: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-md text-xs"
+                    style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('nutrition.formHeight')}</label>
+                  <input type="number" step="0.1" min="0" value={form.height} onChange={e => setForm(f => ({ ...f, height: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-md text-xs"
+                    style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }} />
+                </div>
               </div>
-              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{k.value}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-          {/* Screening list */}
-          <div className="lg:col-span-2 dash-card">
-            <div className="flex items-center justify-between mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <div className="flex items-center gap-2">
-                <Scale className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nutrition.screenings')}</span>
+              <div className="flex flex-wrap items-center gap-4 mt-3">
+                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                  <input type="checkbox" checked={form.edema} onChange={e => setForm(f => ({ ...f, edema: e.target.checked }))} />
+                  {t('nutrition.formEdema')}
+                </label>
+                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                  <input type="checkbox" checked={form.isAnc} onChange={e => setForm(f => ({ ...f, isAnc: e.target.checked }))} />
+                  {t('nutrition.formAnc')}
+                </label>
+                {/* Live classification preview */}
+                {parseFloat(form.muac) > 0 && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{
+                      background: `${getStatusColor(classifyScreening(parseFloat(form.muac), form.edema, form.isAnc))}15`,
+                      color: getStatusColor(classifyScreening(parseFloat(form.muac), form.edema, form.isAnc)),
+                    }}>
+                    {t('nutrition.formClassification')}: {classifyScreening(parseFloat(form.muac), form.edema, form.isAnc)}
+                  </span>
+                )}
               </div>
-              <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{t('nutrition.totalCount', { count: stats.total })}</span>
-            </div>
-            {screenings.length === 0 ? (
-              <div
-                className="flex flex-col items-center justify-center gap-2 text-center"
-                style={{ padding: '40px 16px', color: 'var(--text-muted)' }}
+              {formError && (
+                <p className="text-xs mt-2 font-semibold" style={{ color: 'var(--color-danger)' }}>{formError}</p>
+              )}
+              <button
+                onClick={submitScreening}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold mt-3"
+                style={{ background: ACCENT, color: '#fff', border: 'none', cursor: 'pointer' }}
               >
-                <Scale className="w-6 h-6" style={{ opacity: 0.5 }} />
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                  {t('nutrition.noScreenings')}
-                </p>
-                <p className="text-xs">{t('nutrition.noScreeningsDesc')}</p>
-              </div>
-            ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="w-full" style={{ minWidth: 960 }}>
-                <thead>
-                  <tr>
-                    {[t('nutrition.colPatient'), t('nutrition.colAgeType'), t('nutrition.colMuac'), t('nutrition.colWeight'), t('nutrition.colHeight'), t('nutrition.colEdema'), t('nutrition.colStatus'), t('nutrition.colDate')].map(h => (
-                      <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 1 }}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {screenings.map(s => (
-                    <tr key={s.id} className="transition-colors hover:bg-[var(--table-row-hover)]" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ background: getStatusColor(s.status) }} />
-                          <span className="text-xs font-semibold">{s.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs">{s.age} &middot; {s.sex}</td>
-                      <td className="px-4 py-2.5">
-                        <span className="text-xs font-bold" style={{ color: s.muac < MUAC_THRESHOLDS.severe ? 'var(--color-danger)' : s.muac < MUAC_THRESHOLDS.moderate ? 'var(--color-warning)' : 'var(--text-primary)' }}>
-                          {s.muac}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs">{s.weight}</td>
-                      <td className="px-4 py-2.5 text-xs">{s.height}</td>
-                      <td className="px-4 py-2.5">{s.edema ? <span className="text-[10px] font-bold" style={{ color: 'var(--color-danger)' }}>{t('nutrition.edemaYes')}</span> : <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('nutrition.edemaNo')}</span>}</td>
-                      <td className="px-4 py-2.5">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${getStatusColor(s.status)}15`, color: getStatusColor(s.status) }}>
-                          {s.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>{s.date}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                <CheckCircle2 className="w-3 h-3" /> {t('nutrition.formSave')}
+              </button>
             </div>
-            )}
-          </div>
+          )}
 
-          {/* Right column */}
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
             {/* MUAC classification */}
             <div className="dash-card">
@@ -245,10 +454,68 @@ export default function NutritionDashboard() {
 
             {/* Supply status */}
             <div className="dash-card">
-              <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <Utensils className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nutrition.supplies')}</span>
+              <div className="flex items-center justify-between mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <div className="flex items-center gap-2">
+                  <Utensils className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('nutrition.supplies')}</span>
+                </div>
+                <button
+                  onClick={() => { setShowSupplyForm(v => !v); setSupplyFormError(''); }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold"
+                  style={{ background: showSupplyForm ? 'var(--overlay-subtle)' : ACCENT, color: showSupplyForm ? 'var(--text-secondary)' : '#fff', border: '1px solid var(--border-medium)', cursor: 'pointer' }}
+                >
+                  {showSupplyForm ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                  {showSupplyForm ? t('nutrition.formCancel') : t('nutrition.addSupplyItem')}
+                </button>
               </div>
+
+              {showSupplyForm && (
+                <div className="px-3 pb-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={supplyForm.name}
+                      onChange={e => setSupplyForm(f => ({ ...f, name: e.target.value }))}
+                      placeholder={t('nutrition.supplyFormName')}
+                      className="px-2 py-1.5 rounded-md text-xs col-span-2"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+                    />
+                    <input
+                      value={supplyForm.unit}
+                      onChange={e => setSupplyForm(f => ({ ...f, unit: e.target.value }))}
+                      placeholder={t('nutrition.supplyFormUnit')}
+                      className="px-2 py-1.5 rounded-md text-xs"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+                    />
+                    <input
+                      type="number" min="0" step="1"
+                      value={supplyForm.currentLevel}
+                      onChange={e => setSupplyForm(f => ({ ...f, currentLevel: e.target.value }))}
+                      placeholder={t('nutrition.supplyFormCurrentLevel')}
+                      className="px-2 py-1.5 rounded-md text-xs"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+                    />
+                    <input
+                      type="number" min="0" step="1"
+                      value={supplyForm.reorderLevel}
+                      onChange={e => setSupplyForm(f => ({ ...f, reorderLevel: e.target.value }))}
+                      placeholder={t('nutrition.supplyFormReorderLevel')}
+                      className="px-2 py-1.5 rounded-md text-xs col-span-2"
+                      style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                  {supplyFormError && (
+                    <p className="text-xs mt-1.5 font-semibold" style={{ color: 'var(--color-danger)' }}>{supplyFormError}</p>
+                  )}
+                  <button
+                    onClick={submitSupplyItem}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold mt-2"
+                    style={{ background: ACCENT, color: '#fff', border: 'none', cursor: 'pointer' }}
+                  >
+                    <CheckCircle2 className="w-3 h-3" /> {t('nutrition.supplyFormSave')}
+                  </button>
+                </div>
+              )}
+
               <div className="p-3 space-y-1">
                 {supplies.length === 0 && (
                   <p
@@ -259,23 +526,47 @@ export default function NutritionDashboard() {
                   </p>
                 )}
                 {supplies.map(item => (
-                  <div key={item.name} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between py-2 px-2 rounded"
+                    style={{
+                      borderBottom: '1px solid var(--border-light)',
+                      background: item.status === 'critical' ? 'color-mix(in srgb, var(--color-danger) 8%, transparent)'
+                        : item.status === 'low' ? 'color-mix(in srgb, var(--color-warning) 8%, transparent)'
+                        : 'transparent',
+                    }}
+                  >
                     <div className="flex items-center gap-2">
                       {item.status === 'critical' ? <AlertTriangle className="w-3 h-3" style={{ color: 'var(--color-danger)' }} /> :
                        item.status === 'low' ? <TrendingDown className="w-3 h-3" style={{ color: 'var(--color-warning)' }} /> :
                        <CheckCircle2 className="w-3 h-3" style={{ color: 'var(--color-success)' }} />}
                       <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{item.name}</span>
                     </div>
-                    <span className="text-xs font-bold" style={{
-                      color: item.status === 'critical' ? 'var(--color-danger)' : item.status === 'low' ? 'var(--color-warning)' : 'var(--text-primary)',
-                    }}>{item.stock} {item.unit}</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => adjustSupply(item.id, -1)}
+                        aria-label={`Decrease ${item.name}`}
+                        className="flex items-center justify-center rounded"
+                        style={{ width: 18, height: 18, background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)', cursor: 'pointer', fontSize: 12, lineHeight: 1 }}
+                      >−</button>
+                      <span className="text-xs font-bold" style={{
+                        color: item.status === 'critical' ? 'var(--color-danger)' : item.status === 'low' ? 'var(--color-warning)' : 'var(--text-primary)',
+                        minWidth: 64, textAlign: 'center',
+                      }}>{item.stock} {item.unit}</span>
+                      <button
+                        onClick={() => adjustSupply(item.id, 1)}
+                        aria-label={`Increase ${item.name}`}
+                        className="flex items-center justify-center rounded"
+                        style={{ width: 18, height: 18, background: 'var(--overlay-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)', cursor: 'pointer', fontSize: 12, lineHeight: 1 }}
+                      >+</button>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
         </div>
-      </main>
-    </>
+      </EhrCareDashboard>
+    </main>
   );
 }

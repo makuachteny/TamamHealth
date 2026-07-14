@@ -30,7 +30,7 @@ interface BadgeProps {
 
 export default function Badge({ tone = 'neutral', size = 'sm', uppercase = false, className = '', children }: BadgeProps) {
   const s = TONE_STYLES[tone];
-  const sizing = size === 'sm' ? 'text-[10px] px-2 py-0.5' : 'text-xs px-2.5 py-1';
+  const sizing = size === 'sm' ? 'text-[11px] px-2 py-0.5' : 'text-xs px-2.5 py-1';
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full font-semibold whitespace-nowrap ${sizing} ${uppercase ? 'uppercase tracking-wide' : ''} ${className}`}

@@ -366,7 +366,59 @@ export default function ReportsPage() {
 
         /* ─── HIV/AIDS Program Report ─────────────────────── */
         case 'HIV/AIDS Program Report': {
-          return { rows: [], title: 'HIV/AIDS Program Report', placeholder: t('reports.placeholderHivAids') };
+          // Program indicators derived from HIV-related lab activity
+          // (rapid tests, confirmatory tests, CD4 counts, viral loads).
+          const HIV_TEST_RE = /hiv|cd4|viral\s*load|art\b/i;
+          const hivResults = labResults.filter(r => HIV_TEST_RE.test(r.testName));
+          if (hivResults.length === 0) {
+            return { rows: [], title: 'HIV/AIDS Program Report', placeholder: t('reports.placeholderHivAids') };
+          }
+          const POSITIVE_RE = /positive|reactive|detected/i;
+          const byTest: Record<string, {
+            ordered: number; completed: number; positive: number; abnormal: number; facilities: Set<string>;
+          }> = {};
+          hivResults.forEach(r => {
+            const key = r.testName;
+            if (!byTest[key]) byTest[key] = { ordered: 0, completed: 0, positive: 0, abnormal: 0, facilities: new Set() };
+            const d = byTest[key];
+            d.ordered++;
+            if (r.status === 'completed') {
+              d.completed++;
+              if (POSITIVE_RE.test(r.result || '')) d.positive++;
+              if (r.abnormal) d.abnormal++;
+            }
+            d.facilities.add(r.hospitalName || r.hospitalId || 'Unknown');
+          });
+          const rows: Record<string, unknown>[] = Object.entries(byTest)
+            .sort((a, b) => b[1].ordered - a[1].ordered)
+            .map(([test, d]) => ({
+              Test: test,
+              Ordered: d.ordered,
+              Completed: d.completed,
+              'Positive / Reactive': d.positive,
+              'Positivity Rate (%)': d.completed > 0 ? ((d.positive / d.completed) * 100).toFixed(1) : '0.0',
+              Abnormal: d.abnormal,
+              Facilities: d.facilities.size,
+            }));
+          const totals = Object.values(byTest).reduce(
+            (acc, d) => ({
+              ordered: acc.ordered + d.ordered,
+              completed: acc.completed + d.completed,
+              positive: acc.positive + d.positive,
+              abnormal: acc.abnormal + d.abnormal,
+            }),
+            { ordered: 0, completed: 0, positive: 0, abnormal: 0 },
+          );
+          rows.push({
+            Test: 'TOTAL',
+            Ordered: totals.ordered,
+            Completed: totals.completed,
+            'Positive / Reactive': totals.positive,
+            'Positivity Rate (%)': totals.completed > 0 ? ((totals.positive / totals.completed) * 100).toFixed(1) : '0.0',
+            Abnormal: totals.abnormal,
+            Facilities: '',
+          });
+          return { rows, title: 'HIV/AIDS Program Report' };
         }
 
         /* ─── Drug Consumption Report ─────────────────────── */

@@ -68,6 +68,7 @@ export default function PaymentPanel({
   const [paymentDoc, setPaymentDoc] = useState<PaymentDoc | null>(null);
   const [emailAddress, setEmailAddress] = useState('');
   const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [emailSending, setEmailSending] = useState(false);
   const [showEmailInput, setShowEmailInput] = useState(false);
 
@@ -236,13 +237,21 @@ export default function PaymentPanel({
   const handleEmailReceipt = async () => {
     if (!paymentDoc || !emailAddress) return;
     setEmailSending(true);
+    setEmailError(null);
     try {
       const { buildReceiptData, emailReceipt } = await import('@/lib/services/receipt-service');
       const receipt = buildReceiptData(paymentDoc, currentUser?.hospital?.name || currentUser?.hospitalName);
-      await emailReceipt(receipt, emailAddress);
-      setEmailSent(true);
+      // emailReceipt returns the API's honest `delivered` flag — only claim
+      // "Sent" when the provider actually accepted the email.
+      const delivered = await emailReceipt(receipt, emailAddress);
+      if (delivered) {
+        setEmailSent(true);
+      } else {
+        setEmailError('Email could not be delivered — print the receipt or try again.');
+      }
     } catch (err) {
       console.error(err);
+      setEmailError('Email could not be delivered — print the receipt or try again.');
     } finally {
       setEmailSending(false);
     }
@@ -327,6 +336,14 @@ export default function PaymentPanel({
             <div style={{ padding: '0 20px 12px' }}>
               <div style={{ fontSize: 12, color: 'var(--accent-primary)', padding: '6px 12px', background: 'rgba(33, 145, 208, 0.08)', borderRadius: 8, textAlign: 'center' }}>
                 {t('payments.receiptSentTo', { email: emailAddress })}
+              </div>
+            </div>
+          )}
+
+          {emailError && !emailSent && (
+            <div style={{ padding: '0 20px 12px' }}>
+              <div style={{ fontSize: 12, color: 'var(--color-danger)', padding: '6px 12px', background: 'rgba(229, 46, 66, 0.08)', borderRadius: 8, textAlign: 'center' }}>
+                {emailError}
               </div>
             </div>
           )}
@@ -624,7 +641,7 @@ export default function PaymentPanel({
           }}>{t('action.cancel')}</button>
           <button onClick={handleSubmit} disabled={processing} style={{
             flex: 2, padding: '13px 0', borderRadius: 11, border: 'none',
-            background: 'var(--accent-primary)',
+            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover, #015697))',
             color: '#fff', fontSize: 14, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer',
             opacity: processing ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
             boxShadow: 'none',

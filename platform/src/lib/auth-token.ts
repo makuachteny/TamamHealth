@@ -30,6 +30,21 @@ if (IS_SERVER && IS_PRODUCTION && secret.length < 32) {
   );
 }
 
+// NEXT_PUBLIC_* env vars are inlined into the CLIENT JavaScript bundle at build
+// time. This module is imported by client code (context.tsx), so if the JWT
+// signing secret were ever supplied via NEXT_PUBLIC_JWT_SECRET in production it
+// would be shipped to every browser — anyone could then forge a token for any
+// role. Refuse to start. The server must use the server-only JWT_SECRET; the
+// NEXT_PUBLIC fallback exists solely for the non-production offline dev-token
+// path.
+if (IS_SERVER && IS_PRODUCTION && process.env.NEXT_PUBLIC_JWT_SECRET) {
+  throw new Error(
+    '[SECURITY] NEXT_PUBLIC_JWT_SECRET must not be set in production — it is ' +
+    'bundled into client JavaScript and would expose the token-signing key. ' +
+    'Remove it and set the server-only JWT_SECRET instead.'
+  );
+}
+
 const JWT_SECRET = new TextEncoder().encode(secret);
 
 const JWT_ISSUER = 'tamamhealth';

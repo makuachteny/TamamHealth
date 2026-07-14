@@ -26,6 +26,18 @@ async function patchHandler(
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
+    // Tenant guard: only dispense/update a prescription the caller's
+    // org/facility owns. Without this, a pharmacist could mark another tenant's
+    // prescription dispensed (diversion) or rewrite dose/medication by id.
+    const { getPrescriptionById } = await import('@/lib/services/prescription-service');
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+    const existingRx = await getPrescriptionById(id);
+    if (!existingRx) {
+      return NextResponse.json({ error: 'Prescription not found' }, { status: 404 });
+    }
+    if (filterByScope([existingRx], buildScopeFromAuth(auth)).length === 0) {
+      return forbidden('Access denied to this prescription.');
+    }
     // Check if this is a dispensing action
     if (body.status === 'dispensed') {
       const { dispensePrescription } = await import('@/lib/services/prescription-service');

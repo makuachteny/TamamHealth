@@ -9,7 +9,6 @@ import {
 import RowActionsMenu from '@/components/RowActionsMenu';
 import TopBar from '@/components/TopBar';
 import DataTile from '@/components/DataTile';
-import { FilterMenu } from '@/components/filters';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { ClaimDoc, ClaimStatus, PayerType } from '@/lib/db-types-payments';
@@ -30,7 +29,7 @@ const PAYER_LABEL_KEYS: Record<PayerType, string> = {
 const PAYER_COLORS: Record<PayerType, string> = {
   self_pay: 'var(--accent-primary)',
   nhis: 'var(--color-success)',
-  cbhi: '#0891B2',
+  cbhi: '#2191D0',
   donor: 'var(--color-warning)',
   government: 'var(--accent-primary)',
   private: '#EA580C',
@@ -74,9 +73,9 @@ export default function ClaimsPage() {
   });
   // Text search comes from the shared global search bar (TopBar).
   const searchQuery = globalSearch;
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const activeFilterCount = statusFilter !== 'all' ? 1 : 0;
-  const clearFilters = () => setStatusFilter('all');
+  // Status filter retained for the claims list logic; the header filter UI was
+  // removed, so it stays at 'all'.
+  const [statusFilter] = useState<string>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adjForm, setAdjForm] = useState<AdjudicationForm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -272,20 +271,7 @@ export default function ClaimsPage() {
 
   return (
     <>
-      <TopBar title={t('claims.title')} searchTrailing={
-        <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
-          <FilterMenu.Field label={t('claims.filterAll')}>
-            <select className="w-full text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-              <option value="all">{t('claims.filterAll')}</option>
-              <option value="draft">{t('claims.status_draft')}</option>
-              <option value="submitted">{t('claims.status_submitted')}</option>
-              <option value="accepted">{t('claims.status_accepted')}</option>
-              <option value="denied">{t('claims.status_denied')}</option>
-              <option value="paid">{t('claims.status_paid')}</option>
-            </select>
-          </FilterMenu.Field>
-        </FilterMenu>
-      } />
+      <TopBar title={t('claims.title')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
       {/* KPI Cards */}

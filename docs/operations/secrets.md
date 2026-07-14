@@ -168,7 +168,6 @@ legacy path runs unchanged.
 | `FLUTTERWAVE_SECRET_HASH`                         | 30 days          | Platform | Vendor dashboard rotate, then Doppler     |
 | `RESEND_API_KEY` / `SENDGRID_API_KEY` / `SMTP_URL`| 90 days          | Platform | Vendor dashboard rotate, then Doppler     |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`           | 90 days          | Platform | Sentry dashboard + image rebuild          |
-| `TAMAMHEALTH_LICENSE_*`                           | On expiry only   | Platform | Vendor signed key                         |
 | `DOPPLER_TOKEN` (service token)                   | 90 days          | Ops      | `doppler configs tokens create` + redeploy|
 
 **PHI-adjacent secrets** (`JWT_SECRET`, `COUCHDB_PASSWORD`,

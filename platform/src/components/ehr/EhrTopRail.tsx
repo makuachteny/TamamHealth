@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Calendar,
   ChevronDown,
+  HelpCircle,
   LayoutDashboard,
   LogOut,
   MessageSquare,
@@ -17,6 +18,7 @@ import {
   X,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
+import { useTourContext } from '@/lib/tour/tour-context';
 import { getRoleConfig } from '@/lib/permissions';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { NavItem } from '@/lib/permissions';
@@ -26,6 +28,7 @@ import { formatPhoneDisplay } from '@/lib/field-formats';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import EhrModuleMenu from './EhrModuleMenu';
 import EhrTopActions from './EhrTopActions';
+import QuickActions from '@/components/QuickActions';
 import {
   getPrimaryShortcutItems,
   groupNavItemsBySection,
@@ -39,6 +42,7 @@ export default function EhrTopRail() {
   const { t } = useTranslation();
   const { currentUser, logout } = useApp();
   const { canRegisterPatients } = usePermissions();
+  const { available: tourAvailable, start: startTour } = useTourContext();
   const { patients } = usePatients();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -84,7 +88,7 @@ export default function EhrTopRail() {
   }, [allowedRoutes, currentUser, roleConfig]);
 
   const navGroups = useMemo(() => groupNavItemsBySection(navItems), [navItems]);
-  const quickActionItems = useMemo(() => getPrimaryShortcutItems(navItems), [navItems]);
+  const quickActionItems = useMemo(() => getPrimaryShortcutItems(navItems, currentUser?.role), [navItems, currentUser?.role]);
 
   const navLabel = (item: NavItem): string => {
     const keyMap: Record<string, string> = {
@@ -131,7 +135,6 @@ export default function EhrTopRail() {
   }, [navItems, pathname, quickActionItems]);
 
   const ActiveModuleIcon = activeModuleItem?.icon || LayoutDashboard;
-  const hospitalName = currentUser?.hospitalName || currentUser?.hospital?.name || '';
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -167,7 +170,9 @@ export default function EhrTopRail() {
 
   const openProfilePage = () => {
     setUserOpen(false);
-    router.push('/profile');
+    // No standalone /profile route exists — the profile form lives on the
+    // Settings page's default (preferences) tab.
+    router.push('/settings');
   };
 
   const openSettingsPage = () => {
@@ -197,7 +202,7 @@ export default function EhrTopRail() {
     <header className={`ehr-top-rail ${mobileSearchOpen ? 'is-searching' : ''}`}>
       <div className="ehr-top-brand" onClick={() => router.push(homeHref)} role="button" tabIndex={0}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="ehr-top-brand-logo-full" src="/assets/logos/PNG/Tamam_Style_Guide-22.png" alt="Tamam Healthcare System" />
+        <img className="ehr-top-brand-logo-full" src="/assets/tamamhealth-logo-full-white.svg" alt="Tamam Healthcare System" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="ehr-top-brand-logo-icon" src="/assets/tamamhealth-logo-icon-white.svg" alt="" aria-hidden="true" />
       </div>
@@ -225,16 +230,8 @@ export default function EhrTopRail() {
           />
         )}
 
-        <EhrTopActions items={quickActionItems.slice(0, 4)} navLabel={navLabel} onOpenModule={openModule} />
+        <EhrTopActions items={quickActionItems.slice(0, 6)} navLabel={navLabel} onOpenModule={openModule} />
       </nav>
-
-      {hospitalName ? (
-        <div className="ehr-top-hospital-name" aria-label="Hospital name">
-          <span>{hospitalName}</span>
-        </div>
-      ) : (
-        <div aria-hidden className="ehr-top-hospital-name" />
-      )}
 
       <button
         type="button"
@@ -311,28 +308,22 @@ export default function EhrTopRail() {
             <UserPlus className="w-4 h-4" />
           </button>
         )}
-        <EhrTopActions items={quickActionItems.slice(4, 6)} navLabel={navLabel} onOpenModule={openModule} />
+        <QuickActions />
         <div className="ehr-user-menu-wrap" ref={userRef}>
           <button
             type="button"
-            className={`ehr-avatar ${userOpen ? 'active' : ''}`}
+            className={`ehr-avatar ehr-avatar--labeled ${userOpen ? 'active' : ''}`}
             title={currentUser?.name || 'Tamam user'}
             onClick={() => setUserOpen(value => !value)}
             aria-expanded={userOpen}
             aria-haspopup="menu"
           >
-            <span className="ehr-avatar-mark">{initials}</span>
+            <span className="ehr-avatar-mark" style={roleConfig?.color ? { background: roleConfig.color } : undefined}>{initials}</span>
+            <span className="ehr-avatar-role">{roleConfig?.badgeLabel || roleLabel}</span>
           </button>
 
           {userOpen && (
             <div className="ehr-user-menu" role="menu">
-              <div className="ehr-user-menu-head">
-                <span className="ehr-avatar-mark">{initials}</span>
-              <div>
-                <strong>{currentUser?.name || 'Tamam user'}</strong>
-                <small>{currentUser?.role.replace(/_/g, ' ') || 'Clinical user'}</small>
-              </div>
-              </div>
               <button type="button" role="menuitem" onClick={openProfilePage}>
                 <User className="w-4 h-4" />
                 <span>Profile</span>
@@ -341,6 +332,12 @@ export default function EhrTopRail() {
                 <Settings className="w-4 h-4" />
                 <span>Settings</span>
               </button>
+              {tourAvailable && (
+                <button type="button" role="menuitem" onClick={() => { setUserOpen(false); startTour(); }}>
+                  <HelpCircle className="w-4 h-4" />
+                  <span>Take a tour</span>
+                </button>
+              )}
               <button type="button" role="menuitem" className="danger" onClick={logout}>
                 <LogOut className="w-4 h-4" />
                 <span>Log out</span>

@@ -1,693 +1,612 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import TopBar from '@/components/TopBar';
+import Modal from '@/components/Modal';
+import { useApp } from '@/lib/context';
+import { useToast } from '@/components/Toast';
+import { useIntakeForms } from '@/lib/hooks/useIntakeForms';
 import { usePatients } from '@/lib/hooks/usePatients';
-import type { PatientDoc } from '@/lib/db-types';
-import { patientAge, patientFullName } from '@/lib/patient-utils';
-import {
-  AlertCircle,
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  FileText,
-  Search,
-  X,
-} from '@/components/icons/lucide';
+import { useUsers } from '@/lib/hooks/useUsers';
+import { isRouteAllowed } from '@/lib/permissions';
+import { patientFullName, patientGenderAge } from '@/lib/patient-utils';
+import { formatPhoneDisplay } from '@/lib/field-formats';
+import type {
+  IntakeFormStatus,
+  PatientDoc,
+  PatientIntakeFormDoc,
+  UserRole,
+} from '@/lib/db-types';
+import { ClipboardPen, Mail, MessageSquare, Plus, Search, Settings, X } from '@/components/icons/lucide';
 
-type IntakeStatus = 'pending_review' | 'not_submitted' | 'merged';
-type IntakeSectionKey =
-  | 'basic'
-  | 'demographics'
-  | 'emergency'
-  | 'payment'
-  | 'responsible'
-  | 'obgyn'
-  | 'medical'
-  | 'additional'
-  | 'gad7'
-  | 'phq9'
-  | 'pcl5';
+const TABS: { key: IntakeFormStatus; label: string }[] = [
+  { key: 'pending_review', label: 'Pending Review' },
+  { key: 'not_submitted', label: 'Not Submitted by Patient' },
+  { key: 'merged', label: 'Merged' },
+];
 
-interface IntakeField {
-  id: string;
-  label: string;
-  section: IntakeSectionKey;
-  intakeValue: string;
-  chartValue: string;
-  selected: boolean;
-  conflict?: boolean;
-}
+// Roles that can be the ordering/receiving provider for an intake request.
+// The list is additionally gated by route access below: a provider is only
+// assignable if their role can actually open /patient-intake to see the
+// queue (otherwise requests would route to someone who can never act).
+const PROVIDER_ROLES: UserRole[] = [
+  'doctor',
+  'clinical_officer',
+  'medical_superintendent',
+  'nutritionist',
+  'radiologist',
+];
 
-interface IntakeRequest {
-  id: string;
-  patientId: string;
-  patientName: string;
-  patientMeta: string;
-  provider: string;
-  status: IntakeStatus;
-  sentAt: string;
-  receivedAt?: string;
-  mergedAt?: string;
-  delivery: Array<'sms' | 'email'>;
-  forms: IntakeSectionKey[];
-  fields: IntakeField[];
-}
+// The intake packets a patient can be asked to complete before their visit.
+const INTAKE_FORM_OPTIONS = [
+  'Basic Information',
+  'Demographics',
+  'Emergency Contact',
+  'Financial Information',
+  'Additional Information',
+  'GAD-7',
+  'PHQ-9',
+  'PCL-5',
+];
 
-const STORAGE_KEY = 'tamamhealth.patient-intake.v3';
-
-const SECTION_LABELS: Record<IntakeSectionKey, string> = {
-  basic: 'Basic Information',
-  demographics: 'Demographics',
-  emergency: 'Emergency Contact',
-  payment: 'Method of Payment',
-  responsible: 'Responsible Party',
-  obgyn: 'OB/GYN History',
-  medical: 'Medical Intake',
-  additional: 'Additional Information',
-  gad7: 'GAD-7',
-  phq9: 'PHQ-9',
-  pcl5: 'PCL-5',
+// Labels the reviewer can confidently merge straight into the chart, mapped to
+// the patient-chart key they write to. Multiple form labels can point at the
+// same key (forms evolve / are authored by different people). Anything NOT in
+// this map is shown for context during review but has no checkbox — it isn't
+// structured enough to write back automatically.
+const MERGEABLE_FIELDS: Record<string, keyof PatientDoc> = {
+  'Date of birth': 'dateOfBirth',
+  'Phone': 'phone',
+  'Primary Phone': 'phone',
+  'Phone Number': 'phone',
+  'Address': 'address',
+  'Language': 'primaryLanguage',
+  'Primary Language': 'primaryLanguage',
+  'County': 'county',
+  'State': 'state',
+  'Ethnicity': 'tribe',
+  'Tribe': 'tribe',
+  'Blood Type': 'bloodType',
+  'Blood Group': 'bloodType',
 };
 
-const FORM_OPTIONS: Array<{ key: IntakeSectionKey; label: string; desc: string }> = [
-  { key: 'basic', label: 'Basic Information', desc: 'Name, phone, county, address' },
-  { key: 'demographics', label: 'Demographics', desc: 'Language, ID status, county, boma' },
-  { key: 'emergency', label: 'Emergency Contact', desc: 'Next of kin and contact phone' },
-  { key: 'payment', label: 'Financial Information', desc: 'Cash, mobile money, waiver, NGO support' },
-  { key: 'additional', label: 'Additional Information', desc: 'Allergies, chronic conditions, TB/malaria flags' },
-  { key: 'responsible', label: 'Responsible Party', desc: 'Guarantor and billing responsibility' },
-  { key: 'obgyn', label: 'OB/GYN History', desc: 'Pregnancy and women health history' },
-  { key: 'medical', label: 'Medical Intake', desc: 'Medical history, reminders, and screening notes' },
-  { key: 'gad7', label: 'GAD-7', desc: 'Anxiety screening' },
-  { key: 'phq9', label: 'PHQ-9', desc: 'Depression screening' },
-  { key: 'pcl5', label: 'PCL-5', desc: 'Trauma screening' },
-];
-
-const PROVIDERS = [
-  'Dr. Achol Mayen Deng',
-  'Dr. James Wani Igga',
-  'CO Deng Mabior Kuol',
-  'Midwife Nyakong Gatkuoth',
-  'Nurse Stella Keji Lemi',
-];
-
-function buildFields(patient: PatientDoc | undefined, index = 0): IntakeField[] {
-  const fullName = patient ? patientFullName(patient) : 'Adut Deng Garang';
-  const phone = patient?.phone || '+211 912 555 018';
-  const county = patient?.county || 'Juba';
-  const state = patient?.state || 'Central Equatoria';
-  const nokName = patient?.nokName || 'Deng Garang';
-  const nokRelationship = patient?.nokRelationship || 'Spouse';
-  const nokPhone = patient?.nokPhone || '+211 915 200 118';
-  const allergies = patient?.allergies?.join(', ') || 'None known';
-  const chronic = patient?.chronicConditions?.join(', ') || 'None';
-
-  return [
-    field('name', 'Full name', 'basic', fullName, fullName),
-    field('phone', 'Primary phone', 'basic', normalizePhone(phone, index), phone, true),
-    field('state', 'State', 'basic', state, state),
-    field('county', 'County', 'basic', county, county),
-    field('language', 'Preferred language', 'demographics', index % 2 === 0 ? 'Juba Arabic' : 'Dinka', 'Not recorded', true),
-    field('id_status', 'ID status', 'demographics', 'No national ID available', 'Not recorded', true),
-    field('nokName', 'Next of kin', 'emergency', nokName, nokName),
-    field('nokRelationship', 'Relationship', 'emergency', nokRelationship, nokRelationship),
-    field('nokPhone', 'Next-of-kin phone', 'emergency', normalizePhone(nokPhone, index + 1), nokPhone, true),
-    field('payment_support', 'Method of payment', 'payment', index % 2 === 0 ? 'Self pay' : 'County waiver assessment requested', 'Not recorded', true),
-    field('responsible_name', 'Responsible party', 'responsible', nokName, 'Not recorded', true),
-    field('responsible_relationship', 'Responsible party relationship', 'responsible', nokRelationship, 'Not recorded', true),
-    field('obgyn_pregnancy', 'Pregnancy status', 'obgyn', patient?.gender === 'Female' ? 'Not currently pregnant' : 'Not applicable', 'Not recorded', patient?.gender === 'Female'),
-    field('obgyn_history', 'OB/GYN history', 'obgyn', patient?.gender === 'Female' ? 'No complications reported' : 'Not applicable', 'Not recorded', patient?.gender === 'Female'),
-    field('allergies', 'Allergies', 'additional', allergies, allergies),
-    field('chronicConditions', 'Chronic conditions', 'additional', chronic === 'None' ? 'None reported' : chronic, chronic, chronic === 'None'),
-    field('malaria_screen', 'Malaria risk screen', 'medical', 'Fever in household this week: No', 'Not recorded', true),
-    field('tb_screen', 'TB screen', 'medical', 'Cough over two weeks: No', 'Not recorded', true),
-    field('immunization', 'Immunization reminder', 'medical', 'SMS reminders allowed', 'Not recorded', true),
-    field('gad7_score', 'GAD-7 score', 'gad7', index % 2 === 0 ? '4 - minimal anxiety' : '7 - mild anxiety', 'Not recorded', true),
-    field('phq9_score', 'PHQ-9 score', 'phq9', index % 2 === 0 ? '3 - minimal depression' : '6 - mild depression', 'Not recorded', true),
-    field('pcl5_score', 'PCL-5 score', 'pcl5', '11 - below provisional threshold', 'Not recorded', true),
-  ];
+function formatDate(iso?: string): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
-function field(
-  id: string,
-  label: string,
-  section: IntakeSectionKey,
-  intakeValue: string,
-  chartValue: string,
-  conflict = false,
-): IntakeField {
-  return {
-    id,
-    label,
-    section,
-    intakeValue,
-    chartValue,
-    selected: conflict,
-    conflict,
-  };
+/** Read the current chart value for a mergeable field, as a display string. */
+function currentChartValue(patient: PatientDoc | undefined, label: string): string {
+  if (!patient) return '';
+  const key = MERGEABLE_FIELDS[label];
+  if (!key) return '';
+  const raw = patient[key];
+  if (raw == null || raw === '') return '';
+  if (key === 'dateOfBirth') return formatDate(String(raw));
+  if (key === 'phone') return formatPhoneDisplay(String(raw));
+  return String(raw);
 }
 
-function normalizePhone(phone: string, offset: number): string {
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length < 6) return phone;
-  const suffix = String((Number(digits.slice(-3)) + offset + 7) % 1000).padStart(3, '0');
-  return `${phone.slice(0, Math.max(0, phone.length - 3))}${suffix}`;
-}
-
-function patientMeta(patient: PatientDoc | undefined): string {
-  if (!patient) return 'No chart selected';
-  const age = patientAge(patient);
-  const bits = [
-    patient.hospitalNumber,
-    patient.gender,
-    age ? `${age} yrs` : undefined,
-    patient.county,
-  ].filter(Boolean);
-  return bits.join(' · ');
-}
-
-function seedRequests(patients: PatientDoc[]): IntakeRequest[] {
-  const picks = [patients[0], patients[1], patients[2]].filter(Boolean);
-  const now = Date.now();
-  return picks.map((patient, index) => {
-    const baseFields = buildFields(patient, index);
-    const status: IntakeStatus = index === 0 ? 'pending_review' : index === 1 ? 'not_submitted' : 'merged';
-    return {
-      id: `seed-${patient._id}-${index}`,
-      patientId: patient._id,
-      patientName: patientFullName(patient),
-      patientMeta: patientMeta(patient),
-      provider: PROVIDERS[index % PROVIDERS.length],
-      status,
-      sentAt: new Date(now - index * 86400000).toISOString(),
-      receivedAt: status !== 'not_submitted' ? new Date(now - index * 7200000).toISOString() : undefined,
-      mergedAt: status === 'merged' ? new Date(now - 3600000).toISOString() : undefined,
-      delivery: ['sms', 'email'],
-      forms: FORM_OPTIONS.map(option => option.key),
-      fields: baseFields,
-    };
-  });
-}
-
-function statusLabel(status: IntakeStatus): string {
-  if (status === 'pending_review') return 'Pending Review';
-  if (status === 'not_submitted') return 'Not Submitted by Patient';
-  return 'Merged';
-}
-
-function formatDate(value?: string): string {
-  if (!value) return '-';
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value));
-}
-
-function workflowLabel(request: IntakeRequest): string {
-  if (request.status === 'pending_review') return 'Ready for review';
-  if (request.status === 'merged') return 'Merged to chart';
-  return 'Awaiting patient';
-}
-
-function workflowDetail(request: IntakeRequest): string {
-  const forms = request.forms.length;
-  const delivery = request.delivery.map(channel => channel.toUpperCase()).join(' + ');
-  if (request.status === 'pending_review' && request.receivedAt) {
-    return `Received ${formatDate(request.receivedAt)} · ${forms} form${forms === 1 ? '' : 's'}`;
-  }
-  if (request.status === 'merged' && request.mergedAt) {
-    return `Merged ${formatDate(request.mergedAt)} · ${delivery}`;
-  }
-  return `Sent ${formatDate(request.sentAt)} · ${delivery}`;
-}
+// Shared inline styles so the two modals match the existing filter controls.
+const inputStyle: React.CSSProperties = {
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-light)',
+  color: 'var(--text-primary)',
+  borderRadius: 10,
+  padding: '8px 10px',
+  fontSize: 13,
+  width: '100%',
+};
 
 export default function PatientIntakePage() {
-  const { patients, loading, update } = usePatients();
-  const [requests, setRequests] = useState<IntakeRequest[]>([]);
-  const [activeStatus, setActiveStatus] = useState<IntakeStatus>('pending_review');
-  const [query, setQuery] = useState('');
-  const [providerFilter, setProviderFilter] = useState('all');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { currentUser } = useApp();
+  const { showToast } = useToast();
+  const { forms, loading, merge, reject, sendRequest } = useIntakeForms();
+  const { patients } = usePatients();
+  const { users } = useUsers();
+
+  const [activeTab, setActiveTab] = useState<IntakeFormStatus>('pending_review');
+  const [patientQuery, setPatientQuery] = useState('');
+  const [reviewing, setReviewing] = useState<PatientIntakeFormDoc | null>(null);
+  const [merging, setMerging] = useState(false);
+  // Which mergeable field labels the reviewer has selected to write to the chart.
+  const [checkedFields, setCheckedFields] = useState<Record<string, boolean>>({});
+
+  // --- Send-forms modal state ---
   const [sendOpen, setSendOpen] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [sendProviderId, setSendProviderId] = useState('');
+  const [sendPatient, setSendPatient] = useState<PatientDoc | null>(null);
+  const [sendPatientQuery, setSendPatientQuery] = useState('');
+  const [sendForms, setSendForms] = useState<string[]>([]);
+  const [sendEmail, setSendEmail] = useState(false);
+  const [sendSms, setSendSms] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  useEffect(() => {
-    if (patients.length === 0) return;
+  const providerUsers = useMemo(
+    () => users
+      .filter(u => PROVIDER_ROLES.includes(u.role) && isRouteAllowed(u.role, '/patient-intake'))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    [users],
+  );
+
+  const counts = useMemo(() => {
+    const c: Record<IntakeFormStatus, number> = { pending_review: 0, not_submitted: 0, merged: 0, rejected: 0 };
+    for (const f of forms) c[f.status]++;
+    return c;
+  }, [forms]);
+
+  const filtered = useMemo(() => {
+    const q = patientQuery.trim().toLowerCase();
+    return forms
+      .filter(f => f.status === activeTab)
+      .filter(f => !q || f.patientName.toLowerCase().includes(q));
+  }, [forms, activeTab, patientQuery]);
+
+  // Patient typeahead for the send modal: match name / hospital number / phone.
+  const patientMatches = useMemo(() => {
+    const q = sendPatientQuery.trim().toLowerCase();
+    if (!q) return [];
+    return patients
+      .filter(p =>
+        patientFullName(p).toLowerCase().includes(q) ||
+        (p.hospitalNumber || '').toLowerCase().includes(q) ||
+        (p.phone || '').toLowerCase().includes(q),
+      )
+      .slice(0, 8);
+  }, [patients, sendPatientQuery]);
+
+  const sendProviderUser = useMemo(
+    () => providerUsers.find(u => u._id === sendProviderId),
+    [providerUsers, sendProviderId],
+  );
+
+  function openReview(form: PatientIntakeFormDoc) {
+    // Default every mergeable field to checked.
+    const defaults: Record<string, boolean> = {};
+    for (const field of form.fields) {
+      if (MERGEABLE_FIELDS[field.label]) defaults[field.label] = true;
+    }
+    setCheckedFields(defaults);
+    setReviewing(form);
+  }
+
+  function selectSendPatient(p: PatientDoc) {
+    setSendPatient(p);
+    setSendPatientQuery(patientFullName(p));
+    setSendEmail(false); // patients have no email field yet — stays disabled
+    setSendSms(!!p.phone);
+  }
+
+  function resetSend() {
+    setSendProviderId('');
+    setSendPatient(null);
+    setSendPatientQuery('');
+    setSendForms([]);
+    setSendEmail(false);
+    setSendSms(false);
+  }
+
+  async function handleSend() {
+    if (!sendPatient || !sendProviderId || sendForms.length === 0) return;
+    setSending(true);
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        setRequests(JSON.parse(saved) as IntakeRequest[]);
-        return;
+      const willSendSms = sendSms && !!sendPatient.phone;
+      const smsResult = await sendRequest(
+        sendPatient._id,
+        patientFullName(sendPatient),
+        sendForms.map(f => ({ label: f, value: 'Requested' })),
+        {
+          providerId: sendProviderUser?._id,
+          providerName: sendProviderUser?.name,
+          hospitalNumber: sendPatient.hospitalNumber,
+          hospitalId: currentUser?.hospitalId,
+          orgId: currentUser?.orgId,
+        },
+        {
+          send: willSendSms,
+          phone: sendPatient.phone,
+          facilityName: currentUser?.hospitalName,
+        },
+      );
+      if (willSendSms) {
+        if (smsResult?.ok) {
+          showToast(`Intake forms sent to ${patientFullName(sendPatient)} and an SMS was delivered.`, 'success');
+        } else {
+          showToast(`Intake request saved, but the SMS to ${patientFullName(sendPatient)} failed to send.`, 'error');
+        }
+      } else {
+        showToast(`Intake forms sent to ${patientFullName(sendPatient)}.`, 'success');
       }
+      resetSend();
+      setSendOpen(false);
     } catch {
-      // Ignore invalid local storage and regenerate the demo queue.
+      showToast('Could not send intake forms. Try again.', 'error');
+    } finally {
+      setSending(false);
     }
-    setRequests(seedRequests(patients));
-  }, [patients]);
+  }
 
-  useEffect(() => {
-    if (requests.length === 0) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
-  }, [requests]);
-
-  const activeRequest = requests.find(request => request.id === selectedId) || null;
-  const providerOptions = useMemo(() => {
-    return Array.from(new Set(requests.map(request => request.provider))).sort((a, b) => a.localeCompare(b));
-  }, [requests]);
-  const visibleRequests = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return requests.filter(request => {
-      const matchesStatus = request.status === activeStatus;
-      const matchesProvider = providerFilter === 'all' || request.provider === providerFilter;
-      const matchesQuery = !needle || `${request.patientName} ${request.patientMeta} ${request.provider}`.toLowerCase().includes(needle);
-      return matchesStatus && matchesProvider && matchesQuery;
-    });
-  }, [activeStatus, providerFilter, query, requests]);
-
-  const counts = useMemo(() => ({
-    pending_review: requests.filter(request => request.status === 'pending_review').length,
-    not_submitted: requests.filter(request => request.status === 'not_submitted').length,
-    merged: requests.filter(request => request.status === 'merged').length,
-  }), [requests]);
-
-  const toggleField = (requestId: string, fieldId: string) => {
-    setRequests(current => current.map(request => (
-      request.id !== requestId ? request : {
-        ...request,
-        fields: request.fields.map(item => (
-          item.id === fieldId ? { ...item, selected: !item.selected } : item
-        )),
+  async function handleMerge() {
+    if (!reviewing) return;
+    setMerging(true);
+    try {
+      const updates: Record<string, unknown> = {};
+      for (const field of reviewing.fields) {
+        const key = MERGEABLE_FIELDS[field.label];
+        if (key && checkedFields[field.label]) updates[key] = field.value;
       }
-    )));
-  };
-
-  const markReceived = (requestId: string) => {
-    setRequests(current => current.map(request => (
-      request.id === requestId
-        ? { ...request, status: 'pending_review', receivedAt: new Date().toISOString() }
-        : request
-    )));
-    setActiveStatus('pending_review');
-    showToast('Patient forms received and ready for review.');
-  };
-
-  const mergeRequest = async (request: IntakeRequest) => {
-    const selected = Object.fromEntries(
-      request.fields.filter(item => item.selected).map(item => [item.id, item.intakeValue]),
-    );
-
-    const patientPatch: Partial<PatientDoc> = {};
-    if (typeof selected.phone === 'string') patientPatch.phone = selected.phone;
-    if (typeof selected.state === 'string') patientPatch.state = selected.state;
-    if (typeof selected.county === 'string') patientPatch.county = selected.county;
-    if (typeof selected.nokName === 'string') patientPatch.nokName = selected.nokName;
-    if (typeof selected.nokRelationship === 'string') patientPatch.nokRelationship = selected.nokRelationship;
-    if (typeof selected.nokPhone === 'string') patientPatch.nokPhone = selected.nokPhone;
-    if (typeof selected.allergies === 'string') {
-      patientPatch.allergies = selected.allergies === 'None reported' ? ['None known'] : selected.allergies.split(',').map(v => v.trim()).filter(Boolean);
+      await merge(reviewing._id, updates, currentUser?.name || currentUser?.username || 'Staff');
+      showToast(`${reviewing.patientName}'s form merged into their chart.`, 'success');
+      setReviewing(null);
+    } catch {
+      showToast('Could not merge this form. Try again.', 'error');
+    } finally {
+      setMerging(false);
     }
-    if (typeof selected.chronicConditions === 'string') {
-      patientPatch.chronicConditions = selected.chronicConditions === 'None reported' ? ['None'] : selected.chronicConditions.split(',').map(v => v.trim()).filter(Boolean);
+  }
+
+  async function handleReject() {
+    if (!reviewing) return;
+    setMerging(true);
+    try {
+      await reject(reviewing._id, currentUser?.name || currentUser?.username || 'Staff');
+      showToast('Form rejected', 'success');
+      setReviewing(null);
+    } catch {
+      showToast('Could not reject this form. Try again.', 'error');
+    } finally {
+      setMerging(false);
     }
+  }
 
-    if (Object.keys(patientPatch).length > 0) {
-      await update(request.patientId, patientPatch);
-    }
+  const reviewPatient = useMemo(
+    () => (reviewing ? patients.find(p => p._id === reviewing.patientId) : undefined),
+    [patients, reviewing],
+  );
 
-    setRequests(current => current.map(item => (
-      item.id === request.id
-        ? { ...item, status: 'merged', mergedAt: new Date().toISOString() }
-        : item
-    )));
-    setSelectedId(null);
-    setActiveStatus('merged');
-    showToast('Intake merged into the patient chart.');
-  };
-
-  const sendForms = (input: {
-    patientId: string;
-    provider: string;
-    forms: IntakeSectionKey[];
-    delivery: Array<'sms' | 'email'>;
-  }) => {
-    const patient = patients.find(item => item._id === input.patientId);
-    if (!patient) return;
-    const now = new Date().toISOString();
-    const request: IntakeRequest = {
-      id: `intake-${Date.now()}`,
-      patientId: patient._id,
-      patientName: patientFullName(patient),
-      patientMeta: patientMeta(patient),
-      provider: input.provider,
-      status: 'not_submitted',
-      sentAt: now,
-      delivery: input.delivery,
-      forms: input.forms,
-      fields: buildFields(patient, requests.length).filter(item => input.forms.includes(item.section)),
-    };
-    setRequests(current => [request, ...current]);
-    setActiveStatus('not_submitted');
-    setSendOpen(false);
-    showToast('Forms queued for patient delivery.');
-  };
-
-  const showToast = (message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 2600);
-  };
+  const canSend = !!sendPatient && !!sendProviderId && sendForms.length > 0;
+  const availableFormOptions = INTAKE_FORM_OPTIONS.filter(o => !sendForms.includes(o));
 
   return (
-    <div className="ti-page">
-      <TopBar title="Patient intake" hideSearch />
-
-      {activeRequest ? (
-        <ReviewPanel
-          request={activeRequest}
-          onClose={() => setSelectedId(null)}
-          onToggleField={(fieldId) => toggleField(activeRequest.id, fieldId)}
-          onMerge={() => mergeRequest(activeRequest)}
-        />
-      ) : (
-      <section className="ti-shell">
-        <div className="ti-page-head">
-          <div className="ti-title-row">
-            <h1>Patient Intake</h1>
-            <button type="button" className="ti-settings-link">Settings</button>
-          </div>
-          <div className="ti-page-head-actions">
-            <span>How can we improve this feature? <button type="button">Let us know</button></span>
-            <button type="button" className="ti-primary" onClick={() => setSendOpen(true)}>
-              SEND FORMS
+    <>
+      <TopBar
+        title="Patient Intake"
+        hideSearch
+        titleIcon={<Settings className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}
+        titleActions={
+          <>
+            <a
+              href="mailto:support.tamam@gmail.com?subject=Patient%20Intake%20feedback"
+              className="text-[12px] font-medium hidden sm:inline"
+              style={{ color: 'var(--accent-primary)' }}
+            >
+              How can we improve this feature? <span className="underline">Let us know</span>
+            </a>
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{ background: 'var(--color-warning-600)', borderColor: 'var(--color-warning-600)', color: '#fff' }}
+              onClick={() => setSendOpen(true)}
+            >
+              Send forms
             </button>
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        <div className="ti-board">
-          <aside className="ti-queue-nav" aria-label="Intake queue status">
-            {(['pending_review', 'not_submitted', 'merged'] as IntakeStatus[]).map(status => (
-              <button
-                type="button"
-                key={status}
-                className={activeStatus === status ? 'is-active' : ''}
-                onClick={() => setActiveStatus(status)}
-              >
-                <span>{statusLabel(status)}</span>
-                {counts[status] > 0 && <strong>{counts[status]}</strong>}
-              </button>
-            ))}
+      <main className="page-container page-enter">
+        <div className="flex gap-5 items-start">
+          {/* Status tabs */}
+          <aside className="card-elevated p-2 flex-shrink-0" style={{ width: 220 }}>
+            {TABS.map(tab => {
+              const active = tab.key === activeTab;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className="w-full flex items-center justify-between gap-2 text-left text-[13px] font-medium rounded-lg px-3 py-2.5 mb-1"
+                  style={active
+                    ? { background: 'var(--overlay-subtle)', color: 'var(--accent-primary)' }
+                    : { color: 'var(--text-secondary)' }}
+                >
+                  <span>{tab.label}</span>
+                  {counts[tab.key] > 0 && (
+                    <span
+                      className="text-[11px] font-semibold rounded-full min-w-[20px] text-center px-1.5 py-0.5"
+                      style={active
+                        ? { background: 'var(--color-warning-600)', color: '#fff' }
+                        : { background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}
+                    >
+                      {counts[tab.key]}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </aside>
 
-          <main className="ti-workspace">
-            <div className="ti-toolbar">
-              <label className="ti-filter">
-                <select value={providerFilter} onChange={event => setProviderFilter(event.target.value)}>
-                  <option value="all">All providers</option>
-                  {providerOptions.map(provider => (
-                    <option key={provider} value={provider}>{provider}</option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4" aria-hidden="true" />
-              </label>
-              <label className="ti-search">
-                <Search className="w-4 h-4" />
-                <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search patient, ID, or provider" />
-                {query && (
-                  <button type="button" onClick={() => setQuery('')} aria-label="Clear intake search">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </label>
-            </div>
-
-            <div className="ti-table" role="table" aria-label={`${statusLabel(activeStatus)} intake forms`}>
-              <div className="ti-row ti-head" role="row">
-                <span>{activeStatus === 'merged' ? 'Merged' : activeStatus === 'not_submitted' ? 'Sent' : 'Received'}</span>
-                <span>Patient</span>
-                <span>Workflow</span>
-                <span>Action</span>
-              </div>
-
-              {loading && <div className="ti-empty">Loading intake queue...</div>}
-
-              {!loading && visibleRequests.length === 0 && (
-                <div className="ti-empty">
-                  <FileText className="w-8 h-8" />
-                  <strong>No forms in this queue</strong>
-                  <span>Use Send forms to invite a patient to complete intake before the visit.</span>
-                </div>
-              )}
-
-              {visibleRequests.map(request => (
-                <div className="ti-row" role="row" key={request.id}>
-                  <span>{formatDate(request.mergedAt || request.receivedAt || request.sentAt)}</span>
-                  <span>
-                    <strong>{request.patientName}</strong>
-                    <small>{request.patientMeta} · {request.provider}</small>
-                  </span>
-                  <span>
-                    <strong>{workflowLabel(request)}</strong>
-                    <small>{workflowDetail(request)}</small>
-                  </span>
-                  <span className="ti-actions">
-                    {request.status === 'not_submitted' ? (
-                      <button type="button" className="ti-secondary" onClick={() => markReceived(request.id)}>Mark received</button>
-                    ) : request.status === 'merged' ? (
-                      <button type="button" className="ti-secondary" onClick={() => setSelectedId(request.id)}>View</button>
-                    ) : (
-                      <button type="button" className="ti-secondary" onClick={() => setSelectedId(request.id)}>Review</button>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </main>
-        </div>
-      </section>
-      )}
-
-      {sendOpen && (
-        <SendFormsDialog
-          patients={patients}
-          onClose={() => setSendOpen(false)}
-          onSubmit={sendForms}
-        />
-      )}
-
-      {toast && (
-        <div className="ti-toast" role="status">
-          <CheckCircle2 className="w-4 h-4" />
-          {toast}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ReviewPanel({
-  request,
-  onClose,
-  onToggleField,
-  onMerge,
-}: {
-  request: IntakeRequest;
-  onClose: () => void;
-  onToggleField: (fieldId: string) => void;
-  onMerge: () => void;
-}) {
-  const sections = request.forms.filter(section => request.fields.some(fieldItem => fieldItem.section === section));
-  const selectedCount = request.fields.filter(fieldItem => fieldItem.selected).length;
-  const isMerged = request.status === 'merged';
-
-  return (
-    <section className="ti-review-page" aria-label="Review intake form">
-      <nav className="ti-section-list" aria-label="Intake sections">
-        {sections.map(section => (
-          <a key={section} href={`#section-${section}`}>
-            {SECTION_LABELS[section]}
-          </a>
-        ))}
-      </nav>
-
-      <div className="ti-review-panel">
-        <header>
-          <div>
-            <h2>{request.patientName}</h2>
-            <span>{request.patientMeta} · {request.provider}</span>
-          </div>
-          <button type="button" className="ti-icon-btn" onClick={onClose} aria-label="Close review">
-            <X className="w-5 h-5" />
-          </button>
-        </header>
-
-        <div className="ti-compare">
-          {sections.map(section => (
-            <section id={`section-${section}`} key={section} className="ti-compare-section">
-              <h3>{SECTION_LABELS[section]}</h3>
-              <div className="ti-compare-head">
-                <span>Information from intake forms</span>
-                <span>Information from patient&apos;s chart</span>
-              </div>
-              {request.fields.filter(fieldItem => fieldItem.section === section).map(fieldItem => (
-                <label key={fieldItem.id} className={`ti-compare-row ${fieldItem.conflict ? 'has-conflict' : ''}`}>
-                  <span>
-                    <input
-                      type="checkbox"
-                      checked={fieldItem.selected}
-                      onChange={() => onToggleField(fieldItem.id)}
-                      disabled={isMerged}
-                    />
-                    <span>
-                      <strong>{fieldItem.label}</strong>
-                      <em>{fieldItem.intakeValue}</em>
-                    </span>
-                  </span>
-                  <span>{fieldItem.chartValue}</span>
-                </label>
-              ))}
-            </section>
-          ))}
-        </div>
-
-        <footer>
-          <span>{isMerged ? `Merged ${formatDate(request.mergedAt)}` : `${selectedCount} fields selected for chart merge`}</span>
-          <div>
-            <button type="button" className="ti-secondary" onClick={onClose}>Cancel</button>
-            {!isMerged && (
-              <button type="button" className="ti-primary" onClick={onMerge}>
-                <Check className="w-4 h-4" />
-                Merge Into Chart
-              </button>
-            )}
-            {!isMerged && <button type="button" className="ti-danger" onClick={onClose}>Reject All</button>}
-          </div>
-        </footer>
-      </div>
-    </section>
-  );
-}
-
-function SendFormsDialog({
-  patients,
-  onClose,
-  onSubmit,
-}: {
-  patients: PatientDoc[];
-  onClose: () => void;
-  onSubmit: (input: {
-    patientId: string;
-    provider: string;
-    forms: IntakeSectionKey[];
-    delivery: Array<'sms' | 'email'>;
-  }) => void;
-}) {
-  const [patientId, setPatientId] = useState('');
-  const [provider, setProvider] = useState(PROVIDERS[0]);
-  const [forms, setForms] = useState<IntakeSectionKey[]>(['basic', 'demographics', 'emergency', 'payment', 'additional', 'gad7', 'phq9', 'pcl5']);
-  const [delivery, setDelivery] = useState<Array<'sms' | 'email'>>(['sms', 'email']);
-  const selectedPatient = useMemo(() => patients.find(patient => patient._id === patientId) || null, [patients, patientId]);
-
-  const toggleForm = (key: IntakeSectionKey) => {
-    setForms(current => current.includes(key) ? current.filter(item => item !== key) : [...current, key]);
-  };
-
-  const toggleDelivery = (key: 'sms' | 'email') => {
-    setDelivery(current => current.includes(key) ? current.filter(item => item !== key) : [...current, key]);
-  };
-
-  const canSend = patientId && forms.length > 0 && delivery.length > 0;
-
-  return (
-    <div className="ti-dialog-backdrop" role="dialog" aria-modal="true" aria-label="Send forms to patient">
-      <form
-        className="ti-dialog"
-        onSubmit={event => {
-          event.preventDefault();
-          if (canSend) onSubmit({ patientId, provider, forms, delivery });
-        }}
-      >
-        <header>
-          <div>
-            <h2>Send Forms to Patient</h2>
-          </div>
-          <button type="button" className="ti-icon-btn" onClick={onClose} aria-label="Close send forms">
-            <X className="w-5 h-5" />
-          </button>
-        </header>
-
-        <label className="ti-field">
-          <span>Provider</span>
-          <select value={provider} onChange={event => setProvider(event.target.value)}>
-            {PROVIDERS.map(item => <option key={item}>{item}</option>)}
-          </select>
-        </label>
-
-        <label className="ti-field">
-          <span>Patient</span>
-          <select value={patientId} onChange={event => setPatientId(event.target.value)}>
-            <option value="">Select patient</option>
-            {patients.map(patient => (
-              <option key={patient._id} value={patient._id}>
-                {patientFullName(patient)} · {patient.hospitalNumber || 'No facility number'}
-              </option>
-            ))}
-          </select>
-        </label>
-        {patientId && (
-          <div className="ti-selected-patient">
-            {selectedPatient ? (
-              <>
-                <strong>{patientFullName(selectedPatient)}</strong>
-                <span>{patientMeta(selectedPatient)}</span>
-              </>
-            ) : null}
-            <button type="button" aria-label="Clear selected patient" onClick={() => { setPatientId(''); }}>
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        <div className="ti-form-picker">
-          <span>Patient intake</span>
-          <div className="ti-form-option-list">
-            {FORM_OPTIONS.map(option => (
-              <div
-                key={option.key}
-                className={`ti-form-option ${forms.includes(option.key) ? 'is-selected' : ''}`}
-              >
+          {/* Table + filters */}
+          <div className="flex-1 min-w-0 card-elevated p-4">
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <div className="relative ml-auto" style={{ minWidth: 220 }}>
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
                 <input
-                  id={`form-${option.key}`}
-                  type="checkbox"
-                  checked={forms.includes(option.key)}
-                  onChange={() => toggleForm(option.key)}
+                  value={patientQuery}
+                  onChange={e => setPatientQuery(e.target.value)}
+                  placeholder="Patient"
+                  style={{
+                    background: 'var(--bg-secondary)', border: '1px solid var(--border-light)',
+                    color: 'var(--text-primary)', borderRadius: 10,
+                    padding: '8px 10px 8px 30px', fontSize: 13, width: '100%',
+                  }}
                 />
-                <label htmlFor={`form-${option.key}`}>
-                  <strong>{option.label}</strong>
-                  <small>{option.desc}</small>
+              </div>
+            </div>
+
+            {loading ? (
+              <p className="text-[13px] py-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+            ) : filtered.length === 0 ? (
+              <p className="text-[13px] py-8 text-center" style={{ color: 'var(--text-muted)' }}>
+                No forms in this view.
+              </p>
+            ) : (
+              <table className="data-table" style={{ width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th>Received</th>
+                    <th>Patient</th>
+                    <th>Provider</th>
+                    <th className="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(form => (
+                    <tr key={form._id}>
+                      <td>{formatDate(form.receivedAt || form.requestedAt)}</td>
+                      <td>
+                        <span className="inline-flex items-center gap-2">
+                          <ClipboardPen className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+                          {form.patientName}
+                        </span>
+                      </td>
+                      <td style={{ color: 'var(--text-muted)' }}>{form.providerName || '—'}</td>
+                      <td className="text-right">
+                        {form.status === 'pending_review' ? (
+                          <button type="button" className="btn btn-sm btn-secondary" onClick={() => openReview(form)}>
+                            Review
+                          </button>
+                        ) : form.status === 'merged' ? (
+                          <span className="text-[12px]" style={{ color: 'var(--color-success)' }}>Merged {formatDate(form.mergedAt)}</span>
+                        ) : (
+                          <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Awaiting patient</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* ---------------------------------------------------------------- */}
+      {/* Send forms to patient                                            */}
+      {/* ---------------------------------------------------------------- */}
+      {sendOpen && (
+        <Modal onClose={() => { resetSend(); setSendOpen(false); }} width={520}>
+          <div className="modal-panel" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Send forms to patient</h3>
+              <button
+                onClick={() => { resetSend(); setSendOpen(false); }}
+                className="p-1.5 rounded-lg"
+                style={{ background: 'var(--overlay-subtle)' }}
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {/* Provider */}
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--text-muted)' }}>Provider</label>
+                <select value={sendProviderId} onChange={e => setSendProviderId(e.target.value)} style={inputStyle}>
+                  <option value="">Select a provider</option>
+                  {providerUsers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+                </select>
+              </div>
+
+              {/* Patient typeahead */}
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--text-muted)' }}>Patient</label>
+                <div className="relative">
+                  <input
+                    value={sendPatientQuery}
+                    onChange={e => { setSendPatientQuery(e.target.value); setSendPatient(null); }}
+                    placeholder="Search by name, hospital number, or phone"
+                    style={inputStyle}
+                  />
+                  {!sendPatient && patientMatches.length > 0 && (
+                    <div
+                      className="absolute left-0 right-0 mt-1 rounded-lg overflow-hidden z-10 shadow-lg"
+                      style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-light)', maxHeight: 240, overflowY: 'auto' }}
+                    >
+                      {patientMatches.map(p => (
+                        <button
+                          key={p._id}
+                          type="button"
+                          onClick={() => selectSendPatient(p)}
+                          className="w-full text-left px-3 py-2 text-[13px]"
+                          style={{ color: 'var(--text-primary)' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--overlay-subtle)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <span className="font-medium">{(p.surname || '').toUpperCase()}, {p.firstName}</span>
+                          <span style={{ color: 'var(--text-muted)' }}> ({formatDate(p.dateOfBirth)} · {patientGenderAge(p)})</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Patient intake packets */}
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--text-muted)' }}>Patient Intake</label>
+                {sendForms.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {sendForms.map(f => (
+                      <span
+                        key={f}
+                        className="inline-flex items-center gap-1 text-[12px] font-medium rounded-full px-2.5 py-1"
+                        style={{ background: 'var(--overlay-subtle)', color: 'var(--accent-primary)' }}
+                      >
+                        {f}
+                        <button
+                          type="button"
+                          onClick={() => setSendForms(prev => prev.filter(x => x !== f))}
+                          aria-label={`Remove ${f}`}
+                          className="inline-flex"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="relative">
+                  <Plus className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                  <select
+                    value=""
+                    onChange={e => { if (e.target.value) setSendForms(prev => [...prev, e.target.value]); }}
+                    disabled={availableFormOptions.length === 0}
+                    style={{ ...inputStyle, padding: '8px 10px 8px 30px' }}
+                  >
+                    <option value="">Add a form…</option>
+                    {availableFormOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Delivery */}
+              <div className="flex flex-col gap-2">
+                <label
+                  className="inline-flex items-center gap-2 text-[13px]"
+                  style={{ color: 'var(--text-muted)', cursor: 'not-allowed' }}
+                  title="No email on file for this patient"
+                >
+                  <input type="checkbox" checked={sendEmail} disabled onChange={e => setSendEmail(e.target.checked)} />
+                  <Mail className="w-3.5 h-3.5" />
+                  Email to {'no email on file'}
+                </label>
+                <label
+                  className="inline-flex items-center gap-2 text-[13px]"
+                  style={{ color: sendPatient?.phone ? 'var(--text-primary)' : 'var(--text-muted)', cursor: sendPatient?.phone ? 'pointer' : 'not-allowed' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={sendSms}
+                    disabled={!sendPatient?.phone}
+                    onChange={e => setSendSms(e.target.checked)}
+                  />
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  Send SMS to {sendPatient?.phone ? formatPhoneDisplay(sendPatient.phone) : 'no phone on file'}
                 </label>
               </div>
-            ))}
+            </div>
+
+            <div className="flex gap-2 mt-6">
+              <button onClick={() => { resetSend(); setSendOpen(false); }} className="btn btn-secondary flex-1">Cancel</button>
+              <button onClick={handleSend} disabled={!canSend || sending} className="btn btn-primary flex-1">
+                {sending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
           </div>
-        </div>
+        </Modal>
+      )}
 
-        <div className="ti-delivery">
-          <button type="button" className={delivery.includes('sms') ? 'is-selected' : ''} onClick={() => toggleDelivery('sms')}>
-            SMS to patient
-          </button>
-          <button type="button" className={delivery.includes('email') ? 'is-selected' : ''} onClick={() => toggleDelivery('email')}>
-            Email to patient
-          </button>
-        </div>
+      {/* ---------------------------------------------------------------- */}
+      {/* Review & merge (side-by-side compare)                            */}
+      {/* ---------------------------------------------------------------- */}
+      {reviewing && (
+        <Modal onClose={() => setReviewing(null)} width={720}>
+          <div className="modal-panel" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{reviewing.patientName}</h3>
+              <button onClick={() => setReviewing(null)} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }} aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+              Compare conflicting data, select relevant data, and merge into a single view.
+            </p>
 
-        {!canSend && (
-          <div className="ti-warning">
-            <AlertCircle className="w-4 h-4" />
-            Select a patient, at least one form, and one delivery method.
+            <div className="grid grid-cols-2 gap-4 mb-5">
+              {/* Left: incoming intake data */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+                  Information from intake forms
+                </p>
+                <div className="flex flex-col gap-2.5">
+                  {reviewing.fields.map(field => {
+                    const mergeable = !!MERGEABLE_FIELDS[field.label];
+                    return (
+                      <div key={field.label} className="flex items-start gap-2">
+                        {mergeable ? (
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={!!checkedFields[field.label]}
+                            onChange={e => setCheckedFields(prev => ({ ...prev, [field.label]: e.target.checked }))}
+                          />
+                        ) : (
+                          <span className="w-[13px] flex-shrink-0" />
+                        )}
+                        <p className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+                          {field.label}:{' '}
+                          <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{field.value}</span>
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Right: current chart data */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+                  Information from patient&apos;s chart
+                </p>
+                <div className="flex flex-col gap-2.5">
+                  {reviewing.fields.map(field => {
+                    const current = currentChartValue(reviewPatient, field.label);
+                    return (
+                      <p key={field.label} className="text-[13px]" style={{ color: 'var(--text-primary)', minHeight: 18 }}>
+                        {MERGEABLE_FIELDS[field.label]
+                          ? <>{field.label}: {current || <span style={{ color: 'var(--text-muted)' }}>—</span>}</>
+                          : <span style={{ color: 'var(--text-muted)' }}>&nbsp;</span>}
+                      </p>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => setReviewing(null)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleReject} disabled={merging} className="btn btn-secondary" style={{ color: 'var(--color-danger)' }}>
+                Reject All
+              </button>
+              <button onClick={handleMerge} disabled={merging} className="btn btn-primary flex-1">
+                {merging ? 'Merging…' : 'Merge Into Chart'}
+              </button>
+            </div>
           </div>
-        )}
-
-        <footer>
-          <button type="button" className="ti-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="ti-primary" disabled={!canSend}>SEND</button>
-        </footer>
-      </form>
-    </div>
+        </Modal>
+      )}
+    </>
   );
 }

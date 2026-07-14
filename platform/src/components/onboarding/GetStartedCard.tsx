@@ -16,7 +16,7 @@ import { useOnboarding } from '@/lib/hooks/useOnboarding';
 import { getDefaultDashboard } from '@/lib/permissions';
 import type { OnboardingSection, OnboardingStep } from '@/lib/onboarding/steps';
 import {
-  Check, Lock, X, ArrowRight, Play, FileText, Star, ChevronUp,
+  Check, Lock, X, ArrowRight, Star, ChevronUp,
 } from '@/components/icons/lucide';
 
 export default function GetStartedCard() {
@@ -39,7 +39,7 @@ export default function GetStartedCard() {
     return (
       <div
         className="absolute bottom-4 left-4 z-30 flex items-center gap-0.5 rounded-full py-0.5 pl-1.5 pr-1 text-xs font-semibold text-white shadow-lg"
-        style={{ background: 'var(--accent-primary, #0077d7)' }}
+        style={{ background: 'var(--accent-primary)' }}
       >
         <button
           onClick={() => setCollapsed(false)}
@@ -68,7 +68,7 @@ export default function GetStartedCard() {
   return (
     <div
       className="absolute inset-0 z-30 overflow-y-auto"
-      style={{ background: 'var(--bg-primary, #f6f8fb)' }}
+      style={{ background: 'var(--bg-primary)' }}
     >
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
@@ -77,7 +77,10 @@ export default function GetStartedCard() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="" className="h-10 w-10" />
             <div>
-              <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              <h1
+                className="text-xl font-bold"
+                style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-platform)', letterSpacing: '-0.01em' }}
+              >
                 Welcome, {firstName}!
               </h1>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -105,32 +108,24 @@ export default function GetStartedCard() {
 
         {allDone && <AllDoneBanner onFinish={finish} />}
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          {/* Checklist */}
-          <div className="space-y-4 lg:col-span-2">
-            {plan.sections.map((section, i) => {
-              const unlocked = isSectionUnlocked(plan.sections, i, completedStepIds);
-              return (
-                <SectionCard
-                  key={section.id}
-                  section={section}
-                  defaultOpen={i === 0}
-                  unlocked={unlocked}
-                  completedStepIds={completedStepIds}
-                  onStart={(step) => {
-                    completeStep(step.id);
-                    if (step.href && step.href !== pathname) router.push(step.href);
-                  }}
-                  onToggle={completeStep}
-                />
-              );
-            })}
-          </div>
-
-          {/* Helpful resources */}
-          <div className="lg:col-span-1">
-            <ResourcesPanel resources={plan.resources} />
-          </div>
+        <div className="mx-auto max-w-3xl space-y-4">
+          {plan.sections.map((section, i) => {
+            const unlocked = isSectionUnlocked(plan.sections, i, completedStepIds);
+            return (
+              <SectionCard
+                key={section.id}
+                section={section}
+                defaultOpen={i === 0}
+                unlocked={unlocked}
+                completedStepIds={completedStepIds}
+                onStart={(step) => {
+                  completeStep(step.id);
+                  if (step.href && step.href !== pathname) router.push(step.href);
+                }}
+                onToggle={completeStep}
+              />
+            );
+          })}
         </div>
       </div>
     </div>
@@ -155,7 +150,7 @@ function AllDoneBanner({ onFinish }: { onFinish: () => void }) {
       <button
         onClick={onFinish}
         className="rounded-lg px-4 py-2 text-sm font-semibold text-white"
-        style={{ background: 'var(--accent-primary, #0077d7)' }}
+        style={{ background: 'var(--accent-primary)' }}
       >
         Finish
       </button>
@@ -217,7 +212,7 @@ function SectionCard({
           className="h-0.5 w-full"
           style={{ background: 'var(--border-light)' }}
         >
-          <div className="h-full transition-all" style={{ width: `${total ? (done / total) * 100 : 0}%`, background: 'var(--accent-primary, #0077d7)' }} />
+          <div className="h-full transition-all" style={{ width: `${total ? (done / total) * 100 : 0}%`, background: 'var(--accent-primary)' }} />
         </div>
       )}
 
@@ -269,58 +264,6 @@ function SectionCard({
           })}
         </ul>
       )}
-    </div>
-  );
-}
-
-function ResourcesPanel({ resources }: { resources: { id: string; title: string; type: 'video' | 'article'; href: string; meta: string }[] }) {
-  const [tab, setTab] = useState<'video' | 'article'>('video');
-  const items = resources.filter(r => r.type === tab);
-  return (
-    <div className="rounded-xl border" style={{ borderColor: 'var(--border-medium)', background: 'var(--bg-card-solid)' }}>
-      <div className="px-4 py-3">
-        <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Helpful resources</h3>
-      </div>
-      <div className="flex gap-1 px-4">
-        {(['video', 'article'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className="rounded-t-lg px-3 py-1.5 text-xs font-semibold capitalize"
-            style={{
-              color: tab === t ? 'var(--accent-primary, #0077d7)' : 'var(--text-muted)',
-              borderBottom: tab === t ? '2px solid var(--accent-primary, #0077d7)' : '2px solid transparent',
-            }}
-          >
-            {t === 'video' ? 'Videos' : 'Articles'}
-          </button>
-        ))}
-      </div>
-      <ul className="divide-y p-2" style={{ borderColor: 'var(--border-light)' }}>
-        {items.map(r => (
-          <li key={r.id}>
-            <a
-              href={r.href}
-              target={r.href.startsWith('#') ? undefined : '_blank'}
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-black/5"
-            >
-              <span
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
-                style={{ background: 'rgba(0,119,215,0.10)' }}
-              >
-                {r.type === 'video'
-                  ? <Play className="w-4 h-4" style={{ color: 'var(--accent-primary, #0077d7)' }} />
-                  : <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary, #0077d7)' }} />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{r.title}</p>
-                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{r.meta}</p>
-              </div>
-            </a>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

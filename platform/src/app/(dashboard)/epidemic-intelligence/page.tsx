@@ -184,8 +184,8 @@ export default function EpidemicIntelligencePage() {
               </div>
               <div className="p-4 space-y-3">
                 {rtEstimates.map(rt => {
-                  const barWidth = Math.min(100, (rt.rt / 3) * 100);
-                  const rtColor = rt.rt > 1.5 ? 'var(--color-danger)' : rt.rt > 1.0 ? '#FB923C' : rt.rt > 0.8 ? 'var(--color-warning)' : 'var(--color-success)';
+                  const barWidth = rt.rt === null ? 0 : Math.min(100, (rt.rt / 3) * 100);
+                  const rtColor = rt.rt === null ? 'var(--text-muted)' : rt.rt > 1.5 ? 'var(--color-danger)' : rt.rt > 1.0 ? '#FB923C' : rt.rt > 0.8 ? 'var(--color-warning)' : 'var(--color-success)';
                   return (
                     <div key={rt.disease} className="p-3 rounded-xl" style={{
                       background: 'var(--overlay-subtle)',
@@ -204,13 +204,13 @@ export default function EpidemicIntelligencePage() {
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1">
                             <span className="text-xs font-medium" style={{
-                              color: rt.trend === 'growing' ? 'var(--color-danger)' : rt.trend === 'declining' ? 'var(--color-success)' : 'var(--color-warning)',
+                              color: rt.trend === 'growing' ? 'var(--color-danger)' : rt.trend === 'declining' ? 'var(--color-success)' : rt.trend === 'insufficient_data' ? 'var(--text-muted)' : 'var(--color-warning)',
                             }}>
-                              {rt.weeklyChange > 0 ? '+' : ''}{rt.weeklyChange}%
+                              {rt.trend === 'insufficient_data' ? t('epidemic.notAvailable') : `${rt.weeklyChange > 0 ? '+' : ''}${rt.weeklyChange}%`}
                             </span>
                           </div>
                           <span className="text-xl font-bold font-mono" style={{ color: rtColor }}>
-                            {rt.rt.toFixed(2)}
+                            {rt.rt === null ? '—' : rt.rt.toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -444,16 +444,16 @@ export default function EpidemicIntelligencePage() {
                     const totalCases = diseaseCases.reduce((s, c) => s + c.cases, 0);
                     const totalDeaths = diseaseCases.reduce((s, c) => s + c.deaths, 0);
                     const cfr = totalCases > 0 ? ((totalDeaths / totalCases) * 100).toFixed(1) : '0';
-                    const rtColor = rt.rt > 1.5 ? 'var(--color-danger)' : rt.rt > 1 ? '#FB923C' : 'var(--color-success)';
+                    const rtColor = rt.rt === null ? 'var(--text-muted)' : rt.rt > 1.5 ? 'var(--color-danger)' : rt.rt > 1 ? '#FB923C' : 'var(--color-success)';
                     return (
                       <tr key={rt.disease}>
                         <td className="font-medium text-sm">{rt.disease}</td>
-                        <td><span className="font-bold font-mono" style={{ color: rtColor }}>{rt.rt.toFixed(2)}</span></td>
+                        <td><span className="font-bold font-mono" style={{ color: rtColor }}>{rt.rt === null ? '—' : rt.rt.toFixed(2)}</span></td>
                         <td>
                           <div className="flex items-center gap-1">
                             <span className="text-xs capitalize" style={{
-                              color: rt.trend === 'growing' ? 'var(--color-danger)' : rt.trend === 'declining' ? 'var(--color-success)' : 'var(--color-warning)',
-                            }}>{rt.trend}</span>
+                              color: rt.trend === 'growing' ? 'var(--color-danger)' : rt.trend === 'declining' ? 'var(--color-success)' : rt.trend === 'insufficient_data' ? 'var(--text-muted)' : 'var(--color-warning)',
+                            }}>{rt.trend === 'insufficient_data' ? t('epidemic.notAvailable') : rt.trend}</span>
                           </div>
                         </td>
                         <td className="font-semibold">{totalCases.toLocaleString()}</td>

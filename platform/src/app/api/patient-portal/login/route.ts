@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientIp } from '@/lib/request-utils';
 import { createPatientToken } from '@/lib/patient-portal-auth';
-import { rateLimit as sharedRateLimit, resetRateLimit } from '@/lib/rate-limit';
+import { demoFallbackEnabled, findDemoPatientByHospitalNumber, findDemoPatientByNameDob } from '@/lib/patient-portal-demo';
 
 // Rate limit: 10 attempts / 15 min / IP + 10 attempts / 15 min / phone.
 // Backed by lib/rate-limit.ts, which uses shared Upstash Redis when
@@ -71,11 +71,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Dynamic import to avoid PouchDB SSR crash (same pattern as /api/patients)
-    const { patientsDB } = await import('@/lib/db');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = patientsDB() as any;
-
     type PatientLike = {
       _id: string;
       firstName?: string;
@@ -86,59 +81,85 @@ export async function POST(req: NextRequest) {
       dateOfBirth?: string;
       gender?: string;
       registrationHospital?: string;
+      // Real patient docs (and the demo fallback) carry plenty more the
+      // portal's Overview/Profile tabs read (registrationHospitalName,
+      // county, state, bloodType, allergies, ...) — pass all of it through
+      // rather than hand-picking a subset that quietly drifts from what the
+      // UI actually needs.
+      [key: string]: unknown;
     };
     let found: PatientLike | null = null;
 
-    // Method 1: Hospital number (or geocode ID) + phone.
-    // Use a (type, hospitalNumber) Mango query; geocodeId is checked in a
-    // second narrow query. Phone is filtered in-memory on the tiny result set.
-    if (body.hospitalNumber) {
-      const hn = body.hospitalNumber.trim().toUpperCase();
-      await ensureIndex(db, ['type', 'hospitalNumber'], 'hospitalNumber');
-      const byHn = await db.find({
-        selector: { type: 'patient', hospitalNumber: hn },
-        limit: 50,
-      });
-      const candidates: PatientLike[] = (byHn.docs || []) as PatientLike[];
+    try {
+      // Dynamic import to avoid PouchDB SSR crash (same pattern as /api/patients)
+      const { patientsDB } = await import('@/lib/db');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = patientsDB() as any;
 
-      // Also try geocodeId (separate selector — Mango can't OR across two
-      // distinct indexed fields efficiently).
-      const byGeocode = await db.find({
-        selector: { type: 'patient', geocodeId: hn },
-        limit: 50,
-      });
-      candidates.push(...((byGeocode.docs || []) as PatientLike[]));
+      // Method 1: Hospital number (or geocode ID) + phone.
+      // Use a (type, hospitalNumber) Mango query; geocodeId is checked in a
+      // second narrow query. Phone is filtered in-memory on the tiny result set.
+      if (body.hospitalNumber) {
+        const hn = body.hospitalNumber.trim().toUpperCase();
+        await ensureIndex(db, ['type', 'hospitalNumber'], 'hospitalNumber');
+        const byHn = await db.find({
+          selector: { type: 'patient', hospitalNumber: hn },
+          limit: 50,
+        });
+        const candidates: PatientLike[] = (byHn.docs || []) as PatientLike[];
 
-      found = candidates.find((p) => {
-        const pPhone = phoneDigits(p.phone);
-        return (
-          (p.hospitalNumber?.toUpperCase() === hn || p.geocodeId?.toUpperCase() === hn) &&
-          pPhone === phone &&
-          pPhone.length > 0
-        );
-      }) || null;
-    }
+        // Also try geocodeId (separate selector — Mango can't OR across two
+        // distinct indexed fields efficiently).
+        const byGeocode = await db.find({
+          selector: { type: 'patient', geocodeId: hn },
+          limit: 50,
+        });
+        candidates.push(...((byGeocode.docs || []) as PatientLike[]));
 
-    // Method 2: Name + DOB + phone.
-    // Query by (type, dateOfBirth) — usually a small set — then filter name +
-    // phone in memory.
-    if (!found && body.firstName && body.surname && body.dateOfBirth) {
-      const fn = body.firstName.trim().toLowerCase();
-      const sn = body.surname.trim().toLowerCase();
-      const dob = body.dateOfBirth.trim();
-      await ensureIndex(db, ['type', 'dateOfBirth'], 'dateOfBirth');
-      const byDob = await db.find({
-        selector: { type: 'patient', dateOfBirth: dob },
-        limit: 200,
-      });
-      const candidates: PatientLike[] = (byDob.docs || []) as PatientLike[];
-      found = candidates.find(
-        (p) =>
-          p.firstName?.toLowerCase() === fn &&
-          p.surname?.toLowerCase() === sn &&
-          p.dateOfBirth === dob &&
-          phoneDigits(p.phone) === phone
-      ) || null;
+        found = candidates.find((p) => {
+          const pPhone = phoneDigits(p.phone);
+          return (
+            (p.hospitalNumber?.toUpperCase() === hn || p.geocodeId?.toUpperCase() === hn) &&
+            pPhone === phone &&
+            pPhone.length > 0
+          );
+        }) || null;
+      }
+
+      // Method 2: Name + DOB + phone.
+      // Query by (type, dateOfBirth) — usually a small set — then filter name +
+      // phone in memory.
+      if (!found && body.firstName && body.surname && body.dateOfBirth) {
+        const fn = body.firstName.trim().toLowerCase();
+        const sn = body.surname.trim().toLowerCase();
+        const dob = body.dateOfBirth.trim();
+        await ensureIndex(db, ['type', 'dateOfBirth'], 'dateOfBirth');
+        const byDob = await db.find({
+          selector: { type: 'patient', dateOfBirth: dob },
+          limit: 200,
+        });
+        const candidates: PatientLike[] = (byDob.docs || []) as PatientLike[];
+        found = candidates.find(
+          (p) =>
+            p.firstName?.toLowerCase() === fn &&
+            p.surname?.toLowerCase() === sn &&
+            p.dateOfBirth === dob &&
+            phoneDigits(p.phone) === phone
+        ) || null;
+      }
+    } catch (dbErr) {
+      // The real database is unreachable (e.g. no CouchDB configured in this
+      // environment) rather than simply "no match" — in demo mode, answer
+      // from the same literal seed data the client-side demo already uses
+      // instead of failing the whole portal.
+      if (!demoFallbackEnabled()) throw dbErr;
+      console.warn('[patient-portal/login] DB unreachable, using demo fallback', dbErr);
+      const demoMatch = body.hospitalNumber
+        ? await findDemoPatientByHospitalNumber(body.hospitalNumber, body.phone || '')
+        : (body.firstName && body.surname && body.dateOfBirth)
+          ? await findDemoPatientByNameDob(body.firstName, body.surname, body.dateOfBirth, body.phone || '')
+          : null;
+      found = demoMatch as PatientLike | null;
     }
 
     if (!found) {
@@ -160,14 +181,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       token,
       patient: {
+        ...found,
         id: found._id,
-        firstName: found.firstName,
-        surname: found.surname,
-        hospitalNumber: found.hospitalNumber,
-        phone: found.phone,
-        dateOfBirth: found.dateOfBirth,
-        gender: found.gender,
-        registrationHospital: found.registrationHospital,
       },
     });
   } catch (err) {

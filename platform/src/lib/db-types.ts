@@ -224,6 +224,40 @@ export interface ReferralDoc extends BaseDoc, Omit<Referral, 'id'> {
   orgId?: string;
 }
 
+/** Status of a patient-submitted intake form as it moves through the
+ *  front-desk review queue: a request is sent to the patient, they either
+ *  submit it (pending_review) or don't (not_submitted), and staff review a
+ *  submitted form and merge its data into the patient's chart (merged). */
+export type IntakeFormStatus = 'pending_review' | 'not_submitted' | 'merged' | 'rejected';
+
+export interface IntakeFormField {
+  label: string;
+  value: string;
+}
+
+export interface PatientIntakeFormDoc extends BaseDoc {
+  type: 'patient_intake_form';
+  /** Matched patient record, once one exists (may be unset if the patient
+   *  hasn't been registered yet and this form is their first contact). */
+  patientId?: string;
+  patientName: string;
+  hospitalNumber?: string;
+  providerId?: string;
+  providerName?: string;
+  status: IntakeFormStatus;
+  /** When the intake request/link was sent to the patient. */
+  requestedAt: string;
+  /** When the patient submitted the form. Unset while status is not_submitted. */
+  receivedAt?: string;
+  mergedAt?: string;
+  mergedBy?: string;
+  /** Submitted form answers, shown to staff during review. Free-form
+   *  label/value pairs so the form can evolve without a schema migration. */
+  fields: IntakeFormField[];
+  hospitalId?: string;
+  orgId?: string;
+}
+
 export interface LabResultDoc extends BaseDoc {
   type: 'lab_result';
   patientId: string;
@@ -441,6 +475,76 @@ export interface ProblemDoc extends BaseDoc {
   sourceEncounterId?: string;
   recordedBy?: string;
   recordedByName?: string;
+  hospitalId?: string;
+  hospitalName?: string;
+  orgId?: string;
+}
+
+/**
+ * Care-program enrollment — clinical programs a patient is enrolled in
+ * (ART/HIV care, TB, PMTCT, ANC, Nutrition, EPI/Immunization, NCD clinic, or
+ * a free-text "other"). Anchored to the patient like the Problem List.
+ *
+ * Distinct from `Patient.payorInfo.programEnrollment`, which is an unrelated
+ * insurance/NGO-coverage string captured at registration.
+ */
+export type ProgramKey =
+  | 'art_hiv_care'
+  | 'tb_ds'
+  | 'tb_dr'
+  | 'pmtct'
+  | 'anc'
+  | 'nutrition_otp'
+  | 'nutrition_sfp'
+  | 'epi_immunization'
+  | 'ncd_hypertension_diabetes'
+  | 'other';
+
+export type ProgramEnrollmentStatus = 'active' | 'completed' | 'transferred_out' | 'lost_to_follow_up' | 'discontinued';
+
+export interface ProgramEnrollmentDoc extends BaseDoc {
+  type: 'program_enrollment';
+  patientId: string;
+  patientName?: string;
+  programKey: ProgramKey;
+  /** Display label — the curated program name, or the clinician's free text when programKey === 'other'. */
+  programName: string;
+  status: ProgramEnrollmentStatus;
+  /** Date the patient was enrolled (YYYY-MM-DD) */
+  enrollmentDate: string;
+  /** Date the enrollment ended (completed/transferred/discontinued/LTFU), if any (YYYY-MM-DD) */
+  outcomeDate?: string;
+  notes?: string;
+  recordedBy?: string;
+  recordedByName?: string;
+  hospitalId?: string;
+  hospitalName?: string;
+  orgId?: string;
+}
+
+/**
+ * Procedure performed on a patient (bedside or theatre) — e.g. wound
+ * debridement, incision & drainage, suturing, IUD insertion. Previously no
+ * procedure data model existed; procedures done during a visit were only
+ * captured as free text inside the consultation note.
+ */
+export interface ProcedureDoc extends BaseDoc {
+  type: 'procedure';
+  patientId: string;
+  patientName?: string;
+  /** Encounter that this procedure was performed during, if any */
+  encounterId?: string;
+  /** Display name (e.g. "Incision and drainage of abscess") */
+  name: string;
+  /** Optional procedure code — free text (not validated against a coding system today) */
+  code?: string;
+  /** Date the procedure was performed (YYYY-MM-DD) */
+  date: string;
+  performedBy?: string;
+  performedByName?: string;
+  bodySite?: string;
+  outcome?: string;
+  notes?: string;
   hospitalId?: string;
   hospitalName?: string;
   orgId?: string;
@@ -768,6 +872,39 @@ export interface PatientDocumentDoc extends BaseDoc {
   note?: string;
   uploadedById?: string;
   uploadedByName?: string;
+  hospitalId?: string;
+  orgId?: string;
+}
+
+/** WHO-aligned malnutrition classification from MUAC + edema. */
+export type NutritionStatus = 'SAM' | 'MAM' | 'At Risk' | 'Underweight' | 'Normal';
+
+/**
+ * A MUAC-based nutrition screening (child 6–59m or ANC mother), recorded by
+ * nutrition staff. Feeds the nutrition dashboard and program reports.
+ * Facility-operational PHI; org-scoped sync.
+ */
+export interface NutritionScreeningDoc extends BaseDoc {
+  type: 'nutrition_screening';
+  /** Optional link to a registered patient (screenings may precede registration). */
+  patientId?: string;
+  patientName: string;
+  /** Display age, e.g. '2y', '18m', '28w ANC'. */
+  age: string;
+  sex: string;
+  /** Mid-upper-arm circumference in cm. */
+  muac: number;
+  weightKg?: number;
+  heightCm?: number;
+  /** Bilateral pitting edema (any grade ⇒ SAM). */
+  edema: boolean;
+  /** Pregnant/lactating (ANC) — uses the adult MUAC threshold. */
+  isAnc: boolean;
+  status: NutritionStatus;
+  /** yyyy-mm-dd. */
+  screeningDate: string;
+  screenedById?: string;
+  screenedByName?: string;
   hospitalId?: string;
   orgId?: string;
 }

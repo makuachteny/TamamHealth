@@ -504,7 +504,7 @@ function StaffTab({ scope, hospitalId }: { scope: DataScope | undefined; hospita
                       <div style={{
                         width: 28, height: 28, borderRadius: 8,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'var(--accent-primary)',
+                        background: 'linear-gradient(135deg, #2191D0 0%, #015697 100%)',
                         color: '#fff', fontSize: 11, fontWeight: 700,
                       }}>{initials || '?'}</div>
                       <span style={{ fontWeight: 600, fontSize: 13 }}>{u.name}</span>
@@ -1037,10 +1037,10 @@ function PerformanceTab({ scope, hospitalId }: { scope: DataScope | undefined; h
     { label: t('hospitals.kpiVisitsToday'),       value: kpis.visitsToday,                  icon: Calendar,    tint: '#2191D0' },
     { label: t('hospitals.kpiActiveAdmissions'),  value: kpis.activeAdmissions,             icon: BedDouble,   tint: '#A78BFA' },
     { label: t('hospitals.kpiDischargesToday'),   value: kpis.dischargesToday,              icon: CheckCircle, tint: '#1F9D6F' },
-    { label: t('hospitals.kpiTransfersToday'),    value: kpis.transfersToday,               icon: ArrowLeft,   tint: '#3B82F6' },
+    { label: t('hospitals.kpiTransfersToday'),    value: kpis.transfersToday,               icon: ArrowLeft,   tint: '#2191D0' },
     { label: t('hospitals.kpiAvgLabTat'),         value: kpis.labTatHours || '—',           icon: FlaskConical, tint: '#F59E0B' },
     { label: t('hospitals.kpiRxDispensedToday'),  value: kpis.prescriptionsDispensedToday,  icon: Pill,        tint: '#EC4899' },
-    { label: t('hospitals.kpiImmunizationsToday'), value: kpis.immunizationsToday,          icon: Syringe,     tint: '#3B82F6' },
+    { label: t('hospitals.kpiImmunizationsToday'), value: kpis.immunizationsToday,          icon: Syringe,     tint: '#2191D0' },
   ];
 
   return (

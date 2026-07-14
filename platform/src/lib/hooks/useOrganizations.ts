@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { OrganizationDoc } from '../db-types';
+import { makeCoalescer } from './live-reload';
+import { organizationsDB } from '../db';
 
 export function useOrganizations() {
   const [organizations, setOrganizations] = useState<OrganizationDoc[]>([]);
@@ -23,6 +25,20 @@ export function useOrganizations() {
   }, []);
 
   useEffect(() => { loadOrganizations(); }, [loadOrganizations]);
+
+  // Live PouchDB subscription — reflect writes arriving from sync/other tabs.
+  useEffect(() => {
+    let cancelled = false;
+    const reload = makeCoalescer(() => { if (!cancelled) loadOrganizations(); });
+    const changes = organizationsDB().changes({ since: 'now', live: true, include_docs: false })
+      .on('change', () => reload.trigger())
+      .on('error', () => { /* transient feed errors; next load resyncs */ });
+    return () => {
+      cancelled = true;
+      reload.cancel();
+      try { changes.cancel(); } catch { /* noop */ }
+    };
+  }, [loadOrganizations]);
 
   const create = useCallback(async (
     data: Omit<OrganizationDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>,

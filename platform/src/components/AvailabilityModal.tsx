@@ -83,7 +83,7 @@ export default function AvailabilityModal({ onClose, onCreated }: { onClose: () 
             <Calendar className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Add availability</h2>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:opacity-80"><X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} /></button>
+          <button onClick={onClose} aria-label="Close" className="p-1 rounded-lg hover:opacity-80"><X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} /></button>
         </div>
 
         <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>

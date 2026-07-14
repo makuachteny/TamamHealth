@@ -46,6 +46,13 @@ const NATIONAL_SYNC_EXCLUSIONS = new Set<string>([
   'tamamhealth_clinician_tasks',       // per-clinician personal to-dos — personal/operational data, not national analytics
   'tamamhealth_patient_documents',     // scanned chart documents (films, letters, IDs) — facility-operational PHI blobs, not national analytics
   'tamamhealth_patient_reminders',     // queued patient reminders — facility-operational, not national analytics
+  'tamamhealth_intake_forms',          // patient-submitted intake forms awaiting review/merge — facility-operational workflow, not national analytics
+  'tamamhealth_procedures',            // bedside/theatre procedures — facility-operational clinical detail, not a national/DHIS2 indicator today
+  'tamamhealth_nutrition_supplies',    // facility supply stock levels (RUTF/F-75/…) — facility-operational logistics, not national analytics
+  // (tamamhealth_nutrition_screenings is NOT excluded — SAM/MAM now writes back
+  //  to the `nutrition_screenings` national table via DB_TABLE_MAP + mapper.
+  //  tamamhealth_program_enrollments is NOT excluded either — ART/TB/PMTCT/
+  //  ANC/Nutrition/EPI/NCD enrollment writes back to `program_enrollments`.)
 ]);
 
 // Local-only databases that never participate in sync at all.
@@ -100,6 +107,14 @@ function extractWardsDbTables(): Record<string, string> {
   return out;
 }
 
+/** The Postgres `ALLOWED_TABLES` SQL-injection allowlist in lib/db/postgres.ts. */
+function extractAllowedTables(): Set<string> {
+  const src = readSource('src/lib/db/postgres.ts');
+  const block = src.match(/const ALLOWED_TABLES = new Set<string>\(\[([\s\S]*?)\]\);/);
+  if (!block) throw new Error('Could not locate ALLOWED_TABLES in lib/db/postgres.ts');
+  return new Set([...block[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]));
+}
+
 describe('national sync coverage', () => {
   const dbTableMapKeys = new Set(extractDbTableMapKeys());
   const syncConfigDbs = DATABASE_SYNC_CONFIGS.map((c) => c.localName);
@@ -149,5 +164,20 @@ describe('national sync coverage', () => {
       expect(table).toBeTruthy();
       expect(mapperKeys.has(table)).toBe(true);
     }
+  });
+
+  // Regression guard: every table a FIELD_MAPPER writes to MUST be in the
+  // Postgres `ALLOWED_TABLES` allowlist, or `assertSafeTable` throws on every
+  // upsert and the sync-worker silently drops those docs (this is exactly how
+  // beds/admissions writeback was dead for a release — mapper + migration
+  // existed, allowlist didn't). Catches the whole class at build time.
+  test('every national writeback target table is in the Postgres ALLOWED_TABLES guard', () => {
+    const allowed = extractAllowedTables();
+    const targets = [
+      ...extractFieldMapperKeys(),
+      ...Object.values(extractWardsDbTables()),
+    ];
+    const unlisted = targets.filter((t) => !allowed.has(t));
+    expect(unlisted).toEqual([]);
   });
 });

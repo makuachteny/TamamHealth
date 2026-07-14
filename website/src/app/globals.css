@@ -1,26 +1,198 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 html,
 body {
-  background: var(--tb-cream-50, #FEFFF9);
-  scroll-behavior: smooth;
-  scroll-padding-top: var(--navbar-height, 80px);
+  margin: 0;
+  padding: 0;
+  /* Matches the hero/footer navy rather than the page's cream sections, so
+     mobile Safari's elastic overscroll (or any Android rubber-band/bounce)
+     never flashes white above the hero or below the footer. */
+  background: #015697;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html,
-  body {
-    scroll-behavior: auto;
-  }
+html {
+  scroll-behavior: smooth;
+  /* html is the single scroll root. overflow-x: hidden here clips horizontal
+     overflow without turning <body> into its own scroll container. */
+  overflow-x: hidden;
+  /* Kill the elastic rubber-band/bounce so the page can't be dragged past the
+     top of the hero or the bottom of the footer to reveal the colour behind
+     them — normal in-page scrolling is unaffected. */
+  overscroll-behavior-y: none;
+}
 
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
+body {
+  /* clip (not hidden) hides horizontal overflow WITHOUT making <body> a scroll
+     container — that quirk was trapping vertical scroll. */
+  overflow-x: clip;
+}
+
+section[id] {
+  scroll-margin-top: 78px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.tm-compare-arrow-short {
+  display: none;
+}
+
+/* ── Breakpoints: desktop ≥1024 · tablet 640–1023 · mobile ≤639 ── */
+@media (min-width: 1024px) {
+  .tm-nav-burger,
+  .tm-nav-drawer {
+    display: none !important;
   }
+}
+
+@media (max-width: 1023px) {
+  .tm-nav-links {
+    display: none !important;
+  }
+  .tm-nav-burger {
+    display: inline-flex !important;
+  }
+  .tm-section {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+  .tm-shadow-plate {
+    box-shadow: none !important;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .tm-grid-products,
+  .tm-grid-insights,
+  .tm-grid-split,
+  .tm-grid-features {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .tm-grid-breakdown {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  .tm-grid-team {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .tm-section {
+    padding: 64px 16px !important;
+  }
+  .tm-hero {
+    min-height: 100vh !important;
+    justify-content: flex-end !important;
+  }
+  .tm-hero-sub {
+    width: 100% !important;
+    align-self: flex-start !important;
+  }
+  .tm-btn-row {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    margin-top: 14px !important;
+  }
+  .tm-grid-products,
+  .tm-grid-insights,
+  .tm-grid-split,
+  .tm-grid-breakdown,
+  .tm-grid-features {
+    grid-template-columns: 1fr !important;
+  }
+  .tm-grid-team {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .tm-breakdown-card {
+    min-height: 300px !important;
+  }
+  .tm-compare-strip {
+    flex-direction: column !important;
+  }
+  .tm-compare-col {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .tm-compare-col-mid {
+    border-left: none !important;
+    border-right: none !important;
+    border-top: 1.5px solid #015697 !important;
+    border-bottom: 1.5px solid #015697 !important;
+  }
+  .tm-compare-arrow-full {
+    display: none;
+  }
+  .tm-compare-arrow-short {
+    display: inline;
+  }
+  .tm-form-pad {
+    padding: 24px 16px !important;
+  }
+  .tm-btn-row a {
+    flex: 0 0 auto;
+    text-align: center;
+    font-size: 13px !important;
+    padding: 10px 18px !important;
+  }
+  .tm-contact-h {
+    font-size: 30px !important;
+  }
+  .tm-footer-row {
+    flex-direction: column !important;
+    justify-content: center !important;
+    text-align: center;
+  }
+  .tm-footer-brand {
+    flex-direction: column !important;
+  }
+  .tm-footer-links {
+    justify-content: center !important;
+  }
+}
+
+/* ── Hover / focus states (expressed as style-hover / style-focus in the
+   source design; ported to real CSS since inline styles can't do pseudo-
+   states) ── */
+/* !important is required here: these elements also carry an inline
+   `style` (base state), which otherwise always wins over an external
+   stylesheet rule regardless of pseudo-class — so :hover/:focus would
+   never fire without it. */
+.tm-nav-link:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+.tm-nav-cta:hover {
+  background: #369fda !important;
+}
+.tm-hero-btn-primary:hover {
+  background: #369fda !important;
+}
+.tm-hero-btn-secondary:hover {
+  background: #eff8fd !important;
+}
+.tm-insight-card:hover {
+  box-shadow: 12px 12px 0 var(--tm-insight-shadow) !important;
+}
+.tm-product-card:hover {
+  box-shadow: 10px 10px 0 var(--tm-product-shadow) !important;
+}
+.tm-feature-card:hover {
+  box-shadow: 5px 5px 0 #015697 !important;
+}
+.tm-team-card:hover {
+  background: #f4f4f8 !important;
+}
+.tm-form-input:focus {
+  border-color: #2191d0 !important;
+}
+/* The inline style sets outline: none (it clashed with the border-color
+   swap above with no offset room); restore a real focus indicator via
+   :focus-visible so keyboard users still get one. */
+.tm-form-input:focus-visible {
+  outline: 2px solid #98cfee !important;
+  outline-offset: 2px;
+}
+.tm-submit-btn:hover {
+  background: #369fda !important;
 }

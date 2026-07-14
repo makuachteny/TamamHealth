@@ -20,7 +20,7 @@ export default function GlobalError({
     muted: '#94A3B8',
     dangerBg: 'rgba(229,46,66,0.12)',
     dangerBorder: 'rgba(229,46,66,0.25)',
-    primary: '#2563EB',
+    primary: '#2191D0',
     white: '#FFFFFF',
     secondaryBorder: 'rgba(255,255,255,0.18)',
     secondaryText: '#CBD5E1',
@@ -28,7 +28,7 @@ export default function GlobalError({
 
   return (
     <html lang="en">
-      <body style={{ margin: 0, background: colors.bg, color: colors.text, fontFamily: "var(--font-platform, 'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif)" }}>
+      <body style={{ margin: 0, background: colors.bg, color: colors.text, fontFamily: 'system-ui, sans-serif' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '24px', boxSizing: 'border-box' }}>
           <div style={{ maxWidth: '420px', width: '100%', textAlign: 'center' }}>
             <div style={{ width: 56, height: 56, borderRadius: 16, margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: colors.dangerBg, border: `1px solid ${colors.dangerBorder}` }}>

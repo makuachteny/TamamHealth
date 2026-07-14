@@ -1,0 +1,59 @@
+#cloud-config
+package_update: true
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - debian-keyring
+  - debian-archive-keyring
+
+write_files:
+  - path: /etc/caddy/Caddyfile
+    content: |
+      ${domain}, www.${domain} {
+        reverse_proxy localhost:3001
+      }
+
+  - path: /etc/systemd/system/website.service
+    content: |
+      [Unit]
+      Description=TamamHealth website container
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      Restart=always
+      RestartSec=10
+      ExecStartPre=-/usr/bin/docker rm -f website
+      ExecStartPre=/usr/bin/docker pull ${website_image}
+      ExecStartPre=/usr/bin/touch /etc/website.env
+      ExecStart=/usr/bin/docker run --rm --name website -p 3001:3001 --env-file /etc/website.env ${website_image}
+      ExecStop=/usr/bin/docker stop website
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # Docker
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update -y
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  - systemctl enable --now docker
+
+  # Caddy (official repo - auto TLS via Let's Encrypt)
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
+  - apt-get update -y
+  - apt-get install -y caddy
+  - systemctl restart caddy
+
+  # Registry auth (DigitalOcean Container Registry - token doubles as user/pass)
+  - echo "${do_token}" | docker login registry.digitalocean.com -u "${do_token}" --password-stdin
+
+  # Website container - will retry via systemd until the image is pushed
+  - systemctl daemon-reload
+  - systemctl enable --now website.service

@@ -106,7 +106,7 @@ export default function AnnouncementsPanel({ onClose, onUnreadChange }: { onClos
               <Plus className="w-3.5 h-3.5" /> New
             </button>
           )}
-          <button onClick={onClose} className="p-1"><X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} /></button>
+          <button onClick={onClose} aria-label="Close" className="p-1"><X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} /></button>
         </div>
       </div>
 

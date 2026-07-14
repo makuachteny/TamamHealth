@@ -33,7 +33,7 @@ const PAYMENT_METHODS: { key: UiMethod; name: string; icon: typeof Phone; desc: 
   { key: 'mpesa', name: 'M-Pesa', icon: Phone, desc: 'Pay via M-Pesa mobile money', color: '#4CAF50' },
   { key: 'mtn', name: 'MTN Mobile Money', icon: Phone, desc: 'Pay via MTN MoMo', color: '#FFC107' },
   { key: 'airtel', name: 'Airtel Money', icon: Phone, desc: 'Pay via Airtel Money', color: '#E53935' },
-  { key: 'card', name: 'Card Payment', icon: CreditCard, desc: 'Pay with a debit or credit card', color: '#5C6BC0' },
+  { key: 'card', name: 'Card Payment', icon: CreditCard, desc: 'Pay with a debit or credit card', color: '#2191D0' },
   { key: 'bank', name: 'Bank Transfer', icon: Banknote, desc: 'Pay via bank transfer', color: '#00897B' },
   { key: 'cash', name: 'Cash at Facility', icon: Wallet, desc: 'Pay in cash at the facility desk', color: '#2191D0' },
 ];
@@ -221,7 +221,7 @@ export default function CheckoutPage({ params }: { params: { linkId: string } })
     <Shell>
       {/* Amount banner */}
       <div style={{
-        background: 'var(--accent-primary)',
+        background: 'linear-gradient(135deg, #015697 0%, #2191D0 60%, #369FDA 100%)',
         borderRadius: 14, padding: '22px 24px', color: '#fff', marginBottom: 16, position: 'relative', overflow: 'hidden',
       }}>
         <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />

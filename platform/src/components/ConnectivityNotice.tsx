@@ -24,6 +24,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { DANGER, DANGER_STRONG, SUCCESS, SUCCESS_STRONG, WARNING, WARNING_STRONG, WHITE } from '@/lib/theme-colors';
 import {
   DuotoneCheck as Check,
   DuotoneAlert as AlertTriangle,
@@ -49,11 +50,11 @@ let nextId = 1;
 function toneColors(tone: Tone): { bg: string; border: string; icon: string; text: string } {
   switch (tone) {
     case 'success':
-      return { bg: 'var(--color-success)', border: '#15B8A6', icon: '#fff', text: '#fff' };
+      return { bg: SUCCESS, border: SUCCESS_STRONG, icon: WHITE, text: WHITE };
     case 'warning':
-      return { bg: 'var(--color-warning)', border: '#F59E0B', icon: '#fff', text: '#fff' };
+      return { bg: WARNING, border: WARNING_STRONG, icon: WHITE, text: WHITE };
     case 'danger':
-      return { bg: 'var(--color-danger)',  border: '#F87171', icon: '#fff', text: '#fff' };
+      return { bg: DANGER, border: DANGER_STRONG, icon: WHITE, text: WHITE };
   }
 }
 

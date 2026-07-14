@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { comparePatients, patientFullName, patientAgeLabel, patientAge, patientLastActivity, patientRegisteredAt } from '@/lib/patient-utils';
+import { comparePatients, patientFullName, patientAgeLabel, patientAge } from '@/lib/patient-utils';
 import PatientAvatar from '@/components/patients/PatientAvatar';
-import { UserPlus, Users, ScanLine, Hash, X, ArrowRight, Stethoscope, Filter, ChevronRight } from '@/components/icons/lucide';
+import { UserPlus, Users, ScanLine, Hash, X, ArrowRight, Stethoscope, Filter, ChevronRight, Download } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -20,8 +20,7 @@ import FingerprintIdentifyModal from '@/components/FingerprintIdentifyModal';
 import { isFingerprintEnabled } from '@/lib/services/fingerprint-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import EmptyState from '@/components/EmptyState';
-import SearchInput from '@/components/filters/SearchInput';
-import { formatPhoneDisplay } from '@/lib/field-formats';
+import PageInstructionCard from '@/components/PageInstructionCard';
 
 // Pagination cap — capped to keep DOM-node count manageable on low-end devices.
 // Each row produces ~20 DOM nodes; 100 rows ≈ 2k nodes which renders smoothly.
@@ -187,6 +186,43 @@ export default function PatientsPage() {
   const visible = sorted.slice(0, visibleCount);
   const hasMore = sorted.length > visibleCount;
 
+  // Registry-wide KPIs for the stat cards (not affected by the table's search).
+  const patientKpis = useMemo(() => {
+    const now = Date.now();
+    let male = 0, female = 0, newThisMonth = 0, unassigned = 0, outstanding = 0;
+    for (const p of patients) {
+      if (p.gender === 'Male') male++;
+      else if (p.gender === 'Female') female++;
+      const reg = p.registeredAt || p.registrationDate;
+      if (reg && now - new Date(reg).getTime() < MS30) newThisMonth++;
+      if (!p.assignedDoctor) unassigned++;
+      if ((balanceByPatient.get(p._id) || 0) > 0) outstanding++;
+    }
+    return { total: patients.length, male, female, newThisMonth, unassigned, outstanding };
+  }, [patients, balanceByPatient, MS30]);
+
+  // Export the currently filtered/sorted registry to CSV.
+  const handleDownloadCsv = () => {
+    const header = ['Name', 'Hospital number', 'Gender', 'Age', 'Location', 'Assigned provider'];
+    const rows = sorted.map(p => [
+      patientFullName(p),
+      p.hospitalNumber || '',
+      p.gender || '',
+      patientAgeLabel(p),
+      [p.county, p.state].filter(Boolean).join(', '),
+      p.assignedDoctorName || '',
+    ]);
+    const csv = [header, ...rows]
+      .map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'patients.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   // ── Role-aware columns ──────────────────────────────────────────────────
   // Every role sees the common identity columns (who + how to reach + where +
   // recency). Beyond that the registry adapts to what the role needs to act on:
@@ -271,36 +307,30 @@ export default function PatientsPage() {
   return (
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <PageInstructionCard />
+
           <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
             {/* ── Card toolbar ── */}
             <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              {/* Header row — title + stats */}
-              <div className="flex items-end justify-between gap-3 mb-3">
-                <span
-                  style={{
-                    fontFamily: "var(--font-platform)",
-                    fontWeight: 500,
-                    fontSize: 24,
-                    lineHeight: '100%',
-                    letterSpacing: 0,
-                    color: '#000000',
-                  }}
-                >
+              {/* Title + patient stats (inline, right-aligned — mirrors the wards
+                  "Current Admissions" header instead of separate stat cards). */}
+              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+                <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
                   All patients
                 </span>
-                <div className="flex items-center gap-3 flex-shrink-0 pb-0.5">
-                  <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#2191D0' }} />
-                    Male ({patients.filter(p => p.gender === 'Male').length})
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#D97706' }} />
-                    Female ({patients.filter(p => p.gender === 'Female').length})
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'var(--color-success)' }} />
-                    Total ({filtered.length})
-                  </span>
+                <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
+                  {[
+                    { label: t('patients.statRegistered'), value: patientKpis.total, color: 'var(--text-muted)' },
+                    { label: t('patient.male'), value: patientKpis.male, color: '#2191D0' },
+                    { label: t('patient.female'), value: patientKpis.female, color: '#D97706' },
+                    { label: t('patients.statNewThisMonth'), value: patientKpis.newThisMonth, color: '#15795C' },
+                    { label: isBilling ? t('patients.statOutstanding') : t('patients.statUnassigned'), value: isBilling ? patientKpis.outstanding : patientKpis.unassigned, color: '#B8741C' },
+                  ].map(s => (
+                    <span key={s.label} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                      {s.label} ({s.value.toLocaleString()})
+                    </span>
+                  ))}
                 </div>
               </div>
               {!hideRegistryToolbar && (
@@ -420,10 +450,23 @@ export default function PatientsPage() {
                     </button>
                   )}
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={handleDownloadCsv}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px',
+                    borderRadius: 999, background: 'var(--bg-card-solid)', color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-light)',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  }}
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
+              </div>
             </div>
-            <div className="show-scrollbar patients-registry-table-wrap" style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-              <table className={`w-full patients-registry-table ${canAssignPatients ? 'has-row-actions' : ''} ${isBilling ? 'is-billing' : ''}`} style={{ tableLayout: 'fixed' }}>
+            <div className="show-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', flex: '1 1 0%', minHeight: 0 }}>
+              <table className="w-full" style={{ tableLayout: 'fixed', minWidth: 880 }}>
                 <colgroup>
                   {columns.map(c => (
                     <col key={c.key} className={`patients-registry-col patients-registry-col-${c.key}`} style={{ width: `${(c.width / totalColWidth * 100).toFixed(2)}%` }} />
@@ -485,7 +528,7 @@ export default function PatientsPage() {
               </table>
             </div>
             {hasMore && (
-              <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   {t('patients.showingOf', { shown: visible.length.toLocaleString(), total: filtered.length.toLocaleString() })}
                 </span>

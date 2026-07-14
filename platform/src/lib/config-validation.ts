@@ -9,9 +9,6 @@
 const PLACEHOLDER = /REPLACE|CHANGE|PLACEHOLDER|ChangeMe/i;
 const JWT_PLACEHOLDER = /REPLACE|CHANGE|PLACEHOLDER|default|example|tamamhealth-south-sudan/i;
 
-/** The compiled-in license signing fallback. Must never be the live secret. */
-export const DEFAULT_LICENSE_SECRET = 'tamamhealth-2026-license-signing-key';
-
 export interface ConfigEnv {
   [key: string]: string | undefined;
 }
@@ -40,19 +37,6 @@ export function validateProductionConfig(env: ConfigEnv): string[] {
     errors.push('JWT_SECRET still contains a placeholder / default — generate one with `openssl rand -base64 48`.');
   } else if (jwt.length < 32) {
     errors.push(`JWT_SECRET must be at least 32 characters in production (got ${jwt.length}).`);
-  }
-
-  // --- License signing secret (SaaS control plane) -------------------------
-  // The operator signs every tenant's license with this key; if it is unset or
-  // still the compiled-in fallback, anyone could forge a license. Required in
-  // production so license expiry / suspension can't be bypassed.
-  const licenseSecret = env.TAMAMHEALTH_LICENSE_SECRET || '';
-  if (!licenseSecret) {
-    errors.push('TAMAMHEALTH_LICENSE_SECRET is unset — license keys would be signed with the public default. Set a strong random secret.');
-  } else if (licenseSecret === DEFAULT_LICENSE_SECRET || PLACEHOLDER.test(licenseSecret)) {
-    errors.push('TAMAMHEALTH_LICENSE_SECRET is the public default / a placeholder — rotate it to a strong random secret.');
-  } else if (licenseSecret.length < 32) {
-    errors.push(`TAMAMHEALTH_LICENSE_SECRET must be at least 32 characters in production (got ${licenseSecret.length}).`);
   }
 
   // --- Field encryption key (encryption at rest) ---------------------------

@@ -115,7 +115,7 @@ export const CLINICAL_FLOW_ROLES: Readonly<Record<ClinicalFlowRole, RoleDefiniti
     mapsToUserRoles: ['rooming_nurse', 'nurse', 'midwife'],
   },
   clinician: {
-    role: 'clinician', number: 5, label: 'Clinician',
+    role: 'clinician', number: 5, label: 'Doctor',
     primaryFunction: 'Consultation, documentation, orders, prescriptions, referrals (medical officer, clinical officer, specialist)',
     capabilities: ['consultation', 'ordering', 'prescribing', 'result_review', 'vitals_capture'],
     clinicalVisibility: 'full_chart',

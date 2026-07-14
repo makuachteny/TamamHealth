@@ -23,7 +23,7 @@ afterEach(async () => { await teardownTestDBs(); uuidCounter = 0; });
 async function makePatient() {
   return createPatient({
     hospitalNumber: 'HN-SCR', firstName: 'Aboud', surname: 'Lado', dateOfBirth: '1980-01-01',
-    gender: 'Male', phone: '0911000000', state: 'CES', tribe: 'Bari', primaryLanguage: 'Bari',
+    gender: 'Male', phone: '0911000000', state: 'CES', county: 'Juba', tribe: 'Bari', primaryLanguage: 'Bari',
     bloodType: 'O+', allergies: [], chronicConditions: [], nokName: 'X', nokRelationship: 'Brother',
     nokPhone: '0911000001', registrationHospital: 'hosp-001', registrationDate: '2026-01-01',
   } as unknown as Parameters<typeof createPatient>[0]);

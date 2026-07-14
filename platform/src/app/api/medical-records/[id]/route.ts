@@ -36,11 +36,14 @@ async function patchHandler(
     const { sanitizePayload } = await import('@/lib/validation');
     const sanitized = sanitizePayload(body);
     const { updateMedicalRecord, getMedicalRecordById } = await import('@/lib/services/medical-record-service');
-    // Org-scope guard: a clinician may only amend records in their own org
-    // (super_admin excepted) — prevents cross-tenant tampering by record id.
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+    // Scope guard: a clinician may only amend records their org/facility can
+    // see — same rule as the read path. filterByScope treats a record with no
+    // orgId as deny for scoped roles, closing the legacy-null-orgId bypass, and
+    // also enforces facility scope (the old check was org-only).
     const existing = await getMedicalRecordById(id);
     if (!existing) return NextResponse.json({ error: 'Record not found' }, { status: 404 });
-    if (auth.role !== 'super_admin' && auth.orgId && existing.orgId && existing.orgId !== auth.orgId) {
+    if (filterByScope([existing], buildScopeFromAuth(auth)).length === 0) {
       return forbidden('Access denied to this record');
     }
     const updated = await updateMedicalRecord(id, sanitized as Parameters<typeof updateMedicalRecord>[1]);
@@ -66,10 +69,11 @@ async function deleteHandler(
     if (!hasRole(auth, ['super_admin', 'medical_superintendent'])) return forbidden();
     const { id } = await params;
     const { deleteMedicalRecord, getMedicalRecordById } = await import('@/lib/services/medical-record-service');
-    // Org-scope guard before deletion (super_admin excepted).
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+    // Scope guard before deletion — same rule as the read/amend paths.
     const existing = await getMedicalRecordById(id);
     if (!existing) return NextResponse.json({ error: 'Record not found' }, { status: 404 });
-    if (auth.role !== 'super_admin' && auth.orgId && existing.orgId && existing.orgId !== auth.orgId) {
+    if (filterByScope([existing], buildScopeFromAuth(auth)).length === 0) {
       return forbidden('Access denied to this record');
     }
     const deleted = await deleteMedicalRecord(id);

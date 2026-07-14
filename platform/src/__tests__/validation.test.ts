@@ -21,6 +21,14 @@ describe('validation', () => {
       gender: 'male',
       dateOfBirth: '1990-01-15',
       state: 'Central Equatoria',
+      // Registration-form-required fields (validatePatientData mirrors the
+      // patients/new form): county is required when a state is set, plus
+      // primary language and next-of-kin details.
+      county: 'Juba',
+      primaryLanguage: 'English',
+      nokName: 'Jane Deng',
+      nokRelationship: 'Sister',
+      nokPhone: '0911222333',
     };
 
     test('returns no errors for valid patient data', () => {

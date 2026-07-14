@@ -1,0 +1,1093 @@
+/*
+ * OpenMRS O3-style patient chart shell — scoped styles.
+ *
+ * Everything here is prefixed `omrs-` so it never collides with the legacy
+ * `.ehr-chart-*` cascade in globals.css. Reuses existing `--ehr-*` / neutral
+ * tokens for greys, borders and surfaces; introduces one new accent token
+ * (`--omrs-teal`) for the OpenMRS-style active/accent color, since this app's
+ * `--accent-primary` is blue and the OpenMRS reference uses teal.
+ *
+ * Stage 1: visual shell only (left nav rail, sticky header, sticky vitals
+ * band, right action rail + slide-in drawer). Tab CONTENT is untouched and
+ * simply renders inside `.omrs-content`.
+ */
+
+.omrs-root {
+  --omrs-teal: #007d79;
+  --omrs-teal-soft: rgba(0, 125, 121, 0.08);
+  --omrs-teal-border: rgba(0, 125, 121, 0.28);
+
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: 70vh;
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ══════════════════ LEFT NAV RAIL ══════════════════ */
+
+.omrs-left-rail {
+  flex: 0 0 230px;
+  width: 230px;
+  background: var(--ehr-panel, #fff);
+  border-right: 1px solid var(--ehr-border, #D8E3EC);
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  max-height: 100vh;
+  overflow-y: auto;
+  padding: 8px 0 16px;
+}
+
+.omrs-rail-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ehr-muted, #8395A8);
+  padding: 14px 16px 6px;
+}
+
+.omrs-rail-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 16px;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ehr-text-body, #39536B);
+  cursor: pointer;
+}
+
+.omrs-rail-item:hover {
+  background: var(--ehr-hover, #FAFCFE);
+}
+
+.omrs-rail-item.is-active {
+  background: var(--omrs-teal-soft);
+  border-left-color: var(--omrs-teal);
+  color: var(--ehr-text-title, #132C44);
+  font-weight: 700;
+}
+
+.omrs-rail-item svg {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  color: inherit;
+}
+
+.omrs-rail-item.is-active svg {
+  color: var(--omrs-teal);
+}
+
+.omrs-rail-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omrs-rail-divider {
+  height: 1px;
+  background: var(--ehr-border-soft, #E7EEF5);
+  margin: 10px 16px;
+}
+
+/* ══════════════════ MAIN COLUMN ══════════════════ */
+
+.omrs-main-col {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.omrs-sticky-zone {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: var(--ehr-page-bg, #F8FBFD);
+  border-bottom: 1px solid var(--ehr-border, #D8E3EC);
+}
+
+.omrs-content {
+  flex: 1 1 auto;
+  padding: 20px;
+  min-width: 0;
+}
+
+/* ── Sticky patient header ── */
+
+.omrs-header {
+  padding: 14px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.omrs-avatar {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: 0.5px;
+}
+
+.omrs-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.omrs-header-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.omrs-header-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.omrs-header-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ehr-text-title, #132C44);
+  margin: 0;
+}
+
+.omrs-gender-symbol {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ehr-muted, #8395A8);
+}
+
+.omrs-gender-symbol.male { color: var(--accent-primary); }
+.omrs-gender-symbol.female { color: #C2408A; }
+
+.omrs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.omrs-chip--active-visit {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.omrs-chip--ontime {
+  background: var(--ehr-soft, #E9F0F5);
+  color: var(--ehr-text-body, #39536B);
+}
+
+.omrs-header-meta {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--ehr-muted, #8395A8);
+}
+
+.omrs-header-more {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--ehr-border-soft, #E7EEF5);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 12.5px;
+  color: var(--ehr-text-body, #39536B);
+}
+
+.omrs-header-more strong {
+  color: var(--ehr-text-title, #132C44);
+}
+
+.omrs-header-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.omrs-header-actions-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border-radius: 6px;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  background: var(--ehr-panel, #fff);
+  color: var(--ehr-text-body, #39536B);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.omrs-header-actions-btn:hover {
+  background: var(--ehr-hover, #FAFCFE);
+}
+
+.omrs-header-actions-btn.omrs-link {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent-primary);
+}
+
+.omrs-actions-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 200px;
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(16, 38, 52, 0.14);
+  z-index: 30;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.omrs-actions-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ehr-text-body, #39536B);
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.omrs-actions-menu button:hover {
+  background: var(--ehr-hover, #FAFCFE);
+  color: var(--ehr-text-title, #132C44);
+}
+
+.omrs-actions-menu button svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--ehr-muted, #8395A8);
+}
+
+/* ── Sticky vitals & biometrics band ── */
+
+.omrs-vitals-band {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--ehr-border-soft, #E7EEF5);
+}
+
+.omrs-vitals-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-bottom: 10px;
+}
+
+.omrs-vitals-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ehr-text-title, #132C44);
+}
+
+.omrs-vitals-timestamp {
+  font-size: 11.5px;
+  color: var(--ehr-muted, #8395A8);
+}
+
+.omrs-vitals-fresh-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ehr-danger-bg, #FCE4DE);
+  color: var(--ehr-danger-text, #B93328);
+}
+
+.omrs-vitals-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.omrs-vitals-link:hover { text-decoration: underline; }
+
+.omrs-vitals-info {
+  color: var(--ehr-muted, #8395A8);
+  display: inline-flex;
+}
+
+.omrs-vitals-info svg { width: 14px; height: 14px; }
+
+.omrs-vitals-spacer { flex: 1 1 auto; }
+
+.omrs-vitals-record-link {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.omrs-vitals-record-link:hover { text-decoration: underline; }
+
+.omrs-vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.omrs-vitals-cell {
+  background: var(--ehr-page-bg, #F8FBFD);
+  border: 1px solid var(--ehr-border-soft, #E7EEF5);
+  border-radius: 7px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.omrs-vitals-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--ehr-muted, #8395A8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.omrs-vitals-value {
+  margin-top: 3px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ehr-text-title, #132C44);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.omrs-vitals-value .omrs-vitals-unit {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--ehr-muted, #8395A8);
+  margin-left: 3px;
+}
+
+/* ══════════════════ SECTION CARDS + TABLES (Stage 3) ══════════════════ */
+/* `.omrs-table` rules are scoped under `.omrs-root` so they only apply where
+ * a table explicitly opts in — they never touch the legacy
+ * `.ehr-chart-content .data-table` cascade in globals.css. */
+
+.omrs-section {
+  background: var(--ehr-panel, #fff);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.omrs-section + .omrs-section {
+  margin-top: 16px;
+}
+
+.omrs-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 18px 0;
+}
+
+.omrs-section-title-wrap {
+  padding-bottom: 10px;
+}
+
+.omrs-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ehr-text-title, #132C44);
+  margin: 0 0 6px;
+}
+
+.omrs-section-underline {
+  display: block;
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--omrs-teal);
+}
+
+.omrs-section-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+}
+
+.omrs-section-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+
+.omrs-section-add:hover { text-decoration: underline; }
+.omrs-section-add svg { width: 14px; height: 14px; }
+
+.omrs-section-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ehr-text-body, #39536B);
+  background: var(--ehr-page-bg, #F8FBFD);
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 6px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.omrs-section-filter select {
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.omrs-section-toggle {
+  display: inline-flex;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.omrs-section-toggle button {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border: none;
+  background: var(--ehr-panel, #fff);
+  color: var(--ehr-muted, #8395A8);
+  cursor: pointer;
+}
+
+.omrs-section-toggle button.is-active {
+  background: var(--omrs-teal);
+  color: #fff;
+}
+
+.omrs-section-body {
+  padding: 0 18px 16px;
+}
+
+.omrs-section-search {
+  padding: 0 18px 12px;
+}
+
+.omrs-section-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--ehr-border-soft, #E7EEF5);
+  font-size: 11.5px;
+  color: var(--ehr-muted, #8395A8);
+}
+
+.omrs-section-pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.omrs-section-pager button {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 5px;
+  background: var(--ehr-panel, #fff);
+  color: var(--ehr-text-body, #39536B);
+  cursor: pointer;
+}
+
+.omrs-section-pager button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.omrs-section-pager button svg { width: 13px; height: 13px; }
+
+/* ── Tables ── */
+
+.omrs-root .omrs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.omrs-root .omrs-table thead th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--ehr-muted, #8395A8);
+  background: var(--ehr-head, #F7FAFC);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ehr-border, #D8E3EC);
+  white-space: nowrap;
+}
+
+.omrs-root .omrs-table tbody td {
+  padding: 9px 12px;
+  color: var(--ehr-text, #102634);
+  border-bottom: 1px solid var(--ehr-border-soft, #E7EEF5);
+  vertical-align: top;
+}
+
+.omrs-root .omrs-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.omrs-root .omrs-table tbody tr:hover td {
+  background: var(--ehr-hover, #FAFCFE);
+}
+
+.omrs-root .omrs-table.omrs-table--zebra tbody tr:nth-child(even) td {
+  background: var(--ehr-page-bg, #F8FBFD);
+}
+
+/* ── Empty state ── */
+
+.omrs-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 36px 16px;
+}
+
+.omrs-empty-state svg {
+  width: 34px;
+  height: 34px;
+  color: var(--ehr-muted, #8395A8);
+  opacity: 0.5;
+}
+
+.omrs-empty-state p {
+  font-size: 12.5px;
+  color: var(--ehr-muted, #8395A8);
+  max-width: 320px;
+}
+
+.omrs-empty-action {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.omrs-empty-action:hover { text-decoration: underline; }
+
+.omrs-empty-action--disabled {
+  color: var(--ehr-muted, #8395A8);
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+/* ══════════════════ WORKSPACE PANELS (Stage 2) ══════════════════ */
+/* Shared building blocks for the right-drawer panels: order basket, visit
+ * note, task list, clinical forms, patient lists. Each panel renders its own
+ * `.omrs-drawer-body` + optional `.omrs-drawer-footer` (defined above). */
+
+.omrs-panel-section + .omrs-panel-section {
+  margin-top: 14px;
+}
+
+.omrs-panel-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0 0 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.omrs-panel-section-head svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ehr-muted, #8395A8);
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.omrs-panel-section-head.is-collapsed svg.omrs-chevron {
+  transform: rotate(-90deg);
+}
+
+.omrs-panel-section-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ehr-text-title, #132C44);
+  flex: 1 1 auto;
+}
+
+.omrs-panel-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.omrs-panel-add-btn:hover { text-decoration: underline; }
+.omrs-panel-add-btn svg { width: 13px; height: 13px; color: var(--accent-primary); }
+
+.omrs-panel-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--ehr-border-soft, #E7EEF5);
+}
+
+.omrs-panel-section-head + .omrs-panel-row,
+.omrs-panel-row:first-of-type {
+  border-top: none;
+}
+
+.omrs-panel-row-main {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ehr-text-title, #132C44);
+}
+
+.omrs-panel-row-sub {
+  font-size: 11px;
+  color: var(--ehr-muted, #8395A8);
+  margin-top: 1px;
+}
+
+.omrs-panel-empty {
+  font-size: 12px;
+  color: var(--ehr-muted, #8395A8);
+  padding: 10px 0;
+}
+
+.omrs-panel-permission-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 30px 10px;
+  color: var(--ehr-muted, #8395A8);
+  font-size: 12.5px;
+}
+
+.omrs-panel-field {
+  margin-bottom: 12px;
+}
+
+.omrs-panel-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--ehr-muted, #8395A8);
+  margin-bottom: 5px;
+}
+
+.omrs-panel-input,
+.omrs-panel-textarea,
+.omrs-panel-search {
+  width: 100%;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-size: 12.5px;
+  color: var(--ehr-text, #102634);
+  background: var(--ehr-panel, #fff);
+  font-family: inherit;
+}
+
+.omrs-panel-textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+.omrs-panel-picked-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--omrs-teal-soft);
+  border: 1px solid var(--omrs-teal-border);
+  font-size: 12px;
+}
+
+.omrs-panel-picked-chip button {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.omrs-panel-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.omrs-panel-badge--pending { background: var(--ehr-warning-bg, #FFF1C7); color: var(--ehr-warning-text, #9C5E16); }
+.omrs-panel-badge--active { background: var(--ehr-info-soft, #DCEFFB); color: var(--accent-primary); }
+.omrs-panel-badge--done { background: var(--ehr-success-bg, #DDF2E9); color: var(--ehr-success-text, #0E7155); }
+.omrs-panel-badge--muted { background: var(--ehr-soft, #E9F0F5); color: var(--ehr-muted, #8395A8); }
+
+.omrs-panel-search-wrap {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.omrs-panel-search-wrap svg {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--ehr-muted, #8395A8);
+}
+
+.omrs-panel-search-wrap input {
+  padding-left: 28px;
+}
+
+.omrs-panel-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 0;
+  border-top: 1px solid var(--ehr-border-soft, #E7EEF5);
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.omrs-panel-list-item:first-of-type { border-top: none; }
+
+.omrs-panel-list-item:hover .omrs-panel-row-main {
+  color: var(--accent-primary);
+}
+
+.omrs-panel-list-item svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ehr-muted, #8395A8);
+  flex-shrink: 0;
+}
+
+.omrs-panel-list-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ehr-text-title, #132C44);
+  flex-shrink: 0;
+}
+
+/* ══════════════════ RIGHT ACTION RAIL ══════════════════ */
+
+.omrs-right-rail {
+  flex: 0 0 56px;
+  width: 56px;
+  background: var(--ehr-panel, #fff);
+  border-left: 1px solid var(--ehr-border, #D8E3EC);
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0;
+}
+
+.omrs-right-rail-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ehr-border, #D8E3EC);
+  background: var(--ehr-panel, #fff);
+  color: var(--ehr-muted, #8395A8);
+  cursor: pointer;
+}
+
+.omrs-right-rail-btn:hover {
+  background: var(--ehr-hover, #FAFCFE);
+  color: var(--ehr-text-title, #132C44);
+}
+
+.omrs-right-rail-btn.is-active {
+  background: var(--omrs-teal);
+  border-color: var(--omrs-teal);
+  color: #fff;
+}
+
+.omrs-right-rail-btn svg { width: 17px; height: 17px; }
+
+/* ══════════════════ RIGHT SLIDE-IN DRAWER ══════════════════ */
+
+.omrs-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 38, 52, 0.28);
+  z-index: 39;
+}
+
+.omrs-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 420px;
+  max-width: 100vw;
+  background: var(--ehr-panel, #fff);
+  box-shadow: -8px 0 28px rgba(16, 38, 52, 0.18);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s ease;
+}
+
+/* Maximized state (drawer header's expand toggle): near-full-width workspace. */
+.omrs-drawer.is-maximized {
+  width: min(960px, 92vw);
+}
+
+.omrs-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ehr-border, #D8E3EC);
+  background: var(--ehr-page-bg, #F8FBFD);
+}
+
+.omrs-drawer-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ehr-text-title, #132C44);
+}
+
+.omrs-drawer-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.omrs-drawer-controls button {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--ehr-muted, #8395A8);
+  cursor: pointer;
+}
+
+.omrs-drawer-controls button:hover {
+  background: var(--ehr-hover, #FAFCFE);
+  color: var(--ehr-text-title, #132C44);
+}
+
+.omrs-drawer-controls button svg { width: 15px; height: 15px; }
+
+.omrs-drawer-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 20px 16px;
+}
+
+.omrs-drawer-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  padding: 40px 16px;
+  color: var(--ehr-muted, #8395A8);
+}
+
+.omrs-drawer-empty svg { width: 32px; height: 32px; opacity: 0.6; }
+
+.omrs-drawer-empty p { font-size: 12.5px; max-width: 240px; }
+
+.omrs-drawer-footer {
+  padding: 12px 16px;
+  background: var(--ehr-mission-bg, #10195A);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.omrs-drawer-footer button {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+.omrs-drawer-footer .omrs-btn-ghost {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.omrs-drawer-footer .omrs-btn-primary {
+  background: var(--omrs-teal);
+  color: #fff;
+}
+
+/* ══════════════════ RESPONSIVE ══════════════════ */
+
+@media (max-width: 1100px) {
+  .omrs-vitals-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .omrs-left-rail {
+    flex-basis: 56px;
+    width: 56px;
+  }
+  .omrs-rail-label,
+  .omrs-rail-section-label {
+    display: none;
+  }
+  .omrs-rail-item {
+    justify-content: center;
+    padding: 10px 0;
+  }
+  .omrs-drawer {
+    width: 100vw;
+  }
+}
+
+@media (max-width: 640px) {
+  .omrs-header {
+    flex-wrap: wrap;
+  }
+  .omrs-vitals-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .omrs-right-rail {
+    flex-basis: 44px;
+    width: 44px;
+  }
+  .omrs-right-rail-btn {
+    width: 30px;
+    height: 30px;
+  }
+}

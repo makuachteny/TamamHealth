@@ -199,6 +199,10 @@ export const leaveRequestsDB = () => getDB('tamamhealth_leave_requests');
 export const payrollEntriesDB = () => getDB('tamamhealth_payroll_entries');
 export const controlledSubstanceLogDB = () => getDB('tamamhealth_controlled_substance_log');
 export const problemsDB = () => getDB('tamamhealth_problems');
+// Care-program enrollment (ART/HIV, TB, PMTCT, ANC, Nutrition, EPI, NCD, other).
+export const programEnrollmentsDB = () => getDB('tamamhealth_program_enrollments');
+// Procedures performed on a patient (bedside/theatre) — anchored to the patient.
+export const proceduresDB = () => getDB('tamamhealth_procedures');
 // Order sets / clinical protocols (reference data) — reusable bundles of
 // labs + medications keyed to a presenting condition (WHO/IMCI/ETAT/STG).
 export const orderSetsDB = () => getDB('tamamhealth_order_sets');
@@ -225,6 +229,12 @@ export const patientDocumentsDB = () => getDB('tamamhealth_patient_documents');
 // Queued patient reminders (e.g. "come fasted in 3 weeks") worked by staff.
 export const patientRemindersDB = () => getDB('tamamhealth_patient_reminders');
 
+// MUAC nutrition screenings (children 6–59m + ANC mothers).
+export const nutritionScreeningsDB = () => getDB('tamamhealth_nutrition_screenings');
+
+// Nutrition supply inventory (RUTF, therapeutic milk, ORS, micronutrients, ...).
+export const nutritionSuppliesDB = () => getDB('tamamhealth_nutrition_supplies');
+
 // Sync + conflict databases (Phase 1 closeout)
 export const syncEventsDB = () => getDB('tamamhealth_sync_events');
 export const conflictQueueDB = () => getDB('tamamhealth_conflict_queue');
@@ -241,6 +251,9 @@ export const savedPaymentMethodsDB = () => getDB('tamamhealth_saved_payment_meth
 export const paymentPlansDB = () => getDB('tamamhealth_payment_plans');
 export const invoicesDB = () => getDB('tamamhealth_invoices');
 export const ledgerDB = () => getDB('tamamhealth_ledger');
+// Patient-submitted intake forms awaiting front-desk review and merge into
+// the matching patient's chart.
+export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
 
 // Bump this version to force a re-seed (destroys all data and re-creates).
 // Bumped to 34: v2 demo deployment flipped to demo mode — force browsers that
@@ -262,9 +275,22 @@ export const ledgerDB = () => getDB('tamamhealth_ledger');
 // populated and scrollable.
 // Bumped to 42: per-patient sample problem list + current medications for every
 // patient (all rosters) so all four chart-summary windows are populated.
-// Bumped to 46: generated billing now covers every seeded patient roster, not
-// just the main outpatient patient list, so payments screens stay populated.
-export const SEED_VERSION = 46;
+// Bumped to 44: seeded appointments no longer double-book — each facility's
+// today bookings draw from a shared slot allocator (and the handful of static
+// rows that collided were re-timed), so the day calendar shows one
+// appointment per slot.
+// Bumped to 45: added an active inpatient admission at Wau State Hospital
+// (admission-6 / bed-9, pat-00063) — that facility previously had zero
+// currently-admitted patients, so the day-activity chart always read
+// "0 inpatient" for the Clinical Officer demo account.
+// Bumped to 46-48: Dr. Peter Garang Deng (clinician.peter, the login-picker's
+// Juba doctor) now rotates through today's appointment fill so his schedule
+// board isn't empty, his two care-assigned patients get real bookings with
+// him, the blood bank inventory is seeded (the Blood Bank screen previously
+// showed an all-zero availability grid), and date-only seed fields use the
+// browser's local calendar instead of UTC so "today's" bookings land on the
+// dashboards' local today.
+export const SEED_VERSION = 48;
 
 export async function isSeeded(): Promise<boolean> {
   try {
@@ -273,6 +299,41 @@ export async function isSeeded(): Promise<boolean> {
     return doc.version === SEED_VERSION;
   } catch {
     return false;
+  }
+}
+
+/**
+ * True when a seed at the CURRENT version started but never wrote the final
+ * 'seeded' marker — i.e. the browser reloaded (dev recompile, tab close, hard
+ * navigation) mid-seed. Seed writes are idempotent skip-if-exists puts, so the
+ * caller can resume and fill the gaps WITHOUT wiping; wiping again re-opens
+ * the same interruption window and is how sessions end up with randomly empty
+ * modules (no patients at the front desk, no conversations, empty lab queue).
+ */
+export async function isSeedInProgress(): Promise<boolean> {
+  try {
+    const db = getDB('tamamhealth_meta');
+    const doc = await db.get('seed-started') as { version?: number };
+    return doc.version === SEED_VERSION;
+  } catch {
+    return false;
+  }
+}
+
+export async function markSeedStarted(): Promise<void> {
+  const db = getDB('tamamhealth_meta');
+  try {
+    try {
+      const existing = await db.get('seed-started');
+      await db.remove(existing);
+    } catch {
+      // No existing marker
+    }
+    await db.put({ _id: 'seed-started', version: SEED_VERSION, timestamp: new Date().toISOString() });
+  } catch (err: unknown) {
+    const e = err as { status?: number };
+    if (e.status === 409) return; // Already marked
+    throw err;
   }
 }
 
@@ -316,6 +377,7 @@ export async function resetAllDatabases(): Promise<void> {
     'tamamhealth_saved_payment_methods', 'tamamhealth_payment_plans', 'tamamhealth_invoices', 'tamamhealth_ledger',
     'tamamhealth_sync_events', 'tamamhealth_conflict_queue',
     'tamamhealth_problems', 'tamamhealth_encounters', 'tamamhealth_biometric_templates',
+    'tamamhealth_program_enrollments', 'tamamhealth_procedures',
     'tamamhealth_handoffs', 'tamamhealth_order_sets', 'tamamhealth_phone_notes', 'tamamhealth_assessments',
     // Operational DBs that were created + synced but previously missed here,
     // leaving stale data behind on reset/re-seed.
@@ -324,7 +386,8 @@ export async function resetAllDatabases(): Promise<void> {
     'tamamhealth_leave_requests', 'tamamhealth_payroll_entries',
     'tamamhealth_clinical_favorites', 'tamamhealth_consultation_templates',
     'tamamhealth_clinician_tasks', 'tamamhealth_patient_documents',
-    'tamamhealth_patient_reminders',
+    'tamamhealth_patient_reminders', 'tamamhealth_intake_forms',
+    'tamamhealth_nutrition_screenings', 'tamamhealth_nutrition_supplies',
     // NOTE: 'tamamhealth_controlled_substance_log' is deliberately NOT reset
     // here — it is an append-only regulatory audit trail and resetAllDatabases()
     // runs on production seed-version bumps (see seedProduction).

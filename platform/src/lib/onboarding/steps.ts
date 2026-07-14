@@ -32,33 +32,25 @@ export interface OnboardingSection {
   steps: OnboardingStep[];
 }
 
-export interface ResourceLink {
-  id: string;
-  title: string;
-  type: 'video' | 'article';
-  href: string;
-  /** e.g. "2:34" for videos, "3 min read" for articles. */
-  meta: string;
-}
-
 export interface OnboardingPlan {
   /** Friendly role label, e.g. "Nurse". */
   roleLabel: string;
   /** The route the role lands on — their home dashboard. */
   defaultDashboard: string;
   sections: OnboardingSection[];
-  resources: ResourceLink[];
 }
 
-/** Curated per-route teaching copy. `verb` becomes the step title. */
-const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: number }> = {
+/** Curated per-route teaching copy. `verb` becomes the step title.
+ *  Exported so page-level instruction cards (PageInstructionCard) can reuse
+ *  the same copy instead of duplicating it. */
+export const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: number }> = {
   '/patients': { verb: 'Register your first patient', desc: 'Add a patient and open their record to see their history, vitals, and visits.', est: 2 },
+  '/telehealth': { verb: 'Start a telehealth visit', desc: 'Launch a secure video consultation and document it against the patient’s record.', est: 2 },
   '/consultation': { verb: 'Document a consultation', desc: 'Write a SOAP note, record a diagnosis, and order labs or prescriptions.', est: 3 },
   '/wards': { verb: 'Manage your wards', desc: 'Admit, transfer, and discharge patients and track bed availability.', est: 2 },
   '/referrals': { verb: 'Create a referral', desc: 'Refer a patient to another facility and track the referral chain.', est: 2 },
   '/messages': { verb: 'Send a secure message', desc: 'Message colleagues about a patient without leaving the platform.', est: 1 },
   '/appointments': { verb: 'Book an appointment', desc: 'Schedule a visit and see the day’s calendar at a glance.', est: 2 },
-  '/telehealth': { verb: 'Start a telehealth visit', desc: 'Run a secure video consultation with a remote patient.', est: 2 },
   '/lab': { verb: 'Work with the lab', desc: 'Place lab orders, then enter and review results.', est: 2 },
   '/pharmacy': { verb: 'Dispense from the pharmacy', desc: 'Fill prescriptions and keep stock levels up to date.', est: 2 },
   '/immunizations': { verb: 'Record an immunization', desc: 'Log a vaccine dose against the schedule and flag what’s due.', est: 2 },
@@ -91,6 +83,22 @@ const ROUTE_GUIDE: Record<string, { verb: string; desc: string; est?: number }> 
   '/org-admin/branding': { verb: 'Brand your workspace', desc: 'Add your logo and colours so the app feels like yours.', est: 2 },
   '/org-admin/analytics': { verb: 'Review org analytics', desc: 'See performance across your organization’s facilities.', est: 2 },
   '/org-admin/settings': { verb: 'Configure org settings', desc: 'Set defaults, security, and preferences for your org.', est: 2 },
+  '/org-admin': { verb: 'Open your organization dashboard', desc: 'See org-wide stats, compare facilities, and jump to users, hospitals, and settings.', est: 2 },
+  '/org-admin/pricing': { verb: 'Set your service pricing', desc: 'Add and edit the fee schedule for consultations, labs, pharmacy, and procedures.', est: 2 },
+  // Front desk / clinical intake
+  '/check-in': { verb: 'Check in a patient', desc: 'Find a patient, record their arrival, chief complaint, and acuity, and start their visit.', est: 2 },
+  '/patient-intake': { verb: 'Review patient intake forms', desc: 'Check submitted intake forms and merge the details straight into the patient chart.', est: 2 },
+  '/alerts': { verb: 'Review clinical alerts', desc: 'See critical lab, immunization, and outbreak alerts in one feed and jump straight to the record.', est: 2 },
+  // Pharmacy / lab
+  '/blood-bank': { verb: 'Manage the blood bank', desc: 'Track blood units by group and status, and log newly donated units before they expire.', est: 2 },
+  '/controlled-substances': { verb: 'Log a controlled substance', desc: 'Record intake, dispensing, or waste of scheduled medications with witness sign-off.', est: 2 },
+  // Facility / emergency
+  '/emergency-preparedness': { verb: 'Manage emergency plans', desc: 'Create and activate response plans for outbreaks, disasters, and mass-casualty events.', est: 2 },
+  // Nurse station tabs
+  '/dashboard/nurse/ward': { verb: 'Review the ward roster', desc: 'See admitted patients, record vitals, and assign a doctor from one list.', est: 2 },
+  '/dashboard/nurse/mar': { verb: 'Administer medications', desc: 'Work through due and overdue doses and record what was given, held, or refused.', est: 2 },
+  '/dashboard/nurse/triage': { verb: 'Triage a patient', desc: 'Record ABCC and vitals to get an auto-calculated priority — RED, YELLOW, or GREEN.', est: 2 },
+  '/dashboard/nurse/handoff': { verb: 'Hand off your shift', desc: 'Write SBAR notes on critical patients and sign a handoff report for the next nurse.', est: 2 },
 };
 
 /** Routes that the basics section already covers, so we don't repeat them. */
@@ -143,6 +151,18 @@ export function getOnboardingPlan(role: UserRole): OnboardingPlan {
       estMinutes: 1,
     },
   ];
+  // The patient information screen — the full chart/record — is reached by
+  // opening a patient, so it's not a sidebar nav item and wouldn't otherwise
+  // get a tour card. Teach it explicitly for every role that can open patients.
+  if (config.allowedRoutes.includes('/patients')) {
+    basics.push({
+      id: 'patient-record',
+      title: 'Open a patient information screen',
+      description: 'Open a patient to see their full record — history, problems, medications, vitals, labs, and past visits.',
+      href: '/patients',
+      estMinutes: 1,
+    });
+  }
   if (config.allowedRoutes.includes('/settings')) {
     basics.push({
       id: 'route:/settings',
@@ -173,6 +193,7 @@ export function getOnboardingPlan(role: UserRole): OnboardingPlan {
 
   for (const item of nav) {
     if (usedHrefs.has(item.href)) continue;
+    usedHrefs.add(item.href);
     const sectionKey = item.section ?? 'MORE';
     if (!grouped.has(sectionKey)) {
       grouped.set(sectionKey, []);
@@ -192,24 +213,32 @@ export function getOnboardingPlan(role: UserRole): OnboardingPlan {
     });
   }
 
+  // ── Accessible tools with no sidebar nav item ───────────────────────────────
+  // Some routes a role can reach (e.g. /telehealth) aren't in the sidebar, so
+  // the nav-derived sections miss them. Sweep the role's allowed routes and add
+  // a card for any that has curated guidance but wasn't already covered, so the
+  // tour truly reaches every place the role can go.
+  const extraSteps: OnboardingStep[] = [];
+  for (const route of config.allowedRoutes) {
+    if (usedHrefs.has(route)) continue;
+    if (!ROUTE_GUIDE[route]) continue;
+    usedHrefs.add(route);
+    extraSteps.push(stepFromNav({ href: route, label: route } as NavItem));
+  }
+  if (extraSteps.length > 0) {
+    sections.push({
+      id: 'nav:MORE-TOOLS',
+      title: 'More tools',
+      subtitle: 'Extra tools you can reach',
+      steps: extraSteps,
+    });
+  }
+
   return {
     roleLabel: config.label,
     defaultDashboard,
     sections,
-    resources: getResources(),
   };
-}
-
-// Placeholder "Helpful resources" — wire these to real videos/docs later.
-function getResources(): ResourceLink[] {
-  return [
-    { id: 'tour', title: 'Welcome to TamamHealth (full tour)', type: 'video', href: '#', meta: '2:34' },
-    { id: 'offline', title: 'Working offline & syncing your data', type: 'video', href: '#', meta: '2:59' },
-    { id: 'patients', title: 'Registering and finding patients', type: 'video', href: '#', meta: '3:58' },
-    { id: 'security', title: 'Keeping patient data secure', type: 'article', href: '#', meta: '3 min read' },
-    { id: 'shortcuts', title: 'Keyboard shortcuts cheat-sheet', type: 'article', href: '#', meta: '2 min read' },
-    { id: 'reporting', title: 'How reporting & DHIS2 export work', type: 'article', href: '#', meta: '4 min read' },
-  ];
 }
 
 /** Flatten all step IDs in a plan — handy for totals/percent. */

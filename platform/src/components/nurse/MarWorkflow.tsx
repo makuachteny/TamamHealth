@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
+import Modal from '@/components/Modal';
 import { Pill, Check, X, CheckCircle2, RotateCcw, FileText } from '@/components/icons/lucide';
 import type { MedicationAdministration } from '@/lib/db-types';
 import { useMarEntries, type MAREntry } from './shared';
@@ -198,15 +199,10 @@ export default function MarWorkflow() {
 
       {/* Record-administration modal */}
       {modalEntry && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(10,18,16,0.55)', backdropFilter: 'blur(2px)' }}
-          onClick={closeModal}
-        >
+        <Modal onClose={closeModal} width={448}>
           <div
-            className="w-full max-w-md card-elevated overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-            style={{ boxShadow: 'var(--card-shadow-xl)' }}
+            className="modal-content card-elevated overflow-hidden"
+            style={{ width: '100%' }}
           >
             <header
               className="px-5 py-3 border-b flex items-start justify-between gap-3"
@@ -214,7 +210,7 @@ export default function MarWorkflow() {
             >
               <div className="flex items-start gap-3 min-w-0">
                 <div className="icon-box">
-                  <Pill className="w-4 h-4" style={{ color: '#1E3A8A' }} />
+                  <Pill className="w-4 h-4" style={{ color: '#015697' }} />
                 </div>
                 <div className="min-w-0">
                   <div className="text-[10.5px] font-bold uppercase" style={{
@@ -249,7 +245,7 @@ export default function MarWorkflow() {
                         className="px-2 py-2 text-[11px] font-bold uppercase rounded transition-all"
                         style={{
                           background: on ? 'rgba(33,145,208,0.12)' : 'transparent',
-                          color: on ? '#1E3A8A' : 'var(--text-secondary)',
+                          color: on ? '#015697' : 'var(--text-secondary)',
                           border: `1px solid ${on ? 'rgba(33,145,208,0.30)' : 'var(--border-light)'}`,
                           letterSpacing: '0.04em',
                         }}
@@ -352,7 +348,7 @@ export default function MarWorkflow() {
               </div>
             </footer>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

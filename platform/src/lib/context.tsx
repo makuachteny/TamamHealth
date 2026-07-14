@@ -13,6 +13,7 @@ import { verifyPassword } from './auth';
 import { createToken } from './auth-token';
 import { logAudit } from './services/audit-service';
 import { captureException } from './observability';
+import { CSRF_COOKIE_NAME } from './csrf';
 
 /** True when an error came from a failed dynamic-chunk fetch (stale tab after
  *  a hot-reload, network blip, etc.). The recovery for these is always a
@@ -22,8 +23,6 @@ function isChunkLoadError(err: unknown): boolean {
   const msg = err instanceof Error ? `${err.name} ${err.message}` : String(err);
   return /ChunkLoadError|Loading chunk .*failed|Failed to fetch dynamically imported module/i.test(msg);
 }
-
-export type Theme = 'light' | 'dark';
 
 interface AppUser {
   _id: string;
@@ -55,7 +54,6 @@ interface AppState {
   /** True when the user has explicitly paused sync via toggleOnline */
   syncPaused: boolean;
   lastSync: string;
-  theme: Theme;
   dbReady: boolean;
   globalSearch: string;
   setGlobalSearch: (s: string) => void;
@@ -66,7 +64,6 @@ interface AppState {
   login: (username: string, password: string, hospitalId?: string) => Promise<UserRole | false>;
   logout: () => void;
   toggleOnline: () => void;
-  toggleTheme: () => void;
   /** Sync state from the SyncManager (null when sync is disabled) */
   syncStatus: AggregateStatus | null;
   /** Trigger a one-shot sync across all databases */
@@ -107,7 +104,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // OS-level: is the network actually up?
   const [isNetworkUp, setIsNetworkUp] = useState<boolean>(true);
   const [lastSync, setLastSync] = useState('');
-  const [theme, setTheme] = useState<Theme>('light');
   const [dbReady, setDbReady] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -196,34 +192,99 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch {
         // Offline - OK
       }
-      setDbReady(true);
 
-      // Ensure the background seed is allowed to finish even after the app is
-      // marked ready. This keeps offline data bootstrapping alive without
-      // freezing the login/dashboard shell.
-      void seedPromise;
+      // Check for existing session via cookie (skip API call if no cookie).
+      // `tamamhealth-token` is httpOnly on the server-issued (online) login
+      // path, so it's invisible to document.cookie — check the readable
+      // CSRF cookie (set alongside it) too, or this always misses online
+      // sessions and force-logs-out the user on every hard refresh. The
+      // offline/PouchDB fallback login sets `tamamhealth-token` itself
+      // (non-httpOnly), so that name still needs checking directly.
+      const hasCookie = document.cookie.split(';').some(c => {
+        const name = c.trim().split('=')[0];
+        return name === 'tamamhealth-token' || name === CSRF_COOKIE_NAME;
+      });
+      if (hasCookie) {
+        try {
+          const res = await fetch('/api/auth/me');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.user) {
+              // Load hospital data if user has a hospitalId
+              let hospital: HospitalDoc | undefined;
+              if (data.user.hospitalId) {
+                try {
+                  const { getHospitalById } = await import('./services/hospital-service');
+                  const h = await getHospitalById(data.user.hospitalId);
+                  if (h) hospital = h;
+                } catch {
+                  // OK
+                }
+              }
+
+              // Load organization data
+              let organization: OrganizationDoc | undefined;
+              if (data.user.orgId) {
+                try {
+                  const { getOrganizationById } = await import('./services/organization-service');
+                  const org = await getOrganizationById(data.user.orgId);
+                  if (org) organization = org;
+                } catch {
+                  // OK
+                }
+              }
+
+              const { getOrgBranding, brandingToCSSVars } = await import('./branding');
+              const branding = getOrgBranding(organization);
+              const vars = brandingToCSSVars(branding);
+              for (const [key, value] of Object.entries(vars)) {
+                document.documentElement.style.setProperty(key, value);
+              }
+
+              // Apply org language setting
+              if (organization?.locale) {
+                const { initLocaleFromOrg } = await import('./i18n/useTranslation');
+                initLocaleFromOrg(organization.locale);
+              }
+
+              setCurrentUser({ ...data.user, hospital, organization, branding });
+              setIsAuthenticated(true);
+            }
+          }
+        } catch {
+          // Offline - OK
+        }
+      }
+
+      // Gate route-guarding on dbReady only once the session check above has
+      // resolved — flipping this before that finishes lets DashboardLayout's
+      // isAuthenticated effect fire on a false negative and bounce a
+      // logged-in user to /login (which then redirects to the *default*
+      // dashboard, not the page they actually requested).
+      setDbReady(true);
     };
 
     init();
-
-    // Theme — default to light
-    const saved = localStorage.getItem('tamamhealth-theme') as Theme | null;
-    if (saved === 'light' || saved === 'dark') {
-      setTheme(saved);
-      document.documentElement.setAttribute('data-theme', saved);
-    } else {
-      setTheme('light');
-      document.documentElement.setAttribute('data-theme', 'light');
-    }
 
     // Register service worker with a cache-busting version tag so a new
     // deploy forces the browser to fetch and install the new worker instead
     // of serving stale assets from the previous CACHE_NAME. Skipped in local
     // dev — its cache-first strategy for /_next/static/ otherwise serves
     // stale CSS/JS across reloads and fights the dev server's hot-reload.
-    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-      const buildId = process.env.NEXT_PUBLIC_BUILD_ID || 'dev';
-      navigator.serviceWorker.register(`/sw.js?v=${buildId}`).catch(() => {});
+    if ('serviceWorker' in navigator) {
+      if (process.env.NODE_ENV === 'production') {
+        const buildId = process.env.NEXT_PUBLIC_BUILD_ID || 'dev';
+        navigator.serviceWorker.register(`/sw.js?v=${buildId}`).catch(() => {});
+      } else {
+        // A worker registered by an earlier production build/test on this
+        // origin (e.g. `next start` on the same port) outlives that session
+        // and keeps cache-first-serving stale /_next/static/ + precached
+        // pages forever, since dev mode never re-registers to replace it.
+        // Clear any leftover registration so dev always hits the live server.
+        navigator.serviceWorker.getRegistrations()
+          .then(registrations => registrations.forEach(registration => registration.unregister()))
+          .catch(() => {});
+      }
     }
 
     // Hydrate user-preference from localStorage so the sync-paused choice
@@ -348,15 +409,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (syncManagerRef.current) {
       await syncManagerRef.current.syncNow();
     }
-  }, []);
-
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => {
-      const next = prev === 'light' ? 'dark' : 'light';
-      localStorage.setItem('tamamhealth-theme', next);
-      document.documentElement.setAttribute('data-theme', next);
-      return next;
-    });
   }, []);
 
   const login = useCallback(async (username: string, password: string, hospitalId?: string): Promise<UserRole | false> => {
@@ -653,16 +705,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // actions are stable, so they don't need to be in the dependency list.
   const value = useMemo<AppState>(() => ({
     isAuthenticated, currentUser, isOnline, isNetworkUp, syncPaused,
-    lastSync, theme, dbReady,
+    lastSync, dbReady,
     globalSearch, setGlobalSearch,
     sidebarOpen, setSidebarOpen,
     sidebarCollapsed, setSidebarCollapsed,
-    login, logout, toggleOnline, toggleTheme,
+    login, logout, toggleOnline,
     syncStatus, syncNow,
   }), [
     isAuthenticated, currentUser, isOnline, isNetworkUp, syncPaused,
-    lastSync, theme, dbReady, globalSearch, sidebarOpen, sidebarCollapsed,
-    syncStatus, login, logout, toggleOnline, toggleTheme, syncNow,
+    lastSync, dbReady, globalSearch, sidebarOpen, sidebarCollapsed,
+    syncStatus, login, logout, toggleOnline, syncNow,
   ]);
 
   return (

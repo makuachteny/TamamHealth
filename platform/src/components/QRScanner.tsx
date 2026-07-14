@@ -110,6 +110,7 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors"
           >
             <X className="w-4 h-4" />

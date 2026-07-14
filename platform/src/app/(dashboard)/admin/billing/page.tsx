@@ -7,7 +7,6 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
-import { FilterMenu } from '@/components/filters';
 import DataTile from '@/components/DataTile';
 import {
   CreditCard, Edit3, Check, X,
@@ -21,9 +20,6 @@ export default function AdminBillingPage() {
 
   // Text search comes from the shared global search bar (TopBar).
   const search = globalSearch;
-  const [filterStatus, setFilterStatus] = useState('all');
-  const activeFilterCount = filterStatus !== 'all' ? 1 : 0;
-  const clearFilters = () => { setFilterStatus('all'); };
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPlan, setEditPlan] = useState<'basic' | 'professional' | 'enterprise'>('basic');
   const [editStatus, setEditStatus] = useState<'trial' | 'active' | 'suspended' | 'cancelled'>('trial');
@@ -40,12 +36,8 @@ export default function AdminBillingPage() {
 
   const filteredOrgs = useMemo(() => {
     const q = search.toLowerCase();
-    return organizations.filter(o => {
-      const matchSearch = !q || o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q);
-      const matchStatus = filterStatus === 'all' || o.subscriptionStatus === filterStatus;
-      return matchSearch && matchStatus;
-    });
-  }, [organizations, search, filterStatus]);
+    return organizations.filter(o => !q || o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q));
+  }, [organizations, search]);
 
   if (!currentUser || currentUser.role !== 'super_admin') return null;
 
@@ -103,19 +95,7 @@ export default function AdminBillingPage() {
 
   return (
     <>
-      <TopBar title={t('adminBilling.title')} searchTrailing={
-            <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
-              <FilterMenu.Field label={t('adminBilling.filterByStatus')}>
-                <select className="w-full text-sm" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                  <option value="all">{t('adminBilling.statusAll')}</option>
-                  <option value="trial">{t('adminBilling.statusTrial')}</option>
-                  <option value="active">{t('adminBilling.statusActive')}</option>
-                  <option value="suspended">{t('adminBilling.statusSuspended')}</option>
-                  <option value="cancelled">{t('adminBilling.statusCancelled')}</option>
-                </select>
-              </FilterMenu.Field>
-            </FilterMenu>
-          } />
+      <TopBar title={t('adminBilling.title')} />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
         {/* KPI Cards */}
@@ -235,10 +215,10 @@ export default function AdminBillingPage() {
                       <td className="px-4 py-3">
                         {isEditing ? (
                           <div className="flex items-center gap-1">
-                            <button onClick={() => saveEdit(org._id)} disabled={saving} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-success)' }}>
+                            <button onClick={() => saveEdit(org._id)} disabled={saving} aria-label="Save" className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-success)' }}>
                               <Check className="w-4 h-4" />
                             </button>
-                            <button onClick={cancelEdit} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-danger)' }}>
+                            <button onClick={cancelEdit} aria-label="Cancel" className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-danger)' }}>
                               <X className="w-4 h-4" />
                             </button>
                           </div>

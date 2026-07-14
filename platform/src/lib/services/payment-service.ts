@@ -33,6 +33,7 @@ import type {
   PatientFinancialSummary,
 } from '../db-types-payments';
 import type { BaseDoc } from '../db-types';
+import type { BillingDoc } from '../db-types-billing';
 import type { DataScope } from './data-scope';
 import { filterByScope } from './data-scope';
 import { v4 as uuidv4 } from 'uuid';
@@ -59,6 +60,7 @@ const invoicesDB = () => getDB('tamamhealth_invoices');
 const claimsDB = () => getDB('tamamhealth_claims');
 const adjustmentsDB = () => getDB('tamamhealth_adjustments');
 const chargesDB = () => getDB('tamamhealth_charges');
+const billingDB = () => getDB('tamamhealth_billing');
 
 // ═══════════════════════════════════════════════════════════════════
 // PAYMENTS
@@ -437,6 +439,13 @@ export async function getPatientInsurancePolicies(patientId: string): Promise<In
     .sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
 }
 
+/** Patient ids holding at least one active insurance policy — one bulk query
+ *  so list views can badge every row without a per-patient lookup. */
+export async function getInsuredPatientIds(): Promise<Set<string>> {
+  const rows = await findByType<InsurancePolicyDoc>(insurancePoliciesDB(), 'insurance_policy');
+  return new Set(rows.filter(d => d && d.isActive).map(d => d.patientId));
+}
+
 export async function getPrimaryPolicy(patientId: string): Promise<InsurancePolicyDoc | null> {
   const policies = await getPatientInsurancePolicies(patientId);
   return policies.find(p => p.isPrimary) || policies[0] || null;
@@ -653,7 +662,12 @@ export async function getChargesByPatient(patientId: string): Promise<ChargeDoc[
 // ═══════════════════════════════════════════════════════════════════
 
 export interface SubmitClaimInput {
-  encounterId: string;
+  // Optional — see ClaimDoc.encounterId. Many claims raised from a
+  // BillingDoc that has no linked clinical encounter still need to be
+  // submittable.
+  encounterId?: string;
+  // Links the claim back to the BillingDoc it was raised against, if any.
+  billingId?: string;
   patientId: string;
   patientName: string;
   policyId: string;
@@ -665,6 +679,46 @@ export interface SubmitClaimInput {
   facilityName: string;
   submittedBy: string;
   orgId?: string;
+}
+
+/**
+ * Best-effort mirror of a claim's outcome onto the BillingDoc it was raised
+ * against (`ClaimDoc.billingId`), so the billing view reflects insurance
+ * status without every caller having to remember to update both records.
+ * Never throws — a bill that was deleted/edited concurrently, or a claim with
+ * no `billingId` (e.g. seeded data), just means there's nothing to sync.
+ */
+async function syncBillInsuranceStatus(
+  billingId: string | undefined,
+  status: NonNullable<BillingDoc['insuranceClaimStatus']>,
+  approvedAmount?: number,
+): Promise<void> {
+  if (!billingId) return;
+  try {
+    const db = billingDB();
+    const bill = await db.get(billingId) as BillingDoc;
+    bill.insuranceClaimStatus = status;
+    if (approvedAmount !== undefined) {
+      bill.insuranceApprovedAmount = approvedAmount;
+    } else if (status === 'submitted') {
+      // A freshly (re)submitted claim is pending adjudication — clear any
+      // approved amount left over from a prior claim on the same bill, so the
+      // bill never shows "submitted" alongside a stale approved figure.
+      bill.insuranceApprovedAmount = undefined;
+    }
+    bill.updatedAt = new Date().toISOString();
+    const resp = await db.put(bill);
+    emitSyncEvent({
+      resourceType: 'billing',
+      resourceId: bill._id,
+      operation: 'update',
+      resourceVersion: resp.rev,
+      orgId: bill.orgId,
+      hospitalId: bill.facilityId,
+    });
+  } catch (err) {
+    console.warn(`[syncBillInsuranceStatus] Could not sync bill ${billingId}:`, err);
+  }
 }
 
 export async function submitClaim(input: SubmitClaimInput): Promise<ClaimDoc> {
@@ -698,7 +752,33 @@ export async function submitClaim(input: SubmitClaimInput): Promise<ClaimDoc> {
     hospitalId: doc.facilityId,
   });
 
+  await syncBillInsuranceStatus(input.billingId, 'submitted');
+
   return doc;
+}
+
+/**
+ * Derive the claim status a set of adjudicated amounts implies. Exported so
+ * the claims UI can render a "this is what will happen" preview from the
+ * exact same rule the service applies — no separate status control that
+ * could silently diverge from what gets persisted.
+ *
+ *   - Nothing approved, something denied  -> 'denied'
+ *   - Something approved, nothing denied  -> 'paid' (write-offs are expected
+ *     contractual reductions, not denials, so they don't block "paid")
+ *   - A mix of approved and denied        -> 'partial'
+ *   - Nothing approved or denied yet       -> 'partial' (fallback; e.g. only a
+ *     write-off was recorded, or amounts are still all zero)
+ */
+export function computeAdjudicatedStatus(approved: number, denied: number): ClaimStatus {
+  if (approved <= 0 && denied > 0) return 'denied';
+  if (approved > 0 && denied <= 0) return 'paid';
+  return 'partial';
+}
+
+export interface AdjudicateClaimOptions {
+  denialReasons?: string[];
+  notes?: string;
 }
 
 export async function adjudicateClaim(
@@ -708,23 +788,32 @@ export async function adjudicateClaim(
   writeOff: number,
   patientResponsibility: number,
   adjudicatedBy: string,
+  opts?: AdjudicateClaimOptions,
 ): Promise<ClaimDoc | null> {
   const db = claimsDB();
   try {
     const claim = await db.get(claimId) as ClaimDoc;
     const now = new Date().toISOString();
+    const status = computeAdjudicatedStatus(approved, denied);
 
     claim.totalApproved = approved;
     claim.totalDenied = denied;
     claim.totalWriteOff = writeOff;
     claim.patientResponsibility = patientResponsibility;
     claim.adjudicatedDate = now;
-    claim.status = denied > 0 && approved === 0 ? 'denied' : approved > 0 ? 'paid' : 'partial';
+    claim.status = status;
+    claim.adjudicatedBy = adjudicatedBy;
+    claim.adjudicationNotes = opts?.notes || undefined;
+    // Only a denied/partial outcome carries denial reasons; a fully paid
+    // claim shouldn't keep stale reasons from a prior adjudication pass.
+    claim.denialReasons = status === 'denied' || status === 'partial' ? opts?.denialReasons : undefined;
     claim.updatedAt = now;
-    void adjudicatedBy;
 
     const resp = await db.put(claim);
     claim._rev = resp.rev;
+
+    await logAuditSafe('CLAIM_ADJUDICATED', adjudicatedBy, adjudicatedBy,
+      `Claim ${claim.claimNumber || claim._id} -> ${status} (approved ${approved}, denied ${denied}, write-off ${writeOff})`);
 
     emitSyncEvent({
       resourceType: 'claim',
@@ -763,8 +852,121 @@ export async function adjudicateClaim(
       });
     }
 
+    await syncBillInsuranceStatus(
+      claim.billingId,
+      status === 'denied' ? 'rejected' : status === 'paid' ? 'approved' : 'partial',
+      approved,
+    );
+
     return claim;
   } catch { return null; }
+}
+
+/**
+ * File an appeal against a denied claim. Denied-only transition — a claim
+ * that hasn't been adjudicated (or was fully/partially paid) has nothing to
+ * appeal. Does not change financial totals; adjudicateClaim/resubmitClaim own
+ * those once the payer responds to the appeal.
+ */
+export async function appealClaim(
+  claimId: string,
+  note: string,
+  appealedBy: string,
+  appealedByName: string,
+): Promise<ClaimDoc | null> {
+  const db = claimsDB();
+  try {
+    const claim = await db.get(claimId) as ClaimDoc;
+    if (claim.status !== 'denied') {
+      throw new Error(`Claim ${claimId} is '${claim.status}' — only a denied claim can be appealed.`);
+    }
+
+    const now = new Date().toISOString();
+    claim.status = 'appealed';
+    claim.appealNote = note;
+    claim.appealedAt = now;
+    claim.appealedBy = appealedBy;
+    claim.updatedAt = now;
+
+    const resp = await db.put(claim);
+    claim._rev = resp.rev;
+
+    await logAuditSafe('CLAIM_APPEALED', appealedBy, appealedByName,
+      `Claim ${claim.claimNumber || claim._id} appealed: ${note}`);
+
+    emitSyncEvent({
+      resourceType: 'claim',
+      resourceId: claim._id,
+      operation: 'update',
+      resourceVersion: claim._rev,
+      orgId: claim.orgId,
+      hospitalId: claim.facilityId,
+    });
+
+    return claim;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('only a denied claim')) throw err;
+    return null;
+  }
+}
+
+/**
+ * Resubmit a denied or appealed claim to the payer. Moves the claim back to
+ * 'submitted' and clears the prior adjudication outcome (denial reasons,
+ * approved/denied/write-off amounts) so it reads as freshly pending rather
+ * than carrying a stale verdict — adjudicateClaim will set new totals when
+ * the payer responds again. `resubmissionCount` tracks how many times this
+ * has happened, for billing-ops visibility into chronically-denied claims.
+ */
+export async function resubmitClaim(
+  claimId: string,
+  resubmittedBy: string,
+  resubmittedByName: string,
+): Promise<ClaimDoc | null> {
+  const db = claimsDB();
+  try {
+    const claim = await db.get(claimId) as ClaimDoc;
+    if (claim.status !== 'denied' && claim.status !== 'appealed') {
+      throw new Error(`Claim ${claimId} is '${claim.status}' — only a denied or appealed claim can be resubmitted.`);
+    }
+
+    const now = new Date().toISOString();
+    claim.status = 'submitted';
+    claim.submittedDate = now;
+    claim.resubmissionCount = (claim.resubmissionCount || 0) + 1;
+    claim.lastResubmittedAt = now;
+    claim.lastResubmittedBy = resubmittedBy;
+    // Clear the prior verdict — it's being re-adjudicated from scratch.
+    claim.denialReasons = undefined;
+    claim.totalApproved = undefined;
+    claim.totalDenied = undefined;
+    claim.totalWriteOff = undefined;
+    claim.patientResponsibility = undefined;
+    claim.adjudicatedDate = undefined;
+    claim.updatedAt = now;
+
+    const resp = await db.put(claim);
+    claim._rev = resp.rev;
+
+    await logAuditSafe('CLAIM_RESUBMITTED', resubmittedBy, resubmittedByName,
+      `Claim ${claim.claimNumber || claim._id} resubmitted (attempt #${claim.resubmissionCount})`);
+
+    emitSyncEvent({
+      resourceType: 'claim',
+      resourceId: claim._id,
+      operation: 'update',
+      resourceVersion: claim._rev,
+      orgId: claim.orgId,
+      hospitalId: claim.facilityId,
+    });
+
+    await syncBillInsuranceStatus(claim.billingId, 'submitted');
+
+    return claim;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('only a denied or appealed')) throw err;
+    return null;
+  }
 }
 
 export async function getClaimsByPatient(patientId: string): Promise<ClaimDoc[]> {

@@ -1,15 +1,13 @@
 'use client';
 
 /**
- * TopBar quick-actions cluster:
- *   [ 📣 ] — Announcements panel (compose + list); doubles as the notification
- *            centre, with an unread badge. Direct messaging lives in the sidebar.
- *
- * Shown globally in the TopBar. Scheduling/availability now lives in the
- * sidebar "Schedule" tab rather than a header quick-create menu.
+ * Global quick-actions cluster — tasks, notifications, and announcements.
+ * Rendered once inside EhrTopRail's action row (the single top chrome bar),
+ * so its buttons pick up `.ehr-top-actions button` styling from that parent
+ * rather than declaring their own circular/bordered look.
  */
 import { useState, useRef, useEffect } from 'react';
-import { Megaphone, Bell, Calendar } from '@/components/icons/lucide';
+import { Megaphone, Bell, ClipboardCheck } from '@/components/icons/lucide';
 import AnnouncementsPanel from '@/components/AnnouncementsPanel';
 import NotificationsPanel from '@/components/NotificationsPanel';
 import TasksPanel from '@/components/TasksPanel';
@@ -35,25 +33,19 @@ export default function QuickActions() {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  const iconBtn = 'w-10 h-10 rounded-full flex items-center justify-center transition-colors relative flex-shrink-0';
-  const iconBtnStyle = {
-    background: 'transparent',
-    border: '1.5px solid var(--border-medium)',
-  };
-
   return (
-    <div className="flex items-center gap-2">
+    <>
       {/* My Tasks */}
       <button
+        type="button"
         onClick={() => setTasksOpen(true)}
         aria-label={openTasks.length > 0 ? `My tasks (${openTasks.length} open)` : 'My tasks'}
         title="My tasks"
-        className={iconBtn}
-        style={iconBtnStyle}
+        className="relative"
       >
-        <Calendar className="w-[20px] h-[20px]" color="var(--text-primary)" />
+        <ClipboardCheck className="w-5 h-5" />
         {openTasks.length > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: 'var(--accent-primary)' }}>
+          <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-[3px] rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: 'var(--accent-primary)', boxShadow: '0 0 0 1.5px var(--bg-card)' }}>
             {openTasks.length > 99 ? '99+' : openTasks.length}
           </span>
         )}
@@ -62,16 +54,16 @@ export default function QuickActions() {
 
       {/* Notifications */}
       <button
+        type="button"
         onClick={() => setNotifOpen(true)}
         aria-label={notifCount > 0 ? `Notifications (${notifCount} unread)` : 'Notifications'}
         title="Notifications"
-        className={iconBtn}
-        style={iconBtnStyle}
+        className="relative"
       >
-        <Bell className="w-[20px] h-[20px]" color="var(--text-primary)" />
+        <Bell className="w-5 h-5" />
         {notifCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: '#E05A3A' }}>
-            {notifCount > 99 ? '99+' : `${notifCount}+`}
+          <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-[3px] rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: '#E05A3A', boxShadow: '0 0 0 1.5px var(--bg-card)' }}>
+            {notifCount > 99 ? '99+' : notifCount}
           </span>
         )}
       </button>
@@ -80,22 +72,22 @@ export default function QuickActions() {
       {/* Announcements */}
       <div className="relative" ref={announceRef}>
         <button
+          type="button"
           onClick={() => setAnnounceOpen(o => !o)}
           aria-label="Announcements"
           aria-expanded={announceOpen}
           title="Announcements"
-          className={iconBtn}
-          style={iconBtnStyle}
+          className="relative"
         >
-          <Megaphone className="w-[20px] h-[20px]" color="var(--text-primary)" />
+          <Megaphone className="w-5 h-5" />
           {unread > 0 && (
-            <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white" aria-hidden="true" style={{ background: '#E05A3A' }} />
+            <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full border-2 border-white" aria-hidden="true" style={{ background: '#E05A3A' }} />
           )}
         </button>
         {announceOpen && (
           <AnnouncementsPanel onClose={() => setAnnounceOpen(false)} onUnreadChange={setUnread} />
         )}
       </div>
-    </div>
+    </>
   );
 }

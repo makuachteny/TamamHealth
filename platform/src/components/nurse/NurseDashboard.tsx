@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
@@ -175,7 +174,6 @@ export default function NurseDashboard() {
 
   return (
     <>
-      <TopBar title={t('nurse.title')} hideSearch />
       <main className="page-container page-enter">
         <EhrCareDashboard
           title={currentUser.role === 'triage_nurse' ? 'Triage station' : currentUser.role === 'rooming_nurse' ? 'Rooming station' : t('nurse.title')}
@@ -192,6 +190,12 @@ export default function NurseDashboard() {
             onClick: () => setActiveTab(tab.key),
           }))}
           actions={actions}
+          actionStrip={[
+            ...(canUseRoute('/patients') ? [{ label: 'Patient search', icon: Users, onClick: () => router.push('/patients') }] : []),
+            ...(canUseRoute('/wards') ? [{ label: 'Wards', icon: BedDouble, onClick: () => router.push('/wards') }] : []),
+            ...(canUseRoute('/immunizations') ? [{ label: 'Immunizations', icon: Syringe, onClick: () => router.push('/immunizations') }] : []),
+            ...(canUseRoute('/appointments') ? [{ label: 'Appointments', icon: Calendar, onClick: () => router.push('/appointments') }] : []),
+          ]}
           rows={rows}
           metrics={metrics}
           checklist={checklist}
@@ -204,7 +208,7 @@ export default function NurseDashboard() {
           checklistDescription="Ward care, triage, medications, and handoff."
           missionTitle="Bedside care"
           missionDescription="Keep assigned patients, urgent triage, and medication work visible."
-          showMissionCard={false}
+          showMissionCard
           emptyTitle="No patients in this station"
         >
           <div className="flex flex-col" style={{ minHeight: 0 }}>

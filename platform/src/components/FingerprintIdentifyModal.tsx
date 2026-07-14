@@ -70,7 +70,7 @@ export default function FingerprintIdentifyModal({ onSelect, onClose }: Fingerpr
             <ScanLine className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
             {t('fingerprint.identifyTitle')}
           </h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors">
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>

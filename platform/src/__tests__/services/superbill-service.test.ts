@@ -21,7 +21,7 @@ async function seedFees() {
 async function makePatient() {
   return createPatient({
     hospitalNumber: 'HN-SB1', firstName: 'Bol', surname: 'Akol', dateOfBirth: '1985-01-01',
-    gender: 'Male', phone: '0900000000', state: 'Jonglei', tribe: 'Nuer', primaryLanguage: 'Nuer',
+    gender: 'Male', phone: '0900000000', state: 'Jonglei', county: 'Bor South', tribe: 'Nuer', primaryLanguage: 'Nuer',
     bloodType: 'A+', allergies: [], chronicConditions: [], nokName: 'Nya', nokRelationship: 'Wife',
     nokPhone: '0900000001', registrationHospital: 'hosp-001', registrationDate: '2026-01-01',
   } as unknown as Parameters<typeof createPatient>[0]);

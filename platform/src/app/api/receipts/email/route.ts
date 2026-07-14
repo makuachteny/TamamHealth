@@ -77,7 +77,7 @@ async function postHandler(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { to, subject, html, text, receiptNumber, amount, currency } = payload;
+  const { to, subject, html, text, receiptNumber } = payload;
   if (!to || !subject) {
     return NextResponse.json({ error: 'to and subject are required' }, { status: 400 });
   }
@@ -105,22 +105,34 @@ async function postHandler(req: NextRequest) {
       case 'log':
       default:
         providerUsed = 'log';
-        console.log(JSON.stringify({
-          tag: '[Email Receipt]',
-          to, from, subject,
-          receiptNumber, amount, currency,
-          previewLength: (html || text || '').length,
-        }));
-        delivered = true;
+        // No real email provider is configured. In production this is a
+        // misconfiguration: report honest non-delivery rather than a silent
+        // "sent" (a cashier must not be told a receipt went out when it
+        // didn't). In dev/demo, keep the convenient success and print a
+        // PII-free preview line (never the recipient address or amount).
+        if (process.env.NODE_ENV === 'production') {
+          logApiError(
+            '[API /receipts/email]',
+            new Error('No EMAIL_PROVIDER configured — receipt not delivered'),
+          );
+          delivered = false;
+        } else {
+          console.log(JSON.stringify({
+            tag: '[Email Receipt]',
+            subject, receiptNumber,
+            previewLength: (html || text || '').length,
+          }));
+          delivered = true;
+        }
         break;
     }
 
     return NextResponse.json({
-      success: true,
+      success: delivered,
       delivered,
       provider: providerUsed,
       receiptNumber,
-      message: delivered ? 'Receipt sent' : 'Receipt queued for retry',
+      message: delivered ? 'Receipt sent' : 'Email delivery is not configured — receipt was not sent',
     });
   } catch (error) {
     // Failed sends are logged but reported as "queued" so the UI doesn't

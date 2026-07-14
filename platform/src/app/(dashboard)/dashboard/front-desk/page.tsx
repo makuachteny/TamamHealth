@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { usePatients } from '@/lib/hooks/usePatients';
@@ -10,7 +9,7 @@ import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
 import type { AppointmentDoc, EncounterDoc } from '@/lib/db-types';
 import { formatCompactDateTime, formatMoney } from '@/lib/format-utils';
-import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel } from '@/lib/patient-utils';
+import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel, initials, avatarColor } from '@/lib/patient-utils';
 import { priorityColor } from '@/lib/clinical/triage-display';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import Modal from '@/components/Modal';
@@ -23,8 +22,9 @@ import { getRoleConfig } from '@/lib/permissions';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardMetric, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import {
   Calendar, ClipboardCheck, ArrowRightLeft,
-  UserPlus, ClipboardList,
+  UserPlus, ClipboardList, Search,
   MapPin, LogOut, Wallet, CheckCircle, X, Maximize2,
+  SendHorizontal,
 } from '@/components/icons/lucide';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 
@@ -34,6 +34,7 @@ import { formatPhoneDisplay } from '@/lib/field-formats';
  * Shows the live queue, today's appointments, and registry snapshots in one
  * view so reception can move patients without jumping between screens.
  */
+
 // Exam rooms / bays a walk-in patient can be placed in to meet the provider.
 // Fallback used only when facility settings provide no rooms.
 const ROOM_OPTIONS = ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5', 'Room 6', 'Bay A', 'Bay B', 'Bay C', 'Bay D'];
@@ -74,10 +75,6 @@ function formatDayMonthYear(iso?: string | null): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-function patientDob(patient: { dateOfBirth?: string; dob?: string }): string {
-  return formatDayMonthYear(patient.dateOfBirth || patient.dob);
-}
-
 function isoDateKey(value?: string | null): string {
   if (!value) return new Date().toISOString().slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
@@ -111,7 +108,7 @@ export default function FrontDeskDashboardPage() {
   const roomOptions = rooms.length ? rooms : ROOM_OPTIONS;
 
   const [queueFilter, setQueueFilter] = useState<'all' | 'walk-in' | 'appointment' | 'referral'>('all');
-  const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered'>('all');
+  const [panelView, setPanelView] = useState<'all' | 'appointments' | 'pending' | 'queue' | 'registered' | 'waiting' | 'walkin' | 'completed'>('all');
   const queueSort: 'priority' | 'name' | 'time' | 'status' = 'priority';
   const [queueSearch, setQueueSearch] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -386,11 +383,15 @@ export default function FrontDeskDashboardPage() {
     });
   }, [patients, queueSearch]);
 
-  const recentPatients = useMemo(() => (
-    [...patients]
-      .sort((a, b) => patientRegisteredAt(b).localeCompare(patientRegisteredAt(a)))
-      .slice(0, 6)
-  ), [patients]);
+  const [recentSearch, setRecentSearch] = useState('');
+  const recentPatients = useMemo(() => {
+    const q = recentSearch.trim().toLowerCase();
+    const sorted = [...patients].sort((a, b) => patientRegisteredAt(b).localeCompare(patientRegisteredAt(a)));
+    const filtered = q
+      ? sorted.filter(p => `${patientFullName(p)} ${p.hospitalNumber || ''} ${p.phone || ''} ${p.county || ''} ${p.state || ''}`.toLowerCase().includes(q))
+      : sorted;
+    return filtered.slice(0, q ? 25 : 6);
+  }, [patients, recentSearch]);
 
   // ── Selected patient previous visit info (from real records) ──
   const selectedPatient = useMemo(() =>
@@ -553,10 +554,21 @@ export default function FrontDeskDashboardPage() {
 
   const actions = useMemo<EhrCareDashboardAction[]>(() => ([
     ...(canUseRoute('/check-in') ? [{ label: 'Check in', icon: ClipboardCheck, onClick: () => setCheckInOpen(true), tone: 'primary' as const }] : []),
+    ...(canUseRoute('/patient-intake') ? [{ label: 'Send intake', icon: SendHorizontal, onClick: () => router.push('/patient-intake'), tone: 'primary' as const }] : []),
     ...(canUseRoute('/patients') ? [{ label: t('frontDesk.registerNewPatient'), icon: UserPlus, onClick: () => setRegisterOpen(true) }] : []),
-    ...(canUseRoute('/referrals') ? [{ label: t('frontDesk.viewReferrals'), icon: ArrowRightLeft, onClick: () => router.push('/referrals') }] : []),
-    ...(canUseRoute('/appointments') ? [{ label: t('nav.appointments'), icon: Calendar, onClick: () => router.push('/appointments') }] : []),
   ]), [canUseRoute, router, t]);
+
+  // "View Referrals" / "Appointments" now live as labeled nav links in the top
+  // rail (next to the module dropdown), not as shortcuts inside this card.
+
+  // Quick-navigation strip mirroring the Clinical Officer dashboard's clinical
+  // strip. Route-guarded so a clinic clerk never sees a shortcut they can't open.
+  const actionStrip = useMemo<EhrCareDashboardAction[]>(() => ([
+    ...(canUseRoute('/patients') ? [{ label: 'Patient registry', icon: ClipboardList, onClick: () => router.push('/patients') }] : []),
+    ...(canUseRoute('/appointments') ? [{ label: 'Appointments', icon: Calendar, onClick: () => router.push('/appointments') }] : []),
+    ...(canUseRoute('/referrals') ? [{ label: 'Referrals', icon: ArrowRightLeft, onClick: () => router.push('/referrals') }] : []),
+    ...(canUseRoute('/check-in') ? [{ label: 'Check-in queue', icon: ClipboardCheck, onClick: () => setCheckInOpen(true) }] : []),
+  ]), [canUseRoute, router]);
 
   const frontDeskRows = useMemo<EhrCareDashboardRow[]>(() => {
     const appointmentRows: EhrCareDashboardRow[] = visiblePendingAppointments.map(appointment => ({
@@ -710,6 +722,9 @@ export default function FrontDeskDashboardPage() {
     });
 
     if (panelView === 'pending') return appointmentRows;
+    if (panelView === 'waiting') return queueRows.filter(row => row.status === 'waiting');
+    if (panelView === 'walkin') return queueRows;
+    if (panelView === 'completed') return queueRows.filter(row => row.status === 'done');
     if (panelView === 'queue') return queueRows;
     if (panelView === 'registered') return registeredRows;
     return [...appointmentRows, ...queueRows];
@@ -762,6 +777,33 @@ export default function FrontDeskDashboardPage() {
       },
     },
     {
+      label: 'Waiting',
+      value: queue.filter(item => item.status === 'WAITING').length,
+      active: panelView === 'waiting',
+      onClick: () => {
+        setQueueFilter('all');
+        setPanelView('waiting');
+      },
+    },
+    {
+      label: 'Walk-ins',
+      value: queue.filter(item => item.type === 'walk-in').length,
+      active: panelView === 'walkin',
+      onClick: () => {
+        setQueueFilter('walk-in');
+        setPanelView('walkin');
+      },
+    },
+    {
+      label: 'Completed',
+      value: queue.filter(item => item.status === 'DONE').length,
+      active: panelView === 'completed',
+      onClick: () => {
+        setQueueFilter('all');
+        setPanelView('completed');
+      },
+    },
+    {
       label: 'Registered patients',
       value: patients.length,
       active: panelView === 'registered',
@@ -769,7 +811,7 @@ export default function FrontDeskDashboardPage() {
         setPanelView('registered');
       },
     },
-  ]), [panelView, pendingAppointments.length, patients.length, queue.length, todaysAppointments.length]);
+  ]), [panelView, pendingAppointments.length, patients.length, queue, todaysAppointments.length]);
 
   const centerCopy = useMemo(() => {
     if (panelView === 'appointments') {
@@ -793,6 +835,30 @@ export default function FrontDeskDashboardPage() {
         title: 'Live queue',
         subtitle: `${frontDeskRows.length} patient${frontDeskRows.length === 1 ? '' : 's'} ready for desk action`,
         emptyTitle: t('frontDesk.noPatientsInQueue'),
+        emptyActionLabel: 'Register patient',
+      };
+    }
+    if (panelView === 'waiting') {
+      return {
+        title: 'Waiting',
+        subtitle: `${frontDeskRows.length} patient${frontDeskRows.length === 1 ? '' : 's'} waiting to be seen`,
+        emptyTitle: 'No patients waiting',
+        emptyActionLabel: 'Register patient',
+      };
+    }
+    if (panelView === 'walkin') {
+      return {
+        title: 'Walk-ins',
+        subtitle: `${frontDeskRows.length} walk-in${frontDeskRows.length === 1 ? '' : 's'} in the queue`,
+        emptyTitle: 'No walk-ins',
+        emptyActionLabel: 'Register patient',
+      };
+    }
+    if (panelView === 'completed') {
+      return {
+        title: 'Completed',
+        subtitle: `${frontDeskRows.length} completed visit${frontDeskRows.length === 1 ? '' : 's'} today`,
+        emptyTitle: 'No completed visits',
         emptyActionLabel: 'Register patient',
       };
     }
@@ -824,7 +890,6 @@ export default function FrontDeskDashboardPage() {
 
   return (
     <>
-      <TopBar title={t('frontDesk.receptionCenter')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <EhrCareDashboard
           title=""
@@ -836,13 +901,9 @@ export default function FrontDeskDashboardPage() {
           searchValue={queueSearch}
           searchPlaceholder="Search patients, reasons, departments"
           onSearchChange={setQueueSearch}
-          filters={[
-            { label: 'Waiting', value: queue.filter(item => item.status === 'WAITING').length, active: queueFilter === 'all' && panelView !== 'registered', onClick: () => { setQueueFilter('all'); setPanelView('all'); } },
-            { label: 'Arrivals', value: pendingAppointments.length, active: panelView === 'pending', onClick: () => { setQueueFilter('appointment'); setPanelView('pending'); } },
-            { label: 'Walk-ins', value: queue.filter(item => item.type === 'walk-in').length, active: queueFilter === 'walk-in' && panelView === 'queue', onClick: () => { setQueueFilter('walk-in'); setPanelView('queue'); } },
-            { label: 'Completed', value: queue.filter(item => item.status === 'DONE').length, onClick: () => { setQueueFilter('all'); setPanelView('queue'); } },
-          ]}
+          filters={[]}
           actions={actions}
+          actionStrip={actionStrip}
           rows={frontDeskRows}
           metrics={metrics}
           checklist={checklist}
@@ -854,65 +915,58 @@ export default function FrontDeskDashboardPage() {
           checklistDescription="Registration, arrivals, routing, and checkout."
           missionTitle="Keep the desk moving"
           missionDescription="Show the next action clearly so reception can register, check in, route, and close visits."
-          showMissionCard={false}
+          showMissionCard
           footerContent={(
-            <section className="card-elevated overflow-hidden recently-registered-card">
-              <div className="px-5 py-3 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
-                <div>
-                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Recently registered</h3>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    Patients added most recently.
-                  </p>
+            <section className="ehr-worklist-panel" style={{ minWidth: 0 }}>
+              <div>
+                <h3>Recently registered</h3>
+                <label className="ehr-care-search ehr-worklist-search">
+                  <Search className="w-4 h-4" />
+                  <input
+                    type="search"
+                    value={recentSearch}
+                    onChange={(e) => setRecentSearch(e.target.value)}
+                    placeholder="Search patient, ID, phone, or location"
+                    aria-label="Search recently registered"
+                  />
+                </label>
+                <div className="ehr-worklist-meta">
+                  <span>{recentPatients.length} patients</span>
                 </div>
-                <button type="button" onClick={() => setRegisterOpen(true)} className="btn btn-primary btn-sm">
-                  <UserPlus className="w-4 h-4" />
-                  Register New Patient
-                </button>
               </div>
-              <div className="recently-registered-tablewrap">
-                <table className="data-table" style={{ minWidth: 860 }}>
-                  <thead>
-                    <tr>
-                      <th>Patient</th>
-                      <th>Gender</th>
-                      <th>DOB</th>
-                      <th>Phone</th>
-                      <th>Location</th>
-                      <th>Last Activity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentPatients.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>
-                          No patients registered yet.
-                        </td>
-                      </tr>
-                    ) : recentPatients.map(patient => (
-                      <tr key={patient._id} onClick={() => router.push(`/patients/${patient._id}`)} style={{ cursor: 'pointer' }}>
-                        <td>
-                          <div className="font-medium" style={{ color: 'var(--text-primary)' }}>{patientFullName(patient)}</div>
-                          <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{patient.hospitalNumber || 'No hospital number'}</div>
-                        </td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {patient.gender || 'Not recorded'}
-                        </td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {patientDob(patient)}
-                        </td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {patient.phone ? formatPhoneDisplay(patient.phone) : 'Not recorded'}
-                        </td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {[patient.county, patient.state].filter(Boolean).join(', ') || 'Not recorded'}
-                        </td>
-                        <td className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {formatDayMonthYear(patient.lastConsultedAt || patient.lastVisitDate || patientRegisteredAt(patient))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="ehr-worklist-table" style={{ minWidth: 0 }}>
+                {recentPatients.length > 0 && (
+                  <div className="ehr-worklist-head" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr)', minWidth: 0 }}>
+                    <span>Patient</span>
+                    <span>Phone</span>
+                    <span>Location</span>
+                    <span>Last Activity</span>
+                    <span>Status</span>
+                  </div>
+                )}
+                {recentPatients.length === 0 && (
+                  <div className="ehr-worklist-empty">
+                    No patients registered yet.
+                    <button type="button" onClick={() => setRegisterOpen(true)}>Register new patient</button>
+                  </div>
+                )}
+                {recentPatients.map(patient => (
+                  <button key={patient._id} type="button" className="ehr-worklist-row" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr)', minWidth: 0 }} onClick={() => router.push(`/patients/${patient._id}`)}>
+                    <span className="ehr-worklist-name">
+                      <span className="ehr-patient-icon ehr-patient-icon--sm" style={{ background: avatarColor(patientFullName(patient)), color: '#fff' }}>{initials(patientFullName(patient))}</span>
+                      <span>
+                        <strong>{patientFullName(patient)}</strong>
+                        <small>{patient.hospitalNumber || 'No hospital number'} · {patientGenderAge(patient)}</small>
+                      </span>
+                    </span>
+                    <span className="ehr-worklist-room">{patient.phone ? formatPhoneDisplay(patient.phone) : 'Not recorded'}</span>
+                    <span className="ehr-worklist-room">{[patient.county, patient.state].filter(Boolean).join(', ') || 'Not recorded'}</span>
+                    <span className="ehr-worklist-care">
+                      <strong>{formatDayMonthYear(patient.lastConsultedAt || patient.lastVisitDate || patientRegisteredAt(patient))}</strong>
+                    </span>
+                    <span><b className="ehr-worklist-status active">Registered</b></span>
+                  </button>
+                ))}
               </div>
             </section>
           )}

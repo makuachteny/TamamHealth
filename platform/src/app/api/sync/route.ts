@@ -72,6 +72,21 @@
  *   - tamamhealth_patient_reminders   Queued patient reminders. Facility-
  *                                     operational, not a national analytics
  *                                     target.
+ *   - tamamhealth_intake_forms        Patient-submitted intake forms awaiting
+ *                                     staff review/merge into the chart.
+ *                                     Facility-operational workflow state, not
+ *                                     a national analytics target.
+ *   - tamamhealth_procedures          Bedside/theatre procedures performed on
+ *                                     a patient. Facility-operational clinical
+ *                                     detail (like patient_notes/phone_notes);
+ *                                     not a national/DHIS2 indicator today.
+ *
+ * (tamamhealth_nutrition_screenings now HAS a national projection —
+ * SAM/MAM is a DHIS2 MCH indicator — via DB_TABLE_MAP + FIELD_MAPPER +
+ * migration 0008, so it is no longer excluded. tamamhealth_program_enrollments
+ * likewise HAS a national projection — ART/TB/PMTCT/ANC/Nutrition/EPI/NCD
+ * enrollment are core DHIS2 care-cascade indicators — via DB_TABLE_MAP +
+ * FIELD_MAPPER + migration 0009.)
  *
  * All remaining databases land in DB_TABLE_MAP below; a missing entry causes a
  * 400 from this route, so the sync-worker surfaces a hard failure rather than
@@ -169,6 +184,13 @@ const DB_TABLE_MAP: Record<string, string> = {
   tamamhealth_payment_plans: 'payment_plans',
   tamamhealth_invoices: 'invoices',
   tamamhealth_ledger: 'ledger_entries',
+  // Nutrition screening — SAM/MAM is a national/DHIS2 MCH indicator.
+  // Table definition lives in `0008_nutrition_screenings_writeback.sql`.
+  tamamhealth_nutrition_screenings: 'nutrition_screenings',
+  // Program enrollment — ART/TB/PMTCT/ANC/Nutrition/EPI/NCD are core national/
+  // DHIS2 care-cascade indicators. Table definition lives in
+  // `0009_program_enrollments_writeback.sql`.
+  tamamhealth_program_enrollments: 'program_enrollments',
 };
 
 // A few CouchDB databases co-locate several doc `type`s in one database. The
@@ -203,13 +225,16 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
   patients: (doc) => ({
     id: doc._id,
     hospital_number: doc.hospitalNumber,
-    name: doc.name,
+    // Patient docs store the name as firstName/middleName/surname, not a single `name`.
+    name: [doc.firstName, doc.middleName, doc.surname].filter(Boolean).join(' ') || undefined,
     gender: doc.gender,
     date_of_birth: doc.dateOfBirth,
-    age: doc.age,
+    // Doc field is `estimatedAge`; there is no top-level `age`.
+    age: doc.estimatedAge,
     state: doc.state,
     county: doc.county,
-    hospital_id: doc.hospitalId,
+    // Doc field is `registrationHospital`; there is no `hospitalId`.
+    hospital_id: doc.registrationHospital,
     org_id: doc.orgId,
     created_at: doc.createdAt,
     updated_at: doc.updatedAt,
@@ -230,19 +255,30 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
     updated_at: doc.updatedAt,
   }),
 
-  medical_records: (doc) => ({
-    id: doc._id,
-    patient_id: doc.patientId,
-    hospital_id: doc.hospitalId,
-    record_type: doc.recordType,
-    diagnosis: doc.diagnosis,
-    icd11_code: doc.icd11Code,
-    severity: doc.severity,
-    visit_date: doc.visitDate,
-    org_id: doc.orgId,
-    created_at: doc.createdAt,
-    updated_at: doc.updatedAt,
-  }),
+  medical_records: (doc) => {
+    // A medical record carries a `diagnoses: Diagnosis[]` array, not top-level
+    // diagnosis scalars. Flatten the primary diagnosis (fall back to the first)
+    // so national morbidity analytics get the coded diagnosis instead of NULLs.
+    const diagnoses = Array.isArray(doc.diagnoses)
+      ? (doc.diagnoses as Array<Record<string, unknown>>)
+      : [];
+    const primary = diagnoses.find((d) => d.type === 'primary') ?? diagnoses[0];
+    return {
+      id: doc._id,
+      patient_id: doc.patientId,
+      hospital_id: doc.hospitalId,
+      record_type: doc.visitType,
+      diagnosis: primary?.name,
+      // The platform codes in ICD-11; the value lives in either slot depending
+      // on write path, so prefer icd11Code and fall back to icd10Code.
+      icd11_code: primary?.icd11Code ?? primary?.icd10Code,
+      severity: primary?.severity,
+      visit_date: doc.visitDate,
+      org_id: doc.orgId,
+      created_at: doc.createdAt,
+      updated_at: doc.updatedAt,
+    };
+  },
 
   lab_results: (doc) => ({
     id: doc._id,
@@ -343,6 +379,54 @@ const FIELD_MAPPERS: Record<string, FieldMapper> = {
     state: doc.state,
     county: doc.county,
     certificate_number: doc.certificateNumber,
+    org_id: doc.orgId,
+    created_at: doc.createdAt,
+    updated_at: doc.updatedAt,
+  }),
+
+  nutrition_screenings: (doc) => ({
+    id: doc._id,
+    patient_id: doc.patientId,
+    patient_name: doc.patientName,
+    age: doc.age,
+    sex: doc.sex,
+    muac: doc.muac,
+    weight_kg: doc.weightKg,
+    height_cm: doc.heightCm,
+    edema: doc.edema,
+    is_anc: doc.isAnc,
+    status: doc.status,
+    screening_date: doc.screeningDate,
+    screened_by_id: doc.screenedById,
+    screened_by_name: doc.screenedByName,
+    hospital_id: doc.hospitalId,
+    org_id: doc.orgId,
+    created_at: doc.createdAt,
+    updated_at: doc.updatedAt,
+  }),
+
+  program_enrollments: (doc) => ({
+    id: doc._id,
+    patient_id: doc.patientId,
+    patient_name: doc.patientName,
+    program_key: doc.programKey,
+    // `program_name` is a curated display label for the known program_keys,
+    // but arbitrary clinician-typed free text when program_key === 'other' —
+    // i.e. uncontrolled PHI. Project the curated label only; suppress the
+    // free-text 'other' case (same stance as the excluded `notes` field).
+    program_name: doc.programKey === 'other' ? null : doc.programName,
+    status: doc.status,
+    enrollment_date: doc.enrollmentDate,
+    outcome_date: doc.outcomeDate,
+    // NB: free-text `notes` is deliberately NOT projected to national
+    // analytics. Enrollment in art_hiv_care/tb_dr/pmtct already encodes
+    // stigmatizing status against a named patient; narrative notes would add
+    // uncontrolled PHI to the broader-access national tier. Care-cascade
+    // indicators need status/dates/keys, not free text — same stance as the
+    // patient_notes / phone_notes / assessments national-sync exclusions.
+    recorded_by: doc.recordedBy,
+    recorded_by_name: doc.recordedByName,
+    hospital_id: doc.hospitalId,
     org_id: doc.orgId,
     created_at: doc.createdAt,
     updated_at: doc.updatedAt,

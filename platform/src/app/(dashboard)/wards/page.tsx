@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
+import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -14,6 +14,7 @@ import { useWards } from '@/lib/hooks/useWards';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { AdmissionDoc } from '@/lib/db-types-ward';
+import PageInstructionCard from '@/components/PageInstructionCard';
 
 // Shared column template for the admissions table header + rows:
 // Patient · Ward · Diagnosis · Severity · Discharge action
@@ -26,6 +27,8 @@ export default function WardsPage() {
   const { patients } = usePatients();
   const { wards, activeAdmissions, totalBeds, occupiedBeds, availableBeds, occupancyRate, admit, discharge } = useWards();
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
+  const admitFromQueryRef = useRef(false);
 
   const [admitOpen, setAdmitOpen] = useState(false);
   const [dischargeFor, setDischargeFor] = useState<AdmissionDoc | null>(null);
@@ -51,6 +54,19 @@ export default function WardsPage() {
     dischargeSummary: '',
     followUpRequired: false,
   });
+
+  // Deep link from consultation (?admitPatientId=&diagnosis=): open the admit
+  // modal pre-filled with the patient and diagnosis just captured there,
+  // instead of leaving the clinician to reselect both from scratch.
+  useEffect(() => {
+    const admitPatientId = searchParams?.get('admitPatientId');
+    if (!admitPatientId || admitFromQueryRef.current) return;
+    if (!patients.some(p => p._id === admitPatientId)) return;
+    admitFromQueryRef.current = true;
+    const diagnosis = searchParams?.get('diagnosis') || '';
+    setAdmitForm(prev => ({ ...prev, patientId: admitPatientId, admittingDiagnosis: diagnosis }));
+    setAdmitOpen(true);
+  }, [searchParams, patients]);
 
   const facilityId = currentUser?.hospitalId || currentUser?.hospital?._id;
   const facilityWards = useMemo(
@@ -152,9 +168,9 @@ export default function WardsPage() {
 
   return (
     <>
-      <TopBar title={t('ward.topBarTitle')} hideSearch />
+      <TopBar title={t('ward.wards')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-
+        <PageInstructionCard />
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
           {/* ── Card toolbar ── */}
           <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>

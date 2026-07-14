@@ -1,25 +1,23 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
-
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useToast } from '@/components/Toast';
+import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 import {
   ClipboardCheck, Baby, Skull, Syringe, HeartPulse,
   Database, Building2, ArrowRight, CheckCircle2, AlertTriangle,
-  Clock, Heart, BarChart3, Wifi, WifiOff,
-  BedDouble, Stethoscope, Users, Zap, Save, Plus,
+  Heart, BedDouble, Stethoscope, Users, Zap, Save, Plus,
   Thermometer, Pill, FlaskConical, Droplets,
   ShieldCheck, Truck, FileText,
 } from '@/components/icons/lucide';
 
-const ACCENT = '#0891B2';
+// Use the platform accent token so this dashboard matches the reference
+// Clinical Officer design instead of a one-off hardcoded hex.
+const ACCENT = 'var(--accent-primary)';
 
 interface CensusData {
   date: string;
@@ -107,6 +105,11 @@ export default function DataEntryDashboard() {
   const [census, setCensus] = useState<CensusData>(() => emptyCensus(today));
   const [savedReports, setSavedReports] = useState<CensusData[]>([]);
   const [saving, setSaving] = useState(false);
+  // Which saved report row is expanded to show its full census breakdown,
+  // rendered inline via EhrCareDashboard's `row.detail` slot.
+  const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  // Free-text filter over the saved-report worklist (search by date).
+  const [reportSearch, setReportSearch] = useState('');
 
   const myHospital = useMemo(() =>
     hospitals.find(h => h._id === currentUser?.hospitalId),
@@ -242,303 +245,228 @@ export default function DataEntryDashboard() {
     );
   };
 
-  // Latest report for visualization
+  // Latest report drives the KPI metrics in the right rail.
   const latest = savedReports[0] || null;
   const bedOccupancy = latest && latest.totalBeds > 0 ? Math.round((latest.occupiedBeds / latest.totalBeds) * 100) : 0;
   const medAvailability = latest && latest.tracerMedicinesTotal > 0 ? Math.round((latest.tracerMedicinesInStock / latest.tracerMedicinesTotal) * 100) : 0;
-  const handwashRate = latest && latest.handwashStations > 0 ? Math.round((latest.handwashFunctional / latest.handwashStations) * 100) : 0;
 
-  if (!currentUser) return null;
+  // Search filter over the saved-report worklist (matches on report date).
+  const filteredReports = useMemo(() => {
+    const q = reportSearch.trim().toLowerCase();
+    if (!q) return savedReports;
+    return savedReports.filter(r => r.date.toLowerCase().includes(q));
+  }, [savedReports, reportSearch]);
 
-  return (
-    <>
-      <TopBar title={t('dataEntry.title')} />
-      <main className="page-container page-enter">
+  const dateLabel = formatDateTitle(toIsoDate(new Date()));
 
-        <DashboardHero
-          className="mb-5"
-          stats={[
-            { label: 'Beds', value: myHospital?.totalBeds ?? 0 },
-            { label: 'Doctors', value: myHospital?.doctors ?? 0 },
-            { label: 'Nurses', value: myHospital?.nurses ?? 0 },
-            { label: 'Profile', value: `${facilityStats?.pct ?? 0}%` },
-          ]}
-        />
-
-        <DashboardActionsRow
-          className="mb-5"
-          actions={[
-            { label: 'My Facility', icon: Building2, href: '/my-facility' },
-            { label: 'All Patients', icon: Users, href: '/patients', color: '#0D9488' },
-            { label: 'Data Quality', icon: ClipboardCheck, href: '/data-quality', color: 'var(--accent-primary)' },
-            { label: 'Reports', icon: BarChart3, href: '/reports', color: '#F59E0B' },
-          ]}
-          secondaryCard={<SpotlightCard title="Profile Completeness" value={`${facilityStats?.pct ?? 0}%`} caption="facility profile filled" href="/my-facility" />}
-        />
-
-        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
-        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
-              <ClipboardCheck className="w-5 h-5 text-white" />
+  // Expandable per-report breakdown (patient census / beds & staff / equipment
+  // & supplies). Rendered inline beneath the row via EhrCareDashboard's
+  // `row.detail` slot when the report is selected.
+  const renderReportDetail = (r: CensusData) => {
+    const medAvail = r.tracerMedicinesTotal > 0 ? Math.round((r.tracerMedicinesInStock / r.tracerMedicinesTotal) * 100) : 0;
+    const handwash = r.handwashStations > 0 ? Math.round((r.handwashFunctional / r.handwashStations) * 100) : 0;
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ margin: '4px 0 12px' }}>
+        {/* Patient summary */}
+        <div className="glass-section">
+          <div className="glass-section-header">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.patientCensus')}</span>
             </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.title')}</h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {myHospital?.name || currentUser.hospitalName || ''}{myHospital?.state ? ` · ${myHospital.state}` : ''}
-              </p>
-            </div>
+            <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{r.date}</span>
           </div>
-        </div>
-
-        {/* Facility banner */}
-        {myHospital && (
-          <div className="dash-card mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
-                <Building2 className="w-5 h-5" style={{ color: ACCENT }} />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{myHospital.name}</h2>
-                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  {myHospital.state} &middot; {myHospital.county || myHospital.town} &middot; {myHospital.type?.replace(/_/g, ' ')}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {myHospital.syncStatus === 'online'
-                  ? <Wifi className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
-                  : <WifiOff className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-                }
-                <button onClick={() => setShowForm(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold"
-                  style={{ background: ACCENT, color: '#fff', border: 'none', cursor: 'pointer' }}
-                >
-                  <Plus className="w-3.5 h-3.5" /> {t('dataEntry.newCensus')}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* KPI strip from latest report */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
-          {[
-            { label: t('dataEntry.kpiFacilityScore'), value: facilityStats ? `${facilityStats.pct}%` : '--', icon: BarChart3, color: facilityStats && facilityStats.pct >= 80 ? 'var(--color-success)' : 'var(--color-warning)' },
-            { label: t('dashboard.bedOccupancy'), value: latest ? `${bedOccupancy}%` : '--', icon: BedDouble, color: bedOccupancy > 90 ? 'var(--color-danger)' : bedOccupancy > 70 ? 'var(--color-warning)' : 'var(--color-success)' },
-            { label: t('dataEntry.kpiMedicineAvail'), value: latest ? `${medAvailability}%` : '--', icon: Pill, color: medAvailability >= 80 ? 'var(--color-success)' : medAvailability >= 50 ? 'var(--color-warning)' : 'var(--color-danger)' },
-            { label: t('dataEntry.kpiReportsFiled'), value: savedReports.length, icon: FileText, color: ACCENT },
-          ].map(k => (
-            <div key={k.label} className="dash-card" style={{ padding: '14px 16px' }}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="icon-box-sm">
-                  <k.icon className="w-3.5 h-3.5" style={{ color: k.color }} />
-                </div>
-                <span className="kpi-card-title">{k.label}</span>
-              </div>
-              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{k.value}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Quick actions */}
-        <div className="dash-card mb-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('dataEntry.dataCollection')}</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="p-4 space-y-2">
             {[
-              { label: t('dataEntry.dailyCensus'), icon: ClipboardCheck, color: 'var(--accent-primary)', action: () => setShowForm(true) },
-              { label: t('dataEntry.facilityAssessment'), icon: Building2, color: 'var(--accent-primary)', action: () => router.push('/facility-assessments') },
-              { label: t('dataEntry.dataQuality'), icon: Database, color: 'var(--accent-primary)', action: () => router.push('/data-quality') },
-              { label: t('dataEntry.vitalStatistics'), icon: Heart, color: 'var(--accent-primary)', action: () => router.push('/vital-statistics') },
-              { label: t('nav.immunizations'), icon: Syringe, color: 'var(--accent-primary)', action: () => router.push('/immunizations') },
-              { label: t('nav.anc'), icon: HeartPulse, color: 'var(--accent-primary)', action: () => router.push('/anc') },
-              { label: t('dataEntry.births'), icon: Baby, color: 'var(--accent-primary)', action: () => router.push('/births') },
-              { label: t('dataEntry.deaths'), icon: Skull, color: 'var(--accent-primary)', action: () => router.push('/deaths') },
-            ].map(a => (
-              <button key={a.label} onClick={a.action}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg transition-all"
-                style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}
-              >
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'transparent' }}>
-                  <a.icon className="w-4 h-4" style={{ color: a.color }} />
-                </div>
-                <span className="text-[10px] font-semibold text-center" style={{ color: 'var(--text-primary)' }}>{a.label}</span>
-              </button>
+              { label: t('dataEntry.inpatients'), value: r.inpatientsTotal, color: 'var(--accent-primary)' },
+              { label: t('dataEntry.opdVisits'), value: r.opdVisitsToday, color: 'var(--accent-primary)' },
+              { label: t('encounters.emergency'), value: r.emergencyVisits, color: 'var(--color-danger)' },
+              { label: t('dashboard.bedMaternity'), value: r.maternityAdmissions, color: 'var(--accent-primary)' },
+              { label: t('dataEntry.newborns'), value: r.newborns, color: 'var(--accent-primary)' },
+              { label: t('dataEntry.discharges'), value: r.discharges, color: 'var(--accent-primary)' },
+              { label: t('dataEntry.deaths'), value: r.deaths, color: 'var(--color-danger)' },
+              { label: t('dataEntry.referralsOut'), value: r.referralsOut, color: 'var(--accent-primary)' },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between py-1" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
+                <span className="text-sm font-bold" style={{ color: row.color }}>{row.value}</span>
+              </div>
             ))}
           </div>
         </div>
 
-        {/* Latest report visualization */}
-        {latest ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-            {/* Patient summary */}
-            <div className="glass-section">
-              <div className="glass-section-header">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.patientCensus')}</span>
+        {/* Bed & staff summary */}
+        <div className="glass-section">
+          <div className="glass-section-header">
+            <div className="flex items-center gap-2">
+              <BedDouble className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.bedsAndStaff')}</span>
+            </div>
+          </div>
+          <div className="p-4 space-y-3">
+            {[
+              { label: t('dataEntry.generalBeds'), occupied: r.occupiedBeds, total: r.totalBeds, color: 'var(--accent-primary)' },
+              { label: t('dashboard.bedIcu'), occupied: r.icuOccupied, total: r.icuBeds, color: 'var(--color-danger)' },
+              { label: t('dashboard.bedMaternity'), occupied: r.maternityOccupied, total: r.maternityBeds, color: '#EC4899' },
+              { label: t('dashboard.bedPediatric'), occupied: r.pediatricOccupied, total: r.pediatricBeds, color: 'var(--color-brand-500)' },
+            ].map(bed => {
+              const pct = bed.total > 0 ? Math.round((bed.occupied / bed.total) * 100) : 0;
+              return (
+                <div key={bed.label}>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{bed.label}</span>
+                    <span className="text-[11px] font-bold" style={{ color: pct > 90 ? 'var(--color-danger)' : 'var(--text-secondary)' }}>{bed.occupied}/{bed.total}</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full" style={{ background: 'var(--overlay-medium)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: bed.color }} />
+                  </div>
                 </div>
-                <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{latest.date}</span>
-              </div>
-              <div className="p-4 space-y-2">
+              );
+            })}
+            <div style={{ borderTop: '1px solid var(--border-medium)', paddingTop: 8, marginTop: 4 }}>
+              <div className="text-[10px] font-semibold uppercase mb-2" style={{ color: 'var(--text-muted)' }}>{t('dataEntry.staffPresent')}</div>
+              <div className="grid grid-cols-3 gap-2">
                 {[
-                  { label: t('dataEntry.inpatients'), value: latest.inpatientsTotal, color: 'var(--accent-primary)' },
-                  { label: t('dataEntry.opdVisits'), value: latest.opdVisitsToday, color: 'var(--accent-primary)' },
-                  { label: t('encounters.emergency'), value: latest.emergencyVisits, color: 'var(--color-danger)' },
-                  { label: t('dashboard.bedMaternity'), value: latest.maternityAdmissions, color: 'var(--accent-primary)' },
-                  { label: t('dataEntry.newborns'), value: latest.newborns, color: 'var(--accent-primary)' },
-                  { label: t('dataEntry.discharges'), value: latest.discharges, color: 'var(--accent-primary)' },
-                  { label: t('dataEntry.deaths'), value: latest.deaths, color: 'var(--color-danger)' },
-                  { label: t('dataEntry.referralsOut'), value: latest.referralsOut, color: 'var(--accent-primary)' },
-                ].map(row => (
-                  <div key={row.label} className="flex items-center justify-between py-1" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
-                    <span className="text-sm font-bold" style={{ color: row.color }}>{row.value}</span>
+                  { label: t('dashboard.doctors'), value: r.doctorsPresent },
+                  { label: t('dataEntry.nurses'), value: r.nursesPresent },
+                  { label: t('dataEntry.cos'), value: r.clinicalOfficers },
+                  { label: t('dataEntry.lab'), value: r.labTechs },
+                  { label: t('dataEntry.pharma'), value: r.pharmacists },
+                  { label: t('dataEntry.support'), value: r.supportStaff },
+                ].map(s => (
+                  <div key={s.label} className="text-center p-1.5 rounded" style={{ background: 'var(--overlay-subtle)' }}>
+                    <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{s.value}</div>
+                    <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
                   </div>
                 ))}
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Bed & staff summary */}
-            <div className="glass-section">
-              <div className="glass-section-header">
-                <div className="flex items-center gap-2">
-                  <BedDouble className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.bedsAndStaff')}</span>
-                </div>
-              </div>
-              <div className="p-4 space-y-3">
-                {[
-                  { label: t('dataEntry.generalBeds'), occupied: latest.occupiedBeds, total: latest.totalBeds, color: 'var(--accent-primary)' },
-                  { label: t('dashboard.bedIcu'), occupied: latest.icuOccupied, total: latest.icuBeds, color: 'var(--color-danger)' },
-                  { label: t('dashboard.bedMaternity'), occupied: latest.maternityOccupied, total: latest.maternityBeds, color: '#EC4899' },
-                  { label: t('dashboard.bedPediatric'), occupied: latest.pediatricOccupied, total: latest.pediatricBeds, color: '#2191D0' },
-                ].map(bed => {
-                  const pct = bed.total > 0 ? Math.round((bed.occupied / bed.total) * 100) : 0;
-                  return (
-                    <div key={bed.label}>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{bed.label}</span>
-                        <span className="text-[11px] font-bold" style={{ color: pct > 90 ? 'var(--color-danger)' : 'var(--text-secondary)' }}>{bed.occupied}/{bed.total}</span>
-                      </div>
-                      <div className="w-full h-2 rounded-full" style={{ background: 'var(--overlay-medium)' }}>
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: bed.color }} />
-                      </div>
-                    </div>
-                  );
-                })}
-                <div style={{ borderTop: '1px solid var(--border-medium)', paddingTop: 8, marginTop: 4 }}>
-                  <div className="text-[10px] font-semibold uppercase mb-2" style={{ color: 'var(--text-muted)' }}>{t('dataEntry.staffPresent')}</div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { label: t('dashboard.doctors'), value: latest.doctorsPresent },
-                      { label: t('dataEntry.nurses'), value: latest.nursesPresent },
-                      { label: t('dataEntry.cos'), value: latest.clinicalOfficers },
-                      { label: t('dataEntry.lab'), value: latest.labTechs },
-                      { label: t('dataEntry.pharma'), value: latest.pharmacists },
-                      { label: t('dataEntry.support'), value: latest.supportStaff },
-                    ].map(s => (
-                      <div key={s.label} className="text-center p-1.5 rounded" style={{ background: 'var(--overlay-subtle)' }}>
-                        <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{s.value}</div>
-                        <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Equipment & supplies */}
-            <div className="glass-section">
-              <div className="glass-section-header">
-                <div className="flex items-center gap-2">
-                  <Thermometer className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.equipmentSupplies')}</span>
-                </div>
-              </div>
-              <div className="p-4 space-y-2">
-                {[
-                  { label: t('dataEntry.thermometers'), value: latest.functionalThermometers, icon: Thermometer },
-                  { label: t('dataEntry.bpMonitors'), value: latest.functionalBPMonitors, icon: Heart },
-                  { label: t('dataEntry.stethoscopes'), value: latest.functionalStethoscopes, icon: Stethoscope },
-                  { label: t('dataEntry.pulseOximeters'), value: latest.functionalOximeters, icon: Zap },
-                  { label: t('dataEntry.wheelchairs'), value: latest.wheelchairsAvailable, icon: Truck },
-                  { label: t('dataEntry.ppeSets'), value: latest.ppeSetsAvailable, icon: ShieldCheck },
-                ].map(eq => (
-                  <div key={eq.label} className="flex items-center justify-between py-1" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{eq.label}</span>
-                    </div>
-                    <span className="text-sm font-bold" style={{ color: eq.value > 0 ? 'var(--text-primary)' : 'var(--color-danger)' }}>{eq.value}</span>
-                  </div>
-                ))}
-                <div style={{ borderTop: '1px solid var(--border-medium)', paddingTop: 8, marginTop: 4 }}>
-                  {[
-                    { label: t('dataEntry.medicineAvailability'), pct: medAvailability, color: 'var(--color-success)' },
-                    { label: t('dataEntry.handwashStations'), pct: handwashRate, color: 'var(--accent-primary)' },
-                  ].map(m => (
-                    <div key={m.label} className="mb-2">
-                      <div className="flex justify-between mb-1">
-                        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{m.label}</span>
-                        <span className="text-[11px] font-bold" style={{ color: m.pct >= 80 ? 'var(--color-success)' : 'var(--color-warning)' }}>{m.pct}%</span>
-                      </div>
-                      <div className="w-full h-2 rounded-full" style={{ background: 'var(--overlay-medium)' }}>
-                        <div className="h-full rounded-full" style={{ width: `${m.pct}%`, background: m.color }} />
-                      </div>
-                    </div>
-                  ))}
-                  <div className="flex items-center gap-3 mt-2">
-                    {[
-                      { label: t('dataEntry.ambulance'), ok: latest.ambulanceOperational },
-                      { label: t('dataEntry.generator'), ok: latest.generatorFunctional },
-                      { label: t('dataEntry.water'), ok: latest.waterAvailable },
-                      { label: t('dataEntry.waste'), ok: latest.wasteDisposalFunctional },
-                    ].map(s => (
-                      <div key={s.label} className="flex items-center gap-1">
-                        {s.ok ? <CheckCircle2 className="w-3 h-3" style={{ color: 'var(--color-success)' }} /> : <AlertTriangle className="w-3 h-3" style={{ color: 'var(--color-danger)' }} />}
-                        <span className="text-[9px] font-semibold" style={{ color: 'var(--text-muted)' }}>{s.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+        {/* Equipment & supplies */}
+        <div className="glass-section">
+          <div className="glass-section-header">
+            <div className="flex items-center gap-2">
+              <Thermometer className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.equipmentSupplies')}</span>
             </div>
           </div>
-        ) : (
-          <div className="dash-card p-8 mb-4 text-center">
-            <ClipboardCheck className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.noReportsYet')}</p>
-            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>{t('dataEntry.noReportsDesc')}</p>
-            <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold"
-              style={{ background: ACCENT, color: '#fff', border: 'none', cursor: 'pointer' }}>
-              <Plus className="w-3.5 h-3.5" /> {t('dataEntry.startDailyCensus')}
-            </button>
-          </div>
-        )}
-
-        {/* Previous reports */}
-        {savedReports.length > 0 && (
-          <div className="dash-card mb-4">
-            <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <Clock className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('dataEntry.previousReports', { count: savedReports.length })}</span>
-            </div>
-            <div className="p-3 space-y-1">
-              {savedReports.slice(0, 7).map((r, i) => (
-                <div key={i} className="flex items-center justify-between p-2.5 rounded-md" style={{ border: '1px solid var(--border-light)' }}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{r.date}</span>
+          <div className="p-4 space-y-2">
+            {[
+              { label: t('dataEntry.thermometers'), value: r.functionalThermometers, icon: Thermometer },
+              { label: t('dataEntry.bpMonitors'), value: r.functionalBPMonitors, icon: Heart },
+              { label: t('dataEntry.stethoscopes'), value: r.functionalStethoscopes, icon: Stethoscope },
+              { label: t('dataEntry.pulseOximeters'), value: r.functionalOximeters, icon: Zap },
+              { label: t('dataEntry.wheelchairs'), value: r.wheelchairsAvailable, icon: Truck },
+              { label: t('dataEntry.ppeSets'), value: r.ppeSetsAvailable, icon: ShieldCheck },
+            ].map(eq => (
+              <div key={eq.label} className="flex items-center justify-between py-1" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{eq.label}</span>
+                </div>
+                <span className="text-sm font-bold" style={{ color: eq.value > 0 ? 'var(--text-primary)' : 'var(--color-danger)' }}>{eq.value}</span>
+              </div>
+            ))}
+            <div style={{ borderTop: '1px solid var(--border-medium)', paddingTop: 8, marginTop: 4 }}>
+              {[
+                { label: t('dataEntry.medicineAvailability'), pct: medAvail, color: 'var(--color-success)' },
+                { label: t('dataEntry.handwashStations'), pct: handwash, color: 'var(--accent-primary)' },
+              ].map(m => (
+                <div key={m.label} className="mb-2">
+                  <div className="flex justify-between mb-1">
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{m.label}</span>
+                    <span className="text-[11px] font-bold" style={{ color: m.pct >= 80 ? 'var(--color-success)' : 'var(--color-warning)' }}>{m.pct}%</span>
                   </div>
-                  <div className="flex items-center gap-4 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    <span>{t('dataEntry.inpatientsCount', { count: r.inpatientsTotal })}</span>
-                    <span>{t('dataEntry.opdCount', { count: r.opdVisitsToday })}</span>
-                    <span>{t('dataEntry.bedsCount', { occupied: r.occupiedBeds, total: r.totalBeds })}</span>
+                  <div className="w-full h-2 rounded-full" style={{ background: 'var(--overlay-medium)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${m.pct}%`, background: m.color }} />
                   </div>
                 </div>
               ))}
+              <div className="flex items-center gap-3 mt-2">
+                {[
+                  { label: t('dataEntry.ambulance'), ok: r.ambulanceOperational },
+                  { label: t('dataEntry.generator'), ok: r.generatorFunctional },
+                  { label: t('dataEntry.water'), ok: r.waterAvailable },
+                  { label: t('dataEntry.waste'), ok: r.wasteDisposalFunctional },
+                ].map(s => (
+                  <div key={s.label} className="flex items-center gap-1">
+                    {s.ok ? <CheckCircle2 className="w-3 h-3" style={{ color: 'var(--color-success)' }} /> : <AlertTriangle className="w-3 h-3" style={{ color: 'var(--color-danger)' }} />}
+                    <span className="text-[9px] font-semibold" style={{ color: 'var(--text-muted)' }}>{s.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        )}
+        </div>
+      </div>
+    );
+  };
 
+  if (!currentUser) return null;
+
+  return (
+    <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <EhrCareDashboard
+        title={t('dataEntry.title')}
+        greetingName={currentUser?.name}
+        dateLabel={dateLabel}
+        tabs={[
+          { key: 'all', label: t('dataEntry.previousReports', { count: filteredReports.length }) },
+        ]}
+        activeTab="all"
+        onTabChange={() => {}}
+        searchValue={reportSearch}
+        searchPlaceholder={t('topbar.searchPlaceholder')}
+        onSearchChange={setReportSearch}
+        filters={[]}
+        actions={[
+          { label: t('dataEntry.newCensus'), icon: Plus, onClick: () => setShowForm(true), tone: 'primary' },
+          { label: t('dataEntry.facilityAssessment'), icon: Building2, onClick: () => router.push('/facility-assessments') },
+          { label: t('dataEntry.dataQuality'), icon: Database, onClick: () => router.push('/data-quality') },
+          { label: t('dataEntry.vitalStatistics'), icon: Heart, onClick: () => router.push('/vital-statistics') },
+          { label: t('nav.immunizations'), icon: Syringe, onClick: () => router.push('/immunizations') },
+          { label: t('nav.anc'), icon: HeartPulse, onClick: () => router.push('/anc') },
+          { label: t('dataEntry.births'), icon: Baby, onClick: () => router.push('/births') },
+          { label: t('dataEntry.deaths'), icon: Skull, onClick: () => router.push('/deaths') },
+        ]}
+        rows={filteredReports.map((r, i): EhrCareDashboardRow => {
+          const id = `${r.date}-${i}`;
+          const isOpen = selectedReport === id;
+          const occ = r.totalBeds > 0 ? Math.round((r.occupiedBeds / r.totalBeds) * 100) : 0;
+          return {
+            id,
+            title: r.date,
+            subtitle: `${t('dataEntry.inpatientsCount', { count: r.inpatientsTotal })} · ${t('dataEntry.opdCount', { count: r.opdVisitsToday })}`,
+            compactMeta: t('dataEntry.bedsCount', { occupied: r.occupiedBeds, total: r.totalBeds }),
+            date: r.date,
+            status: `${occ}%`,
+            statusTone: occ > 90 ? 'danger' : occ > 70 ? 'warning' : 'done',
+            onClick: () => setSelectedReport(isOpen ? null : id),
+            detail: isOpen ? renderReportDetail(r) : undefined,
+          };
+        })}
+        metrics={[
+          { label: t('dataEntry.kpiFacilityScore'), value: facilityStats ? `${facilityStats.pct}%` : '--', tone: facilityStats ? (facilityStats.pct >= 80 ? 'success' : 'warning') : 'neutral' },
+          { label: t('dashboard.bedOccupancy'), value: latest ? `${bedOccupancy}%` : '--', tone: bedOccupancy > 90 ? 'danger' : bedOccupancy > 70 ? 'warning' : 'success' },
+          { label: t('dataEntry.kpiMedicineAvail'), value: latest ? `${medAvailability}%` : '--', tone: medAvailability >= 80 ? 'success' : medAvailability >= 50 ? 'warning' : 'danger' },
+          { label: t('dataEntry.kpiReportsFiled'), value: savedReports.length },
+          { label: 'Beds', value: myHospital?.totalBeds ?? 0 },
+          { label: 'Doctors', value: myHospital?.doctors ?? 0 },
+          { label: 'Nurses', value: myHospital?.nurses ?? 0 },
+        ]}
+        metricsTitle={t('dataEntry.title')}
+        checklist={[
+          { label: t('dataEntry.dailyCensus'), done: !!latest && latest.date === today, onClick: () => setShowForm(true) },
+        ]}
+        checklistTitle={t('dataEntry.dataCollection')}
+        missionTitle={myHospital?.name}
+        missionDescription={myHospital ? `${myHospital.state} · ${myHospital.county || myHospital.town} · ${myHospital.type?.replace(/_/g, ' ') ?? ''}` : undefined}
+        centerSubtitle={savedReports.length === 0 ? t('dataEntry.noReportsDesc') : undefined}
+        emptyTitle={t('dataEntry.noReportsYet')}
+        emptyActionLabel={t('dataEntry.startDailyCensus')}
+        onEmptyAction={() => setShowForm(true)}
+      >
         {/* ═══ CENSUS FORM MODAL ═══ */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: 'rgba(0,0,0,0.55)', padding: '24px 16px' }}
@@ -635,7 +563,7 @@ export default function DataEntryDashboard() {
                 {textField(t('dataEntry.stockOutItems'), 'stockOutItems', t('dataEntry.stockOutItemsPlaceholder'))}
 
                 {/* 6. Infection Control */}
-                {sectionHeader(ShieldCheck, t('dataEntry.infectionControl'), '#2191D0')}
+                {sectionHeader(ShieldCheck, t('dataEntry.infectionControl'), 'var(--color-brand-500)')}
                 <div className="grid grid-cols-2 gap-3">
                   {numField(t('dataEntry.handwashStations'), 'handwashStations')}
                   {numField(t('dataEntry.functionalStations'), 'handwashFunctional')}
@@ -663,7 +591,7 @@ export default function DataEntryDashboard() {
             </div>
           </div>
         )}
-      </main>
-    </>
+      </EhrCareDashboard>
+    </main>
   );
 }

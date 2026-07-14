@@ -2040,7 +2040,14 @@ export interface VitalSigns {
 }
 
 export interface Diagnosis {
+  /** Legacy/compat code field. NOTE: the consultation writes the ICD-11 code
+   *  here too (many readers key off `icd10Code`), so prefer `icd11Code` +
+   *  `codeSystem` below when the coding system matters (interop / DHIS2). */
   icd10Code: string;
+  /** ICD-11 (MMS) code — the system this platform actually codes in. */
+  icd11Code?: string;
+  /** Coding system for the codes above, e.g. 'ICD-11-MMS'. */
+  codeSystem?: string;
   name: string;
   type: 'primary' | 'secondary' | 'differential';
   certainty: 'confirmed' | 'suspected';
@@ -2147,6 +2154,15 @@ export interface MedicalRecord {
     temperature?: string; systolic?: string; diastolic?: string; pulse?: string;
     respiratoryRate?: string; oxygenSaturation?: string; weight?: string;
     muac?: string; bloodGlucose?: string; capturedAt?: string; capturedBy?: string;
+  };
+  /** Physical examination findings by system, captured in the consultation
+   *  exam step. Additive/optional; only populated systems are stored. */
+  physicalExamination?: {
+    general?: string;
+    cardiovascular?: string;
+    respiratory?: string;
+    abdominal?: string;
+    neurological?: string;
   };
   diagnoses: Diagnosis[];
   prescriptions: Prescription[];
@@ -2446,80 +2462,7 @@ export const casesByState = [
   { state: 'E. Equatoria', malaria: 1980, cholera: 18, measles: 45, tb: 67, hiv: 310 },
 ];
 
-// ICD-10 codes for search
-export const icd10Codes = [
-  { code: 'A00', name: 'Cholera' },
-  { code: 'A01', name: 'Typhoid and paratyphoid fevers' },
-  { code: 'A06', name: 'Amoebiasis' },
-  { code: 'A09', name: 'Other gastroenteritis and colitis' },
-  { code: 'A15', name: 'Respiratory tuberculosis' },
-  { code: 'A50', name: 'Congenital syphilis' },
-  { code: 'B05', name: 'Measles' },
-  { code: 'B15', name: 'Acute hepatitis A' },
-  { code: 'B16', name: 'Acute hepatitis B' },
-  { code: 'B17', name: 'Other acute viral hepatitis' },
-  { code: 'B20', name: 'HIV disease' },
-  { code: 'B50', name: 'Plasmodium falciparum malaria' },
-  { code: 'B51', name: 'Plasmodium vivax malaria' },
-  { code: 'B55', name: 'Leishmaniasis (Kala-azar)' },
-  { code: 'D57', name: 'Sickle-cell disorders' },
-  { code: 'E11', name: 'Type 2 diabetes mellitus' },
-  { code: 'E40', name: 'Kwashiorkor' },
-  { code: 'E43', name: 'Severe protein-energy malnutrition' },
-  { code: 'G40', name: 'Epilepsy' },
-  { code: 'I10', name: 'Essential hypertension' },
-  { code: 'I50', name: 'Heart failure' },
-  { code: 'J06', name: 'Upper respiratory tract infection' },
-  { code: 'J18', name: 'Pneumonia' },
-  { code: 'J45', name: 'Asthma' },
-  { code: 'K35', name: 'Acute appendicitis' },
-  { code: 'L02', name: 'Cutaneous abscess, furuncle and carbuncle' },
-  { code: 'N39', name: 'Urinary tract infection' },
-  { code: 'O80', name: 'Normal delivery' },
-  { code: 'O82', name: 'Delivery by caesarean section' },
-  { code: 'R50', name: 'Fever of unknown origin' },
-  { code: 'S06', name: 'Intracranial injury' },
-  { code: 'T30', name: 'Burn and corrosion' },
-  { code: 'T63', name: 'Toxic effect of venomous animal' },
-];
-
 // Common medications for prescription
-export const medications = [
-  { name: 'Artemether-Lumefantrine (Coartem)', category: 'Antimalarial' },
-  { name: 'Artesunate IV', category: 'Antimalarial' },
-  { name: 'Quinine', category: 'Antimalarial' },
-  { name: 'Amoxicillin', category: 'Antibiotic' },
-  { name: 'Azithromycin', category: 'Antibiotic' },
-  { name: 'Ceftriaxone', category: 'Antibiotic' },
-  { name: 'Ciprofloxacin', category: 'Antibiotic' },
-  { name: 'Metronidazole', category: 'Antibiotic' },
-  { name: 'Doxycycline', category: 'Antibiotic' },
-  { name: 'Cotrimoxazole', category: 'Antibiotic' },
-  { name: 'RHZE (TB fixed-dose)', category: 'Anti-TB' },
-  { name: 'Isoniazid', category: 'Anti-TB' },
-  { name: 'TDF/3TC/DTG', category: 'ARV' },
-  { name: 'Paracetamol', category: 'Analgesic' },
-  { name: 'Ibuprofen', category: 'Analgesic/Anti-inflammatory' },
-  { name: 'Tramadol', category: 'Analgesic' },
-  { name: 'Diclofenac', category: 'Anti-inflammatory' },
-  { name: 'Amlodipine', category: 'Antihypertensive' },
-  { name: 'Enalapril', category: 'Antihypertensive' },
-  { name: 'Hydrochlorothiazide', category: 'Diuretic' },
-  { name: 'Metformin', category: 'Antidiabetic' },
-  { name: 'Glibenclamide', category: 'Antidiabetic' },
-  { name: 'Insulin (Regular)', category: 'Antidiabetic' },
-  { name: 'ORS (Oral Rehydration Salts)', category: 'Rehydration' },
-  { name: 'Zinc Sulfate', category: 'Supplement' },
-  { name: 'Ferrous Sulfate + Folic Acid', category: 'Supplement' },
-  { name: 'Vitamin A', category: 'Supplement' },
-  { name: 'Mebendazole', category: 'Anthelminthic' },
-  { name: 'Albendazole', category: 'Anthelminthic' },
-  { name: 'Phenobarbital', category: 'Anticonvulsant' },
-  { name: 'Carbamazepine', category: 'Anticonvulsant' },
-  { name: 'Salbutamol Inhaler', category: 'Bronchodilator' },
-  { name: 'Prednisolone', category: 'Corticosteroid' },
-  { name: 'Hydrocortisone', category: 'Corticosteroid' },
-  { name: 'Oxytocin', category: 'Obstetric' },
-  { name: 'Misoprostol', category: 'Obstetric' },
-  { name: 'Tetanus Toxoid', category: 'Vaccine' },
-];
+// Medications are sourced from the bundled WHO EML formulary (single source of
+// truth, ATC-coded) rather than hardcoded here.
+export { medications } from '@/lib/data/formulary';

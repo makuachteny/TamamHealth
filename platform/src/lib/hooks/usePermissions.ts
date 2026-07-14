@@ -51,7 +51,7 @@ export function usePermissions() {
   // Specialized roles
   const canDispense = role === 'pharmacist';
   const canEnterLabResults = role === 'lab_tech';
-  const canDoTelehealth = role === 'doctor' || isClinician || isMedSupt;
+  const canDoTelehealth = role === 'doctor' || role === 'clinical_officer' || isClinician || isMedSupt;
 
   // Referrals — clinical staff + front desk + supervisors + midwife (obstetric)
   const canManageReferrals = role === 'doctor' || role === 'clinical_officer' || isClinician || isMidwife || isRegistrationClerk || role === 'front_desk' || isSuperAdmin;
@@ -71,7 +71,10 @@ export function usePermissions() {
 
   // Reports & export — HRIO, records/HMIS officer, and the county director own DHIS2/HMIS reporting.
   const canExportDHIS2 = isGovernment || isHospitalManager || role === 'hrio' || isRecordsHmis || isCountyDirector || isSuperAdmin;
-  const canViewReports = role === 'clinical_officer' || role === 'hrio' || isRecordsHmis || isFacilityAdmin || isHospitalManager || isMedSupt || isGovernment || isCountyDirector || isOrgAdmin || isSuperAdmin;
+  // Reports/analytics were deliberately moved off clinicians (see canViewEpidemicIntel/
+  // canViewMCHAnalytics above) onto HMIS/management/government roles; clinical_officer
+  // was a leftover here and is intentionally excluded for consistency.
+  const canViewReports = role === 'hrio' || isRecordsHmis || isFacilityAdmin || isHospitalManager || isMedSupt || isGovernment || isCountyDirector || isOrgAdmin || isSuperAdmin;
 
   // Billing & collections — biller + dedicated cashier + management + admins.
   // Front desk no longer handles money (separation of duties).

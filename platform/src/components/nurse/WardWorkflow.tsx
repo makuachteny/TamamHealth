@@ -3,9 +3,11 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
+import { useWards } from '@/lib/hooks/useWards';
 import { useToast } from '@/components/Toast';
+import Modal from '@/components/Modal';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
-import { patientFullName, patientAgeLabel } from '@/lib/patient-utils';
+import { patientFullName, patientAgeLabel, initials } from '@/lib/patient-utils';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   ChevronDown, Thermometer, Activity, ClipboardList, UserPlus,
@@ -25,16 +27,44 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
   const { showToast } = useToast();
 
   const { reload, wardPatients, patientTriageMap } = useWardRoster();
+  const { activeAdmissions } = useWards();
+
+  // patientId → their active ward/bed placement, for the Location column and
+  // the ward filter. Only admitted patients appear here; the rest show "—".
+  const admissionByPatient = useMemo(() => {
+    const map = new Map<string, { wardName: string; bedNumber?: string }>();
+    for (const a of activeAdmissions) {
+      if (!map.has(a.patientId)) map.set(a.patientId, { wardName: a.wardName, bedNumber: a.bedNumber });
+    }
+    return map;
+  }, [activeAdmissions]);
 
   // Free-text search lives inline in the list header (below); structured filters
   // (gender / age / status) come from the WardFilters dropdown beside it.
   const [search, setSearch] = useState('');
+  // Acuity quick-filter driven by the summary chips (RED / YELLOW). Kept local
+  // rather than in the shared WardFilterState since it's a board-only shortcut.
+  const [acuity, setAcuity] = useState<'' | 'RED' | 'YELLOW'>('');
+  // Ward/location quick-filter (mirrors the reference "Filter by location").
+  const [wardFilter, setWardFilter] = useState('');
   const ageBandOf = (age?: number) => age == null ? null : age < 18 ? 'child' : age < 65 ? 'adult' : 'elderly';
   const q = search.trim().toLowerCase();
+
+  // Distinct wards actually represented in the current roster — the filter only
+  // offers wards that have someone on the board, and hides entirely if none.
+  const wardOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of wardPatients) {
+      const a = admissionByPatient.get(p._id);
+      if (a?.wardName) set.add(a.wardName);
+    }
+    return [...set].sort();
+  }, [wardPatients, admissionByPatient]);
 
   const displayedPatients = useMemo(() => wardPatients.filter(p => {
     const triage = patientTriageMap.get(p._id) || p._triage;
     const status = triage?.status || 'none';
+    const priority = triage?.priority || '';
     const complaint = (triage?.chiefComplaint || '').toLowerCase();
     if (q && !(
       patientFullName(p).toLowerCase().includes(q) ||
@@ -44,20 +74,40 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
     if (filters.gender && p.gender !== filters.gender) return false;
     if (filters.age && ageBandOf(p.estimatedAge) !== filters.age) return false;
     if (filters.status && status !== filters.status) return false;
+    if (acuity && priority !== acuity) return false;
+    if (wardFilter && admissionByPatient.get(p._id)?.wardName !== wardFilter) return false;
     return true;
-  }), [wardPatients, patientTriageMap, filters, q]);
+  }), [wardPatients, patientTriageMap, filters, q, acuity, wardFilter, admissionByPatient]);
 
-  // Column widths (percent). Filtering now lives in the search bar + WardFilters
-  // dropdown, so the header just shows labels.
-  const WARD_COLS = [
-    { key: 'name', label: t('nurse.colPatientName'), width: 18 },
-    { key: 'hn', label: t('nurse.colId'), width: 11 },
-    { key: 'gender', label: t('nurse.colGender'), width: 13 },
-    { key: 'age', label: t('nurse.colAge'), width: 11 },
-    { key: 'complaint', label: t('nurse.colChiefComplaint'), width: 19 },
-    { key: 'status', label: t('nurse.colStatus'), width: 14 },
-    { key: 'actions', label: t('nurse.colActions'), width: 14 },
-  ] as const;
+  // At-a-glance counts across the whole roster (unfiltered), powering the
+  // summary strip above the table. Acuity + workflow-status breakdown.
+  const summary = useMemo(() => {
+    let critical = 0, urgent = 0, waiting = 0, inConsult = 0, notTriaged = 0;
+    for (const p of wardPatients) {
+      const triage = patientTriageMap.get(p._id) || p._triage;
+      const priority = triage?.priority || '';
+      const status = triage?.status || 'none';
+      if (priority === 'RED') critical++;
+      else if (priority === 'YELLOW') urgent++;
+      if (status === 'pending') waiting++;
+      else if (status === 'seen') inConsult++;
+      else if (status === 'none') notTriaged++;
+    }
+    return { total: wardPatients.length, critical, urgent, waiting, inConsult, notTriaged };
+  }, [wardPatients, patientTriageMap]);
+
+  // Toggling a status chip clears any acuity filter and vice-versa, so the two
+  // quick-filters never fight each other.
+  const toggleStatus = (v: string) => { setAcuity(''); setFilters({ ...filters, status: filters.status === v ? '' : v }); };
+  const toggleAcuity = (v: 'RED' | 'YELLOW') => { setFilters({ ...filters, status: '' }); setAcuity(acuity === v ? '' : v); };
+
+  // Only surface the Location column + ward filter when at least one patient on
+  // the board is actually admitted to a bed — otherwise it's a column of dashes.
+  const showLocation = wardOptions.length > 0;
+  const gridCols = showLocation
+    ? 'minmax(0,1.9fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,1.5fr) minmax(0,0.9fr) minmax(0,0.9fr)'
+    : 'minmax(0,2fr) minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr)';
+
 
   // Assign-doctor modal
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
@@ -171,177 +221,230 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        {/* Ward Patient table */}
-        <div className="dash-card mb-4 overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0, order: 1 }}>
+      {/* Ward Patient table — same .ehr-worklist-panel card the Clinical
+          Officer's "Assigned patients" list uses, so both dashboards render
+          this list identically instead of the ward view having its own
+          bespoke bordered card. A single top-level element here, matching
+          MarWorkflow/TriageWorkflow — EhrCareDashboard already wraps
+          `children` in its own .ehr-worklist-panel.ehr-care-workflow div, so
+          an extra wrapper here double-nests the class and breaks its width
+          (the child of .ehr-care-workflow shrinks to content width instead
+          of stretching, since the inline flex:1 needs to be on THIS element
+          directly to win over `.ehr-care-workflow > *`). */}
+      <section className="ehr-worklist-panel" style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
           {/* Inline search + structured filters — lives in the list header rather
               than the platform-wide top search bar. */}
-          <div className="px-3 py-2.5 flex items-center gap-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="flex-shrink-0">Ward patients</h3>
             <ListSearch value={search} onChange={setSearch} placeholder={t('nurse.searchPatientPlaceholder')} />
+            {wardOptions.length > 0 && (
+              <select
+                className="ward-location-select"
+                value={wardFilter}
+                onChange={e => setWardFilter(e.target.value)}
+                aria-label={t('nurse.colLocation')}
+              >
+                <option value="">{t('nurse.allWards')}</option>
+                {wardOptions.map(w => <option key={w} value={w}>{w}</option>)}
+              </select>
+            )}
             <WardFilters filters={filters} setFilters={setFilters} />
           </div>
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            <table className="w-full" style={{ tableLayout: 'fixed', minWidth: 840 }}>
-              <colgroup>
-                {WARD_COLS.map(c => <col key={c.key} style={{ width: `${c.width}%` }} />)}
-              </colgroup>
-              <thead>
-                <tr>
-                  {WARD_COLS.map((c) => (
-                    <th key={c.key} className={`${c.key === 'actions' ? 'text-right' : 'text-left'} px-4 py-2.5`} style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', position: 'sticky', top: 0, background: 'var(--bg-card-solid)', zIndex: 2 }}>
-                      <div className={`flex items-center gap-2 ${c.key === 'actions' ? 'justify-end' : ''}`}>
-                        <span className="text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap">{c.label}</span>
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {displayedPatients.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                      {t('patients.patientsFound', { count: 0 })}
-                    </td>
-                  </tr>
-                )}
-                {displayedPatients.map((patient) => {
-                  const realTriage = patientTriageMap.get(patient._id);
-                  const triage = realTriage || patient._triage;
-                  const triagePriority = triage?.priority;
-                  const triageStatus = triage?.status || 'none';
-                  const isRed = triagePriority === 'RED';
-                  return (
-                    <tr
-                      key={patient._id}
-                      role={patient._demo ? undefined : 'button'}
-                      tabIndex={patient._demo ? undefined : 0}
-                      onClick={patient._demo ? undefined : () => router.push(`/patients/${patient._id}`)}
-                      onKeyDown={patient._demo ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${patient._id}`); } }}
-                      className={`${patient._demo ? '' : 'cursor-pointer'} transition-colors hover:bg-[var(--table-row-hover)]`}
-                      style={{
-                        borderBottom: '1px solid var(--border-light)',
-                        background: isRed ? 'rgba(196,69,54,0.04)' : 'transparent',
-                      }}
+
+          {/* At-a-glance roster summary. Acuity + status chips double as quick
+              filters; the total is display-only. */}
+          <div className="ward-summary" role="group" aria-label={t('nurse.wardPatients')}>
+            <div className="ward-summary-chip is-total">
+              <span className="ward-summary-count">{summary.total}</span>
+              <span className="ward-summary-label">{t('nurse.summaryTotal')}</span>
+            </div>
+            <button
+              type="button"
+              className={`ward-summary-chip acuity-red ${acuity === 'RED' ? 'is-active' : ''}`}
+              onClick={() => toggleAcuity('RED')}
+              aria-pressed={acuity === 'RED'}
+            >
+              <span className="ward-summary-dot" />
+              <span className="ward-summary-count">{summary.critical}</span>
+              <span className="ward-summary-label">{t('nurse.summaryCritical')}</span>
+            </button>
+            <button
+              type="button"
+              className={`ward-summary-chip acuity-yellow ${acuity === 'YELLOW' ? 'is-active' : ''}`}
+              onClick={() => toggleAcuity('YELLOW')}
+              aria-pressed={acuity === 'YELLOW'}
+            >
+              <span className="ward-summary-dot" />
+              <span className="ward-summary-count">{summary.urgent}</span>
+              <span className="ward-summary-label">{t('nurse.summaryUrgent')}</span>
+            </button>
+            <span className="ward-summary-divider" aria-hidden="true" />
+            <button
+              type="button"
+              className={`ward-summary-chip status-waiting ${filters.status === 'pending' ? 'is-active' : ''}`}
+              onClick={() => toggleStatus('pending')}
+              aria-pressed={filters.status === 'pending'}
+            >
+              <span className="ward-summary-count">{summary.waiting}</span>
+              <span className="ward-summary-label">{t('nurse.statusWaiting')}</span>
+            </button>
+            <button
+              type="button"
+              className={`ward-summary-chip status-consult ${filters.status === 'seen' ? 'is-active' : ''}`}
+              onClick={() => toggleStatus('seen')}
+              aria-pressed={filters.status === 'seen'}
+            >
+              <span className="ward-summary-count">{summary.inConsult}</span>
+              <span className="ward-summary-label">{t('nurse.statusInConsult')}</span>
+            </button>
+            <button
+              type="button"
+              className={`ward-summary-chip status-none ${filters.status === 'none' ? 'is-active' : ''}`}
+              onClick={() => toggleStatus('none')}
+              aria-pressed={filters.status === 'none'}
+            >
+              <span className="ward-summary-count">{summary.notTriaged}</span>
+              <span className="ward-summary-label">{t('nurse.statusNotTriaged')}</span>
+            </button>
+          </div>
+
+          <div className="ehr-worklist-table">
+            {displayedPatients.length > 0 && (
+              <div className="ehr-worklist-head" style={{ gridTemplateColumns: gridCols, minWidth: 0 }}>
+                <span>{t('nurse.colPatientName')}</span>
+                <span>{t('nurse.colAge')} / {t('nurse.colGender')}</span>
+                {showLocation && <span>{t('nurse.colLocation')}</span>}
+                <span>{t('nurse.colChiefComplaint')}</span>
+                <span>{t('nurse.colStatus')}</span>
+                <span>{t('nurse.colActions')}</span>
+              </div>
+            )}
+            {displayedPatients.length === 0 && (
+              <div className="ehr-worklist-empty">
+                {t('patients.patientsFound', { count: 0 })}
+              </div>
+            )}
+            {displayedPatients.map((patient) => {
+              const realTriage = patientTriageMap.get(patient._id);
+              const triage = realTriage || patient._triage;
+              const triagePriority = triage?.priority;
+              const triageStatus = triage?.status || 'none';
+              const statusLabel = triageStatus === 'pending' ? t('nurse.statusWaiting')
+                : triageStatus === 'seen' ? t('nurse.statusInConsult')
+                : (triageStatus === 'discharged' || triageStatus === 'admitted') ? triageStatus
+                : t('nurse.statusNotTriaged');
+              const statusTone = triageStatus === 'pending' ? 'ready'
+                : triageStatus === 'seen' ? 'active'
+                : (triageStatus === 'discharged' || triageStatus === 'admitted') ? 'active'
+                : 'done';
+              const admission = admissionByPatient.get(patient._id);
+              const location = admission ? `${admission.wardName}${admission.bedNumber ? ` · ${admission.bedNumber}` : ''}` : '—';
+              return (
+                <div
+                  key={patient._id}
+                  className="ehr-worklist-row"
+                  data-triage={triagePriority || 'GREEN'}
+                  role={patient._demo ? undefined : 'button'}
+                  tabIndex={patient._demo ? undefined : 0}
+                  onClick={patient._demo ? undefined : () => router.push(`/patients/${patient._id}`)}
+                  onKeyDown={patient._demo ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${patient._id}`); } }}
+                  style={{
+                    cursor: patient._demo ? 'default' : 'pointer',
+                    gridTemplateColumns: gridCols,
+                    minWidth: 0,
+                  }}
+                >
+                  <span className="ehr-worklist-name">
+                    <span className="ehr-patient-icon ehr-patient-icon--sm">{initials(patientFullName(patient))}</span>
+                    <span>
+                      <strong>{patientFullName(patient)}</strong>
+                      <small>{patient.hospitalNumber || 'No ID'}</small>
+                    </span>
+                  </span>
+                  <span className="ehr-worklist-room">{patientAgeLabel(patient)} · {patient.gender || '—'}</span>
+                  {showLocation && <span className={admission ? 'ward-location-cell' : 'ward-location-cell is-empty'}>{location}</span>}
+                  <span><b className="ehr-department-pill opd">{triage?.chiefComplaint || '—'}</b></span>
+                  <span><b className={`ehr-worklist-status ${statusTone}`}>{statusLabel}</b></span>
+                  <span className="relative flex justify-end" onClick={(e) => e.stopPropagation()}>
+                    {patient._demo ? (
+                      <span className="text-[10px] font-medium px-2 py-1 rounded-md" style={{ color: 'var(--text-muted)', background: 'var(--overlay-subtle)' }}>{t('nurse.demoRow')}</span>
+                    ) : (
+                    <button
+                      onClick={() => setOpenActionsFor(openActionsFor === patient._id ? null : patient._id)}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors hover:bg-[var(--overlay-subtle)]"
+                      style={{ border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
                     >
-                      <td className="px-4 py-2.5">
-                        <span className="text-[12px] font-medium truncate block hover:opacity-80" style={{ color: 'var(--text-primary)' }}>{patientFullName(patient)}</span>
-                      </td>
-                      <td className="px-4 py-2.5 text-[12px] font-mono tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{patient.hospitalNumber}</td>
-                      <td className="px-4 py-2.5 text-[12px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                        {patient.gender || '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-[12px] tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                        {patientAgeLabel(patient)}
-                      </td>
-                      <td className="px-4 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
-                        <span className="block truncate">{triage?.chiefComplaint || '—'}</span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        {triageStatus === 'pending' && (
-                          <span className="text-[11px] font-medium whitespace-nowrap" style={{ color: 'var(--color-warning)' }}>{t('nurse.statusWaiting')}</span>
-                        )}
-                        {triageStatus === 'seen' && (
-                          <span className="text-[11px] font-medium whitespace-nowrap" style={{ color: '#2563EB' }}>{t('nurse.statusInConsult')}</span>
-                        )}
-                        {(triageStatus === 'discharged' || triageStatus === 'admitted') && (
-                          <span className="text-[11px] font-medium whitespace-nowrap capitalize" style={{ color: 'var(--color-success)' }}>{triageStatus}</span>
-                        )}
-                        {triageStatus === 'none' && !triagePriority && (
-                          <span className="text-[11px] font-medium whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{t('nurse.statusNotTriaged')}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="relative flex justify-end">
-                          {patient._demo ? (
-                            <span className="text-[10px] font-medium px-2 py-1 rounded-md" style={{ color: 'var(--text-muted)', background: 'var(--overlay-subtle)' }}>{t('nurse.demoRow')}</span>
-                          ) : (
+                      {t('nurse.colActions')}
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                    )}
+                    {!patient._demo && openActionsFor === patient._id && (
+                      <>
+                        {/* Click-away backdrop */}
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenActionsFor(null)} />
+                        <div
+                          className="absolute right-0 top-full mt-1 z-20 py-1 rounded-xl overflow-hidden min-w-[170px]"
+                          style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}
+                        >
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenActionsFor(openActionsFor === patient._id ? null : patient._id);
+                            onClick={() => {
+                              setOpenActionsFor(null);
+                              setVitalsPatient({ id: patient._id, name: patientFullName(patient) });
+                              setVitalsForm({
+                                systolic: '', diastolic: '', temperature: '', pulse: '', spo2: '', weight: '', respiratoryRate: '', notes: '',
+                                painScore: '', bloodGlucose: '', gcs: '', muac: '',
+                                oralIntakeMl: '', ivIntakeMl: '', urineOutputMl: '', otherOutputMl: '',
+                              });
+                              setVitalsSaved(false);
+                              setVitalsModalOpen(true);
                             }}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors hover:bg-[var(--overlay-subtle)]"
-                            style={{ border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
+                            style={{ color: 'var(--text-primary)' }}
                           >
-                            {t('nurse.colActions')}
-                            <ChevronDown className="w-3 h-3" />
+                            <Activity className="w-3.5 h-3.5 flex-shrink-0" style={{ color: ACCENT }} />
+                            {t('nurse.actionVitals')}
                           </button>
+                          {(!triage || triageStatus === 'none') && (
+                            <button
+                              onClick={() => {
+                                setOpenActionsFor(null);
+                                startTriage(patient._id);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
+                              style={{ color: 'var(--text-primary)' }}
+                            >
+                              <ClipboardList className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C2410C' }} />
+                              {t('nurse.actionTriage')}
+                            </button>
                           )}
-                          {!patient._demo && openActionsFor === patient._id && (
-                            <>
-                              {/* Click-away backdrop */}
-                              <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setOpenActionsFor(null); }} />
-                              <div
-                                className="absolute right-0 top-full mt-1 z-20 py-1 rounded-xl overflow-hidden min-w-[170px]"
-                                style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}
-                              >
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenActionsFor(null);
-                                    setVitalsPatient({ id: patient._id, name: patientFullName(patient) });
-                                    setVitalsForm({
-                                      systolic: '', diastolic: '', temperature: '', pulse: '', spo2: '', weight: '', respiratoryRate: '', notes: '',
-                                      painScore: '', bloodGlucose: '', gcs: '', muac: '',
-                                      oralIntakeMl: '', ivIntakeMl: '', urineOutputMl: '', otherOutputMl: '',
-                                    });
-                                    setVitalsSaved(false);
-                                    setVitalsModalOpen(true);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
-                                  style={{ color: 'var(--text-primary)' }}
-                                >
-                                  <Activity className="w-3.5 h-3.5 flex-shrink-0" style={{ color: ACCENT }} />
-                                  {t('nurse.actionVitals')}
-                                </button>
-                                {!patient._demo && (!triage || triageStatus === 'none') && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenActionsFor(null);
-                                      startTriage(patient._id);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
-                                    style={{ color: 'var(--text-primary)' }}
-                                  >
-                                    <ClipboardList className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C2410C' }} />
-                                    {t('nurse.actionTriage')}
-                                  </button>
-                                )}
-                                {!patient._demo && triageStatus === 'pending' && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenActionsFor(null);
-                                      setAssignTarget({
-                                        patientId: patient._id,
-                                        patientName: patientFullName(patient),
-                                        hospitalNumber: patient.hospitalNumber,
-                                        triageId: realTriage?._id,
-                                        currentDoctorId: patient.assignedDoctor,
-                                      });
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
-                                    style={{ color: 'var(--text-primary)' }}
-                                  >
-                                    <UserPlus className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
-                                    {t('nurse.actionAssign')}
-                                  </button>
-                                )}
-                              </div>
-                            </>
+                          {triageStatus === 'pending' && (
+                            <button
+                              onClick={() => {
+                                setOpenActionsFor(null);
+                                setAssignTarget({
+                                  patientId: patient._id,
+                                  patientName: patientFullName(patient),
+                                  hospitalNumber: patient.hospitalNumber,
+                                  triageId: realTriage?._id,
+                                  currentDoctorId: patient.assignedDoctor,
+                                });
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--overlay-subtle)]"
+                              style={{ color: 'var(--text-primary)' }}
+                            >
+                              <UserPlus className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
+                              {t('nurse.actionAssign')}
+                            </button>
                           )}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-        </div>
-
-      </div>
+      </section>
 
       {assignTarget && (
         <AssignDoctorModal
@@ -353,10 +456,10 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
 
       {/* MODAL: Quick Vitals Entry */}
       {vitalsModalOpen && vitalsPatient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+        <Modal onClose={() => setVitalsModalOpen(false)} width={512}>
           <div
-            className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', maxHeight: '90vh', overflowY: 'auto' }}
+            className="modal-content card-elevated"
+            style={{ width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
@@ -747,7 +850,7 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
               </div>
             )}
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

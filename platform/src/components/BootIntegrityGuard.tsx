@@ -80,7 +80,7 @@ export default function BootIntegrityGuard() {
         position: 'fixed', inset: 0, zIndex: 2147483647,
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, boxSizing: 'border-box',
         background: '#0f1117', color: '#f1f5f9',
-        fontFamily: "'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+        fontFamily: 'system-ui, sans-serif',
       }}
     >
       <div style={{ maxWidth: 420, width: '100%', textAlign: 'center' }}>
@@ -93,7 +93,7 @@ export default function BootIntegrityGuard() {
         </p>
         <button
           onClick={() => { try { sessionStorage.removeItem(RELOAD_FLAG); } catch { /* ignore */ } window.location.reload(); }}
-          style={{ background: '#2563EB', color: 'white', border: 'none', padding: '12px 24px', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+          style={{ background: '#2191D0', color: 'white', border: 'none', padding: '12px 24px', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
         >
           Reload
         </button>

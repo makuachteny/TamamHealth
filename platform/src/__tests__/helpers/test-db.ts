@@ -88,8 +88,12 @@ export function createDBMock() {
     clinicianTasksDB: () => getTestDB('test_tamamhealth_clinician_tasks'),
     patientDocumentsDB: () => getTestDB('test_tamamhealth_patient_documents'),
     patientRemindersDB: () => getTestDB('test_tamamhealth_patient_reminders'),
+    nutritionScreeningsDB: () => getTestDB('test_tamamhealth_nutrition_screenings'),
+    nutritionSuppliesDB: () => getTestDB('test_tamamhealth_nutrition_supplies'),
     SEED_VERSION: 12,
     isSeeded: async () => false,
+    isSeedInProgress: async () => false,
+    markSeedStarted: async () => {},
     markSeeded: async () => {},
     resetAllDatabases: async () => {},
   };

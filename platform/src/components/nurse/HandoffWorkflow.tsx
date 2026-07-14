@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
+import Modal from '@/components/Modal';
 import { patientFullName } from '@/lib/patient-utils';
 import { formatLongDate } from '@/lib/format-utils';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -203,7 +204,7 @@ export default function HandoffWorkflow({
 
   // Real KPI strip — only counts we actually have.
   const stats = [
-    { icon: BedDouble, label: t('nurse.totalPatients'), value: totalPatients, color: '#2563EB', bg: 'rgba(37,99,235,0.12)' },
+    { icon: BedDouble, label: t('nurse.totalPatients'), value: totalPatients, color: '#2191D0', bg: 'rgba(37,99,235,0.12)' },
     { icon: AlertCircle, label: t('nurse.criticalPatients'), value: criticalCount, color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.12)' },
     { icon: Pill, label: t('nurse.medicationsOverdue'), value: overdueMarCount, color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.12)' },
     { icon: Pill, label: t('nurse.medicationsDueNow'), value: dueMarCount, color: 'var(--color-warning)', bg: 'rgba(228,168,75,0.12)' },
@@ -488,16 +489,15 @@ export default function HandoffWorkflow({
 
   if (variant === 'modal') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => onClose?.()}>
+      <Modal onClose={() => onClose?.()} width={768}>
         <div
-          className="w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', maxHeight: '90vh' }}
-          onClick={e => e.stopPropagation()}
+          className="modal-content card-elevated flex flex-col"
+          style={{ width: '100%', maxHeight: '90vh' }}
         >
           {header}
           {body}
         </div>
-      </div>
+      </Modal>
     );
   }
 

@@ -1,21 +1,17 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
-
-import { useState, useMemo } from 'react';
-import TopBar from '@/components/TopBar';
+import { useState, useMemo, useRef } from 'react';
 import DemoModeBanner from '@/components/DemoModeBanner';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useLabResults } from '@/lib/hooks/useLabResults';
+import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
+import { addPatientDocument } from '@/lib/services/patient-document-service';
 import {
-  Scan, Upload, CheckCircle2, Clock, AlertTriangle,
-  FileText, BarChart3, TrendingUp, Eye,
-  Image, Activity, Users, MessageSquare,
+  Upload, CheckCircle2, FileText, BarChart3, TrendingUp,
 } from '@/components/icons/lucide';
-import PatientName from '@/components/PatientName';
+import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
+import { formatDateTitle, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
 
 const ACCENT = 'var(--accent-primary)';
 
@@ -41,9 +37,10 @@ export default function RadiologyDashboard() {
   const { t } = useTranslation();
   const { currentUser } = useApp();
   const { patients } = usePatients();
-  const { results: labResults } = useLabResults();
+  const { results: labResults, update: updateLabResult } = useLabResults();
   const [selectedStudy, setSelectedStudy] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [queueSearch, setQueueSearch] = useState('');
   const [findings, setFindings] = useState('');
   // Local overrides so submitted demo findings persist for this session.
   // The radiology backend isn't wired yet, so we keep edits in memory
@@ -51,18 +48,145 @@ export default function RadiologyDashboard() {
   const [submittedFindings, setSubmittedFindings] = useState<Record<string, string>>({});
   const [submitToast, setSubmitToast] = useState<string | null>(null);
 
-  const studies = useMemo(
-    () => (IS_DEMO ? SAMPLE_STUDIES : []).map(s => {
-      const override = submittedFindings[s.id];
-      return override ? { ...s, status: 'completed', findings: override } : s;
-    }),
-    [submittedFindings],
-  );
-  const filtered = filterStatus === 'all' ? studies : studies.filter(s => s.status === filterStatus);
+  // Attached imaging files per study (session-scoped object URLs, same
+  // in-memory pattern as findings until the PACS/storage backend lands).
+  const [attachments, setAttachments] = useState<Record<string, { name: string; url: string }[]>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachTargetRef = useRef<string | null>(null);
 
-  const handleSubmitReport = (studyId: string) => {
+  const openAttachDialog = (studyId: string) => {
+    attachTargetRef.current = studyId;
+    fileInputRef.current?.click();
+  };
+
+  const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024; // 5MB per file — PouchDB doc budget
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = String(reader.result || '');
+        resolve(dataUrl.slice(dataUrl.indexOf(',') + 1)); // strip data: prefix
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const handleFilesChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const studyId = attachTargetRef.current;
+    const files = e.target.files;
+    if (!studyId || !files || files.length === 0) return;
+    const chosen = Array.from(files);
+    e.target.value = ''; // allow re-selecting the same file
+
+    // Immediate thumbnails for this session.
+    const added = chosen.map(f => ({ name: f.name, url: URL.createObjectURL(f) }));
+    setAttachments(prev => ({ ...prev, [studyId]: [...(prev[studyId] || []), ...added] }));
+
+    // Real studies: persist each file to the patient chart (synced
+    // patient_documents store, category 'radiology') so the image survives
+    // the session and reaches the ordering clinician.
+    const study = realStudies.find(s => s.id === studyId);
+    if (study) {
+      for (const file of chosen) {
+        if (file.size > MAX_ATTACHMENT_BYTES) continue; // skip oversized silently in toast below
+        try {
+          const base64Data = await fileToBase64(file);
+          await addPatientDocument({
+            patientId: study.patientId,
+            title: `${study.modality} — ${study.bodyPart}: ${file.name}`,
+            category: 'radiology',
+            fileName: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            base64Data,
+            sizeBytes: file.size,
+            note: `Attached from radiology work queue (order ${studyId})`,
+            uploadedById: currentUser?._id,
+            uploadedByName: currentUser?.name,
+            hospitalId: currentUser?.hospitalId,
+            orgId: currentUser?.orgId,
+          });
+        } catch {
+          // Persistence failure keeps the session thumbnail; staff can retry.
+        }
+      }
+    }
+
+    setSubmitToast(t('radiology.imageAttachedFor', { id: studyId }));
+    window.setTimeout(() => setSubmitToast(null), 3000);
+  };
+
+  const removeAttachment = (studyId: string, url: string) => {
+    URL.revokeObjectURL(url);
+    setAttachments(prev => ({
+      ...prev,
+      [studyId]: (prev[studyId] || []).filter(a => a.url !== url),
+    }));
+  };
+
+  // Real imaging orders flow in from consultation as lab_result docs with
+  // specimen 'Imaging' (see clinical-flow/lab-catalog.ts). They are listed
+  // first; demo studies fill the queue only in demo mode.
+  const realStudies = useMemo(
+    () =>
+      labResults
+        .filter(r => isImagingStudy(r))
+        .map(r => {
+          const [modality, bodyPart] = r.testName.split(' — ');
+          return {
+            id: r._id,
+            patientId: r.patientId,
+            patientName: r.patientName,
+            modality: (modality || r.testName).trim(),
+            bodyPart: (bodyPart || r.testName).trim(),
+            status: r.status,
+            priority: r.critical ? 'urgent' : 'routine',
+            orderedBy: r.orderedBy,
+            date: (r.orderedAt || '').slice(0, 10),
+            notes: r.clinicalNotes || '',
+            findings: r.result || undefined,
+            isReal: true,
+          };
+        }),
+    [labResults],
+  );
+
+  const studies = useMemo(
+    () => [
+      ...realStudies,
+      ...(IS_DEMO ? SAMPLE_STUDIES : []).map(s => {
+        const override = submittedFindings[s.id];
+        return override
+          ? { ...s, status: 'completed', findings: override, isReal: false }
+          : { ...s, isReal: false };
+      }),
+    ],
+    [realStudies, submittedFindings],
+  );
+
+  const filtered = useMemo(() => {
+    const q = queueSearch.trim().toLowerCase();
+    return studies.filter(s => {
+      if (filterStatus !== 'all' && s.status !== filterStatus) return false;
+      if (!q) return true;
+      return [s.patientName, s.modality, s.bodyPart].some(v => (v || '').toLowerCase().includes(q));
+    });
+  }, [studies, filterStatus, queueSearch]);
+
+  const handleSubmitReport = async (studyId: string) => {
     if (!findings.trim()) return;
-    setSubmittedFindings(prev => ({ ...prev, [studyId]: findings.trim() }));
+    const isReal = realStudies.some(s => s.id === studyId);
+    if (isReal) {
+      // Persist to the actual order doc so the findings reach the ordering
+      // clinician's consultation view and the HMIS reports.
+      await updateLabResult(studyId, {
+        result: findings.trim(),
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+      });
+    } else {
+      setSubmittedFindings(prev => ({ ...prev, [studyId]: findings.trim() }));
+    }
     setFindings('');
     setSubmitToast(t('radiology.reportSubmittedFor', { id: studyId }));
     window.setTimeout(() => setSubmitToast(null), 3000);
@@ -90,289 +214,249 @@ export default function RadiologyDashboard() {
     avgTAT: '45 min',
   }), [studies]);
 
+  const dateLabel = formatDateTitle(toIsoDate(new Date()));
+
+  // Expandable per-study detail (ordered-by / notes / findings entry / image
+  // attachments). Rendered inline beneath the row via EhrCareDashboard's
+  // `row.detail` slot, so clicks inside it don't collapse the row.
+  const renderStudyDetail = (study: (typeof filtered)[number]) => (
+    <div style={{ margin: '0 0 8px', padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.orderedBy')}</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.orderedBy}</p></div>
+        <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.modality')}</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.modality}</p></div>
+      </div>
+      <div className="mb-3"><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.clinicalNotes')}</span><p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{study.notes}</p></div>
+
+      {study.findings && (
+        <div className="mb-3 p-3 rounded-lg" style={{ background: '#05966908', border: '1px solid #05966920' }}>
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>{t('radiology.findings')}</span>
+            {submittedFindings[study.id] && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleUndoReport(study.id); }}
+                className="text-[10px] font-semibold underline"
+                style={{ color: ACCENT }}
+              >
+                {t('action.undo')}
+              </button>
+            )}
+          </div>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-primary)' }}>{study.findings}</p>
+        </div>
+      )}
+
+      {study.status !== 'completed' && (
+        <div>
+          <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('radiology.enterFindings')}</label>
+          <textarea rows={3} value={findings} onChange={e => setFindings(e.target.value)}
+            placeholder={t('radiology.findingsPlaceholder')}
+            className="w-full p-3 rounded-lg text-xs" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', resize: 'vertical' }}
+          />
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => handleSubmitReport(study.id)}
+              disabled={!findings.trim()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold"
+              style={{
+                background: findings.trim() ? ACCENT : 'var(--overlay-subtle)',
+                color: findings.trim() ? '#fff' : 'var(--text-muted)',
+                border: 'none',
+                cursor: findings.trim() ? 'pointer' : 'not-allowed',
+                opacity: findings.trim() ? 1 : 0.7,
+              }}
+            >
+              <CheckCircle2 className="w-3 h-3" /> {t('radiology.submitReport')}
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); openAttachDialog(study.id); }}
+              title={t('radiology.attachImageTitle')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold"
+              style={{
+                background: 'var(--bg-card-solid)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border-medium)',
+                cursor: 'pointer',
+              }}
+            >
+              <Upload className="w-3 h-3" /> {t('radiology.attachImage')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Attached imaging files */}
+      {(attachments[study.id] || []).length > 0 && (
+        <div className="mt-3">
+          <span className="text-[9px] font-bold uppercase block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+            {t('radiology.attachedImages')}
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {(attachments[study.id] || []).map(att => (
+              <div key={att.url} className="relative rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-medium)', width: 96 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={att.url} alt={att.name} style={{ width: 96, height: 72, objectFit: 'cover', display: 'block', background: 'var(--overlay-subtle)' }} />
+                <button
+                  onClick={(e) => { e.stopPropagation(); removeAttachment(study.id, att.url); }}
+                  title={t('radiology.removeImage')}
+                  className="absolute top-1 right-1 flex items-center justify-center rounded-full"
+                  style={{ width: 18, height: 18, background: 'rgba(15,23,42,0.65)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11, lineHeight: 1 }}
+                >
+                  ×
+                </button>
+                <span className="block px-1.5 py-1 text-[9px] truncate" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-solid)' }}>{att.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   if (!currentUser) return null;
 
   return (
-    <>
-      <TopBar title={t('radiology.title')} />
-      <main className="page-container page-enter">
+    <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {/* Hidden picker for study image attachments (JPEG/PNG/DICOM exports) */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,.dcm"
+        multiple
+        onChange={handleFilesChosen}
+        style={{ display: 'none' }}
+      />
 
-        <DashboardHero
-          className="mb-5"
-          stats={[
-            { label: 'Studies', value: stats.total },
-            { label: 'Pending', value: stats.pending },
-            { label: 'In Progress', value: stats.inProgress },
-            { label: 'Urgent', value: stats.urgent },
-          ]}
-        />
+      {IS_DEMO && <DemoModeBanner />}
 
-        <DashboardActionsRow
-          className="mb-5"
-          actions={[
-            { label: 'All Patients', icon: Users, href: '/patients' },
-            { label: 'Imaging Queue', icon: Scan, href: '/radiology', color: 'var(--accent-primary)' },
-            { label: 'Reports', icon: BarChart3, href: '/reports', color: '#0D9488' },
-            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#F59E0B' },
-          ]}
-          secondaryCard={<SpotlightCard title="Urgent Studies" value={stats.urgent} caption={`${stats.pending} pending · ${stats.inProgress} in progress`} />}
-        />
-
-        {IS_DEMO && <DemoModeBanner />}
-
-        {submitToast && (
-          <div
-            role="status"
-            className="mb-3 flex items-center gap-2 px-3 py-2 rounded-md text-xs font-semibold"
-            style={{ background: 'rgba(5,150,105,0.10)', border: '1px solid rgba(5,150,105,0.25)', color: 'var(--color-success)' }}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" /> {submitToast}
-          </div>
-        )}
-
-        {/* COMMAND CENTER HEADER (matches the nurse dashboard) */}
-        <div className="flex items-center justify-between flex-wrap gap-3" style={{ marginBottom: 44 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'transparent' }}>
-              <Scan className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{t('radiology.title')}</h1>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {currentUser.hospitalName || currentUser.hospital?.name || ''}
-              </p>
-            </div>
-          </div>
+      {submitToast && (
+        <div
+          role="status"
+          className="mb-3 flex items-center gap-2 px-3 py-2 rounded-md text-xs font-semibold"
+          style={{ background: 'rgba(5,150,105,0.10)', border: '1px solid rgba(5,150,105,0.25)', color: 'var(--color-success)' }}
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" /> {submitToast}
         </div>
+      )}
 
-        {/* KPI tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
-          {[
-            { label: t('radiology.kpiTotalStudies'), value: stats.total, icon: Scan, color: 'var(--accent-primary)' },
-            { label: t('radiology.kpiPending'), value: stats.pending, icon: Clock, color: 'var(--accent-primary)' },
-            { label: t('radiology.kpiInProgress'), value: stats.inProgress, icon: Activity, color: 'var(--accent-primary)' },
-            { label: t('radiology.kpiCompleted'), value: stats.completed, icon: CheckCircle2, color: 'var(--accent-primary)' },
-            { label: t('radiology.kpiUrgentEmergency'), value: stats.urgent, icon: AlertTriangle, color: 'var(--color-danger)' },
-            { label: t('radiology.kpiXrays'), value: stats.xray, icon: Image, color: 'var(--accent-primary)' },
-            { label: t('radiology.kpiUltrasounds'), value: stats.ultrasound, icon: Eye, color: 'var(--accent-primary)' },
-            { label: t('radiology.kpiAvgTat'), value: stats.avgTAT, icon: TrendingUp, color: 'var(--accent-primary)' },
-          ].map(k => (
-            <div key={k.label} className="card-elevated" style={{ padding: '14px 16px' }}>
-              <div className="flex items-center gap-2 mb-2">
-                <k.icon className="w-[18px] h-[18px] flex-shrink-0" style={{ color: k.color }} />
-                <span className="kpi-card-title">{k.label}</span>
-              </div>
-              <div className="stat-value text-3xl" style={{ color: 'var(--text-primary)', lineHeight: 1, fontWeight: 800 }}>{k.value}</div>
+      <EhrCareDashboard
+        title={t('radiology.title')}
+        greetingName={currentUser?.name}
+        dateLabel={dateLabel}
+        tabs={[]}
+        activeTab={filterStatus}
+        onTabChange={setFilterStatus}
+        searchValue={queueSearch}
+        searchPlaceholder={t('radiology.imagingWorklist')}
+        onSearchChange={setQueueSearch}
+        filters={[
+          { label: t('radiology.filter_all'), value: stats.total, active: filterStatus === 'all', onClick: () => setFilterStatus('all') },
+          { label: t('radiology.filter_pending'), value: stats.pending, active: filterStatus === 'pending', onClick: () => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending') },
+          { label: t('radiology.filter_in_progress'), value: stats.inProgress, active: filterStatus === 'in_progress', onClick: () => setFilterStatus(filterStatus === 'in_progress' ? 'all' : 'in_progress') },
+          { label: t('radiology.filter_completed'), value: stats.completed, active: filterStatus === 'completed', onClick: () => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed') },
+        ]}
+        actions={[]}
+        rows={filtered.map((study): EhrCareDashboardRow => {
+          const isOpen = selectedStudy === study.id;
+          return {
+            id: study.id,
+            title: study.patientName,
+            subtitle: `${study.modality} · ${study.bodyPart}`,
+            compactMeta: study.date,
+            date: study.date,
+            status: t(`radiology.status_${study.status}`),
+            statusTone: study.status === 'completed' ? 'done'
+              : study.status === 'in_progress' ? 'active'
+              : study.priority === 'emergency' ? 'danger'
+              : study.priority === 'urgent' ? 'warning'
+              : 'scheduled',
+            priority: study.priority !== 'routine' ? t(`radiology.priority_${study.priority}`) : undefined,
+            onClick: () => setSelectedStudy(isOpen ? null : study.id),
+            detail: isOpen ? renderStudyDetail(study) : undefined,
+          };
+        })}
+        metrics={[
+          { label: t('radiology.filter_pending'), value: stats.pending, active: filterStatus === 'pending', onClick: () => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending') },
+          { label: t('radiology.filter_in_progress'), value: stats.inProgress, active: filterStatus === 'in_progress', onClick: () => setFilterStatus(filterStatus === 'in_progress' ? 'all' : 'in_progress') },
+          { label: t('radiology.filter_completed'), value: stats.completed, active: filterStatus === 'completed', onClick: () => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed') },
+          { label: t('radiology.kpiUrgentEmergency'), value: stats.urgent, tone: 'danger' },
+          { label: t('radiology.kpiXrays'), value: stats.xray },
+          { label: t('radiology.kpiUltrasounds'), value: stats.ultrasound },
+        ]}
+        metricsTitle={t('radiology.title')}
+        checklist={[
+          { label: t('radiology.kpiPending'), done: stats.pending === 0, onClick: () => setFilterStatus('pending') },
+          { label: t('radiology.kpiInProgress'), done: stats.inProgress === 0, onClick: () => setFilterStatus('in_progress') },
+          { label: t('radiology.kpiCompleted'), done: stats.pending === 0 && stats.inProgress === 0, onClick: () => setFilterStatus('completed') },
+        ]}
+        checklistTitle={t('radiology.imagingWorklist')}
+        missionTitle={t('radiology.title')}
+        missionDescription={t('radiology.imagingWorklist')}
+        emptyTitle={t('radiology.noStudies')}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3" style={{ minWidth: 0 }}>
+          {/* Modality breakdown */}
+          <div className="dash-card">
+            <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <BarChart3 className="w-4 h-4" style={{ color: ACCENT }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('radiology.byModality')}</span>
             </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-          {/* Study worklist */}
-          <div className="lg:col-span-2 dash-card" style={{ padding: '16px', maxHeight: 'none', overflow: 'auto' }}>
-            <div className="glass-section-header">
-              <div className="flex items-center gap-2">
-                <Scan className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('radiology.imagingWorklist')}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {['all', 'pending', 'in_progress', 'completed'].map(s => (
-                  <button key={s} onClick={() => setFilterStatus(filterStatus === s && s !== 'all' ? 'all' : s)}
-                    title={filterStatus === s && s !== 'all' ? t('action.deselect') : undefined} style={{
-                    padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700,
-                    background: filterStatus === s ? ACCENT : 'var(--overlay-subtle)',
-                    color: filterStatus === s ? '#fff' : 'var(--text-muted)',
-                    border: filterStatus === s ? 'none' : '1px solid var(--border-medium)',
-                    cursor: 'pointer', textTransform: 'capitalize',
-                  }}>{t(`radiology.filter_${s}`)}</button>
-                ))}
-              </div>
-            </div>
-            <div style={{ maxHeight: 500, overflowY: 'auto' }}>
-              {filtered.length === 0 && (
-                <div
-                  className="flex flex-col items-center justify-center gap-2 text-center"
-                  style={{ padding: '40px 16px', color: 'var(--text-muted)' }}
-                >
-                  <Scan className="w-6 h-6" style={{ opacity: 0.5 }} />
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                    {t('radiology.noStudies')}
-                  </p>
-                  <p className="text-xs">{t('radiology.noStudiesDesc')}</p>
-                </div>
-              )}
-              {filtered.map(study => (
-                <div key={study.id} onClick={() => setSelectedStudy(selectedStudy === study.id ? null : study.id)}
-                  className="cursor-pointer transition-colors" style={{
-                    padding: '12px 16px', borderBottom: '1px solid var(--border-light)',
-                    background: selectedStudy === study.id ? 'var(--accent-light)' : 'transparent',
-                  }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{
-                      background: 'transparent',
-                    }}>
-                      {study.status === 'completed' ? <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} /> :
-                       study.priority === 'emergency' ? <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} /> :
-                       <Scan className="w-4 h-4" style={{ color: study.priority === 'urgent' ? 'var(--color-warning)' : ACCENT }} />}
+            <div className="p-4 space-y-3">
+              {MODALITIES.map(mod => {
+                const count = studies.filter(s => s.modality === mod).length;
+                const pct = studies.length > 0 ? Math.round((count / studies.length) * 100) : 0;
+                return (
+                  <div key={mod}>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{mod}</span>
+                      <span className="text-[11px] font-bold" style={{ color: count > 0 ? ACCENT : 'var(--text-muted)' }}>{count}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <PatientName name={study.patientName} nameClassName="text-sm font-semibold" />
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
-                          background: study.priority === 'emergency' ? '#DC262615' : study.priority === 'urgent' ? '#D9770615' : 'var(--overlay-subtle)',
-                          color: study.priority === 'emergency' ? 'var(--color-danger)' : study.priority === 'urgent' ? 'var(--color-warning)' : 'var(--text-muted)',
-                        }}>{t(`radiology.priority_${study.priority}`)}</span>
-                      </div>
-                      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                        {study.modality} &middot; {study.bodyPart} &middot; {study.date}
-                      </p>
+                    <div className="w-full h-2 rounded-full" style={{ background: 'var(--overlay-medium)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: ACCENT }} />
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{
-                      background: study.status === 'completed' ? '#05966915' : study.status === 'in_progress' ? '#3b82f615' : '#D9770615',
-                      color: study.status === 'completed' ? 'var(--color-success)' : study.status === 'in_progress' ? 'var(--accent-primary)' : 'var(--color-warning)',
-                    }}>{t(`radiology.status_${study.status}`)}</span>
                   </div>
+                );
+              })}
+            </div>
+          </div>
 
-                  {selectedStudy === study.id && (
-                    <div style={{ marginTop: 12, padding: '12px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)' }}>
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.orderedBy')}</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.orderedBy}</p></div>
-                        <div><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.modality')}</span><p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{study.modality}</p></div>
-                      </div>
-                      <div className="mb-3"><span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>{t('radiology.clinicalNotes')}</span><p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{study.notes}</p></div>
-
-                      {study.findings && (
-                        <div className="mb-3 p-3 rounded-lg" style={{ background: '#05966908', border: '1px solid #05966920' }}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--color-success)' }}>{t('radiology.findings')}</span>
-                            {submittedFindings[study.id] && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleUndoReport(study.id); }}
-                                className="text-[10px] font-semibold underline"
-                                style={{ color: ACCENT }}
-                              >
-                                {t('action.undo')}
-                              </button>
-                            )}
-                          </div>
-                          <p className="text-xs mt-1" style={{ color: 'var(--text-primary)' }}>{study.findings}</p>
-                        </div>
-                      )}
-
-                      {study.status !== 'completed' && (
-                        <div>
-                          <label className="text-[10px] font-bold uppercase block mb-1" style={{ color: 'var(--text-muted)' }}>{t('radiology.enterFindings')}</label>
-                          <textarea rows={3} value={findings} onChange={e => setFindings(e.target.value)}
-                            placeholder={t('radiology.findingsPlaceholder')}
-                            className="w-full p-3 rounded-lg text-xs" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', resize: 'vertical' }}
-                          />
-                          <div className="flex gap-2 mt-2">
-                            <button
-                              onClick={() => handleSubmitReport(study.id)}
-                              disabled={!findings.trim()}
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold"
-                              style={{
-                                background: findings.trim() ? ACCENT : 'var(--overlay-subtle)',
-                                color: findings.trim() ? '#fff' : 'var(--text-muted)',
-                                border: 'none',
-                                cursor: findings.trim() ? 'pointer' : 'not-allowed',
-                                opacity: findings.trim() ? 1 : 0.7,
-                              }}
-                            >
-                              <CheckCircle2 className="w-3 h-3" /> {t('radiology.submitReport')}
-                            </button>
-                            <button
-                              disabled
-                              title={t('radiology.attachImageTitle')}
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold"
-                              style={{
-                                background: 'var(--overlay-subtle)',
-                                color: 'var(--text-muted)',
-                                border: '1px solid var(--border-medium)',
-                                cursor: 'not-allowed',
-                                opacity: 0.6,
-                              }}
-                            >
-                              <Upload className="w-3 h-3" /> {t('radiology.attachImage')}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+          {/* Body parts studied */}
+          <div className="dash-card">
+            <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('radiology.bodyRegions')}</span>
+            </div>
+            <div className="p-4 space-y-1">
+              {[...new Set(studies.map(s => s.bodyPart))].map(part => (
+                <div key={part} className="flex items-center justify-between py-1.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{part}</span>
+                  <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{studies.filter(s => s.bodyPart === part).length}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Right column - stats */}
-          <div className="flex flex-col gap-3">
-
-            {/* Modality breakdown */}
-            <div className="dash-card">
-              <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <BarChart3 className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('radiology.byModality')}</span>
-              </div>
-              <div className="p-4 space-y-3">
-                {MODALITIES.map(mod => {
-                  const count = studies.filter(s => s.modality === mod).length;
-                  const pct = studies.length > 0 ? Math.round((count / studies.length) * 100) : 0;
-                  return (
-                    <div key={mod}>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{mod}</span>
-                        <span className="text-[11px] font-bold" style={{ color: count > 0 ? ACCENT : 'var(--text-muted)' }}>{count}</span>
-                      </div>
-                      <div className="w-full h-2 rounded-full" style={{ background: 'var(--overlay-medium)' }}>
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: ACCENT }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+          {/* Quick stats */}
+          <div className="dash-card">
+            <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('radiology.performance')}</span>
             </div>
-
-            {/* Body parts studied */}
-            <div className="dash-card">
-              <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('radiology.bodyRegions')}</span>
-              </div>
-              <div className="p-4 space-y-1">
-                {[...new Set(studies.map(s => s.bodyPart))].map(part => (
-                  <div key={part} className="flex items-center justify-between py-1.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{part}</span>
-                    <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{studies.filter(s => s.bodyPart === part).length}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Quick stats */}
-            <div className="dash-card">
-              <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('radiology.performance')}</span>
-              </div>
-              <div className="p-4 grid grid-cols-2 gap-3">
-                {[
-                  { label: t('radiology.completionRate'), value: `${studies.length > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%` },
-                  { label: t('radiology.kpiAvgTat'), value: stats.avgTAT },
-                  { label: t('radiology.totalPatients'), value: patients.length },
-                  { label: t('radiology.labCrossRefs'), value: labResults.length },
-                ].map(s => (
-                  <div key={s.label} className="p-2.5 rounded-md text-center" style={{ background: 'var(--overlay-subtle)' }}>
-                    <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{s.value}</div>
-                    <div className="text-[9px] font-semibold" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
+            <div className="p-4 grid grid-cols-2 gap-3">
+              {[
+                { label: t('radiology.completionRate'), value: `${studies.length > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%` },
+                { label: t('radiology.kpiAvgTat'), value: stats.avgTAT },
+                { label: t('radiology.totalPatients'), value: patients.length },
+                { label: t('radiology.labCrossRefs'), value: labResults.length },
+              ].map(s => (
+                <div key={s.label} className="p-2.5 rounded-md text-center" style={{ background: 'var(--overlay-subtle)' }}>
+                  <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{s.value}</div>
+                  <div className="text-[9px] font-semibold" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </main>
-    </>
+      </EhrCareDashboard>
+    </main>
   );
 }

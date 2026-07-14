@@ -5,7 +5,6 @@ import Link from 'next/link';
 import TopBar from '@/components/TopBar';
 import EmptyState from '@/components/EmptyState';
 import Badge, { type BadgeTone } from '@/components/Badge';
-import { FilterMenu } from '@/components/filters';
 import { useANC } from '@/lib/hooks/useANC';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { patientAge } from '@/lib/patient-utils';
@@ -43,9 +42,6 @@ export default function ANCPage() {
   const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
   // Text search comes from the shared global search bar (TopBar).
   const search = globalSearch;
-  const [riskFilter, setRiskFilter] = useState<string>('all');
-  const activeFilterCount = (riskFilter !== 'all' ? 1 : 0);
-  const clearFilters = () => { setRiskFilter('all'); };
   const [showModal, setShowModal] = useState(false);
   // Edit/correct affordance for a saved ANC visit. Visits are corrected via
   // updateANCVisit (audit/sync preserved), not hard-deleted from the UI.
@@ -121,11 +117,8 @@ export default function ANCPage() {
       const q = search.toLowerCase();
       result = result.filter(m => m.latest.motherName.toLowerCase().includes(q));
     }
-    if (riskFilter !== 'all') {
-      result = result.filter(m => m.latest.riskLevel === riskFilter);
-    }
     return result;
-  }, [motherSummaries, search, riskFilter]);
+  }, [motherSummaries, search]);
 
   const selectedMotherVisits = useMemo(() => {
     if (!selectedMother) return [];
@@ -215,18 +208,7 @@ export default function ANCPage() {
 
   return (
     <>
-      <TopBar title={t('anc.title')} searchTrailing={
-          <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
-            <FilterMenu.Field label={t('anc.allRiskLevels')}>
-              <select value={riskFilter} onChange={e => setRiskFilter(e.target.value)} className="w-full text-sm">
-                <option value="all">{t('anc.allRiskLevels')}</option>
-                <option value="high">{t('anc.riskHigh')}</option>
-                <option value="moderate">{t('anc.riskModerate')}</option>
-                <option value="low">{t('anc.riskLow')}</option>
-              </select>
-            </FilterMenu.Field>
-          </FilterMenu>
-      } actions={
+      <TopBar title={t('anc.title')} actions={
         canRecordVitalEvents && (
           <button onClick={() => setShowModal(true)} className="btn btn-primary">
             <Plus className="w-4 h-4" /> {t('anc.registerVisit')}
@@ -256,7 +238,7 @@ export default function ANCPage() {
               ] as const).map((step, i) => {
                 const pct = stats.totalMothers > 0 ? Math.round((step.count / stats.totalMothers) * 100) : 0;
                 const dropoff = i > 0 ? Math.max(0, ([stats.continuum.anc1, stats.continuum.anc2, stats.continuum.anc3, stats.continuum.anc4, stats.continuum.anc5plus][i - 1]) - step.count) : 0;
-                const barColor = step.key === 'anc4' ? 'var(--accent-primary)' : pct >= 50 ? '#1E3A8A' : pct >= 25 ? 'var(--color-warning)' : 'var(--color-danger)';
+                const barColor = step.key === 'anc4' ? 'var(--accent-primary)' : pct >= 50 ? '#015697' : pct >= 25 ? 'var(--color-warning)' : 'var(--color-danger)';
                 return (
                   <div key={step.key} className="flex items-center gap-3">
                     <span className="text-xs font-medium w-44 text-right" style={{ color: 'var(--text-secondary)' }}>{step.label}</span>
@@ -298,6 +280,10 @@ export default function ANCPage() {
                 const risk = riskColors[latest.riskLevel] || riskColors.low;
                 const isSelected = selectedMother === latest.motherId;
                 const select = () => setSelectedMother(isSelected ? null : latest.motherId);
+                const hasRealPatientRecord = !!latest.motherId
+                  && !latest.motherId.startsWith('demo-')
+                  && !latest.motherId.startsWith('mother-new-')
+                  && !latest.motherId.includes('_demo');
                 return (
                   <div
                     key={latest.motherId}
@@ -309,7 +295,7 @@ export default function ANCPage() {
                     style={{ background: isSelected ? 'var(--nav-active-bg)' : undefined }}
                   >
                     <div className="flex-1 min-w-0">
-                      {latest.motherId && !latest.motherId.startsWith('demo-') && !latest.motherId.startsWith('mother-new-') && !latest.motherId.includes('_demo') ? (
+                      {hasRealPatientRecord ? (
                         <Link
                           href={`/patients/${latest.motherId}`}
                           onClick={(e) => e.stopPropagation()}
@@ -330,15 +316,17 @@ export default function ANCPage() {
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                         {visitCount} visit{visitCount !== 1 ? 's' : ''}
                       </span>
-                      <Link
-                        href={`/patients/${latest.motherId}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full transition-colors hover:bg-[var(--accent-light)]"
-                        style={{ color: 'var(--accent-primary)' }}
-                        title="View patient record"
-                      >
-                        View <ExternalLink className="w-3 h-3" />
-                      </Link>
+                      {hasRealPatientRecord && (
+                        <Link
+                          href={`/patients/${latest.motherId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full transition-colors hover:bg-[var(--accent-light)]"
+                          style={{ color: 'var(--accent-primary)' }}
+                          title="View patient record"
+                        >
+                          View <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      )}
                       <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
                     </div>
                   </div>

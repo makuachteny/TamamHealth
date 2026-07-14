@@ -24,7 +24,13 @@ import { formatPhoneDisplay } from '@/lib/field-formats';
 // `splitActions` lays the row out on the same 2-column grid the dashboard cards
 // use (search + trailing in the left column, actions right-aligned in the right
 // column), so the search bar lines up edge-to-edge with the cards below it.
-export default function GlobalSearchBar({ actions, searchTrailing, splitActions }: { actions?: ReactNode; searchTrailing?: ReactNode; splitActions?: boolean } = {}) {
+// `hideInput` drops the text search field (and its quick-jump dropdown) while
+// keeping the actions/trailing row — used on pages that already have the
+// platform header search and don't want a duplicate search box (e.g. payments).
+// `title`/`titleIcon` render the page title as the row's leading, non-shrinking
+// item — TopBar hands these down so the title sits on the same line as the
+// search box and actions instead of stacked in a row of its own.
+export default function GlobalSearchBar({ title, titleIcon, actions, searchTrailing, splitActions, hideInput }: { title?: string; titleIcon?: ReactNode; actions?: ReactNode; searchTrailing?: ReactNode; splitActions?: boolean; hideInput?: boolean } = {}) {
   const { t } = useTranslation();
   const { globalSearch, setGlobalSearch } = useApp();
   const [localSearch, setLocalSearch] = useState(globalSearch);
@@ -95,8 +101,15 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
       : 'mx-[10px] mt-[10px] flex-shrink-0 flex items-center gap-3 flex-wrap'}>
       {/* In split mode this groups search + trailing into the left grid column;
           otherwise `contents` makes them plain flex children as before. */}
-      <div className={split ? 'flex flex-wrap sm:flex-nowrap items-center gap-3 min-w-0' : 'contents'}>
-      <div className={split ? 'relative flex-[1_1_260px] min-w-[180px] max-w-full' : 'relative flex-1 min-w-[180px] max-w-2xl'} ref={searchContainerRef}>
+      <div className={split ? 'flex items-center gap-3 min-w-0' : 'contents'}>
+      {title && (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {titleIcon}
+          <h1 className="text-base font-semibold whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>{title}</h1>
+        </div>
+      )}
+      {!hideInput && (
+      <div className={split ? 'relative flex-1 min-w-0' : 'relative flex-1 min-w-[220px] max-w-2xl'} ref={searchContainerRef}>
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px]" color="var(--text-muted)" />
         <input
           type="search"
@@ -183,6 +196,7 @@ export default function GlobalSearchBar({ actions, searchTrailing, splitActions 
           </button>
         )}
       </div>
+      )}
 
       {/* Compact control docked directly beside the search input (e.g. a filter
           icon), as opposed to the page actions pushed to the row's end. */}

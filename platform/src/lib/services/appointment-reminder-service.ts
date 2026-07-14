@@ -88,7 +88,11 @@ export async function generateReminderMessages(appointments: AppointmentDoc[]): 
       // batch but never the user-facing request path.
       if (smsEnabled && (channel === 'sms' || channel === 'both') && apt.patientPhone) {
         const result = await sendSms({ to: apt.patientPhone, body: reminderText });
-        await updateMessage(created._id, { smsResult: result }).catch(() => {});
+        // Best-effort persist of the delivery result — but log the failure so a
+        // broken result-write doesn't silently punch a hole in the SMS audit trail.
+        await updateMessage(created._id, { smsResult: result }).catch(err => {
+          console.warn(`Failed to persist SMS result on message ${created._id}`, err);
+        });
       }
 
       // Best-effort flip of reminderSent. If this throws (e.g. doc deleted

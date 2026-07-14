@@ -90,25 +90,19 @@ async function postHandler(req: NextRequest) {
     const merchantRequestId = callback.MerchantRequestID;
 
     if (resultCode === 0) {
-      // Successful payment — extract metadata
+      // Successful payment — extract only what we persist. The receipt number
+      // becomes the provider reference; the payer phone / amount / date are
+      // intentionally NOT captured here to keep PII out of the log below.
       const items = callback.CallbackMetadata?.Item || [];
-      const amount = items.find((i) => i.Name === 'Amount')?.Value;
       const mpesaReceiptNumber = items.find(
         (i) => i.Name === 'MpesaReceiptNumber'
       )?.Value;
-      const phoneNumber = items.find((i) => i.Name === 'PhoneNumber')?.Value;
-      const transactionDate = items.find(
-        (i) => i.Name === 'TransactionDate'
-      )?.Value;
 
-      // Log the successful payment for processing
+      // Log only opaque transaction correlators — never the payer phone
+      // number, receipt number, or amount (PII / financial data in stdout).
       console.log('[M-Pesa Webhook] Payment received:', {
         checkoutRequestId,
         merchantRequestId,
-        amount,
-        mpesaReceiptNumber,
-        phoneNumber,
-        transactionDate,
         timestamp: new Date().toISOString(),
       });
 

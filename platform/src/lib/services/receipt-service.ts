@@ -56,16 +56,16 @@ export function generateReceiptHTML(receipt: ReceiptData): string {
 <style>
   @page { margin: 10mm; size: 80mm auto; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: var(--font-platform, 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif); color: #1A2C2A; background: #fff; max-width: 320px; margin: 0 auto; padding: 16px; }
+  body { font-family: system-ui, sans-serif; color: #1A2C2A; background: #fff; max-width: 320px; margin: 0 auto; padding: 16px; }
   .header { text-align: center; padding-bottom: 12px; border-bottom: 2px dashed #ccc; margin-bottom: 12px; }
-  .header h1 { font-size: 16px; font-weight: 800; color: #1E3A8A; letter-spacing: 0.5px; }
+  .header h1 { font-size: 16px; font-weight: 800; color: #015697; letter-spacing: 0.5px; }
   .header p { font-size: 11px; color: #64748b; margin-top: 2px; }
-  .receipt-title { text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; margin-bottom: 12px; }
+  .receipt-title { text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #2191D0; margin-bottom: 12px; }
   .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
   .row .label { color: #64748b; }
   .row .value { font-weight: 600; text-align: right; max-width: 55%; }
   .amount-row { padding: 10px 0; margin: 8px 0; border-top: 1px solid #eee; border-bottom: 1px solid #eee; }
-  .amount-row .value { font-size: 18px; font-weight: 800; color: #3b82f6; }
+  .amount-row .value { font-size: 18px; font-weight: 800; color: #2191D0; }
   .amount-row .label { font-size: 13px; font-weight: 600; }
   .footer { text-align: center; margin-top: 16px; padding-top: 12px; border-top: 2px dashed #ccc; }
   .footer p { font-size: 10px; color: #64748b; line-height: 1.5; }
@@ -111,15 +111,18 @@ export function printReceipt(receipt: ReceiptData): void {
   }
 }
 
+/**
+ * Email a receipt via /api/receipts/email (SendGrid/Resend/SMTP behind an
+ * EMAIL_PROVIDER switch; a dev-only "log" provider counts as delivered).
+ *
+ * Returns the route's honest `delivered` flag — callers must gate their
+ * "Receipt sent" UI on it. A cashier being told an email went out when it
+ * didn't is worse than surfacing the failure.
+ */
 export async function emailReceipt(receipt: ReceiptData, toEmail: string): Promise<boolean> {
-  // In production, this would POST to an email API endpoint
-  // For now, log to console and return success
-  console.log(`[Receipt Service] Sending receipt ${receipt.receiptNumber} to ${toEmail}`);
-  console.log(`[Receipt Service] Receipt HTML length: ${generateReceiptHTML(receipt).length} chars`);
-
   try {
-    // Attempt to call the email API (would exist in production). Goes through
-    // apiFetch so the CSRF token from the session cookie is auto-attached.
+    // Goes through apiFetch so the CSRF token from the session cookie is
+    // auto-attached.
     const { apiFetch } = await import('@/lib/api-fetch');
     const response = await apiFetch('/api/receipts/email', {
       method: 'POST',
@@ -134,12 +137,14 @@ export async function emailReceipt(receipt: ReceiptData, toEmail: string): Promi
       }),
     });
 
-    if (response.ok) return true;
-    // If API doesn't exist yet, that's fine — gracefully fail
-    console.log('[Receipt Service] Email API not available — receipt logged for manual delivery');
-    return true;
-  } catch {
-    console.log('[Receipt Service] Email API not available — receipt logged for manual delivery');
-    return true; // Don't fail the payment flow for email issues
+    if (!response.ok) {
+      console.warn(`[Receipt Service] Email API returned ${response.status} for receipt ${receipt.receiptNumber}`);
+      return false;
+    }
+    const body = await response.json().catch(() => null) as { delivered?: boolean } | null;
+    return body?.delivered === true;
+  } catch (err) {
+    console.warn('[Receipt Service] Email send failed', err);
+    return false;
   }
 }

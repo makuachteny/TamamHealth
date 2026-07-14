@@ -1,17 +1,15 @@
 'use client';
-import DashboardHero from '@/components/dashboard/DashboardHero';
-import DashboardActionsRow from '@/components/dashboard/DashboardActionsRow';
-import SpotlightCard from '@/components/dashboard/SpotlightCard';
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBar from '@/components/TopBar';
+import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useLabResults } from '@/lib/hooks/useLabResults';
+import { isImagingStudy } from '@/lib/clinical-flow/lab-catalog';
+import EhrCareDashboard, { type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import {
-  FlaskConical, Clock, CheckCircle2, AlertTriangle, Activity,
+  FlaskConical, CheckCircle2, AlertTriangle, Activity,
   Radio, Microscope, Droplets, FileText,
-  MessageSquare, ChevronRight, Beaker, Thermometer, Loader2,
+  MessageSquare, Beaker, Thermometer, Loader2,
   X, Save, Table, List, BarChart3, Timer, BellOff, Users,
 } from '@/components/icons/lucide';
 import PatientName from '@/components/PatientName';
@@ -83,16 +81,16 @@ const FLAG_COLORS = {
 const LAB_LIVE_FEED_ENABLED = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 const LAB_EVENT_TYPES = [
-  { label: 'Specimen Received', color: '#06B6D4', icon: Droplets },
+  { label: 'Specimen Received', color: 'var(--color-brand-400)', icon: Droplets },
   { label: 'Centrifuge Started', color: '#A855F7', icon: Loader2 },
   { label: 'Malaria RDT Completed', color: 'var(--color-success)', icon: Microscope },
   { label: 'Critical Hemoglobin Flagged', color: '#F87171', icon: AlertTriangle },
-  { label: 'CBC Analysis Running', color: '#2563EB', icon: Activity },
+  { label: 'CBC Analysis Running', color: 'var(--color-brand-500)', icon: Activity },
   { label: 'Urinalysis Complete', color: 'var(--color-warning)', icon: Beaker },
   { label: 'Blood Culture Incubated', color: '#EC4899', icon: Thermometer },
   { label: 'Result Validated', color: 'var(--accent-primary)', icon: CheckCircle2 },
   { label: 'Specimen Rejected - Hemolyzed', color: 'var(--color-danger)', icon: AlertTriangle },
-  { label: 'Glucose Result Ready', color: '#2563EB', icon: FlaskConical },
+  { label: 'Glucose Result Ready', color: 'var(--color-brand-500)', icon: FlaskConical },
 ];
 
 interface LiveEvent {
@@ -128,9 +126,17 @@ interface BatchEntry {
 export default function LabDashboardPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { results, loading, update } = useLabResults();
+  const { currentUser } = useApp();
+  const { results: allResults, loading, update } = useLabResults();
+  // Imaging orders (specimen 'Imaging') belong to the radiology work queue —
+  // keep the lab bench focused on specimen-based investigations.
+  const results = useMemo(() => allResults.filter(r => !isImagingStudy(r)), [allResults]);
+  const dateLabel = useMemo(() => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date()), []);
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [eventCounter, setEventCounter] = useState(0);
+  // Work-queue status filter (shell tabs) + inline search bound to the shell's left rail.
+  const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  const [queueSearch, setQueueSearch] = useState('');
 
   // Feature 1: Result Entry Modal
   const [showResultModal, setShowResultModal] = useState(false);
@@ -265,9 +271,26 @@ export default function LabDashboardPage() {
   }, [results]);
 
   // --- Categorized results ---
-  const pendingOrders = useMemo(() => results.filter(r => r.status === 'pending' || r.status === 'in_progress').slice(0, 8), [results]);
   const allPendingOrders = useMemo(() => results.filter(r => r.status === 'pending' || r.status === 'in_progress'), [results]);
   const recentCompleted = useMemo(() => results.filter(r => r.status === 'completed').slice(0, 6), [results]);
+
+  // Work queue rendered by the shared shell: filtered by the selected status
+  // chip and the inline search query. Pending / in-progress orders sort first
+  // so the most actionable work is at the top of the list.
+  const visibleQueue = useMemo(() => {
+    const query = queueSearch.trim().toLowerCase();
+    return results.filter(r => {
+      const statusOk = queueFilter === 'all' ? true : r.status === queueFilter;
+      if (!statusOk) return false;
+      if (!query) return true;
+      return (
+        (r.patientName || '').toLowerCase().includes(query) ||
+        (r.testName || '').toLowerCase().includes(query) ||
+        (r.specimen || '').toLowerCase().includes(query) ||
+        (r.orderedBy || '').toLowerCase().includes(query)
+      );
+    }).slice(0, 40);
+  }, [results, queueFilter, queueSearch]);
   const specimenCounts = useMemo(() => {
     const map: Record<string, number> = {};
     results.forEach(r => { map[r.specimen] = (map[r.specimen] || 0) + 1; });
@@ -430,53 +453,95 @@ export default function LabDashboardPage() {
 
   if (loading) {
     return (
-      <>
-        <TopBar title={t('lab.laboratory')} hideSearch />
-        <main className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin" style={{ color: ACCENT }} />
-        </main>
-      </>
+      <main className="page-container page-enter flex-1 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: ACCENT }} />
+      </main>
     );
   }
 
   const unackAlerts = criticalAlerts.filter(a => !a.acknowledged);
 
-  const quickActions = [
-    { label: t('lab.acceptOrder'), icon: FileText, color: 'var(--color-success)', onClick: () => {} },
-    { label: t('lab.enterResult'), icon: Microscope, color: ACCENT, onClick: () => setShowResultModal(true) },
-    { label: t('lab.batchEntry'), icon: Table, color: '#A855F7', onClick: () => { setEntryMode('batch'); setShowResultModal(true); } },
-    { label: t('lab.message'), icon: MessageSquare, color: '#2563EB', onClick: () => {} },
-  ];
+  // Open the single-entry result modal pre-selected on a specific pending order.
+  const openResultForOrder = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setResultValue('');
+    setEntryMode('single');
+    setShowResultModal(true);
+  };
 
   return (
     <>
-      <TopBar title="Laboratory" hideSearch />
-      <main className="page-container page-enter">
-
-        <DashboardHero
-          className="mb-5"
-          stats={[
-            { label: 'Pending', value: kpis.pending },
-            { label: 'In Progress', value: kpis.inProgress },
-            { label: 'Completed Today', value: kpis.completedToday },
-            { label: 'Critical', value: kpis.critical },
+      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <EhrCareDashboard
+          title={t('lab.laboratory')}
+          eyebrow={t('nav.lab')}
+          greetingName={currentUser?.name}
+          dateLabel={dateLabel}
+          tabs={[
+            { key: 'all', label: t('lab.viewAll'), count: results.length },
+            { key: 'pending', label: t('lab.pending'), count: kpis.pending },
+            { key: 'in_progress', label: t('lab.processing'), count: kpis.inProgress },
+            { key: 'completed', label: t('lab.completedToday'), count: kpis.completedToday },
           ]}
-        />
-
-        <DashboardActionsRow
-          className="mb-5"
+          activeTab={queueFilter}
+          onTabChange={(k) => setQueueFilter(k as typeof queueFilter)}
+          searchValue={queueSearch}
+          searchPlaceholder={t('topbar.searchPlaceholder')}
+          onSearchChange={setQueueSearch}
+          filters={[]}
           actions={[
-            { label: 'All Patients', icon: Users, href: '/patients' },
-            { label: 'Blood Bank', icon: Droplets, href: '/blood-bank', color: '#C44536' },
-            { label: 'Reports', icon: BarChart3, href: '/reports', color: 'var(--accent-primary)' },
-            { label: 'Messages', icon: MessageSquare, href: '/messages', color: '#0D9488' },
+            { label: t('lab.enterResult'), icon: Microscope, onClick: () => setShowResultModal(true), tone: 'primary' },
+            { label: t('lab.batchEntry'), icon: Table, onClick: () => { setEntryMode('batch'); setShowResultModal(true); } },
+            { label: t('lab.message'), icon: MessageSquare, onClick: () => router.push('/messages') },
           ]}
-          secondaryCard={<SpotlightCard title="Critical Results" value={kpis.critical} caption={`${kpis.abnormal} abnormal · ${kpis.unacknowledgedCritical} unacknowledged`} />}
-        />
+          actionStrip={[
+            { label: t('nav.patients'), icon: Users, onClick: () => router.push('/patients') },
+            { label: t('lab.acceptOrder'), icon: FileText, onClick: () => router.push('/lab') },
+            { label: t('nav.reports'), icon: BarChart3, onClick: () => router.push('/reports') },
+            { label: t('lab.message'), icon: MessageSquare, onClick: () => router.push('/messages') },
+          ]}
+          rows={visibleQueue.map((order): EhrCareDashboardRow => {
+            const time = order.status === 'completed'
+              ? (order.completedAt ? new Date(order.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined)
+              : (order.orderedAt ? new Date(order.orderedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined);
+            const isOpen = order.status === 'pending' || order.status === 'in_progress';
+            return {
+              id: order._id,
+              title: order.patientName,
+              subtitle: `${order.testName} · ${order.specimen}`,
+              meta: order.orderedBy ? t('lab.orderedBy', { name: order.orderedBy }) : undefined,
+              compactMeta: time,
+              time,
+              status: order.critical ? t('lab.critical') : order.status === 'in_progress' ? t('lab.processing') : order.status === 'completed' ? t('lab.completedToday') : t('lab.pending'),
+              statusTone: order.critical ? 'danger' : order.abnormal ? 'warning' : order.status === 'completed' ? 'done' : order.status === 'in_progress' ? 'active' : 'scheduled',
+              priority: order.critical ? t('lab.critical') : undefined,
+              actionLabel: isOpen ? t('lab.enterResult') : undefined,
+              onAction: isOpen ? () => openResultForOrder(order._id) : undefined,
+            };
+          })}
+          metrics={[
+            { label: t('lab.pending'), value: kpis.pending },
+            { label: t('lab.processing'), value: kpis.inProgress },
+            { label: t('lab.completedToday'), value: kpis.completedToday },
+            { label: t('lab.abnormalBadge'), value: kpis.abnormal, tone: 'warning' },
+            { label: t('lab.critical'), value: kpis.critical, tone: 'danger' },
+          ]}
+          metricsTitle={t('lab.laboratory')}
+          checklist={[
+            { label: t('lab.enterResult'), done: kpis.pending === 0, onClick: () => setShowResultModal(true) },
+            { label: t('lab.batchEntry'), done: kpis.inProgress === 0, onClick: () => { setEntryMode('batch'); setShowResultModal(true); } },
+            { label: t('lab.criticalResult'), done: kpis.unacknowledgedCritical === 0, onClick: () => setQueueFilter('completed') },
+          ]}
+          checklistTitle={t('lab.quickActions')}
+          missionTitle={t('lab.laboratory')}
+          missionDescription={t('lab.ordersQueue')}
+          emptyTitle={t('lab.noPendingOrders')}
+        >
+          <div className="flex flex-col gap-3" style={{ minWidth: 0 }}>
 
         {/* --- Feature 2: Critical Result Alert Banner --- */}
         {unackAlerts.length > 0 && (
-          <div className="mb-4 space-y-2">
+          <div className="space-y-2">
             {unackAlerts.map(alert => (
               <div key={alert.id} className="flex items-center gap-3 p-3 rounded-2xl" style={{
                 background: 'rgba(239,68,68,0.08)',
@@ -510,106 +575,8 @@ export default function LabDashboardPage() {
           </div>
         )}
 
-        {/* --- Command Center Header --- */}
-        <div className="flex items-center justify-between" style={{ marginBottom: 44 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center">
-              <FlaskConical className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
-                {t('lab.laboratory')}
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowResultModal(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
-              style={{ background: ACCENT, color: '#fff' }}
-            >
-              <Microscope className="w-3.5 h-3.5" />
-              {t('lab.enterResult')}
-            </button>
-          </div>
-        </div>
-
-        {/* --- Quick Actions (moved up, full-width) --- */}
-        <div className="dash-card rounded-2xl p-3 mb-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('lab.quickActions')}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {quickActions.map(action => (
-              <button key={action.label} onClick={action.onClick} className="card-elevated flex items-center gap-3 px-3.5 py-3 text-left transition-all">
-                <action.icon className="w-[22px] h-[22px] flex-shrink-0" style={{ color: action.color }} />
-                <span className="text-[12px] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* --- Main Grid: Orders Queue (2col) + Specimen Pipeline (1col) + Result Entry (1col) --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-
-          {/* Orders Queue Table - 2 columns */}
-          <div className="md:col-span-2 dash-card rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.ordersQueue')}</span>
-                <span className="px-2 py-0.5 rounded text-[9px] font-bold tracking-wider" style={{
-                  background: 'rgba(6,182,212,0.1)', color: ACCENT, border: '1px solid rgba(6,182,212,0.2)',
-                }}>{t('lab.activeCount', { count: pendingOrders.length })}</span>
-              </div>
-              <button
-                onClick={() => router.push('/lab')}
-                className="text-[10px] font-medium flex items-center gap-1"
-                style={{ color: ACCENT }}
-              >
-                {t('lab.viewAll')} <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div className="p-3 space-y-1.5" style={{ maxHeight: '340px', overflowY: 'auto' }}>
-              {pendingOrders.length > 0 ? pendingOrders.map(order => (
-                <div key={order._id} className="flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer" onClick={() => {
-                  setSelectedOrderId(order._id);
-                  setResultValue('');
-                  setEntryMode('single');
-                  setShowResultModal(true);
-                }} style={{
-                  background: 'var(--overlay-subtle)', border: `1px solid ${order.critical ? 'rgba(239,68,68,0.25)' : 'var(--border-light)'}`,
-                }}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{
-                    background: 'transparent',
-                  }}>
-                    {order.status === 'in_progress'
-                      ? <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#A855F7' }} />
-                      : <Clock className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
-                    }
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{order.testName}</p>
-                    <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{order.patientName} &middot; {order.specimen}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
-                      background: order.status === 'in_progress' ? 'rgba(168,85,247,0.12)' : 'rgba(251,191,36,0.12)',
-                      color: order.status === 'in_progress' ? '#A855F7' : 'var(--color-warning)',
-                    }}>{order.status === 'in_progress' ? t('lab.processing') : t('lab.pending')}</span>
-                    {order.critical && (
-                      <div className="mt-1">
-                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>{t('lab.critical')}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <FlaskConical className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noPendingOrders')}</p>
-                </div>
-              )}
-            </div>
-          </div>
+        {/* --- Specimen Pipeline + Live Feed --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
           {/* Specimen Pipeline - 1 column */}
           <div className="dash-card rounded-2xl overflow-hidden">
@@ -693,7 +660,7 @@ export default function LabDashboardPage() {
         </div>
 
         {/* --- Bottom: Recent Completed Results --- */}
-        <div className="dash-card rounded-2xl overflow-hidden mb-4">
+        <div className="dash-card rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
@@ -741,7 +708,7 @@ export default function LabDashboardPage() {
         <div className="dash-card rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <div className="flex items-center gap-2">
-              <Timer className="w-4 h-4" style={{ color: '#2563EB' }} />
+              <Timer className="w-4 h-4" style={{ color: 'var(--color-brand-500)' }} />
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.tatDashboard')}</span>
             </div>
             <div className="flex items-center gap-3">
@@ -847,6 +814,8 @@ export default function LabDashboardPage() {
           </div>
         </div>
 
+          </div>
+        </EhrCareDashboard>
       </main>
 
       {/* ===== Feature 1 & 3: Result Entry Modal (Single + Batch) ===== */}

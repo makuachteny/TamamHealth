@@ -7,7 +7,6 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useApp } from '@/lib/context';
 import { useOrganizations } from '@/lib/hooks/useOrganizations';
 import type { OrganizationDoc } from '@/lib/db-types';
-import { FilterMenu } from '@/components/filters';
 import {
   Plus, X, Edit3, Ban,
   ToggleLeft, ToggleRight
@@ -52,10 +51,6 @@ export default function AdminOrganizationsPage() {
 
   // Text search comes from the shared global search bar (TopBar).
   const search = globalSearch;
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterType, setFilterType] = useState<string>('all');
-  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterType !== 'all' ? 1 : 0);
-  const clearFilters = () => { setFilterStatus('all'); setFilterType('all'); };
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<OrgFormData>(emptyForm);
@@ -93,12 +88,9 @@ export default function AdminOrganizationsPage() {
   const filteredOrgs = useMemo(() => {
     return organizations.filter(o => {
       const q = search.toLowerCase();
-      const matchSearch = !q || o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q) || o.contactEmail.toLowerCase().includes(q);
-      const matchStatus = filterStatus === 'all' || o.subscriptionStatus === filterStatus;
-      const matchType = filterType === 'all' || o.orgType === filterType;
-      return matchSearch && matchStatus && matchType;
+      return !q || o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q) || o.contactEmail.toLowerCase().includes(q);
     });
-  }, [organizations, search, filterStatus, filterType]);
+  }, [organizations, search]);
 
   if (!currentUser || currentUser.role !== 'super_admin') return null;
 
@@ -201,26 +193,7 @@ export default function AdminOrganizationsPage() {
 
   return (
     <>
-      <TopBar title={t('orgAdmin.title')} searchTrailing={
-            <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
-              <FilterMenu.Field label={t('orgAdmin.filterByType')}>
-                <select className="w-full text-sm" value={filterType} onChange={e => setFilterType(e.target.value)}>
-                  <option value="all">{t('orgAdmin.typeAll')}</option>
-                  <option value="public">{t('orgAdmin.typePublic')}</option>
-                  <option value="private">{t('orgAdmin.typePrivate')}</option>
-                </select>
-              </FilterMenu.Field>
-              <FilterMenu.Field label={t('orgAdmin.filterByStatus')}>
-                <select className="w-full text-sm" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                  <option value="all">{t('orgAdmin.statusAll')}</option>
-                  <option value="active">{t('orgAdmin.statusActive')}</option>
-                  <option value="trial">{t('orgAdmin.statusTrial')}</option>
-                  <option value="suspended">{t('orgAdmin.statusSuspended')}</option>
-                  <option value="cancelled">{t('orgAdmin.statusCancelled')}</option>
-                </select>
-              </FilterMenu.Field>
-            </FilterMenu>
-          } actions={
+      <TopBar title={t('orgAdmin.title')} actions={
             <button onClick={openCreate} className="btn btn-primary">
               <Plus className="w-4 h-4" /> {t('orgAdmin.newOrganization')}
             </button>
