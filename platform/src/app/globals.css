@@ -6774,6 +6774,25 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 
+/* Intake fills the step area: the card grows to the bottom of the scroll
+   region, its body becomes a flex column, and surplus height is handed to the
+   free-text complaint box — so a short form never leaves dead space under the
+   vitals grid. Growth only ADDS height when the container has leftover room;
+   content taller than the viewport still scrolls normally. */
+.ehr-soap-scroll .ehr-consult-fill-card {
+  flex: 1 0 auto;
+}
+.ehr-consult-fill-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.ehr-consult-fill-body .ehr-consult-complaint-box {
+  flex: 1 1 auto;
+  min-height: 84px;
+  resize: vertical;
+}
+
 .ehr-soap-scroll .card-elevated > button,
 .ehr-soap-scroll .card-elevated > div:first-child,
 .ehr-soap-scroll .glass-section-header {

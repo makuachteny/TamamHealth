@@ -138,14 +138,11 @@ export default function ConsultationPage() {
   // Section collapse state (11 sections — includes AI section at index 3 and Attachments at index 8)
   // In the stepped wizard every section is expanded; the active step controls
   // which section cards are visible (others are hidden), so sections start open.
-  // Exception: Prescriptions and Lab Orders render as centred popups, so they
-  // start closed — clicking their section header opens the popup.
-  const [openSections, setOpenSections] = useState<boolean[]>(() => {
-    const initial = Array(CONSULT_SECTION.referral + 1).fill(true);
-    initial[CONSULT_SECTION.prescriptions] = false;
-    initial[CONSULT_SECTION.labs] = false;
-    return initial;
-  });
+  // Prescriptions and Lab Orders render inline in their own cards on the
+  // Orders step, each led by a search bar with suggestion dropdown.
+  const [openSections, setOpenSections] = useState<boolean[]>(() =>
+    Array(CONSULT_SECTION.referral + 1).fill(true)
+  );
   // Current wizard step (0..6), mapping to the workflow stages below.
   const [step, setStep] = useState(0);
 
@@ -153,6 +150,16 @@ export default function ConsultationPage() {
   const [scribeOpen, setScribeOpen] = useState(false);
 
   const [customLab, setCustomLab] = useState('');
+
+  // Lab test picker — search bar with a suggestion dropdown (mirrors the
+  // medication search in the Prescriptions card).
+  const [labSearch, setLabSearch] = useState('');
+  const [showLabDropdown, setShowLabDropdown] = useState(false);
+  const filteredLabSuggestions = useMemo(() => {
+    const q = labSearch.trim().toLowerCase();
+    const matches = q ? labTests.filter(tn => tn.toLowerCase().includes(q)) : labTests;
+    return matches.slice(0, 12);
+  }, [labSearch, labTests]);
 
   // Patient selector
   const [patientSearch, setPatientSearch] = useState('');
@@ -1670,42 +1677,6 @@ export default function ConsultationPage() {
     );
   };
 
-  // Centred popup for the heavyweight order sections (Prescriptions, Lab
-  // Orders): the section header in the page is the trigger; the section's
-  // form renders in a modal whose body scrolls independently.
-  const SectionPopup = ({ index, children }: { index: number; children: React.ReactNode }) => {
-    const { icon: Icon, label } = sectionHeaders[index];
-    return (
-      <Modal onClose={() => toggleSection(index)} width={860}>
-        <div
-          className="modal-panel modal-panel--lg"
-          style={{ width: '100%', maxHeight: 'min(720px, calc(100vh - 64px))', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}
-        >
-          <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            <div className="flex items-center gap-3">
-              <Icon className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</span>
-            </div>
-            <button
-              onClick={() => toggleSection(index)}
-              aria-label="Close"
-              style={{
-                background: 'var(--overlay-subtle)', border: 'none', cursor: 'pointer',
-                width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--text-muted)',
-              }}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-            {children}
-          </div>
-        </div>
-      </Modal>
-    );
-  };
-
   const WORKFLOW_PANEL = {
     intake: 1,
     exam: 2,
@@ -1955,10 +1926,10 @@ export default function ConsultationPage() {
                 siblings and push the first visible card out of line. */}
             <div className="pr-1 ehr-soap-scroll">
             {/* Section 1: Intake + Vital Signs */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(1) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden ehr-consult-fill-card" style={{ display: stepHas(1) ? undefined : 'none' }}>
               <SectionHeader index={1} />
               {openSections[1] && (
-                <div className="p-5">
+                <div className="p-5 ehr-consult-fill-body">
                   {selectedPatient && !todaysTriage && (
                     <div className="flex items-start gap-2 p-3 mb-4 rounded-lg" style={{ background: 'rgba(217,119,6,0.10)', border: '1px solid var(--color-warning)' }}>
                       <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-warning)' }} />
@@ -1990,6 +1961,7 @@ export default function ConsultationPage() {
                       reworded, reordered, or deleted freely. */}
                   <textarea
                     rows={3}
+                    className="ehr-consult-complaint-box"
                     value={chiefComplaint}
                     onChange={e => setChiefComplaint(e.target.value)}
                     placeholder="e.g. Fever, watery diarrhoea, vomiting — or pick from the symptom list"
@@ -2274,13 +2246,12 @@ export default function ConsultationPage() {
               )}
             </div>
 
-            {/* Orders launchers — Prescriptions + Lab Orders share one row of
-                compact cards; each opens its centred popup. */}
-            <div className="ehr-order-launchers flex gap-3" style={{ display: stepHas(4) ? 'flex' : 'none' }}>
+            {/* Orders — Prescriptions + Lab Orders side by side, each an inline
+                card led by a search bar with a suggestion dropdown. */}
+            <div className="ehr-order-launchers flex gap-3 items-start" style={{ display: stepHas(4) ? 'flex' : 'none' }}>
             <div className="card-elevated overflow-hidden flex-1 min-w-0">
               <SectionHeader index={5} />
               {openSections[5] && (
-                <SectionPopup index={5}>
                 <div className="p-5">
                   {/* Prescribing safety advisories (CDS): allergy, interaction, duplicate */}
                   {hasRxWarnings && (
@@ -2451,14 +2422,12 @@ export default function ConsultationPage() {
                     <p className="text-sm py-3" style={{ color: 'var(--text-muted)' }}>{t('consultation.noPrescriptions')}</p>
                   )}
                 </div>
-                </SectionPopup>
               )}
             </div>
 
             <div className="card-elevated overflow-hidden flex-1 min-w-0">
               <SectionHeader index={6} />
               {openSections[6] && (
-                <SectionPopup index={6}>
                 <div className="p-5 space-y-5">
                   {/* Returned results for a resumed visit, shown inline so the
                       clinician can act on them before finalising. */}
@@ -2496,6 +2465,49 @@ export default function ConsultationPage() {
                     </div>
                   )}
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('consultation.selectTestsHint')}</p>
+
+                  {/* Lab test search — dropdown suggestions on click/focus */}
+                  <div className="relative">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                      <input
+                        type="search"
+                        placeholder="Search lab tests…"
+                        value={labSearch}
+                        onChange={e => { setLabSearch(e.target.value); setShowLabDropdown(true); }}
+                        onFocus={() => setShowLabDropdown(true)}
+                        className="pl-9 search-icon-input"
+                        style={{ background: 'var(--overlay-subtle)' }}
+                      />
+                    </div>
+                    {showLabDropdown && filteredLabSuggestions.length > 0 && (
+                      <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)', maxHeight: 280, overflowY: 'auto' }}>
+                        {filteredLabSuggestions.map(test => (
+                          <button
+                            key={test}
+                            onClick={() => {
+                              setLabOrders(prev => ({ ...prev, [test]: !prev[test] }));
+                              setLabSearch('');
+                              setShowLabDropdown(false);
+                            }}
+                            className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                            style={{ borderBottom: '1px solid var(--border-light)' }}
+                          >
+                            <span className="flex items-center gap-2 text-sm font-medium">
+                              <FlaskConical className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+                              {test}
+                            </span>
+                            <span className="flex items-center gap-2">
+                              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
+                                {basicLabs.includes(test) ? 'Basic' : 'Special'}
+                              </span>
+                              {labOrders[test] && <Check className="w-4 h-4" style={{ color: 'var(--color-success)' }} />}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Apply a clinical protocol / order set — fills labs, meds, diagnoses, plan in one tap */}
                   {orderSets.length > 0 && (
@@ -2643,7 +2655,6 @@ export default function ConsultationPage() {
                     </>
                   )}
                 </div>
-                </SectionPopup>
               )}
             </div>
             </div>
