@@ -232,27 +232,12 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
           of stretching, since the inline flex:1 needs to be on THIS element
           directly to win over `.ehr-care-workflow > *`). */}
       <section className="ehr-worklist-panel" style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
-          {/* Inline search + structured filters — lives in the list header rather
-              than the platform-wide top search bar. */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Header, patients-registry style: row 1 = title + inline dot-stat
+              chips (right-aligned); row 2 = search + ward select + filters.
+              Acuity/status chips still double as one-tap filters. */}
+          <div className="ward-header-row">
             <h3 className="flex-shrink-0">Ward patients</h3>
-            <ListSearch value={search} onChange={setSearch} placeholder={t('nurse.searchPatientPlaceholder')} />
-            {wardOptions.length > 0 && (
-              <select
-                className="ward-location-select"
-                value={wardFilter}
-                onChange={e => setWardFilter(e.target.value)}
-                aria-label={t('nurse.colLocation')}
-              >
-                <option value="">{t('nurse.allWards')}</option>
-                {wardOptions.map(w => <option key={w} value={w}>{w}</option>)}
-              </select>
-            )}
-            <WardFilters filters={filters} setFilters={setFilters} />
-            {/* At-a-glance roster summary, patients-registry style: inline
-                dot-stat chips, right-aligned on the header row. Acuity +
-                status chips still double as one-tap filters. */}
-            <div className="ward-stat-inline ml-auto" role="group" aria-label={t('nurse.wardPatients')}>
+            <div className="ward-stat-inline" role="group" aria-label={t('nurse.wardPatients')}>
               <span className="ward-stat-chip">
                 <span className="ward-stat-dot" style={{ background: 'var(--text-muted)' }} />
                 {t('nurse.summaryTotal')} ({summary.total})
@@ -303,6 +288,21 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
                 {t('nurse.statusNotTriaged')} ({summary.notTriaged})
               </button>
             </div>
+          </div>
+          <div className="ward-controls-row">
+            <ListSearch value={search} onChange={setSearch} placeholder={t('nurse.searchPatientPlaceholder')} />
+            {wardOptions.length > 0 && (
+              <select
+                className="ward-location-select"
+                value={wardFilter}
+                onChange={e => setWardFilter(e.target.value)}
+                aria-label={t('nurse.colLocation')}
+              >
+                <option value="">{t('nurse.allWards')}</option>
+                {wardOptions.map(w => <option key={w} value={w}>{w}</option>)}
+              </select>
+            )}
+            <WardFilters filters={filters} setFilters={setFilters} />
           </div>
 
           <div className="ehr-worklist-table">

@@ -5084,10 +5084,24 @@ thead th {
   overflow: auto;
 }
 
-/* ── Ward patients inline summary ────────────────────────────────────────
-   At-a-glance acuity + status counts on the roster header row, styled like
-   the patients-registry dot-stat chips (no boxes). Acuity and status chips
-   still act as one-tap filters (see WardWorkflow). */
+/* ── Ward patients header ─────────────────────────────────────────────────
+   Two rows, mirroring the patients registry: row 1 = title + inline dot-stat
+   chips (right-aligned); row 2 = search + ward select + filters. Row 1 is the
+   panel's first child, so it inherits the shared worklist-header padding +
+   flex/space-between; row 2 needs its own matching side padding. */
+.ward-header-row {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ward-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+/* At-a-glance acuity + status counts, styled like the patients-registry
+   dot-stat chips (no boxes). Acuity and status chips still act as one-tap
+   filters (see WardWorkflow). */
 .ward-stat-inline {
   display: flex;
   align-items: center;
@@ -5140,6 +5154,12 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 
 /* Ward filter select in the list header. */
 .ward-location-select {
+  /* width:auto + flex:none defeats the global `select { width:100% }` rule,
+     which would otherwise stretch this select across the whole controls row
+     and crush the flex-1 search box to zero width. */
+  width: auto;
+  flex: 0 0 auto;
+  max-width: 200px;
   height: 34px;
   padding: 0 30px 0 12px;
   border: 1px solid var(--ehr-border, var(--border-light));

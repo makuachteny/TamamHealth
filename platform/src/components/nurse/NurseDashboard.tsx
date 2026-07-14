@@ -33,6 +33,11 @@ export default function NurseDashboard() {
   const today = new Date().toISOString().slice(0, 10);
   const triageToday = triages.filter(tr => (tr.triagedAt || '').startsWith(today));
   const criticalTriage = triageToday.filter(tr => tr.priority === 'RED').length;
+  // Ward-roster acuity/status counts, mirrored from the Ward patients view so
+  // the station side card carries the same at-a-glance numbers.
+  const urgentTriage = triageToday.filter(tr => tr.priority === 'YELLOW').length;
+  const waitingTriage = triageToday.filter(tr => tr.status === 'pending').length;
+  const inConsultTriage = triageToday.filter(tr => tr.status === 'seen').length;
 
   // The Quick Actions cards act as the station switcher — each swaps the inline
   // body below (the clinical-officer dashboard pattern: quick-action cards drive
@@ -160,8 +165,11 @@ export default function NurseDashboard() {
     { label: 'Active admissions', value: activeAdmissions.length },
     { label: 'Triage today', value: triageToday.length },
     { label: 'Critical', value: criticalTriage, tone: criticalTriage > 0 ? 'danger' as const : 'neutral' as const },
+    { label: 'Urgent', value: urgentTriage, tone: urgentTriage > 0 ? 'warning' as const : 'neutral' as const },
+    { label: 'Waiting', value: waitingTriage },
+    { label: 'In consult', value: inConsultTriage },
     { label: 'Active station', value: stationLabel[activeTab] },
-  ]), [activeAdmissions.length, activeTab, criticalTriage, patients.length, stationLabel, triageToday.length]);
+  ]), [activeAdmissions.length, activeTab, criticalTriage, urgentTriage, waitingTriage, inConsultTriage, patients.length, stationLabel, triageToday.length]);
 
   const checklist = useMemo(() => ([
     { label: 'Review assigned patients', done: patients.length === 0, onClick: () => setActiveTab('ward') },
