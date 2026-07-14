@@ -8,6 +8,7 @@ import {
   RotateCcw, Ban, AlertTriangle,
 } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
+import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { SearchInput } from '@/components/filters';
 import { computePlanKpis } from '@/components/payments/PlanKpiCards';
@@ -104,6 +105,44 @@ export default function PaymentsPage() {
   }, [scope]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // ── Pending verification queue ─────────────────────────────────────
+  // Pay-by-link (cash/bank) and patient-portal payments are written with
+  // status 'pending' awaiting finance review. Card/mobile-money pendings are
+  // normally reconciled by the provider webhook — anything still here needs a
+  // human decision. Approve posts it (and credits the patient ledger); reject
+  // marks it failed with a note.
+  const { showToast } = useToast();
+  const pendingPayments = useMemo(
+    () => data.payments.filter(p => p.status === 'pending')
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')),
+    [data.payments],
+  );
+  const [pendingBusy, setPendingBusy] = useState<string | null>(null);
+
+  const resolvePending = useCallback(async (p: PaymentDoc, approve: boolean) => {
+    if (!p.reference) {
+      showToast('This payment has no reference and cannot be transitioned — contact support', 'error');
+      return;
+    }
+    setPendingBusy(p._id);
+    try {
+      const { updatePaymentStatus } = await import('@/lib/services/payment-service');
+      const updated = await updatePaymentStatus(
+        p.reference,
+        approve ? 'posted' : 'failed',
+        approve ? undefined : { reason: `Rejected in verification by ${currentUser?.name || 'finance'}` },
+      );
+      if (!updated) throw new Error('Payment not found by reference');
+      showToast(approve ? `Payment ${p.reference} approved and posted` : `Payment ${p.reference} rejected`, 'success');
+      await loadData();
+    } catch (err) {
+      console.error('Pending payment resolution failed:', err);
+      showToast('Could not update the payment — try again', 'error');
+    } finally {
+      setPendingBusy(null);
+    }
+  }, [currentUser?.name, loadData, showToast]);
 
   // ── Aggregate by patient ───────────────────────────────────────────
   const patientLines: PatientLine[] = useMemo(() => {
@@ -358,6 +397,58 @@ export default function PaymentsPage() {
             </div>
           );
         })()}
+
+        {/* Pending verification queue — payments awaiting a finance decision.
+            Rendered only when something needs review, so the page stays clean. */}
+        {pendingPayments.length > 0 && (
+          <div className="dash-card overflow-hidden mb-3" style={{ border: '1px solid rgba(184,116,28,0.35)' }}>
+            <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(184,116,28,0.06)' }}>
+              <Clock className="w-4 h-4" style={{ color: '#B8741C' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Pending verification</span>
+              <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full text-[11px] font-bold" style={{ background: '#B8741C', color: '#fff' }}>
+                {pendingPayments.length}
+              </span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Approving posts the payment and credits the patient&rsquo;s balance.
+              </span>
+            </div>
+            {pendingPayments.map(p => (
+              <div key={p._id} className="px-4 py-2.5 flex items-center gap-3 flex-wrap" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <div style={{ minWidth: 180 }}>
+                  <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{p.patientName}</div>
+                  <div className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{p.reference}</div>
+                </div>
+                <div className="text-sm font-bold" style={{ color: 'var(--text-primary)', minWidth: 110 }}>
+                  {formatMoney(p.amount)} {p.currency}
+                </div>
+                <span className="text-xs px-2 py-0.5 rounded-md" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-secondary)' }}>
+                  {getMethodConfig(p.method).label}
+                </span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {p.createdAt ? new Date(p.createdAt).toLocaleString() : ''}
+                </span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    onClick={() => resolvePending(p, true)}
+                    disabled={pendingBusy === p._id}
+                    className="btn btn-primary btn-sm"
+                    style={{ gap: 6 }}
+                  >
+                    <Banknote className="w-3.5 h-3.5" /> {pendingBusy === p._id ? 'Working…' : 'Approve'}
+                  </button>
+                  <button
+                    onClick={() => resolvePending(p, false)}
+                    disabled={pendingBusy === p._id}
+                    className="btn btn-secondary btn-sm"
+                    style={{ gap: 6, color: 'var(--color-danger)' }}
+                  >
+                    <Ban className="w-3.5 h-3.5" /> Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* People list — fills the remaining viewport height; rows scroll inside. */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>

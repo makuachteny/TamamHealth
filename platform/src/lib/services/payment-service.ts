@@ -204,6 +204,7 @@ export async function updatePaymentStatus(
   // terminal payment or churn the ledger.
   if (pmt.status === status) return pmt;
 
+  const wasPending = pmt.status === 'pending';
   pmt.status = status;
   if (details?.reason) {
     pmt.notes = pmt.notes ? `${pmt.notes}\n${details.reason}` : details.reason;
@@ -211,6 +212,28 @@ export async function updatePaymentStatus(
   pmt.updatedAt = new Date().toISOString();
   const resp = await db.put(pmt);
   pmt._rev = resp.rev;
+
+  // Posting a previously-pending payment (gateway webhook confirmation, or a
+  // finance user approving a cash/bank pay-by-link payment) is the moment the
+  // money becomes real — credit the patient ledger exactly like collectPayment
+  // does for posted-at-creation payments. Without this, webhook-confirmed
+  // payments never reduced the patient's balance.
+  if (wasPending && status === 'posted') {
+    await createLedgerEntry({
+      patientId: pmt.patientId,
+      encounterId: pmt.encounterId,
+      entryType: 'payment',
+      amount: -pmt.amount,
+      description: `Payment via ${pmt.method}: ${pmt.amount} ${pmt.currency}`,
+      referenceId: pmt._id,
+      referenceType: 'payment',
+      method: pmt.method,
+      currency: pmt.currency,
+      facilityId: pmt.facilityId,
+      orgId: pmt.orgId,
+      createdBy: pmt.processedBy,
+    });
+  }
 
   await logAuditSafe('PAYMENT_STATUS_UPDATED', pmt.processedBy, pmt.processedByName,
     `Payment ${pmt.reference} -> ${status}${details?.providerReference ? ` (provider ref: ${details.providerReference})` : ''}`);

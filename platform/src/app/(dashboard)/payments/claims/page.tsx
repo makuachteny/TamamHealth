@@ -1,17 +1,25 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   FileText,
   AlertTriangle,
+  Plus,
+  X,
 } from '@/components/icons/lucide';
 import RowActionsMenu from '@/components/RowActionsMenu';
 import TopBar from '@/components/TopBar';
 import DataTile from '@/components/DataTile';
+import Modal from '@/components/Modal';
 import { useApp } from '@/lib/context';
+import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import type { ClaimDoc, ClaimStatus, PayerType } from '@/lib/db-types-payments';
+import { usePatients } from '@/lib/hooks/usePatients';
+import { patientFullName } from '@/lib/patient-utils';
+import { computeAdjudicatedStatus } from '@/lib/services/payment-service';
+import type { ClaimDoc, ClaimStatus, PayerType, InsurancePolicyDoc } from '@/lib/db-types-payments';
+import type { BillingDoc } from '@/lib/db-types-billing';
 import { formatMoney } from '@/lib/format-utils';
 
 // Payer mix labels/colours — relocated from the old Billing cockpit so the
@@ -49,11 +57,17 @@ interface ClaimKPIs {
 
 interface AdjudicationForm {
   claimId: string;
-  status: ClaimStatus;
   allowedAmount: number;
   paidAmount: number;
   denialReason?: string;
   notes: string;
+}
+
+interface NewClaimForm {
+  patientId: string;
+  policyId: string;
+  billingId: string;
+  amount: string;
 }
 
 export default function ClaimsPage() {
@@ -80,6 +94,23 @@ export default function ClaimsPage() {
   const [adjForm, setAdjForm] = useState<AdjudicationForm | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const { showToast } = useToast();
+  const { patients } = usePatients();
+
+  // Appeal modal (denied claim → appealed, with a note).
+  const [appealFor, setAppealFor] = useState<ClaimDoc | null>(null);
+  const [appealNote, setAppealNote] = useState('');
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+
+  // "New claim" modal — the first UI path that actually creates a ClaimDoc
+  // (previously claims only existed from seed data).
+  const [newClaimOpen, setNewClaimOpen] = useState(false);
+  const [newClaim, setNewClaim] = useState<NewClaimForm>({ patientId: '', policyId: '', billingId: '', amount: '' });
+  const [patientSearch, setPatientSearch] = useState('');
+  const [patientPolicies, setPatientPolicies] = useState<InsurancePolicyDoc[]>([]);
+  const [patientBills, setPatientBills] = useState<BillingDoc[]>([]);
+  const [submittingClaim, setSubmittingClaim] = useState(false);
+
   const scope = useMemo(
     () =>
       currentUser
@@ -92,15 +123,14 @@ export default function ClaimsPage() {
     [currentUser]
   );
 
-  useEffect(() => {
+  const loadClaims = useCallback(async (cancelledRef?: { cancelled: boolean }) => {
     if (!scope) return;
-    let cancelled = false;
-
-    const loadClaims = async () => {
+    const cancelled = () => cancelledRef?.cancelled === true;
+    {
       try {
         const { getAllClaims } = await import('@/lib/services/payment-service');
         const claimsData = await getAllClaims(scope);
-        if (cancelled) return;
+        if (cancelled()) return;
         setClaims(claimsData);
 
         // Calculate KPIs
@@ -129,19 +159,123 @@ export default function ClaimsPage() {
           }
         });
 
-        if (cancelled) return;
+        if (cancelled()) return;
         setKpis(kpiData);
         setLoading(false);
       } catch (error) {
-        if (cancelled) return;
+        if (cancelled()) return;
         console.error('Failed to load claims:', error);
         setLoading(false);
       }
-    };
-
-    loadClaims();
-    return () => { cancelled = true; };
+    }
   }, [scope]);
+
+  useEffect(() => {
+    const ref = { cancelled: false };
+    loadClaims(ref);
+    return () => { ref.cancelled = true; };
+  }, [loadClaims]);
+
+  // When a patient is picked in the New-claim modal, load their insurance
+  // policies and open bills so the claim can be raised against real data.
+  useEffect(() => {
+    if (!newClaim.patientId) { setPatientPolicies([]); setPatientBills([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [{ getPatientInsurancePolicies }, { getAllBills }] = await Promise.all([
+          import('@/lib/services/payment-service'),
+          import('@/lib/services/billing-service'),
+        ]);
+        const [policies, bills] = await Promise.all([
+          getPatientInsurancePolicies(newClaim.patientId),
+          getAllBills(scope),
+        ]);
+        if (cancelled) return;
+        setPatientPolicies(policies);
+        setPatientBills(bills.filter(b => b.patientId === newClaim.patientId && (b.balanceDue ?? 0) > 0));
+      } catch (err) {
+        console.error('Failed to load patient billing context:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [newClaim.patientId, scope]);
+
+  const handleAppeal = async () => {
+    if (!appealFor || !appealNote.trim()) { showToast('An appeal needs a note for the payer', 'error'); return; }
+    setLifecycleBusy(true);
+    try {
+      const { appealClaim } = await import('@/lib/services/payment-service');
+      await appealClaim(appealFor._id, appealNote.trim(), currentUser?._id || 'unknown', currentUser?.name || 'Unknown');
+      showToast(`Claim ${appealFor.claimNumber} appealed`, 'success');
+      setAppealFor(null);
+      setAppealNote('');
+      await loadClaims();
+    } catch (err) {
+      console.error(err);
+      showToast((err as Error).message || 'Could not appeal this claim', 'error');
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const handleResubmit = async (claim: ClaimDoc) => {
+    setLifecycleBusy(true);
+    try {
+      const { resubmitClaim } = await import('@/lib/services/payment-service');
+      await resubmitClaim(claim._id, currentUser?._id || 'unknown', currentUser?.name || 'Unknown');
+      showToast(`Claim ${claim.claimNumber} resubmitted to ${claim.payerName}`, 'success');
+      await loadClaims();
+    } catch (err) {
+      console.error(err);
+      showToast((err as Error).message || 'Could not resubmit this claim', 'error');
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const resetNewClaim = () => {
+    setNewClaim({ patientId: '', policyId: '', billingId: '', amount: '' });
+    setPatientSearch('');
+    setNewClaimOpen(false);
+  };
+
+  const handleSubmitNewClaim = async () => {
+    const policy = patientPolicies.find(p => p._id === newClaim.policyId);
+    const patient = patients.find(p => p._id === newClaim.patientId);
+    const bill = patientBills.find(b => b._id === newClaim.billingId);
+    const amount = bill ? (bill.balanceDue ?? bill.totalAmount ?? 0) : parseFloat(newClaim.amount);
+    if (!patient) { showToast('Pick a patient first', 'error'); return; }
+    if (!policy) { showToast('Pick the insurance policy to claim against', 'error'); return; }
+    if (!Number.isFinite(amount) || amount <= 0) { showToast('Enter a claim amount greater than zero', 'error'); return; }
+    setSubmittingClaim(true);
+    try {
+      const { submitClaim } = await import('@/lib/services/payment-service');
+      const doc = await submitClaim({
+        patientId: patient._id,
+        patientName: patientFullName(patient),
+        policyId: policy._id,
+        payerName: policy.payerName,
+        payerType: policy.payerType,
+        billingId: bill?._id,
+        encounterId: bill?.encounterId,
+        chargeIds: [],
+        totalBilled: amount,
+        facilityId: currentUser?.hospitalId || '',
+        facilityName: currentUser?.hospitalName || '',
+        submittedBy: currentUser?.name || currentUser?.username || 'Unknown',
+        orgId: currentUser?.orgId,
+      });
+      showToast(`Claim ${doc.claimNumber} submitted to ${policy.payerName}`, 'success');
+      resetNewClaim();
+      await loadClaims();
+    } catch (err) {
+      console.error(err);
+      showToast((err as Error).message || 'Could not submit the claim', 'error');
+    } finally {
+      setSubmittingClaim(false);
+    }
+  };
 
   useEffect(() => {
     let filtered = claims;
@@ -169,49 +303,51 @@ export default function ClaimsPage() {
     setEditingId(claim._id);
     setAdjForm({
       claimId: claim._id,
-      status: claim.status,
-      allowedAmount: claim.totalAllowed || 0,
+      allowedAmount: claim.totalAllowed || claim.totalBilled || 0,
       paidAmount: claim.totalApproved || 0,
       denialReason: claim.denialReasons?.join(', ') || '',
       notes: '',
     });
   };
 
+  // The persisted status is DERIVED from the amounts by the exact rule the
+  // service applies (computeAdjudicatedStatus) — the modal shows a live
+  // preview of that outcome instead of offering a status dropdown that the
+  // save path would silently ignore.
+  const adjPreview = useMemo(() => {
+    if (!adjForm) return null;
+    const allowed = Number.isFinite(adjForm.allowedAmount) ? Math.max(0, adjForm.allowedAmount) : 0;
+    const paid = Number.isFinite(adjForm.paidAmount) ? Math.max(0, adjForm.paidAmount) : 0;
+    return computeAdjudicatedStatus(paid, Math.max(0, allowed - paid));
+  }, [adjForm]);
+
   const handleSaveAdjudication = async () => {
     if (!adjForm) return;
 
     try {
       const { adjudicateClaim } = await import('@/lib/services/payment-service');
-      // Map the form state to the service's positional args.
-      // adjudicateClaim(claimId, approved, denied, writeOff, patientResponsibility, by)
-      // The service derives final status from approved/denied amounts:
-      //   denied > 0 && approved === 0  → 'denied'
-      //   approved > 0                  → 'paid'
-      //   else                          → 'partial'
       const allowed = Number.isFinite(adjForm.allowedAmount) ? Math.max(0, adjForm.allowedAmount) : 0;
       const paid = Number.isFinite(adjForm.paidAmount) ? Math.max(0, adjForm.paidAmount) : 0;
-      const approved = adjForm.status === 'denied' ? 0 : paid;
-      const denied = adjForm.status === 'denied' ? allowed : Math.max(0, allowed - paid);
       await adjudicateClaim(
         adjForm.claimId,
-        approved,
-        denied,
+        paid,
+        Math.max(0, allowed - paid),
         0,
         0,
-        currentUser?.name || 'Unknown'
+        currentUser?.name || 'Unknown',
+        {
+          denialReasons: adjForm.denialReason?.trim() ? [adjForm.denialReason.trim()] : undefined,
+          notes: adjForm.notes.trim() || undefined,
+        }
       );
 
-      // Reload claims
-      if (scope) {
-        const { getAllClaims } = await import('@/lib/services/payment-service');
-        const updated = await getAllClaims(scope);
-        setClaims(updated);
-      }
+      await loadClaims();
 
       setEditingId(null);
       setAdjForm(null);
     } catch (error) {
       console.error('Failed to save adjudication:', error);
+      showToast('Could not save the adjudication', 'error');
     }
   };
 
@@ -271,7 +407,15 @@ export default function ClaimsPage() {
 
   return (
     <>
-      <TopBar title={t('claims.title')} hideSearch />
+      <TopBar title={t('claims.title')} hideSearch actions={
+        <button
+          onClick={() => setNewClaimOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold"
+          style={{ background: 'var(--accent-primary)', color: '#fff' }}
+        >
+          <Plus className="w-4 h-4" /> New claim
+        </button>
+      } />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
       {/* KPI Cards */}
@@ -520,6 +664,8 @@ export default function ClaimsPage() {
                       <RowActionsMenu
                         actions={[
                           ...((claim.status === 'submitted' || claim.status === 'draft') ? [{ key: 'adjudicate', label: t('claims.actionAdjudicate'), onClick: () => handleAdjudicate(claim) }] : []),
+                          ...(claim.status === 'denied' ? [{ key: 'appeal', label: 'Appeal denial', onClick: () => { setAppealNote(''); setAppealFor(claim); } }] : []),
+                          ...((claim.status === 'denied' || claim.status === 'appealed') ? [{ key: 'resubmit', label: 'Resubmit to payer', onClick: () => handleResubmit(claim) }] : []),
                         ]}
                       />
                     </div>
@@ -575,34 +721,26 @@ export default function ClaimsPage() {
               }}>
                 {t('claims.colStatus')}
               </label>
-              <select
-                value={adjForm.status}
-                onChange={(e) =>
-                  setAdjForm({
-                    ...adjForm,
-                    status: e.target.value as ClaimStatus,
-                  })
-                }
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid var(--border-light)',
-                  borderRadius: '4px',
-                  fontSize: '0.9375rem',
-                  color: 'var(--text-primary)',
-                  background: 'var(--bg-card)',
-                  boxSizing: 'border-box',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="draft">{t('claims.status_draft')}</option>
-                <option value="submitted">{t('claims.status_submitted')}</option>
-                <option value="accepted">{t('claims.status_accepted')}</option>
-                <option value="denied">{t('claims.status_denied')}</option>
-                <option value="paid">{t('claims.status_paid')}</option>
-                <option value="appealed">{t('claims.status_appealed')}</option>
-                <option value="partial">{t('claims.status_partial')}</option>
-              </select>
+              {/* Derived, not chosen: the same amount rule the service persists.
+                  Paid amount 0 with an allowed amount = full denial. */}
+              {adjPreview && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', borderRadius: '4px',
+                  border: '1px solid var(--border-light)', background: 'var(--overlay-subtle)',
+                }}>
+                  <span style={{
+                    display: 'inline-block', padding: '3px 10px', borderRadius: '4px',
+                    fontSize: '0.625rem', fontWeight: 700, textTransform: 'uppercase',
+                    backgroundColor: getStatusBgColor(adjPreview),
+                    color: getStatusTextColor(adjPreview),
+                    borderLeft: `2px solid ${getStatusBorderColor(adjPreview)}`,
+                  }}>{t(`claims.status_${adjPreview}`)}</span>
+                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                    Derived from the amounts below — set paid to 0 to deny the full allowed amount.
+                  </span>
+                </div>
+              )}
             </div>
 
             <div style={{ marginBottom: '1.5rem' }}>
@@ -673,7 +811,7 @@ export default function ClaimsPage() {
               />
             </div>
 
-            {adjForm.status === 'denied' && (
+            {(adjPreview === 'denied' || adjPreview === 'partial') && (
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{
                   display: 'block',
@@ -798,6 +936,167 @@ export default function ClaimsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Appeal modal — denied claim → appealed, with a note for the payer. */}
+      {appealFor && (
+        <Modal onClose={() => !lifecycleBusy && setAppealFor(null)} width={440} labelledBy="appeal-claim-title">
+          <div className="rounded-xl p-5 space-y-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="flex items-center justify-between">
+              <h2 id="appeal-claim-title" className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Appeal claim {appealFor.claimNumber}
+              </h2>
+              <button className="p-1 rounded" onClick={() => !lifecycleBusy && setAppealFor(null)} style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Denied by {appealFor.payerName} · billed {formatMoney(appealFor.totalBilled || 0)}
+              {appealFor.denialReasons?.length ? ` · reason: ${appealFor.denialReasons.join(', ')}` : ''}
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Appeal note</label>
+              <textarea
+                rows={3}
+                value={appealNote}
+                onChange={e => setAppealNote(e.target.value)}
+                placeholder="Why the denial should be reconsidered…"
+                autoFocus
+                className="w-full p-2.5 rounded-md text-[13px]"
+                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', resize: 'vertical' }}
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button className="btn btn-sm btn-secondary" disabled={lifecycleBusy} onClick={() => setAppealFor(null)}>Cancel</button>
+              <button className="btn btn-sm btn-primary" disabled={lifecycleBusy || !appealNote.trim()} onClick={handleAppeal}>
+                {lifecycleBusy ? 'Submitting…' : 'Submit appeal'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* New claim modal — pick an insured patient, the policy, and the bill
+          (or a manual amount), then submit through the real claims service. */}
+      {newClaimOpen && (
+        <Modal onClose={() => !submittingClaim && resetNewClaim()} width={480} labelledBy="new-claim-title">
+          <div className="rounded-xl p-5 space-y-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <div className="flex items-center justify-between">
+              <h2 id="new-claim-title" className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>New insurance claim</h2>
+              <button className="p-1 rounded" onClick={() => !submittingClaim && resetNewClaim()} style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
+            </div>
+
+            {/* Patient picker */}
+            {newClaim.patientId ? (
+              <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg" style={{ background: 'var(--accent-light)', border: '1px solid var(--border-accent)' }}>
+                <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {patientFullName(patients.find(p => p._id === newClaim.patientId) || { firstName: 'Unknown', surname: '' } as never)}
+                </div>
+                <button onClick={() => setNewClaim({ patientId: '', policyId: '', billingId: '', amount: '' })} className="text-xs font-semibold underline shrink-0" style={{ color: 'var(--accent-primary)' }}>Change</button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Patient</label>
+                <input
+                  type="text"
+                  value={patientSearch}
+                  onChange={e => setPatientSearch(e.target.value)}
+                  placeholder="Search by name or hospital number…"
+                  autoFocus
+                  className="w-full p-2.5 rounded-md text-[13px]"
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+                />
+                {patientSearch.trim().length >= 2 && (
+                  <div className="rounded-md overflow-hidden" style={{ border: '1px solid var(--border-light)', maxHeight: 180, overflowY: 'auto' }}>
+                    {patients
+                      .filter(p => `${patientFullName(p)} ${p.hospitalNumber || ''}`.toLowerCase().includes(patientSearch.trim().toLowerCase()))
+                      .slice(0, 6)
+                      .map(p => (
+                        <button
+                          key={p._id}
+                          onClick={() => setNewClaim(f => ({ ...f, patientId: p._id }))}
+                          className="w-full text-left px-3 py-2 text-[13px] hover:bg-[var(--overlay-subtle)]"
+                          style={{ color: 'var(--text-primary)', display: 'block' }}
+                        >
+                          {patientFullName(p)} <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{p.hospitalNumber || ''}</span>
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Policy picker */}
+            {newClaim.patientId && (
+              patientPolicies.length === 0 ? (
+                <p className="text-xs px-3 py-2.5 rounded-md" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>
+                  This patient has no insurance policy on file — add one from their chart&rsquo;s Billing tab first.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Insurance policy</label>
+                  <select
+                    value={newClaim.policyId}
+                    onChange={e => setNewClaim(f => ({ ...f, policyId: e.target.value }))}
+                    className="w-full p-2.5 rounded-md text-[13px]"
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">Select policy…</option>
+                    {patientPolicies.map(pol => (
+                      <option key={pol._id} value={pol._id}>
+                        {pol.payerName}{pol.memberId ? ` · ${pol.memberId}` : ''}{pol.isPrimary ? ' (primary)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )
+            )}
+
+            {/* Bill or manual amount */}
+            {newClaim.patientId && patientPolicies.length > 0 && (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Bill to claim against</label>
+                  <select
+                    value={newClaim.billingId}
+                    onChange={e => setNewClaim(f => ({ ...f, billingId: e.target.value }))}
+                    className="w-full p-2.5 rounded-md text-[13px]"
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">No linked bill — enter amount manually</option>
+                    {patientBills.map(b => (
+                      <option key={b._id} value={b._id}>
+                        {formatMoney(b.balanceDue ?? 0)} outstanding · {(b.encounterDate || b.createdAt || '').slice(0, 10)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {!newClaim.billingId && (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Claim amount</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newClaim.amount}
+                      onChange={e => setNewClaim(f => ({ ...f, amount: e.target.value }))}
+                      className="w-full p-2.5 rounded-md text-[13px]"
+                      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button className="btn btn-sm btn-secondary" disabled={submittingClaim} onClick={resetNewClaim}>Cancel</button>
+              <button
+                className="btn btn-sm btn-primary"
+                disabled={submittingClaim || !newClaim.patientId || !newClaim.policyId || (!newClaim.billingId && !newClaim.amount)}
+                onClick={handleSubmitNewClaim}
+              >
+                {submittingClaim ? 'Submitting…' : 'Submit claim'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
       </main>
     </>

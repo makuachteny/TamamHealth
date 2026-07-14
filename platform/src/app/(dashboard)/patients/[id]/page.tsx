@@ -2409,17 +2409,16 @@ export default function PatientDetailPage() {
             />
           )}
 
-          {/* Procedures — no procedure data model exists in this app; faithful
-              OpenMRS empty state routing to the consultation flow. */}
+          {/* Procedures — bedside/theatre procedures (ProcedureDoc), recorded
+              and listed directly on the chart. */}
           {activeTab === 'procedures' && (
-            <ProceduresSection patientId={patient._id} canConsult={canConsult} router={router} />
+            <ProceduresSection patientId={patient._id} patientName={patientFullName(patient)} canConsult={canConsult} />
           )}
 
-          {/* Programs — no care-program enrollment data model exists in this
-              app; faithful OpenMRS empty state, action left as a disabled
-              "coming soon" note rather than a fabricated flow. */}
+          {/* Programs — care-program enrollments (ART/TB/PMTCT/ANC/Nutrition/
+              EPI/NCD) with enroll + status-transition flows. */}
           {activeTab === 'programs' && (
-            <ProgramsSection />
+            <ProgramsSection patientId={patient._id} patientName={patientFullName(patient)} canConsult={canConsult} />
           )}
           </section>
           </OpenmrsChartShell>
