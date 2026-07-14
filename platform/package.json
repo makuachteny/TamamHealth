@@ -85,6 +85,7 @@
     "glob": "^11.1.0",
     "js-yaml": "^4.1.2",
     "minimatch": "^10.2.3",
+    "test-exclude": "^7.0.0",
     "path-to-regexp": "^8.3.1",
     "postcss": "$postcss",
     "smol-toml": "^1.6.1",
