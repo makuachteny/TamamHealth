@@ -6785,10 +6785,25 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   display: flex;
   flex-direction: column;
 }
+/* Surplus height is split across the whole form so no single element balloons
+   and no void pools anywhere: the complaint box grows (capped to stay
+   proportionate), the vitals grid's rows space out evenly through the rest,
+   and the BMI strip anchors to the card bottom like a footer. With no surplus
+   (short windows, the step region scrolls) everything renders at its natural
+   compact size. */
 .ehr-consult-fill-body .ehr-consult-complaint-box {
   flex: 1 1 auto;
   min-height: 84px;
+  max-height: 280px;
   resize: vertical;
+}
+.ehr-consult-fill-body > .grid {
+  flex: 1 1 auto;
+  align-content: space-evenly;
+  margin-bottom: 12px;
+}
+.ehr-consult-fill-body > div:last-child {
+  margin-top: auto;
 }
 
 .ehr-soap-scroll .card-elevated > button,
