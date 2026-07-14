@@ -1706,18 +1706,17 @@ export default function ConsultationPage() {
     hasPlanInput()
   );
 
-  // The consultation wizard is intentionally linear: intake with vitals
-  // first, and summary last as a read-only review step.
+  // The consultation wizard is intentionally linear: intake (chief complaint
+  // + vitals) sits together with the physical examination as one opening
+  // stage, and summary is last as a read-only review step.
   const workflowStages: { label: string; sections: number[] }[] = [
-    { label: 'Intake', sections: [WORKFLOW_PANEL.intake] },
-    { label: 'Examination', sections: [WORKFLOW_PANEL.exam] },
+    { label: 'Intake & Examination', sections: [WORKFLOW_PANEL.intake, WORKFLOW_PANEL.exam] },
     { label: 'Assessment', sections: [WORKFLOW_PANEL.assessment] },
     { label: 'Orders', sections: [WORKFLOW_PANEL.orders] },
     { label: 'Plan & checkout', sections: [WORKFLOW_PANEL.plan] },
     { label: 'Summary', sections: [WORKFLOW_PANEL.summary] },
   ];
   const workflowStageIcons: React.ElementType[] = [
-    Thermometer,
     Stethoscope,
     AlertTriangle,
     FlaskConical,
@@ -1728,18 +1727,22 @@ export default function ConsultationPage() {
   const stepHas = (sectionIndex: number) => workflowStages[step]?.sections.includes(sectionIndex) ?? false;
   const isLastStep = step === workflowStages.length - 1;
 
+  // Gate by the SECTIONS the current stage contains (not by comparing the
+  // 0-based step index to the 1-based panel constants — that off-by-one made
+  // every gate fire one step late). A merged stage validates all its sections.
   const validateStep = (currentStep: number): string | null => {
-    if (currentStep === WORKFLOW_PANEL.intake) {
+    const sections = workflowStages[currentStep]?.sections ?? [];
+    if (sections.includes(WORKFLOW_PANEL.intake)) {
       if (!hasChiefComplaint()) return t('consultation.chiefComplaintRequired');
-      if (!hasVitalsInput() && !todaysTriage) return 'Capture vitals or complete triage before moving to examination.';
+      if (!hasVitalsInput() && !todaysTriage) return 'Capture vitals or complete triage before continuing.';
     }
-    if (currentStep === WORKFLOW_PANEL.exam && !hasExamInput()) {
+    if (sections.includes(WORKFLOW_PANEL.exam) && !hasExamInput()) {
       return 'Document the physical examination before moving to assessment.';
     }
-    if (currentStep === WORKFLOW_PANEL.assessment && diagnoses.length === 0) {
+    if (sections.includes(WORKFLOW_PANEL.assessment) && diagnoses.length === 0) {
       return 'Add at least one diagnosis before moving to orders.';
     }
-    if (currentStep === WORKFLOW_PANEL.plan && !hasPlanInput()) {
+    if (sections.includes(WORKFLOW_PANEL.plan) && !hasPlanInput()) {
       return 'Add a treatment plan, follow-up, referral, or attachment before reviewing the summary.';
     }
     return null;
@@ -2056,8 +2059,10 @@ export default function ConsultationPage() {
               )}
             </div>
 
-            {/* Section 2: Physical Examination */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(2) ? undefined : 'none' }}>
+            {/* Section 2: Physical Examination — shares the opening stage with
+                Intake; ehr-card-fit so the intake card's grow-don't-shrink
+                sizing can never crush it on short windows. */}
+            <div className="card-elevated overflow-hidden ehr-card-fit" style={{ display: stepHas(2) ? undefined : 'none' }}>
               <SectionHeader index={2} />
               {openSections[2] && (
                 <div className="p-5 space-y-4">
