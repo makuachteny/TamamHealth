@@ -39,7 +39,7 @@ import { useApp } from '@/lib/context';
 import { isProviderRole, isClinicalAuthorRole } from '@/lib/clinical-roles';
 import type { SuperbillPreview } from '@/lib/services/superbill-service';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { patientAgeLabel, patientFullName, patientInitials } from '@/lib/patient-utils';
+import { patientAgeLabel, patientFullName } from '@/lib/patient-utils';
 import { formatMoney } from '@/lib/format-utils';
 import { useToast } from '@/components/Toast';
 import {
@@ -134,8 +134,6 @@ export default function ConsultationPage() {
   const { currentUser } = useApp();
   const { canConsult } = usePermissions();
   const { triages } = useTriage();
-  const [historySearch, setHistorySearch] = useState('');
-  const [pmhSearch, setPmhSearch] = useState('');
 
   // Section collapse state (11 sections — includes AI section at index 3 and Attachments at index 8)
   // In the stepped wizard every section is expanded; the active step controls
@@ -155,8 +153,6 @@ export default function ConsultationPage() {
   const [scribeOpen, setScribeOpen] = useState(false);
 
   const [customLab, setCustomLab] = useState('');
-  const hpiRef = useRef<HTMLTextAreaElement | null>(null);
-  const familyHistoryRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Patient selector
   const [patientSearch, setPatientSearch] = useState('');
@@ -359,32 +355,6 @@ export default function ConsultationPage() {
       const base = prev.trim().replace(/,\s*$/, '');
       return base ? `${base}, ${text}` : text;
     });
-  };
-  const appendWorkflowText = (
-    setter: Dispatch<SetStateAction<string>>,
-    current: string,
-    value: string,
-  ) => {
-    const text = value.trim();
-    if (!text) return;
-    setter(current.trim() ? `${current.trim()}\n${text}` : text);
-  };
-  const addPmhCondition = (condition: string) => {
-    const cleaned = condition.trim();
-    if (!cleaned) return;
-    setHistory(h => {
-      const next = Array.from(new Set([...h.pmhConditions, cleaned].map(c => c.trim()).filter(Boolean)));
-      return { ...h, pmhConditions: next };
-    });
-    setPmhSearch('');
-  };
-  const appendExamFinding = (field: keyof typeof physExam, value: string) => {
-    const text = value.trim();
-    if (!text) return;
-    setPhysExam(prev => ({
-      ...prev,
-      [field]: prev[field].trim() ? `${prev[field].trim()}\n${text}` : text,
-    }));
   };
   const appendWorkflowText = (
     setter: Dispatch<SetStateAction<string>>,
@@ -1984,280 +1954,6 @@ export default function ConsultationPage() {
                 margin utility would also fire on cards after display:none
                 siblings and push the first visible card out of line. */}
             <div className="pr-1 ehr-soap-scroll">
-            {/* Section 1: Intake + Vital Signs */}
-            <div className="card-elevated overflow-hidden" style={{ display: stepHas(1) ? undefined : 'none' }}>
-              <SectionHeader index={1} />
-              {openSections[1] && (
-                <div className="p-5">
-                  {/* Symptom screening templates — branching question sets that
-                      compile into the history (pick a visit type, tap answers). */}
-                  <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border-light)' }}>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <ClipboardList className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Symptom screen (optional)</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {SYMPTOM_TEMPLATES.map(tmpl => {
-                        const active = symptomTemplateId === tmpl.id;
-                        return (
-                          <button
-                            key={tmpl.id}
-                            type="button"
-                            onClick={() => { setSymptomTemplateId(active ? null : tmpl.id); setSymptomAnswers({}); }}
-                            className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors"
-                            style={{ background: active ? 'var(--accent-primary)' : 'var(--overlay-subtle)', color: active ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
-                          >
-                            {tmpl.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  {symptomTemplateId && getSymptomTemplate(symptomTemplateId) && (
-                      <>
-                        <SymptomTemplateForm
-                          template={getSymptomTemplate(symptomTemplateId)!}
-                          answers={symptomAnswers}
-                          onAnswer={setSymptomAnswer}
-                        />
-                        <div className="flex items-center gap-2 mt-2">
-                          <button type="button" onClick={insertSymptomTemplate} className="btn btn-sm btn-primary">Add to history</button>
-                          <button type="button" onClick={() => { setSymptomTemplateId(null); setSymptomAnswers({}); }} className="btn btn-sm btn-secondary">Cancel</button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="mt-5 pt-5 border-t" style={{ borderColor: 'var(--border-light)' }}>
-                    <div className="flex items-center justify-between gap-3 mb-4">
-                      <div>
-                        <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>History</div>
-                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          Capture the full history here before moving on to the rest of the note.
-                        </div>
-                      </div>
-                      <SearchInput
-                        value={historySearch}
-                        onChange={setHistorySearch}
-                        placeholder="Search chart history"
-                        className="max-w-[320px]"
-                      />
-                    </div>
-
-                    <div className="ehr-consult-history-summary">
-                      <div className="rounded-2xl border overflow-hidden ehr-consult-subcard" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                        <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Chart history</div>
-                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Prior history appears here first. Blank items below still need input.
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          {chartHistorySummary.length > 0 ? (
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              {chartHistorySummary.map(item => (
-                                <div key={item.key} className="rounded-xl border px-3 py-3" style={{ borderColor: 'var(--border-light)', background: 'var(--overlay-subtle)' }}>
-                                  <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                                    {item.label}
-                                  </div>
-                                  <div className="mt-1 text-sm font-medium leading-5" style={{ color: item.value ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                                    {item.value || 'Needs input'}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="rounded-xl border border-dashed px-4 py-6 text-sm" style={{ color: 'var(--text-muted)', borderColor: 'var(--border-light)' }}>
-                              No history is on the chart yet. Use the fields below to capture it.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                    </div>
-
-                    <div className="ehr-consult-history-grid mt-4">
-                      <div className="space-y-4 ehr-consult-history-column">
-                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--hpi" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                          <div className="ehr-consult-card-head ehr-consult-card-head--align-end">
-                            <div>
-                              <label>History of present illness</label>
-                              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>OLDCARTS structure. Edit directly in the note below.</div>
-                            </div>
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => {
-                                hpiRef.current?.focus();
-                                const len = hpiRef.current?.value.length ?? 0;
-                                hpiRef.current?.setSelectionRange(len, len);
-                              }}
-                            >
-                              Edit
-                            </button>
-                          </div>
-                          <textarea
-                            ref={hpiRef}
-                            value={history.hpi}
-                            onChange={e => setHistory(h => ({ ...h, hpi: e.target.value }))}
-                            rows={5}
-                            className="mt-3"
-                            placeholder="Onset, location, duration, character, aggravating/relieving, radiation, timing, severity."
-                          />
-                        </div>
-
-                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--pmh" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                          <div className="ehr-consult-card-head">
-                          <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Past medical history</label>
-                          <div className="w-full max-w-[320px] ehr-consult-card-search">
-                            <SearchAddField
-                              placeholder="Search or add a condition"
-                              options={CHRONIC_CONDITIONS}
-                              value={pmhSearch}
-                              onChange={setPmhSearch}
-                              onPick={addPmhCondition}
-                              onAdd={addPmhCondition}
-                            />
-                          </div>
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {filteredPmhConditions.length > 0 ? filteredPmhConditions.slice(0, 8).map(c => {
-                              const on = history.pmhConditions.includes(c);
-                              return (
-                                <button
-                                  key={c}
-                                  type="button"
-                                  onClick={() => addPmhCondition(c)}
-                                  className="text-[12px] font-medium px-2.5 py-1 rounded-full"
-                                  style={{ border: `1px solid ${on ? 'var(--accent-primary)' : 'var(--border-medium)'}`, background: on ? 'var(--accent-light)' : 'transparent', color: on ? 'var(--accent-text)' : 'var(--text-secondary)' }}
-                                >
-                                  {c}
-                                </button>
-                              );
-                            }) : (
-                              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>No matching chronic condition.</div>
-                            )}
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {history.pmhConditions.map(c => (
-                              <button
-                                key={c}
-                                type="button"
-                                onClick={() => setHistory(h => ({ ...h, pmhConditions: h.pmhConditions.filter(x => x !== c) }))}
-                                className="text-[12px] font-medium px-2.5 py-1 rounded-full"
-                                style={{ border: '1px solid var(--accent-primary)', background: 'var(--accent-light)', color: 'var(--accent-text)' }}
-                              >
-                                {c}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-                            <div>
-                              <label>Past surgeries</label>
-                              <input value={history.pmhSurgeries} list="surgeries-list" onChange={e => setHistory(h => ({ ...h, pmhSurgeries: e.target.value }))} placeholder="e.g. appendectomy 2019" />
-                            </div>
-                            <div>
-                              <label>Prior admissions</label>
-                              <input value={history.pmhAdmissions} list="admissions-list" onChange={e => setHistory(h => ({ ...h, pmhAdmissions: e.target.value }))} placeholder="e.g. severe malaria 2024" />
-                            </div>
-                          </div>
-                          <label className="flex items-center gap-2 mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                            <input type="checkbox" checked={history.pmhTransfusion} onChange={e => setHistory(h => ({ ...h, pmhTransfusion: e.target.checked }))} style={{ width: 'auto' }} />
-                            Previous blood transfusion
-                          </label>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 ehr-consult-history-column">
-                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--family" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                          <div className="ehr-consult-card-head">
-	                            <div>
-	                              <label>Family history</label>
-	                              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Capture the relevant family history directly below.</div>
-	                            </div>
-	                            <button
-	                              type="button"
-	                              className="btn btn-secondary btn-sm"
-	                              onClick={() => {
-	                                familyHistoryRef.current?.focus();
-	                                const len = familyHistoryRef.current?.value.length ?? 0;
-	                                familyHistoryRef.current?.setSelectionRange(len, len);
-	                              }}
-	                            >
-	                              Edit
-	                            </button>
-                          </div>
-                          <textarea ref={familyHistoryRef} value={history.familyHistory} onChange={e => setHistory(h => ({ ...h, familyHistory: e.target.value }))} rows={3} className="mt-3" placeholder="Relevant conditions in close family" />
-                        </div>
-
-                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--social" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                          <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Social history</label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 ehr-consult-social-grid">
-                            <div><label>Smoking</label><select value={history.shSmoking} onChange={e => setHistory(h => ({ ...h, shSmoking: e.target.value as typeof h.shSmoking }))}>{SMOKING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
-                            <div><label>Alcohol</label><select value={history.shAlcohol} onChange={e => setHistory(h => ({ ...h, shAlcohol: e.target.value as typeof h.shAlcohol }))}>{ALCOHOL_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
-                            <div><label>Occupation</label><input value={history.shOccupation} list="occupation-list" onChange={e => setHistory(h => ({ ...h, shOccupation: e.target.value }))} /></div>
-                            <div><label>Substance use</label><input value={history.shSubstance} list="substance-list" onChange={e => setHistory(h => ({ ...h, shSubstance: e.target.value }))} placeholder="None / details" /></div>
-                            <div>
-                              <label>Socioeconomic status</label>
-                              <select value={history.shSES} onChange={e => setHistory(h => ({ ...h, shSES: e.target.value as typeof h.shSES }))}>
-                                <option value="">Not assessed</option>
-                                {SES_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                              </select>
-                            </div>
-                            <div>
-                              <label>Health insurance</label>
-                              <div className="mt-1 space-y-2">
-                                <label
-                                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors"
-                                  style={{
-                                    background: history.shInsurance ? 'var(--accent-light)' : 'var(--overlay-subtle)',
-                                    border: `1px solid ${history.shInsurance ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                                  }}
-                                >
-                                  <span className="text-sm font-medium" style={{ color: history.shInsurance ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
-                                    {history.shInsurance ? 'Insured' : 'Not insured'}
-                                  </span>
-                                  <input
-                                    type="checkbox"
-                                    checked={history.shInsurance}
-                                    onChange={e => setHistory(h => ({ ...h, shInsurance: e.target.checked, shInsuranceProvider: e.target.checked ? h.shInsuranceProvider : '' }))}
-                                    style={{ width: 'auto', accentColor: 'var(--accent-primary)' }}
-                                  />
-                                </label>
-                                {history.shInsurance && (
-                                  <input
-                                    value={history.shInsuranceProvider}
-                                    list="insurance-provider-list"
-                                    onChange={e => setHistory(h => ({ ...h, shInsuranceProvider: e.target.value }))}
-                                    placeholder="Insurance provider / scheme"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl border p-4 ehr-consult-subcard ehr-consult-history-card ehr-consult-history-card--drug" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
-                          <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Drug history &amp; allergies</label>
-                          <div className="mt-3">
-                            <label>Current chronic medications</label>
-                            <input value={history.dhChronicMeds} list="medication-list" onChange={e => setHistory(h => ({ ...h, dhChronicMeds: e.target.value }))} placeholder="e.g. metformin, amlodipine" />
-                          </div>
-                          <div className="mt-3">
-                            <label>Drug allergies (comma separated)</label>
-                            <input value={history.dhAllergies} list="allergy-list" disabled={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhAllergies: e.target.value }))} placeholder="e.g. penicillin, sulfa" />
-                          </div>
-                          <label className="flex items-center gap-2 mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                            <input type="checkbox" checked={history.dhNKDA} onChange={e => setHistory(h => ({ ...h, dhNKDA: e.target.checked, dhAllergies: e.target.checked ? '' : h.dhAllergies }))} style={{ width: 'auto' }} />
-                            No known drug allergies
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Section 1: Intake + Vital Signs */}
             <div className="card-elevated overflow-hidden" style={{ display: stepHas(1) ? undefined : 'none' }}>
               <SectionHeader index={1} />

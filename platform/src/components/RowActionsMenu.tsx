@@ -78,7 +78,7 @@ export default function RowActionsMenu({ actions, ariaLabel = 'Actions' }: { act
         <div
           ref={menuRef}
           className="fixed rounded-xl overflow-hidden py-1"
-          style={{ top: coords.top, left: coords.left, width: MENU_WIDTH, zIndex: 1000, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'none' }}
+          style={{ top: coords.top, left: coords.left, width: MENU_WIDTH, zIndex: 1000, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg, 0 16px 48px rgba(0,0,0,0.2))' }}
         >
           {actions.map(a => (
             <button

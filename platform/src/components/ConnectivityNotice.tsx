@@ -140,7 +140,7 @@ export default function ConnectivityNotice() {
 
     prevOnline.current = isOnline;
     prevPaused.current = syncPaused;
-  }, [isOnline, isNetworkUp, syncPaused, isAuthenticated, syncStatus?.state, t]);
+  }, [isOnline, isNetworkUp, syncPaused, isAuthenticated, syncStatus?.state]);
 
   // Sync errors: notify on entering the 'error' state. Find a database error
   // message if available so we can show a useful body.
@@ -163,7 +163,7 @@ export default function ConnectivityNotice() {
       );
     }
     prevSyncErrState.current = state;
-  }, [syncStatus, isAuthenticated, t]);
+  }, [syncStatus, isAuthenticated]);
 
   // Cleanup timers on unmount
   useEffect(() => () => {
@@ -189,7 +189,7 @@ export default function ConnectivityNotice() {
           color: colors.text,
           borderRadius: 'var(--card-radius)',
           border: `1px solid ${colors.border}`,
-          boxShadow: 'none',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
         }}
       >
         {notice.tone === 'warning' && syncPaused && isNetworkUp ? (

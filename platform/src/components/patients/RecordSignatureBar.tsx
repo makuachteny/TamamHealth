@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useApp } from '@/lib/context';
 import type { MedicalRecordDoc } from '@/lib/db-types';
 import { Lock, Edit3, Plus, CheckCircle2, Clock, X } from '@/components/icons/lucide';
@@ -19,17 +19,13 @@ function statusOf(rec: MedicalRecordDoc): 'draft' | 'awaiting_cosign' | 'signed'
  */
 export default function RecordSignatureBar({ record }: { record: MedicalRecordDoc }) {
   const { currentUser } = useApp();
-  const [displayRecord, setDisplayRecord] = useState(record);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<null | 'sign' | 'cosign'>(null);
-  const [signatureName, setSignatureName] = useState('');
   const [addendumOpen, setAddendumOpen] = useState(false);
   const [addendumText, setAddendumText] = useState('');
 
-  useEffect(() => { setDisplayRecord(record); }, [record]);
-
-  const status = statusOf(displayRecord);
+  const status = statusOf(record);
   const role = currentUser?.role;
   const isProvider = !!role && PROVIDER_ROLES.includes(role);
   const isTrainee = !!role && TRAINEE_AUTHOR_ROLES.includes(role);
@@ -37,20 +33,16 @@ export default function RecordSignatureBar({ record }: { record: MedicalRecordDo
 
   const signer = {
     userId: currentUser?._id,
-    userName: signatureName.trim() || currentUser?.name || currentUser?.username || 'Unknown',
+    userName: currentUser?.name || currentUser?.username || 'Unknown',
     userRole: role,
   };
 
-  async function run(fn: () => Promise<MedicalRecordDoc | null | unknown>) {
+  async function run(fn: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
     try {
-      const updated = await fn();
-      if (updated && typeof updated === 'object' && '_id' in updated) {
-        setDisplayRecord(updated as MedicalRecordDoc);
-      }
+      await fn();
       setConfirming(null);
-      setSignatureName('');
       setAddendumOpen(false);
       setAddendumText('');
     } catch (e) {
@@ -63,15 +55,15 @@ export default function RecordSignatureBar({ record }: { record: MedicalRecordDo
   async function doSign() {
     const svc = await import('@/lib/services/medical-record-service');
     // Providers sign as final; trainees sign and route for co-signature.
-    return svc.signMedicalRecord(displayRecord._id, signer, { awaitingCosign: isTrainee && !isProvider });
+    await svc.signMedicalRecord(record._id, signer, { awaitingCosign: isTrainee && !isProvider });
   }
   async function doCosign() {
     const svc = await import('@/lib/services/medical-record-service');
-    return svc.cosignMedicalRecord(displayRecord._id, signer);
+    await svc.cosignMedicalRecord(record._id, signer);
   }
   async function doAddendum() {
     const svc = await import('@/lib/services/medical-record-service');
-    return svc.addAddendum(displayRecord._id, addendumText, signer);
+    await svc.addAddendum(record._id, addendumText, signer);
   }
 
   // ---- Status badge -------------------------------------------------------
@@ -101,15 +93,15 @@ export default function RecordSignatureBar({ record }: { record: MedicalRecordDo
     );
   })();
 
-  const signedMeta = displayRecord.signedAt && (
+  const signedMeta = record.signedAt && (
     <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-      Signed by {displayRecord.signedByName} · {formatDateTime(displayRecord.signedAt)}
-      {displayRecord.cosignedByName && <> · Co-signed by {displayRecord.cosignedByName}</>}
+      Signed by {record.signedByName} · {formatDateTime(record.signedAt)}
+      {record.cosignedByName && <> · Co-signed by {record.cosignedByName}</>}
     </span>
   );
 
   return (
-    <div className="rounded-lg p-2 record-signature-bar" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+    <div className="rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
       <div className="flex items-center gap-2 flex-wrap justify-between">
         <div className="flex items-center gap-2 flex-wrap">
           {badge}
@@ -119,42 +111,28 @@ export default function RecordSignatureBar({ record }: { record: MedicalRecordDo
         <div className="flex items-center gap-2">
           {/* Sign a draft */}
           {status === 'draft' && canAuthor && confirming !== 'sign' && (
-            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => { setSignatureName(currentUser?.name || currentUser?.username || ''); setConfirming('sign'); }}>
+            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => setConfirming('sign')}>
               <Lock className="w-3.5 h-3.5" /> {isProvider ? 'Sign' : 'Sign & route for co-sign'}
             </button>
           )}
           {status === 'draft' && confirming === 'sign' && (
-            <span className="inline-flex items-center gap-2 flex-wrap justify-end">
-              <input
-                autoFocus
-                value={signatureName}
-                onChange={(e) => setSignatureName(e.target.value)}
-                placeholder="Type signer name"
-                className="record-signature-input"
-                aria-label="Signer name"
-              />
-              <button className="btn btn-sm btn-primary" disabled={busy || !signatureName.trim()} onClick={() => run(doSign)}>Confirm</button>
+            <span className="inline-flex items-center gap-2">
+              <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Sign &amp; lock this note?</span>
+              <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => run(doSign)}>Confirm</button>
               <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setConfirming(null)}>Cancel</button>
             </span>
           )}
 
           {/* Co-sign a trainee note */}
           {status === 'awaiting_cosign' && isProvider && confirming !== 'cosign' && (
-            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => { setSignatureName(currentUser?.name || currentUser?.username || ''); setConfirming('cosign'); }}>
+            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => setConfirming('cosign')}>
               <CheckCircle2 className="w-3.5 h-3.5" /> Co-sign
             </button>
           )}
           {status === 'awaiting_cosign' && isProvider && confirming === 'cosign' && (
-            <span className="inline-flex items-center gap-2 flex-wrap justify-end">
-              <input
-                autoFocus
-                value={signatureName}
-                onChange={(e) => setSignatureName(e.target.value)}
-                placeholder="Type co-signer name"
-                className="record-signature-input"
-                aria-label="Co-signer name"
-              />
-              <button className="btn btn-sm btn-primary" disabled={busy || !signatureName.trim()} onClick={() => run(doCosign)}>Confirm</button>
+            <span className="inline-flex items-center gap-2">
+              <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Co-sign &amp; finalize?</span>
+              <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => run(doCosign)}>Confirm</button>
               <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setConfirming(null)}>Cancel</button>
             </span>
           )}
@@ -191,9 +169,9 @@ export default function RecordSignatureBar({ record }: { record: MedicalRecordDo
       )}
 
       {/* Existing addenda */}
-      {(displayRecord.addenda || []).length > 0 && (
+      {(record.addenda || []).length > 0 && (
         <ul className="mt-3 space-y-2">
-          {(displayRecord.addenda || []).map((a, i) => (
+          {(record.addenda || []).map((a, i) => (
             <li key={i} className="rounded-lg p-2.5" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)' }}>
               <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>
                 Addendum · {a.authorName} · {formatDateTime(a.createdAt)}

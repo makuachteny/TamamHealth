@@ -62,7 +62,7 @@ export default function AdminDashboardPage() {
       }
     };
     loadCounts();
-  }, [t]);
+  }, []);
 
   // Load audit logs
   useEffect(() => {
@@ -78,7 +78,7 @@ export default function AdminDashboardPage() {
       }
     };
     loadAudit();
-  }, [t]);
+  }, []);
 
   // Load system health: DB stats, sync status, backup time
   useEffect(() => {
@@ -122,7 +122,7 @@ export default function AdminDashboardPage() {
       }
     };
     loadHealth();
-  }, [t]);
+  }, []);
 
   // Derive org sync statuses once orgs are loaded
   useEffect(() => {

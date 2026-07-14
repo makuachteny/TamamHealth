@@ -8,7 +8,7 @@
  * triage station; the front desk captures arrival context + an acuity flag.
  */
 import type { TriageDoc, TriagePriority } from '../db-types';
-import { createTriage, getTriageByPatient } from './triage-service';
+import { createTriage } from './triage-service';
 import { getAppointmentsByPatient, updateAppointmentStatus } from './appointment-service';
 import { jubaDate } from '../time-juba';
 
@@ -59,23 +59,6 @@ export interface CheckInResult {
   appointmentId?: string;
 }
 
-async function linkSameDayAppointment(input: CheckInInput): Promise<Pick<CheckInResult, 'appointmentCheckedIn' | 'appointmentId'>> {
-  try {
-    const today = jubaDate();
-    const appts = await getAppointmentsByPatient(input.patientId);
-    const match = appts.find(
-      (a) => a.appointmentDate === today && (a.status === 'scheduled' || a.status === 'confirmed'),
-    );
-    if (match) {
-      await updateAppointmentStatus(match._id, 'checked_in');
-      return { appointmentCheckedIn: true, appointmentId: match._id };
-    }
-  } catch {
-    // appointment linkage is best-effort; the check-in itself still succeeded
-  }
-  return { appointmentCheckedIn: false };
-}
-
 /**
  * Check a patient in. Always creates the triage/queue entry; additionally marks
  * a same-day scheduled/confirmed appointment as checked_in when one exists.
@@ -86,19 +69,6 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
   }
   const acuity = input.acuity ?? 'routine';
   const v = input.vitals ?? {};
-  const today = jubaDate();
-
-  const activeToday = (await getTriageByPatient(input.patientId)).find((triage) => {
-    const sameDay = triage.triagedAt ? jubaDate(triage.triagedAt) === today : false;
-    const active = triage.status === 'pending' || triage.status === 'seen';
-    const sameFacility = !input.facilityId || !triage.facilityId || triage.facilityId === input.facilityId;
-    return sameDay && active && sameFacility;
-  });
-
-  if (activeToday) {
-    const linked = await linkSameDayAppointment(input);
-    return { triage: activeToday, ...linked };
-  }
 
   const triage = await createTriage({
     patientId: input.patientId,
@@ -133,6 +103,23 @@ export async function checkInPatient(input: CheckInInput): Promise<CheckInResult
     status: 'pending',
   } as Omit<TriageDoc, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>);
 
-  const linked = await linkSameDayAppointment(input);
-  return { triage, ...linked };
+  // Link a same-day appointment if present — non-fatal.
+  let appointmentCheckedIn = false;
+  let appointmentId: string | undefined;
+  try {
+    const today = jubaDate();
+    const appts = await getAppointmentsByPatient(input.patientId);
+    const match = appts.find(
+      (a) => a.appointmentDate === today && (a.status === 'scheduled' || a.status === 'confirmed'),
+    );
+    if (match) {
+      await updateAppointmentStatus(match._id, 'checked_in');
+      appointmentCheckedIn = true;
+      appointmentId = match._id;
+    }
+  } catch {
+    // appointment linkage is best-effort; the check-in itself still succeeded
+  }
+
+  return { triage, appointmentCheckedIn, appointmentId };
 }

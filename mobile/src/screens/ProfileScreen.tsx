@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { Icon } from '@/components/icons';
 import { useRouter } from 'expo-router';
-import { colors, spacing, fontSize, radius, fontFamily } from '../lib/theme';
+import { colors, spacing, fontSize, radius } from '../lib/theme';
 import { useAuth } from '../lib/auth';
 
 const HEALTH_LINKS = [
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textTertiary,
     marginTop: 2,
-    fontFamily: fontFamily.mono,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   profileMeta: {
     flexDirection: 'row',

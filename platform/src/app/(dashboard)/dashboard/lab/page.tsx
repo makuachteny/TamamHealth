@@ -546,7 +546,7 @@ export default function LabDashboardPage() {
               <div key={alert.id} className="flex items-center gap-3 p-3 rounded-2xl" style={{
                 background: 'rgba(239,68,68,0.08)',
                 border: '2px solid rgba(239,68,68,0.35)',
-                boxShadow: 'none',
+                boxShadow: '0 0 12px rgba(239,68,68,0.15)',
               }}>
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'transparent' }}>
                   <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
@@ -822,7 +822,7 @@ export default function LabDashboardPage() {
       {showResultModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
           <div className="dash-card w-full max-w-2xl mx-4 rounded-2xl overflow-hidden" style={{
-            boxShadow: 'none',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
             maxHeight: '85vh', display: 'flex', flexDirection: 'column',
           }}>
             {/* Modal Header */}

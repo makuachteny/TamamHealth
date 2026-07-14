@@ -151,7 +151,7 @@ export default function AppointmentsCalendar({
             fontSize: 12,
             fontFamily: "var(--font-platform)",
             fontWeight: 600,
-            boxShadow: 'none',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
           },
         };
       }}

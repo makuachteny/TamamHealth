@@ -207,7 +207,7 @@ function HospitalsPageInner() {
     a.download = `facility-performance-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [filteredHospitals, t]);
+  }, [filteredHospitals]);
 
   if (loading) {
     return (

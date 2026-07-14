@@ -219,7 +219,7 @@ export default function OrgUsersPage() {
       super_admin: 'var(--color-danger)',
       org_admin: 'var(--accent-primary)',
       doctor: 'var(--accent-primary)',
-      clinical_officer: 'var(--accent-primary)',
+      clinical_officer: '#8B5CF6',
       nurse: '#EC4899',
       lab_tech: '#369FDA',
       pharmacist: 'var(--color-warning)',

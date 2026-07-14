@@ -148,11 +148,18 @@ export const axisTick = {
   fontFamily: "var(--font-platform)",
 };
 
-/** Flat area chart placeholder kept for existing chart call sites. */
+/** Gradient defs for area charts — drop inside <defs> in an <AreaChart> */
 export function AreaGradients({ id1 = 'grad1', id2 = 'grad2', color1 = 'var(--accent-primary)', color2 = 'var(--color-warning)' }) {
-  void id1;
-  void id2;
-  void color1;
-  void color2;
-  return null;
+  return (
+    <defs>
+      <linearGradient id={id1} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor={color1} stopOpacity={0.18} />
+        <stop offset="95%" stopColor={color1} stopOpacity={0} />
+      </linearGradient>
+      <linearGradient id={id2} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor={color2} stopOpacity={0.15} />
+        <stop offset="95%" stopColor={color2} stopOpacity={0} />
+      </linearGradient>
+    </defs>
+  );
 }

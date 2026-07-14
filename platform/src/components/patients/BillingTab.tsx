@@ -547,6 +547,12 @@ export default function BillingTab({
 
   return (
     <div className="space-y-5">
+      {/* ─── Balance Alert Banner ─── */}
+      <BalanceBanner
+        patientId={patient._id}
+        onPayClick={() => setShowPaymentPanel(true)}
+      />
+
       {/* ─── Quick Actions ─── */}
       <div className="flex gap-3 flex-wrap">
         <button
@@ -598,11 +604,11 @@ export default function BillingTab({
       </div>
 
       {/* ─── Two-Column: Insurance + Charges ─── */}
-      <div className="billing-account-grid grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-4 items-stretch">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
         {/* Insurance Coverage */}
-        <div className="billing-account-card card-elevated h-full">
-          <div className="billing-account-card__header">
-            <h3 className="billing-account-card__title" style={{ color: 'var(--text-primary)' }}>
+        <div className="card-elevated p-4 h-full">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <Shield size={16} style={{ color: 'var(--accent-primary)' }} />
               {t('billing.insuranceCoverage')}
             </h3>
@@ -622,18 +628,16 @@ export default function BillingTab({
         </div>
 
         {/* Recent Charges */}
-        <div className="billing-account-card card-elevated h-full">
-          <div className="billing-account-card__header">
-            <h3 className="billing-account-card__title" style={{ color: 'var(--text-primary)' }}>
-              <Receipt size={16} style={{ color: 'var(--accent-primary)' }} />
-              {t('billing.recentCharges')}
-              {d.charges.length > 0 && (
-                <span className="billing-account-card__count" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
-                  {d.charges.length}
-                </span>
-              )}
-            </h3>
-          </div>
+        <div className="card-elevated p-4 h-full">
+          <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
+            <Receipt size={16} style={{ color: 'var(--accent-primary)' }} />
+            {t('billing.recentCharges')}
+            {d.charges.length > 0 && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
+                {d.charges.length}
+              </span>
+            )}
+          </h3>
           {d.charges.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 text-center" style={{ color: 'var(--text-muted)' }}>
               <Receipt size={28} style={{ opacity: 0.3, marginBottom: 8 }} />
@@ -642,7 +646,7 @@ export default function BillingTab({
           ) : (
             <div className="space-y-0">
               {d.charges.slice(0, 8).map(charge => (
-                <div key={charge._id} className="billing-list-row flex items-center justify-between">
+                <div key={charge._id} className="flex items-center justify-between py-2.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{charge.description}</div>
                     <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
@@ -672,20 +676,20 @@ export default function BillingTab({
         </div>
 
         {/* Saved Payment Methods */}
-        <div className="billing-account-card card-elevated h-full">
-          <div className="billing-account-card__header">
-            <h3 className="billing-account-card__title" style={{ color: 'var(--text-primary)' }}>
+        <div className="card-elevated p-4 h-full">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <CreditCard size={16} style={{ color: 'var(--accent-primary)' }} />
               {t('billing.savedPaymentMethods') || 'Saved payment methods'}
               {methods.length > 0 && (
-                <span className="billing-account-card__count" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-subtle)', color: 'var(--text-muted)' }}>
                   {methods.length}
                 </span>
               )}
             </h3>
             <button
               onClick={() => setShowAddMethod(true)}
-              className="billing-card-action flex items-center gap-1.5 text-xs font-semibold transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
               style={{ background: 'var(--overlay-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
             >
               <Plus size={14} /> {t('billing.addMethod') || 'Add method'}
@@ -705,7 +709,7 @@ export default function BillingTab({
                   : m.bankAccountLast4 ? `${m.bankName ?? ''} •••• ${m.bankAccountLast4}`.trim()
                   : m.phoneNumber ?? '';
                 return (
-                  <div key={m._id} className="billing-list-row flex items-center gap-3">
+                  <div key={m._id} className="flex items-center gap-3 py-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0" style={{ background: 'transparent' }}>
                       <CreditCard size={14} style={{ color: 'var(--accent-primary)' }} />
                     </div>
@@ -738,13 +742,11 @@ export default function BillingTab({
         </div>
 
         {/* Full Ledger History */}
-        <div className="billing-account-card card-elevated h-full">
-          <div className="billing-account-card__header">
-            <h3 className="billing-account-card__title" style={{ color: 'var(--text-primary)' }}>
-              <BarChart3 size={16} style={{ color: 'var(--accent-primary)' }} />
-              {t('billing.transactionLedger')}
-            </h3>
-          </div>
+        <div className="card-elevated p-4 h-full">
+          <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--text-primary)' }}>
+            <BarChart3 size={16} style={{ color: 'var(--accent-primary)' }} />
+            {t('billing.transactionLedger')}
+          </h3>
           <PaymentHistoryTimeline patientId={patient._id} limit={30} />
         </div>
       </div>

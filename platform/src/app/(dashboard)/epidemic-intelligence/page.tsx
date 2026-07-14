@@ -218,7 +218,7 @@ export default function EpidemicIntelligencePage() {
                       <div className="relative h-3 rounded-full" style={{ background: 'var(--overlay-light)' }}>
                         <div className="h-full rounded-full transition-all" style={{
                           width: `${barWidth}%`,
-                          background: `var(--accent-primary)`,
+                          background: `linear-gradient(90deg, #4ADE80, ${rtColor})`,
                         }} />
                         {/* Rt = 1 marker */}
                         <div className="absolute top-0 bottom-0 w-0.5" style={{
@@ -406,7 +406,7 @@ export default function EpidemicIntelligencePage() {
                             style={{
                               height: `${barHeight}%`,
                               minHeight: totalCases > 0 ? '4px' : '0',
-                              background: `var(--accent-primary)`,
+                              background: `linear-gradient(180deg, #EF4444, rgba(239,68,68,0.4))`,
                             }}
                           />
                         </div>
@@ -618,7 +618,7 @@ export default function EpidemicIntelligencePage() {
                     <div className="h-2 rounded-full mb-3" style={{ background: 'var(--overlay-light)' }}>
                       <div className="h-full rounded-full" style={{
                         width: `${state.riskScore}%`,
-                        background: `var(--accent-primary)`,
+                        background: `linear-gradient(90deg, #4ADE80, ${color})`,
                       }} />
                     </div>
                     {/* Diseases */}

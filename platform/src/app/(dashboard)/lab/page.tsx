@@ -470,7 +470,7 @@ export default function LabPage() {
                 style={{
                   width: '100%', maxWidth: 520, padding: 28, borderRadius: 16,
                   background: 'var(--bg-card)', position: 'relative',
-                  boxShadow: 'none',
+                  boxShadow: '0 24px 64px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.1)',
                   maxHeight: '90vh', overflowY: 'auto',
                 }}
               >
@@ -621,7 +621,7 @@ export default function LabPage() {
                 style={{
                   width: '100%', maxWidth: 460, padding: 24, borderRadius: 16,
                   background: 'var(--bg-card)',
-                  boxShadow: 'none',
+                  boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
                   border: '1px solid var(--color-danger)',
                 }}
               >

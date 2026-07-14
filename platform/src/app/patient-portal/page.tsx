@@ -208,7 +208,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
             <div className="pp-form-lede">
               <div className="pp-logo-wrap">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="" aria-hidden className="pp-logo-img" />
+                <img src="/assets/tamamhealth-logo.svg" alt="" aria-hidden className="pp-logo-img" />
               </div>
               <h1 className="pp-heading">{t('patientPortal.heroHeading')}</h1>
               <p className="pp-subheading">
@@ -301,7 +301,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
                   background: BLUE, padding: '14px 20px', borderRadius: 4,
                   border: 'none', cursor: loading ? 'wait' : 'pointer',
                   opacity: loading || !dbReady ? 0.6 : 1,
-                  boxShadow: 'none',
+                  boxShadow: '0 2px 8px rgba(0,119,215,0.25)',
                 }}>
                 {loading ? t('patientPortal.searching') : t('patientPortal.signInTitle')} <ArrowRight size={14} />
               </button>
@@ -354,7 +354,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
       {/* ═══ Right: imagery panel (desktop only) ═══ */}
       <aside className="pp-image-panel" aria-hidden>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/patients/doctor-nurse-consultation.jpg" alt={t('patientPortal.heroImageAlt')} />
+        <img src="/assets/doctor-nurse-consultation.jpg" alt={t('patientPortal.heroImageAlt')} />
         <div className="pp-image-scrim" />
 
         <div className="pp-image-body">
@@ -429,7 +429,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           border-radius: 20px;
           background: var(--bg-card-solid);
           border: 1px solid var(--border-medium);
-          box-shadow: none;
+          box-shadow: 0 6px 18px rgba(26,58,58,0.08);
           margin-bottom: 20px;
         }
         .pp-logo-img { width: 42px; height: 42px; }
@@ -454,7 +454,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           background: var(--bg-card-solid);
           border-radius: 16px;
           border: 1px solid var(--border-medium);
-          box-shadow: none;
+          box-shadow: 0 12px 40px rgba(26,58,58,0.08), 0 1px 2px rgba(26,58,58,0.04);
           text-align: left;
           position: relative;
           overflow: hidden;
@@ -523,7 +523,9 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         .pp-image-scrim {
           position: absolute;
           inset: 0;
-          background: var(--bg-card-solid);
+          background:
+            linear-gradient(135deg, rgba(26,58,58,0.72) 0%, rgba(26,58,58,0.40) 40%, rgba(45,155,106,0.40) 100%),
+            linear-gradient(180deg, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.0) 30%, rgba(0,0,0,0.40) 100%);
           z-index: 1;
         }
         .pp-image-body, .pp-image-footer {
@@ -573,7 +575,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           border-radius: 50%;
           background: var(--color-warning-400);
           flex-shrink: 0;
-          box-shadow: none;
+          box-shadow: 0 0 0 3px rgba(228,168,75,0.18);
         }
       `}</style>
     </div>
@@ -1856,7 +1858,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
       }
     })();
     return () => { cancelled = true; };
-  }, [patient._id, t]);
+  }, [patient._id]);
 
   const safeBills = bills || [];
   const totalOwed = safeBills.reduce((s, b) => s + (b.amount - b.paid), 0);
@@ -2016,7 +2018,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
           )}
           <div style={{ padding: 16, borderRadius: 10, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', textAlign: 'left', marginBottom: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('patientPortal.reference')}</p><p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-platform-mono)' }}>{refNum}</p></div>
+              <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('patientPortal.reference')}</p><p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace' }}>{refNum}</p></div>
               <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('portal.amount')}</p><p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(paidAmount)}</p></div>
               <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('portal.method')}</p><p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{paymentMethods.find(m => m.key === payMethod)?.name}</p></div>
               <div><p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('patientPortal.bills')}</p><p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t('patientPortal.itemCount', { count: billCount })}</p></div>
@@ -2433,7 +2435,7 @@ const patientPortalCSS = `
 }
 .pp-toggle__btn--active {
   background: var(--accent-primary); color: #fff;
-  box-shadow: none;
+  box-shadow: 0 2px 8px rgba(0,119,215,0.25);
 }
 .pp-field { margin-bottom: 20px; }
 .pp-label {
@@ -2448,7 +2450,7 @@ const patientPortalCSS = `
   font-size: 16px; color: var(--text-primary); background: var(--bg-card-solid);
   transition: border-color 0.2s, box-shadow 0.2s; outline: none;
 }
-.pp-input:focus { border-color: var(--accent-primary); box-shadow: none; }
+.pp-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 4px var(--accent-light); }
 .pp-input::placeholder { color: var(--text-muted); }
 .pp-btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
@@ -2456,9 +2458,9 @@ const patientPortalCSS = `
   font-family: var(--font-platform); font-size: 16px;
   font-weight: 700; cursor: pointer; border: none;
   background: var(--accent-primary); color: #fff; transition: all 0.2s ease;
-  box-shadow: none;
+  box-shadow: 0 2px 8px rgba(0,119,215,0.2);
 }
-.pp-btn-primary:hover { filter: none; transform: translateY(-1px); box-shadow: none; }
+.pp-btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,119,215,0.3); }
 .pp-error {
   padding: 14px 16px; border-radius: 8px; background: rgba(218,18,48,0.06);
   border: 1px solid rgba(218,18,48,0.15); margin-bottom: 18px;

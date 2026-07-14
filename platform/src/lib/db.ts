@@ -148,17 +148,6 @@ export function getRemoteDB(name: string): PouchDatabase | null {
   return remoteDatabases[name];
 }
 
-/** Drop cached DB handles so the next `getDB()` call reopens them cleanly. */
-export function clearDBCache(name?: string): void {
-  if (name) {
-    delete databases[name];
-    delete remoteDatabases[name];
-    return;
-  }
-  for (const key of Object.keys(databases)) delete databases[key];
-  for (const key of Object.keys(remoteDatabases)) delete remoteDatabases[key];
-}
-
 // Typed database accessors
 export const usersDB = () => getDB('tamamhealth_users');
 export const patientsDB = () => getDB('tamamhealth_patients');

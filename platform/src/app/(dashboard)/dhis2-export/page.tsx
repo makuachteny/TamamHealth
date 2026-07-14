@@ -157,7 +157,7 @@ export default function DHIS2ExportPage() {
           style={{
             background: syncing ? 'var(--overlay-medium)' : 'linear-gradient(135deg, #2191D0, #015697)',
             color: syncing ? 'var(--text-muted)' : '#fff',
-            boxShadow: 'none',
+            boxShadow: syncing ? 'none' : '0 4px 12px rgba(33, 145, 208, 0.3)',
           }}
         >
           <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />

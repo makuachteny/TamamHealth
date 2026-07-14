@@ -1,5 +1,3 @@
-import { Platform } from 'react-native';
-
 /** TamamHealth design tokens — matches the platform's Pan-African palette. */
 
 export const colors = {
@@ -64,17 +62,4 @@ export const fontSize = {
   xl: 20,
   xxl: 28,
   hero: 34,
-};
-
-export const fontFamily = {
-  body: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-  mono: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-};
-
-export const fontWeight = {
-  regular: '400' as const,
-  medium: '500' as const,
-  semibold: '600' as const,
-  bold: '700' as const,
-  heavy: '800' as const,
 };

@@ -46,10 +46,8 @@ export function brandingToCSSVars(branding: OrgBranding): Record<string, string>
     // Override the accent system with org branding
     '--accent-primary': branding.primaryColor,
     '--accent-hover': branding.secondaryColor,
-    '--accent-text': branding.secondaryColor,
     '--accent-light': `${branding.primaryColor}12`,
-    '--accent-border': branding.primaryColor,
-    '--border-accent': branding.primaryColor,
+    '--accent-border': `${branding.primaryColor}30`,
     '--nav-active-bg': branding.primaryColor,
   };
 }

@@ -58,10 +58,8 @@ export default function GlobalSearchBar({ title, titleIcon, actions, searchTrail
     if (q.length < 2) return [];
     return (patients || [])
       .filter(p =>
-        `${p.firstName || ''} ${p.middleName || ''} ${p.surname || ''}`.toLowerCase().includes(q) ||
+        `${p.firstName || ''} ${p.surname || ''}`.toLowerCase().includes(q) ||
         (p.hospitalNumber || '').toLowerCase().includes(q) ||
-        (p.nationalId || '').toLowerCase().includes(q) ||
-        (p.geocodeId || '').toLowerCase().includes(q) ||
         (p.phone || '').includes(q)
       )
       .slice(0, 6);
@@ -97,7 +95,7 @@ export default function GlobalSearchBar({ title, titleIcon, actions, searchTrail
 
   return (
     <div className={split
-      ? 'mx-[10px] mt-[10px] flex-shrink-0 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3 xl:items-center'
+      ? 'mx-[10px] mt-[10px] flex-shrink-0 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:items-center'
       : 'mx-[10px] mt-[10px] flex-shrink-0 flex items-center gap-3 flex-wrap'}>
       {/* In split mode this groups search + trailing into the left grid column;
           otherwise `contents` makes them plain flex children as before. */}
@@ -136,7 +134,7 @@ export default function GlobalSearchBar({ title, titleIcon, actions, searchTrail
               width: 'min(100%, 420px)',
               background: 'var(--bg-card-solid)',
               border: '1px solid var(--border-medium)',
-              boxShadow: 'none',
+              boxShadow: '0 16px 48px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.06)',
             }}
           >
             {patientMatches.length === 0 ? (
@@ -212,7 +210,7 @@ export default function GlobalSearchBar({ title, titleIcon, actions, searchTrail
           pushed to the row's end. */}
       {actions && (
         <div className={split
-          ? 'flex items-center gap-2 flex-wrap xl:justify-end min-w-0'
+          ? 'flex items-center gap-2 flex-wrap lg:justify-end'
           : 'flex items-center gap-2 flex-shrink-0 ml-auto flex-wrap'}>
           {actions}
         </div>

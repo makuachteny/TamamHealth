@@ -7,22 +7,16 @@ Object.assign(globalThis, { TextEncoder, TextDecoder });
 
 // Polyfill setImmediate/clearImmediate for pouchdb-adapter-memory (memdown) in jsdom
 if (typeof globalThis.setImmediate === 'undefined') {
-  const timedGlobal = globalThis as typeof globalThis & {
-    setImmediate: typeof timers.setImmediate;
-    clearImmediate: typeof timers.clearImmediate;
-  };
-
-  timedGlobal.setImmediate = timers.setImmediate;
-  timedGlobal.clearImmediate = timers.clearImmediate;
+  (globalThis as any).setImmediate = timers.setImmediate;
+  (globalThis as any).clearImmediate = timers.clearImmediate;
 }
 
 // Polyfill fetch for pouchdb-browser in jsdom (Node 18+ has native fetch)
 if (typeof globalThis.fetch === 'undefined') {
   Object.assign(globalThis, {
-    fetch: (...args: Parameters<typeof fetch>) =>
-      // @ts-expect-error -- node-fetch v2 is untyped here; this is only a Jest fetch polyfill.
-      import('node-fetch')
-      .then(m => (m.default as typeof fetch)(...args)),
+    // @ts-ignore -- node-fetch may or may not have declarations depending on
+    // the install (v2 has none); only used as a test polyfill either way.
+    fetch: (...args: Parameters<typeof fetch>) => import('node-fetch').then(m => (m.default as any)(...args)),
     Headers: class Headers {},
     Request: class Request {},
     Response: class Response {},

@@ -18,7 +18,7 @@ export default function CheckoutLayout({ children }: { children: React.ReactNode
       }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="TamamHealth" style={{ width: 28, height: 28 }} />
+          <img src="/assets/tamamhealth-logo.svg" alt="TamamHealth" style={{ width: 28, height: 28 }} />
           <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.04em' }}>TamamHealth</span>
           <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent-primary)', padding: '3px 8px', borderRadius: 6, background: 'var(--accent-light)' }}>Secure Payment</span>
         </Link>

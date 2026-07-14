@@ -26,13 +26,14 @@ export default function DashboardHero({
   className = '',
 }: {
   stats: HeroStat[];
-  /** Override the greeting headline (defaults to "Welcome, {name}"). */
+  /** Override the greeting headline (defaults to "Good Morning {name}"). */
   title?: string;
   className?: string;
 }) {
   const { currentUser } = useApp();
   const now = new Date();
-  const headline = title ?? `Welcome${currentUser?.name ? `, ${currentUser.name}` : ''}`;
+  const greeting = now.getHours() < 12 ? 'Good Morning' : now.getHours() < 17 ? 'Good Afternoon' : 'Good Evening';
+  const headline = title ?? `${greeting}${currentUser?.name ? ` ${currentUser.name}` : ''}`;
   const heroDate = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const facility = currentUser?.hospitalName;
 

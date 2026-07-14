@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AvailabilityModal from '@/components/AvailabilityModal';
 import {
-  Calendar, User,
+  Calendar, Plus, Clock, CheckCircle2, User,
   AlertTriangle, RefreshCw,
   Video, Stethoscope, Syringe, HeartPulse, FlaskConical,
   Building2, X, UserPlus, ClipboardList,
@@ -18,9 +18,11 @@ import { useInsuredPatientIds } from '@/lib/hooks/usePayments';
 import { patientFullName } from '@/lib/patient-utils';
 import { useApp } from '@/lib/context';
 import { useSettings } from '@/lib/settings/SettingsProvider';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import type { AppointmentType, AppointmentPriority, AppointmentStatus, FacilityLevel, PatientDoc, AppointmentDoc } from '@/lib/db-types';
+import { FilterBar, SearchInput, FilterSelect } from '@/components/filters';
+import type { AppointmentType, AppointmentPriority, AppointmentStatus, FacilityLevel } from '@/lib/db-types';
 import dynamic from 'next/dynamic';
 import PortalModal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
@@ -65,6 +67,12 @@ const statusConfig: Record<AppointmentStatus, { color: string; bg: string; label
   completed:   { color: '#047857', bg: 'rgba(4,120,87,0.10)',    label: 'Completed' },
   cancelled:   { color: '#DC2626', bg: 'rgba(220,38,38,0.10)',   label: 'Cancelled' },
   no_show:     { color: '#64748B', bg: 'rgba(100,116,139,0.10)', label: 'No Show' },
+};
+
+const priorityConfig: Record<AppointmentPriority, { color: string; label: string }> = {
+  routine: { color: 'var(--color-success)', label: 'Routine' },
+  urgent: { color: 'var(--color-warning)', label: 'Urgent' },
+  emergency: { color: 'var(--color-danger)', label: 'Emergency' },
 };
 
 const timeSlots = Array.from({ length: 24 }, (_, h) =>
@@ -147,8 +155,9 @@ export default function AppointmentsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  // Deep link: ?new=1 opens the booking form straight away. Read on the client
-  // to avoid needing a Suspense boundary around useSearchParams, then strip the param.
+  // Deep link: TopBar "+ → Schedule appointment" routes here with ?new=1 to
+  // open the booking form straight away. Read on the client to avoid needing a
+  // Suspense boundary around useSearchParams, then strip the param.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
@@ -234,6 +243,13 @@ export default function AppointmentsPage() {
   const [formRecurrencePattern, setFormRecurrencePattern] = useState<'weekly' | 'biweekly' | 'monthly' | 'quarterly'>('monthly');
   const [submitting, setSubmitting] = useState(false);
 
+  // Walk-in form
+  const [wiPatient, setWiPatient] = useState('');
+  const [wiReason, setWiReason] = useState('');
+  const [wiDepartment, setWiDepartment] = useState('Outpatient');
+  const [wiPriority, setWiPriority] = useState<AppointmentPriority>('routine');
+  const [wiNotes, setWiNotes] = useState('');
+
   // Reschedule / Cancel
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
@@ -249,7 +265,12 @@ export default function AppointmentsPage() {
   // appointment on `resource` so clicking can open the existing detail/edit flow.
   const calendarEvents = useMemo(() => {
     let list = appointments;
-    const q = globalSearch.toLowerCase().trim();
+    if (filterStatus === 'pending_approval') {
+      list = list.filter(a => a.status === 'scheduled' && a.appointmentDate >= today);
+    } else if (filterStatus !== 'all') {
+      list = list.filter(a => a.status === filterStatus);
+    }
+    const q = `${search} ${globalSearch}`.toLowerCase().trim();
     if (q) list = list.filter(a =>
       a.patientName.toLowerCase().includes(q) ||
       a.providerName.toLowerCase().includes(q) ||
@@ -267,14 +288,39 @@ export default function AppointmentsPage() {
         resource: a,
       };
     });
-  }, [appointments, globalSearch]);
+  }, [appointments, filterStatus, search, globalSearch, today]);
 
-  const selectedAppointment = eventApt
-    ? appointments.find(a => a._id === eventApt._id) || eventApt
-    : null;
-  const selectedPatient = selectedAppointment
-    ? patients.find(p => p._id === selectedAppointment.patientId)
-    : undefined;
+  // Same scope as the calendar (date + search) but WITHOUT the status filter, so the
+  // status tab badges show how many appointments each status holds in the current view.
+  const statusBaseList = useMemo(() => {
+    let list = appointments;
+    if (selectedDate) list = list.filter(a => a.appointmentDate === selectedDate);
+    const q = `${search} ${globalSearch}`.toLowerCase().trim();
+    if (q) list = list.filter(a =>
+      a.patientName.toLowerCase().includes(q) ||
+      a.providerName.toLowerCase().includes(q) ||
+      a.department.toLowerCase().includes(q) ||
+      a.reason.toLowerCase().includes(q)
+    );
+    return list;
+  }, [appointments, selectedDate, search, globalSearch]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: statusBaseList.length };
+    for (const a of statusBaseList) counts[a.status] = (counts[a.status] || 0) + 1;
+    return counts;
+  }, [statusBaseList]);
+
+  const statusTabs = useMemo(() => {
+    const base = [{ key: 'all', label: t('appointments.allStatus'), count: statusCounts.all }];
+    const fromStatuses = (Object.keys(statusConfig) as AppointmentStatus[])
+      .filter(k => (statusCounts[k] || 0) > 0 || filterStatus === k)
+      .map(k => ({ key: k, label: t(statusLabelKey[k]), count: statusCounts[k] || 0 }));
+    return [...base, ...fromStatuses];
+  }, [statusCounts, filterStatus, t, statusLabelKey]);
+
+  // Pending approvals
+  const pendingApprovals = useMemo(() => appointments.filter(a => a.status === 'scheduled' && a.appointmentDate >= today), [appointments, today]);
 
   const resetForm = () => {
     setFormPatient(''); setFormDate(jubaDate()); setFormTime('09:00');
@@ -313,10 +359,33 @@ export default function AppointmentsPage() {
     finally { setSubmitting(false); }
   };
 
+  const handleWalkIn = async () => {
+    if (!wiPatient || !wiReason) { showToast(t('appointments.toastFillRequiredShort'), 'error'); return; }
+    const patient = patients.find(p => p._id === wiPatient);
+    if (!patient) { showToast(t('appointments.toastSelectValidPatientShort'), 'error'); return; }
+    setSubmitting(true);
+    try {
+      await create({
+        patientId: patient._id, patientName: `${patient.firstName} ${patient.surname}`,
+        patientPhone: patient.phone || undefined, providerId: currentUser?._id || '',
+        providerName: currentUser?.name || '', facilityId: currentUser?.hospitalId || '',
+        facilityName: currentUser?.hospitalName || '', facilityLevel: 'payam' as FacilityLevel,
+        appointmentDate: today, appointmentTime: jubaTime(),
+        duration: 30, appointmentType: 'walk_in', priority: wiPriority,
+        department: wiDepartment, reason: wiReason, notes: wiNotes || undefined,
+        status: 'checked_in', reminderSent: false, isRecurring: false,
+        bookedBy: currentUser?._id || '', bookedByName: currentUser?.name || '', state: '',
+      });
+      showToast(t('appointments.toastWalkInRegistered'), 'success'); setShowWalkIn(false);
+      setWiPatient(''); setWiReason(''); setWiNotes(''); setWiDepartment('Outpatient'); setWiPriority('routine');
+    } catch (err) { showToast(err instanceof Error ? err.message : t('appointments.toastFailed'), 'error'); }
+    finally { setSubmitting(false); }
+  };
+
   const handleStatusChange = useCallback(async (id: string, status: AppointmentStatus) => {
-    try { await updateStatus(id, status); showToast(t('appointments.toastStatusChanged', { status: t(STATUS_LABEL_KEY[status]).toLowerCase() }), 'success'); }
+    try { await updateStatus(id, status); showToast(t('appointments.toastStatusChanged', { status: t(statusLabelKey[status]).toLowerCase() }), 'success'); }
     catch { showToast(t('appointments.toastFailedUpdate'), 'error'); }
-  }, [updateStatus, showToast, t]);
+  }, [updateStatus, showToast, t, statusLabelKey]);
 
   // Map a status to the step it can be reversed back to. Reversing reuses the
   // same updateAppointmentStatus path (which accepts any target status), so an
@@ -632,7 +701,7 @@ export default function AppointmentsPage() {
                 <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(TYPE_LABEL_KEY[at.value])}</option>)}</select></div>
+                <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</select></div>
                 <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
@@ -906,7 +975,7 @@ export default function AppointmentsPage() {
                   <div><label>{t('appointments.labelDuration')}</label><select value={formDuration} onChange={e => setFormDuration(Number(e.target.value))}>{[15, 20, 30, 45, 60, 90].map(d => <option key={d} value={d}>{t('appointments.durationMin', { count: d })}</option>)}</select></div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
-                  <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(TYPE_LABEL_KEY[at.value])}</option>)}</select></div>
+                  <div><label>{t('appointments.labelType')}</label><select value={formType} onChange={e => setFormType(e.target.value as AppointmentType)}>{appointmentTypes.filter(at => at.value !== 'walk_in').map(at => <option key={at.value} value={at.value}>{t(typeLabelKey[at.value])}</option>)}</select></div>
                   <div><label>{t('appointments.labelPriority')}</label><select value={formPriority} onChange={e => setFormPriority(e.target.value as AppointmentPriority)}><option value="routine">{t('appointments.priorityRoutine')}</option><option value="urgent">{t('appointments.priorityUrgent')}</option><option value="emergency">{t('appointments.priorityEmergency')}</option></select></div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'stretch', gap: 12 }}>
@@ -940,213 +1009,6 @@ export default function AppointmentsPage() {
 }
 
 /* ─── Reusable Components ─── */
-
-function AppointmentDetailSidebar({
-  appointment,
-  patient,
-  statusLabel,
-  priorityLabel,
-  typeLabel,
-  onClose,
-  onOpenPatient,
-  onEdit,
-  onReschedule,
-  onCancel,
-  onUndo,
-  onReopen,
-  canCancel,
-}: {
-  appointment: AppointmentDoc;
-  patient?: PatientDoc;
-  statusLabel: string;
-  priorityLabel: string;
-  typeLabel: string;
-  onClose: () => void;
-  onOpenPatient: () => void;
-  onEdit: () => void;
-  onReschedule: () => void;
-  onCancel: () => void;
-  onUndo?: () => void;
-  onReopen?: () => void;
-  canCancel: boolean;
-}) {
-  const [activeTab, setActiveTab] = useState<'visit' | 'financial'>('visit');
-  const patientMeta = formatPatientMeta(patient);
-  const location = appointment.facilityName || appointment.department || 'Not assigned';
-  const intakeStatus = appointment.reminderSent ? 'Sent to patient' : 'Not sent to patient';
-  const noteStatus = appointment.notes ? 'Note started' : 'Note not started';
-  const chargeStatus = appointment.status === 'completed' ? 'Ready for charge capture' : 'Charge not started';
-  const visitRows = [
-    { label: 'Resources', value: appointment.providerName || 'Unassigned' },
-    { label: 'Appointment Mode', value: appointment.appointmentType === 'telehealth' ? 'Telehealth' : appointment.appointmentType === 'walk_in' ? 'Walk-in' : 'In Office' },
-    { label: 'Location', value: location },
-    { label: 'Visit Reason', value: appointment.reason || typeLabel },
-    { label: 'Patient Intake', value: intakeStatus },
-    { label: 'Date', value: formatAppointmentDate(appointment.appointmentDate) },
-    { label: 'Time', value: formatAppointmentTimeRange(appointment) },
-    { label: 'Duration', value: `${appointment.duration} minutes` },
-    { label: 'Department', value: appointment.department || 'Not assigned' },
-    { label: 'Phone', value: appointment.patientPhone || patient?.phone || 'Not recorded' },
-    { label: 'Reminder', value: appointment.reminderSent ? `Sent${appointment.reminderChannel ? ` by ${appointment.reminderChannel}` : ''}` : 'Not sent' },
-    { label: 'Recurring', value: appointment.isRecurring ? formatReadable(appointment.recurrencePattern || 'recurring') : 'No' },
-    { label: 'Note', value: noteStatus },
-    ...(appointment.cancelledReason ? [{ label: 'Cancel Reason', value: appointment.cancelledReason }] : []),
-    ...(appointment.checkedInAt ? [{ label: 'Checked In', value: formatDateTime(appointment.checkedInAt) }] : []),
-    ...(appointment.completedAt ? [{ label: 'Completed', value: formatDateTime(appointment.completedAt) }] : []),
-    ...(appointment.notes ? [{ label: 'Notes', value: appointment.notes }] : []),
-  ];
-  const financialRows = [
-    { label: 'Balance', value: '$0.00' },
-    { label: 'Charge', value: chargeStatus },
-    { label: 'Payment Responsibility', value: 'Not recorded' },
-    { label: 'Insurance', value: 'Not recorded' },
-    { label: 'Claim Status', value: 'Not started' },
-    { label: 'Patient Intake', value: intakeStatus },
-    { label: 'Facility', value: location },
-    { label: 'Facility Level', value: formatReadable(appointment.facilityLevel) },
-    { label: 'Booked By', value: appointment.bookedByName || appointment.bookedBy || 'Not recorded' },
-    { label: 'Booked On', value: formatDateTime(appointment.createdAt) },
-    { label: 'Last Updated', value: formatDateTime(appointment.updatedAt) },
-  ];
-  const rows = activeTab === 'visit' ? visitRows : financialRows;
-
-  return (
-    <aside className="appointment-detail-sidebar" aria-label="Appointment details" role="dialog" aria-modal="true">
-      <div className="appointment-detail-sidebar__header">
-        <button type="button" className="appointment-detail-sidebar__back" onClick={onClose} aria-label="Close appointment details">
-          <ChevronLeft size={22} />
-        </button>
-        <div className="appointment-detail-sidebar__title">
-          <h2>{formatAppointmentTimeRange(appointment)}</h2>
-          <button type="button" onClick={onOpenPatient}>{appointment.patientName}</button>
-          {patientMeta && <p>{patientMeta}</p>}
-          <div className="appointment-detail-sidebar__status">
-            <span>{statusLabel}</span>
-            <span>{priorityLabel}</span>
-          </div>
-        </div>
-        <button type="button" className="appointment-detail-sidebar__close" onClick={onClose} aria-label="Close appointment details">
-          <X size={16} />
-        </button>
-      </div>
-
-      <div className="appointment-detail-sidebar__tabs" role="tablist" aria-label="Appointment detail sections">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'visit'}
-          className={activeTab === 'visit' ? 'active' : undefined}
-          onClick={() => setActiveTab('visit')}
-        >
-          Visit Information
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'financial'}
-          className={activeTab === 'financial' ? 'active' : undefined}
-          onClick={() => setActiveTab('financial')}
-        >
-          Financial Information
-        </button>
-      </div>
-
-      <div className="appointment-detail-sidebar__body" role="tabpanel">
-        {rows.map(row => (
-          <DetailRow key={row.label} label={row.label} value={row.value} />
-        ))}
-      </div>
-
-      <div className="appointment-detail-sidebar__actions">
-        <button type="button" className="btn btn-primary btn-sm" onClick={onOpenPatient}>
-          <User size={14} /> Open patient record
-        </button>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={onEdit}>Edit</button>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={onReschedule}>Reschedule</button>
-        {onUndo && <button type="button" className="btn btn-secondary btn-sm" onClick={onUndo}>Undo</button>}
-        {onReopen && <button type="button" className="btn btn-secondary btn-sm" onClick={onReopen}>Reopen</button>}
-        {canCancel && (
-          <button type="button" className="btn btn-secondary btn-sm danger" onClick={onCancel}>Cancel</button>
-        )}
-      </div>
-    </aside>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="appointment-detail-row">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
-  );
-}
-
-function formatAppointmentDate(date: string) {
-  return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: '2-digit',
-    year: 'numeric',
-  });
-}
-
-function formatAppointmentTimeRange(appointment: AppointmentDoc) {
-  const [hours, minutes] = appointment.appointmentTime.split(':').map(Number);
-  const start = new Date(`${appointment.appointmentDate}T${appointment.appointmentTime || '00:00'}:00`);
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return `${appointment.appointmentTime} · ${appointment.duration}m`;
-  const end = appointment.endTime
-    ? new Date(`${appointment.appointmentDate}T${appointment.endTime}:00`)
-    : new Date(start.getTime() + appointment.duration * 60000);
-  const fmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
-  return `${fmt.format(start)} - ${fmt.format(end)}`;
-}
-
-function formatDateTime(value?: string) {
-  if (!value) return 'Not recorded';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString('en-US', {
-    month: 'short',
-    day: '2-digit',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-function formatReadable(value?: string) {
-  if (!value) return 'Not recorded';
-  return value
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, char => char.toUpperCase());
-}
-
-function formatPatientMeta(patient?: PatientDoc) {
-  if (!patient) return '';
-  const age = patient.dateOfBirth ? calculateAge(patient.dateOfBirth) : patient.estimatedAge;
-  const ageText = typeof age === 'number' ? `${age} y/o` : undefined;
-  const sexText = patient.gender;
-  if (patient.dateOfBirth && ageText) return `DOB: ${formatShortDate(patient.dateOfBirth)} (${ageText} ${sexText})`;
-  if (ageText) return `${ageText} ${sexText}`;
-  return sexText || '';
-}
-
-function calculateAge(dateOfBirth: string) {
-  const dob = new Date(`${dateOfBirth}T12:00:00`);
-  if (Number.isNaN(dob.getTime())) return undefined;
-  const now = new Date();
-  let age = now.getFullYear() - dob.getFullYear();
-  const monthDelta = now.getMonth() - dob.getMonth();
-  if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < dob.getDate())) age -= 1;
-  return age;
-}
-
-function formatShortDate(date: string) {
-  const d = new Date(`${date}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return date;
-  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
-}
 
 function Modal({ children, onClose, title, titleColor, icon, size = 'md', nav }: {
   children: React.ReactNode; onClose: () => void; title: string; titleColor?: string;

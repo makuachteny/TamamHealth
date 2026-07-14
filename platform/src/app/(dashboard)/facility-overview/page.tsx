@@ -291,14 +291,19 @@ function FacilityOverview() {
             return (
               <ResponsiveContainer width="100%" height={260}>
                 <AreaChart {...commonProps}>
+                  <defs>
+                    <linearGradient id="gOpd" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#2191D0" stopOpacity={0.4} /><stop offset="95%" stopColor="#2191D0" stopOpacity={0} /></linearGradient>
+                    <linearGradient id="gAnc" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} /><stop offset="95%" stopColor="#ec4899" stopOpacity={0} /></linearGradient>
+                    <linearGradient id="gImm" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} /><stop offset="95%" stopColor="#22c55e" stopOpacity={0} /></linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                   <XAxis dataKey="month" tick={axisTick} />
                   <YAxis tick={axisTick} />
                   <Tooltip {...chartTooltipStyle} />
                   <Legend {...legendProps} />
-                  <Area type="monotone" dataKey="OPD Visits" stroke="#2191D0" fill="#2191D0" fillOpacity={0.12} strokeWidth={2} />
-                  <Area type="monotone" dataKey="ANC Visits" stroke="#ec4899" fill="#ec4899" fillOpacity={0.12} strokeWidth={2} />
-                  <Area type="monotone" dataKey="Immunizations" stroke="#22c55e" fill="#22c55e" fillOpacity={0.12} strokeWidth={2} />
+                  <Area type="monotone" dataKey="OPD Visits" stroke="#2191D0" fill="url(#gOpd)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="ANC Visits" stroke="#ec4899" fill="url(#gAnc)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="Immunizations" stroke="#22c55e" fill="url(#gImm)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             );

@@ -77,7 +77,7 @@ export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, on
 
       return next;
     });
-  }, [busy, mode, setupPin, onVerifyPin, onSetPin, onUnlock, t]);
+  }, [busy, mode, setupPin, onVerifyPin, onSetPin, onUnlock]);
 
   const handleBackspace = useCallback(() => {
     setPin(prev => prev.slice(0, -1));
@@ -97,7 +97,7 @@ export default function LockScreen({ userName, hasPin, onVerifyPin, onSetPin, on
       <div className="flex flex-col items-center gap-4 w-full max-w-xs px-6">
         {/* TamamHealth logo */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="TamamHealth" className="w-16 h-16" />
+        <img src="/assets/tamamhealth-logo.svg" alt="TamamHealth" className="w-16 h-16" />
 
         {/* Name & status */}
         <div className="text-center">

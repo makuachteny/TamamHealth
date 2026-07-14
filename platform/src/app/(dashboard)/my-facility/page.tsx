@@ -98,7 +98,7 @@ export default function MyFacilityPage() {
     } finally {
       setSaving(false);
     }
-  }, [hospitalId, update, operationalStatus, totalBeds, icuBeds, maternityBeds, pediatricBeds, doctors, nurses, clinicalOfficers, labTechnicians, pharmacists, hasElectricity, electricityHours, hasGenerator, hasSolar, hasInternet, internetType, hasAmbulance, emergency24hr, serviceFlags, t]);
+  }, [hospitalId, update, operationalStatus, totalBeds, icuBeds, maternityBeds, pediatricBeds, doctors, nurses, clinicalOfficers, labTechnicians, pharmacists, hasElectricity, electricityHours, hasGenerator, hasSolar, hasInternet, internetType, hasAmbulance, emergency24hr, serviceFlags]);
 
   const handleSubmitToMoH = useCallback(async () => {
     if (!hospitalId) return;

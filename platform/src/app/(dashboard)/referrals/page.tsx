@@ -10,7 +10,7 @@ import {
   ArrowRightLeft, Plus, CheckCircle2,
   AlertTriangle, ChevronDown, ChevronUp, X,
   Stethoscope, Package, FileText, Image as ImageIcon,
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   User, Activity, FlaskConical, Paperclip, XCircle, MessageSquarePlus,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ClipboardCheck, Bell, RotateCcw,
@@ -113,7 +113,7 @@ export default function ReferralsPage() {
   // For each receiving facility, count how many referrals we sent there
   // and what fraction were accepted (status sent → received → seen → completed).
   // New incoming referrals (status 'sent') for notification badge
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const newIncomingCount = incomingReferrals.filter(r => r.status === 'sent' && !viewedReferralIds.has(r._id)).length;
 
   // Auto-mark as 'received' when user expands an incoming referral with status 'sent'

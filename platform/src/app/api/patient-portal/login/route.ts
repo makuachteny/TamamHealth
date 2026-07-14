@@ -4,11 +4,23 @@ import { createPatientToken } from '@/lib/patient-portal-auth';
 import { demoFallbackEnabled, findDemoPatientByHospitalNumber, findDemoPatientByNameDob } from '@/lib/patient-portal-demo';
 
 // Rate limit: 10 attempts / 15 min / IP + 10 attempts / 15 min / phone.
-// Backed by lib/rate-limit.ts, which uses shared Upstash Redis when
-// configured so multi-instance deployments share the same counters (falls
-// back to in-process memory otherwise — see that module's docstring).
+// Operational note: this API is process-local and best-effort. Multi-replica
+// deployments should front it with an edge/shared rate limiter.
+const rateLimit: Record<string, { count: number; windowStart: number }> = {};
+const phoneAttempts: Record<string, { count: number; windowStart: number }> = {};
 const RATE_WINDOW_MS = 15 * 60 * 1000;
 const RATE_MAX = 10;
+
+function isRateLimited(key: string, bucket: Record<string, { count: number; windowStart: number }>): boolean {
+  const now = Date.now();
+  const entry = bucket[key];
+  if (!entry || now - entry.windowStart > RATE_WINDOW_MS) {
+    bucket[key] = { count: 1, windowStart: now };
+    return false;
+  }
+  entry.count++;
+  return entry.count > RATE_MAX;
+}
 
 function phoneDigits(p: string | undefined | null): string {
   return (p || '').replace(/\D/g, '');
@@ -37,9 +49,7 @@ async function ensureIndex(db: any, fields: string[], key: keyof typeof indexSta
  */
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
-  const ipRateKey = `patient-login:ip:${ip}`;
-  const ipVerdict = await sharedRateLimit({ key: ipRateKey, limit: RATE_MAX, windowMs: RATE_WINDOW_MS });
-  if (!ipVerdict.allowed) {
+  if (isRateLimited(ip, rateLimit)) {
     return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
   }
 
@@ -60,14 +70,10 @@ export async function POST(req: NextRequest) {
   // Normalize to digits only so "+211-912-345-678", "+211 912 345 678",
   // and "211912345678" all compare equal.
   const phone = phoneDigits(body.phone);
-  const phoneRateKey = phone ? `patient-login:phone:${phone}` : null;
 
-  // Per-phone backoff using the same shared bucket described above.
-  if (phoneRateKey) {
-    const phoneVerdict = await sharedRateLimit({ key: phoneRateKey, limit: RATE_MAX, windowMs: RATE_WINDOW_MS });
-    if (!phoneVerdict.allowed) {
-      return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
-    }
+  // Per-phone backoff using the same process-local bucket described above.
+  if (phone && isRateLimited(phone, phoneAttempts)) {
+    return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
   }
 
   try {
@@ -165,10 +171,6 @@ export async function POST(req: NextRequest) {
     if (!found) {
       return NextResponse.json({ error: 'No matching patient found. Check your details.' }, { status: 401 });
     }
-
-    // Clear both counters on success so a patient who mistyped a few times
-    // isn't left one attempt from a lockout.
-    await Promise.all([resetRateLimit(ipRateKey), ...(phoneRateKey ? [resetRateLimit(phoneRateKey)] : [])]);
 
     // Issue a patient-scoped JWT (8 hour expiry)
     const token = await createPatientToken({

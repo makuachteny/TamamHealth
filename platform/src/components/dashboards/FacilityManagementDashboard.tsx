@@ -303,8 +303,8 @@ export default function FacilityManagementDashboard() {
                   {upcoming.map((a, i) => (
                     <tr key={a._id} role="button" tabIndex={0}
                       className="cursor-pointer hover:bg-[var(--table-row-hover)]"
-                      onClick={() => router.push(`/appointments?appointment=${a._id}`)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/appointments?appointment=${a._id}`); } }}
+                      onClick={() => router.push(`/patients/${a.patientId}`)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/patients/${a.patientId}`); } }}
                       style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td className="px-5 py-2.5 text-[12px] font-mono tabular-nums" style={{ color: 'var(--text-secondary)' }}>APT{String(i + 1).padStart(3, '0')}</td>
                       <td className="px-5 py-2.5 text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{a.patientName}</td>
@@ -316,7 +316,7 @@ export default function FacilityManagementDashboard() {
                       <td className="px-5 py-2.5">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={(e) => { e.stopPropagation(); router.push(`/appointments?appointment=${a._id}`); }}
+                            onClick={(e) => { e.stopPropagation(); router.push('/appointments'); }}
                             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--overlay-medium)]"
                             title="Edit appointment" aria-label="Edit appointment"
                           >

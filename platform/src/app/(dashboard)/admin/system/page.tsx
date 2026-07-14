@@ -112,7 +112,7 @@ export default function AdminSystemPage() {
       }
     };
     loadStats();
-  }, [t]);
+  }, []);
 
   if (!currentUser || currentUser.role !== 'super_admin') return null;
 

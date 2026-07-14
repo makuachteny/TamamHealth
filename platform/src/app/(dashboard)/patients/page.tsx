@@ -15,7 +15,7 @@ import dynamic from 'next/dynamic';
 const QRScanner = dynamic(() => import('@/components/QRScanner'), { ssr: false });
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
 import RowActionsMenu from '@/components/RowActionsMenu';
-import { formatCompactDateTime, formatMoney } from '@/lib/format-utils';
+import { formatMoney } from '@/lib/format-utils';
 import FingerprintIdentifyModal from '@/components/FingerprintIdentifyModal';
 import { isFingerprintEnabled } from '@/lib/services/fingerprint-service';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -27,13 +27,6 @@ import PageInstructionCard from '@/components/PageInstructionCard';
 // At 10k+ patients we render in pages instead of dumping the whole list.
 const PAGE_SIZE = 100;
 
-function formatRegistryDate(iso?: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
 export default function PatientsPage() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -42,7 +35,6 @@ export default function PatientsPage() {
   const { canRegisterPatients, isMedicalBiller, isCashier } = usePermissions();
   // Billing-desk roles see money (outstanding balance) instead of clinical detail.
   const isBilling = isMedicalBiller || isCashier;
-  const hideRegistryToolbar = false;
   // Structured filters — a single "Filters" dropdown panel (replaces the old
   // per-column funnels). Text search lives in the platform-wide search bar; this
   // panel narrows by the registry's real dimensions.
@@ -233,7 +225,7 @@ export default function PatientsPage() {
   type PatientCol = { key: string; label: string; width: number; align?: 'right'; render: (p: typeof patients[number]) => React.ReactNode };
   const columns: PatientCol[] = [
     {
-      key: 'patient', label: t('nurse.colPatientName'), width: 18,
+      key: 'patient', label: t('nurse.colPatientName'), width: 20,
       render: (p) => (
         <div className="flex items-center gap-2 min-w-0">
           <PatientAvatar patient={p} size={30} />
@@ -242,23 +234,15 @@ export default function PatientsPage() {
       ),
     },
     {
-      key: 'gender', label: t('nurse.colGender'), width: 8,
+      key: 'gender', label: t('nurse.colGender'), width: 9,
       render: (p) => <span className="text-[12px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.gender || '—'}</span>,
     },
     {
-      key: 'age', label: t('nurse.colAge'), width: 7,
+      key: 'age', label: t('nurse.colAge'), width: 8,
       render: (p) => <span className="text-[12px] tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{patientAgeLabel(p)}</span>,
     },
-    {
-      key: 'registered', label: 'Registered', width: 12,
-      render: (p) => <span className="text-[12px] tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{formatRegistryDate(patientRegisteredAt(p))}</span>,
-    },
-    {
-      key: 'phone', label: t('patient.phone'), width: 13,
-      render: (p) => <span className="text-[12px] tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.phone ? formatPhoneDisplay(p.phone) : '—'}</span>,
-    },
-    { key: 'hospitalNo', label: t('patients.colHospitalNo'), width: 12, render: (p) => <span className="text-[12px] font-mono tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.hospitalNumber || '—'}</span> },
-    { key: 'location', label: t('patient.location'), width: 15, render: (p) => <span className="text-[12px] block truncate" style={{ color: 'var(--text-secondary)' }}>{[p.county, p.state].filter(Boolean).join(', ') || '—'}</span> },
+    { key: 'hospitalNo', label: t('patients.colHospitalNo'), width: 13, render: (p) => <span className="text-[12px] font-mono tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{p.hospitalNumber || '—'}</span> },
+    { key: 'location', label: t('patient.location'), width: 16, render: (p) => <span className="text-[12px] block truncate" style={{ color: 'var(--text-secondary)' }}>{[p.county, p.state].filter(Boolean).join(', ') || '—'}</span> },
   ];
 
   if (isBilling) {
@@ -274,8 +258,10 @@ export default function PatientsPage() {
   }
 
   columns.push({
-    key: 'lastActivity', label: 'Last Activity', width: 12,
-    render: (p) => <span className="text-[12px] tabular-nums whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{patientLastActivity(p) ? formatCompactDateTime(patientLastActivity(p)) : 'No visits'}</span>,
+    key: 'assigned', label: t('patients.colAssigned'), width: 12,
+    render: (p) => p.assignedDoctorName
+      ? <span className="text-[12px] block truncate" style={{ color: 'var(--text-secondary)' }}>{p.assignedDoctorName}</span>
+      : <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>—</span>,
   });
 
   // The whole row is clickable (navigates to the patient), so there is no bare
@@ -333,121 +319,107 @@ export default function PatientsPage() {
                   ))}
                 </div>
               </div>
-              {!hideRegistryToolbar && (
-                <div className="patients-registry-toolbar">
-                  {/* Search wrapper — flex:1 so it fills remaining space; input inside uses width:100% from global CSS */}
-                  <SearchInput
+              {/* Search + filter row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {/* Search wrapper — flex:1 so it fills remaining space; input inside uses width:100% from global CSS */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <input
+                    type="text"
                     value={localSearch}
-                    onChange={setLocalSearch}
-                    placeholder="Search by name or patient ID..."
-                    aria-label="Search patients"
-                    className="patients-registry-search"
+                    onChange={e => setLocalSearch(e.target.value)}
+                    placeholder="Search by name or patient ID…"
+                    style={{ padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
                   />
-                  {/* Filters */}
-                  <div className="relative" ref={filterRef}>
-                    <button
-                      onClick={() => setShowFilters(s => !s)}
-                      aria-label={t('patients.filtersTitle')}
-                      aria-expanded={showFilters}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 14px',
-                        borderRadius: 999,
-                        border: `1px solid ${activeFilterCount ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                        background: activeFilterCount ? 'rgba(33,145,208,0.08)' : 'var(--bg-card-solid)',
-                        color: activeFilterCount ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                        fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
-                      }}
+                </div>
+                {/* Filters */}
+                <div className="relative" ref={filterRef}>
+                  <button
+                    onClick={() => setShowFilters(s => !s)}
+                    aria-expanded={showFilters}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 14px',
+                      borderRadius: 999,
+                      border: `1px solid ${activeFilterCount ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+                      background: activeFilterCount ? 'rgba(33,145,208,0.08)' : 'var(--bg-card-solid)',
+                      color: activeFilterCount ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <Filter className="w-3.5 h-3.5" />
+                    {t('patients.filtersTitle')}
+                    {activeFilterCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </button>
+                  {showFilters && (
+                    <div
+                      className="absolute left-0 mt-2 rounded-2xl overflow-hidden z-50"
+                      style={{ width: 'min(92vw, 560px)', background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg, 0 16px 48px rgba(0,0,0,0.2))' }}
                     >
-                      <Filter className="w-3.5 h-3.5" />
-                      <span className="patients-registry-action-label">{t('patients.filtersTitle')}</span>
-                      {activeFilterCount > 0 && (
-                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
-                          {activeFilterCount}
-                        </span>
-                      )}
-                    </button>
-                    {showFilters && (
-                      <div
-                        className="absolute right-0 mt-2 rounded-2xl overflow-hidden z-50"
-                        style={{ width: 'min(92vw, 560px)', background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'none' }}
-                      >
-                        <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('patients.filtersTitle')}</span>
-                          <div className="flex items-center gap-2">
-                            {activeFilterCount > 0 && (
-                              <button onClick={clearFilters} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('nurse.clearAllFilters')}</button>
-                            )}
-                            <button type="button" onClick={() => setShowFilters(false)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
-                              <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-                          <label className="flex flex-col gap-1">
-                            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterOlderThan')}</span>
-                            <div className="relative">
-                              <input type="number" min={0} max={120} value={filters.olderThan} onChange={e => setF('olderThan', e.target.value)} placeholder="—" className="w-full text-sm py-2 pl-3 pr-12" style={fieldStyle} />
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('patients.filterYears')}</span>
-                            </div>
-                          </label>
-                          <label className="flex flex-col gap-1">
-                            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('nurse.colGender')}</span>
-                            <select value={filters.gender} onChange={e => setF('gender', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
-                              <option value="">{t('patients.all')}</option>
-                              <option value="Male">{t('patient.male')}</option>
-                              <option value="Female">{t('patient.female')}</option>
-                            </select>
-                          </label>
-                          <label className="flex flex-col gap-1">
-                            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patient.location')}</span>
-                            <select value={filters.state} onChange={e => setF('state', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
-                              <option value="">{t('patients.all')}</option>
-                              {states.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                          </label>
-                          <label className="flex flex-col gap-1">
-                            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterRegisteredFrom')}</span>
-                            <input type="date" value={filters.registeredFrom} onChange={e => setF('registeredFrom', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle} />
-                          </label>
-                          <label className="flex flex-col gap-1">
-                            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterRegisteredTo')}</span>
-                            <input type="date" value={filters.registeredTo} onChange={e => setF('registeredTo', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle} />
-                          </label>
-                        </div>
-                        <div className="px-4 pb-4">
-                          <span className="text-[11px] font-semibold block mb-2" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterShowWith')}</span>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
-                            {([
-                              ['allergies', t('patients.kpiAllergiesFlagged')],
-                              ['chronic', t('patient.chronicConditions')],
-                              ['recent', t('patients.kpiVisitedLast30d')],
-                              ['assignedMe', t('patients.assignedMe')],
-                              ['unassigned', t('patients.assignedUnassigned')],
-                              ...(isBilling ? [['outstanding', t('patients.filterOutstanding')] as const] : []),
-                            ] as const).map(([key, label]) => (
-                              <label key={key} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-primary)' }}>
-                                <input type="checkbox" checked={filters[key]} onChange={e => setF(key, e.target.checked)} className="w-4 h-4 rounded" style={{ accentColor: 'var(--accent-primary)' }} />
-                                {label}
-                              </label>
-                            ))}
-                          </div>
+                      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('patients.filtersTitle')}</span>
+                        <div className="flex items-center gap-2">
+                          {activeFilterCount > 0 && (
+                            <button onClick={clearFilters} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('nurse.clearAllFilters')}</button>
+                          )}
+                          <button type="button" onClick={() => setShowFilters(false)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
+                            <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                          </button>
                         </div>
                       </div>
-                    )}
-                  </div>
-                  {canRegisterPatients && (
-                    <button
-                      onClick={() => router.push('/patients/new')}
-                      aria-label={t('frontDesk.registerNewPatient')}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px',
-                        borderRadius: 999, background: '#2191D0', color: '#fff', border: 'none',
-                        fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                      }}
-                    >
-                      <UserPlus className="w-4 h-4" />
-                      <span className="patients-registry-action-label">{t('frontDesk.registerNewPatient')}</span>
-                    </button>
+                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterOlderThan')}</span>
+                          <div className="relative">
+                            <input type="number" min={0} max={120} value={filters.olderThan} onChange={e => setF('olderThan', e.target.value)} placeholder="—" className="w-full text-sm py-2 pl-3 pr-12" style={fieldStyle} />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('patients.filterYears')}</span>
+                          </div>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('nurse.colGender')}</span>
+                          <select value={filters.gender} onChange={e => setF('gender', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
+                            <option value="">{t('patients.all')}</option>
+                            <option value="Male">{t('patient.male')}</option>
+                            <option value="Female">{t('patient.female')}</option>
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patient.location')}</span>
+                          <select value={filters.state} onChange={e => setF('state', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle}>
+                            <option value="">{t('patients.all')}</option>
+                            {states.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterRegisteredFrom')}</span>
+                          <input type="date" value={filters.registeredFrom} onChange={e => setF('registeredFrom', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle} />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterRegisteredTo')}</span>
+                          <input type="date" value={filters.registeredTo} onChange={e => setF('registeredTo', e.target.value)} className="w-full text-sm py-2 px-3" style={fieldStyle} />
+                        </label>
+                      </div>
+                      <div className="px-4 pb-4">
+                        <span className="text-[11px] font-semibold block mb-2" style={{ color: 'var(--text-secondary)' }}>{t('patients.filterShowWith')}</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
+                          {([
+                            ['allergies', t('patients.kpiAllergiesFlagged')],
+                            ['chronic', t('patient.chronicConditions')],
+                            ['recent', t('patients.kpiVisitedLast30d')],
+                            ['assignedMe', t('patients.assignedMe')],
+                            ['unassigned', t('patients.assignedUnassigned')],
+                            ...(isBilling ? [['outstanding', t('patients.filterOutstanding')] as const] : []),
+                          ] as const).map(([key, label]) => (
+                            <label key={key} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-primary)' }}>
+                              <input type="checkbox" checked={filters[key]} onChange={e => setF(key, e.target.checked)} className="w-4 h-4 rounded" style={{ accentColor: 'var(--accent-primary)' }} />
+                              {label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
                 <button
@@ -469,7 +441,7 @@ export default function PatientsPage() {
               <table className="w-full" style={{ tableLayout: 'fixed', minWidth: 880 }}>
                 <colgroup>
                   {columns.map(c => (
-                    <col key={c.key} className={`patients-registry-col patients-registry-col-${c.key}`} style={{ width: `${(c.width / totalColWidth * 100).toFixed(2)}%` }} />
+                    <col key={c.key} style={{ width: `${(c.width / totalColWidth * 100).toFixed(2)}%` }} />
                   ))}
                 </colgroup>
                 <thead>

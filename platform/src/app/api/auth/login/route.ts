@@ -2,16 +2,40 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createToken } from '@/lib/auth-token';
 import { CSRF_COOKIE_NAME, mintCsrfToken } from '@/lib/csrf';
 import { getClientIp } from '@/lib/request-utils';
-import { rateLimit, resetRateLimit } from '@/lib/rate-limit';
 
-// Rate limiting: per-user lock stops single-account brute-force; per-IP lock
-// stops password spraying across many usernames from one host. Backed by
-// lib/rate-limit.ts, which uses shared Upstash Redis when configured (falls
-// back to in-process memory otherwise — see that module's docstring).
-const USER_LOCK_THRESHOLD = 5;       // tries before user lock
+// Rate limiting: track failed attempts in memory, keyed separately by
+// username AND by source IP. Per-user lock stops single-account brute-force;
+// per-IP lock stops password spraying across many usernames from one host.
+//
+// NOTE: This is process-local state. For horizontally scaled deploys, move
+// this into Redis so multiple Next.js instances share the same counters.
+const failedAttempts: Record<string, { count: number; lockedUntil: number }> = {};
+const ipAttempts: Record<string, { count: number; lockedUntil: number }> = {};
+
+const USER_LOCK_THRESHOLD = 5;       // failed tries before user lock
 const USER_LOCK_MS = 15 * 60 * 1000; // 15 minutes
-const IP_LOCK_THRESHOLD = 20;        // tries from one IP before IP lock
+const IP_LOCK_THRESHOLD = 20;        // failed tries from one IP before IP lock
 const IP_LOCK_MS = 15 * 60 * 1000;   // 15 minutes
+
+// Periodic cleanup of expired rate-limit entries to prevent memory leaks
+const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+let lastCleanup = Date.now();
+function cleanupExpiredEntries() {
+  const now = Date.now();
+  if (now - lastCleanup < CLEANUP_INTERVAL) return;
+  lastCleanup = now;
+  for (const key of Object.keys(failedAttempts)) {
+    if (failedAttempts[key].lockedUntil > 0 && failedAttempts[key].lockedUntil < now) {
+      delete failedAttempts[key];
+    }
+  }
+  for (const key of Object.keys(ipAttempts)) {
+    if (ipAttempts[key].lockedUntil > 0 && ipAttempts[key].lockedUntil < now) {
+      delete ipAttempts[key];
+    }
+  }
+}
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,25 +59,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
     const sanitizedUsername = trimmedUsername;
+
+    // Periodic cleanup of expired entries
+    cleanupExpiredEntries();
+
     const clientIp = getClientIp(request);
-    const userRateKey = `login:user:${sanitizedUsername}`;
-    const ipRateKey = `login:ip:${clientIp}`;
 
     // Rate limiting check — reject both individual-account lockouts and
-    // source-IP lockouts before we touch the password verifier. Counting every
-    // attempt (not just failures) keeps this a single round-trip per key; a
-    // successful login resets both counters below so a legitimate user who
-    // mistyped their password a few times isn't left one guess from a lockout.
-    const userVerdict = await rateLimit({ key: userRateKey, limit: USER_LOCK_THRESHOLD, windowMs: USER_LOCK_MS });
-    if (!userVerdict.allowed) {
-      const remainingMinutes = Math.ceil((userVerdict.resetAt - Date.now()) / 60000);
+    // source-IP lockouts before we touch the password verifier.
+    const userLock = failedAttempts[sanitizedUsername];
+    if (userLock && userLock.lockedUntil > Date.now()) {
+      const remainingMinutes = Math.ceil((userLock.lockedUntil - Date.now()) / 60000);
       return NextResponse.json(
         { error: `Account temporarily locked. Try again in ${remainingMinutes} minutes.` },
         { status: 429 }
       );
     }
-    const ipVerdict = await rateLimit({ key: ipRateKey, limit: IP_LOCK_THRESHOLD, windowMs: IP_LOCK_MS });
-    if (!ipVerdict.allowed) {
+    const ipLock = ipAttempts[clientIp];
+    if (ipLock && ipLock.lockedUntil > Date.now()) {
       return NextResponse.json(
         { error: 'Too many failed attempts from this network. Try again later.' },
         { status: 429 }
@@ -66,6 +89,22 @@ export async function POST(request: NextRequest) {
     const user = await authenticateUser(sanitizedUsername, password);
 
     if (!user) {
+      // Track failed attempt by username
+      if (!failedAttempts[sanitizedUsername]) {
+        failedAttempts[sanitizedUsername] = { count: 0, lockedUntil: 0 };
+      }
+      failedAttempts[sanitizedUsername].count++;
+      if (failedAttempts[sanitizedUsername].count >= USER_LOCK_THRESHOLD) {
+        failedAttempts[sanitizedUsername].lockedUntil = Date.now() + USER_LOCK_MS;
+      }
+      // Track failed attempt by IP (separate counter — password-spray defence)
+      if (!ipAttempts[clientIp]) {
+        ipAttempts[clientIp] = { count: 0, lockedUntil: 0 };
+      }
+      ipAttempts[clientIp].count++;
+      if (ipAttempts[clientIp].count >= IP_LOCK_THRESHOLD) {
+        ipAttempts[clientIp].lockedUntil = Date.now() + IP_LOCK_MS;
+      }
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
@@ -76,7 +115,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Clear failed attempts on successful login (both counters)
-    await Promise.all([resetRateLimit(userRateKey), resetRateLimit(ipRateKey)]);
+    delete failedAttempts[sanitizedUsername];
+    delete ipAttempts[clientIp];
 
     // Provision (or refresh) the matching CouchDB user. Runs with admin
     // credentials server-side so the browser never sees them. The browser

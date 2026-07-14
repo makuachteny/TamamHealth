@@ -8,7 +8,7 @@ import { useHospitals } from '@/lib/hooks/useHospitals';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { SUPPORTED_LOCALES } from '@/lib/i18n';
-import { SCREEN_LOCK_ENABLED, hasLockPin, setLockPin, clearLockPin } from '@/lib/hooks/useAutoLock';
+import { hasLockPin, setLockPin, clearLockPin } from '@/lib/hooks/useAutoLock';
 import { getUserPrefs, setUserPrefs, DEFAULT_USER_PREFS, type UserPrefs } from '@/lib/user-prefs';
 import { useToast } from '@/components/Toast';
 import { statesAndCounties } from '@/data/mock';
@@ -30,7 +30,7 @@ import type { DHIS2ExportScope } from '@/lib/services/dhis2-export-service';
 
 const ROLES: { value: UserRole; label: string }[] = [
   { value: 'doctor', label: 'Doctor' },
-  { value: 'clinical_officer', label: 'Doctor' },
+  { value: 'clinical_officer', label: 'Clinical Officer' },
   { value: 'nurse', label: 'Nurse' },
   { value: 'lab_tech', label: 'Lab Technician' },
   { value: 'pharmacist', label: 'Pharmacist' },
@@ -133,13 +133,6 @@ export default function SettingsPage() {
   useEffect(() => { setPinIsSet(hasLockPin()); }, []);
 
   const handleSetPin = async () => {
-    if (!SCREEN_LOCK_ENABLED) {
-      clearLockPin();
-      setPinIsSet(false);
-      setPinForm({ next: '', confirm: '' });
-      showToast('Screen lock is disabled during development', 'success');
-      return;
-    }
     if (!/^\d{4,6}$/.test(pinForm.next)) { showToast('PIN must be 4–6 digits', 'error'); return; }
     if (pinForm.next !== pinForm.confirm) { showToast('PINs do not match', 'error'); return; }
     setPinSaving(true);
@@ -583,28 +576,24 @@ export default function SettingsPage() {
               </div>
               <div className="p-5 space-y-3">
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {SCREEN_LOCK_ENABLED
-                    ? 'The screen locks automatically when idle. Set a PIN so it can\u2019t be unlocked without it — recommended on shared front-desk devices.'
-                    : 'Screen lock is disabled during development. The app will not auto-lock or ask for a PIN.'}
+                  The screen locks automatically when idle. Set a PIN so it can&apos;t be unlocked without it — recommended on shared front-desk devices.
                   {pinIsSet && <span className="ml-1 font-semibold" style={{ color: 'var(--color-success)' }}>PIN is active.</span>}
                 </p>
                 <div>
                   <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>{pinIsSet ? 'New PIN' : 'PIN'} (4–6 digits)</label>
                   <input inputMode="numeric" maxLength={6} type="password" value={pinForm.next}
                     onChange={e => setPinForm(p => ({ ...p, next: e.target.value.replace(/\D/g, '') }))}
-                    disabled={!SCREEN_LOCK_ENABLED}
                     className="w-full" style={{ background: 'var(--overlay-subtle)' }} autoComplete="off" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Confirm PIN</label>
                   <input inputMode="numeric" maxLength={6} type="password" value={pinForm.confirm}
                     onChange={e => setPinForm(p => ({ ...p, confirm: e.target.value.replace(/\D/g, '') }))}
-                    disabled={!SCREEN_LOCK_ENABLED}
                     className="w-full" style={{ background: 'var(--overlay-subtle)' }} autoComplete="off" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={handleSetPin} disabled={!SCREEN_LOCK_ENABLED || pinSaving || !pinForm.next} className="btn btn-primary btn-sm">
-                    <Lock className="w-4 h-4" /> {SCREEN_LOCK_ENABLED ? (pinSaving ? 'Saving…' : pinIsSet ? 'Update PIN' : 'Set PIN') : 'Disabled'}
+                  <button onClick={handleSetPin} disabled={pinSaving || !pinForm.next} className="btn btn-primary btn-sm">
+                    <Lock className="w-4 h-4" /> {pinSaving ? 'Saving…' : pinIsSet ? 'Update PIN' : 'Set PIN'}
                   </button>
                   {pinIsSet && (
                     <button onClick={handleClearPin} aria-label="Remove PIN" title="Remove PIN" className="p-2 rounded-lg transition-colors hover:bg-red-50" style={{ color: 'var(--color-danger)' }}><Trash2 className="w-4 h-4" /></button>

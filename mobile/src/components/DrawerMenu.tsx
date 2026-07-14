@@ -5,7 +5,7 @@ import {
 import { Icon } from '@/components/icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
-import { colors, spacing, fontSize, radius, fontFamily } from '../lib/theme';
+import { colors, spacing, fontSize, radius } from '../lib/theme';
 
 type Props = {
   visible: boolean;
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   hnRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   hnText: {
     fontSize: 12, color: colors.textTertiary, fontWeight: '500',
-    fontFamily: fontFamily.mono,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 
   // Menu

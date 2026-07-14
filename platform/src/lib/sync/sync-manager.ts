@@ -123,7 +123,7 @@ export class SyncManager {
       // This regresses to the previous double-replication behaviour but
       // keeps the app functional. Surface a console warning so it's
       // visible during development.
-       
+      // eslint-disable-next-line no-console
       console.warn(
         '[sync] navigator.locks unavailable; multi-tab leader election disabled. ' +
         'Multiple open tabs will all replicate (more bandwidth, more conflicts).'
@@ -155,7 +155,7 @@ export class SyncManager {
       // In the page-closing case we don't care; otherwise log and surrender
       // leader state.
       if (this._started) {
-         
+        // eslint-disable-next-line no-console
         console.warn('[sync] leader-lock request failed:', err);
       }
       this._leader = false;

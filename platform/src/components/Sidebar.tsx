@@ -82,11 +82,11 @@ export default function Sidebar() {
     .filter((h): h is string => !!h && (pathname === h || !!pathname?.startsWith(h + '/')))
     .sort((a, b) => b.length - a.length)[0];
 
+  const branding = currentUser?.branding;
   // The top of the sidebar is the product brand. The org/facility identity is
   // shown exactly once in the user card below, so it must not be repeated here.
   const brandName = 'Tamam Healthcare System';
-  const brandIcon = '/assets/logos/SVG/Tamam_Style_Guide-33.svg';
-  const brandLogo = '/assets/tamamhealth-logo-full.svg';
+  const brandLogo = branding?.logoUrl;
 
   const handleNavClick = () => {
     setSidebarOpen(false);
@@ -227,7 +227,7 @@ export default function Sidebar() {
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={brandIcon}
+                src={brandLogo || '/assets/tamam-icon.svg'}
                 alt={brandName}
                 className="flex-shrink-0 object-contain"
                 style={{ width: 32, height: 32 }}
@@ -237,7 +237,7 @@ export default function Sidebar() {
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={brandLogo}
+                src={brandLogo || '/assets/tamamhealth-logo-full.svg'}
                 alt={brandName}
                 className="flex-1 min-w-0 object-contain object-left"
                 style={{ height: 28, width: 'auto', maxWidth: 180 }}
@@ -398,13 +398,14 @@ export default function Sidebar() {
         className="hidden lg:flex fixed left-0 top-0 bottom-0 flex-col z-40 transition-all duration-300 ease-in-out"
         style={{
           width: collapsed ? '80px' : '220px',
-          top: 'calc(var(--ehr-top-rail-height) + 8px)',
-          margin: '0 0 10px 10px',
-          height: 'calc(100vh - var(--ehr-top-rail-height) - 18px)',
+          margin: '10px 0 10px 10px',
+          height: 'calc(100vh - 20px)',
           background: 'var(--glass-bg-strong)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
           border: '1px solid var(--glass-border)',
           borderRadius: 18,
-          boxShadow: 'none',
+          boxShadow: 'var(--panel-shadow), var(--glass-highlight)',
         }}
       >
         {sidebarBody(collapsed)}
@@ -439,13 +440,12 @@ export default function Sidebar() {
         }`}
         style={{
           width: '280px',
-          top: 'calc(var(--ehr-top-rail-height) + 8px)',
-          margin: '0 0 10px 10px',
-          height: 'calc(100vh - var(--ehr-top-rail-height) - 18px)',
+          margin: '10px 0 10px 10px',
+          height: 'calc(100vh - 20px)',
           background: 'var(--sidebar-bg)',
           borderRadius: 18,
           borderRight: 'none',
-          boxShadow: 'none',
+          boxShadow: sidebarOpen ? '0 4px 32px rgba(1, 86, 151, 0.24)' : 'none',
         }}
       >
         {sidebarBody(false)}

@@ -261,10 +261,10 @@ export default function PaymentPanel({
     return (
       <Modal onClose={() => onSuccess(paymentDoc._id)} width={420} disableBackdropClose>
         <div className="modal-content" style={{ width: '100%' }}>
-          {/* Success header */}
+          {/* Success header with green gradient */}
           <div style={{
             padding: '28px 20px', textAlign: 'center',
-            background: 'var(--accent-light)',
+            background: 'linear-gradient(135deg, rgba(33, 145, 208, 0.12), rgba(59, 130, 246,0.04))',
             borderBottom: '1px solid var(--border-medium)',
           }}>
             <div style={{
@@ -375,7 +375,7 @@ export default function PaymentPanel({
           .pp-pay select { -webkit-appearance:none; appearance:none; background-image:none; }
           .pp-pay input:focus, .pp-pay select:focus, .pp-pay textarea:focus {
             outline:none !important; border-color:var(--accent-primary) !important;
-            box-shadow: none;
+            box-shadow:0 0 0 3px var(--accent-light) !important;
           }
           .pp-pay label { font-size:11px !important; font-weight:700 !important; letter-spacing:.03em; text-transform:uppercase; color:var(--text-muted) !important; }
           .pp-pay .pp-field-label { font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; display:block; }
@@ -393,7 +393,7 @@ export default function PaymentPanel({
         </div>
 
         {/* Amount hero */}
-        <div style={{ padding: '18px 22px', background: 'var(--accent-light)', borderBottom: '1px solid var(--border-light)' }}>
+        <div style={{ padding: '18px 22px', background: 'linear-gradient(135deg, var(--accent-light), transparent 80%)', borderBottom: '1px solid var(--border-light)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-text)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('payments.amountDueLabel')}</div>
           <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--accent-text)', letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{formatMoney(amountDue, { currency })}</div>
         </div>
@@ -644,7 +644,7 @@ export default function PaymentPanel({
             background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover, #015697))',
             color: '#fff', fontSize: 14, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer',
             opacity: processing ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-            boxShadow: 'none',
+            boxShadow: '0 4px 14px var(--accent-glow, rgba(33,145,208,0.3))',
           }}>
             {processing ? <><Loader2 size={14} className="animate-spin" /> {t('payments.processing')}</> : t('payments.recordAmount', { amount: parseFloat(amount).toLocaleString(), currency })}
           </button>

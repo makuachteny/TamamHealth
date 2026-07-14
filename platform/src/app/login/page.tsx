@@ -5,32 +5,57 @@ import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, ChevronRight, X } from '@/components/icons/lucide';
 import { Icon } from '@/components/icons';
 import { useApp } from '@/lib/context';
-import { DEMO_ACCOUNT_NAMES, DEMO_LOGIN_ACCOUNTS, type DemoLoginAccount } from '@/lib/demo-users';
-import { getDemoPasswordMap } from '@/lib/demo-passwords';
 import { resolveLandingPage } from '@/lib/user-prefs';
+import type { UserRole } from '@/lib/db-types';
 
 // Tamam brand accent — sourced from the shared theme tokens.
 const ACCENT = 'var(--accent-primary)';
 const ACCENT_DEEP = 'var(--accent-hover)';
 
-const ACCOUNT_NAME = DEMO_ACCOUNT_NAMES;
+// Real display names for each demo account (from the seed roster).
+const ACCOUNT_NAME: Record<string, string> = {
+  'chv.ajak': 'Ajak Deng Mawien',
+  'bhw.akol': 'Akol Deng Mading',
+  'reg.clerk': 'Grace Poni Lukudu',
+  'clinic.clerk': 'Joseph Taban Lado',
+  'cashier.deng': 'Deng Akec Ring',
+  'biller.nyandeng': 'Nyandeng Chol Atem',
+  'triage.mary': 'Mary Nyaruai Gai',
+  'rooming.sara': 'Sara Aluel Bol',
+  'nurse.stella': 'Stella Keji Lemi',
+  'midwife.nyakong': 'Nyakong Gatkuoth',
+  'co.deng': 'Deng Mabior Kuol',
+  'clinician.peter': 'Dr. Peter Garang Deng',
+  'lab.gatluak': 'Gatluak Puok',
+  'rad.tamamhealth': 'Ladu Soro',
+  'pharma.rose': 'Rose Gbudue',
+  'nutr.nyabol': 'Nyabol Koang Jal',
+  'data.ayen': 'Ayen Dut Malual',
+  'hmis.john': 'John Majok Chol',
+  'facadmin.rita': 'Rita Akello Ojok',
+  'org.admin': 'Mercy Org Administrator',
+  'sup.mary': 'Mary Lado Kenyi',
+  'county.lopez': 'Dr. Lopez Lokai Modi',
+  'admin': 'Ministry of Health',
+  'superadmin': 'TamamHealth Platform Admin',
+};
 
 // Hero-image pool — every user's sign-in screen gets a distinct photo. With more
 // accounts than photos a few repeat, but never adjacent within a group.
 const IMAGE_POOL = [
   '/assets/patients/community-health-worker.jpg',
-  '/assets/patients/community-health-worker.jpg',
+  '/assets/community-health-worker.jpg',
   '/assets/patients/portrait-man-camera.jpg',
   '/assets/patients/portrait-man-beanie.jpg',
   '/assets/health-data.jpg',
   '/assets/patients/doctor-writing-notes.jpg',
   '/assets/patients/african-nurse.jpg',
-  '/assets/patients/african-nurse.jpg',
+  '/assets/african-nurse.jpg',
   '/assets/patients/doctor-nurse-consultation.jpg',
-  '/assets/patients/doctor-nurse-consultation.jpg',
+  '/assets/doctor-nurse-consultation.jpg',
   '/assets/patients/doctor-prescription.jpg',
   '/assets/patients/doctor-tablet-review.jpg',
-  '/assets/patients/doctor-tablet-smiling.jpg',
+  '/assets/doctor-tablet-smiling.jpg',
   '/assets/patients/doctor-tablet-smiling.jpg',
   '/assets/patients/founder-teny.jpg',
   '/assets/patients/founder-ekow.jpg',
@@ -105,12 +130,30 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const demoCreds = getDemoPasswordMap();
+  const [demoCreds, setDemoCreds] = useState<Record<string, string>>({});
   // The user the visitor tapped. `null` = show the account list. The string
   // 'manual' = blank, fully-editable form for non-demo / production sign-in.
   const [selected, setSelected] = useState<Account | 'manual' | null>(null);
   const [hospitalId, setHospitalId] = useState('');
   const demoEnabled = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
+
+  // Pull freshly-generated demo passwords from the server (one-time per load).
+  useEffect(() => {
+    if (!demoEnabled) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/demo-credentials', { cache: 'no-store' });
+        if (!res.ok) return;
+        const body = await res.json() as { profiles: { username: string; password: string | null }[] };
+        if (cancelled) return;
+        const map: Record<string, string> = {};
+        for (const p of body.profiles) if (p.password) map[p.username] = p.password;
+        setDemoCreds(map);
+      } catch { /* demo creds are a convenience; fail silently */ }
+    })();
+    return () => { cancelled = true; };
+  }, [demoEnabled]);
 
   useEffect(() => {
     if (isAuthenticated && currentUser) router.push(resolveLandingPage(currentUser.role));
@@ -153,7 +196,7 @@ export default function LoginPage() {
       <div className="tl-loading">
         <div className="tl-loading-mark">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="" aria-hidden width={40} height={40} />
+          <img src="/assets/tamam-icon.svg" alt="" aria-hidden width={40} height={40} />
         </div>
         <p>Redirecting to your dashboard…</p>
         <style jsx>{`
@@ -434,11 +477,11 @@ const sharedStyles = (
     .tl-hero::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--accent-hover) 18%, transparent); }
     .tl-hero-close { position: absolute; top: 18px; right: 18px; z-index: 3; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: none; background: var(--bg-card-solid); color: var(--text-primary); cursor: pointer; box-shadow: none; }
     .tl-hero-close:hover { background: var(--bg-card-solid); }
-    .tl-chip { position: absolute; z-index: 2; backdrop-filter: none; }
+    .tl-chip { position: absolute; z-index: 2; backdrop-filter: blur(6px); }
     .tl-chip-task { top: 64px; left: 34px; background: ${ACCENT}; color: var(--color-white); border-radius: 14px; padding: 11px 15px; box-shadow: none; }
     .tl-chip-title { font-size: 13px; font-weight: 700; }
     .tl-chip-time { font-size: 11.5px; opacity: 0.9; margin-top: 2px; }
-    .tl-week { position: absolute; z-index: 2; right: 30px; bottom: 150px; display: flex; gap: 4px; padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--color-white) 22%, transparent); border: 1px solid color-mix(in srgb, var(--color-white) 45%, transparent); backdrop-filter: none; }
+    .tl-week { position: absolute; z-index: 2; right: 30px; bottom: 150px; display: flex; gap: 4px; padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--color-white) 22%, transparent); border: 1px solid color-mix(in srgb, var(--color-white) 45%, transparent); backdrop-filter: blur(10px); }
     .tl-week-day { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 34px; padding: 4px 0; border-radius: 10px; color: var(--color-white); }
     .tl-week-day.is-on { background: ${ACCENT}; }
     .tl-week-dow { font-size: 10px; font-weight: 600; opacity: 0.85; }

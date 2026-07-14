@@ -99,15 +99,12 @@ export default function FingerprintCapture({ value, onChange }: FingerprintCaptu
   };
 
   return (
-    <div className="registration-inline-panel fingerprint-capture-panel">
-      <div className="registration-panel-heading">
-        <h4 className="flex items-center gap-1.5">
-          <ScanLine className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
-          {t('fingerprint.sectionTitle')}
-        </h4>
-        <span>{ready ? 'Ready' : 'Unavailable'}</span>
-      </div>
-      <p className="fingerprint-capture-description">
+    <div className="border-t pt-4" style={{ borderColor: 'var(--border-light)' }}>
+      <h4 className="text-sm font-medium mb-1 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+        <ScanLine className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
+        {t('fingerprint.sectionTitle')}
+      </h4>
+      <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>
         {t('fingerprint.sectionDesc')}
       </p>
 

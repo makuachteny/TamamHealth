@@ -64,7 +64,7 @@ export default function FilterTabs({
             style={{
               background: isActive ? accent : 'transparent',
               color: isActive ? '#FFFFFF' : 'var(--text-muted)',
-              boxShadow: 'none',
+              boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.14)' : 'none',
             }}
           >
             {Icon ? <Icon size={size === 'sm' ? 12 : 14} /> : null}

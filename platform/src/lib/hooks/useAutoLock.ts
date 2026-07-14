@@ -51,16 +51,11 @@ async function hashPin(pin: string): Promise<string> {
 
 /** Whether a screen-lock PIN is currently set on this device. */
 export function hasLockPin(): boolean {
-  return SCREEN_LOCK_ENABLED && typeof window !== 'undefined' && !!localStorage.getItem(PIN_HASH_KEY);
+  return typeof window !== 'undefined' && !!localStorage.getItem(PIN_HASH_KEY);
 }
 
 /** Set (or replace) the screen-lock PIN for this device. */
 export async function setLockPin(pin: string): Promise<void> {
-  if (!SCREEN_LOCK_ENABLED) {
-    localStorage.removeItem(PIN_HASH_KEY);
-    if (typeof window !== 'undefined') window.dispatchEvent(new Event(PIN_CHANGED_EVENT));
-    return;
-  }
   localStorage.setItem(PIN_HASH_KEY, await hashPin(pin));
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(PIN_CHANGED_EVENT));
 }
@@ -143,7 +138,6 @@ export function useAutoLock(isAuthenticated: boolean, orgLockTimeoutMinutes?: nu
 
   /** Verify a PIN against the stored hash. Returns true if valid. */
   const verifyPin = useCallback(async (pin: string): Promise<boolean> => {
-    if (!SCREEN_LOCK_ENABLED) return true;
     const storedHash = localStorage.getItem(PIN_HASH_KEY);
     if (!storedHash) return true; // No PIN set = accept any input
     const inputHash = await hashPin(pin);
@@ -152,11 +146,6 @@ export function useAutoLock(isAuthenticated: boolean, orgLockTimeoutMinutes?: nu
 
   /** Set (or update) the user's PIN */
   const setPin = useCallback(async (pin: string) => {
-    if (!SCREEN_LOCK_ENABLED) {
-      localStorage.removeItem(PIN_HASH_KEY);
-      setHasPin(false);
-      return;
-    }
     const hashed = await hashPin(pin);
     localStorage.setItem(PIN_HASH_KEY, hashed);
     setHasPin(true);
@@ -170,7 +159,6 @@ export function useAutoLock(isAuthenticated: boolean, orgLockTimeoutMinutes?: nu
 
   /** Update the inactivity timeout (in ms) */
   const setTimeoutMs = useCallback((ms: number) => {
-    if (!SCREEN_LOCK_ENABLED) return;
     localStorage.setItem(LOCK_TIMEOUT_KEY, String(ms));
     resetTimer();
   }, [resetTimer]);
@@ -179,7 +167,6 @@ export function useAutoLock(isAuthenticated: boolean, orgLockTimeoutMinutes?: nu
   useEffect(() => {
     if (!isAuthenticated || AUTO_LOCK_DISABLED) {
       setIsLocked(false);
-      if (timerRef.current) clearTimeout(timerRef.current);
       return;
     }
 

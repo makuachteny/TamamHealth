@@ -75,7 +75,7 @@ export default function GetStartedCard() {
         <div className="mb-6 flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/logos/SVG/Tamam_Style_Guide-33.svg" alt="" className="h-10 w-10" />
+            <img src="/assets/tamamhealth-logo.svg" alt="" className="h-10 w-10" />
             <div>
               <h1
                 className="text-xl font-bold"

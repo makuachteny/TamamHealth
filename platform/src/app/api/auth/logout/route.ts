@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CSRF_COOKIE_NAME } from '@/lib/csrf';
 import { revokeToken } from '@/lib/token-blacklist';
-import { IDLE_ACTIVITY_COOKIE_NAME } from '@/lib/session-idle';
 
 export async function POST(request: NextRequest) {
   // Extract token from cookie and add to the persisted revocation list. Every
@@ -27,14 +26,6 @@ export async function POST(request: NextRequest) {
   // pair it with a future session of the same user.
   response.cookies.set(CSRF_COOKIE_NAME, '', {
     httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 0,
-    path: '/',
-  });
-
-  response.cookies.set(IDLE_ACTIVITY_COOKIE_NAME, '', {
-    httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     maxAge: 0,

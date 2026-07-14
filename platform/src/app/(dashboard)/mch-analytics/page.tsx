@@ -150,7 +150,7 @@ export default function MCHAnalyticsPage() {
                     <div className="relative h-4 rounded-full" style={{ background: 'var(--overlay-light)' }}>
                       <div className="h-full rounded-full transition-all" style={{
                         width: `${Math.min(100, item.rate)}%`,
-                        background: `var(--accent-primary)`,
+                        background: `linear-gradient(90deg, ${item.color}, ${item.color}80)`,
                       }} />
                       <div className="absolute top-0 bottom-0 w-0.5" style={{
                         left: `${item.target}%`,
@@ -290,7 +290,7 @@ export default function MCHAnalyticsPage() {
                         <div className="h-2 rounded-full mb-2" style={{ background: 'var(--overlay-light)' }}>
                           <div className="h-full rounded-full" style={{
                             width: `${gap.coverageRate}%`,
-                            background: `var(--accent-primary)`,
+                            background: `linear-gradient(90deg, ${color}80, ${color})`,
                           }} />
                         </div>
                         <div className="flex justify-between text-[9px]">
@@ -357,7 +357,7 @@ export default function MCHAnalyticsPage() {
                         <div className="w-full rounded-t-xl transition-all" style={{
                           height: `${barHeight}%`,
                           minHeight: '8px',
-                          background: `var(--accent-primary)`,
+                          background: `linear-gradient(180deg, ${item.color}, ${item.color}40)`,
                         }} />
                       </div>
                       <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.label}</p>

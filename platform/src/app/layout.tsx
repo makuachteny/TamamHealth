@@ -20,20 +20,6 @@ import { ToastProvider } from "@/components/Toast";
 import TextareaAutoResize from "@/components/TextareaAutoResize";
 import BootIntegrityGuard from "@/components/BootIntegrityGuard";
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-dm-sans",
-  display: "swap",
-});
-
-const jetBrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-jetbrains-mono",
-  display: "swap",
-});
-
 export const metadata: Metadata = {
   title: "TamamHealth — Every Patient Deserves to Be Remembered",
   description: "Offline-first health records for South Sudan and Africa, built to keep patient stories connected from the bedside to the nation.",

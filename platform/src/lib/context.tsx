@@ -72,7 +72,6 @@ interface AppState {
 
 /** localStorage key for persisting the user's sync on/off preference */
 const SYNC_PREFERENCE_KEY = 'tamamhealth.sync.preference';
-const BOOT_DB_TIMEOUT_MS = 2500;
 
 function readSyncPreference(): boolean {
   if (typeof window === 'undefined') return true;
@@ -117,80 +116,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Initialize database and check session
   useEffect(() => {
     const init = async () => {
-      let seedPromise: Promise<void> | null = null;
-      // Seed database on first load (client-side only). Do not hard-block app
-      // boot on the full demo seed; in development and on large seeded
-      // datasets it can take long enough to strand the whole app behind the
-      // loading screen even though server-auth and route rendering are ready.
+      // Seed database on first load (client-side only)
+      // In production, seeding only runs if DB is empty (isSeeded check inside seedDatabase)
       try {
         const { seedDatabase } = await import('./db-seed');
-        seedPromise = seedDatabase().catch((err) => {
-          console.error('[TamamHealth] Database seed error:', err);
-        });
-        await Promise.race([
-          seedPromise,
-          new Promise<void>((resolve) => {
-            window.setTimeout(() => {
-              console.warn(`[TamamHealth] Database seed exceeded ${BOOT_DB_TIMEOUT_MS}ms; continuing app boot while seed finishes in background.`);
-              resolve();
-            }, BOOT_DB_TIMEOUT_MS);
-          }),
-        ]);
+        await seedDatabase();
       } catch (err) {
-        console.error('[TamamHealth] Database seed bootstrap error:', err);
-      }
-
-      // Check for an existing server session. The auth token is httpOnly, so
-      // the browser cannot inspect it through document.cookie; /api/auth/me is
-      // the source of truth for refreshes and direct route entry.
-      try {
-        const res = await fetch('/api/auth/me');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.user) {
-            // Load hospital data if user has a hospitalId
-            let hospital: HospitalDoc | undefined;
-            if (data.user.hospitalId) {
-              try {
-                const { getHospitalById } = await import('./services/hospital-service');
-                const h = await getHospitalById(data.user.hospitalId);
-                if (h) hospital = h;
-              } catch {
-                // OK
-              }
-            }
-
-            // Load organization data
-            let organization: OrganizationDoc | undefined;
-            if (data.user.orgId) {
-              try {
-                const { getOrganizationById } = await import('./services/organization-service');
-                const org = await getOrganizationById(data.user.orgId);
-                if (org) organization = org;
-              } catch {
-                // OK
-              }
-            }
-
-            const { getOrgBranding, brandingToCSSVars } = await import('./branding');
-            const branding = getOrgBranding(organization);
-            const vars = brandingToCSSVars(branding);
-            for (const [key, value] of Object.entries(vars)) {
-              document.documentElement.style.setProperty(key, value);
-            }
-
-            // Apply org language setting
-            if (organization?.locale) {
-              const { initLocaleFromOrg } = await import('./i18n/useTranslation');
-              initLocaleFromOrg(organization.locale);
-            }
-
-            setCurrentUser({ ...data.user, hospital, organization, branding });
-            setIsAuthenticated(true);
-          }
-        }
-      } catch {
-        // Offline - OK
+        console.error('[TamamHealth] Database seed error:', err);
       }
 
       // Check for existing session via cookie (skip API call if no cookie).
