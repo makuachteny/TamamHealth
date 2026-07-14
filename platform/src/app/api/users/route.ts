@@ -58,7 +58,6 @@ async function postHandler(request: NextRequest) {
     if (rateLimitResponse) return rateLimitResponse;
     const auth = await getAuthPayload(request);
     if (!auth) return unauthorized();
-    if (!hasRole(auth, WRITE_ROLES)) return forbidden();
     let body: Record<string, unknown>;
     try {
       body = await request.json();
@@ -69,6 +68,26 @@ async function postHandler(request: NextRequest) {
     body = sanitizePayload(body);
     const action = body.action as string;
     const { getUserById } = await import('@/lib/services/user-service');
+
+    // Self-service lane: any authenticated user may update their OWN benign
+    // profile fields (name, phone) — nothing role- or tenancy-bearing. All
+    // other mutations require an admin role below. Password changes go through
+    // /api/auth/change-password (which verifies the current password), never here.
+    if (action === 'update' && body.userId === auth.sub && !hasRole(auth, WRITE_ROLES)) {
+      const { updateUser } = await import('@/lib/services/user-service');
+      const updated = await updateUser(
+        auth.sub,
+        {
+          name: body.name as string | undefined,
+          phone: body.phone as string | undefined,
+        },
+        auth.sub,
+        auth.username
+      );
+      return NextResponse.json({ user: updated });
+    }
+
+    if (!hasRole(auth, WRITE_ROLES)) return forbidden();
     // Reset password
     if (action === 'reset_password') {
       if (!body.userId || !body.newPassword) {
@@ -137,6 +156,7 @@ async function postHandler(request: NextRequest) {
         body.userId as string,
         {
           name: body.name as string | undefined,
+          phone: body.phone as string | undefined,
           role: body.role as UserRole | undefined,
           hospitalId: body.hospitalId as string | undefined,
           hospitalName: body.hospitalName as string | undefined,

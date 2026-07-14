@@ -29,7 +29,12 @@ export function usePermissions() {
   const canManageOrg = isSuperAdmin || isOrgAdmin;
   const canViewCrossOrg = isSuperAdmin;
   const canEditBranding = isSuperAdmin || isOrgAdmin;
-  const canManageUsers = isGovernment || isSuperAdmin || isOrgAdmin || isFacilityAdmin;
+  // Must mirror WRITE_ROLES in /api/users — user accounts are provisioned
+  // through that central API (the security boundary), so showing the
+  // management UI to roles the API rejects (government, facility_administrator)
+  // only produced 403s — or worse, before centralization, stranded local-only
+  // accounts that could never log in anywhere.
+  const canManageUsers = isSuperAdmin || isOrgAdmin;
 
   // Clinical work — only clinical staff. super_admin is a SaaS platform
   // operator: it keeps clinical *read* (canViewClinical) for support/QA but

@@ -122,7 +122,7 @@ export default function SettingsPage() {
   // ── My account / preferences ──
   const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
   const [profileSaving, setProfileSaving] = useState(false);
-  const [pwForm, setPwForm] = useState({ next: '', confirm: '' });
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [pwSaving, setPwSaving] = useState(false);
   const [showSelfPw, setShowSelfPw] = useState(false);
 
@@ -203,15 +203,30 @@ export default function SettingsPage() {
 
   const handleChangeOwnPassword = async () => {
     if (!currentUser?._id) return;
+    if (!pwForm.current) { showToast('Enter your current password', 'error'); return; }
     if (pwForm.next.length < 6) { showToast('Password must be at least 6 characters', 'error'); return; }
     if (pwForm.next !== pwForm.confirm) { showToast('Passwords do not match', 'error'); return; }
     setPwSaving(true);
     try {
-      await resetPassword(currentUser._id, pwForm.next);
-      setPwForm({ next: '', confirm: '' });
+      // Self-service change goes through the auth route: it verifies the
+      // CURRENT password and clears mustChangePassword centrally. (The old
+      // resetPassword() path here was an admin-reset — it skipped verification
+      // and re-flagged the account for a forced change at next login.)
+      const { apiFetch } = await import('@/lib/api-fetch');
+      const res = await apiFetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(body.error || 'Failed to change password', 'error');
+        return;
+      }
+      setPwForm({ current: '', next: '', confirm: '' });
       showToast('Password changed', 'success');
     } catch {
-      showToast('Failed to change password', 'error');
+      showToast('Failed to change password — check your connection', 'error');
     } finally {
       setPwSaving(false);
     }
@@ -536,6 +551,17 @@ export default function SettingsPage() {
               </div>
               <div className="p-5 space-y-3">
                 <div>
+                  <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Current password</label>
+                  <input
+                    type="password"
+                    value={pwForm.current}
+                    onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))}
+                    className="w-full"
+                    style={{ background: 'var(--overlay-subtle)' }}
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div>
                   <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>New password</label>
                   <div className="relative">
                     <input
@@ -562,7 +588,7 @@ export default function SettingsPage() {
                     autoComplete="new-password"
                   />
                 </div>
-                <button onClick={handleChangeOwnPassword} disabled={pwSaving || !pwForm.next} className="btn btn-secondary btn-sm">
+                <button onClick={handleChangeOwnPassword} disabled={pwSaving || !pwForm.next || !pwForm.current} className="btn btn-secondary btn-sm">
                   <KeyRound className="w-4 h-4" /> {pwSaving ? 'Updating…' : 'Change password'}
                 </button>
               </div>

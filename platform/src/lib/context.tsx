@@ -355,7 +355,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Only if the request itself fails (offline / network error) do we fall
       // back to the PouchDB-local path so previously-logged-in users can still
       // sign in without connectivity.
-      let user: Pick<UserDoc, '_id' | 'username' | 'name' | 'role' | 'hospitalId' | 'hospitalName' | 'orgId' | 'isActive' | 'passwordHash'> | null = null;
+      let user: Pick<UserDoc, '_id' | 'username' | 'name' | 'role' | 'hospitalId' | 'hospitalName' | 'orgId' | 'isActive' | 'passwordHash' | 'mustChangePassword'> | null = null;
       let usedApi = false;
 
       try {
@@ -376,6 +376,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             orgId: body.user.orgId,
             isActive: true,
             passwordHash: '',
+            // Without copying this, the ForcePasswordChange gate never fired
+            // for online logins — admin-issued temporary passwords were
+            // silently accepted as permanent credentials.
+            mustChangePassword: body.user.mustChangePassword,
           };
           usedApi = true;
 

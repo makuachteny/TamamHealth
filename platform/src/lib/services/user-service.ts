@@ -10,6 +10,46 @@ import { ROLE_LABEL } from '../role-display';
 // can never go stale/missing in user validation again.
 const VALID_ROLES = Object.keys(ROLE_LABEL) as UserRole[];
 
+// ─── Central provisioning ───────────────────────────────────────────────────
+// User accounts are AUTH data: they must live in the central users database or
+// the new user can never log in anywhere but the creating device. The users DB
+// deliberately syncs PULL-ONLY to browsers (a device must not be able to push
+// itself a super_admin), so browser-side mutations cannot go through the local
+// PouchDB — they must go through POST /api/users, which authenticates the
+// actor, enforces role/tenant rules, and writes to CouchDB directly. The
+// server (including /api/users itself) keeps using the direct DB path below.
+//
+// Reads stay local-first on purpose: the pull replica is the offline staff
+// directory, and the live `.changes()` subscription in useUsers refreshes
+// lists as soon as an API-side write replicates back down.
+//
+// JEST_WORKER_ID guard: tests run under jsdom (window exists) but exercise the
+// DB path against mocked databases.
+const isBrowserRuntime = () => typeof window !== 'undefined' && !process.env.JEST_WORKER_ID;
+
+/** POST an action to /api/users and translate failures into readable errors. */
+async function postUsersApi(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { apiFetch } = await import('../api-fetch');
+  let res: Response;
+  try {
+    res = await apiFetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // Network failure. Do NOT fall back to a local write — a locally-created
+    // account looks successful but can never authenticate on the server or
+    // any other device, which is worse than an honest error.
+    throw new Error('User accounts are managed centrally and require a connection. Check your internet and try again.');
+  }
+  const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+  if (!res.ok) {
+    throw new Error((body.error as string) || `User request failed (${res.status})`);
+  }
+  return body;
+}
+
 export async function getAllUsers(scope?: DataScope): Promise<UserDoc[]> {
   const db = usersDB();
   const all = await findByType<UserDoc>(db, 'user');
@@ -41,6 +81,22 @@ export async function createUser(
   actorId?: string,
   actorUsername?: string
 ): Promise<UserDoc> {
+  // Browser: provision through the central API (see note at top of file).
+  // The server route authenticates the actor and re-runs this function on the
+  // Node side, where the direct DB path below writes to CouchDB.
+  if (isBrowserRuntime()) {
+    const body = await postUsersApi({
+      username: data.username,
+      password: data.password,
+      name: data.name,
+      role: data.role,
+      hospitalId: data.hospitalId,
+      hospitalName: data.hospitalName,
+      orgId: data.orgId,
+    });
+    return body.user as UserDoc;
+  }
+
   const db = usersDB();
 
   // Validate
@@ -121,6 +177,11 @@ export async function updateUser(
   actorId?: string,
   actorUsername?: string
 ): Promise<UserDoc> {
+  if (isBrowserRuntime()) {
+    const body = await postUsersApi({ action: 'update', userId: id, ...data });
+    return body.user as UserDoc;
+  }
+
   const db = usersDB();
   const existing = await db.get(id) as UserDoc;
 
@@ -149,6 +210,11 @@ export async function resetPassword(
   actorId?: string,
   actorUsername?: string
 ): Promise<void> {
+  if (isBrowserRuntime()) {
+    await postUsersApi({ action: 'reset_password', userId: id, newPassword });
+    return;
+  }
+
   const db = usersDB();
   const existing = await db.get(id) as UserDoc;
 
@@ -208,6 +274,11 @@ export async function deactivateUser(
   actorId?: string,
   actorUsername?: string
 ): Promise<void> {
+  if (isBrowserRuntime()) {
+    await postUsersApi({ action: 'deactivate', userId: id });
+    return;
+  }
+
   const db = usersDB();
   const existing = await db.get(id) as UserDoc;
 
