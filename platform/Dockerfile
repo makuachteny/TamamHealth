@@ -3,7 +3,13 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
 COPY . .
-RUN npm run build
+# `next build` collects page data for API routes whose auth helpers refuse to
+# run in production without JWT_SECRET. The real secret is injected at runtime;
+# this build-time value only satisfies the guard. Builder-stage only — never
+# reaches the runtime image. Mirrors ci.yml.
+ARG JWT_SECRET=docker-build-time-placeholder-not-used-at-runtime
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN JWT_SECRET="$JWT_SECRET" npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
