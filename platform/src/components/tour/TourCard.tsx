@@ -1,35 +1,45 @@
 'use client';
 
+import { useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, X } from '@/components/icons/lucide';
 import type { TourStep } from '@/lib/tour/types';
 
 const CARD_WIDTH = 300;
 const GAP = 14;
+const MARGIN = 12;
 
-function cardPosition(rect: DOMRect, placement: TourStep['placement']) {
+// Position the card next to its target, auto-flipping to the opposite side when
+// the preferred side would push it off-screen, and always clamping it fully
+// within the viewport using the card's measured height.
+function cardPosition(rect: DOMRect, placement: TourStep['placement'], cardH: number) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const style: React.CSSProperties = { position: 'fixed', width: CARD_WIDTH };
-  const clampX = (x: number) => Math.min(Math.max(x, 12), vw - CARD_WIDTH - 12);
+  const clampX = (x: number) => Math.min(Math.max(x, MARGIN), Math.max(MARGIN, vw - CARD_WIDTH - MARGIN));
+  const clampY = (y: number) => Math.min(Math.max(y, MARGIN), Math.max(MARGIN, vh - cardH - MARGIN));
+
+  const centerX = clampX(rect.left + rect.width / 2 - CARD_WIDTH / 2);
+  const centerY = clampY(rect.top + rect.height / 2 - cardH / 2);
+
+  const fitsBelow = rect.bottom + GAP + cardH <= vh - MARGIN;
+  const fitsAbove = rect.top - GAP - cardH >= MARGIN;
+  const fitsRight = rect.right + GAP + CARD_WIDTH <= vw - MARGIN;
+  const fitsLeft = rect.left - GAP - CARD_WIDTH >= MARGIN;
 
   switch (placement) {
     case 'top':
-      style.left = clampX(rect.left + rect.width / 2 - CARD_WIDTH / 2);
-      style.bottom = Math.max(12, vh - rect.top + GAP);
-      return { style, tail: 'bottom' as const };
+      if (fitsAbove || !fitsBelow) { style.left = centerX; style.top = rect.top - GAP - cardH; return { style, tail: 'bottom' as const }; }
+      style.left = centerX; style.top = rect.bottom + GAP; return { style, tail: 'top' as const };
     case 'left':
-      style.right = Math.max(12, vw - rect.left + GAP);
-      style.top = Math.min(Math.max(rect.top + rect.height / 2 - 40, 12), vh - 200);
-      return { style, tail: 'right' as const };
+      if (fitsLeft || !fitsRight) { style.left = rect.left - GAP - CARD_WIDTH; style.top = centerY; return { style, tail: 'right' as const }; }
+      style.left = rect.right + GAP; style.top = centerY; return { style, tail: 'left' as const };
     case 'right':
-      style.left = Math.min(rect.right + GAP, vw - CARD_WIDTH - 12);
-      style.top = Math.min(Math.max(rect.top + rect.height / 2 - 40, 12), vh - 200);
-      return { style, tail: 'left' as const };
+      if (fitsRight || !fitsLeft) { style.left = rect.right + GAP; style.top = centerY; return { style, tail: 'left' as const }; }
+      style.left = rect.left - GAP - CARD_WIDTH; style.top = centerY; return { style, tail: 'right' as const };
     case 'bottom':
     default:
-      style.left = clampX(rect.left + rect.width / 2 - CARD_WIDTH / 2);
-      style.top = Math.min(rect.bottom + GAP, vh - 220);
-      return { style, tail: 'top' as const };
+      if (fitsBelow || !fitsAbove) { style.left = centerX; style.top = rect.bottom + GAP; return { style, tail: 'top' as const }; }
+      style.left = centerX; style.top = rect.top - GAP - cardH; return { style, tail: 'bottom' as const };
   }
 }
 
@@ -45,13 +55,25 @@ export default function TourCard({
   onSkip: () => void;
   isLast: boolean;
 }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [cardH, setCardH] = useState(180);
+
+  // Re-measure whenever the content or anchor changes so the on-screen clamp
+  // uses the card's real height.
+  useLayoutEffect(() => {
+    const h = cardRef.current?.offsetHeight;
+    if (h && Math.abs(h - cardH) > 1) setCardH(h);
+  }, [step.id, rect, cardH]);
+
   const { style, tail } = rect
-    ? cardPosition(rect, step.placement)
+    ? cardPosition(rect, step.placement, cardH)
     : { style: { position: 'fixed' as const, left: '50%', top: '50%', width: CARD_WIDTH, transform: 'translate(-50%, -50%)' }, tail: null };
 
   return (
     <>
-      {rect && (
+      {/* Dim backdrop so the card stands out. With an anchor it's the spotlight
+          cut-out; centred (narrative) steps get a plain dim wash. */}
+      {rect ? (
         <div
           aria-hidden
           style={{
@@ -67,8 +89,11 @@ export default function TourCard({
             transition: 'left .2s ease, top .2s ease, width .2s ease, height .2s ease',
           }}
         />
+      ) : (
+        <div aria-hidden style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.35)', pointerEvents: 'none', zIndex: 9998 }} />
       )}
       <div
+        ref={cardRef}
         role="dialog"
         aria-label={step.title}
         style={{
@@ -79,7 +104,9 @@ export default function TourCard({
           border: '1px solid var(--border-light)',
           boxShadow: 'var(--card-shadow-lg)',
           padding: '16px 18px',
-          transition: rect ? 'left .2s ease, top .2s ease, bottom .2s ease, right .2s ease' : undefined,
+          maxHeight: 'calc(100vh - 24px)',
+          overflowY: 'auto',
+          transition: rect ? 'left .2s ease, top .2s ease' : undefined,
         }}
       >
         {tail && (

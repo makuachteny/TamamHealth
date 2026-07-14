@@ -272,7 +272,14 @@ export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
 // (admission-6 / bed-9, pat-00063) — that facility previously had zero
 // currently-admitted patients, so the day-activity chart always read
 // "0 inpatient" for the Clinical Officer demo account.
-export const SEED_VERSION = 45;
+// Bumped to 46-48: Dr. Peter Garang Deng (clinician.peter, the login-picker's
+// Juba doctor) now rotates through today's appointment fill so his schedule
+// board isn't empty, his two care-assigned patients get real bookings with
+// him, the blood bank inventory is seeded (the Blood Bank screen previously
+// showed an all-zero availability grid), and date-only seed fields use the
+// browser's local calendar instead of UTC so "today's" bookings land on the
+// dashboards' local today.
+export const SEED_VERSION = 48;
 
 export async function isSeeded(): Promise<boolean> {
   try {
@@ -281,6 +288,41 @@ export async function isSeeded(): Promise<boolean> {
     return doc.version === SEED_VERSION;
   } catch {
     return false;
+  }
+}
+
+/**
+ * True when a seed at the CURRENT version started but never wrote the final
+ * 'seeded' marker — i.e. the browser reloaded (dev recompile, tab close, hard
+ * navigation) mid-seed. Seed writes are idempotent skip-if-exists puts, so the
+ * caller can resume and fill the gaps WITHOUT wiping; wiping again re-opens
+ * the same interruption window and is how sessions end up with randomly empty
+ * modules (no patients at the front desk, no conversations, empty lab queue).
+ */
+export async function isSeedInProgress(): Promise<boolean> {
+  try {
+    const db = getDB('tamamhealth_meta');
+    const doc = await db.get('seed-started') as { version?: number };
+    return doc.version === SEED_VERSION;
+  } catch {
+    return false;
+  }
+}
+
+export async function markSeedStarted(): Promise<void> {
+  const db = getDB('tamamhealth_meta');
+  try {
+    try {
+      const existing = await db.get('seed-started');
+      await db.remove(existing);
+    } catch {
+      // No existing marker
+    }
+    await db.put({ _id: 'seed-started', version: SEED_VERSION, timestamp: new Date().toISOString() });
+  } catch (err: unknown) {
+    const e = err as { status?: number };
+    if (e.status === 409) return; // Already marked
+    throw err;
   }
 }
 

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import Modal from '@/components/Modal';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 // Clean single-stroke Tailwind Labs Heroicons via the local compatibility shim.
 import {
   ArrowLeft, ArrowRightLeft,
@@ -99,12 +99,30 @@ const FACESHEET_PANEL_OPTIONS: Array<{ id: FacesheetPanelId; label: string }> = 
 
 const DEFAULT_FACESHEET_PANELS = FACESHEET_PANEL_OPTIONS.map(panel => panel.id);
 
+// Tab ids that a `?tab=` deep-link is allowed to open. Mirrors `allTabs` (in the
+// component) plus the other reachable `activeTab` targets (`referrals`, `sbar`).
+// Clinical-permission gating still runs in the effect below, so a non-clinical
+// user deep-linked to a clinical tab is bounced back to overview.
+const DEEP_LINK_TAB_IDS = new Set([
+  'overview', 'appointments', 'history', 'problems', 'prescriptions', 'immunizations',
+  'allergies', 'vitals', 'notes', 'labs', 'demographics', 'billing', 'careChecklist',
+  'documents', 'recall', 'referrals', 'sbar',
+]);
+
 export default function PatientDetailPage() {
   const routeParams = useParams<{ id?: string | string[] }>();
   const id = Array.isArray(routeParams?.id) ? routeParams.id[0] : routeParams?.id;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const contentRef = useRef<HTMLElement>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  // Deep-link support: a link like `/patients/<id>?tab=labs&focus=<recordId>`
+  // opens that chart section (validated + permission-gated) and the section
+  // scrolls to / highlights the specific record. Seeded once from the URL.
+  const initialTab = searchParams.get('tab');
+  const focusId = searchParams.get('focus') || undefined;
+  const [activeTab, setActiveTab] = useState(
+    initialTab && DEEP_LINK_TAB_IDS.has(initialTab) ? initialTab : 'overview',
+  );
   const [demographicsTab, setDemographicsTab] = useState('profile');
   const [vitalsView, setVitalsView] = useState<'table' | 'flowsheet'>('table');
   const [showCustomizeView, setShowCustomizeView] = useState(false);
@@ -2109,6 +2127,7 @@ export default function PatientDetailPage() {
               patientId={patient._id}
               canOrderLabs={canOrderLabs}
               onAdd={() => setShowOrderLabModal(true)}
+              focusId={focusId}
             />
           )}
 

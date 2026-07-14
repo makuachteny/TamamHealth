@@ -6,14 +6,20 @@ import { useApp } from '@/lib/context';
 import type { UserRole } from '@/lib/db-types';
 import TourCard from '@/components/tour/TourCard';
 import { clinicalOfficerTourSteps } from './clinical-officer-steps';
+import { buildGenericTour } from './generic-steps';
 import { hasSeenTour, markTourSeen } from './tour-storage';
 import type { TourDefinition } from './types';
 
-// Role -> tour. Clinical Officer is the first module walked through; other
-// roles can get their own entry here later without touching the engine.
+// Hand-authored tours take priority; every other role falls back to a
+// generated start-to-finish tour of its own workspace (see buildGenericTour),
+// so "Take a tour" is available to every user.
 const TOURS_BY_ROLE: Partial<Record<UserRole, TourDefinition>> = {
   clinical_officer: { key: 'clinical-officer', steps: clinicalOfficerTourSteps },
 };
+
+function tourForRole(role: UserRole): TourDefinition {
+  return TOURS_BY_ROLE[role] ?? buildGenericTour(role);
+}
 
 const MEASURE_RETRY_MS = 120;
 const MEASURE_TIMEOUT_MS = 4000;
@@ -35,7 +41,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const tour = currentUser ? TOURS_BY_ROLE[currentUser.role] : undefined;
+  const tour = useMemo(() => (currentUser ? tourForRole(currentUser.role) : undefined), [currentUser]);
   const steps = useMemo(() => tour?.steps ?? [], [tour]);
 
   const [active, setActive] = useState(false);
@@ -85,6 +91,9 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     if (!active || !step) return;
     if (pathname !== step.route) { setRect(null); return; }
 
+    // Narrative step with no anchor — render the card centred over the page.
+    if (!step.target) { setRect(null); return; }
+
     let cancelled = false;
     let clickedPreStep = false;
     setRect(null);
@@ -117,7 +126,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
   // Keep the highlight glued to its target through scrolling/resizing.
   useEffect(() => {
-    if (!active || !step || !rect) return;
+    if (!active || !step || !rect || !step.target) return;
     const el = document.querySelector<HTMLElement>(step.target);
     if (!el) return;
     const onUpdate = () => setRect(el.getBoundingClientRect());

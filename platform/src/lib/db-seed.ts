@@ -10,8 +10,9 @@ import {
   appointmentsDB, wardDB, pharmacyInventoryDB, triageDB, availabilityDB,
   assetsDB, leaveRequestsDB, payrollEntriesDB,
   problemsDB, telehealthDB, patientNotesDB, orderSetsDB,
-  phoneNotesDB, assessmentsDB, intakeFormsDB,
-  isSeeded, markSeeded, resetAllDatabases, getDB
+  phoneNotesDB, assessmentsDB, intakeFormsDB, bloodBankDB,
+  isSeeded, markSeeded, resetAllDatabases, getDB,
+  isSeedInProgress, markSeedStarted
 } from './db';
 // `@/data/mock` carries 88 KB of fake patient PHI (50+ patient records, fake
 // hospitals, sample referrals/alerts). It is imported dynamically inside the
@@ -52,11 +53,21 @@ const SEED_NOW = Date.now();
 function daysAgo(n: number): string {
   return new Date(SEED_NOW - n * 86400000).toISOString();
 }
+// Date-ONLY fields (appointmentDate etc.) must be in the browser's LOCAL
+// calendar, not UTC: the dashboards compute "today" with local getFullYear/
+// getMonth/getDate (see toIsoDate in EhrMiniCalendar). With UTC dates, anyone
+// west of UTC using the app in the evening got "today's" seeded bookings
+// stamped with tomorrow's date — schedule boards looked empty right after a
+// fresh seed. Timestamps (daysAgo above) stay UTC ISO instants.
+function localIsoDate(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 function dateAgo(n: number): string {
-  return new Date(SEED_NOW - n * 86400000).toISOString().slice(0, 10);
+  return localIsoDate(SEED_NOW - n * 86400000);
 }
 function dateFromNow(n: number): string {
-  return new Date(SEED_NOW + n * 86400000).toISOString().slice(0, 10);
+  return localIsoDate(SEED_NOW + n * 86400000);
 }
 
 const defaultOrganizations: Omit<OrganizationDoc, '_rev'>[] = [
@@ -1175,8 +1186,15 @@ export async function seedDatabase(): Promise<void> {
   // production bundle never ships it.
   const { hospitals, patients, referrals, diseaseAlerts, generateMedicalRecords } =
     await import('@/data/mock');
-  // Stale or missing seed — wipe all databases and re-seed fresh
-  await resetAllDatabases();
+  // Stale or missing seed — wipe all databases and re-seed fresh. But when a
+  // seed at THIS version was interrupted (hard reload mid-seed), resume it
+  // instead: every write below is a skip-if-exists put, so re-running only
+  // fills the gaps. Wiping again would re-open the interruption window and is
+  // how sessions ended up with randomly empty modules.
+  if (!(await isSeedInProgress())) {
+    await resetAllDatabases();
+    await markSeedStarted();
+  }
 
   const now = new Date().toISOString();
 
@@ -1768,6 +1786,9 @@ export async function seedDatabase(): Promise<void> {
       { id: 'user-dr.wani', name: 'Dr. James Wani Igga' },
       { id: 'user-dr.achol', name: 'Dr. Achol Mayen Deng' },
       { id: 'user-co.deng', name: 'CO Deng Mabior Kuol' },
+      // clinician.peter is the login picker's featured Juba doctor — without
+      // him in the rotation his dashboard calendar shows no bookings at all.
+      { id: 'user-clinician.peter', name: 'Dr. Peter Garang Deng' },
     ];
     const labStatuses = ['completed', 'in_progress', 'pending', 'completed', 'completed'];
     const apptStatuses = ['scheduled', 'confirmed', 'checked_in', 'completed', 'no_show'];
@@ -1852,6 +1873,9 @@ export async function seedDatabase(): Promise<void> {
         providers: [
           { id: 'user-dr.wani', name: 'Dr. James Wani Igga' },
           { id: 'user-dr.achol', name: 'Dr. Achol Mayen Deng' },
+          // The login picker's featured Juba doctor — must own a share of
+          // today's board or his dashboard lanes render empty.
+          { id: 'user-clinician.peter', name: 'Dr. Peter Garang Deng' },
         ],
         triager: { id: 'user-triage.mary', name: 'Mary Nyaruai Gai' }, desk: DESK_JUBA,
       },
@@ -2761,6 +2785,77 @@ export async function seedDatabase(): Promise<void> {
   const osNow = new Date().toISOString();
   for (const os of seedOrderSets) {
     await safePut(osDB, { ...os, createdAt: osNow, updatedAt: osNow, orgId: PUBLIC_ORG_ID } as unknown as Record<string, unknown>);
+  }
+
+  // ── Today's bookings for Dr. Peter's assigned patients ────────────────────
+  // careAssignments hands pat-00021/pat-00025 to clinician.peter; give each an
+  // actual appointment with him today so the dashboard worklist status comes
+  // from a real booking instead of the "scheduled" fallback label.
+  {
+    const apDB = appointmentsDB();
+    const peterAssigned = [
+      { p: patients[20], time: '15:30', end: '16:00', status: 'checked_in', reason: 'New OPD consult — abdominal pain', dept: 'Outpatient' },
+      { p: patients[24], time: '16:15', end: '16:45', status: 'scheduled', reason: 'Wound review — surgical follow-up', dept: 'Surgery' },
+    ];
+    for (let i = 0; i < peterAssigned.length; i++) {
+      const { p, time, end, status, reason, dept } = peterAssigned[i];
+      if (!p) continue;
+      const name = `${p.firstName} ${p.middleName ? p.middleName + ' ' : ''}${p.surname}`.replace(/\s+/g, ' ').trim();
+      await safePut(apDB, {
+        _id: `appointment-peter-assigned-${i + 1}`, type: 'appointment',
+        patientId: p.id, patientName: name, patientPhone: p.phone || '',
+        providerId: 'user-clinician.peter', providerName: 'Dr. Peter Garang Deng',
+        facilityId: 'hosp-001', facilityName: 'Juba Teaching Hospital', facilityLevel: 'national',
+        appointmentDate: dateAgo(0), appointmentTime: time, endTime: end, duration: 30,
+        appointmentType: 'general', priority: 'routine', department: dept, reason,
+        status, ...(status === 'checked_in' ? { checkedInAt: daysAgo(0) } : {}),
+        reminderSent: true, reminderChannel: 'sms', isRecurring: false,
+        bookedBy: 'user-desk.amira', bookedByName: 'Amira Juma Hassan',
+        state: 'Central Equatoria', county: 'Juba',
+        orgId: PUBLIC_ORG_ID, createdAt: daysAgo(1), updatedAt: daysAgo(0),
+      } as unknown as Record<string, unknown>);
+    }
+  }
+
+  // ── Blood bank inventory ──────────────────────────────────────────────────
+  // Without stock the Blood Bank screen renders an all-zero availability grid
+  // for every role. Juba carries a realistic mixed inventory; Wau a thinner
+  // state-hospital one. All units screen-negative; a couple are mid-workflow
+  // (reserved / crossmatched) so the status filters have something to show.
+  {
+    const bbDB = bloodBankDB();
+    const BB_FACILITIES = [
+      { fid: 'hosp-001', fname: 'Juba Teaching Hospital', prefix: 'JTH', stock: { 'O+': 8, 'O-': 2, 'A+': 6, 'A-': 1, 'B+': 4, 'B-': 1, 'AB+': 2, 'AB-': 1 } },
+      { fid: 'hosp-002', fname: 'Wau State Hospital', prefix: 'WSH', stock: { 'O+': 3, 'A+': 2, 'B+': 1 } },
+    ] as const;
+    const BB_COMPONENTS = ['whole_blood', 'whole_blood', 'packed_rbc', 'whole_blood', 'packed_rbc', 'platelets'] as const;
+    for (const fac of BB_FACILITIES) {
+      let unitSeq = 0;
+      for (const [group, count] of Object.entries(fac.stock)) {
+        for (let u = 0; u < count; u++) {
+          unitSeq += 1;
+          const collectedDaysAgo = (unitSeq * 3) % 21; // spread over the last 3 weeks
+          // Whole blood keeps ~35 days from collection — all seeded units are in date.
+          const status = unitSeq % 9 === 0 ? 'reserved' : unitSeq % 7 === 0 ? 'crossmatched' : 'available';
+          await safePut(bbDB, {
+            _id: `blood-${fac.fid}-${group.replace('+', 'pos').replace('-', 'neg')}-${u + 1}`,
+            type: 'blood_bank',
+            unitId: `${fac.prefix}-BB-${String(unitSeq).padStart(4, '0')}`,
+            bloodGroup: group,
+            component: BB_COMPONENTS[unitSeq % BB_COMPONENTS.length],
+            volume: 450,
+            collectionDate: dateAgo(collectedDaysAgo),
+            expiryDate: dateFromNow(35 - collectedDaysAgo),
+            status,
+            ...(status === 'crossmatched' ? { crossmatchResult: 'compatible' } : {}),
+            facilityId: fac.fid, facilityName: fac.fname,
+            screeningResults: { hiv: false, hepatitisB: false, hepatitisC: false, syphilis: false, malaria: false },
+            orgId: PUBLIC_ORG_ID,
+            createdAt: daysAgo(collectedDaysAgo), updatedAt: daysAgo(collectedDaysAgo),
+          } as unknown as Record<string, unknown>);
+        }
+      }
+    }
   }
 
   await markSeeded();

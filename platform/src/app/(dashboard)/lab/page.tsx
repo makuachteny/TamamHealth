@@ -754,7 +754,7 @@ export default function LabPage() {
               </thead>
               <tbody>
                 {filtered.map(order => (
-                  <tr key={order._id} className="cursor-pointer hover:bg-white/[0.03]" onClick={() => { if (order.patientId) router.push(`/patients/${order.patientId}`); }}>
+                  <tr key={order._id} className="cursor-pointer hover:bg-white/[0.03]" onClick={() => { if (order.patientId) router.push(`/patients/${order.patientId}?tab=labs&focus=${order._id}`); }}>
                     <td>
                       <PatientName patientId={order.patientId} name={order.patientName} nameClassName="font-medium text-sm" />
                       <p className="text-xs font-mono" style={{ color: 'var(--accent-primary)' }}>{order.hospitalNumber}</p>
