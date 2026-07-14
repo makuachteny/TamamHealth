@@ -6824,24 +6824,88 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 
 /* Intake (vitals) fills the step area. The card itself gets grow-don't-shrink
    sizing from `.ehr-card-fit` (see the ≥861px consultation block much further
-   down — plain grow with min-height:0 would let a short window clip the vitals
-   grid behind the card's overflow:hidden). The body becomes a flex column:
-   the vitals grid's rows space out evenly through any surplus height and the
-   BMI strip anchors to the card bottom like a footer — no dead gap, nothing
-   ballooning. With no surplus (short windows, the step region scrolls)
-   everything renders at its natural compact size. */
+   down). The body is a flex column of vitals GROUPS; surplus height splits
+   equally across the groups, whose grids space their rows evenly — the form
+   breathes uniformly instead of pooling a gap anywhere. With no surplus
+   (short windows, the step region scrolls) everything renders compact. */
 .ehr-consult-fill-body {
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
-.ehr-consult-fill-body > .grid {
+.ehr-consult-fill-body > .ehr-vitals-group {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.ehr-consult-fill-body > .ehr-vitals-group > .grid {
   flex: 1 1 auto;
   align-content: space-evenly;
-  margin-bottom: 12px;
 }
-.ehr-consult-fill-body > div:last-child {
-  margin-top: auto;
+
+/* ── Intake vitals groups ── */
+.ehr-vitals-group-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border-light);
 }
+/* Non-blocking out-of-range hint under a vital input. */
+.ehr-soap-scroll input.ehr-vital-flagged {
+  border-color: var(--color-warning) !important;
+  background: rgba(217, 119, 6, 0.05) !important;
+}
+.ehr-vitals-flag {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #B8741C;
+}
+/* Live BMI tile inside the Body measurements group. */
+.ehr-bmi-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--border-medium);
+  background: var(--overlay-subtle);
+}
+.ehr-bmi-tile-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ehr-bmi-tile-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ehr-bmi-tile-value b {
+  font-size: 16px;
+  color: var(--text-primary);
+}
+.ehr-bmi-tile-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.ehr-bmi-tile-chip {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+.ehr-bmi-tile-chip.is-ok { background: rgba(21, 121, 92, 0.12); color: #15795C; }
+.ehr-bmi-tile-chip.is-warn { background: rgba(184, 116, 28, 0.14); color: #B8741C; }
+.ehr-bmi-tile-chip.is-alert { background: rgba(196, 69, 54, 0.12); color: #C44536; }
 
 .ehr-soap-scroll .card-elevated > button,
 .ehr-soap-scroll .card-elevated > div:first-child,

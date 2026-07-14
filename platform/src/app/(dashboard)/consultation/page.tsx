@@ -319,6 +319,36 @@ export default function ConsultationPage() {
     gcs: '',
   });
 
+  // Adult screening ranges for the inline "recheck" hints on the intake form.
+  // Informational only — they never block the wizard (paediatric/pregnancy
+  // norms differ; the clinician judges).
+  const vitalHint = (field: string, raw: string): string | null => {
+    if (!raw.trim()) return null;
+    const v = parseFloat(raw);
+    if (!Number.isFinite(v)) return null;
+    switch (field) {
+      case 'temperature': return v >= 38 ? 'Fever' : v < 35 ? 'Hypothermia — recheck' : null;
+      case 'systolic': return v >= 180 ? 'Severely high' : v >= 140 ? 'High' : v < 90 ? 'Low' : null;
+      case 'diastolic': return v >= 110 ? 'Severely high' : v >= 90 ? 'High' : v < 60 ? 'Low' : null;
+      case 'pulse': return v > 120 ? 'Tachycardic' : v < 50 ? 'Bradycardic' : null;
+      case 'respRate': return v > 24 ? 'Tachypnoeic' : v < 10 ? 'Low — recheck' : null;
+      case 'o2Sat': return v < 90 ? 'Critical — act now' : v < 94 ? 'Low' : null;
+      case 'bloodGlucose': return v > 11 ? 'High' : v < 3 ? 'Hypoglycaemia' : null;
+      case 'gcs': return v < 9 ? 'Severe — airway risk' : v < 15 ? 'Reduced' : null;
+      case 'painScore': return v >= 7 ? 'Severe pain' : null;
+      case 'muac': return v > 0 && v < 11.5 ? 'SAM range (child)' : null;
+      default: return null;
+    }
+  };
+  const bmiValue = vitals.weight && vitals.height && parseFloat(vitals.height) > 0
+    ? parseFloat(vitals.weight) / ((parseFloat(vitals.height) / 100) ** 2)
+    : null;
+  const bmiCategory = bmiValue == null ? null
+    : bmiValue < 18.5 ? { label: 'Underweight', tone: 'warn' as const }
+    : bmiValue < 25 ? { label: 'Normal', tone: 'ok' as const }
+    : bmiValue < 30 ? { label: 'Overweight', tone: 'warn' as const }
+    : { label: 'Obese', tone: 'alert' as const };
+
   // Physical Examination
   const [physExam, setPhysExam] = useState({
     general: '',
@@ -1954,92 +1984,75 @@ export default function ConsultationPage() {
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Triaged today — vitals carried over below.</span>
                     </div>
                   )}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label>{t('consultation.vitalTemperature')}</label>
-                      <input type="number" step="0.1" value={vitals.temperature}
-                        onChange={e => setVitals(v => ({ ...v, temperature: e.target.value }))}
-                        placeholder="e.g. 37.0" />
+                  {/* Vitals grouped into clinical clusters. Each field shows a
+                      live, non-blocking range hint when the value looks off. */}
+                  {([
+                    {
+                      title: 'Core vital signs',
+                      fields: [
+                        { key: 'temperature', label: t('consultation.vitalTemperature'), placeholder: 'e.g. 37.0', step: '0.1' },
+                        { key: 'systolic', label: t('consultation.vitalSystolic'), placeholder: 'e.g. 120' },
+                        { key: 'diastolic', label: t('consultation.vitalDiastolic'), placeholder: 'e.g. 80' },
+                        { key: 'pulse', label: t('consultation.vitalPulse'), placeholder: 'e.g. 72' },
+                        { key: 'respRate', label: t('consultation.vitalRespRate'), placeholder: 'e.g. 18' },
+                        { key: 'o2Sat', label: t('consultation.vitalO2Sat'), placeholder: 'e.g. 98' },
+                      ],
+                    },
+                    {
+                      title: 'Body measurements',
+                      fields: [
+                        { key: 'weight', label: t('consultation.vitalWeight'), placeholder: 'e.g. 65.0', step: '0.1' },
+                        { key: 'height', label: t('consultation.vitalHeight'), placeholder: 'e.g. 170', step: '0.1' },
+                        { key: 'muac', label: t('consultation.vitalMuac'), placeholder: 'e.g. 14.5', step: '0.1' },
+                      ],
+                    },
+                    {
+                      title: 'Assessment scores',
+                      fields: [
+                        { key: 'painScore', label: t('consultation.vitalPainScore'), placeholder: 'e.g. 3', min: '0', max: '10' },
+                        { key: 'bloodGlucose', label: t('consultation.vitalBloodGlucose'), placeholder: 'e.g. 5.5', step: '0.1' },
+                        { key: 'gcs', label: t('consultation.vitalGcs'), placeholder: 'e.g. 15', min: '3', max: '15' },
+                      ],
+                    },
+                  ] as { title: string; fields: { key: keyof typeof vitals; label: string; placeholder: string; step?: string; min?: string; max?: string }[] }[]).map(group => (
+                    <div key={group.title} className="ehr-vitals-group">
+                      <div className="ehr-vitals-group-title">{group.title}</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {group.fields.map(f => {
+                          const hint = vitalHint(f.key, vitals[f.key]);
+                          return (
+                            <div key={f.key}>
+                              <label>{f.label}</label>
+                              <input
+                                type="number"
+                                step={f.step}
+                                min={f.min}
+                                max={f.max}
+                                value={vitals[f.key]}
+                                onChange={e => setVitals(v => ({ ...v, [f.key]: e.target.value }))}
+                                placeholder={f.placeholder}
+                                className={hint ? 'ehr-vital-flagged' : undefined}
+                              />
+                              {hint && <span className="ehr-vitals-flag">{hint}</span>}
+                            </div>
+                          );
+                        })}
+                        {group.title === 'Body measurements' && (
+                          <div className="ehr-bmi-tile">
+                            <span className="ehr-bmi-tile-label">{t('consultation.calculatedBmi')}</span>
+                            {bmiValue != null && bmiCategory ? (
+                              <span className="ehr-bmi-tile-value">
+                                <b>{bmiValue.toFixed(1)}</b>
+                                <span className={`ehr-bmi-tile-chip is-${bmiCategory.tone}`}>{bmiCategory.label}</span>
+                              </span>
+                            ) : (
+                              <span className="ehr-bmi-tile-empty">enter weight &amp; height</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <label>{t('consultation.vitalSystolic')}</label>
-                      <input type="number" value={vitals.systolic}
-                        onChange={e => setVitals(v => ({ ...v, systolic: e.target.value }))}
-                        placeholder="e.g. 120" />
-                    </div>
-                    <div>
-                      <label>{t('consultation.vitalDiastolic')}</label>
-                      <input type="number" value={vitals.diastolic}
-                        onChange={e => setVitals(v => ({ ...v, diastolic: e.target.value }))}
-                        placeholder="e.g. 80" />
-                    </div>
-                    <div>
-                      <label>{t('consultation.vitalPulse')}</label>
-                      <input type="number" value={vitals.pulse}
-                        onChange={e => setVitals(v => ({ ...v, pulse: e.target.value }))}
-                        placeholder="e.g. 72" />
-                    </div>
-                    <div>
-                      <label>{t('consultation.vitalRespRate')}</label>
-                      <input type="number" value={vitals.respRate}
-                        onChange={e => setVitals(v => ({ ...v, respRate: e.target.value }))}
-                        placeholder="e.g. 18" />
-                    </div>
-                    <div>
-                      <label>{t('consultation.vitalO2Sat')}</label>
-                      <input type="number" value={vitals.o2Sat}
-                        onChange={e => setVitals(v => ({ ...v, o2Sat: e.target.value }))}
-                        placeholder="e.g. 98" />
-                    </div>
-                    <div>
-                      <label>{t('consultation.vitalWeight')}</label>
-                      <input type="number" step="0.1" value={vitals.weight}
-                        onChange={e => setVitals(v => ({ ...v, weight: e.target.value }))}
-                        placeholder="e.g. 65.0" />
-                    </div>
-                    <div>
-                      <label>{t('consultation.vitalHeight')}</label>
-                      <input type="number" step="0.1" value={vitals.height}
-                        onChange={e => setVitals(v => ({ ...v, height: e.target.value }))}
-                        placeholder="e.g. 170" />
-                    </div>
-                    <div>
-                      <label>{t('consultation.vitalMuac')}</label>
-                      <input type="number" step="0.1" value={vitals.muac}
-                        onChange={e => setVitals(v => ({ ...v, muac: e.target.value }))}
-                        placeholder="e.g. 14.5" />
-                    </div>
-                    <div>
-                      <label>{t('consultation.vitalPainScore')}</label>
-                      <input type="number" min="0" max="10" value={vitals.painScore}
-                        onChange={e => setVitals(v => ({ ...v, painScore: e.target.value }))}
-                        placeholder="e.g. 3" />
-                    </div>
-                    <div>
-                      <label>{t('consultation.vitalBloodGlucose')}</label>
-                      <input type="number" step="0.1" value={vitals.bloodGlucose}
-                        onChange={e => setVitals(v => ({ ...v, bloodGlucose: e.target.value }))}
-                        placeholder="e.g. 5.5" />
-                    </div>
-                    <div>
-                      <label>{t('consultation.vitalGcs')}</label>
-                      <input type="number" min="3" max="15" value={vitals.gcs}
-                        onChange={e => setVitals(v => ({ ...v, gcs: e.target.value }))}
-                        placeholder="e.g. 15" />
-                    </div>
-                  </div>
-                  {/* Always visible — shows the value once weight & height are
-                      both entered, and a hint until then. */}
-                  <div className="mt-3 p-3 rounded-lg" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                    <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{t('consultation.calculatedBmi')} </span>
-                    {vitals.weight && vitals.height && parseFloat(vitals.height) > 0 ? (
-                      <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                        {(parseFloat(vitals.weight) / ((parseFloat(vitals.height) / 100) ** 2)).toFixed(1)}
-                      </span>
-                    ) : (
-                      <span className="text-sm" style={{ color: 'var(--text-muted)' }}>— enter weight &amp; height</span>
-                    )}
-                  </div>
+                  ))}
                 </div>
               )}
             </div>
