@@ -1181,6 +1181,20 @@
   filter: none !important;
 }
 
+/* The guided tour is the one exception to the flat no-shadow baseline: its
+   full-screen dim + spotlight ring are drawn with box-shadow, and the card
+   needs real elevation to stand out over any page. */
+.tour-spotlight {
+  box-shadow:
+    0 0 0 3px var(--accent-primary),
+    0 0 0 6px rgba(59, 130, 246, 0.30),
+    0 0 0 9999px rgba(15, 23, 42, 0.50) !important;
+}
+
+.tour-card {
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.35) !important;
+}
+
 body [style*="gradient"] {
   background-image: none !important;
 }
@@ -3784,6 +3798,40 @@ thead th {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Current facility name in the top rail — context for which hospital the
+   signed-in user is working in. Truncates; hidden on narrow viewports. */
+.ehr-top-facility {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 240px;
+  padding: 5px 10px;
+  margin-right: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ehr-top-facility svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.ehr-top-facility span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1100px) {
+  .ehr-top-facility {
+    display: none;
+  }
 }
 
 .ehr-mobile-search-trigger {
@@ -6774,28 +6822,17 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 }
 
 
-/* Intake fills the step area. The card itself gets grow-don't-shrink sizing
-   from `.ehr-card-fit` (see the ≥861px consultation block much further down —
-   plain grow with min-height:0 would let a short window clip the vitals grid
-   behind the card's overflow:hidden). These two rules make the intake body a
-   flex column and hand the surplus height to the free-text complaint box, so
-   the filled space is useful writing room instead of a dead gap under the
-   vitals grid. */
+/* Intake (vitals) fills the step area. The card itself gets grow-don't-shrink
+   sizing from `.ehr-card-fit` (see the ≥861px consultation block much further
+   down — plain grow with min-height:0 would let a short window clip the vitals
+   grid behind the card's overflow:hidden). The body becomes a flex column:
+   the vitals grid's rows space out evenly through any surplus height and the
+   BMI strip anchors to the card bottom like a footer — no dead gap, nothing
+   ballooning. With no surplus (short windows, the step region scrolls)
+   everything renders at its natural compact size. */
 .ehr-consult-fill-body {
   display: flex;
   flex-direction: column;
-}
-/* Surplus height is split across the whole form so no single element balloons
-   and no void pools anywhere: the complaint box grows (capped to stay
-   proportionate), the vitals grid's rows space out evenly through the rest,
-   and the BMI strip anchors to the card bottom like a footer. With no surplus
-   (short windows, the step region scrolls) everything renders at its natural
-   compact size. */
-.ehr-consult-fill-body .ehr-consult-complaint-box {
-  flex: 1 1 auto;
-  min-height: 84px;
-  max-height: 280px;
-  resize: vertical;
 }
 .ehr-consult-fill-body > .grid {
   flex: 1 1 auto;

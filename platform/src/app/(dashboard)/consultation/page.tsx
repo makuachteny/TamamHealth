@@ -1706,17 +1706,19 @@ export default function ConsultationPage() {
     hasPlanInput()
   );
 
-  // The consultation wizard is intentionally linear: intake (chief complaint
-  // + vitals) sits together with the physical examination as one opening
-  // stage, and summary is last as a read-only review step.
+  // The consultation wizard is intentionally linear: intake (vitals) first,
+  // then the physical examination — which OPENS with the chief complaint /
+  // presenting symptoms — and summary last as a read-only review step.
   const workflowStages: { label: string; sections: number[] }[] = [
-    { label: 'Intake & Examination', sections: [WORKFLOW_PANEL.intake, WORKFLOW_PANEL.exam] },
+    { label: 'Intake', sections: [WORKFLOW_PANEL.intake] },
+    { label: 'Examination', sections: [WORKFLOW_PANEL.exam] },
     { label: 'Assessment', sections: [WORKFLOW_PANEL.assessment] },
     { label: 'Orders', sections: [WORKFLOW_PANEL.orders] },
     { label: 'Plan & checkout', sections: [WORKFLOW_PANEL.plan] },
     { label: 'Summary', sections: [WORKFLOW_PANEL.summary] },
   ];
   const workflowStageIcons: React.ElementType[] = [
+    Thermometer,
     Stethoscope,
     AlertTriangle,
     FlaskConical,
@@ -1733,11 +1735,12 @@ export default function ConsultationPage() {
   const validateStep = (currentStep: number): string | null => {
     const sections = workflowStages[currentStep]?.sections ?? [];
     if (sections.includes(WORKFLOW_PANEL.intake)) {
-      if (!hasChiefComplaint()) return t('consultation.chiefComplaintRequired');
-      if (!hasVitalsInput() && !todaysTriage) return 'Capture vitals or complete triage before continuing.';
+      if (!hasVitalsInput() && !todaysTriage) return 'Capture vitals or complete triage before moving to examination.';
     }
-    if (sections.includes(WORKFLOW_PANEL.exam) && !hasExamInput()) {
-      return 'Document the physical examination before moving to assessment.';
+    if (sections.includes(WORKFLOW_PANEL.exam)) {
+      // The examination step opens with the chief complaint, so both gate here.
+      if (!hasChiefComplaint()) return t('consultation.chiefComplaintRequired');
+      if (!hasExamInput()) return 'Document the physical examination before moving to assessment.';
     }
     if (sections.includes(WORKFLOW_PANEL.assessment) && diagnoses.length === 0) {
       return 'Add at least one diagnosis before moving to orders.';
@@ -1766,7 +1769,9 @@ export default function ConsultationPage() {
   // both the stage rail and the progress checklist — progress is driven by what
   // has been filled in, not by which section happens to be open.
   const workflowPanelFilled = (i: number): boolean => (
-    i === WORKFLOW_PANEL.intake ? intakeReady()
+    // Intake is vitals-only now — the chief complaint lives at the top of the
+    // Examination step (intakeReady still spans both for overall completeness).
+    i === WORKFLOW_PANEL.intake ? (hasVitalsInput() || !!todaysTriage)
     : i === WORKFLOW_PANEL.exam ? hasExamInput()
     : i === WORKFLOW_PANEL.assessment ? diagnoses.length > 0
     : i === WORKFLOW_PANEL.orders ? hasOrdersInput()
@@ -1949,26 +1954,6 @@ export default function ConsultationPage() {
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Triaged today — vitals carried over below.</span>
                     </div>
                   )}
-                  <CodedSearchField
-                    label={t('consultation.chiefComplaintLabel')}
-                    placeholder="Search signs & symptoms…"
-                    options={symptomOptions}
-                    value={symptomSearch}
-                    onChange={setSymptomSearch}
-                    onSelect={c => { addSymptom(c.name); setSymptomSearch(''); }}
-                    onAddCustom={text => { addSymptom(text); setSymptomSearch(''); }}
-                    showCodeBadge={false}
-                    maxResults={10}
-                  />
-                  {/* One editable box — picked symptoms append here and can be
-                      reworded, reordered, or deleted freely. */}
-                  <textarea
-                    rows={3}
-                    className="ehr-consult-complaint-box"
-                    value={chiefComplaint}
-                    onChange={e => setChiefComplaint(e.target.value)}
-                    placeholder="e.g. Fever, watery diarrhoea, vomiting — or pick from the symptom list"
-                  />
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label>{t('consultation.vitalTemperature')}</label>
@@ -2059,13 +2044,34 @@ export default function ConsultationPage() {
               )}
             </div>
 
-            {/* Section 2: Physical Examination — shares the opening stage with
-                Intake; ehr-card-fit so the intake card's grow-don't-shrink
-                sizing can never crush it on short windows. */}
+            {/* Section 2: Physical Examination — OPENS with the chief
+                complaint / presenting symptoms (moved out of Intake so the
+                story of the visit starts where the examination starts). */}
             <div className="card-elevated overflow-hidden ehr-card-fit" style={{ display: stepHas(2) ? undefined : 'none' }}>
               <SectionHeader index={2} />
               {openSections[2] && (
                 <div className="p-5 space-y-4">
+                  <div>
+                    <CodedSearchField
+                      label={t('consultation.chiefComplaintLabel')}
+                      placeholder="Search signs & symptoms…"
+                      options={symptomOptions}
+                      value={symptomSearch}
+                      onChange={setSymptomSearch}
+                      onSelect={c => { addSymptom(c.name); setSymptomSearch(''); }}
+                      onAddCustom={text => { addSymptom(text); setSymptomSearch(''); }}
+                      showCodeBadge={false}
+                      maxResults={10}
+                    />
+                    {/* One editable box — picked symptoms append here and can
+                        be reworded, reordered, or deleted freely. */}
+                    <textarea
+                      rows={3}
+                      value={chiefComplaint}
+                      onChange={e => setChiefComplaint(e.target.value)}
+                      placeholder="e.g. Fever, watery diarrhoea, vomiting — or pick from the symptom list"
+                    />
+                  </div>
                   {([
                     { key: 'general', label: t('consultation.examGeneral'), placeholder: t('consultation.examGeneralPlaceholder') },
                     { key: 'cardiovascular', label: t('consultation.examCardiovascular'), placeholder: t('consultation.examCardiovascularPlaceholder') },
