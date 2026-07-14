@@ -172,6 +172,18 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Tenant/facility scope check — without it any staff member with a link
+    // role could resolve another org's linkId to its patientId and amount.
+    // 404 (not 403) on mismatch so cross-org callers can't confirm existence,
+    // matching the patients/[id] pattern.
+    const { buildScopeFromAuth, filterByScope } = await import('@/lib/services/data-scope');
+    if (filterByScope([link as unknown as Record<string, unknown>], buildScopeFromAuth(auth)).length === 0) {
+      return NextResponse.json(
+        { error: 'Payment link not found' },
+        { status: 404 }
+      );
+    }
+
     console.log('[Payment Link API] GET request for link:', {
       linkId,
       status: link.status,

@@ -10,8 +10,9 @@ import {
   Video, Stethoscope, Syringe, HeartPulse, FlaskConical,
   Building2, X, UserPlus, ClipboardList,
   ExternalLink, ChevronLeft, ChevronRight,
-  Search, Download, Filter,
+  Download, Filter,
 } from '@/components/icons/lucide';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useInsuredPatientIds } from '@/lib/hooks/usePayments';
@@ -482,79 +483,59 @@ export default function AppointmentsPage() {
           <>
             {/* Table card */}
             <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-              <div className="listpage-table-toolbar" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-                {/* Title + day stats (inline, right-aligned — mirrors the wards
-                    "Current Admissions" header instead of separate stat cards). */}
-                <div className="flex items-end justify-between gap-3 flex-wrap">
-                  <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
-                    Appointments for: {dayLabel}
-                  </span>
-                  <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
-                    {[
-                      { label: 'Appointments', value: dayStats.total, color: 'var(--text-muted)' },
-                      { label: 'Checked in', value: dayStats.checkedIn, color: '#15795C' },
-                      { label: 'Not arrived', value: dayStats.notArrived, color: '#C44536' },
-                      { label: dayStats.topService ? (appointmentTypes.find(ti => ti.value === dayStats.topService!.type)?.label || dayStats.topService.type) : 'No appointments', value: dayStats.topService?.count ?? 0, color: '#2191D0' },
-                      { label: 'Providers', value: dayStats.providers, color: '#D97706' },
-                    ].map((s, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                        {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div className="listpage-table-search">
-                    <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              <EhrListHeader
+                title={`Appointments for: ${dayLabel}`}
+                stats={[
+                  { label: 'Appointments', value: dayStats.total, color: LIST_STAT_COLORS.muted },
+                  { label: 'Checked in', value: dayStats.checkedIn, color: LIST_STAT_COLORS.blue },
+                  { label: 'Not arrived', value: dayStats.notArrived, color: LIST_STAT_COLORS.amber },
+                  { label: dayStats.topService ? (appointmentTypes.find(ti => ti.value === dayStats.topService!.type)?.label || dayStats.topService.type) : 'No appointments', value: dayStats.topService?.count ?? 0, color: LIST_STAT_COLORS.green },
+                  { label: 'Providers', value: dayStats.providers, color: LIST_STAT_COLORS.bronze },
+                ]}
+                search={{ value: listSearch, onChange: setListSearch, placeholder: 'Filter table', ariaLabel: 'Filter table' }}
+                actions={
+                  <>
                     <input
-                      type="search"
-                      value={listSearch}
-                      onChange={e => setListSearch(e.target.value)}
-                      placeholder="Filter table"
-                      aria-label="Filter table"
+                      type="date"
+                      value={listDate}
+                      onChange={e => setListDate(e.target.value || today)}
+                      className="listpage-toolbar-date"
+                      style={{ width: 150, flex: '0 0 auto' }}
+                      aria-label={t('appointments.labelDate')}
                     />
-                  </div>
-                  <input
-                    type="date"
-                    value={listDate}
-                    onChange={e => setListDate(e.target.value || today)}
-                    className="listpage-toolbar-date"
-                    style={{ width: 150, flex: '0 0 auto' }}
-                    aria-label={t('appointments.labelDate')}
-                  />
-                  <div className={`listpage-icon-select ${listStatus !== 'all' ? 'is-active' : ''}`} title="Filter appointments by status">
-                    <Filter size={16} />
-                    <select
-                      value={listStatus}
-                      onChange={e => setListStatus(e.target.value)}
-                      aria-label="Filter appointments by status"
-                    >
-                      <option value="all">All statuses</option>
-                      {(Object.keys(statusConfig) as AppointmentStatus[]).map(k => (
-                        <option key={k} value={k}>{t(statusLabelKey[k])}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button type="button" className="listpage-icon-btn" onClick={handleDownloadCsv} title="Download" aria-label="Download">
-                    <Download size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className="listpage-icon-btn"
-                    onClick={() => setViewMode('calendar')}
-                    title="Appointments calendar"
-                    aria-label="Appointments calendar"
-                  >
-                    <Calendar size={16} />
-                  </button>
-                  {canBookAppointments && (
-                    <button type="button" className="listpage-icon-btn listpage-icon-btn-primary" onClick={() => setShowNewForm(true)} title="Create new appointment" aria-label="Create new appointment">
-                      <Plus size={16} />
+                    <div className={`listpage-icon-select ${listStatus !== 'all' ? 'is-active' : ''}`} title="Filter appointments by status">
+                      <Filter size={16} />
+                      <select
+                        value={listStatus}
+                        onChange={e => setListStatus(e.target.value)}
+                        aria-label="Filter appointments by status"
+                      >
+                        <option value="all">All statuses</option>
+                        {(Object.keys(statusConfig) as AppointmentStatus[]).map(k => (
+                          <option key={k} value={k}>{t(statusLabelKey[k])}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <button type="button" className="listpage-icon-btn" onClick={handleDownloadCsv} title="Download" aria-label="Download">
+                      <Download size={16} />
                     </button>
-                  )}
-                </div>
-              </div>
+                    <button
+                      type="button"
+                      className="listpage-icon-btn"
+                      onClick={() => setViewMode('calendar')}
+                      title="Appointments calendar"
+                      aria-label="Appointments calendar"
+                    >
+                      <Calendar size={16} />
+                    </button>
+                    {canBookAppointments && (
+                      <button type="button" className="listpage-icon-btn listpage-icon-btn-primary" onClick={() => setShowNewForm(true)} title="Create new appointment" aria-label="Create new appointment">
+                        <Plus size={16} />
+                      </button>
+                    )}
+                  </>
+                }
+              />
 
               <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
                 <table className="data-table listpage-table" style={{ minWidth: 980 }}>

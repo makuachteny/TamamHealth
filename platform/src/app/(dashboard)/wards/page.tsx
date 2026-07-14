@@ -15,6 +15,7 @@ import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { AdmissionDoc } from '@/lib/db-types-ward';
 import PageInstructionCard from '@/components/PageInstructionCard';
+import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 
 // Shared column template for the admissions table header + rows:
 // Patient · Ward · Diagnosis · Severity · Discharge action
@@ -156,87 +157,58 @@ export default function WardsPage() {
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <PageInstructionCard />
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          {/* ── Card toolbar ── */}
-          <div className="px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
-            {/* Title + bed stats */}
-            <div className="flex items-end justify-between gap-3 mb-3">
-              <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
-                {t('ward.currentAdmissions')}
-              </span>
-              <div className="flex items-center gap-3 flex-shrink-0 pb-0.5">
-                {[
-                  { label: t('ward.kpiTotalBeds'), value: totalBeds, color: 'var(--text-muted)' },
-                  { label: t('ward.kpiOccupied'), value: occupiedBeds, color: '#2191D0' },
-                  { label: t('ward.kpiAvailable'), value: availableBeds, color: '#15795C' },
-                  { label: t('ward.kpiOccupancy'), value: `${occupancyRate}%`, color: occupancyRate > 90 ? '#C44536' : occupancyRate > 75 ? '#B8741C' : 'var(--accent-primary)' },
-                ].map(s => (
-                  <span key={s.label} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                    {s.label} ({s.value})
-                  </span>
-                ))}
-              </div>
-            </div>
-            {/* Search + filter row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <input
-                  type="text"
-                  value={admissionSearch}
-                  onChange={e => setAdmissionSearch(e.target.value)}
-                  placeholder="Search by patient, ward, or diagnosis…"
-                  style={{ padding: '9px 18px', height: 38, borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
-                />
-              </div>
-              {facilityWards.length > 0 && (
-                <div className="relative" ref={wardFilterRef}>
-                  <button
-                    onClick={() => setShowWardFilter(s => !s)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 14px', borderRadius: 999,
-                      border: `1px solid ${activeFilterCount ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                      background: activeFilterCount ? 'rgba(33,145,208,0.08)' : 'var(--bg-card-solid)',
-                      color: activeFilterCount ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                      fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Filters
-                    {activeFilterCount > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
-                        {activeFilterCount}
-                      </span>
+          <EhrListHeader
+            title={t('ward.currentAdmissions')}
+            stats={[
+              { label: t('ward.kpiTotalBeds'), value: totalBeds, color: LIST_STAT_COLORS.muted },
+              { label: t('ward.kpiOccupied'), value: occupiedBeds, color: LIST_STAT_COLORS.blue },
+              { label: t('ward.kpiAvailable'), value: availableBeds, color: LIST_STAT_COLORS.green },
+              { label: t('ward.kpiOccupancy'), value: `${occupancyRate}%`, color: occupancyRate > 90 ? '#C44536' : occupancyRate > 75 ? LIST_STAT_COLORS.amber : LIST_STAT_COLORS.blue },
+            ]}
+            search={{ value: admissionSearch, onChange: setAdmissionSearch, placeholder: 'Search by patient, ward, or diagnosis…' }}
+            actions={
+              <>
+                {facilityWards.length > 0 && (
+                  <div className="relative" ref={wardFilterRef}>
+                    <EhrListHeaderButton onClick={() => setShowWardFilter(s => !s)} active={activeFilterCount > 0} ariaExpanded={showWardFilter}>
+                      Filters
+                      {activeFilterCount > 0 && (
+                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </EhrListHeaderButton>
+                    {showWardFilter && (
+                      <div className="absolute left-0 mt-2 rounded-2xl overflow-hidden z-50"
+                        style={{ width: 240, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: '0 16px 48px rgba(0,0,0,0.15)' }}>
+                        <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Filter by ward</span>
+                          {activeFilterCount > 0 && (
+                            <button onClick={() => { clearFilters(); setShowWardFilter(false); }} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>Clear</button>
+                          )}
+                        </div>
+                        <div className="p-3">
+                          <select value={filterWard} onChange={e => { setFilterWard(e.target.value); setShowWardFilter(false); }}
+                            style={{ width: 'auto', minWidth: '100%', height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13 }}>
+                            <option value="">All wards</option>
+                            {facilityWards.map(w => (
+                              <option key={w._id} value={w._id}>{w.name} ({w.occupiedBeds}/{w.totalBeds})</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     )}
-                  </button>
-                  {showWardFilter && (
-                    <div className="absolute left-0 mt-2 rounded-2xl overflow-hidden z-50"
-                      style={{ width: 240, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: '0 16px 48px rgba(0,0,0,0.15)' }}>
-                      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Filter by ward</span>
-                        {activeFilterCount > 0 && (
-                          <button onClick={() => { clearFilters(); setShowWardFilter(false); }} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>Clear</button>
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <select value={filterWard} onChange={e => { setFilterWard(e.target.value); setShowWardFilter(false); }}
-                          style={{ width: 'auto', minWidth: '100%', height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', fontSize: 13 }}>
-                          <option value="">All wards</option>
-                          {facilityWards.map(w => (
-                            <option key={w._id} value={w._id}>{w.name} ({w.occupiedBeds}/{w.totalBeds})</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              <button
-                onClick={() => setAdmitOpen(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 999, background: '#2191D0', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-              >
-                <Plus className="w-4 h-4" /> {t('ward.admitPatient')}
-              </button>
-            </div>
-          </div>
+                  </div>
+                )}
+                <button
+                  onClick={() => setAdmitOpen(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 999, background: '#2191D0', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                >
+                  <Plus className="w-4 h-4" /> {t('ward.admitPatient')}
+                </button>
+              </>
+            }
+          />
           <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
           {filteredAdmissions.length === 0 ? (
             <EmptyState

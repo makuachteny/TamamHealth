@@ -14,7 +14,7 @@ import {
   User, Activity, FlaskConical, Paperclip, XCircle, MessageSquarePlus,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ClipboardCheck, Bell, RotateCcw,
-  Search, Download,
+  Download,
 } from '@/components/icons/lucide';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useReferrals } from '@/lib/hooks/useReferrals';
@@ -22,6 +22,7 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
+import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import ReferralFilters, { type ReferralFilterState } from '@/components/referrals/ReferralFilters';
 import RowActionsMenu, { type RowAction } from '@/components/referrals/RowActionsMenu';
 import ReferralFormModal from '@/components/referrals/ReferralFormModal';
@@ -538,91 +539,53 @@ export default function ReferralsPage() {
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <PageInstructionCard />
 
-        {/* ═══ Page header ═══ */}
-        <div className="listpage-header">
-          <div className="listpage-header-title">
-            <div className="listpage-header-icon"><ArrowRightLeft size={22} /></div>
-            <div>
-              <p className="listpage-eyebrow">{currentUser?.hospitalName || 'Clinic'}</p>
-              <h1 className="listpage-title">{t('referrals.pageTitle')}</h1>
-            </div>
-          </div>
-          <div className="listpage-header-controls">
-            <select
-              value={activeTab}
-              onChange={e => setActiveTab(e.target.value as 'incoming' | 'outgoing')}
-              className="listpage-service-select"
-              aria-label="Filter referrals by direction"
-            >
-              <option value="incoming">{`Incoming referrals${newIncomingCount > 0 ? ` (${newIncomingCount} new)` : ''}`}</option>
-              <option value="outgoing">Outgoing referrals</option>
-            </select>
-          </div>
-        </div>
-
-        {/* ═══ New referral action ═══ */}
-        {canManageReferrals && (
-          <div className="listpage-actions-row">
-            <button type="button" className="btn btn-primary" style={{ gap: 8 }} onClick={() => setShowNewReferral(true)}>
-              <Plus size={16} /> {t('referrals.newReferral')}
-            </button>
-          </div>
-        )}
-
         {/* ═══ Table card ═══ */}
         <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          {/* Title + referral stats (inline, right-aligned — mirrors the wards
-              "Current Admissions" / patients "All patients" header instead of
-              separate stat cards). */}
-          <div className="px-4 pt-4">
-            <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
-              <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
-                {activeTab === 'incoming' ? 'Incoming' : 'Outgoing'} referrals
-              </span>
-              <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
-                {[
-                  { label: 'Total referrals', value: activeReferrals.length, color: 'var(--text-muted)' },
-                  { label: 'Accepted', value: acceptedCount, color: '#15795C' },
-                  { label: 'Declined', value: declinedCount, color: '#C44536' },
-                  { label: 'Pending / awaiting response', value: pendingCount, color: '#B8741C' },
-                  { label: 'Completed', value: completedCount, color: '#2191D0' },
-                ].map(s => (
-                  <span key={s.label} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                    {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="listpage-table-toolbar">
-            <div className="listpage-table-search">
-              <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-              <input
-                type="search"
-                value={localSearch}
-                onChange={e => setLocalSearch(e.target.value)}
-                placeholder="Search by patient, hospital, or department…"
-                aria-label="Filter table"
-              />
-            </div>
-            <ReferralFilters
-              filters={colFilters}
-              setFilter={setColFilter}
-              clearAll={clearColFilters}
-              urgencyOptions={urgencyOptions}
-              statusOptions={[
-                { v: 'sent', l: getStatusLabel('sent') },
-                { v: 'received', l: getStatusLabel('received') },
-                { v: 'seen', l: getStatusLabel('seen') },
-                { v: 'completed', l: getStatusLabel('completed') },
-                { v: 'cancelled', l: getStatusLabel('cancelled') },
-              ]}
-            />
-            <button type="button" className="btn btn-secondary btn-sm" style={{ gap: 6 }} onClick={handleDownloadCsv}>
-              <Download size={15} /> Download
-            </button>
-          </div>
+          <EhrListHeader
+            title={t('referrals.pageTitle')}
+            stats={[
+              { label: 'Total referrals', value: activeReferrals.length, color: LIST_STAT_COLORS.muted },
+              { label: 'Accepted', value: acceptedCount, color: LIST_STAT_COLORS.blue },
+              { label: 'Declined', value: declinedCount, color: LIST_STAT_COLORS.amber },
+              { label: 'Pending / awaiting response', value: pendingCount, color: LIST_STAT_COLORS.green },
+              { label: 'Completed', value: completedCount, color: LIST_STAT_COLORS.bronze },
+            ]}
+            search={{ value: localSearch, onChange: setLocalSearch, placeholder: 'Search by patient, hospital, or department…', ariaLabel: 'Filter table' }}
+            actions={
+              <>
+                <select
+                  value={activeTab}
+                  onChange={e => setActiveTab(e.target.value as 'incoming' | 'outgoing')}
+                  aria-label="Filter referrals by direction"
+                  style={{ height: 38, padding: '0 14px', borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, flexShrink: 0 }}
+                >
+                  <option value="incoming">{`Incoming referrals${newIncomingCount > 0 ? ` (${newIncomingCount} new)` : ''}`}</option>
+                  <option value="outgoing">Outgoing referrals</option>
+                </select>
+                <ReferralFilters
+                  filters={colFilters}
+                  setFilter={setColFilter}
+                  clearAll={clearColFilters}
+                  urgencyOptions={urgencyOptions}
+                  statusOptions={[
+                    { v: 'sent', l: getStatusLabel('sent') },
+                    { v: 'received', l: getStatusLabel('received') },
+                    { v: 'seen', l: getStatusLabel('seen') },
+                    { v: 'completed', l: getStatusLabel('completed') },
+                    { v: 'cancelled', l: getStatusLabel('cancelled') },
+                  ]}
+                />
+                <EhrListHeaderButton onClick={handleDownloadCsv}>
+                  <Download size={15} /> Download
+                </EhrListHeaderButton>
+                {canManageReferrals && (
+                  <button type="button" className="btn btn-primary" style={{ gap: 8, flexShrink: 0 }} onClick={() => setShowNewReferral(true)}>
+                    <Plus size={16} /> {t('referrals.newReferral')}
+                  </button>
+                )}
+              </>
+            }
+          />
 
           <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             {filteredReferrals.length === 0 ? (

@@ -17,7 +17,8 @@ import type {
   PatientIntakeFormDoc,
   UserRole,
 } from '@/lib/db-types';
-import { ClipboardPen, Mail, MessageSquare, Plus, Search, Settings, X } from '@/components/icons/lucide';
+import { ClipboardPen, Mail, MessageSquare, Plus, Settings, X } from '@/components/icons/lucide';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 
 const TABS: { key: IntakeFormStatus; label: string }[] = [
   { key: 'pending_review', label: 'Pending Review' },
@@ -274,23 +275,13 @@ export default function PatientIntakePage() {
         hideSearch
         titleIcon={<Settings className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}
         titleActions={
-          <>
-            <a
-              href="mailto:support.tamam@gmail.com?subject=Patient%20Intake%20feedback"
-              className="text-[12px] font-medium hidden sm:inline"
-              style={{ color: 'var(--accent-primary)' }}
-            >
-              How can we improve this feature? <span className="underline">Let us know</span>
-            </a>
-            <button
-              type="button"
-              className="btn btn-sm"
-              style={{ background: 'var(--color-warning-600)', borderColor: 'var(--color-warning-600)', color: '#fff' }}
-              onClick={() => setSendOpen(true)}
-            >
-              Send forms
-            </button>
-          </>
+          <a
+            href="mailto:support.tamam@gmail.com?subject=Patient%20Intake%20feedback"
+            className="text-[12px] font-medium hidden sm:inline"
+            style={{ color: 'var(--accent-primary)' }}
+          >
+            How can we improve this feature? <span className="underline">Let us know</span>
+          </a>
         }
       />
 
@@ -327,66 +318,73 @@ export default function PatientIntakePage() {
           </aside>
 
           {/* Table + filters */}
-          <div className="flex-1 min-w-0 card-elevated p-4">
-            <div className="flex flex-wrap items-center gap-3 mb-4">
-              <div className="relative ml-auto" style={{ minWidth: 220 }}>
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-                <input
-                  value={patientQuery}
-                  onChange={e => setPatientQuery(e.target.value)}
-                  placeholder="Patient"
-                  style={{
-                    background: 'var(--bg-secondary)', border: '1px solid var(--border-light)',
-                    color: 'var(--text-primary)', borderRadius: 10,
-                    padding: '8px 10px 8px 30px', fontSize: 13, width: '100%',
-                  }}
-                />
-              </div>
-            </div>
+          <div className="flex-1 min-w-0 card-elevated overflow-hidden flex flex-col">
+            <EhrListHeader
+              title="Patient Intake"
+              stats={[
+                { label: 'Sent', value: forms.length, color: LIST_STAT_COLORS.muted },
+                { label: 'Pending review', value: counts.pending_review, color: LIST_STAT_COLORS.blue },
+                { label: 'Not submitted', value: counts.not_submitted, color: LIST_STAT_COLORS.amber },
+                { label: 'Merged', value: counts.merged, color: LIST_STAT_COLORS.green },
+              ]}
+              search={{ value: patientQuery, onChange: setPatientQuery, placeholder: 'Patient', ariaLabel: 'Search by patient' }}
+              actions={
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ background: 'var(--color-warning-600)', borderColor: 'var(--color-warning-600)', color: '#fff' }}
+                  onClick={() => setSendOpen(true)}
+                >
+                  Send forms
+                </button>
+              }
+            />
 
-            {loading ? (
-              <p className="text-[13px] py-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading…</p>
-            ) : filtered.length === 0 ? (
-              <p className="text-[13px] py-8 text-center" style={{ color: 'var(--text-muted)' }}>
-                No forms in this view.
-              </p>
-            ) : (
-              <table className="data-table" style={{ width: '100%' }}>
-                <thead>
-                  <tr>
-                    <th>Received</th>
-                    <th>Patient</th>
-                    <th>Provider</th>
-                    <th className="text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(form => (
-                    <tr key={form._id}>
-                      <td>{formatDate(form.receivedAt || form.requestedAt)}</td>
-                      <td>
-                        <span className="inline-flex items-center gap-2">
-                          <ClipboardPen className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-                          {form.patientName}
-                        </span>
-                      </td>
-                      <td style={{ color: 'var(--text-muted)' }}>{form.providerName || '—'}</td>
-                      <td className="text-right">
-                        {form.status === 'pending_review' ? (
-                          <button type="button" className="btn btn-sm btn-secondary" onClick={() => openReview(form)}>
-                            Review
-                          </button>
-                        ) : form.status === 'merged' ? (
-                          <span className="text-[12px]" style={{ color: 'var(--color-success)' }}>Merged {formatDate(form.mergedAt)}</span>
-                        ) : (
-                          <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Awaiting patient</span>
-                        )}
-                      </td>
+            <div className="p-4">
+              {loading ? (
+                <p className="text-[13px] py-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+              ) : filtered.length === 0 ? (
+                <p className="text-[13px] py-8 text-center" style={{ color: 'var(--text-muted)' }}>
+                  No forms in this view.
+                </p>
+              ) : (
+                <table className="data-table" style={{ width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>Received</th>
+                      <th>Patient</th>
+                      <th>Provider</th>
+                      <th className="text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                  </thead>
+                  <tbody>
+                    {filtered.map(form => (
+                      <tr key={form._id}>
+                        <td>{formatDate(form.receivedAt || form.requestedAt)}</td>
+                        <td>
+                          <span className="inline-flex items-center gap-2">
+                            <ClipboardPen className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+                            {form.patientName}
+                          </span>
+                        </td>
+                        <td style={{ color: 'var(--text-muted)' }}>{form.providerName || '—'}</td>
+                        <td className="text-right">
+                          {form.status === 'pending_review' ? (
+                            <button type="button" className="btn btn-sm btn-secondary" onClick={() => openReview(form)}>
+                              Review
+                            </button>
+                          ) : form.status === 'merged' ? (
+                            <span className="text-[12px]" style={{ color: 'var(--color-success)' }}>Merged {formatDate(form.mergedAt)}</span>
+                          ) : (
+                            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Awaiting patient</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       </main>

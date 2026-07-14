@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Modal from '@/components/Modal';
 import PatientName from '@/components/PatientName';
-import { Pill, AlertTriangle, Loader2, Plus, X, Printer, Calendar, ChevronRight, AlertOctagon, Filter, Search, Download } from '@/components/icons/lucide';
+import { Pill, AlertTriangle, Loader2, Plus, X, Printer, Calendar, ChevronRight, AlertOctagon, Filter, Download } from '@/components/icons/lucide';
+import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -82,6 +83,9 @@ export default function PharmacyPage() {
 
   // Compact per-column filter controls (funnel dropdown in each header).
   const fieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', padding: '5px 9px', borderRadius: 8, fontSize: 11, width: '100%', minWidth: 0 } as const;
+  // Pill-shaped select matching EhrListHeaderButton, for filter dropdowns that
+  // live in the shared header's actions row alongside pill buttons.
+  const pillSelectStyle = { height: 38, padding: '0 14px', borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer' } as const;
   const textNode = (key: keyof typeof colFilters, label: string) => (
     <input type="text" autoFocus value={colFilters[key]} onChange={(e) => setColFilter(key, e.target.value)} placeholder={label} className="normal-case font-normal tracking-normal w-full" style={fieldStyle} />
   );
@@ -293,7 +297,6 @@ export default function PharmacyPage() {
 
   const pendingRx = rxQueue.filter(r => r.status === 'pending').length;
   const lowStock = inventory.filter(i => i.status === 'low' || i.status === 'critical').length;
-  const inventoryAdequate = inventory.filter(i => i.status === 'adequate').length;
   const totalDispensedToday = inventory.reduce((sum, i) => sum + (i.dispensedToday || 0), 0);
 
   const filteredInventory = inventory.filter(i => {
@@ -346,7 +349,6 @@ export default function PharmacyPage() {
       .sort((a, b) => (a.expiryDate || '').localeCompare(b.expiryDate || '')),
   [inventory, q, categoryFilter, statusFilter]);
   const expiredCount = inventory.filter(i => i.status === 'expired').length;
-  const expiringCount = inventory.filter(i => i.status !== 'expired' && daysUntil(i.expiryDate) <= 90).length;
   const expiryStatusFor = (item: typeof inventory[number]) => {
     const days = daysUntil(item.expiryDate);
     const expired = item.status === 'expired' || days <= 0;
@@ -511,69 +513,66 @@ export default function PharmacyPage() {
     <main className="page-container page-enter">
       <PageInstructionCard />
 
-      {/* ═══ Page header ═══ */}
-      <div className="listpage-header">
-        <div className="listpage-header-title">
-          <div className="listpage-header-icon"><Pill size={22} /></div>
-          <div>
-            <p className="listpage-eyebrow">{currentUser?.hospitalName || 'Clinic'}</p>
-            <h1 className="listpage-title">{t('nav.pharmacy')}</h1>
-          </div>
-        </div>
-        <div className="listpage-header-controls">
-          <select
-            value={categoryFilter}
-            onChange={e => setCategoryFilter(e.target.value)}
-            className="listpage-service-select"
-            aria-label="Filter by medication category"
-          >
-            <option value="all">Filter by medication category</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {/* ═══ Actions row ═══ */}
-      <div className="listpage-actions-row">
-        {anyColFilter && (
-          <button onClick={clearColFilters} className="btn btn-secondary" title={t('nurse.clearAllFilters')} aria-label={t('nurse.clearAllFilters')}>
-            <X className="w-4 h-4" />
-            <span className="hidden sm:inline">{t('nurse.clearAllFilters')}</span>
-          </button>
-        )}
-        {canDispense && (
-          <button onClick={() => setShowStockInModal(true)} className="btn btn-primary">
-            <Plus className="w-4 h-4" /> {t('pharmacy.receiveStock')}
-          </button>
-        )}
-      </div>
-
       {/* ═══ Table card ═══ */}
       <div className="dash-card overflow-hidden">
-        {/* Title + inventory stats (inline, right-aligned — mirrors the wards
-            "Current Admissions" header instead of separate stat cards). */}
-        <div className="px-4 pt-4">
-          <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
-            <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
-              {sectionTitles[activeTab]}
-            </span>
-            <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
-              {[
-                { label: 'Inventory items', value: inventory.length, color: 'var(--text-muted)' },
-                { label: 'In stock', value: inventoryAdequate, color: '#15795C' },
-                { label: 'Needs attention', value: lowStock, color: '#C44536' },
-                { label: t('pharmacy.kpiDispensedToday'), value: totalDispensedToday, color: '#2191D0' },
-                { label: 'Expiring within 90 days', value: expiringCount, color: '#B8741C' },
-                { label: t('pharmacy.kpiExpired'), value: expiredCount, color: '#C44536' },
-              ].map((s, i) => (
-                <span key={i} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                  {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
+        <EhrListHeader
+          title={sectionTitles[activeTab]}
+          stats={[
+            { label: t('pharmacy.prescriptionQueue'), value: rxQueue.length, color: LIST_STAT_COLORS.muted },
+            { label: t('pharmacy.pending'), value: pendingRx, color: LIST_STAT_COLORS.blue },
+            { label: t('pharmacy.kpiDispensedToday'), value: totalDispensedToday, color: LIST_STAT_COLORS.amber },
+            { label: 'Low stock', value: lowStock, color: LIST_STAT_COLORS.green },
+          ]}
+          search={!(activeTab === 'patients' && activePatient) ? { value: tableSearch, onChange: setTableSearch, placeholder: 'Filter table', ariaLabel: 'Filter table' } : undefined}
+          actions={
+            <>
+              <select
+                value={categoryFilter}
+                onChange={e => setCategoryFilter(e.target.value)}
+                aria-label="Filter by medication category"
+                style={pillSelectStyle}
+              >
+                <option value="all">Category</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              {!(activeTab === 'patients' && activePatient) && (activeTab === 'inventory' || activeTab === 'reorder' || activeTab === 'expiry') && (
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+                  aria-label="Filter by stock status"
+                  style={pillSelectStyle}
+                >
+                  <option value="all">Status</option>
+                  <option value="adequate">{t('pharmacy.inStock')}</option>
+                  <option value="low">{t('pharmacy.invStatus_low')}</option>
+                  <option value="critical">{t('pharmacy.invStatus_critical')}</option>
+                  <option value="expired">{t('pharmacy.invStatus_expired')}</option>
+                </select>
+              )}
+              {anyColFilter && (
+                <EhrListHeaderButton onClick={clearColFilters} ariaLabel={t('nurse.clearAllFilters')}>
+                  <X className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{t('nurse.clearAllFilters')}</span>
+                </EhrListHeaderButton>
+              )}
+              {!(activeTab === 'patients' && activePatient) && activeTab === 'reorder' && canDispense && reorderList.length > 0 && (
+                <button type="button" onClick={handlePrintReorder} className="btn btn-primary btn-sm" style={{ gap: 6, height: 38 }}>
+                  <Printer size={15} /> {t('pharmacy.generateOrder')}
+                </button>
+              )}
+              {!(activeTab === 'patients' && activePatient) && (
+                <EhrListHeaderButton onClick={handleDownloadCsv}>
+                  <Download size={15} /> Download
+                </EhrListHeaderButton>
+              )}
+              {canDispense && (
+                <button onClick={() => setShowStockInModal(true)} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap' }}>
+                  <Plus className="w-4 h-4" /> {t('pharmacy.receiveStock')}
+                </button>
+              )}
+            </>
+          }
+        />
         <div className="flex gap-0 border-b overflow-x-auto" style={{ borderColor: 'var(--border-light)' }}>
           {tabsConfig.map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
@@ -583,43 +582,6 @@ export default function PharmacyPage() {
             </button>
           ))}
         </div>
-
-        {!(activeTab === 'patients' && activePatient) && (
-          <div className="listpage-table-toolbar">
-            <div className="listpage-table-search">
-              <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-              <input
-                type="search"
-                value={tableSearch}
-                onChange={e => setTableSearch(e.target.value)}
-                placeholder="Filter table"
-                aria-label="Filter table"
-              />
-            </div>
-            {(activeTab === 'inventory' || activeTab === 'reorder' || activeTab === 'expiry') && (
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
-                className="listpage-status-select"
-                aria-label="Filter by stock status"
-              >
-                <option value="all">Filter by stock status</option>
-                <option value="adequate">{t('pharmacy.inStock')}</option>
-                <option value="low">{t('pharmacy.invStatus_low')}</option>
-                <option value="critical">{t('pharmacy.invStatus_critical')}</option>
-                <option value="expired">{t('pharmacy.invStatus_expired')}</option>
-              </select>
-            )}
-            {activeTab === 'reorder' && canDispense && reorderList.length > 0 && (
-              <button type="button" onClick={handlePrintReorder} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
-                <Printer size={15} /> {t('pharmacy.generateOrder')}
-              </button>
-            )}
-            <button type="button" className="btn btn-secondary btn-sm" style={{ gap: 6 }} onClick={handleDownloadCsv}>
-              <Download size={15} /> Download
-            </button>
-          </div>
-        )}
 
         {activeTab === 'queue' && (
           rxLoading ? (

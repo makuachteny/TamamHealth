@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import TopBar from '@/components/TopBar';
 import PatientName from '@/components/PatientName';
 import { useDeaths } from '@/lib/hooks/useDeaths';
 import { useHospitals } from '@/lib/hooks/useHospitals';
@@ -11,8 +10,8 @@ import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { FilterBar } from '@/components/filters';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck } from '@/components/icons/lucide';
 
 export default function DeathsPage() {
@@ -83,6 +82,19 @@ export default function DeathsPage() {
     return true;
   });
 
+  // Header stat chips — computed from data already loaded on this page,
+  // unaffected by the column filters (same as the patients header).
+  const thisMonthPrefix = new Date().toISOString().slice(0, 7);
+  const deathStats = useMemo(() => {
+    const all = deaths || [];
+    return {
+      total: all.length,
+      thisMonth: all.filter(d => d.dateOfDeath?.startsWith(thisMonthPrefix)).length,
+      certified: all.filter(d => !!d.certifiedBy).length,
+      uncertified: all.filter(d => !d.certifiedBy).length,
+    };
+  }, [deaths, thisMonthPrefix]);
+
   const deathCols = [
     { key: 'certificate', label: t('deaths.colCertificate') },
     { key: 'deceased', label: t('deaths.colDeceased') },
@@ -148,47 +160,43 @@ export default function DeathsPage() {
   );
 
   return (
-    <>
-      <TopBar title={t('deaths.title')} actions={
-            canRecordVitalEvents ? (
-              <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
-                <Plus className="w-4 h-4" /> {t('deaths.registerDeath')}
-              </button>
-            ) : undefined
-          } />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        {/* Single unified filter */}
-        <FilterBar>
-          <div className="relative flex-1" style={{ maxWidth: 360 }}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              placeholder={t('deaths.searchPlaceholder') || 'Search by name, certificate, cause…'}
-              value={colFilters.name}
-              onChange={e => setColFilter('name', e.target.value)}
-              className="input-field"
-              style={{ paddingLeft: 36 }}
-            />
-          </div>
-          <select value={colFilters.sex} onChange={e => setColFilter('sex', e.target.value)} className="input-field" style={{ width: 'auto' }}>
-            <option value="">All Genders</option>
-            <option value="Male">{t('patient.male')}</option>
-            <option value="Female">{t('patient.female')}</option>
-          </select>
-          <select value={colFilters.registered} onChange={e => setColFilter('registered', e.target.value)} className="input-field" style={{ width: 'auto' }}>
-            <option value="">All Status</option>
-            <option value="yes">{t('deaths.yes')}</option>
-            <option value="no">{t('deaths.no')}</option>
-          </select>
-          {anyColFilter && (
-            <button onClick={clearColFilters} className="btn btn-secondary btn-sm" title={t('nurse.clearAllFilters')} aria-label={t('nurse.clearAllFilters')}>
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </FilterBar>
-
+    <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Table */}
         <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <EhrListHeader
+            title={t('deaths.title')}
+            stats={[
+              { label: 'Registered', value: deathStats.total, color: LIST_STAT_COLORS.muted },
+              { label: 'This month', value: deathStats.thisMonth, color: LIST_STAT_COLORS.blue },
+              { label: 'Certified', value: deathStats.certified, color: LIST_STAT_COLORS.amber },
+              { label: 'Uncertified', value: deathStats.uncertified, color: LIST_STAT_COLORS.green },
+            ]}
+            search={{ value: colFilters.name, onChange: v => setColFilter('name', v), placeholder: t('deaths.searchPlaceholder') || 'Search by name, certificate, cause…', ariaLabel: t('deaths.searchPlaceholder') || 'Search deaths' }}
+            actions={
+              <>
+                <select value={colFilters.sex} onChange={e => setColFilter('sex', e.target.value)} className="input-field" style={{ width: 'auto', height: 38 }}>
+                  <option value="">All Genders</option>
+                  <option value="Male">{t('patient.male')}</option>
+                  <option value="Female">{t('patient.female')}</option>
+                </select>
+                <select value={colFilters.registered} onChange={e => setColFilter('registered', e.target.value)} className="input-field" style={{ width: 'auto', height: 38 }}>
+                  <option value="">All Status</option>
+                  <option value="yes">{t('deaths.yes')}</option>
+                  <option value="no">{t('deaths.no')}</option>
+                </select>
+                {anyColFilter && (
+                  <button onClick={clearColFilters} className="btn btn-secondary btn-sm" title={t('nurse.clearAllFilters')} aria-label={t('nurse.clearAllFilters')} style={{ height: 38 }}>
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+                {canRecordVitalEvents && (
+                  <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2" style={{ height: 38, whiteSpace: 'nowrap' }}>
+                    <Plus className="w-4 h-4" /> {t('deaths.registerDeath')}
+                  </button>
+                )}
+              </>
+            }
+          />
           <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           <table className="data-table" style={{ minWidth: 960 }}>
             <thead>
@@ -378,7 +386,6 @@ export default function DeathsPage() {
             </div>
           </div>
         )}
-      </main>
-    </>
+    </main>
   );
 }

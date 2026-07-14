@@ -1166,6 +1166,20 @@ const seedBills: Omit<BillingDoc, '_rev'>[] = [
 ];
 
 export async function seedDatabase(): Promise<void> {
+  // Serialize seeding across tabs. Two tabs seeding concurrently is how the
+  // demo DB gets corrupted: one tab's resetAllDatabases() destroys IndexedDB
+  // stores while the other still holds open connections, the version-change
+  // transaction aborts, the seed throws (CustomPouchError), and the browser is
+  // left with partial data. Under the lock, the second tab waits and then sees
+  // isSeeded() === true and returns without touching anything. Same Web Locks
+  // pattern the sync manager uses for its leader election.
+  if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+    return navigator.locks.request('tamamhealth-seed', () => seedDatabaseExclusive());
+  }
+  return seedDatabaseExclusive();
+}
+
+async function seedDatabaseExclusive(): Promise<void> {
   if (await isSeeded()) {
     // Run photo migration on already-seeded databases so existing installs
     // pick up the new photoUrl field without requiring a reset.

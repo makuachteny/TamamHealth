@@ -7,7 +7,8 @@ import PatientName from '@/components/PatientName';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { useRouter } from 'next/navigation';
-import { FlaskConical, AlertTriangle, X, Plus, Radio, CheckCircle2, Filter, Search, Download } from '@/components/icons/lucide';
+import { FlaskConical, AlertTriangle, X, Plus, Radio, CheckCircle2, Filter, Download } from '@/components/icons/lucide';
+import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import { useLabResults } from '@/lib/hooks/useLabResults';
 import { evaluateCritical } from '@/lib/services/lab-critical-flag';
 import { parseInstrumentPayload, type ParsedInstrumentResult } from '@/lib/services/instrument-intake-service';
@@ -254,6 +255,8 @@ export default function LabPage() {
   // own filters, so the header numbers stay a stable "whole queue" summary).
   const labStats = {
     total: labResults.length,
+    pending: labResults.filter(o => o.status === 'pending').length,
+    inProgress: labResults.filter(o => o.status === 'in_progress').length,
     completed: labResults.filter(o => o.status === 'completed').length,
     critical: labResults.filter(o => o.critical).length,
     awaiting: labResults.filter(o => o.status === 'pending' || o.status === 'in_progress').length,
@@ -290,6 +293,9 @@ export default function LabPage() {
   // Per-column filter controls + column config (funnel dropdown per header).
   type ColFilter = { field: keyof typeof colFilters; node: React.ReactNode };
   const fieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', padding: '5px 9px', borderRadius: 8, fontSize: 11, width: '100%', minWidth: 0 } as const;
+  // Pill-shaped select matching EhrListHeaderButton, for filter dropdowns that
+  // live in the shared header's actions row alongside pill buttons.
+  const pillSelectStyle = { height: 38, padding: '0 14px', borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer' } as const;
   const textFilter = (key: keyof typeof colFilters, label: string): ColFilter => ({
     field: key,
     node: <input type="text" autoFocus value={colFilters[key]} onChange={(e) => setColFilter(key, e.target.value)} placeholder={label} className="normal-case font-normal tracking-normal w-full" style={fieldStyle} />,
@@ -393,48 +399,6 @@ export default function LabPage() {
     <>
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <PageInstructionCard />
-
-          {/* ── Page header ── */}
-          <div className="listpage-header">
-            <div className="listpage-header-title">
-              <div className="listpage-header-icon"><FlaskConical size={22} /></div>
-              <div>
-                <p className="listpage-eyebrow">{currentUser?.hospitalName || 'Clinic'}</p>
-                <h1 className="listpage-title">{t('lab.laboratory')}</h1>
-              </div>
-            </div>
-            <div className="listpage-header-controls">
-              <select
-                value={colFilters.test}
-                onChange={e => setColFilter('test', e.target.value)}
-                className="listpage-service-select"
-                aria-label="Filter lab orders by test type"
-              >
-                <option value="">Filter lab orders by test type</option>
-                {testTypeOptions.map(name => <option key={name} value={name}>{name}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* ── Actions row ── */}
-          <div className="listpage-actions-row">
-            {anyFilterActive && (
-              <button onClick={clearColFilters} className="btn btn-secondary" title={t('nurse.clearAllFilters')} aria-label={t('nurse.clearAllFilters')}>
-                <X className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('nurse.clearAllFilters')}</span>
-              </button>
-            )}
-            {canEnterLabResults && (
-              <button onClick={() => setShowImportModal(true)} className="btn btn-secondary">
-                <Radio className="w-4 h-4" /> Import from analyzer
-              </button>
-            )}
-            {canOrderLabs && (
-              <button onClick={() => setShowOrderModal(true)} className="btn btn-primary">
-                <Plus className="w-4 h-4" /> {t('lab.newOrder')}
-              </button>
-            )}
-          </div>
 
           {overdueReviews.length > 0 && (
             <div className="card-elevated p-3 mb-4 flex items-start gap-2" style={{ background: 'rgba(229,46,66,0.08)', border: '1px solid var(--color-danger)' }}>
@@ -663,54 +627,60 @@ export default function LabPage() {
 
           {/* Lab Orders Table */}
           <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-            {/* Title + inline stat pills (mirrors the Patients/Wards list-card header) */}
-            <div style={{ padding: '14px 16px 0' }}>
-              <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
-                <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
-                  Lab orders
-                </span>
-                <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
-                  {[
-                    { label: 'Total lab orders', value: labStats.total, color: 'var(--text-muted)' },
-                    { label: 'Completed', value: labStats.completed, color: 'var(--color-success)' },
-                    { label: 'Critical', value: labStats.critical, color: 'var(--color-danger)' },
-                    { label: 'Awaiting results', value: labStats.awaiting, color: '#B8741C' },
-                    { label: 'Overdue clinician review', value: overdueReviews.length, color: '#C44536' },
-                  ].map((s, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                      {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="listpage-table-toolbar">
-              <div className="listpage-table-search">
-                <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                <input
-                  type="search"
-                  value={quickSearch}
-                  onChange={e => setQuickSearch(e.target.value)}
-                  placeholder="Filter table"
-                  aria-label="Filter table"
-                />
-              </div>
-              <select
-                value={colFilters.status}
-                onChange={e => setColFilter('status', e.target.value)}
-                className="listpage-status-select"
-                aria-label="Filter lab orders by status"
-              >
-                <option value="">Filter lab orders by status</option>
-                <option value="pending">{t('lab.filterPending')}</option>
-                <option value="in_progress">{t('lab.inProgress')}</option>
-                <option value="completed">{t('referral.completed')}</option>
-              </select>
-              <button type="button" className="btn btn-secondary btn-sm" style={{ gap: 6 }} onClick={handleDownloadCsv}>
-                <Download size={15} /> Download
-              </button>
-            </div>
+            <EhrListHeader
+              title={t('lab.laboratory')}
+              stats={[
+                { label: 'Orders', value: labStats.total, color: LIST_STAT_COLORS.muted },
+                { label: 'Pending', value: labStats.pending, color: LIST_STAT_COLORS.blue },
+                { label: 'In progress', value: labStats.inProgress, color: LIST_STAT_COLORS.amber },
+                { label: 'Completed', value: labStats.completed, color: LIST_STAT_COLORS.green },
+                { label: 'Critical', value: labStats.critical, color: LIST_STAT_COLORS.bronze },
+              ]}
+              search={{ value: quickSearch, onChange: setQuickSearch, placeholder: 'Filter table', ariaLabel: 'Filter table' }}
+              actions={
+                <>
+                  <select
+                    value={colFilters.test}
+                    onChange={e => setColFilter('test', e.target.value)}
+                    aria-label="Filter lab orders by test type"
+                    style={pillSelectStyle}
+                  >
+                    <option value="">Test type</option>
+                    {testTypeOptions.map(name => <option key={name} value={name}>{name}</option>)}
+                  </select>
+                  <select
+                    value={colFilters.status}
+                    onChange={e => setColFilter('status', e.target.value)}
+                    aria-label="Filter lab orders by status"
+                    style={pillSelectStyle}
+                  >
+                    <option value="">Status</option>
+                    <option value="pending">{t('lab.filterPending')}</option>
+                    <option value="in_progress">{t('lab.inProgress')}</option>
+                    <option value="completed">{t('referral.completed')}</option>
+                  </select>
+                  {anyFilterActive && (
+                    <EhrListHeaderButton onClick={clearColFilters} ariaLabel={t('nurse.clearAllFilters')}>
+                      <X className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{t('nurse.clearAllFilters')}</span>
+                    </EhrListHeaderButton>
+                  )}
+                  <EhrListHeaderButton onClick={handleDownloadCsv}>
+                    <Download size={15} /> Download
+                  </EhrListHeaderButton>
+                  {canEnterLabResults && (
+                    <EhrListHeaderButton onClick={() => setShowImportModal(true)}>
+                      <Radio className="w-3.5 h-3.5" /> Import from analyzer
+                    </EhrListHeaderButton>
+                  )}
+                  {canOrderLabs && (
+                    <button onClick={() => setShowOrderModal(true)} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap' }}>
+                      <Plus className="w-4 h-4" /> {t('lab.newOrder')}
+                    </button>
+                  )}
+                </>
+              }
+            />
             <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             <table className="data-table" style={{ minWidth: 960 }}>
               <thead>

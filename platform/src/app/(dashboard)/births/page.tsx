@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import TopBar from '@/components/TopBar';
 import { useBirths } from '@/lib/hooks/useBirths';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { patientFullName } from '@/lib/patient-utils';
@@ -11,6 +10,7 @@ import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import {
   Baby, Plus, X, ChevronDown, ChevronUp,
 } from '@/components/icons/lucide';
@@ -35,8 +35,10 @@ export default function BirthsPage() {
   const { canRecordVitalEvents } = usePermissions();
   const { showToast } = useToast();
   const { t } = useTranslation();
-  // Text search comes from the shared global search bar (TopBar).
-  const search = globalSearch;
+  // Table toolbar search (shared list-page header), combined with the
+  // platform-wide search bar so a term typed elsewhere still narrows this list.
+  const [tableSearch, setTableSearch] = useState('');
+  const search = `${tableSearch} ${globalSearch}`.trim();
   const [showForm, setShowForm] = useState(false);
   const [expandedBirth, setExpandedBirth] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -52,6 +54,19 @@ export default function BirthsPage() {
     (!search || `${b.childFirstName} ${b.childSurname}`.toLowerCase().includes(search.toLowerCase()) ||
     (b.motherName || '').toLowerCase().includes(search.toLowerCase()) || (b.certificateNumber || '').toLowerCase().includes(search.toLowerCase()))
   );
+
+  // Header stat chips — computed from data already loaded on this page,
+  // unaffected by the search box (same as the patients header).
+  const thisMonthPrefix = new Date().toISOString().slice(0, 7);
+  const birthStats = useMemo(() => {
+    const all = births || [];
+    return {
+      total: all.length,
+      thisMonth: all.filter(b => b.dateOfBirth?.startsWith(thisMonthPrefix)).length,
+      male: all.filter(b => b.childGender === 'Male').length,
+      female: all.filter(b => b.childGender === 'Female').length,
+    };
+  }, [births, thisMonthPrefix]);
 
   const handleSubmit = async () => {
     if (!form.childFirstName || !form.motherName) return;
@@ -74,17 +89,26 @@ export default function BirthsPage() {
   };
 
   return (
-    <>
-      <TopBar title={t('nav.births')} actions={
-            canRecordVitalEvents && (
-              <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2">
-                <Plus className="w-4 h-4" /> {t('births.registerBirth')}
-              </button>
-            )
-          } />
-      <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+    <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Table */}
         <div className="card-elevated overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <EhrListHeader
+            title={t('nav.births')}
+            stats={[
+              { label: 'Registered', value: birthStats.total, color: LIST_STAT_COLORS.muted },
+              { label: 'This month', value: birthStats.thisMonth, color: LIST_STAT_COLORS.blue },
+              { label: 'Male', value: birthStats.male, color: LIST_STAT_COLORS.amber },
+              { label: 'Female', value: birthStats.female, color: LIST_STAT_COLORS.green },
+            ]}
+            search={{ value: tableSearch, onChange: setTableSearch, placeholder: 'Search by child or mother name…', ariaLabel: 'Search births' }}
+            actions={
+              canRecordVitalEvents && (
+                <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2" style={{ height: 38, whiteSpace: 'nowrap' }}>
+                  <Plus className="w-4 h-4" /> {t('births.registerBirth')}
+                </button>
+              )
+            }
+          />
           <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           {loading ? (
             <div className="p-8 text-center"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</p></div>
@@ -265,7 +289,6 @@ export default function BirthsPage() {
             </div>
           </div>
         )}
-      </main>
-    </>
+    </main>
   );
 }

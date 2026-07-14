@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import TopBar from '@/components/TopBar';
 import EmptyState from '@/components/EmptyState';
 import Badge, { type BadgeTone } from '@/components/Badge';
 import { useANC } from '@/lib/hooks/useANC';
@@ -13,6 +12,7 @@ import { useApp } from '@/lib/context';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { ANCVisitDoc } from '@/lib/db-types';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import {
   HeartPulse, Plus, X, Users,
   Calendar, ChevronRight, ExternalLink, Edit3,
@@ -40,8 +40,10 @@ export default function ANCPage() {
   // view for facility management and the Ministry of Health. Clinical roles keep
   // the data recordings, workflow, and the mother/visit data.
   const canViewCoverage = ['facility_administrator', 'hospital_manager', 'medical_superintendent', 'government', 'county_health_director', 'super_admin'].includes(currentUser?.role ?? '');
-  // Text search comes from the shared global search bar (TopBar).
-  const search = globalSearch;
+  // Table toolbar search (shared list-page header), combined with the
+  // platform-wide search bar so a term typed elsewhere still narrows this list.
+  const [tableSearch, setTableSearch] = useState('');
+  const search = `${tableSearch} ${globalSearch}`.trim();
   const [showModal, setShowModal] = useState(false);
   // Edit/correct affordance for a saved ANC visit. Visits are corrected via
   // updateANCVisit (audit/sync preserved), not hard-deleted from the UI.
@@ -120,6 +122,19 @@ export default function ANCPage() {
     return result;
   }, [motherSummaries, search]);
 
+  // Header stat chips — computed from data already loaded on this page (no
+  // extra fetches). Unaffected by the search box, same as the patients header.
+  const today = new Date().toISOString().slice(0, 10);
+  const thisMonthPrefix = today.slice(0, 7);
+  const highRiskCount = useMemo(() => motherSummaries.filter(m => m.latest.riskLevel === 'high').length, [motherSummaries]);
+  const visitsThisMonth = useMemo(() => (visits || []).filter(v => v.visitDate?.startsWith(thisMonthPrefix)).length, [visits, thisMonthPrefix]);
+  const dueSoonCount = useMemo(() => {
+    const in7 = new Date();
+    in7.setDate(in7.getDate() + 7);
+    const in7Str = in7.toISOString().slice(0, 10);
+    return motherSummaries.filter(m => m.latest.nextVisitDate && m.latest.nextVisitDate >= today && m.latest.nextVisitDate <= in7Str).length;
+  }, [motherSummaries, today]);
+
   const selectedMotherVisits = useMemo(() => {
     if (!selectedMother) return [];
     return (visits || []).filter(v => v.motherId === selectedMother).sort((a, b) => a.visitNumber - b.visitNumber);
@@ -192,30 +207,19 @@ export default function ANCPage() {
 
   if (loading) {
     return (
-      <>
-        <TopBar title={t('anc.title')} />
-        <main className="page-container page-enter">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('anc.loadingRecords')}</p>
-            </div>
+      <main className="page-container page-enter">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('anc.loadingRecords')}</p>
           </div>
-        </main>
-      </>
+        </div>
+      </main>
     );
   }
 
   return (
-    <>
-      <TopBar title={t('anc.title')} actions={
-        canRecordVitalEvents && (
-          <button onClick={() => setShowModal(true)} className="btn btn-primary">
-            <Plus className="w-4 h-4" /> {t('anc.registerVisit')}
-          </button>
-        )
-      } />
-      <main className="page-container page-enter">
+    <main className="page-container page-enter">
         {/* Continuum funnel */}
         {canViewCoverage && stats && stats.continuum && stats.totalMothers > 0 && (
           <div className="card-elevated p-5 mb-4">
@@ -268,12 +272,23 @@ export default function ANCPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Mother List */}
           <div className="lg:col-span-2 card-elevated overflow-hidden">
-            <div className="p-4 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-light)' }}>
-              <HeartPulse className="w-4 h-4" style={{ color: '#EC4899' }} />
-              <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                {t('anc.mothersEnrolledCount', { count: filteredMothers.length })}
-              </h3>
-            </div>
+            <EhrListHeader
+              title={t('anc.title')}
+              stats={[
+                { label: 'Mothers enrolled', value: motherSummaries.length, color: LIST_STAT_COLORS.muted },
+                { label: 'High risk', value: highRiskCount, color: LIST_STAT_COLORS.blue },
+                { label: 'Visits this month', value: visitsThisMonth, color: LIST_STAT_COLORS.amber },
+                { label: 'Due soon', value: dueSoonCount, color: LIST_STAT_COLORS.green },
+              ]}
+              search={{ value: tableSearch, onChange: setTableSearch, placeholder: 'Search mothers by name…', ariaLabel: 'Search mothers by name' }}
+              actions={
+                canRecordVitalEvents && (
+                  <button onClick={() => setShowModal(true)} className="btn btn-primary" style={{ gap: 8, height: 38, whiteSpace: 'nowrap' }}>
+                    <Plus className="w-4 h-4" /> {t('anc.registerVisit')}
+                  </button>
+                )
+              }
+            />
 
             <div className="divide-y data-row-divider-sm" style={{ borderColor: 'var(--table-row-border)' }}>
               {filteredMothers.map(({ latest, visitCount }) => {
@@ -781,7 +796,6 @@ export default function ANCPage() {
             </div>
           </div>
         )}
-      </main>
-    </>
+    </main>
   );
 }

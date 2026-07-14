@@ -16,6 +16,7 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { ImmunizationDefaulter } from '@/lib/services/immunization-service';
 import type { ImmunizationDoc } from '@/lib/db-types';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import {
   Syringe, Search, Plus, X, CheckCircle2, Clock, AlertTriangle,
   XCircle, ChevronDown, ChevronUp, Users, ExternalLink, Edit3, Download,
@@ -272,7 +273,6 @@ export default function ImmunizationsPage() {
   );
   const totalDosesGiven = useMemo(() => vaccineFilteredImms.filter(i => i.status === 'completed').length, [vaccineFilteredImms]);
   const givenToday = useMemo(() => vaccineFilteredImms.filter(i => i.status === 'completed' && i.dateGiven === today).length, [vaccineFilteredImms, today]);
-  const selectedCoverage = vaccineFilter !== 'all' ? coverage?.find(c => c.vaccine === vaccineFilter) : undefined;
 
   // Export the currently filtered per-child table as CSV — one summary row per child.
   const handleDownloadCsv = () => {
@@ -356,27 +356,36 @@ export default function ImmunizationsPage() {
 
   return (
     <main className="page-container page-enter">
-      {/* ═══ Page header ═══ */}
-      <div className="listpage-header">
-        <div className="listpage-header-title">
-          <div className="listpage-header-icon"><Syringe size={22} /></div>
-          <div>
-            <p className="listpage-eyebrow">{currentUser?.hospitalName || 'Clinic'}</p>
-            <h1 className="listpage-title">{t('immun.title')}</h1>
-          </div>
-        </div>
-        <div className="listpage-header-controls">
-          <select
-            value={vaccineFilter}
-            onChange={e => setVaccineFilter(e.target.value)}
-            className="listpage-service-select"
-            aria-label="Filter by vaccine"
-          >
-            <option value="all">Filter by vaccine</option>
-            {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
-      </div>
+      {/* ═══ Page header — compact title, dot stats, one controls row ═══ */}
+      <EhrListHeader
+        title={t('immun.title')}
+        stats={[
+          { label: `Doses given${vaccineFilter !== 'all' ? ` · ${vaccineFilter}` : ''}`, value: totalDosesGiven, color: LIST_STAT_COLORS.muted },
+          { label: 'Given today', value: givenToday, color: LIST_STAT_COLORS.blue },
+          { label: 'Overdue', value: vaccineFilteredDefaulters.length, color: LIST_STAT_COLORS.amber },
+          { label: 'Fully immunized', value: Math.max((stats?.totalChildren || 0) - (defaulterStats?.uniqueChildren || 0), 0), color: LIST_STAT_COLORS.green },
+        ]}
+        search={{ value: tableSearch, onChange: setTableSearch, placeholder: 'Search children by name…', ariaLabel: 'Search children by name' }}
+        actions={
+          <>
+            <select
+              value={vaccineFilter}
+              onChange={e => setVaccineFilter(e.target.value)}
+              className="listpage-service-select"
+              aria-label="Filter by vaccine"
+              style={{ height: 38, borderRadius: 999 }}
+            >
+              <option value="all">All vaccines</option>
+              {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+            {canRecordVitalEvents && (
+              <button onClick={() => setShowModal(true)} className="btn btn-primary" style={{ gap: 8, height: 38, whiteSpace: 'nowrap' }}>
+                <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* Tab switcher */}
       <div className="flex gap-0 border-b mt-4 mb-1 overflow-x-auto" style={{ borderColor: 'var(--border-light)' }}>
@@ -402,15 +411,6 @@ export default function ImmunizationsPage() {
             </span>
           )}
         </button>
-      </div>
-
-      {/* ═══ Actions row ═══ */}
-      <div className="listpage-actions-row">
-        {canRecordVitalEvents && (
-          <button onClick={() => setShowModal(true)} className="btn btn-primary" style={{ gap: 8 }}>
-            <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}
-          </button>
-        )}
       </div>
 
         {/* By Vaccine — population-level outreach view */}
@@ -710,37 +710,12 @@ export default function ImmunizationsPage() {
         {/* Vaccine Schedule Table — Grouped by Child */}
         {activeTab === 'records' && (
         <div className="card-elevated overflow-hidden">
-          {/* Title + inline vaccination stat pills (mirrors the Patients/Wards header pattern) */}
-          <div className="flex items-end justify-between gap-3 mb-3 flex-wrap px-4 pt-4">
-            <span style={{ fontFamily: "var(--font-platform)", fontWeight: 500, fontSize: 24, lineHeight: '100%', letterSpacing: 0, color: '#000000' }}>
+          {/* Secondary toolbar — child-status filter + export. Title, stats,
+              search, and vaccine filter now live in the shared page header above. */}
+          <div className="listpage-table-toolbar">
+            <span className="text-sm font-medium flex-1" style={{ color: 'var(--text-primary)' }}>
               {t('immun.vaccinationRecords', { count: filteredChildren.length })}
             </span>
-            <div className="flex items-center gap-3 flex-wrap justify-end pb-0.5">
-              {[
-                { label: `Doses${vaccineFilter !== 'all' ? ` · ${vaccineFilter}` : ''}`, value: totalDosesGiven, color: 'var(--text-muted)' },
-                { label: 'Given today', value: givenToday, color: '#15795C' },
-                { label: 'Overdue', value: vaccineFilteredDefaulters.length, color: '#C44536' },
-                { label: 'Children with overdue doses', value: defaulterStats?.uniqueChildren || 0, color: '#B8741C' },
-                { label: vaccineFilter === 'all' ? 'Children tracked' : `${vaccineFilter} coverage`, value: vaccineFilter === 'all' ? (stats?.totalChildren || 0) : `${selectedCoverage?.percentage ?? 0}%`, color: '#2191D0' },
-              ].map((s, i) => (
-                <span key={i} className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                  {s.label} ({typeof s.value === 'number' ? s.value.toLocaleString() : s.value})
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="listpage-table-toolbar">
-            <div className="listpage-table-search">
-              <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-              <input
-                type="search"
-                value={tableSearch}
-                onChange={e => setTableSearch(e.target.value)}
-                placeholder="Filter by child name"
-                aria-label="Filter by child name"
-              />
-            </div>
             <select
               value={childStatusFilter}
               onChange={e => setChildStatusFilter(e.target.value as 'all' | 'up_to_date' | 'has_overdue')}
