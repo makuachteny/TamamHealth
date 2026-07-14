@@ -88,16 +88,19 @@ export default function LabPage() {
   const [quickSearch, setQuickSearch] = useState('');
   const anyFilterActive = anyColFilter || !!quickSearch;
   const clearColFilters = () => { setColFilters({ patient: '', test: '', specimen: '', status: '', result: '', orderedBy: '' }); setQuickSearch(''); };
-  const [openFilter, setOpenFilter] = useState<string | null>(null);
-  const filterRef = useRef<HTMLSpanElement>(null);
+  // Header "Filters" popover (test type + status) — mirrors the patients
+  // registry's Filters dropdown pattern, separate from the per-column funnels.
+  const [showHeaderFilters, setShowHeaderFilters] = useState(false);
+  const headerFilterRef = useRef<HTMLDivElement>(null);
+  const headerFilterCount = [colFilters.test, colFilters.status].filter(Boolean).length;
   useEffect(() => {
-    if (!openFilter) return;
-    const onDown = (e: MouseEvent) => { if (filterRef.current && !filterRef.current.contains(e.target as Node)) setOpenFilter(null); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenFilter(null); };
+    if (!showHeaderFilters) return;
+    const onDown = (e: MouseEvent) => { if (headerFilterRef.current && !headerFilterRef.current.contains(e.target as Node)) setShowHeaderFilters(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowHeaderFilters(false); };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [openFilter]);
+  }, [showHeaderFilters]);
   const { globalSearch, currentUser } = useApp();
   const { results: labResults, update: updateLabResult, advance: advanceLabOrder, loading: labLoading, reload: reloadLabs } = useLabResults();
   const { patients } = usePatients();
@@ -290,32 +293,18 @@ export default function LabPage() {
     URL.revokeObjectURL(url);
   };
 
-  // Per-column filter controls + column config (funnel dropdown per header).
-  type ColFilter = { field: keyof typeof colFilters; node: React.ReactNode };
-  const fieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', padding: '5px 9px', borderRadius: 8, fontSize: 11, width: '100%', minWidth: 0 } as const;
-  // Pill-shaped select matching EhrListHeaderButton, for filter dropdowns that
-  // live in the shared header's actions row alongside pill buttons.
-  const pillSelectStyle = { height: 38, padding: '0 14px', borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer' } as const;
-  const textFilter = (key: keyof typeof colFilters, label: string): ColFilter => ({
-    field: key,
-    node: <input type="text" autoFocus value={colFilters[key]} onChange={(e) => setColFilter(key, e.target.value)} placeholder={label} className="normal-case font-normal tracking-normal w-full" style={fieldStyle} />,
-  });
-  const selectFilter = (key: keyof typeof colFilters, opts: { v: string; l: string }[]): ColFilter => ({
-    field: key,
-    node: (
-      <select value={colFilters[key]} onChange={(e) => setColFilter(key, e.target.value)} className="normal-case font-normal tracking-normal w-full" style={fieldStyle}>
-        <option value="">{t('patients.all')}</option>
-        {opts.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-      </select>
-    ),
-  });
-  const labCols: { key: string; label: string; filter?: ColFilter }[] = [
-    { key: 'patient', label: t('lab.patient'), filter: textFilter('patient', t('lab.patient')) },
-    { key: 'test', label: t('lab.testName'), filter: textFilter('test', t('lab.testName')) },
-    { key: 'specimen', label: t('lab.specimen'), filter: textFilter('specimen', t('lab.specimen')) },
-    { key: 'status', label: t('lab.status'), filter: selectFilter('status', [{ v: 'pending', l: t('lab.filterPending') }, { v: 'in_progress', l: t('lab.inProgress') }, { v: 'completed', l: t('referral.completed') }]) },
-    { key: 'result', label: t('lab.result'), filter: textFilter('result', t('lab.result')) },
-    { key: 'orderedBy', label: t('lab.orderedByLabel'), filter: textFilter('orderedBy', t('lab.orderedByLabel')) },
+  // Column config — plain labels; filtering lives in the header search +
+  // Filters popover (matching the patients registry), not per-column funnels.
+  // Field style for the selects inside the header's Filters popover (mirrors
+  // the patients registry's Filters panel fields).
+  const popoverFieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', borderRadius: 8, minWidth: 0 } as const;
+  const labCols: { key: string; label: string }[] = [
+    { key: 'patient', label: t('lab.patient') },
+    { key: 'test', label: t('lab.testName') },
+    { key: 'specimen', label: t('lab.specimen') },
+    { key: 'status', label: t('lab.status') },
+    { key: 'result', label: t('lab.result') },
+    { key: 'orderedBy', label: t('lab.orderedByLabel') },
     { key: 'time', label: t('lab.time') },
     ...(canEnterLabResults ? [{ key: 'action', label: t('lab.action') }] : []),
   ];
@@ -639,26 +628,58 @@ export default function LabPage() {
               search={{ value: quickSearch, onChange: setQuickSearch, placeholder: 'Filter table', ariaLabel: 'Filter table' }}
               actions={
                 <>
-                  <select
-                    value={colFilters.test}
-                    onChange={e => setColFilter('test', e.target.value)}
-                    aria-label="Filter lab orders by test type"
-                    style={pillSelectStyle}
-                  >
-                    <option value="">Test type</option>
-                    {testTypeOptions.map(name => <option key={name} value={name}>{name}</option>)}
-                  </select>
-                  <select
-                    value={colFilters.status}
-                    onChange={e => setColFilter('status', e.target.value)}
-                    aria-label="Filter lab orders by status"
-                    style={pillSelectStyle}
-                  >
-                    <option value="">Status</option>
-                    <option value="pending">{t('lab.filterPending')}</option>
-                    <option value="in_progress">{t('lab.inProgress')}</option>
-                    <option value="completed">{t('referral.completed')}</option>
-                  </select>
+                  <div className="relative" ref={headerFilterRef}>
+                    <EhrListHeaderButton
+                      onClick={() => setShowHeaderFilters(s => !s)}
+                      active={headerFilterCount > 0}
+                      ariaExpanded={showHeaderFilters}
+                      ariaLabel={t('patients.filtersTitle')}
+                    >
+                      <Filter className="w-3.5 h-3.5" />
+                      {t('patients.filtersTitle')}
+                      {headerFilterCount > 0 && (
+                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
+                          {headerFilterCount}
+                        </span>
+                      )}
+                    </EhrListHeaderButton>
+                    {showHeaderFilters && (
+                      <div
+                        className="absolute right-0 mt-2 rounded-2xl overflow-hidden z-50"
+                        style={{ width: 'min(92vw, 420px)', background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg, 0 16px 48px rgba(0,0,0,0.2))' }}
+                      >
+                        <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('patients.filtersTitle')}</span>
+                          <div className="flex items-center gap-2">
+                            {headerFilterCount > 0 && (
+                              <button type="button" onClick={() => { setColFilter('test', ''); setColFilter('status', ''); }} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('nurse.clearAllFilters')}</button>
+                            )}
+                            <button type="button" onClick={() => setShowHeaderFilters(false)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
+                              <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('lab.testName')}</span>
+                            <select value={colFilters.test} onChange={e => setColFilter('test', e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
+                              <option value="">{t('patients.all')}</option>
+                              {testTypeOptions.map(name => <option key={name} value={name}>{name}</option>)}
+                            </select>
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('lab.status')}</span>
+                            <select value={colFilters.status} onChange={e => setColFilter('status', e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
+                              <option value="">{t('patients.all')}</option>
+                              <option value="pending">{t('lab.filterPending')}</option>
+                              <option value="in_progress">{t('lab.inProgress')}</option>
+                              <option value="completed">{t('referral.completed')}</option>
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {anyFilterActive && (
                     <EhrListHeaderButton onClick={clearColFilters} ariaLabel={t('nurse.clearAllFilters')}>
                       <X className="w-3.5 h-3.5" />
@@ -687,37 +708,7 @@ export default function LabPage() {
                 <tr>
                   {labCols.map(c => (
                     <th key={c.key}>
-                      <div className="flex items-center gap-1.5">
-                        <span className="whitespace-nowrap">{c.label}</span>
-                        {c.filter && (
-                          <span ref={openFilter === c.key ? filterRef : null} className="relative inline-flex items-center">
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === c.key ? null : c.key); }}
-                              className="inline-flex items-center justify-center w-4 h-4 rounded transition-colors hover:bg-[var(--overlay-subtle)]"
-                              aria-label={`${c.label} filter`}
-                            >
-                              <Filter className="w-3 h-3" style={{ color: colFilters[c.filter.field] ? 'var(--accent-primary)' : 'var(--text-muted)', fill: colFilters[c.filter.field] ? 'var(--accent-primary)' : 'transparent' }} />
-                            </button>
-                            {openFilter === c.key && (
-                              <div className="absolute top-full right-0 mt-2 normal-case rounded-xl overflow-hidden flex flex-col" style={{ zIndex: 50, width: 220, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}>
-                                <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
-                                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{c.label}</span>
-                                  <button type="button" onClick={() => setOpenFilter(null)} className="p-0.5 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
-                                    <X className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-                                  </button>
-                                </div>
-                                <div className="p-2 flex flex-col gap-1.5">
-                                  {c.filter.node}
-                                  {colFilters[c.filter.field] && (
-                                    <button type="button" onClick={() => setColFilter(c.filter!.field, '')} className="text-[11px] font-medium text-left px-1" style={{ color: 'var(--accent-primary)' }}>{t('nurse.filterClear')}</button>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </span>
-                        )}
-                      </div>
+                      <span className="whitespace-nowrap">{c.label}</span>
                     </th>
                   ))}
                 </tr>

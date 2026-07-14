@@ -11,6 +11,7 @@ import type { BloodBankDoc } from '@/lib/db-types';
 import Badge, { type BadgeTone } from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { formatDate } from '@/lib/format-utils';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 
 const BLOOD_GROUPS: BloodBankDoc['bloodGroup'][] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -98,6 +99,21 @@ export default function BloodBankPage() {
     return counts;
   }, [units]);
 
+  // Header stat chips — computed from the units already loaded on this page.
+  const unitStats = useMemo(() => {
+    const now = new Date();
+    let available = 0, reserved = 0, expiringSoon = 0;
+    for (const u of units) {
+      if (u.status === 'available') available += 1;
+      if (u.status === 'reserved' || u.status === 'crossmatched') reserved += 1;
+      const days = daysUntil(u.expiryDate);
+      if (u.status !== 'expired' && u.status !== 'discarded' && u.status !== 'transfused' && new Date(u.expiryDate) >= now && days <= 7) {
+        expiringSoon += 1;
+      }
+    }
+    return { total: units.length, available, reserved, expiringSoon };
+  }, [units]);
+
   const openModal = () => {
     setForm(emptyForm());
     setOpen(true);
@@ -141,11 +157,7 @@ export default function BloodBankPage() {
 
   return (
     <>
-      <TopBar title="Blood Bank" actions={
-            <button onClick={openModal} className="btn btn-primary">
-              <Plus className="w-4 h-4" /> Add unit
-            </button>
-          } />
+      <TopBar title="Blood Bank" />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Availability by blood group — one tile per group, count of AVAILABLE units */}
         <div className="dash-card mb-4">
@@ -190,14 +202,20 @@ export default function BloodBankPage() {
 
         {/* Units table */}
         <div className="dash-card flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-          <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-            <div className="flex items-center gap-3">
-              <h3 className="font-semibold text-sm">Blood units</h3>
-              <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>
-                {units.length} total
-              </span>
-            </div>
-          </div>
+          <EhrListHeader
+            title="Blood units"
+            stats={[
+              { label: 'Units', value: unitStats.total, color: LIST_STAT_COLORS.muted },
+              { label: 'Available', value: unitStats.available, color: LIST_STAT_COLORS.blue },
+              { label: 'Reserved', value: unitStats.reserved, color: LIST_STAT_COLORS.amber },
+              { label: 'Expiring ≤7d', value: unitStats.expiringSoon, color: LIST_STAT_COLORS.green },
+            ]}
+            actions={
+              <button onClick={openModal} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap' }}>
+                <Plus className="w-4 h-4" /> Add unit
+              </button>
+            }
+          />
           <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           {loading ? (
             <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading…</div>

@@ -11,7 +11,8 @@
  * patients header (muted/blue/amber/green/bronze). Search and actions are
  * optional slots so pages keep their own filter popovers and buttons.
  */
-import type { ReactNode, ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type ChangeEvent } from 'react';
+import { Filter, X } from '@/components/icons/lucide';
 
 export interface EhrListHeaderStat {
   label: string;
@@ -123,5 +124,76 @@ export function EhrListHeaderButton({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * EhrListFilters — the "Filters" pill + popover pattern from the patients
+ * registry header. Renders an `EhrListHeaderButton` (with an active-count
+ * badge) that toggles a dropdown panel; the panel's contents (selects,
+ * chips, whatever a page needs) are passed as `children`. Closes on outside
+ * click or Escape, same as the patients filter panel.
+ */
+export function EhrListFilters({
+  activeCount,
+  onClear,
+  children,
+  label = 'Filters',
+  panelWidth = 320,
+}: {
+  /** Number of filters currently applied — drives the badge and the active/blue button state. */
+  activeCount: number;
+  /** Optional "Clear all" affordance in the panel header, shown only when activeCount > 0. */
+  onClear?: () => void;
+  children: ReactNode;
+  label?: string;
+  panelWidth?: number | string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <EhrListHeaderButton onClick={() => setOpen(o => !o)} active={activeCount > 0} ariaExpanded={open} ariaLabel={label}>
+        <Filter className="w-3.5 h-3.5" />
+        {label}
+        {activeCount > 0 && (
+          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
+            {activeCount}
+          </span>
+        )}
+      </EhrListHeaderButton>
+      {open && (
+        <div
+          className="absolute right-0 mt-2 rounded-2xl overflow-hidden z-50"
+          style={{ width: panelWidth, maxWidth: '92vw', background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg, 0 16px 48px rgba(0,0,0,0.2))' }}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</span>
+            <div className="flex items-center gap-2">
+              {activeCount > 0 && onClear && (
+                <button type="button" onClick={onClear} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>Clear all</button>
+              )}
+              <button type="button" onClick={() => setOpen(false)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label="Close">
+                <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+              </button>
+            </div>
+          </div>
+          <div className="p-4 flex flex-col gap-3">{children}</div>
+        </div>
+      )}
+    </div>
   );
 }

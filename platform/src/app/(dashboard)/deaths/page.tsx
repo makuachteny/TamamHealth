@@ -11,7 +11,10 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useToast } from '@/components/Toast';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { COMMON_ICD11_CODES } from '@/lib/icd11-codes';
-import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import EhrListHeader, { EhrListFilters, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+
+// Shared control styling inside the header's Filters popover.
+const filterFieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', borderRadius: 8, minWidth: 0 } as const;
 import { Plus, Search, X, FileText, ChevronDown, ChevronUp, UserCheck } from '@/components/icons/lucide';
 
 export default function DeathsPage() {
@@ -25,8 +28,6 @@ export default function DeathsPage() {
   // Per-column filters (replace the old search + gender top bar).
   const [colFilters, setColFilters] = useState({ certificate: '', name: '', sex: '', age: '', cause: '', manner: '', facility: '', registered: '' });
   const setColFilter = (k: string, v: string) => setColFilters(f => ({ ...f, [k]: v }));
-  const anyColFilter = Object.values(colFilters).some(Boolean);
-  const clearColFilters = () => setColFilters({ certificate: '', name: '', sex: '', age: '', cause: '', manner: '', facility: '', registered: '' });
   const ageBandOf = (age: number | null) => age == null ? null : age < 18 ? 'child' : age < 65 ? 'adult' : 'elderly';
   const [showForm, setShowForm] = useState(false);
   const [expandedDeath, setExpandedDeath] = useState<string | null>(null);
@@ -174,21 +175,28 @@ export default function DeathsPage() {
             search={{ value: colFilters.name, onChange: v => setColFilter('name', v), placeholder: t('deaths.searchPlaceholder') || 'Search by name, certificate, cause…', ariaLabel: t('deaths.searchPlaceholder') || 'Search deaths' }}
             actions={
               <>
-                <select value={colFilters.sex} onChange={e => setColFilter('sex', e.target.value)} className="input-field" style={{ width: 'auto', height: 38 }}>
-                  <option value="">All Genders</option>
-                  <option value="Male">{t('patient.male')}</option>
-                  <option value="Female">{t('patient.female')}</option>
-                </select>
-                <select value={colFilters.registered} onChange={e => setColFilter('registered', e.target.value)} className="input-field" style={{ width: 'auto', height: 38 }}>
-                  <option value="">All Status</option>
-                  <option value="yes">{t('deaths.yes')}</option>
-                  <option value="no">{t('deaths.no')}</option>
-                </select>
-                {anyColFilter && (
-                  <button onClick={clearColFilters} className="btn btn-secondary btn-sm" title={t('nurse.clearAllFilters')} aria-label={t('nurse.clearAllFilters')} style={{ height: 38 }}>
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+                <EhrListFilters
+                  activeCount={(colFilters.sex ? 1 : 0) + (colFilters.registered ? 1 : 0)}
+                  onClear={() => { setColFilter('sex', ''); setColFilter('registered', ''); }}
+                  panelWidth={260}
+                >
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('nurse.colGender')}</span>
+                    <select value={colFilters.sex} onChange={e => setColFilter('sex', e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
+                      <option value="">All Genders</option>
+                      <option value="Male">{t('patient.male')}</option>
+                      <option value="Female">{t('patient.female')}</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('deaths.colRegistered')}</span>
+                    <select value={colFilters.registered} onChange={e => setColFilter('registered', e.target.value)} className="w-full text-sm py-2 px-3" style={filterFieldStyle}>
+                      <option value="">All Status</option>
+                      <option value="yes">{t('deaths.yes')}</option>
+                      <option value="no">{t('deaths.no')}</option>
+                    </select>
+                  </label>
+                </EhrListFilters>
                 {canRecordVitalEvents && (
                   <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2" style={{ height: 38, whiteSpace: 'nowrap' }}>
                     <Plus className="w-4 h-4" /> {t('deaths.registerDeath')}

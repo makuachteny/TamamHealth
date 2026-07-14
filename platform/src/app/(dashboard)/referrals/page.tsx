@@ -557,7 +557,7 @@ export default function ReferralsPage() {
                   value={activeTab}
                   onChange={e => setActiveTab(e.target.value as 'incoming' | 'outgoing')}
                   aria-label="Filter referrals by direction"
-                  style={{ height: 38, padding: '0 14px', borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, flexShrink: 0 }}
+                  style={{ width: 'auto', height: 38, padding: '0 14px', borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, flexShrink: 0 }}
                 >
                   <option value="incoming">{`Incoming referrals${newIncomingCount > 0 ? ` (${newIncomingCount} new)` : ''}`}</option>
                   <option value="outgoing">Outgoing referrals</option>

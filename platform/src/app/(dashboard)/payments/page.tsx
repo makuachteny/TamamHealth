@@ -13,6 +13,7 @@ import { SearchInput } from '@/components/filters';
 import { computePlanKpis } from '@/components/payments/PlanKpiCards';
 import DataTile from '@/components/DataTile';
 import Modal from '@/components/Modal';
+import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import PaymentPanel from '@/components/payments/PaymentPanel';
 import { getMethodConfig } from '@/lib/payment-method-config';
 import type { PaymentDoc, ClaimDoc, PaymentPlanDoc } from '@/lib/db-types-payments';
@@ -46,11 +47,13 @@ interface PaymentsData {
 export default function PaymentsPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser, globalSearch } = useApp();
+  const { currentUser, globalSearch, setGlobalSearch } = useApp();
   const [data, setData] = useState<PaymentsData>({ payments: [], claims: [], plans: [], bills: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  // Text search comes from the shared global search bar (TopBar).
+  // Text search comes from the shared global search state, surfaced as the
+  // list header's own search box (the TopBar's search row is hidden on this
+  // page in favor of the title + primary action layout).
   const search = globalSearch;
   // Balance filter retained for the bills list logic; the header filter UI was
   // removed, so it stays at 'all'.
@@ -179,6 +182,17 @@ export default function PaymentsPage() {
     });
   }, [patientLines, search, balanceFilter]);
 
+  // Header stat chips — invoice counts from the bills already loaded on this page.
+  const invoiceStats = useMemo(() => {
+    const pending = data.bills.filter(b => (b.balanceDue ?? 0) > 0).length;
+    return {
+      total: data.bills.length,
+      pending,
+      paid: data.bills.length - pending,
+      outstandingPatients: patientLines.filter(l => l.outstanding > 0).length,
+    };
+  }, [data.bills, patientLines]);
+
   // A/R aging buckets — days since the encounter, over every bill still carrying
   // a balance. Relocated from the old Billing cockpit so the biller sees how old
   // the receivables are right on the bills screen.
@@ -299,11 +313,7 @@ export default function PaymentsPage() {
 
   return (
     <>
-      <TopBar title={t('payments.title')} hideSearch titleActions={
-            <button onClick={() => { setCollectSearch(''); setCollectPickerOpen(true); }} className="btn btn-primary">
-              <Banknote className="w-4 h-4" /> {t('billing.collectPayment')}
-            </button>
-          } />
+      <TopBar title={t('payments.title')} hideSearch />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {error && (
           <div style={{
@@ -351,6 +361,21 @@ export default function PaymentsPage() {
 
         {/* People list — fills the remaining viewport height; rows scroll inside. */}
         <div className="dash-card overflow-hidden flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+          <EhrListHeader
+            title={t('payments.title')}
+            stats={[
+              { label: 'Invoices', value: invoiceStats.total, color: LIST_STAT_COLORS.muted },
+              { label: 'Pending', value: invoiceStats.pending, color: LIST_STAT_COLORS.blue },
+              { label: 'Paid', value: invoiceStats.paid, color: LIST_STAT_COLORS.amber },
+              { label: 'Outstanding', value: invoiceStats.outstandingPatients, color: LIST_STAT_COLORS.green },
+            ]}
+            search={{ value: search, onChange: setGlobalSearch, placeholder: t('payments.searchPlaceholder'), ariaLabel: t('payments.searchPlaceholder') }}
+            actions={
+              <button onClick={() => { setCollectSearch(''); setCollectPickerOpen(true); }} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap' }}>
+                <Banknote className="w-4 h-4" /> {t('billing.collectPayment')}
+              </button>
+            }
+          />
           {filtered.length === 0 ? (
             <div className="p-10 text-center" style={{ color: 'var(--text-muted)' }}>
               <Wallet className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />

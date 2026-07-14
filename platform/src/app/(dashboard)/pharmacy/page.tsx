@@ -28,17 +28,18 @@ export default function PharmacyPage() {
   // Category / stock-status filtering now lives in the shared header + table
   // toolbar (categoryFilter / statusFilter below) rather than per-column funnels.
   const [colFilters, setColFilters] = useState({ qPatient: '', qMedication: '', qPrescribedBy: '', iMedication: '' });
-  const setColFilter = (k: string, v: string) => setColFilters(f => ({ ...f, [k]: v }));
-  const [openFilter, setOpenFilter] = useState<string | null>(null);
-  const filterRef = useRef<HTMLSpanElement>(null);
+  // Header "Filters" popover (category + stock status) — mirrors the patients
+  // registry's Filters dropdown pattern, separate from the per-column funnels.
+  const [showHeaderFilters, setShowHeaderFilters] = useState(false);
+  const headerFilterRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!openFilter) return;
-    const onDown = (e: MouseEvent) => { if (filterRef.current && !filterRef.current.contains(e.target as Node)) setOpenFilter(null); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenFilter(null); };
+    if (!showHeaderFilters) return;
+    const onDown = (e: MouseEvent) => { if (headerFilterRef.current && !headerFilterRef.current.contains(e.target as Node)) setShowHeaderFilters(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowHeaderFilters(false); };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [openFilter]);
+  }, [showHeaderFilters]);
   // Patients tab — which patient's prescription view is open (patient _id)
   const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
   const { globalSearch, setGlobalSearch, currentUser } = useApp();
@@ -81,42 +82,13 @@ export default function PharmacyPage() {
   // changes (the table search drives the patient lookup now).
   useEffect(() => { setSelectedPatient(null); }, [tableSearch, globalSearch]);
 
-  // Compact per-column filter controls (funnel dropdown in each header).
-  const fieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', padding: '5px 9px', borderRadius: 8, fontSize: 11, width: '100%', minWidth: 0 } as const;
-  // Pill-shaped select matching EhrListHeaderButton, for filter dropdowns that
-  // live in the shared header's actions row alongside pill buttons.
-  const pillSelectStyle = { height: 38, padding: '0 14px', borderRadius: 999, border: '1px solid var(--border-light)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer' } as const;
-  const textNode = (key: keyof typeof colFilters, label: string) => (
-    <input type="text" autoFocus value={colFilters[key]} onChange={(e) => setColFilter(key, e.target.value)} placeholder={label} className="normal-case font-normal tracking-normal w-full" style={fieldStyle} />
-  );
-  const FilterTh = (label: string, key: keyof typeof colFilters, node: React.ReactNode) => (
-    <th>
-      <div className="flex items-center gap-1.5">
-        <span className="whitespace-nowrap">{label}</span>
-        <span ref={openFilter === key ? filterRef : null} className="relative inline-flex items-center">
-          <button type="button" onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === key ? null : key); }} className="inline-flex items-center justify-center w-4 h-4 rounded transition-colors hover:bg-[var(--overlay-subtle)]" aria-label={`${label} filter`}>
-            <Filter className="w-3 h-3" style={{ color: colFilters[key] ? 'var(--accent-primary)' : 'var(--text-muted)', fill: colFilters[key] ? 'var(--accent-primary)' : 'transparent' }} />
-          </button>
-          {openFilter === key && (
-            <div className="absolute top-full right-0 mt-2 normal-case rounded-xl overflow-hidden flex flex-col" style={{ zIndex: 50, width: 220, background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg)' }}>
-              <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</span>
-                <button type="button" onClick={() => setOpenFilter(null)} className="p-0.5 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
-                  <X className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-                </button>
-              </div>
-              <div className="p-2 flex flex-col gap-1.5">
-                {node}
-                {colFilters[key] && (
-                  <button type="button" onClick={() => setColFilter(key, '')} className="text-[11px] font-medium text-left px-1" style={{ color: 'var(--accent-primary)' }}>{t('nurse.filterClear')}</button>
-                )}
-              </div>
-            </div>
-          )}
-        </span>
-      </div>
-    </th>
-  );
+  // Filtering lives in the header search + Filters popover (matching the
+  // patients registry) — no per-column funnels.
+  // Field style for the selects inside the header's Filters popover (mirrors
+  // the patients registry's Filters panel fields).
+  const popoverFieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', borderRadius: 8, minWidth: 0 } as const;
+  const statusFilterRelevant = activeTab === 'inventory' || activeTab === 'reorder' || activeTab === 'expiry';
+  const headerFilterCount = (categoryFilter !== 'all' ? 1 : 0) + (statusFilterRelevant && statusFilter !== 'all' ? 1 : 0);
 
   // Stock-in modal state
   const [showStockInModal, setShowStockInModal] = useState(false);
@@ -526,29 +498,61 @@ export default function PharmacyPage() {
           search={!(activeTab === 'patients' && activePatient) ? { value: tableSearch, onChange: setTableSearch, placeholder: 'Filter table', ariaLabel: 'Filter table' } : undefined}
           actions={
             <>
-              <select
-                value={categoryFilter}
-                onChange={e => setCategoryFilter(e.target.value)}
-                aria-label="Filter by medication category"
-                style={pillSelectStyle}
-              >
-                <option value="all">Category</option>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              {!(activeTab === 'patients' && activePatient) && (activeTab === 'inventory' || activeTab === 'reorder' || activeTab === 'expiry') && (
-                <select
-                  value={statusFilter}
-                  onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
-                  aria-label="Filter by stock status"
-                  style={pillSelectStyle}
+              <div className="relative" ref={headerFilterRef}>
+                <EhrListHeaderButton
+                  onClick={() => setShowHeaderFilters(s => !s)}
+                  active={headerFilterCount > 0}
+                  ariaExpanded={showHeaderFilters}
+                  ariaLabel={t('patients.filtersTitle')}
                 >
-                  <option value="all">Status</option>
-                  <option value="adequate">{t('pharmacy.inStock')}</option>
-                  <option value="low">{t('pharmacy.invStatus_low')}</option>
-                  <option value="critical">{t('pharmacy.invStatus_critical')}</option>
-                  <option value="expired">{t('pharmacy.invStatus_expired')}</option>
-                </select>
-              )}
+                  <Filter className="w-3.5 h-3.5" />
+                  {t('patients.filtersTitle')}
+                  {headerFilterCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold" style={{ background: '#2191D0', color: '#fff' }}>
+                      {headerFilterCount}
+                    </span>
+                  )}
+                </EhrListHeaderButton>
+                {showHeaderFilters && (
+                  <div
+                    className="absolute right-0 mt-2 rounded-2xl overflow-hidden z-50"
+                    style={{ width: 'min(92vw, 420px)', background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', boxShadow: 'var(--card-shadow-lg, 0 16px 48px rgba(0,0,0,0.2))' }}
+                  >
+                    <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                      <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('patients.filtersTitle')}</span>
+                      <div className="flex items-center gap-2">
+                        {headerFilterCount > 0 && (
+                          <button type="button" onClick={() => { setCategoryFilter('all'); setStatusFilter('all'); }} className="text-[11px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{t('nurse.clearAllFilters')}</button>
+                        )}
+                        <button type="button" onClick={() => setShowHeaderFilters(false)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
+                          <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                      <label className="flex flex-col gap-1">
+                        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('pharmacy.category')}</span>
+                        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
+                          <option value="all">{t('patients.all')}</option>
+                          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </label>
+                      {statusFilterRelevant && (
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('pharmacy.statusLabel')}</span>
+                          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)} className="w-full text-sm py-2 px-3" style={popoverFieldStyle}>
+                            <option value="all">{t('patients.all')}</option>
+                            <option value="adequate">{t('pharmacy.inStock')}</option>
+                            <option value="low">{t('pharmacy.invStatus_low')}</option>
+                            <option value="critical">{t('pharmacy.invStatus_critical')}</option>
+                            <option value="expired">{t('pharmacy.invStatus_expired')}</option>
+                          </select>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               {anyColFilter && (
                 <EhrListHeaderButton onClick={clearColFilters} ariaLabel={t('nurse.clearAllFilters')}>
                   <X className="w-3.5 h-3.5" />
@@ -593,10 +597,10 @@ export default function PharmacyPage() {
               <table className="data-table" style={{ minWidth: 840 }}>
                 <thead>
                   <tr>
-                    {FilterTh(t('pharmacy.patient'), 'qPatient', textNode('qPatient', t('pharmacy.patient')))}
-                    {FilterTh(t('pharmacy.medication'), 'qMedication', textNode('qMedication', t('pharmacy.medication')))}
+                    <th>{t('pharmacy.patient')}</th>
+                    <th>{t('pharmacy.medication')}</th>
                     <th>{t('pharmacy.dosage')}</th>
-                    {FilterTh(t('pharmacy.prescribedBy'), 'qPrescribedBy', textNode('qPrescribedBy', t('pharmacy.prescribedBy')))}
+                    <th>{t('pharmacy.prescribedBy')}</th>
                     <th>{t('pharmacy.time')}</th>
                     <th>{t('pharmacy.statusLabel')}</th>
                     <th>{t('pharmacy.action')}</th>
@@ -659,7 +663,7 @@ export default function PharmacyPage() {
             <table className="data-table" style={{ minWidth: 1080 }}>
               <thead>
                 <tr>
-                  {FilterTh(t('pharmacy.medication'), 'iMedication', textNode('iMedication', t('pharmacy.medication')))}
+                  <th>{t('pharmacy.medication')}</th>
                   <th>{t('pharmacy.category')}</th>
                   <th>{t('pharmacy.stockLabel')}</th>
                   <th>{t('pharmacy.reorderLevel')}</th>

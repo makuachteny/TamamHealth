@@ -16,7 +16,7 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { ImmunizationDefaulter } from '@/lib/services/immunization-service';
 import type { ImmunizationDoc } from '@/lib/db-types';
-import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import EhrListHeader, { EhrListFilters, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import {
   Syringe, Search, Plus, X, CheckCircle2, Clock, AlertTriangle,
   XCircle, ChevronDown, ChevronUp, Users, ExternalLink, Edit3, Download,
@@ -25,6 +25,9 @@ import {
 
 const VACCINES = ['BCG', 'OPV', 'Penta', 'PCV', 'Rota', 'Measles', 'Yellow Fever', 'Vitamin A'];
 const SITES: Array<'left arm' | 'right arm' | 'left thigh' | 'right thigh' | 'oral'> = ['left arm', 'right arm', 'left thigh', 'right thigh', 'oral'];
+
+// Shared control styling inside the header's Filters popover.
+const filterFieldStyle = { background: 'var(--bg-card-solid)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', borderRadius: 8, minWidth: 0 } as const;
 
 const statusConfig = {
   completed: { color: '#059669', bg: 'rgba(5,150,105,0.12)', icon: CheckCircle2, label: 'Completed' },
@@ -368,16 +371,24 @@ export default function ImmunizationsPage() {
         search={{ value: tableSearch, onChange: setTableSearch, placeholder: 'Search children by name…', ariaLabel: 'Search children by name' }}
         actions={
           <>
-            <select
-              value={vaccineFilter}
-              onChange={e => setVaccineFilter(e.target.value)}
-              className="listpage-service-select"
-              aria-label="Filter by vaccine"
-              style={{ height: 38, borderRadius: 999 }}
+            <EhrListFilters
+              activeCount={vaccineFilter !== 'all' ? 1 : 0}
+              onClear={() => setVaccineFilter('all')}
+              panelWidth={260}
             >
-              <option value="all">All vaccines</option>
-              {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>Vaccine</span>
+                <select
+                  value={vaccineFilter}
+                  onChange={e => setVaccineFilter(e.target.value)}
+                  className="w-full text-sm py-2 px-3"
+                  style={filterFieldStyle}
+                >
+                  <option value="all">All vaccines</option>
+                  {VACCINES.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </label>
+            </EhrListFilters>
             {canRecordVitalEvents && (
               <button onClick={() => setShowModal(true)} className="btn btn-primary" style={{ gap: 8, height: 38, whiteSpace: 'nowrap' }}>
                 <Plus className="w-4 h-4" /> {t('immun.recordVaccination')}
