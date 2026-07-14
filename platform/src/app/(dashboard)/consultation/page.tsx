@@ -1926,7 +1926,7 @@ export default function ConsultationPage() {
                 siblings and push the first visible card out of line. */}
             <div className="pr-1 ehr-soap-scroll">
             {/* Section 1: Intake + Vital Signs */}
-            <div className="card-elevated overflow-hidden ehr-consult-fill-card" style={{ display: stepHas(1) ? undefined : 'none' }}>
+            <div className="card-elevated overflow-hidden ehr-card-fit ehr-consult-fill-card" style={{ display: stepHas(1) ? undefined : 'none' }}>
               <SectionHeader index={1} />
               {openSections[1] && (
                 <div className="p-5 ehr-consult-fill-body">
