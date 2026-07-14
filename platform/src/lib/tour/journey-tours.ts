@@ -1,0 +1,783 @@
+import type { UserRole } from '@/lib/db-types';
+import { getRoleConfig } from '@/lib/permissions';
+import { clinicalOfficerTourSteps } from './clinical-officer-steps';
+import type { TourDefinition, TourStep } from './types';
+
+/**
+ * Journey-based "Take a tour" definitions — one per workspace, derived from
+ * docs/USER-JOURNEYS.md so the tour walks each user through THEIR documented
+ * day, step by step (not just the shared shell).
+ *
+ * Authoring rules:
+ * - Page-level stops use an empty `target` → the engine renders a centred
+ *   narrative card over that page (robust; no per-page selector to break).
+ * - Anchored stops only use the shell selectors that exist for every role
+ *   (.ehr-top-search / .ehr-top-modules / .ehr-top-actions).
+ * - Steps are FILTERED against the role's route allow-list before use, so a
+ *   tour can never navigate a user onto an "Access Restricted" screen — e.g.
+ *   a triage nurse simply skips the ANC/immunizations stops of the nurse
+ *   journey.
+ */
+
+const searchStep = (route: string): TourStep => ({
+  id: 'search',
+  route,
+  target: '.ehr-top-search',
+  title: 'Find any patient',
+  body: 'Search by name, hospital number, or phone from anywhere in the app.',
+  placement: 'bottom',
+});
+
+const finishStep = (route: string): TourStep => ({
+  id: 'finish',
+  route,
+  target: '.ehr-top-actions',
+  title: "You're all set",
+  body: 'That’s your workflow end to end. Replay this tour anytime from your profile menu — look for “Take a tour.”',
+  placement: 'left',
+});
+
+// ── Nursing (nurse, midwife, triage/rooming nurse) — USER-JOURNEYS §5 ──────
+const NURSE_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/dashboard/nurse',
+    target: '.ehr-care-greeting',
+    title: 'Welcome to your Nurse Station',
+    body: 'Let’s walk your shift end to end: triage, the ward board, medication rounds, and handoff. Use Back and Next, or skip anytime.',
+    placement: 'bottom',
+  },
+  {
+    id: 'station-tabs',
+    route: '/dashboard/nurse',
+    target: '',
+    title: 'One station, four jobs',
+    body: 'Ward, MAR, Triage, and Handoff live as tabs of this station — everything a shift needs without leaving the page.',
+  },
+  {
+    id: 'triage',
+    route: '/dashboard/nurse/triage',
+    target: '',
+    title: 'Triage — ETAT assessment',
+    body: 'Walk-ins arrive here as pending from check-in. Record the chief complaint, ETAT ABCC (Airway, Breathing, Circulation, Consciousness), and full vitals — the RED / YELLOW / GREEN priority derives automatically from the danger signs.',
+  },
+  {
+    id: 'triage-disposition',
+    route: '/dashboard/nurse/triage',
+    target: '',
+    title: 'Disposition from Recent Triages',
+    body: 'From the recent list, move each patient along: pending → seen, admitted, referred, or discharged. Edits reuse the same record so the audit trail stays intact.',
+  },
+  {
+    id: 'ward-board',
+    route: '/dashboard/nurse/ward',
+    target: '',
+    title: 'The ward board',
+    body: 'Your acuity-sorted roster — critical patients first, with location and status chips. Row actions: quick Vitals (persists a real vitals record visible on chart trends), re-Triage, and Assign doctor.',
+  },
+  {
+    id: 'mar',
+    route: '/dashboard/nurse/mar',
+    target: '',
+    title: 'Medication rounds (MAR)',
+    body: 'Every scheduled dose across your patients, flagged overdue / due / upcoming / given (overdue = more than 1 hour past). Quick-mark “Given”, or open the detail modal for dose, route, witness, and notes — Undo voids append-only.',
+  },
+  {
+    id: 'mar-bedside',
+    route: '/dashboard/nurse/mar',
+    target: '',
+    title: 'Bedside time-grid',
+    body: 'Each admission also has a printable meds × dose-times grid (Wards → admission → MAR): record GIVEN / MISSED / REFUSED / HELD per cell — non-given needs a reason, controlled drugs need a witness.',
+  },
+  {
+    id: 'handoff',
+    route: '/dashboard/nurse/handoff',
+    target: '',
+    title: 'Shift handoff',
+    body: 'The shift auto-detects (day/evening/night). Write a per-patient SBAR for your critical patients, check the shift KPIs, then Sign off — the oncoming nurse acknowledges your handoff.',
+  },
+  {
+    id: 'anc',
+    route: '/anc',
+    target: '',
+    title: 'Antenatal care',
+    body: 'Mothers grouped with latest visit and risk level. A visit captures gestational age, BP, fundal height, fetal heart rate, screens, and the next-visit date — feeding MCH analytics and DHIS2.',
+  },
+  {
+    id: 'immunizations',
+    route: '/immunizations',
+    target: '',
+    title: 'Immunizations & defaulters',
+    body: 'Record doses against each child’s schedule, and work the Defaulters tab — overdue doses can be recalled by SMS to the caregiver, per row or in bulk.',
+  },
+  searchStep('/dashboard/nurse'),
+  finishStep('/dashboard/nurse'),
+];
+
+// ── Laboratory (lab_tech) — §7.1 ───────────────────────────────────────────
+const LAB_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/dashboard/lab',
+    target: '.ehr-care-greeting',
+    title: 'Welcome to the Lab bench',
+    body: 'Let’s walk an order from specimen to result — including the safety rails around critical values.',
+    placement: 'bottom',
+  },
+  {
+    id: 'lifecycle',
+    route: '/dashboard/lab',
+    target: '',
+    title: 'The order lifecycle',
+    body: 'Every order is a state machine: ordered → specimen collected → received at lab → in process → resulted → reviewed by clinician. Rejected specimens loop back for re-collection. STAT orders arrive already in-process and flagged.',
+  },
+  {
+    id: 'work-queue',
+    route: '/dashboard/lab',
+    target: '',
+    title: 'Work the queue row by row',
+    body: 'Collect specimen → Receive at lab (or Reject with a reason) → Start processing → Enter result with value, unit, reference range, and abnormal/critical flags.',
+  },
+  {
+    id: 'critical',
+    route: '/dashboard/lab',
+    target: '',
+    title: 'Critical results — two eyes',
+    body: 'Entered values are auto-scored against the critical-value table. A critical result requires a two-person confirmation and fires a high-priority message to the ordering clinician.',
+  },
+  {
+    id: 'batch',
+    route: '/dashboard/lab',
+    target: '',
+    title: 'Batch entry & analyzer import',
+    body: 'Enter results in batches by test type, or import LIS-2A/HL7 analyzer payloads for review — imports are never auto-saved.',
+  },
+  {
+    id: 'registry',
+    route: '/lab',
+    target: '',
+    title: 'The full lab registry',
+    body: 'The operational registry with every order, CSV export, and SLA banners when results sit unreviewed too long (24 h critical / 7 days routine). Rows deep-link into the patient chart at the exact result.',
+  },
+  {
+    id: 'blood-bank',
+    route: '/blood-bank',
+    target: '',
+    title: 'Blood bank',
+    body: 'Availability by blood group (scarcity color-coded), expiry warnings, and donated-unit registration with auto-suggested unit IDs.',
+  },
+  searchStep('/dashboard/lab'),
+  finishStep('/dashboard/lab'),
+];
+
+// ── Pharmacy (pharmacist) — §7.3–7.4 ───────────────────────────────────────
+const PHARMACY_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/dashboard/pharmacy',
+    target: '.ehr-care-greeting',
+    title: 'Welcome to the Pharmacy',
+    body: 'Let’s walk the dispensing queue, the safety gates, and your inventory tools.',
+    placement: 'bottom',
+  },
+  {
+    id: 'queue',
+    route: '/dashboard/pharmacy',
+    target: '',
+    title: 'The prescription queue',
+    body: 'Prescriptions arrive from consultations in priority order — life-sustaining tiers first, immediate-urgency floats up.',
+  },
+  {
+    id: 'dispense-gates',
+    route: '/dashboard/pharmacy',
+    target: '',
+    title: 'Dispensing safety gates',
+    body: 'Each dispense checks, in order: enough stock for the full course, drug interactions against the patient’s other active meds, and — for controlled drugs — a witness picker that writes the two-signature register entry before stock moves.',
+  },
+  {
+    id: 'inventory',
+    route: '/pharmacy',
+    target: '',
+    title: 'Inventory, reorder & expiry',
+    body: 'Live stock status (adequate / low / critical / expired), receive stock with batch + expiry, FEFO expiry tracking, reorder quantities with a printable purchase order, and CSV export everywhere.',
+  },
+  {
+    id: 'controlled',
+    route: '/controlled-substances',
+    target: '',
+    title: 'Controlled-substance register',
+    body: 'An append-only, two-signature register: intake, dispense, waste, reconciliation, transfer. Entries can never be edited or deleted — dispensing scheduled drugs writes here automatically.',
+  },
+  searchStep('/dashboard/pharmacy'),
+  finishStep('/dashboard/pharmacy'),
+];
+
+// ── Radiology (radiologist) — §7.2 ─────────────────────────────────────────
+const RADIOLOGY_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/dashboard/radiology',
+    target: '.ehr-care-greeting',
+    title: 'Welcome to Imaging',
+    body: 'Imaging orders from consultations land on this worklist automatically.',
+    placement: 'bottom',
+  },
+  {
+    id: 'study',
+    route: '/dashboard/radiology',
+    target: '',
+    title: 'Work a study',
+    body: 'Open a study → attach images or DICOM files (they save to the patient’s documents, so the ordering clinician sees them) → enter findings → Submit report. Completing returns the findings to the chart.',
+  },
+  {
+    id: 'panels',
+    route: '/dashboard/radiology',
+    target: '',
+    title: 'Your analytics',
+    body: 'Modality breakdown, body regions, completion rate, and average turnaround time — at a glance.',
+  },
+  searchStep('/dashboard/radiology'),
+  finishStep('/dashboard/radiology'),
+];
+
+// ── Nutrition (nutritionist) — §7.7 ────────────────────────────────────────
+const NUTRITION_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/dashboard/nutrition',
+    target: '.ehr-care-greeting',
+    title: 'Welcome to Nutrition',
+    body: 'CMAM screening and therapeutic supplies, in one station.',
+    placement: 'bottom',
+  },
+  {
+    id: 'screening',
+    route: '/dashboard/nutrition',
+    target: '',
+    title: 'Screen a child',
+    body: 'Name, age, sex, MUAC, weight/height, edema — the classification derives live: SAM, MAM, At Risk, Underweight, or Normal. The worklist filters by classification.',
+  },
+  {
+    id: 'supplies',
+    route: '/dashboard/nutrition',
+    target: '',
+    title: 'Therapeutic supplies',
+    body: 'Track RUTF, F-75/F-100, ReSoMal, Vitamin A and MUAC tapes with reorder-level statuses; +/− adjustments persist and survive reload.',
+  },
+  searchStep('/dashboard/nutrition'),
+  finishStep('/dashboard/nutrition'),
+];
+
+// ── Front desk (front_desk, clerks) — §4 ───────────────────────────────────
+const FRONT_DESK_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/dashboard/front-desk',
+    target: '.ehr-care-greeting',
+    title: 'Welcome to the Front Desk',
+    body: 'Your desk runs the flow of the whole facility: register → check in → assign → room → close out. Let’s walk it.',
+    placement: 'bottom',
+  },
+  {
+    id: 'queue',
+    route: '/dashboard/front-desk',
+    target: '',
+    title: 'The live queue',
+    body: 'One queue merges triaged walk-ins, arrived appointments, and open checkouts — sorted RED → YELLOW → GREEN with status chips (WAITING / IN CONSULT / ADMITTED / REFERRED / DONE).',
+  },
+  {
+    id: 'register',
+    route: '/patients/new',
+    target: '',
+    title: 'Register a patient — 6 steps',
+    body: 'Demographics → Contact & location (the household number derives the geocode) → Next of kin → Biometrics (photo + consent-gated fingerprints) → Payment coverage → Review. “Register & Check In” jumps straight to check-in.',
+  },
+  {
+    id: 'check-in',
+    route: '/check-in',
+    target: '',
+    title: 'Check in an arrival',
+    body: 'Find the patient, record arrival mode and chief complaint, pick acuity (Routine / Priority / Emergency), optional quick vitals — submitting creates the pending triage token that puts them in the nurse’s queue.',
+  },
+  {
+    id: 'assign',
+    route: '/dashboard/front-desk',
+    target: '',
+    title: 'Room & assign',
+    body: 'On queue rows: assign an exam room, and assign the provider — that’s the reception → clinical handoff; the patient appears in that clinician’s worklist.',
+  },
+  {
+    id: 'appointments',
+    route: '/appointments',
+    target: '',
+    title: 'Appointments',
+    body: 'List or full calendar. The lifecycle runs requested → scheduled → confirmed → checked-in → in progress → completed, with conflict checks against provider availability. Walk-in creates an already-checked-in appointment.',
+  },
+  {
+    id: 'intake-forms',
+    route: '/patient-intake',
+    target: '',
+    title: 'Patient intake forms',
+    body: 'Send form packets to a patient by SMS; returned submissions land in Pending Review, where you merge approved fields into the chart side by side.',
+  },
+  {
+    id: 'referrals',
+    route: '/referrals',
+    target: '',
+    title: 'Referrals',
+    body: 'Outgoing referrals bundle a transfer package of the patient’s records. Incoming: Accept re-homes the patient here and drops an intake encounter; Decline requires a reason.',
+  },
+  {
+    id: 'checkout',
+    route: '/dashboard/front-desk',
+    target: '',
+    title: 'Close the visit',
+    body: 'Checkout on DONE rows runs the facility gate — prescriptions dispensed? critical labs reviewed? payment determined? — then discharges the encounter. Undo is supported.',
+  },
+  searchStep('/dashboard/front-desk'),
+  finishStep('/dashboard/front-desk'),
+];
+
+// ── Cashier — §8.2 ─────────────────────────────────────────────────────────
+const CASHIER_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/payments',
+    target: '',
+    title: 'Welcome to Payments',
+    body: 'Patient accounts sorted outstanding-first, with A/R aging buckets. Let’s walk a collection.',
+  },
+  {
+    id: 'collect',
+    route: '/payments',
+    target: '',
+    title: 'Collect a payment',
+    body: 'Pick the patient (or arrive deep-linked from front-desk checkout), choose the tender — cash, mobile money (m-Gurush, M-Pesa, MTN, Airtel), bank transfer, insurance, or waiver — and the payment posts and credits the ledger.',
+  },
+  {
+    id: 'receipt',
+    route: '/payments',
+    target: '',
+    title: 'Receipts',
+    body: 'Print or email the receipt right from the confirmation — the “Sent” badge only shows when the email provider actually accepted it.',
+  },
+  {
+    id: 'pending',
+    route: '/payments',
+    target: '',
+    title: 'Verify pending payments',
+    body: 'Pay-by-link and patient-portal payments arrive pending. The amber verification queue appears whenever something needs review: Approve posts it and credits the patient’s balance; Reject records why.',
+  },
+  {
+    id: 'plans',
+    route: '/payments',
+    target: '',
+    title: 'Plans, refunds & waivers',
+    body: 'Record installments on payment plans, void or refund posted payments (with confirmation), and waive bills through the exemption path — reason required.',
+  },
+  searchStep('/payments'),
+  finishStep('/payments'),
+];
+
+// ── Medical biller — §8.3 ──────────────────────────────────────────────────
+const BILLER_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/payments',
+    target: '',
+    title: 'Welcome to Billing',
+    body: 'You have the cashier’s collections view plus the full insurance-claims lifecycle. Let’s walk both.',
+  },
+  {
+    id: 'collections',
+    route: '/payments',
+    target: '',
+    title: 'Collections & pending verification',
+    body: 'Collect payments, verify pending pay-by-link/portal payments, manage plans and refunds — same flow as the cashier.',
+  },
+  {
+    id: 'claims',
+    route: '/payments/claims',
+    target: '',
+    title: 'Claims at a glance',
+    body: 'KPIs for billed / pending / approved / denied, plus the payer mix: self-pay, NHIS, CBHI, donor/NGO, government, private, employer.',
+  },
+  {
+    id: 'submit',
+    route: '/payments/claims',
+    target: '',
+    title: 'Submit a claim',
+    body: '“New claim”: pick the insured patient, their policy, and the outstanding bill (or enter the amount) — the claim goes to the payer as submitted.',
+  },
+  {
+    id: 'adjudicate',
+    route: '/payments/claims',
+    target: '',
+    title: 'Adjudicate honestly',
+    body: 'Record the allowed and paid amounts — the resulting status (paid / partial / denied) previews live from the same rule that gets saved. Paid 0 against an allowed amount = full denial, with a reason.',
+  },
+  {
+    id: 'appeal',
+    route: '/payments/claims',
+    target: '',
+    title: 'Appeal & resubmit',
+    body: 'Denied claims carry row actions: Appeal (with a note for the payer) and Resubmit — the resubmission count is tracked on the claim.',
+  },
+  finishStep('/payments'),
+];
+
+// ── Records / HMIS (hrio, records officer, data entry) — §9 ────────────────
+const RECORDS_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/dashboard/data-entry',
+    target: '',
+    title: 'Welcome to Records & HMIS',
+    body: 'From daily census to DHIS2 export — the facility’s reporting spine. Let’s walk it in order.',
+  },
+  {
+    id: 'census',
+    route: '/dashboard/data-entry',
+    target: '',
+    title: 'Daily census entry',
+    body: 'OPD attendance, admissions, deliveries, immunizations given, bed occupancy, and disease counts — entered here daily.',
+  },
+  {
+    id: 'births',
+    route: '/births',
+    target: '',
+    title: 'Register births',
+    body: 'Child + parents + birth details; the certificate number auto-generates (SS-B-…), and the mother’s chart links when she’s a registered patient.',
+  },
+  {
+    id: 'deaths',
+    route: '/deaths',
+    target: '',
+    title: 'Register deaths',
+    body: 'Decedent details, WHO cause chain, certificate number. Ward “death” discharges route here automatically.',
+  },
+  {
+    id: 'vitals-stats',
+    route: '/vital-statistics',
+    target: '',
+    title: 'Vital statistics',
+    body: 'Read-only rollups: sex ratios, crude rates, monthly trends.',
+  },
+  {
+    id: 'quality',
+    route: '/data-quality',
+    target: '',
+    title: 'Data quality',
+    body: 'Completeness, timeliness, and consistency scoring — check it before you export.',
+  },
+  {
+    id: 'dhis2',
+    route: '/dhis2-export',
+    target: '',
+    title: 'DHIS2 export',
+    body: 'Pick the period and level, then Sync to DHIS2 or download JSON/CSV. Statuses and the sync log here are real and persisted — “Never synced” means never synced.',
+  },
+  {
+    id: 'reports',
+    route: '/reports',
+    target: '',
+    title: 'Monthly reports',
+    body: 'Downloadable facility reports; MCH analytics has the maternal/child indicator dashboards.',
+  },
+  finishStep('/dashboard/data-entry'),
+];
+
+// ── Hospital manager — §11.3 ───────────────────────────────────────────────
+const MANAGER_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/facility-management',
+    target: '',
+    title: 'Welcome to Facility Management',
+    body: 'Reviews score, today’s appointments, enquiries, and staff shortcuts — your operational home.',
+  },
+  {
+    id: 'hospitals',
+    route: '/hospitals',
+    target: '',
+    title: 'Facility console',
+    body: 'Open a facility to quick-create wards, staff, and stock, or edit its details.',
+  },
+  {
+    id: 'settings',
+    route: '/facility-settings',
+    target: '',
+    title: 'Facility settings',
+    body: 'Payment methods offered, tax rate, exam rooms, and feature flags like fingerprint identification.',
+  },
+  {
+    id: 'hr',
+    route: '/hr',
+    target: '',
+    title: 'HR & leave',
+    body: 'Staff roster, shift schedule, leave requests, and payroll — with CSV export.',
+  },
+  {
+    id: 'equipment',
+    route: '/equipment',
+    target: '',
+    title: 'Assets & equipment',
+    body: 'Register assets with service intervals, log services and repairs, and watch the “service due soon” 30-day lookahead.',
+  },
+  finishStep('/facility-management'),
+];
+
+// ── Facility administrator — role directory + §11.3 ────────────────────────
+const FACILITY_ADMIN_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/facility-overview',
+    target: '',
+    title: 'Welcome to your Facility Overview',
+    body: 'Facility administration: settings, staff, payments, and MoH submissions. Let’s walk the essentials.',
+  },
+  {
+    id: 'settings',
+    route: '/facility-settings',
+    target: '',
+    title: 'Facility settings',
+    body: 'Payment methods, tax rate, rooms, and feature flags for this facility.',
+  },
+  {
+    id: 'payments',
+    route: '/payments',
+    target: '',
+    title: 'Payments oversight',
+    body: 'The full collections view — including the pending-verification queue for pay-by-link and portal payments.',
+  },
+  {
+    id: 'my-facility',
+    route: '/my-facility',
+    target: '',
+    title: 'Submit to MoH',
+    body: 'Your facility’s self-profile plus assessment and census submissions to the Ministry.',
+  },
+  finishStep('/facility-overview'),
+];
+
+// ── Org admin — §11.2 ──────────────────────────────────────────────────────
+const ORG_ADMIN_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/facility-management',
+    target: '',
+    title: 'Welcome, Org Admin',
+    body: 'You run the organization: facilities, staff accounts, branding, and the price list. Let’s walk each.',
+  },
+  {
+    id: 'hospitals',
+    route: '/org-admin/hospitals',
+    target: '',
+    title: 'Your facilities',
+    body: 'Create and manage the hospitals and clinics in your organization.',
+  },
+  {
+    id: 'users',
+    route: '/org-admin/users',
+    target: '',
+    title: 'Staff accounts',
+    body: 'Create staff, reset passwords, deactivate. New accounts are provisioned centrally with a temporary password the user must change at first login — so they can sign in on any device.',
+  },
+  {
+    id: 'pricing',
+    route: '/org-admin/pricing',
+    target: '',
+    title: 'The price list',
+    body: 'The fee schedule that powers billing: category, service code, unit price. Unpriced services are skipped, never charged at zero.',
+  },
+  {
+    id: 'branding',
+    route: '/org-admin/branding',
+    target: '',
+    title: 'Branding',
+    body: 'Your logo and theme, applied across every facility in the organization.',
+  },
+  finishStep('/facility-management'),
+];
+
+// ── County health director — §10 ───────────────────────────────────────────
+const COUNTY_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/dashboard/state',
+    target: '',
+    title: 'Welcome to your county dashboard',
+    body: 'Jurisdiction-scoped oversight: MCH indicators, births/deaths, immunization coverage, and facilities — aggregate only, never patient-level.',
+  },
+  {
+    id: 'surveillance',
+    route: '/surveillance',
+    target: '',
+    title: 'Disease surveillance',
+    body: 'Notifiable-disease counts across the states, outbreak alerts, and exportable line lists.',
+  },
+  {
+    id: 'assessments',
+    route: '/facility-assessments',
+    target: '',
+    title: 'Facility assessments',
+    body: 'Supervisor scorecards for the facilities in your jurisdiction; facilities also self-submit via My Facility.',
+  },
+  finishStep('/dashboard/state'),
+];
+
+// ── Government (MoH) — §10 ─────────────────────────────────────────────────
+const GOVERNMENT_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/government',
+    target: '',
+    title: 'Welcome to the national dashboard',
+    body: 'Facility network status, beds, staff, and utilization by state, with trends and drill-downs.',
+  },
+  {
+    id: 'surveillance',
+    route: '/surveillance',
+    target: '',
+    title: 'Surveillance',
+    body: 'Notifiable diseases across the 28 states; create outbreak alerts and export line lists.',
+  },
+  {
+    id: 'epidemic',
+    route: '/epidemic-intelligence',
+    target: '',
+    title: 'Epidemic intelligence',
+    body: 'Signal detection, outbreak risk, and hotspot mapping — the epidemic curves aggregate real weekly case reports.',
+  },
+  {
+    id: 'dhis2',
+    route: '/dhis2-export',
+    target: '',
+    title: 'DHIS2',
+    body: 'National-level exports and sync into the HMIS — with a persisted, honest sync log.',
+  },
+  finishStep('/government'),
+];
+
+// ── Super admin — §11.1 ────────────────────────────────────────────────────
+const SUPER_ADMIN_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    route: '/admin',
+    target: '',
+    title: 'Welcome, platform operator',
+    body: 'Organizations, users, system config, tenant billing, and sync conflicts. Let’s walk the platform console.',
+  },
+  {
+    id: 'orgs',
+    route: '/admin/organizations',
+    target: '',
+    title: 'Organizations',
+    body: 'Create and deactivate tenants — each organization is fully isolated.',
+  },
+  {
+    id: 'users',
+    route: '/admin/users',
+    target: '',
+    title: 'Cross-tenant users',
+    body: 'Add users, change roles, activate/deactivate across every tenant. Only you can grant platform or national roles.',
+  },
+  {
+    id: 'system',
+    route: '/admin/system',
+    target: '',
+    title: 'System',
+    body: 'Platform and DHIS2 configuration, plus manual sync pushes.',
+  },
+  {
+    id: 'billing',
+    route: '/admin/billing',
+    target: '',
+    title: 'Tenant billing',
+    body: 'Subscription plans and statuses per organization.',
+  },
+  {
+    id: 'conflicts',
+    route: '/admin/conflicts',
+    target: '',
+    title: 'Sync conflicts',
+    body: 'Resolve or dismiss offline-sync conflicts — the safety valve of an offline-first system.',
+  },
+  finishStep('/admin'),
+];
+
+// ── Medical superintendent — clinical journey + oversight stops ────────────
+const SUPERINTENDENT_STEPS: TourStep[] = [
+  ...clinicalOfficerTourSteps.filter(s => s.id !== 'finish'),
+  {
+    id: 'payments-oversight',
+    route: '/payments',
+    target: '',
+    title: 'Financial oversight',
+    body: 'You also see collections, the pending-verification queue, and claims — the money side of the visits you supervise.',
+  },
+  {
+    id: 'hr-oversight',
+    route: '/hr',
+    target: '',
+    title: 'People',
+    body: 'Shifts, leave, and payroll for the clinical teams you run.',
+  },
+  finishStep('/dashboard'),
+];
+
+const JOURNEY_STEPS: Partial<Record<UserRole, TourStep[]>> = {
+  // Clinical
+  clinical_officer: clinicalOfficerTourSteps,
+  doctor: clinicalOfficerTourSteps,
+  clinician: clinicalOfficerTourSteps,
+  medical_superintendent: SUPERINTENDENT_STEPS,
+  // Nursing
+  nurse: NURSE_STEPS,
+  midwife: NURSE_STEPS,
+  triage_nurse: NURSE_STEPS,
+  rooming_nurse: NURSE_STEPS,
+  // Diagnostics & pharmacy
+  lab_tech: LAB_STEPS,
+  pharmacist: PHARMACY_STEPS,
+  radiologist: RADIOLOGY_STEPS,
+  nutritionist: NUTRITION_STEPS,
+  // Front of house
+  front_desk: FRONT_DESK_STEPS,
+  central_registration_clerk: FRONT_DESK_STEPS,
+  clinic_clerk: FRONT_DESK_STEPS,
+  // Money
+  cashier: CASHIER_STEPS,
+  medical_biller: BILLER_STEPS,
+  // Records
+  hrio: RECORDS_STEPS,
+  records_hmis_officer: RECORDS_STEPS,
+  data_entry_clerk: RECORDS_STEPS,
+  // Management & admin
+  hospital_manager: MANAGER_STEPS,
+  facility_administrator: FACILITY_ADMIN_STEPS,
+  org_admin: ORG_ADMIN_STEPS,
+  county_health_director: COUNTY_STEPS,
+  government: GOVERNMENT_STEPS,
+  super_admin: SUPER_ADMIN_STEPS,
+};
+
+function isRouteAllowed(route: string, allowedRoutes: readonly string[]): boolean {
+  return allowedRoutes.some(r => route === r || route.startsWith(r + '/'));
+}
+
+/**
+ * The journey tour for a role, with any steps whose route falls outside the
+ * role's allow-list removed (so the tour never strands a user on an
+ * "Access Restricted" screen). Returns undefined when the role has no
+ * journey or filtering leaves too little to be worth touring — callers fall
+ * back to the generic shell tour.
+ */
+export function journeyTourForRole(role: UserRole): TourDefinition | undefined {
+  const steps = JOURNEY_STEPS[role];
+  if (!steps) return undefined;
+  const allowed = getRoleConfig(role)?.allowedRoutes || [];
+  const filtered = steps.filter(s => isRouteAllowed(s.route, allowed));
+  if (filtered.length < 3) return undefined;
+  return { key: `journey-${role}`, steps: filtered };
+}

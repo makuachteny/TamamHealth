@@ -5,20 +5,16 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import type { UserRole } from '@/lib/db-types';
 import TourCard from '@/components/tour/TourCard';
-import { clinicalOfficerTourSteps } from './clinical-officer-steps';
 import { buildGenericTour } from './generic-steps';
+import { journeyTourForRole } from './journey-tours';
 import { hasSeenTour, markTourSeen } from './tour-storage';
 import type { TourDefinition } from './types';
 
-// Hand-authored tours take priority; every other role falls back to a
-// generated start-to-finish tour of its own workspace (see buildGenericTour),
-// so "Take a tour" is available to every user.
-const TOURS_BY_ROLE: Partial<Record<UserRole, TourDefinition>> = {
-  clinical_officer: { key: 'clinical-officer', steps: clinicalOfficerTourSteps },
-};
-
+// Journey tours (one per role, derived from docs/USER-JOURNEYS.md) take
+// priority; any role without one falls back to a generated shell tour
+// (buildGenericTour), so "Take a tour" is available to every user.
 function tourForRole(role: UserRole): TourDefinition {
-  return TOURS_BY_ROLE[role] ?? buildGenericTour(role);
+  return journeyTourForRole(role) ?? buildGenericTour(role);
 }
 
 const MEASURE_RETRY_MS = 120;
@@ -159,6 +155,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
           rect={rect}
           index={stepIndex}
           total={steps.length}
+          stepTitles={steps.map(s => s.title)}
+          onJumpTo={setStepIndex}
           onBack={stepIndex > 0 ? back : undefined}
           onNext={next}
           onSkip={finish}

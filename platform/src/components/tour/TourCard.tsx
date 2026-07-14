@@ -1,7 +1,7 @@
 'use client';
 
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft, X } from '@/components/icons/lucide';
+import { ArrowLeft, ChevronDown, ChevronUp, Check, X } from '@/components/icons/lucide';
 import type { TourStep } from '@/lib/tour/types';
 
 const CARD_WIDTH = 300;
@@ -44,12 +44,16 @@ function cardPosition(rect: DOMRect, placement: TourStep['placement'], cardH: nu
 }
 
 export default function TourCard({
-  step, rect, index, total, onBack, onNext, onSkip, isLast,
+  step, rect, index, total, stepTitles, onJumpTo, onBack, onNext, onSkip, isLast,
 }: {
   step: TourStep;
   rect: DOMRect | null;
   index: number;
   total: number;
+  /** Titles of every step in the tour — powers the "All steps" overview. */
+  stepTitles?: string[];
+  /** Jump straight to a step from the overview list. */
+  onJumpTo?: (index: number) => void;
   onBack?: () => void;
   onNext: () => void;
   onSkip: () => void;
@@ -57,6 +61,7 @@ export default function TourCard({
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [cardH, setCardH] = useState(180);
+  const [showAllSteps, setShowAllSteps] = useState(false);
 
   // Re-measure whenever the content or anchor changes so the on-screen clamp
   // uses the card's real height.
@@ -142,7 +147,68 @@ export default function TourCard({
         </div>
 
         <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 6px' }}>{step.title}</h3>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 14px' }}>{step.body}</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 10px' }}>{step.body}</p>
+
+        {/* "All steps" overview — the whole journey at a glance, with the
+            current stop highlighted, finished stops ticked, and every row
+            clickable to jump straight there. */}
+        {stepTitles && stepTitles.length > 1 && (
+          <div style={{ marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={() => setShowAllSteps(v => !v)}
+              aria-expanded={showAllSteps}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none',
+                color: 'var(--accent-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0,
+              }}
+            >
+              {showAllSteps ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {showAllSteps ? 'Hide steps' : `Show all ${stepTitles.length} steps`}
+            </button>
+            {showAllSteps && (
+              <ol style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, maxHeight: 180, overflowY: 'auto' }}>
+                {stepTitles.map((title, i) => {
+                  const isCurrent = i === index;
+                  const isDone = i < index;
+                  return (
+                    <li key={`${i}-${title}`}>
+                      <button
+                        type="button"
+                        onClick={() => onJumpTo?.(i)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                          background: isCurrent ? 'var(--accent-light)' : 'transparent',
+                          border: 'none', borderRadius: 6, padding: '4px 6px', cursor: onJumpTo ? 'pointer' : 'default',
+                        }}
+                      >
+                        <span
+                          aria-hidden
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                            fontSize: 10, fontWeight: 700,
+                            background: isDone || isCurrent ? 'var(--accent-primary)' : 'var(--overlay-subtle)',
+                            color: isDone || isCurrent ? '#fff' : 'var(--text-muted)',
+                          }}
+                        >
+                          {isDone ? <Check className="w-2.5 h-2.5" /> : i + 1}
+                        </span>
+                        <span style={{
+                          fontSize: 12, lineHeight: 1.3,
+                          fontWeight: isCurrent ? 700 : 500,
+                          color: isCurrent ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        }}>
+                          {title}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {onBack ? (
