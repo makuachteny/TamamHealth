@@ -5905,6 +5905,48 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   border: 0 !important;
 }
 
+/* Bare variant — used when the workflow child renders its own card(s) (the
+   nurse Ward/Triage/MAR/Handoff stations). The wrapper stops being a card so
+   those inner cards ARE the outer cards, with no panel drawn behind them, and
+   fills the center panel edge-to-edge (a small inset for breathing room).
+   Uses a two-class selector so it outranks the several single-class
+   `.ehr-worklist-panel` border/background rules declared later in this file. */
+.ehr-worklist-panel.ehr-care-workflow--bare {
+  margin: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  /* Vertical gap under the daybar only — no horizontal inset, so the inner
+     cards' left/right edges line up with the full-width daybar (the header
+     showing the date + tab counts) above them. */
+  padding: 10px 0;
+}
+.ehr-care-workflow.ehr-care-workflow--bare > * {
+  /* Let the child stretch to fill the panel height instead of natural size,
+     and don't strip the inner cards' own borders/radius. */
+  flex: 1 1 auto;
+  min-height: 0;
+  box-shadow: revert !important;
+  border-radius: revert !important;
+  border: revert !important;
+}
+/* Cancel the worklist-panel HEADER styling (`.ehr-worklist-panel >
+   div:first-child`) that otherwise insets and horizontally centers the whole
+   workflow container — in bare mode the first child is the workflow, not a
+   panel title row. `align-items: stretch` lets the workflow fill the full
+   width (without it, a flex-column child centers at its natural width, so on
+   wide screens the triage cards floated in the middle). */
+.ehr-care-workflow.ehr-care-workflow--bare > div:first-child {
+  padding: 0;
+  align-items: stretch;
+}
+/* A workflow that renders its own .ehr-worklist-panel (Ward) relies on the
+   wrapper's 10px padding for its edge gap, so drop the panel's own margin to
+   avoid doubling it. */
+.ehr-care-workflow--bare .ehr-worklist-panel {
+  margin: 0;
+}
+
 .ehr-mission-card {
   background: var(--color-brand-700) !important;
   color: #fff;

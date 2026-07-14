@@ -105,6 +105,7 @@ export default function EhrCareDashboard({
   onEmptyAction,
   showActionStrip = false,
   showMissionCard = true,
+  hideRowList = false,
   children,
 }: {
   title: string;
@@ -150,6 +151,11 @@ export default function EhrCareDashboard({
   onEmptyAction?: () => void;
   showActionStrip?: boolean;
   showMissionCard?: boolean;
+  /** When the `children` workflow already renders its own patient list
+   *  (e.g. the nurse stations' Ward/Triage/MAR workflows), set this to skip
+   *  the generic row list so the workflow fills the center panel top-to-bottom
+   *  instead of sitting below a duplicate list. */
+  hideRowList?: boolean;
   children?: ReactNode;
 }) {
   const router = useRouter();
@@ -306,6 +312,7 @@ export default function EhrCareDashboard({
             </div>
           </div>
 
+          {!hideRowList && (
           <div className="ehr-appointment-list ehr-care-list">
             {visibleRows.length === 0 ? (
               <div className="ehr-empty-state">
@@ -338,6 +345,7 @@ export default function EhrCareDashboard({
               </div>
             ))}
           </div>
+          )}
 
           {footerContent && (
             <div className="ehr-care-footer">
@@ -347,7 +355,7 @@ export default function EhrCareDashboard({
 
           {children && (
             <>
-              <div className={`ehr-worklist-panel ehr-care-workflow ${effectiveView === 'calendar' ? 'is-calendar' : ''}`}>
+              <div className={`ehr-worklist-panel ehr-care-workflow ${hideRowList ? 'ehr-care-workflow--bare' : ''} ${effectiveView === 'calendar' ? 'is-calendar' : ''}`}>
                 {children}
               </div>
             </>

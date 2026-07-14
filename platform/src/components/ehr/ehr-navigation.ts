@@ -81,26 +81,59 @@ export function groupNavItemsBySection(items: NavItem[]): { section: string | nu
   return groups;
 }
 
-export function getPrimaryShortcutItems(items: NavItem[], role?: UserRole, maxItems = 5) {
-  const duplicateRoutes = role ? HEADER_SHORTCUT_DUPLICATE_ROUTES[role] : undefined;
-  const withPriority = items
-    // Messaging lives in the module menu and mobile tab bar, not the top
-    // rail — its rail slot belongs to the lab shortcut.
-    .filter(item => item.href !== '/dashboard' && !item.href.startsWith('/dashboard/') && item.href !== '/messages')
-    .filter(item => !duplicateRoutes?.includes(item.href))
-    .map((item, index) => ({
-      item,
-      index,
-      priority: PRIMARY_SHORTCUT_PRIORITY.indexOf(item.href),
-    }));
-
-  return withPriority
+/** Sort a nav-item list by top-rail shortcut priority, then original order. */
+function sortByShortcutPriority(list: NavItem[]): NavItem[] {
+  return list
+    .map((item, index) => ({ item, index, priority: PRIMARY_SHORTCUT_PRIORITY.indexOf(item.href) }))
     .sort((a, b) => {
       const aPriority = a.priority === -1 ? Number.MAX_SAFE_INTEGER : a.priority;
       const bPriority = b.priority === -1 ? Number.MAX_SAFE_INTEGER : b.priority;
       if (aPriority !== bPriority) return aPriority - bPriority;
       return a.index - b.index;
     })
-    .slice(0, maxItems)
     .map(entry => entry.item);
+}
+
+/**
+ * The top-rail shortcut row next to the module dropdown. Returns between
+ * `minItems` and `maxItems` shortcuts so every role has a usable row — never
+ * the empty rail that lean-nav roles (e.g. triage_nurse, whose only non-dash
+ * routes are both body-duplicates) used to get.
+ *
+ * Tiers, in fill order:
+ *   1. Primary destinations — not the home dashboard, messages, or a route the
+ *      role's own dashboard body already duplicates.
+ *   2. Body-duplicate destinations — still real nav targets; pulled in only to
+ *      reach the minimum.
+ *   3. Messages, then the role's dashboard/home — last-resort fillers so even
+ *      three-route roles show a populated row.
+ * We show tier 1 up to `maxItems`; if tier 1 alone is under `minItems`, later
+ * tiers backfill up to `minItems`.
+ */
+export function getPrimaryShortcutItems(items: NavItem[], role?: UserRole, maxItems = 5, minItems = 4) {
+  const duplicateRoutes = role ? HEADER_SHORTCUT_DUPLICATE_ROUTES[role] : undefined;
+  const isDashboard = (href: string) => href === '/dashboard' || href.startsWith('/dashboard/');
+
+  const tier1 = sortByShortcutPriority(
+    items.filter(item => !isDashboard(item.href) && item.href !== '/messages' && !duplicateRoutes?.includes(item.href)),
+  );
+  const tier2 = sortByShortcutPriority(
+    items.filter(item => !isDashboard(item.href) && item.href !== '/messages' && duplicateRoutes?.includes(item.href)),
+  );
+  const tier3 = sortByShortcutPriority(
+    items.filter(item => item.href === '/messages' || isDashboard(item.href)),
+  );
+
+  // De-duplicate by href across tiers (defensive; nav items are already unique).
+  const seen = new Set<string>();
+  const ordered = [...tier1, ...tier2, ...tier3].filter(item => {
+    if (seen.has(item.href)) return false;
+    seen.add(item.href);
+    return true;
+  });
+
+  // Aim for tier 1 (capped at maxItems); if that's short of the minimum, take
+  // enough of the backfill tiers to reach it — bounded by what actually exists.
+  const target = Math.min(ordered.length, Math.max(minItems, Math.min(tier1.length, maxItems)));
+  return ordered.slice(0, target);
 }

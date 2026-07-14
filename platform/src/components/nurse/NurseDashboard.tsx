@@ -218,6 +218,7 @@ export default function NurseDashboard() {
           missionDescription="Keep assigned patients, urgent triage, and medication work visible."
           showMissionCard
           emptyTitle="No patients in this station"
+          hideRowList
         >
           <div className="flex flex-col" style={{ minHeight: 0 }}>
             {activeTab === 'ward' && <WardWorkflow filters={wardFilters} setFilters={setWardFilters} />}

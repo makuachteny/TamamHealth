@@ -21,16 +21,27 @@ interface PatientRegistrationFormProps {
 
 export function PatientRegistrationForm({ embedded = false, onCancel, onRegistered }: PatientRegistrationFormProps = {}) {
   const { t } = useTranslation();
-  const steps = [t('patientNew.stepDemographics'), t('patientNew.stepContactLocation'), t('patientNew.stepNextOfKin'), 'Biometrics', 'Payment Coverage', t('patientNew.stepReview')];
+  const steps = [t('patientNew.stepDemographics'), t('patientNew.stepContactLocation'), t('patientNew.stepNextOfKin'), t('patientNew.stepBiometrics'), t('patientNew.stepPaymentCoverage'), t('patientNew.stepReview')];
   const stepDescriptions = [
-    'Capture the patient identity details used across triage, visits, and records.',
-    'Record contact, household, geocode, and location information.',
-    'Add reliable family or friend contacts for follow-up and care decisions.',
-    'Capture the patient photo and enroll fingerprints for identification at future visits.',
-    'Set how the patient will be billed or covered at checkout.',
-    'Confirm the registration details before creating the chart.',
+    t('patientNew.stepDescDemographics'),
+    t('patientNew.stepDescContactLocation'),
+    t('patientNew.stepDescNextOfKin'),
+    t('patientNew.stepDescBiometrics'),
+    t('patientNew.stepDescPaymentCoverage'),
+    t('patientNew.stepDescReview'),
   ];
   const stepIcons = [UserPlus, MapPin, Users, ScanLine, Wallet, ClipboardList];
+  const relationshipOptions = [
+    { value: 'Spouse', labelKey: 'patientNew.relSpouse' },
+    { value: 'Parent', labelKey: 'patientNew.relParent' },
+    { value: 'Child', labelKey: 'patientNew.relChild' },
+    { value: 'Sibling', labelKey: 'patientNew.relSibling' },
+    { value: 'Uncle', labelKey: 'patientNew.relUncle' },
+    { value: 'Aunt', labelKey: 'patientNew.relAunt' },
+    { value: 'Cousin', labelKey: 'patientNew.relCousin' },
+    { value: 'Friend', labelKey: 'patientNew.relFriend' },
+    { value: 'Other', labelKey: 'patientNew.relOther' },
+  ];
   const router = useRouter();
   const { create: createPatient } = usePatients();
   const { currentUser } = useApp();
@@ -121,7 +132,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
         const age = parseInt(form.estimatedAge, 10);
         if (isNaN(age) || age < 0 || age > 150) errs.estimatedAge = t('patientNew.errAgeRange');
       }
-      if (!form.primaryLanguage) errs.primaryLanguage = 'Primary language is required';
+      if (!form.primaryLanguage) errs.primaryLanguage = t('patientNew.errPrimaryLanguageRequired');
     } else if (s === 1) {
       if (!form.state) errs.state = t('patientNew.errStateRequired');
       if (form.state && !form.county) errs.county = t('patientNew.errCountyRequired');
@@ -263,7 +274,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
           showToast(t('fingerprint.enrollFailed'), 'error');
         }
       }
-      showToast(`${t('patientNew.toastRegistered', { firstName: form.firstName, surname: form.surname })}${result?.hospitalNumber ? ` — Hospital No. ${result.hospitalNumber}` : ''}`, 'success');
+      showToast(`${t('patientNew.toastRegistered', { firstName: form.firstName, surname: form.surname })}${result?.hospitalNumber ? t('patientNew.hospitalNumberSuffix', { number: result.hospitalNumber }) : ''}`, 'success');
       if (onRegistered) {
         onRegistered();
       } else if (nextAction === 'check-in' && result?._id) {
@@ -295,14 +306,14 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             <ArrowLeft className="w-4 h-4" /> {t('patientNew.backToPatients')}
           </button>
           <div className="patient-registration-context" aria-live="polite">
-            <span>Step {step + 1} of {steps.length}</span>
+            <span>{t('patientNew.stepProgress', { current: step + 1, total: steps.length })}</span>
             <strong>{steps[step]}</strong>
           </div>
           </div>
         )}
 
         {/* Step Indicator — stretches across the full width of the form below */}
-        <div className="patient-registration-stepper" aria-label="Registration progress">
+        <div className="patient-registration-stepper" aria-label={t('patientNew.registrationProgressAriaLabel')}>
           {steps.map((s, i) => (
             <div key={s} className={`patient-registration-step ${i === step ? 'is-active' : i < step ? 'is-complete' : ''}`}>
               <div className={`step-dot ${i === step ? 'step-dot-active' : i < step ? 'step-dot-completed' : ''}`}>
@@ -337,10 +348,10 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
               <div className="registration-section">
                 <div className="registration-section-header">
                   <div>
-                    <p>Identity</p>
+                    <p>{t('patientNew.sectionIdentity')}</p>
                     <h3>{t('patientNew.demographicsHeading')}</h3>
                   </div>
-                  <span>Required fields marked *</span>
+                  <span>{t('patientNew.requiredFieldsNote')}</span>
                 </div>
                 <div className="flex gap-3 items-start">
                   <div className="registration-field-grid registration-field-grid--three flex-1">
@@ -409,10 +420,10 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
               <div className="registration-section">
                 <div className="registration-section-header">
                   <div>
-                    <p>Contact and location</p>
+                    <p>{t('patientNew.sectionContactLocation')}</p>
                     <h3>{t('patientNew.contactLocationHeading')}</h3>
                   </div>
-                  <span>Phone fields are optional unless used</span>
+                  <span>{t('patientNew.phoneOptionalNote')}</span>
                 </div>
                 <div className="registration-field-grid registration-field-grid--three">
                   <div>
@@ -501,19 +512,19 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
               <div className="registration-section">
                 <div className="registration-section-header">
                   <div>
-                    <p>Family and consent</p>
+                    <p>{t('patientNew.sectionFamilyConsent')}</p>
                     <h3>{t('patientNew.nextOfKinHeading')}</h3>
                   </div>
-                  <span>Primary contact required · up to 4 contacts total</span>
+                  <span>{t('patientNew.nokContactsNote')}</span>
                 </div>
                 <p className="registration-section-note">
-                  Multiple contacts improve follow-up. Patients may not have reliable phone access, and multiple family members may be involved in care decisions.
+                  {t('patientNew.nokSectionNote')}
                 </p>
 
                 {/* Primary NOK */}
                 <div className="registration-contact-card">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>Primary</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>{t('patientNew.primaryBadge')}</span>
                   </div>
                   <div className="registration-field-grid registration-field-grid--two">
                     <div>
@@ -525,8 +536,8 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                       <label>{t('patientNew.relationship')} *</label>
                       <select value={form.nokRelationship} onChange={e => update('nokRelationship', e.target.value)} aria-invalid={!!errors.nokRelationship} style={errors.nokRelationship ? { borderColor: 'var(--color-danger)' } : {}}>
                         <option value="">{t('patientNew.selectRelationship')}</option>
-                        {['Spouse', 'Parent', 'Child', 'Sibling', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Other'].map(r => (
-                          <option key={r} value={r}>{r}</option>
+                        {relationshipOptions.map(r => (
+                          <option key={r.value} value={r.value}>{t(r.labelKey)}</option>
                         ))}
                       </select>
                     </div>
@@ -546,31 +557,31 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                 {additionalNok.map((nok, i) => (
                   <div key={i} className="registration-contact-card">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-light)', color: 'var(--text-muted)' }}>Contact {i + 2}</span>
-                      <button type="button" onClick={() => removeNokEntry(i)} aria-label="Remove contact" title="Remove contact" className="p-1.5 rounded-lg transition-colors hover:bg-red-50" style={{ color: 'var(--color-danger)' }}><Trash2 className="w-4 h-4" /></button>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--overlay-light)', color: 'var(--text-muted)' }}>{t('patientNew.contactNumber', { number: i + 2 })}</span>
+                      <button type="button" onClick={() => removeNokEntry(i)} aria-label={t('patientNew.removeContact')} title={t('patientNew.removeContact')} className="p-1.5 rounded-lg transition-colors hover:bg-red-50" style={{ color: 'var(--color-danger)' }}><Trash2 className="w-4 h-4" /></button>
                     </div>
                     <div className="registration-field-grid registration-field-grid--two">
                       <div>
-                        <label>Full Name</label>
-                        <input type="text" value={nok.name} onChange={e => updateNokEntry(i, { name: e.target.value })} placeholder="Full name" />
+                        <label>{t('patientNew.optionalFullName')}</label>
+                        <input type="text" value={nok.name} onChange={e => updateNokEntry(i, { name: e.target.value })} placeholder={t('patientNew.fullNamePlaceholder')} />
                       </div>
                       <div>
-                        <label>Relationship</label>
+                        <label>{t('patientNew.relationshipOptional')}</label>
                         <select value={nok.relationship} onChange={e => updateNokEntry(i, { relationship: e.target.value })}>
-                          <option value="">Select relationship</option>
-                          {['Spouse', 'Parent', 'Child', 'Sibling', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Other'].map(r => (
-                            <option key={r} value={r}>{r}</option>
+                          <option value="">{t('patientNew.selectRelationship')}</option>
+                          {relationshipOptions.map(r => (
+                            <option key={r.value} value={r.value}>{t(r.labelKey)}</option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label>Phone</label>
-                        <input type="tel" value={nok.phone} onChange={e => updateNokEntry(i, { phone: e.target.value })} placeholder="Phone number" aria-invalid={!!errors[`additionalNok.${i}.phone`]} style={errors[`additionalNok.${i}.phone`] ? { borderColor: 'var(--color-danger)' } : {}} />
+                        <label>{t('patientNew.phoneOptionalLabel')}</label>
+                        <input type="tel" value={nok.phone} onChange={e => updateNokEntry(i, { phone: e.target.value })} placeholder={t('patientNew.phoneNumberPlaceholder')} aria-invalid={!!errors[`additionalNok.${i}.phone`]} style={errors[`additionalNok.${i}.phone`] ? { borderColor: 'var(--color-danger)' } : {}} />
                         {errors[`additionalNok.${i}.phone`] && <p className="text-[11px] mt-1" role="alert" style={{ color: 'var(--color-danger)' }}>{errors[`additionalNok.${i}.phone`]}</p>}
                       </div>
                       <div>
-                        <label>Address / Location</label>
-                        <input type="text" value={nok.address} onChange={e => updateNokEntry(i, { address: e.target.value })} placeholder="Village, boma, or address" />
+                        <label>{t('patientNew.addressLocation')}</label>
+                        <input type="text" value={nok.address} onChange={e => updateNokEntry(i, { address: e.target.value })} placeholder={t('patientNew.addressLocationPlaceholder')} />
                       </div>
                     </div>
                   </div>
@@ -578,7 +589,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
 
                 {additionalNok.length < 3 && (
                   <button type="button" onClick={addNokEntry} className="btn btn-secondary btn-sm">
-                    + Add another contact
+                    + {t('patientNew.addAnotherContact')}
                   </button>
                 )}
               </div>
@@ -589,26 +600,26 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
               <div className="registration-section">
                 <div className="registration-section-header">
                   <div>
-                    <p>Identity verification</p>
-                    <h3>Photo &amp; Fingerprint</h3>
+                    <p>{t('patientNew.identityVerification')}</p>
+                    <h3>{t('patientNew.photoFingerprintHeading')}</h3>
                   </div>
-                  <span>Optional but recommended</span>
+                  <span>{t('patientNew.optionalButRecommended')}</span>
                 </div>
                 <p className="registration-section-note">
-                  A photo and fingerprints let staff confirm this patient&apos;s identity at future visits, even when documents or a hospital card are unavailable.
+                  {t('patientNew.biometricsNote')}
                 </p>
 
                 {/* Patient photo capture */}
                 <div className="registration-inline-panel registration-inline-panel--media">
                   <div className="registration-panel-heading">
-                    <h4>Patient Photo</h4>
-                    <span>Optional</span>
+                    <h4>{t('patientNew.patientPhotoHeading')}</h4>
+                    <span>{t('patientNew.optionalLabel')}</span>
                   </div>
                   <div className="registration-media-row">
                     <div className="flex-shrink-0" style={{ width: 72, height: 72, borderRadius: 12, overflow: 'hidden', border: '2px dashed var(--border-light)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {patientPhotoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={patientPhotoUrl} alt="Patient" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={patientPhotoUrl} alt={t('patientNew.photoAlt')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
                         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: 'var(--text-muted)', opacity: 0.4 }}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
                       )}
@@ -616,16 +627,16 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     <div className="flex flex-col gap-2">
                       <button type="button" onClick={() => setShowPhotoModal(true)} className="btn btn-secondary btn-sm flex items-center gap-1.5">
                         <Camera className="w-3.5 h-3.5" />
-                        {patientPhotoUrl ? 'Retake photo' : 'Take photo'}
+                        {patientPhotoUrl ? t('patientNew.retakePhoto') : t('patientNew.takePhoto')}
                       </button>
                       {patientPhotoUrl && (
                         <button type="button" onClick={() => setPatientPhotoUrl(null)} className="btn btn-sm text-xs" style={{ color: 'var(--text-muted)', background: 'transparent' }}>
-                          Remove
+                          {t('action.remove')}
                         </button>
                       )}
                     </div>
                     <p>
-                      Take a photo with the camera, or upload one. Use a clear front-facing photo. JPG, PNG or WebP, max 5 MB.
+                      {t('patientNew.photoHelp')}
                     </p>
                   </div>
                 </div>
@@ -639,23 +650,23 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
               <div className="registration-section">
                 <div className="registration-section-header">
                   <div>
-                    <p>Billing setup</p>
-                    <h3>Payment Coverage</h3>
+                    <p>{t('patientNew.billingSetup')}</p>
+                    <h3>{t('patientNew.stepPaymentCoverage')}</h3>
                   </div>
-                  <span>Used at checkout</span>
+                  <span>{t('patientNew.usedAtCheckout')}</span>
                 </div>
                 <p className="registration-section-note">
-                    Capture how this patient&apos;s care will be covered. This information is used at checkout and billing.
+                    {t('patientNew.coverageNote')}
                 </p>
 
                 <div>
-                  <label>Coverage Type *</label>
+                  <label>{t('patientNew.coverageTypeLabel')}</label>
                   <div className="registration-option-grid">
                     {([
-                      { value: 'out-of-pocket', label: 'Out of Pocket', desc: 'Patient pays directly' },
-                      { value: 'program', label: 'Program Enrolled', desc: 'Government or NGO program' },
-                      { value: 'exemption', label: 'Exemption', desc: 'Fee waiver or exemption status' },
-                      { value: 'ngo', label: 'NGO Covered', desc: 'NGO covers services' },
+                      { value: 'out-of-pocket', labelKey: 'patientNew.coverageOutOfPocket', descKey: 'patientNew.coverageOutOfPocketDesc' },
+                      { value: 'program', labelKey: 'patientNew.coverageProgram', descKey: 'patientNew.coverageProgramDesc' },
+                      { value: 'exemption', labelKey: 'patientNew.coverageExemption', descKey: 'patientNew.coverageExemptionDesc' },
+                      { value: 'ngo', labelKey: 'patientNew.coverageNgo', descKey: 'patientNew.coverageNgoDesc' },
                     ] as const).map(opt => (
                       <button
                         key={opt.value}
@@ -667,8 +678,8 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                           background: form.payorCoverageType === opt.value ? 'var(--accent-light)' : 'var(--overlay-subtle)',
                         }}
                       >
-                        <span className="text-sm font-semibold" style={{ color: form.payorCoverageType === opt.value ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{opt.label}</span>
-                        <span className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{opt.desc}</span>
+                        <span className="text-sm font-semibold" style={{ color: form.payorCoverageType === opt.value ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{t(opt.labelKey)}</span>
+                        <span className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{t(opt.descKey)}</span>
                       </button>
                     ))}
                   </div>
@@ -676,36 +687,36 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
 
                 {form.payorCoverageType === 'program' && (
                   <div>
-                    <label>Program Name</label>
-                    <input type="text" value={form.payorProgram} onChange={e => update('payorProgram', e.target.value)} placeholder="e.g. UNICEF Health Program, MoH Free Care" />
+                    <label>{t('patientNew.programName')}</label>
+                    <input type="text" value={form.payorProgram} onChange={e => update('payorProgram', e.target.value)} placeholder={t('patientNew.programNamePlaceholder')} />
                   </div>
                 )}
                 {form.payorCoverageType === 'ngo' && (
                   <div>
-                    <label>NGO Name</label>
-                    <input type="text" value={form.payorNgo} onChange={e => update('payorNgo', e.target.value)} placeholder="e.g. MSF, IRC, GOAL" />
+                    <label>{t('patientNew.ngoName')}</label>
+                    <input type="text" value={form.payorNgo} onChange={e => update('payorNgo', e.target.value)} placeholder={t('patientNew.ngoNamePlaceholder')} />
                   </div>
                 )}
                 {form.payorCoverageType === 'exemption' && (
                   <div>
-                    <label>Exemption Reason</label>
+                    <label>{t('patientNew.exemptionReasonLabel')}</label>
                     <select value={form.payorExemptionReason} onChange={e => updateExemptionReason(e.target.value)}>
-                      <option value="">Select reason</option>
-                      <option value="Child under 5">Child under 5</option>
-                      <option value="Pregnant woman">Pregnant woman</option>
-                      <option value="Indigent / unable to pay">Indigent / unable to pay</option>
-                      <option value="Emergency care">Emergency care</option>
-                      <option value="Other">Other</option>
+                      <option value="">{t('patientNew.selectReason')}</option>
+                      <option value="Child under 5">{t('patientNew.exemptionChildUnder5')}</option>
+                      <option value="Pregnant woman">{t('patientNew.exemptionPregnantWoman')}</option>
+                      <option value="Indigent / unable to pay">{t('patientNew.exemptionIndigent')}</option>
+                      <option value="Emergency care">{t('patientNew.exemptionEmergency')}</option>
+                      <option value="Other">{t('patientNew.exemptionOther')}</option>
                     </select>
                     {form.payorExemptionReason === 'Other' && (
-                      <input type="text" className="mt-2" value={form.payorExemptionOther} onChange={e => update('payorExemptionOther', e.target.value)} placeholder="Specify reason" />
+                      <input type="text" className="mt-2" value={form.payorExemptionOther} onChange={e => update('payorExemptionOther', e.target.value)} placeholder={t('patientNew.specifyReason')} />
                     )}
                   </div>
                 )}
 
                 <div className="registration-info-note">
                   <p>
-                    Medical history, allergies, and chronic conditions are collected later during triage and clinical consultation — not at registration.
+                    {t('patientNew.medicalHistoryDeferredNote')}
                   </p>
                 </div>
               </div>
@@ -718,13 +729,13 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                   <div style={{ width: 60, height: 60, borderRadius: 12, overflow: 'hidden', flexShrink: 0, border: '1px solid var(--border-light)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {patientPhotoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={patientPhotoUrl} alt="Patient" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={patientPhotoUrl} alt={t('patientNew.photoAlt')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: 'var(--text-muted)', opacity: 0.4 }}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
                     )}
                   </div>
                   <div>
-                    <p>Final check</p>
+                    <p>{t('patientNew.finalCheck')}</p>
                     <h3>{t('patientNew.reviewHeading')}</h3>
                   </div>
                 </div>
@@ -746,18 +757,18 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                       {geocodeId && <p className="text-sm font-mono"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewGeocodeId')}</span> {geocodeId}</p>}
                       {form.nationalId && <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewNationalId')}</span> {form.nationalId}</p>}
                       <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewNok')}</span> {form.nokName} ({form.nokRelationship})</p>
-                      <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Fingerprints:</span> {fingerprints.length > 0 ? `${fingerprints.length} enrolled` : 'Not captured'}</p>
+                      <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewFingerprints')}</span> {fingerprints.length > 0 ? t('patientNew.reviewFingerprintsEnrolled', { count: fingerprints.length }) : t('patientNew.reviewFingerprintsNotCaptured')}</p>
                     </div>
                   </div>
                   <div className="registration-review-card">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Payment Coverage</h4>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>{t('patientNew.stepPaymentCoverage')}</h4>
                     <div className="space-y-1.5">
-                      <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Coverage:</span> {form.payorCoverageType}</p>
-                      {form.payorProgram && <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Program:</span> {form.payorProgram}</p>}
-                      {form.payorNgo && <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>NGO:</span> {form.payorNgo}</p>}
-                      {form.payorExemptionReason && <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Exemption:</span> {form.payorExemptionReason === 'Other' ? (form.payorExemptionOther || 'Other') : form.payorExemptionReason}</p>}
+                      <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewCoverage')}</span> {form.payorCoverageType}</p>
+                      {form.payorProgram && <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewProgram')}</span> {form.payorProgram}</p>}
+                      {form.payorNgo && <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewNgo')}</span> {form.payorNgo}</p>}
+                      {form.payorExemptionReason && <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewExemption')}</span> {form.payorExemptionReason === 'Other' ? (form.payorExemptionOther || t('patientNew.exemptionOther')) : form.payorExemptionReason}</p>}
                       {additionalNok.length > 0 && (
-                        <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Additional contacts:</span> {additionalNok.length}</p>
+                        <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>{t('patientNew.reviewAdditionalContacts')}</span> {additionalNok.length}</p>
                       )}
                     </div>
                   </div>
@@ -784,7 +795,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                     {submitting && submitIntent === 'profile' ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full" /> {t('patientNew.saving')}</> : t('patientNew.registerPatient')}
                   </button>
                   <button onClick={() => handleSubmit('check-in')} disabled={submitting} className="btn btn-success" style={{ opacity: submitting ? 0.7 : 1 }}>
-                    {submitting && submitIntent === 'check-in' ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('patientNew.saving')}</> : <><Check className="w-4 h-4" /> Register & Check In</>}
+                    {submitting && submitIntent === 'check-in' ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t('patientNew.saving')}</> : <><Check className="w-4 h-4" /> {t('patientNew.registerAndCheckIn')}</>}
                   </button>
                 </div>
               )}

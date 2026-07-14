@@ -283,7 +283,10 @@ export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
 // orgId (they were invisible to every scoped user, so the five showcase
 // billing patients had empty ledgers) and three intake-form providerName
 // denorms corrected to match their providerId's user doc.
-export const SEED_VERSION = 49;
+// Bumped to 50: Bentiu State Hospital (hosp-004) now has a seeded lab-order
+// queue + walk-in roster, so lab.gatluak's Lab Command Center shows real data
+// instead of an empty "No pending orders" queue.
+export const SEED_VERSION = 50;
 
 export async function isSeeded(): Promise<boolean> {
   try {

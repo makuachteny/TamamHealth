@@ -3,15 +3,27 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import TopBar from '@/components/TopBar';
-import { Droplets, Plus, X } from '@/components/icons/lucide';
+import { Droplets, Plus, X, Search, UserCheck, FlaskConical, Syringe, Trash2, CheckCircle2, XCircle } from '@/components/icons/lucide';
 import { useApp } from '@/lib/context';
 import { useToast } from '@/components/Toast';
-import { getAllUnits, addUnit } from '@/lib/services/blood-bank-service';
-import type { BloodBankDoc } from '@/lib/db-types';
+import {
+  getAllUnits,
+  addUnit,
+  reserveUnit,
+  crossmatchUnit,
+  recordTransfusion,
+  discardUnit,
+  getCompatibleGroups,
+} from '@/lib/services/blood-bank-service';
+import type { BloodBankDoc, PatientDoc } from '@/lib/db-types';
 import Badge, { type BadgeTone } from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { formatDate } from '@/lib/format-utils';
 import EhrListHeader, { LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
+import RowActionsMenu, { type RowAction } from '@/components/RowActionsMenu';
+import { usePatients } from '@/lib/hooks/usePatients';
+import { patientFullName } from '@/lib/patient-utils';
+import PatientAvatar from '@/components/patients/PatientAvatar';
 
 const BLOOD_GROUPS: BloodBankDoc['bloodGroup'][] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -44,6 +56,7 @@ const daysUntil = (date: string) =>
 export default function BloodBankPage() {
   const { currentUser } = useApp();
   const { showToast } = useToast();
+  const { patients } = usePatients();
 
   const [units, setUnits] = useState<BloodBankDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,6 +168,175 @@ export default function BloodBankPage() {
     }
   };
 
+  // ── Unit lifecycle: reserve → crossmatch → transfuse, plus discard ──
+
+  const [reserveUnitId, setReserveUnitId] = useState<string | null>(null);
+  const [reserveQuery, setReserveQuery] = useState('');
+  const [reservePatient, setReservePatient] = useState<PatientDoc | null>(null);
+  const [reserveCompatibleGroups, setReserveCompatibleGroups] = useState<string[] | null>(null);
+  const [reserving, setReserving] = useState(false);
+
+  const [discardUnitId, setDiscardUnitId] = useState<string | null>(null);
+  const [discardReason, setDiscardReason] = useState('');
+  const [discarding, setDiscarding] = useState(false);
+
+  const [crossmatchUnitId, setCrossmatchUnitId] = useState<string | null>(null);
+  const [crossmatchChoice, setCrossmatchChoice] = useState<'compatible' | 'incompatible'>('compatible');
+  const [crossmatching, setCrossmatching] = useState(false);
+
+  const [transfuseUnitId, setTransfuseUnitId] = useState<string | null>(null);
+  const [transfusing, setTransfusing] = useState(false);
+
+  const closeReserve = useCallback(() => {
+    setReserveUnitId(null);
+    setReserveQuery('');
+    setReservePatient(null);
+    setReserveCompatibleGroups(null);
+  }, []);
+  const closeDiscard = useCallback(() => { setDiscardUnitId(null); setDiscardReason(''); }, []);
+  const closeCrossmatch = useCallback(() => { setCrossmatchUnitId(null); setCrossmatchChoice('compatible'); }, []);
+  const closeTransfuse = useCallback(() => { setTransfuseUnitId(null); }, []);
+
+  const reserveMatches = useMemo(() => {
+    const q = reserveQuery.trim().toLowerCase();
+    if (q.length < 1) return [];
+    return patients.filter(p =>
+      patientFullName(p).toLowerCase().includes(q) ||
+      (p.hospitalNumber || '').toLowerCase().includes(q) ||
+      (p.phone || '').toLowerCase().includes(q),
+    ).slice(0, 8);
+  }, [reserveQuery, patients]);
+
+  // Surface compatible donor groups for context once a patient is picked —
+  // informational only, does not block reservation.
+  useEffect(() => {
+    if (!reservePatient) { setReserveCompatibleGroups(null); return; }
+    let cancelled = false;
+    getCompatibleGroups(reservePatient.bloodType || '').then(groups => {
+      if (!cancelled) setReserveCompatibleGroups(groups);
+    });
+    return () => { cancelled = true; };
+  }, [reservePatient]);
+
+  const handleReserve = async () => {
+    if (!reserveUnitId || !reservePatient) {
+      showToast('Select a patient to reserve this unit', 'error');
+      return;
+    }
+    setReserving(true);
+    try {
+      const result = await reserveUnit(reserveUnitId, reservePatient._id);
+      if (!result) throw new Error('reserve-failed');
+      showToast(`Unit reserved for ${patientFullName(reservePatient)}`, 'success');
+      closeReserve();
+      await loadUnits();
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to reserve unit — it may no longer be available', 'error');
+    } finally {
+      setReserving(false);
+    }
+  };
+
+  const handleDiscard = async () => {
+    if (!discardUnitId || !discardReason.trim()) {
+      showToast('A reason is required to discard a unit', 'error');
+      return;
+    }
+    setDiscarding(true);
+    try {
+      const result = await discardUnit(discardUnitId, discardReason.trim());
+      if (!result) throw new Error('discard-failed');
+      showToast('Unit discarded', 'success');
+      closeDiscard();
+      await loadUnits();
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to discard unit', 'error');
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
+  const handleCrossmatch = async () => {
+    if (!crossmatchUnitId) return;
+    setCrossmatching(true);
+    try {
+      const result = await crossmatchUnit(crossmatchUnitId, crossmatchChoice);
+      if (!result) throw new Error('crossmatch-failed');
+      showToast(
+        crossmatchChoice === 'compatible'
+          ? 'Crossmatch recorded — compatible'
+          : 'Crossmatch recorded as incompatible — unit returned to available inventory',
+        'success',
+      );
+      closeCrossmatch();
+      await loadUnits();
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to record crossmatch result', 'error');
+    } finally {
+      setCrossmatching(false);
+    }
+  };
+
+  const handleTransfuse = async () => {
+    if (!transfuseUnitId) return;
+    const unit = units.find(u => u._id === transfuseUnitId);
+    if (!unit?.reservedForPatient) {
+      showToast('No patient reservation found for this unit', 'error');
+      return;
+    }
+    setTransfusing(true);
+    try {
+      const transfusedBy = currentUser?.name || currentUser?.username || currentUser?._id || 'Staff';
+      const result = await recordTransfusion(transfuseUnitId, unit.reservedForPatient, transfusedBy);
+      if (!result) throw new Error('transfuse-failed');
+      showToast('Transfusion recorded', 'success');
+      closeTransfuse();
+      await loadUnits();
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to record transfusion', 'error');
+    } finally {
+      setTransfusing(false);
+    }
+  };
+
+  const rowActions = (u: BloodBankDoc): RowAction[] => {
+    const discardAction: RowAction = {
+      key: 'discard',
+      label: 'Discard',
+      icon: <Trash2 className="w-3.5 h-3.5" />,
+      tone: 'danger',
+      onClick: () => { setDiscardUnitId(u._id); setDiscardReason(''); },
+    };
+    switch (u.status) {
+      case 'available':
+        return [
+          { key: 'reserve', label: 'Reserve', icon: <UserCheck className="w-3.5 h-3.5" />, onClick: () => setReserveUnitId(u._id) },
+          discardAction,
+        ];
+      case 'reserved':
+        return [
+          {
+            key: 'crossmatch',
+            label: 'Record crossmatch',
+            icon: <FlaskConical className="w-3.5 h-3.5" />,
+            onClick: () => { setCrossmatchUnitId(u._id); setCrossmatchChoice('compatible'); },
+          },
+          discardAction,
+        ];
+      case 'crossmatched':
+        return [
+          { key: 'transfuse', label: 'Record transfusion', icon: <Syringe className="w-3.5 h-3.5" />, onClick: () => setTransfuseUnitId(u._id) },
+          discardAction,
+        ];
+      default:
+        return [];
+    }
+  };
+
   return (
     <>
       <TopBar title="Blood Bank" />
@@ -226,7 +408,7 @@ export default function BloodBankPage() {
               message="Use “Add unit” to register one."
             />
           ) : (
-            <table className="data-table" style={{ minWidth: 840 }}>
+            <table className="data-table" style={{ minWidth: 960 }}>
               <thead>
                 <tr>
                   <th>Unit ID</th>
@@ -236,6 +418,7 @@ export default function BloodBankPage() {
                   <th>Collected</th>
                   <th>Expires</th>
                   <th>Status</th>
+                  <th style={{ width: 56 }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -261,6 +444,9 @@ export default function BloodBankPage() {
                       </td>
                       <td>
                         <Badge tone={STATUS_TONE[u.status]}>{u.status}</Badge>
+                      </td>
+                      <td>
+                        <RowActionsMenu actions={rowActions(u)} ariaLabel={`Actions for unit ${u.unitId}`} />
                       </td>
                     </tr>
                   );
@@ -353,6 +539,238 @@ export default function BloodBankPage() {
             </div>
           </Modal>
         )}
+
+        {/* Reserve unit modal */}
+        {reserveUnitId && (() => {
+          const unit = units.find(u => u._id === reserveUnitId);
+          if (!unit) return null;
+          const isCompatible = reserveCompatibleGroups ? reserveCompatibleGroups.includes(unit.bloodGroup) : null;
+          return (
+            <Modal onClose={closeReserve}>
+              <div className="modal-panel modal-panel--md" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="icon-box-sm">
+                      <UserCheck className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                    </div>
+                    <h3 className="text-base font-semibold">Reserve unit {unit.unitId}</h3>
+                  </div>
+                  <button onClick={closeReserve} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {reservePatient ? (
+                    <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                      <PatientAvatar patient={reservePatient} size={36} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(reservePatient)}</p>
+                        <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          {reservePatient.hospitalNumber || '-'}{reservePatient.bloodType ? ` · ${reservePatient.bloodType}` : ''}
+                        </p>
+                      </div>
+                      <button type="button" onClick={() => { setReservePatient(null); setReserveQuery(''); }} className="btn btn-sm btn-secondary">
+                        <X className="w-3.5 h-3.5" /> Change
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                      <input
+                        autoFocus
+                        value={reserveQuery}
+                        onChange={e => setReserveQuery(e.target.value)}
+                        placeholder="Search by name, patient ID, or phone…"
+                        style={{ paddingLeft: 40 }}
+                      />
+                      {reserveMatches.length > 0 && (
+                        <div className="mt-1 rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-light)', background: 'var(--bg-card)' }}>
+                          {reserveMatches.map(p => (
+                            <button
+                              key={p._id}
+                              type="button"
+                              onClick={() => setReservePatient(p)}
+                              className="w-full text-left px-3 py-2 flex items-center gap-2.5 hover:bg-[var(--table-row-hover)]"
+                              style={{ borderBottom: '1px solid var(--border-light)' }}
+                            >
+                              <PatientAvatar patient={p} size={26} />
+                              <span className="flex-1 text-[13px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(p)}</span>
+                              <span className="text-[11px] font-mono flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{p.hospitalNumber}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {reservePatient && reserveCompatibleGroups && (
+                    <p className="text-xs" style={{ color: isCompatible ? 'var(--color-success)' : 'var(--color-warning)' }}>
+                      {isCompatible
+                        ? `Unit ${unit.bloodGroup} is compatible with ${reservePatient.bloodType || 'the patient'}'s blood type.`
+                        : `Note: unit ${unit.bloodGroup} is not typically compatible with ${reservePatient.bloodType || "this patient's"} blood type (compatible groups: ${reserveCompatibleGroups.join(', ') || '—'}).`}
+                    </p>
+                  )}
+                </div>
+                <hr className="section-divider" />
+                <div className="flex gap-2 mt-2">
+                  <button onClick={closeReserve} className="btn btn-secondary flex-1">Cancel</button>
+                  <button onClick={handleReserve} disabled={!reservePatient || reserving} className="btn btn-primary flex-1">
+                    {reserving ? 'Reserving…' : 'Reserve unit'}
+                  </button>
+                </div>
+              </div>
+            </Modal>
+          );
+        })()}
+
+        {/* Discard unit modal */}
+        {discardUnitId && (() => {
+          const unit = units.find(u => u._id === discardUnitId);
+          if (!unit) return null;
+          return (
+            <Modal onClose={closeDiscard}>
+              <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="icon-box-sm">
+                      <Trash2 className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
+                    </div>
+                    <h3 className="text-base font-semibold">Discard unit {unit.unitId}</h3>
+                  </div>
+                  <button onClick={closeDiscard} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>Reason</label>
+                    <textarea
+                      autoFocus
+                      rows={3}
+                      value={discardReason}
+                      onChange={e => setDiscardReason(e.target.value)}
+                      placeholder="e.g. Failed screening, temperature excursion…"
+                    />
+                  </div>
+                </div>
+                <hr className="section-divider" />
+                <div className="flex gap-2 mt-2">
+                  <button onClick={closeDiscard} className="btn btn-secondary flex-1">Cancel</button>
+                  <button onClick={handleDiscard} disabled={!discardReason.trim() || discarding} className="btn btn-danger flex-1">
+                    {discarding ? 'Discarding…' : 'Discard unit'}
+                  </button>
+                </div>
+              </div>
+            </Modal>
+          );
+        })()}
+
+        {/* Crossmatch modal */}
+        {crossmatchUnitId && (() => {
+          const unit = units.find(u => u._id === crossmatchUnitId);
+          if (!unit) return null;
+          return (
+            <Modal onClose={closeCrossmatch}>
+              <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="icon-box-sm">
+                      <FlaskConical className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                    </div>
+                    <h3 className="text-base font-semibold">Record crossmatch — {unit.unitId}</h3>
+                  </div>
+                  <button onClick={closeCrossmatch} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCrossmatchChoice('compatible')}
+                      className="flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all inline-flex items-center justify-center gap-1.5"
+                      style={crossmatchChoice === 'compatible'
+                        ? { background: 'var(--color-success-bg, rgba(21,121,92,0.12))', color: 'var(--color-success)', border: '1px solid var(--color-success)' }
+                        : { background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                    >
+                      <CheckCircle2 className="w-4 h-4" /> Compatible
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCrossmatchChoice('incompatible')}
+                      className="flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all inline-flex items-center justify-center gap-1.5"
+                      style={crossmatchChoice === 'incompatible'
+                        ? { background: 'var(--color-danger-bg)', color: 'var(--color-danger)', border: '1px solid var(--color-danger)' }
+                        : { background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                    >
+                      <XCircle className="w-4 h-4" /> Incompatible
+                    </button>
+                  </div>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {crossmatchChoice === 'compatible'
+                      ? 'The unit will move to “crossmatched” and be ready for transfusion.'
+                      : 'The unit will return to “available” inventory for a different patient.'}
+                  </p>
+                </div>
+                <hr className="section-divider" />
+                <div className="flex gap-2 mt-2">
+                  <button onClick={closeCrossmatch} className="btn btn-secondary flex-1">Cancel</button>
+                  <button onClick={handleCrossmatch} disabled={crossmatching} className="btn btn-primary flex-1">
+                    {crossmatching ? 'Saving…' : 'Save result'}
+                  </button>
+                </div>
+              </div>
+            </Modal>
+          );
+        })()}
+
+        {/* Transfuse unit modal */}
+        {transfuseUnitId && (() => {
+          const unit = units.find(u => u._id === transfuseUnitId);
+          if (!unit) return null;
+          const patient = patients.find(p => p._id === unit.reservedForPatient);
+          return (
+            <Modal onClose={closeTransfuse}>
+              <div className="modal-panel modal-panel--sm" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="icon-box-sm">
+                      <Syringe className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                    </div>
+                    <h3 className="text-base font-semibold">Record transfusion — {unit.unitId}</h3>
+                  </div>
+                  <button onClick={closeTransfuse} className="p-1.5 rounded-lg" style={{ background: 'var(--overlay-subtle)' }}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {patient ? (
+                    <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                      <PatientAvatar patient={patient} size={36} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(patient)}</p>
+                        <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{patient.hospitalNumber || '-'}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                      Reserved patient: {unit.reservedForPatient || 'unknown'} (details unavailable)
+                    </p>
+                  )}
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Recorded by {currentUser?.name || currentUser?.username || 'you'}.
+                  </p>
+                </div>
+                <hr className="section-divider" />
+                <div className="flex gap-2 mt-2">
+                  <button onClick={closeTransfuse} className="btn btn-secondary flex-1">Cancel</button>
+                  <button onClick={handleTransfuse} disabled={transfusing || !unit.reservedForPatient} className="btn btn-primary flex-1">
+                    {transfusing ? 'Recording…' : 'Confirm transfusion'}
+                  </button>
+                </div>
+              </div>
+            </Modal>
+          );
+        })()}
       </main>
     </>
   );

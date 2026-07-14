@@ -1165,6 +1165,29 @@ const seedBills: Omit<BillingDoc, '_rev'>[] = [
   },
 ];
 
+/** True when the seed marker claims "done" but the patient store holds no
+ *  seeded patient docs — the corrupted "empty despite seeded" state. */
+async function isCoreDataMissing(): Promise<boolean> {
+  try {
+    const res = await patientsDB().allDocs({ limit: 1, startkey: 'pat-', endkey: 'pat-￰' });
+    return res.rows.length === 0;
+  } catch {
+    // If we can't read the store, don't force a destructive re-seed.
+    return false;
+  }
+}
+
+/** Remove the 'seeded' marker so the next seedDatabase() call re-seeds. */
+async function clearSeedMarker(): Promise<void> {
+  const db = getDB('tamamhealth_meta');
+  try {
+    const existing = await db.get('seeded');
+    await db.remove(existing);
+  } catch {
+    // No marker to clear.
+  }
+}
+
 export async function seedDatabase(): Promise<void> {
   // Serialize seeding across tabs. Two tabs seeding concurrently is how the
   // demo DB gets corrupted: one tab's resetAllDatabases() destroys IndexedDB
@@ -1181,11 +1204,22 @@ export async function seedDatabase(): Promise<void> {
 
 async function seedDatabaseExclusive(): Promise<void> {
   if (await isSeeded()) {
-    // Run photo migration on already-seeded databases so existing installs
-    // pick up the new photoUrl field without requiring a reset.
-    await migratePatientPhotos();
-    await migrateDemoAppointmentsAndWalkins();
-    return;
+    // Self-heal a corrupted "marked-seeded but empty" state. The seed marker is
+    // written last, so normally it implies the data is present — but a wiped or
+    // evicted IndexedDB (storage pressure, a partial destroy, a manual clear)
+    // can leave the marker's DB intact while the data DBs are gone, and then
+    // every dashboard reads empty even though isSeeded() says "done". If the
+    // patient store is empty in demo mode, drop the marker and fall through to
+    // a full re-seed instead of trusting the stale flag.
+    if (IS_DEMO && (await isCoreDataMissing())) {
+      try { await clearSeedMarker(); } catch { /* fall through to reseed */ }
+    } else {
+      // Run photo migration on already-seeded databases so existing installs
+      // pick up the new photoUrl field without requiring a reset.
+      await migratePatientPhotos();
+      await migrateDemoAppointmentsAndWalkins();
+      return;
+    }
   }
 
   // Production mode: only create initial admin + organization
@@ -1451,6 +1485,64 @@ async function seedDatabaseExclusive(): Promise<void> {
         }
       : {};
     await safePut(pDB, withSampleChart({ ...mp, ...assignment, orgId: PUBLIC_ORG_ID } as unknown as Record<string, unknown>));
+  }
+
+  // ── Bentiu State Hospital (hosp-004) lab queue ──────────────────────────
+  // lab.gatluak is the lab tech at Bentiu; every seeded lab_result otherwise
+  // lands at hosp-001/002/003, so his Lab Command Center opened on an empty
+  // queue ("No pending orders"). Seed a small walk-in roster + a realistic mix
+  // of orders (pending / in-progress / completed, incl. one critical) so the
+  // station shows its intended data.
+  {
+    const bentiuLabPatients = [
+      { id: 'pat-00220', name: 'Riek Gatkuoth Puljang', num: 'BSH-000020', gender: 'Male', dob: '1988-05-14' },
+      { id: 'pat-00221', name: 'Nyakier Both Reath', num: 'BSH-000021', gender: 'Female', dob: '1995-09-02' },
+      { id: 'pat-00222', name: 'Chuol Deng Wiyual', num: 'BSH-000022', gender: 'Male', dob: '1979-01-20' },
+      { id: 'pat-00223', name: 'Nyaruot Gai Chan', num: 'BSH-000023', gender: 'Female', dob: '2001-11-30' },
+      { id: 'pat-00224', name: 'Tut Malual Kang', num: 'BSH-000024', gender: 'Male', dob: '1966-03-08' },
+      { id: 'pat-00225', name: 'Adhieu Wol Deng', num: 'BSH-000025', gender: 'Female', dob: '1992-07-19' },
+    ];
+    for (const bp of bentiuLabPatients) {
+      const [firstName, middleName, surname] = bp.name.split(' ');
+      await safePut(pDB, withSampleChart({
+        _id: bp.id, type: 'patient', firstName, middleName, surname,
+        gender: bp.gender, dateOfBirth: bp.dob, phone: '',
+        registrationHospital: 'hosp-004', registrationHospitalName: 'Bentiu State Hospital',
+        hospitalNumber: bp.num, state: 'Unity', county: 'Rubkona', payam: '', boma: '', geocodeId: '',
+        lastVisitDate: dateAgo(0), lastVisitHospital: 'hosp-004', isActive: true,
+        orgId: PUBLIC_ORG_ID, createdAt: daysAgo(30), updatedAt: daysAgo(0),
+      } as unknown as Record<string, unknown>));
+    }
+
+    const BENTIU_LAB_TESTS = [
+      { testName: 'Malaria RDT', specimen: 'Blood', result: 'Positive (P. falciparum)', ref: 'Negative', abnormal: true, critical: false },
+      { testName: 'Full Blood Count', specimen: 'Blood (EDTA)', result: 'Hb 7.1 g/dL, WBC 12.4×10³/μL', ref: 'Hb 12-16 g/dL', abnormal: true, critical: true },
+      { testName: 'Blood Glucose (Random)', specimen: 'Blood', result: '132 mg/dL', ref: '70-140', abnormal: false, critical: false },
+      { testName: 'HIV Rapid Test', specimen: 'Blood', result: 'Non-reactive', ref: 'Non-reactive', abnormal: false, critical: false },
+      { testName: 'Urinalysis', specimen: 'Urine', result: 'Protein ++, Leucocytes +', ref: 'Normal', abnormal: true, critical: false },
+      { testName: 'Widal Test', specimen: 'Blood', result: '', ref: '< 1:80', abnormal: false, critical: false },
+    ];
+    // Give a spread of workflow states so pending/processing/completed all show.
+    const bentiuStatuses = ['pending', 'in_progress', 'completed', 'pending', 'completed', 'in_progress'];
+    const bDB = labResultsDB();
+    for (let i = 0; i < bentiuLabPatients.length; i++) {
+      const bp = bentiuLabPatients[i];
+      const tst = BENTIU_LAB_TESTS[i % BENTIU_LAB_TESTS.length];
+      const status = bentiuStatuses[i % bentiuStatuses.length];
+      const orderedAt = daysAgo(i % 3);
+      const completedAt = status === 'completed' ? daysAgo(Math.max(0, (i % 3) - 0.03)) : '';
+      await safePut(bDB, {
+        _id: `lab-bentiu-${bp.id}`, type: 'lab_result', patientId: bp.id, patientName: bp.name, hospitalNumber: bp.num,
+        testName: tst.testName, specimen: tst.specimen, status,
+        result: status === 'completed' ? tst.result : '', unit: '', referenceRange: tst.ref,
+        abnormal: status === 'completed' ? tst.abnormal : false,
+        critical: status === 'completed' ? tst.critical : false,
+        orderedBy: 'CO Deng Mabior Kuol', orderedAt: orderedAt.replace('T', ' ').slice(0, 16),
+        completedAt: completedAt ? completedAt.replace('T', ' ').slice(0, 16) : '',
+        hospitalId: 'hosp-004', hospitalName: 'Bentiu State Hospital',
+        createdAt: orderedAt, updatedAt: completedAt || orderedAt, orgId: PUBLIC_ORG_ID,
+      } as unknown as Record<string, unknown>);
+    }
   }
 
   // Seed phone notes (P1.4) — open callbacks routed to Juba doctors so the

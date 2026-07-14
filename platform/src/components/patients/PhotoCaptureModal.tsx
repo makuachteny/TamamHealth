@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from '@/components/Modal';
 import { Camera, Check, RefreshCw, Upload, X } from '@/components/icons/lucide';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface PhotoCaptureModalProps {
   onCapture: (dataUrl: string) => void;
@@ -23,6 +24,7 @@ const MAX_EDGE = 640;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 export default function PhotoCaptureModal({ onCapture, onClose }: PhotoCaptureModalProps) {
+  const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [phase, setPhase] = useState<'starting' | 'live' | 'preview' | 'error'>('starting');
@@ -50,10 +52,10 @@ export default function PhotoCaptureModal({ onCapture, onClose }: PhotoCaptureMo
       setPhase('live');
     } catch {
       stopStream();
-      setError('Camera is unavailable or permission was denied. You can upload a photo instead.');
+      setError(t('photoCapture.cameraUnavailable'));
       setPhase('error');
     }
-  }, [stopStream]);
+  }, [stopStream, t]);
 
   const retake = () => {
     setPhase('starting');
@@ -93,7 +95,7 @@ export default function PhotoCaptureModal({ onCapture, onClose }: PhotoCaptureMo
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > MAX_UPLOAD_BYTES) {
-      setError('Photo must be 5 MB or smaller.');
+      setError(t('photoCapture.photoTooLarge'));
       e.target.value = '';
       return;
     }
@@ -122,9 +124,9 @@ export default function PhotoCaptureModal({ onCapture, onClose }: PhotoCaptureMo
         <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
           <h3 id="photo-capture-title" className="text-sm font-semibold flex items-center gap-2">
             <Camera className="w-4 h-4" style={{ color: 'var(--tamamhealth-blue)' }} />
-            Take Patient Photo
+            {t('photoCapture.title')}
           </h3>
-          <button onClick={handleClose} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors">
+          <button onClick={handleClose} aria-label={t('action.close')} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -137,7 +139,7 @@ export default function PhotoCaptureModal({ onCapture, onClose }: PhotoCaptureMo
           >
             {phase === 'preview' && snapshot ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={snapshot} alt="Captured patient" className="w-full h-full object-cover" />
+              <img src={snapshot} alt={t('photoCapture.capturedPhotoAlt')} className="w-full h-full object-cover" />
             ) : (
               <video
                 ref={videoRef}
@@ -152,7 +154,7 @@ export default function PhotoCaptureModal({ onCapture, onClose }: PhotoCaptureMo
             )}
             {phase === 'starting' && (
               <div className="absolute inset-0 flex items-center justify-center text-xs" style={{ color: 'var(--text-muted)' }}>
-                Starting camera…
+                {t('photoCapture.startingCamera')}
               </div>
             )}
             {phase === 'error' && (
@@ -171,10 +173,10 @@ export default function PhotoCaptureModal({ onCapture, onClose }: PhotoCaptureMo
           {phase === 'preview' ? (
             <div className="flex items-center gap-2">
               <button type="button" onClick={usePhoto} className="btn btn-primary flex-1 flex items-center justify-center gap-2">
-                <Check className="w-4 h-4" /> Use photo
+                <Check className="w-4 h-4" /> {t('photoCapture.usePhoto')}
               </button>
               <button type="button" onClick={retake} className="btn btn-secondary flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" /> Retake
+                <RefreshCw className="w-4 h-4" /> {t('photoCapture.retake')}
               </button>
             </div>
           ) : (
@@ -185,17 +187,17 @@ export default function PhotoCaptureModal({ onCapture, onClose }: PhotoCaptureMo
                 disabled={phase !== 'live'}
                 className="btn btn-primary flex-1 flex items-center justify-center gap-2"
               >
-                <Camera className="w-4 h-4" /> Capture
+                <Camera className="w-4 h-4" /> {t('photoCapture.capture')}
               </button>
               <label className="btn btn-secondary cursor-pointer flex items-center gap-2">
-                <Upload className="w-4 h-4" /> Upload
+                <Upload className="w-4 h-4" /> {t('photoCapture.upload')}
                 <input type="file" className="sr-only" accept="image/jpeg,image/png,image/webp" onChange={handleFileUpload} />
               </label>
             </div>
           )}
 
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Use a clear, front-facing photo so staff can confirm the patient&apos;s identity at future visits.
+            {t('photoCapture.footerGuidance')}
           </p>
         </div>
       </div>

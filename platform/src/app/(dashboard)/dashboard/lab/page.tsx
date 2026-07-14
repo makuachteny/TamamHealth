@@ -134,6 +134,9 @@ export default function LabDashboardPage() {
   const dateLabel = useMemo(() => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date()), []);
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [eventCounter, setEventCounter] = useState(0);
+  // Live Feed + Recent Completed moved off the center panel into the
+  // Laboratory side card; this opens one of them in a modal on click.
+  const [labPanel, setLabPanel] = useState<null | 'feed' | 'recent'>(null);
   // Work-queue status filter (shell tabs) + inline search bound to the shell's left rail.
   const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [queueSearch, setQueueSearch] = useState('');
@@ -525,6 +528,10 @@ export default function LabDashboardPage() {
             { label: t('lab.completedToday'), value: kpis.completedToday },
             { label: t('lab.abnormalBadge'), value: kpis.abnormal, tone: 'warning' },
             { label: t('lab.critical'), value: kpis.critical, tone: 'danger' },
+            // Click-through to the Live Feed / Recent Completed panels, which
+            // used to sit in the center but now open from here on demand.
+            { label: t('lab.liveFeed'), value: eventCounter, onClick: () => setLabPanel('feed') },
+            { label: t('lab.recentCompletedResults'), value: recentCompleted.length, onClick: () => setLabPanel('recent') },
           ]}
           metricsTitle={t('lab.laboratory')}
           checklist={[
@@ -575,132 +582,40 @@ export default function LabDashboardPage() {
           </div>
         )}
 
-        {/* --- Specimen Pipeline + Live Feed --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-
-          {/* Specimen Pipeline - 1 column */}
-          <div className="dash-card rounded-2xl overflow-hidden">
-            <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-              <div className="flex items-center gap-2">
-                <Droplets className="w-4 h-4" style={{ color: '#EC4899' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.specimenPipeline')}</span>
-              </div>
-            </div>
-            <div className="p-3 space-y-2">
-              {specimenCounts.length > 0 ? specimenCounts.map(([specimen, count]) => {
-                const pct = kpis.total > 0 ? Math.round((count / kpis.total) * 100) : 0;
-                return (
-                  <div key={specimen} className="p-2.5 rounded-xl transition-all" style={{
-                    background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-                  }}>
-                    <div className="flex justify-between items-center mb-1.5">
-                      <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{specimen}</span>
-                      <span className="text-[10px] font-bold" style={{ color: ACCENT }}>{count}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
-                      <div className="h-full rounded-full transition-all duration-700" style={{
-                        width: `${pct}%`, background: ACCENT,
-                      }} />
-                    </div>
-                    <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('lab.percentOfTotal', { pct })}</p>
-                  </div>
-                );
-              }) : (
-                <div className="flex flex-col items-center justify-center py-6">
-                  <Droplets className="w-6 h-6 mb-1" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noSpecimenData')}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Panel: Live Feed + Quick Actions - 1 column */}
-          <div className="space-y-4 flex flex-col">
-            {/* Live Feed */}
-            <div className="dash-card rounded-2xl overflow-hidden flex-1 flex flex-col" style={{ maxHeight: '260px' }}>
-              <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="flex items-center gap-2">
-                  <Radio className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.liveFeed')}</span>
-                </div>
-                <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('lab.eventsCount', { count: eventCounter })}</span>
-              </div>
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {liveEvents.map(evt => {
-                  const Icon = evt.icon;
-                  return (
-                    <div key={evt.id} className="p-2 rounded-lg transition-all" style={{
-                      background: evt.isNew ? `${evt.color}08` : 'transparent',
-                      border: evt.isNew ? `1px solid ${evt.color}20` : '1px solid transparent',
-                      animation: evt.isNew ? 'fadeIn 0.3s ease-out' : undefined,
-                    }}>
-                      <div className="flex items-start gap-2">
-                        <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: 'transparent' }}>
-                          <Icon className="w-2.5 h-2.5" style={{ color: evt.color }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] font-semibold truncate" style={{ color: evt.color }}>{evt.label}</span>
-                            {evt.isNew && (
-                              <span className="text-[7px] font-bold px-1 py-0.5 rounded" style={{ background: `${evt.color}20`, color: evt.color }}>{t('lab.new')}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>{evt.patient}</span>
-                            <span className="text-[9px] font-mono flex-shrink-0 ml-1" style={{ color: 'var(--text-muted)' }}>{evt.time}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* --- Bottom: Recent Completed Results --- */}
+        {/* --- Specimen Pipeline (Live Feed + Recent Completed moved to the
+             Laboratory side card, opened on click) --- */}
         <div className="dash-card rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
+          <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.recentCompletedResults')}</span>
+              <Droplets className="w-4 h-4" style={{ color: '#EC4899' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.specimenPipeline')}</span>
             </div>
-            <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('lab.resultsCount', { count: recentCompleted.length })}</span>
           </div>
-          <div className="p-3">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {recentCompleted.length > 0 ? recentCompleted.map(r => (
-                <div key={r._id} className="p-3 rounded-xl transition-all cursor-pointer" style={{
-                  background: 'var(--overlay-subtle)',
-                  border: `1px solid ${r.critical ? 'rgba(239,68,68,0.25)' : r.abnormal ? 'rgba(251,146,60,0.25)' : 'var(--border-light)'}`,
+          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {specimenCounts.length > 0 ? specimenCounts.map(([specimen, count]) => {
+              const pct = kpis.total > 0 ? Math.round((count / kpis.total) * 100) : 0;
+              return (
+                <div key={specimen} className="p-2.5 rounded-xl transition-all" style={{
+                  background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
                 }}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{r.testName}</span>
-                    {r.critical ? (
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>{t('lab.critical')}</span>
-                    ) : r.abnormal ? (
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(251,146,60,0.12)', color: '#FB923C' }}>{t('lab.abnormalBadge')}</span>
-                    ) : (
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(74,222,128,0.12)', color: 'var(--color-success)' }}>{t('lab.normalBadge')}</span>
-                    )}
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{specimen}</span>
+                    <span className="text-[10px] font-bold" style={{ color: ACCENT }}>{count}</span>
                   </div>
-                  <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{r.patientName}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold stat-value" style={{
-                      color: r.critical ? 'var(--color-danger)' : r.abnormal ? '#FB923C' : ACCENT,
-                    }}>{r.result} {r.unit}</span>
-                    <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{r.referenceRange}</span>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
+                    <div className="h-full rounded-full transition-all duration-700" style={{
+                      width: `${pct}%`, background: ACCENT,
+                    }} />
                   </div>
-                  <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>{r.specimen} &middot; {r.completedAt ? new Date(r.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}</p>
+                  <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('lab.percentOfTotal', { pct })}</p>
                 </div>
-              )) : (
-                <div className="col-span-2 sm:col-span-3 flex flex-col items-center justify-center py-8 text-center">
-                  <Microscope className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noCompletedResults')}</p>
-                </div>
-              )}
-            </div>
+              );
+            }) : (
+              <div className="col-span-full flex flex-col items-center justify-center py-6">
+                <Droplets className="w-6 h-6 mb-1" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noSpecimenData')}</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -817,6 +732,104 @@ export default function LabDashboardPage() {
           </div>
         </EhrCareDashboard>
       </main>
+
+      {/* ===== Live Feed / Recent Completed — opened from the Laboratory card ===== */}
+      {labPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setLabPanel(null)}>
+          <div className="dash-card w-full max-w-2xl mx-4 rounded-2xl overflow-hidden flex flex-col" style={{ maxHeight: '80vh', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="flex items-center gap-2">
+                {labPanel === 'feed'
+                  ? <Radio className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
+                  : <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} />}
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  {labPanel === 'feed' ? t('lab.liveFeed') : t('lab.recentCompletedResults')}
+                </span>
+                <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                  {labPanel === 'feed' ? t('lab.eventsCount', { count: eventCounter }) : t('lab.resultsCount', { count: recentCompleted.length })}
+                </span>
+              </div>
+              <button type="button" onClick={() => setLabPanel(null)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
+                <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+              </button>
+            </div>
+
+            {labPanel === 'feed' && (
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {liveEvents.length > 0 ? liveEvents.map(evt => {
+                  const Icon = evt.icon;
+                  return (
+                    <div key={evt.id} className="p-2 rounded-lg" style={{
+                      background: evt.isNew ? `${evt.color}08` : 'transparent',
+                      border: evt.isNew ? `1px solid ${evt.color}20` : '1px solid transparent',
+                    }}>
+                      <div className="flex items-start gap-2">
+                        <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Icon className="w-2.5 h-2.5" style={{ color: evt.color }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[11px] font-semibold truncate" style={{ color: evt.color }}>{evt.label}</span>
+                            {evt.isNew && (
+                              <span className="text-[7px] font-bold px-1 py-0.5 rounded" style={{ background: `${evt.color}20`, color: evt.color }}>{t('lab.new')}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{evt.patient}</span>
+                            <span className="text-[10px] font-mono flex-shrink-0 ml-1" style={{ color: 'var(--text-muted)' }}>{evt.time}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="flex flex-col items-center justify-center py-10">
+                    <Radio className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.eventsCount', { count: 0 })}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {labPanel === 'recent' && (
+              <div className="flex-1 overflow-y-auto p-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {recentCompleted.length > 0 ? recentCompleted.map(r => (
+                    <div key={r._id} className="p-3 rounded-xl" style={{
+                      background: 'var(--overlay-subtle)',
+                      border: `1px solid ${r.critical ? 'rgba(239,68,68,0.25)' : r.abnormal ? 'rgba(251,146,60,0.25)' : 'var(--border-light)'}`,
+                    }}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{r.testName}</span>
+                        {r.critical ? (
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--color-danger)' }}>{t('lab.critical')}</span>
+                        ) : r.abnormal ? (
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(251,146,60,0.12)', color: '#FB923C' }}>{t('lab.abnormalBadge')}</span>
+                        ) : (
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(74,222,128,0.12)', color: 'var(--color-success)' }}>{t('lab.normalBadge')}</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{r.patientName}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold stat-value" style={{
+                          color: r.critical ? 'var(--color-danger)' : r.abnormal ? '#FB923C' : ACCENT,
+                        }}>{r.result} {r.unit}</span>
+                        <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{r.referenceRange}</span>
+                      </div>
+                      <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>{r.specimen} &middot; {r.completedAt ? new Date(r.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}</p>
+                    </div>
+                  )) : (
+                    <div className="col-span-2 sm:col-span-3 flex flex-col items-center justify-center py-10 text-center">
+                      <Microscope className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
+                      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noCompletedResults')}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ===== Feature 1 & 3: Result Entry Modal (Single + Batch) ===== */}
       {showResultModal && (
