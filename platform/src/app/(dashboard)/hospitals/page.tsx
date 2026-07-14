@@ -7,7 +7,7 @@ import TopBar from '@/components/TopBar';
 import {
   Building2, BedDouble, Users, Stethoscope, WifiOff,
   Zap, ZapOff, Sun, Truck, Signal, Clock, Activity,
-  MapPin, HeartPulse, X, Search, Filter, ChevronDown,
+  MapPin, HeartPulse, X, Filter,
   FlaskConical, Download, Eye, Settings,
   Syringe, Baby, Pill, ShieldCheck, Microscope,
 } from '@/components/icons/lucide';
@@ -18,6 +18,7 @@ import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { FilterSelect } from '@/components/filters';
+import EhrListHeader, { EhrListHeaderButton, LIST_STAT_COLORS } from '@/components/ehr/EhrListHeader';
 import type { HospitalDoc, UserRole } from '@/lib/db-types';
 
 // Roles that can open the per-hospital management dashboard. The route itself
