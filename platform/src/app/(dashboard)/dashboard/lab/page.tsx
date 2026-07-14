@@ -134,9 +134,9 @@ export default function LabDashboardPage() {
   const dateLabel = useMemo(() => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: '2-digit' }).format(new Date()), []);
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [eventCounter, setEventCounter] = useState(0);
-  // Live Feed + Recent Completed moved off the center panel into the
-  // Laboratory side card; this opens one of them in a modal on click.
-  const [labPanel, setLabPanel] = useState<null | 'feed' | 'recent'>(null);
+  // Specimen Pipeline + Live Feed + Recent Completed moved off the center
+  // panel into the Laboratory side card; this opens one of them in a modal.
+  const [labPanel, setLabPanel] = useState<null | 'specimen' | 'feed' | 'recent'>(null);
   // Work-queue status filter (shell tabs) + inline search bound to the shell's left rail.
   const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [queueSearch, setQueueSearch] = useState('');
@@ -528,8 +528,10 @@ export default function LabDashboardPage() {
             { label: t('lab.completedToday'), value: kpis.completedToday },
             { label: t('lab.abnormalBadge'), value: kpis.abnormal, tone: 'warning' },
             { label: t('lab.critical'), value: kpis.critical, tone: 'danger' },
-            // Click-through to the Live Feed / Recent Completed panels, which
-            // used to sit in the center but now open from here on demand.
+            // Click-through to the Specimen Pipeline / Live Feed / Recent
+            // Completed panels, which used to sit in the center but now open
+            // from here on demand.
+            { label: t('lab.specimenPipeline'), value: kpis.total, onClick: () => setLabPanel('specimen') },
             { label: t('lab.liveFeed'), value: eventCounter, onClick: () => setLabPanel('feed') },
             { label: t('lab.recentCompletedResults'), value: recentCompleted.length, onClick: () => setLabPanel('recent') },
           ]}
@@ -582,42 +584,8 @@ export default function LabDashboardPage() {
           </div>
         )}
 
-        {/* --- Specimen Pipeline (Live Feed + Recent Completed moved to the
-             Laboratory side card, opened on click) --- */}
-        <div className="dash-card rounded-2xl overflow-hidden">
-          <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-            <div className="flex items-center gap-2">
-              <Droplets className="w-4 h-4" style={{ color: '#EC4899' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.specimenPipeline')}</span>
-            </div>
-          </div>
-          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {specimenCounts.length > 0 ? specimenCounts.map(([specimen, count]) => {
-              const pct = kpis.total > 0 ? Math.round((count / kpis.total) * 100) : 0;
-              return (
-                <div key={specimen} className="p-2.5 rounded-xl transition-all" style={{
-                  background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-                }}>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{specimen}</span>
-                    <span className="text-[10px] font-bold" style={{ color: ACCENT }}>{count}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
-                    <div className="h-full rounded-full transition-all duration-700" style={{
-                      width: `${pct}%`, background: ACCENT,
-                    }} />
-                  </div>
-                  <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('lab.percentOfTotal', { pct })}</p>
-                </div>
-              );
-            }) : (
-              <div className="col-span-full flex flex-col items-center justify-center py-6">
-                <Droplets className="w-6 h-6 mb-1" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noSpecimenData')}</p>
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Specimen Pipeline, Live Feed and Recent Completed now live in the
+            Laboratory side card and open on click (see the labPanel modal). */}
 
         {/* --- Feature 4: TAT (Turnaround Time) Dashboard --- */}
         <div className="dash-card rounded-2xl overflow-hidden">
@@ -739,20 +707,47 @@ export default function LabDashboardPage() {
           <div className="dash-card w-full max-w-2xl mx-4 rounded-2xl overflow-hidden flex flex-col" style={{ maxHeight: '80vh', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
             <div className="px-4 py-3 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
               <div className="flex items-center gap-2">
-                {labPanel === 'feed'
-                  ? <Radio className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                  : <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} />}
+                {labPanel === 'specimen'
+                  ? <Droplets className="w-4 h-4" style={{ color: '#EC4899' }} />
+                  : labPanel === 'feed'
+                    ? <Radio className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
+                    : <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} />}
                 <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  {labPanel === 'feed' ? t('lab.liveFeed') : t('lab.recentCompletedResults')}
+                  {labPanel === 'specimen' ? t('lab.specimenPipeline') : labPanel === 'feed' ? t('lab.liveFeed') : t('lab.recentCompletedResults')}
                 </span>
                 <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                  {labPanel === 'feed' ? t('lab.eventsCount', { count: eventCounter }) : t('lab.resultsCount', { count: recentCompleted.length })}
+                  {labPanel === 'specimen' ? t('lab.resultsCount', { count: kpis.total }) : labPanel === 'feed' ? t('lab.eventsCount', { count: eventCounter }) : t('lab.resultsCount', { count: recentCompleted.length })}
                 </span>
               </div>
               <button type="button" onClick={() => setLabPanel(null)} className="p-1 rounded hover:bg-[var(--overlay-subtle)]" aria-label={t('action.close')}>
                 <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
               </button>
             </div>
+
+            {labPanel === 'specimen' && (
+              <div className="flex-1 overflow-y-auto p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {specimenCounts.length > 0 ? specimenCounts.map(([specimen, count]) => {
+                  const pct = kpis.total > 0 ? Math.round((count / kpis.total) * 100) : 0;
+                  return (
+                    <div key={specimen} className="p-2.5 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{specimen}</span>
+                        <span className="text-[10px] font-bold" style={{ color: ACCENT }}>{count}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: ACCENT }} />
+                      </div>
+                      <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('lab.percentOfTotal', { pct })}</p>
+                    </div>
+                  );
+                }) : (
+                  <div className="col-span-full flex flex-col items-center justify-center py-10">
+                    <Droplets className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noSpecimenData')}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {labPanel === 'feed' && (
               <div className="flex-1 overflow-y-auto p-2 space-y-1">

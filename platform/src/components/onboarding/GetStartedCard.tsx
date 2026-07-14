@@ -9,7 +9,7 @@
 // lib/onboarding/steps.ts), so it always teaches exactly the features the
 // signed-in role can use.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
@@ -28,6 +28,14 @@ export default function GetStartedCard() {
     allDone, finished, collapsed,
     completeStep, setCollapsed, dismiss, finish,
   } = useOnboarding();
+
+  // When the guided tour starts it needs the dashboard visible — collapse
+  // this overlay to its launcher pill so the tour can spotlight the page.
+  useEffect(() => {
+    const onTourStarted = () => setCollapsed(true);
+    window.addEventListener('tamam:tour-started', onTourStarted);
+    return () => window.removeEventListener('tamam:tour-started', onTourStarted);
+  }, [setCollapsed]);
 
   if (!currentUser || !ready || !plan || finished) return null;
 

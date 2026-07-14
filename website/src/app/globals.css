@@ -171,17 +171,20 @@ textarea::placeholder {
 .tm-hero-btn-secondary:hover {
   background: #eff8fd !important;
 }
-.tm-insight-card:hover {
-  box-shadow: 12px 12px 0 var(--tm-insight-shadow) !important;
+/* Shared card language: every card carries a static offset solid shadow
+   colored by its section accent. Team cards are the exception — their
+   1px-gap mosaic leaves no room for a shadow. */
+.tm-product-card {
+  box-shadow: 10px 10px 0 var(--tm-product-shadow);
 }
-.tm-product-card:hover {
-  box-shadow: 10px 10px 0 var(--tm-product-shadow) !important;
+.tm-feature-card {
+  box-shadow: 8px 8px 0 #015697;
 }
-.tm-feature-card:hover {
-  box-shadow: 5px 5px 0 #015697 !important;
+.tm-breakdown-card {
+  box-shadow: 8px 8px 0 #e8863a;
 }
-.tm-team-card:hover {
-  background: #f4f4f8 !important;
+.tm-national-card {
+  box-shadow: 8px 8px 0 #015697;
 }
 .tm-form-input:focus {
   border-color: #2191d0 !important;

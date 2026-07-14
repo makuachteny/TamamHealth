@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  Building2,
   Calendar,
   ChevronDown,
   HelpCircle,
@@ -285,6 +286,12 @@ export default function EhrTopRail() {
       )}
 
       <div className="ehr-top-actions">
+        {currentUser?.hospitalName && (
+          <div className="ehr-top-facility" title={currentUser.hospitalName}>
+            <Building2 className="w-3.5 h-3.5" />
+            <span>{currentUser.hospitalName}</span>
+          </div>
+        )}
         {canSearchPatients && (
           <button
             type="button"

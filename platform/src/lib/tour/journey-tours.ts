@@ -164,7 +164,7 @@ const LAB_STEPS: TourStep[] = [
     route: '/blood-bank',
     target: '',
     title: 'Blood bank',
-    body: 'Availability by blood group (scarcity color-coded), expiry warnings, and donated-unit registration with auto-suggested unit IDs.',
+    body: 'Availability by blood group (scarcity color-coded), expiry warnings, and donated-unit registration with auto-suggested unit IDs. Each unit’s row menu walks the transfusion lifecycle: Reserve for a patient (with compatibility check) → Record crossmatch → Record transfusion — or Discard with a reason.',
   },
   searchStep('/dashboard/lab'),
   finishStep('/dashboard/lab'),
@@ -290,7 +290,7 @@ const FRONT_DESK_STEPS: TourStep[] = [
     route: '/patients/new',
     target: '',
     title: 'Register a patient — 6 steps',
-    body: 'Demographics → Contact & location (the household number derives the geocode) → Next of kin → Biometrics (photo + consent-gated fingerprints) → Payment coverage → Review. “Register & Check In” jumps straight to check-in.',
+    body: 'Demographics → Contact & location (the household number derives the geocode) → Next of kin → Biometrics (take the patient’s photo with the camera popup — or upload — plus consent-gated fingerprints) → Payment coverage → Review. “Register & Check In” jumps straight to check-in.',
   },
   {
     id: 'check-in',
@@ -633,7 +633,7 @@ const GOVERNMENT_STEPS: TourStep[] = [
     route: '/government',
     target: '',
     title: 'Welcome to the national dashboard',
-    body: 'Facility network status, beds, staff, and utilization by state, with trends and drill-downs.',
+    body: 'Weekly disease trends, facility distribution, and performance by state — with chart-type switches, fullscreen views, and drill-downs.',
   },
   {
     id: 'surveillance',

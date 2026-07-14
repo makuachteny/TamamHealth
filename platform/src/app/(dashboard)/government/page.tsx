@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import TopBar from '@/components/TopBar';
 import {
-  Building2, Users, BedDouble, Stethoscope, Wifi, WifiOff,
+  Building2, Users,
   AlertTriangle, ArrowRightLeft, TrendingUp, TrendingDown,
   Minus, ChevronDown, ChevronRight, Download, Calendar,
   ArrowUpDown, Check, BarChart3, LineChart as LineChartIcon,
   PieChart as PieChartIcon, Activity, Filter,
-  Layers, MapPin, Target, Sliders, X, Maximize2, ChevronLeft
+  Layers, Target, Sliders, X, Maximize2, ChevronLeft
 } from '@/components/icons/lucide';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -24,7 +24,6 @@ import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import { useReferrals } from '@/lib/hooks/useReferrals';
 import EmptyState from '@/components/EmptyState';
 import PatientName from '@/components/PatientName';
-import DashboardGreetingHeader from '@/components/dashboard/DashboardGreetingHeader';
 import type { HospitalDoc, DiseaseAlertDoc } from '@/lib/db-types';
 
 /**
@@ -446,13 +445,6 @@ const DISEASE_COLORS: Record<string, string> = {
   'Meningitis': 'var(--color-brand-400)', 'Kala-azar': 'var(--color-purple-500)', 'Hepatitis E': '#F43F5E',
 };
 
-// Master list of all diseases collected across the system
-const ALL_COLLECTED_DISEASES = [
-  'Malaria', 'Cholera', 'Measles', 'Pneumonia', 'Diarrhea',
-  'Tuberculosis', 'HIV/AIDS', 'Acute Watery Diarrhea',
-  'Meningitis', 'Kala-azar', 'Hepatitis E',
-];
-
 const WEEKLY_DISEASE_KEYS = ['malaria', 'cholera', 'measles', 'pneumonia', 'diarrhea'] as const;
 const STATE_DISEASE_KEYS = ['malaria', 'cholera', 'measles', 'tb', 'hiv'] as const;
 
@@ -492,7 +484,7 @@ export default function GovernmentDashboardPage() {
   /* ─── TABLEAU-STYLE SELECTOR STATES ──────────────────────────── */
 
   // Global state filter
-  const [selectedState, setSelectedState] = useState<string>('all');
+  const [selectedState] = useState<string>('all');
 
   // Disease Trends panel
   const [dtChartType, setDtChartType] = useState('line');
@@ -517,7 +509,7 @@ export default function GovernmentDashboardPage() {
   const [perfView, setPerfView] = useState('gauges');
 
   // Alert filter by disease
-  const [alertDiseaseFilter, setAlertDiseaseFilter] = useState('all');
+  const [alertDiseaseFilter] = useState('all');
 
   // Fullscreen chart states
   const [fullscreenChart, setFullscreenChart] = useState<string | null>(null);
@@ -527,14 +519,6 @@ export default function GovernmentDashboardPage() {
       router.push('/dashboard');
     }
   }, [currentUser, router]);
-
-  // All states from data
-  const allStates = useMemo(() => {
-    const states = new Set<string>();
-    hospitals.forEach(h => { if (h.state) states.add(h.state); });
-    casesByState.forEach(s => states.add(s.state));
-    return Array.from(states).sort();
-  }, [hospitals, casesByState]);
 
   // Ministry of Health reporting gate: facility data only counts toward the
   // national picture once the facility has reviewed and submitted it from
@@ -549,19 +533,9 @@ export default function GovernmentDashboardPage() {
 
   // KPI aggregates
   const totalHospitals = filteredHospitals.length;
-  const totalPatients = filteredHospitals.reduce((s, h) => s + h.patientCount, 0);
-  const totalBeds = filteredHospitals.reduce((s, h) => s + h.totalBeds, 0);
   const totalDoctors = filteredHospitals.reduce((s, h) => s + h.doctors, 0);
   const totalNurses = filteredHospitals.reduce((s, h) => s + h.nurses, 0);
   const totalCOs = filteredHospitals.reduce((s, h) => s + h.clinicalOfficers, 0);
-  const totalStaff = totalDoctors + totalNurses + totalCOs;
-  const onlineHospitals = filteredHospitals.filter(h => h.syncStatus === 'online').length;
-  const offlineHospitals = filteredHospitals.filter(h => h.syncStatus === 'offline').length;
-  const activeAlerts = diseaseAlerts.filter(a => {
-    if (selectedState !== 'all' && a.state !== selectedState) return false;
-    return a.alertLevel === 'emergency' || a.alertLevel === 'warning';
-  }).length;
-  const pendingReferrals = referrals.filter(r => r.status === 'sent' || r.status === 'received').length;
 
   // Facility distribution
   const facilityDistribution = useMemo(() => {

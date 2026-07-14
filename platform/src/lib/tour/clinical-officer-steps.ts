@@ -1,22 +1,22 @@
 import type { TourStep } from './types';
 
-// Walks a Clinical Officer through a full visit end to end: the dashboard
-// they land on after login, finding a patient, then the consultation wizard
-// (History -> Intake -> Examination -> Assessment -> Orders -> Plan &
-// checkout). Section anchors correspond to `data-tour="consult-section-N"`
-// on each SectionHeader in `consultation/page.tsx`. The wizard only reveals
-// the section for its current stage, and advancing a stage requires that
-// stage's data to be filled in — so a scripted tour (with no real patient
-// data entered) can only ever spotlight the first stage's section; later
-// stages are described narratively via the Back/Next footer (`.ehr-consult-step-nav`)
-// instead of being spotlighted directly.
+// Walks a clinician through a full visit end to end: the dashboard they land
+// on after login, finding a patient, then the consultation wizard's six
+// stages (Intake → Examination → Assessment → Orders → Plan & checkout →
+// Summary). Section anchors correspond to `data-tour="consult-section-N"` on
+// each SectionHeader in `consultation/page.tsx`. The wizard only shows the
+// section(s) for its current stage and advancing requires that stage's data,
+// so a scripted tour (no real patient data entered) can only spotlight the
+// first stage's card; later stages are described narratively — the engine
+// renders those cards centred, and the step-nav footer
+// (`.ehr-consult-step-nav`) anchors the wrap-up.
 export const clinicalOfficerTourSteps: TourStep[] = [
   {
     id: 'welcome',
     route: '/dashboard',
     target: '.ehr-care-greeting',
     title: 'Welcome to TamamHealth',
-    body: "Let's walk through a Clinical Officer's day — from your schedule to finishing a consultation. Use Back and Next anytime, or skip to explore on your own.",
+    body: "Let's walk through a clinician's day — from your schedule to finishing a consultation. Use Back and Next anytime, or skip to explore on your own.",
     placement: 'bottom',
   },
   {
@@ -48,7 +48,7 @@ export const clinicalOfficerTourSteps: TourStep[] = [
     route: '/dashboard',
     target: '.ehr-outstanding-card',
     title: 'Outstanding items',
-    body: 'Referrals, lab results, and other follow-ups waiting on you — grouped here so nothing slips through.',
+    body: 'Documents to sign, open referrals, and visits paused as “Awaiting labs” — resume a paused visit from here when results return.',
     placement: 'left',
   },
   {
@@ -76,19 +76,47 @@ export const clinicalOfficerTourSteps: TourStep[] = [
     placement: 'bottom',
   },
   {
-    id: 'consult-history',
+    id: 'consult-intake',
     route: '/consultation',
-    target: '[data-tour="consult-section-0"]',
-    title: 'Start with history',
-    body: 'Capture the chief complaint, history of present illness, past medical history, and social/family history.',
+    target: '[data-tour="consult-section-1"]',
+    title: 'Step 1 — Intake',
+    body: 'Pick the patient (the right rail shows their allergies and history), capture the chief complaint — type or search the symptom catalog — and record vitals. Next unlocks once the complaint and vitals (or today’s triage) are in.',
     placement: 'bottom',
+  },
+  {
+    id: 'consult-exam-assessment',
+    route: '/consultation',
+    target: '',
+    title: 'Steps 2–3 — Examination & Assessment',
+    body: 'Record findings by system (general, cardiovascular, respiratory, abdominal, neurological), then code at least one diagnosis with the ICD-11 search — each with type, certainty, and severity.',
+  },
+  {
+    id: 'consult-orders',
+    route: '/consultation',
+    target: '',
+    title: 'Step 4 — Orders: two cards, two search bars',
+    body: 'Prescriptions and Lab Orders sit side by side. Each starts with a search bar — click it and suggestions drop down. Medications add with preset dose/route/frequency and pass allergy, interaction, and duplicate checks; lab tests can also be ticked from the Basic/Special panels, one-tap panel bundles, or a clinical protocol.',
+  },
+  {
+    id: 'consult-send-ahead',
+    route: '/consultation',
+    target: '',
+    title: 'Send orders ahead, mid-visit',
+    body: '“Order tests & send to lab” pauses the visit as Awaiting labs — resume it from your dashboard when results return. “Send to pharmacy” queues medications for preparation now. Anything not sent goes automatically when you complete the visit.',
+  },
+  {
+    id: 'consult-plan',
+    route: '/consultation',
+    target: '',
+    title: 'Steps 5–6 — Plan, checkout & summary',
+    body: 'Write the treatment plan, set follow-up, and choose the disposition: checkout, admit (jumps to Wards pre-filled), or refer (bundles a transfer package). The Summary previews the visit — including the charges that will post — before you complete it.',
   },
   {
     id: 'consult-wizard-flow',
     route: '/consultation',
     target: '.ehr-consult-step-nav',
-    title: 'The rest of the visit',
-    body: 'Once history is in, Next walks you through Intake, Examination, Assessment, Orders, and Plan & checkout in order — recording vitals, exam findings, ICD-11 diagnoses, prescriptions, lab orders, and referrals along the way. Use Back anytime to revisit an earlier stage.',
+    title: 'Back and Next drive the visit',
+    body: 'The footer walks you through all six stages in order; each stage unlocks when its data is in. Your draft auto-saves as you type — a crash or closed tab never loses a consultation.',
     placement: 'top',
   },
   {
@@ -96,7 +124,7 @@ export const clinicalOfficerTourSteps: TourStep[] = [
     route: '/consultation',
     target: '.ehr-consult-step-nav',
     title: 'You’re ready',
-    body: 'That’s the full Clinical Officer workflow, start to finish. You can replay this tour anytime from your profile menu.',
+    body: 'That’s the full clinical workflow, start to finish. You can replay this tour anytime from your profile menu.',
     placement: 'top',
   },
 ];

@@ -81,6 +81,7 @@ export default function TourCard({
       {rect ? (
         <div
           aria-hidden
+          className="tour-spotlight"
           style={{
             position: 'fixed',
             left: rect.left - 6,
@@ -88,26 +89,28 @@ export default function TourCard({
             width: rect.width + 12,
             height: rect.height + 12,
             borderRadius: 10,
-            boxShadow: '0 0 0 3px var(--accent-primary), 0 0 0 9999px rgba(15, 23, 42, 0.35)',
             pointerEvents: 'none',
             zIndex: 9998,
             transition: 'left .2s ease, top .2s ease, width .2s ease, height .2s ease',
           }}
         />
       ) : (
-        <div aria-hidden style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.35)', pointerEvents: 'none', zIndex: 9998 }} />
+        <div aria-hidden style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.50)', pointerEvents: 'none', zIndex: 9998 }} />
       )}
       <div
         ref={cardRef}
         role="dialog"
         aria-label={step.title}
+        className="tour-card"
         style={{
           ...style,
           zIndex: 9999,
           background: 'var(--bg-card)',
           borderRadius: 'var(--card-radius)',
-          border: '1px solid var(--border-light)',
-          boxShadow: 'var(--card-shadow-lg)',
+          // Strong accent ring so the card reads clearly against any page.
+          // The drop shadow lives in .tour-card (globals.css) — the flat
+          // baseline strips box-shadow with !important, so inline won't win.
+          border: '2px solid var(--accent-primary)',
           padding: '16px 18px',
           maxHeight: 'calc(100vh - 24px)',
           overflowY: 'auto',
@@ -122,7 +125,7 @@ export default function TourCard({
               width: 12,
               height: 12,
               background: 'var(--bg-card)',
-              border: '1px solid var(--border-light)',
+              border: '2px solid var(--accent-primary)',
               transform: 'rotate(45deg)',
               ...(tail === 'top' ? { top: -7, left: '50%', marginLeft: -6, borderRight: 'none', borderBottom: 'none' } : {}),
               ...(tail === 'bottom' ? { bottom: -7, left: '50%', marginLeft: -6, borderLeft: 'none', borderTop: 'none' } : {}),

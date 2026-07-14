@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
+import { getDefaultDashboard } from '@/lib/permissions';
 import type { UserRole } from '@/lib/db-types';
 import TourCard from '@/components/tour/TourCard';
 import { buildGenericTour } from './generic-steps';
@@ -59,18 +60,29 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
   const start = useCallback(() => {
     if (!tour) return;
+    // The Get Started onboarding overlay covers the home dashboard for new
+    // users — exactly when the tour auto-launches. Ask it to collapse to its
+    // pill so the tour can actually point at the page underneath.
+    window.dispatchEvent(new CustomEvent('tamam:tour-started'));
     setStepIndex(0);
     setRect(null);
     setActive(true);
   }, [tour]);
 
-  // Auto-launch once per user, the first time they land on their dashboard.
+  // Auto-launch once per user, the first time they land on their role's home
+  // dashboard (not just /dashboard — a nurse lands on /dashboard/nurse, a lab
+  // tech on /dashboard/lab, …). The ref is only marked once the timer
+  // actually fires: context hydration right after login re-runs this effect
+  // within the 600ms window, and marking earlier would let the cleanup cancel
+  // the launch permanently.
   useEffect(() => {
     if (!tour || !currentUser || autoStartedRef.current) return;
-    if (pathname !== '/dashboard') return;
+    if (pathname !== getDefaultDashboard(currentUser.role)) return;
     if (hasSeenTour(tour.key, currentUser._id)) return;
-    autoStartedRef.current = true;
-    const timer = setTimeout(() => start(), 600);
+    const timer = setTimeout(() => {
+      autoStartedRef.current = true;
+      start();
+    }, 600);
     return () => clearTimeout(timer);
   }, [tour, currentUser, pathname, start]);
 
@@ -105,7 +117,12 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         }
       }
       const el = document.querySelector<HTMLElement>(step.target);
-      if (el) {
+      // Only accept a target that is actually visible: wizard stages hide
+      // their sections with display:none, and a hidden element measures as a
+      // zero rect at (0,0) — spotlighting that pins the highlight to the
+      // screen corner. Keep polling instead; on timeout the card renders
+      // centred like a narrative step.
+      if (el && el.getBoundingClientRect().width > 0) {
         el.scrollIntoView({ block: 'center', behavior: 'smooth' });
         requestAnimationFrame(() => {
           if (!cancelled) setRect(el.getBoundingClientRect());

@@ -115,8 +115,9 @@ const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
     body: "Clinics keep working through power cuts and network gaps, then sync safely when connection returns.",
     icon: (
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M6.5 18a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 16.6 8.5 4.25 4.25 0 0 1 18 16.8" />
-        <line x1="4" y1="21" x2="20" y2="4" />
+        <path d="m2 2 20 20" />
+        <path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193" />
+        <path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07" />
       </svg>
     ),
   },
@@ -125,12 +126,15 @@ const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
     body: "Patients without papers register once — fingerprint and photo give undocumented patients an identity that can't be lost.",
     icon: (
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 3c-2.5 0-4.5 2-4.5 4.5V9" />
-        <path d="M12 3c2.5 0 4.5 2 4.5 4.5V11" />
-        <path d="M9.5 9.5v3.5c0 3 1 5.5 2.5 7.5" />
-        <path d="M14.5 12v2.5c0 2.4.6 4.3 1.5 5.9" />
-        <path d="M12 8.5c-1.1 0-2 .9-2 2" />
-        <path d="M12 11.5c1.1 0 2 .9 2 2v1" />
+        <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
+        <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+        <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+        <path d="M2 12a10 10 0 0 1 18-6" />
+        <path d="M2 16h.01" />
+        <path d="M21.8 16c.2-2 .131-5.354 0-6" />
+        <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
+        <path d="M8.65 22c.21-.66.45-1.32.57-2" />
+        <path d="M9 6.8a6 6 0 0 1 9 5.2v2" />
       </svg>
     ),
   },
@@ -149,12 +153,11 @@ const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
     body: "Every visit adds to the same story — no duplicate files, no histories rebuilt from memory at the front desk.",
     icon: (
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-        <path d="M16 3h3a2 2 0 0 1 2 2v3" />
-        <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
-        <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
-        <circle cx="12" cy="10" r="3" />
-        <path d="M7.5 17c.8-1.9 2.4-3 4.5-3s3.7 1.1 4.5 3" />
+        <rect x="2" y="5" width="20" height="14" rx="2" />
+        <circle cx="9" cy="11" r="2" />
+        <path d="M6.17 15a3 3 0 0 1 5.66 0" />
+        <path d="M16 10h2" />
+        <path d="M16 14h2" />
       </svg>
     ),
   },
@@ -163,8 +166,12 @@ const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
     body: "Registration, triage, consultation, lab, pharmacy, and billing — every step tied to the same visit.",
     icon: (
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#015697" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 2 4.5 5v6c0 4.8 3.2 8.6 7.5 10 4.3-1.4 7.5-5.2 7.5-10V5L12 2Z" />
-        <path d="M9 11.5l2 2 4-4" />
+        <rect x="8" y="2" width="8" height="4" rx="1" />
+        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+        <path d="M12 11h4" />
+        <path d="M12 16h4" />
+        <path d="M8 11h.01" />
+        <path d="M8 16h.01" />
       </svg>
     ),
   },
@@ -321,6 +328,28 @@ const GOAL_STATS = [
   { value: "12mo", label: "from equipment to measurement and scale" },
 ];
 
+// The Ministry of Health's 2025 Essential Health Services Package (EHSP) defines
+// six levels of care; Tamam's products are shaped to serve each one, all writing
+// to the same patient record. Product mapping mirrors the PRODUCTS array above.
+const CARE_LEVELS = [
+  { level: "Community — Boma Health Initiative", role: "Promotion, screening & referral", product: "Registry & referral", tone: "#2C7DA0" },
+  { level: "Primary Health Care Unit (PHCU)", role: "First formal point of care", product: "CMS", tone: "#0B6E5C" },
+  { level: "Primary Health Care Centre (PHCC)", role: "Expanded primary & maternity care", product: "CMS", tone: "#0B6E5C" },
+  { level: "County Hospital", role: "First referral & inpatient care", product: "HMIS", tone: "#1C7AAF" },
+  { level: "State Hospital", role: "Secondary & specialised care", product: "HMIS", tone: "#146A9E" },
+  { level: "Referral / Tertiary Hospital", role: "Tertiary & teaching care", product: "HMIS", tone: "#015697" },
+];
+
+// Health-system reality from the EHSP 2025 situation analysis (SARA 2018 survey,
+// WHO/MoH data). These are why an offline-first, low-power design is not optional.
+const SYSTEM_STATS = [
+  { value: "4%", label: "of facilities have a computer with internet", source: "SARA / EHSP 2025" },
+  { value: "13%", label: "have any on-site power source", source: "SARA / EHSP 2025" },
+  { value: "1.42", label: "health facilities per 10,000 people — against a national target of 2", source: "EHSP 2025" },
+  { value: "7.6", label: "health workers per 10,000 people — the WHO norm is 44.5", source: "EHSP 2025" },
+  { value: "38.7", label: "UHC service-coverage index, out of 100", source: "EHSP 2025" },
+];
+
 const TEAM = [
   { name: "Teny Makuach", role: "Founder & Developer", image: "/assets/founder-teny.jpg" },
   { name: "Ekow Williams", role: "Community & Partnerships", image: "/assets/founder-ekow.jpg" },
@@ -345,44 +374,6 @@ const H2: React.CSSProperties = {
   margin: 0,
   lineHeight: 1.1,
 };
-
-/* Oversized, faint logo mark bled into a section's background — decorative
-   only, so it's aria-hidden and never intercepts clicks. `tone` picks
-   whether the mark reads as white (dark section) or a neutral charcoal
-   (light section); the source SVG's own fill is baked-in blue, so both
-   tones go through a filter rather than a color prop. */
-function SectionMark({
-  size = 460,
-  corner,
-  tone = "white",
-  opacity = 0.07,
-  rotate = 0,
-}: {
-  size?: number;
-  corner: React.CSSProperties;
-  tone?: "white" | "dark";
-  opacity?: number;
-  rotate?: number;
-}) {
-  return (
-    <img
-      src="/assets/tamam-logo-mark.svg"
-      alt=""
-      aria-hidden="true"
-      style={{
-        position: "absolute",
-        width: size,
-        height: size,
-        opacity,
-        filter: tone === "white" ? "brightness(0) invert(1)" : "brightness(0) invert(0.15)",
-        transform: `rotate(${rotate}deg)`,
-        pointerEvents: "none",
-        zIndex: 0,
-        ...corner,
-      }}
-    />
-  );
-}
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -483,13 +474,16 @@ export default function Home() {
             <a href="#solution" className="tm-nav-link" style={{ color: "rgba(255,255,255,0.92)", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em", padding: "9px 18px", borderRadius: 0 }}>
               Solution
             </a>
+            <a href="#national" className="tm-nav-link" style={{ color: "rgba(255,255,255,0.92)", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em", padding: "9px 18px", borderRadius: 0 }}>
+              Alignment
+            </a>
             <a href="#team" className="tm-nav-link" style={{ color: "rgba(255,255,255,0.92)", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em", padding: "9px 18px", borderRadius: 0 }}>
               Team
             </a>
             <a href="#contact" className="tm-nav-link" style={{ color: "rgba(255,255,255,0.92)", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em", padding: "9px 18px", borderRadius: 0 }}>
               Contact
             </a>
-            <a href="#contact" className="tm-nav-cta" style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 13.5, fontWeight: 700, padding: "10px 22px", textDecoration: "none", letterSpacing: "0.02em", borderRadius: 999 }}>
+            <a href="#contact" className="tm-nav-cta" style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 13.5, fontWeight: 700, padding: "10px 22px", textDecoration: "none", letterSpacing: "0.02em", borderRadius: 0 }}>
               Book a Demo
             </a>
           </div>
@@ -520,6 +514,9 @@ export default function Home() {
           <div className="tm-nav-drawer" style={{ display: "flex", flexDirection: "column", background: "#015697", borderTop: "1px solid rgba(255,255,255,0.12)", padding: "8px 0 16px", margin: "0 -32px" }}>
             <a href="#solution" onClick={() => setMenuOpen(false)} style={{ color: "#FFFFFF", textDecoration: "none", fontSize: 16, fontWeight: 600, padding: "14px 32px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
               Solution
+            </a>
+            <a href="#national" onClick={() => setMenuOpen(false)} style={{ color: "#FFFFFF", textDecoration: "none", fontSize: 16, fontWeight: 600, padding: "14px 32px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+              Alignment
             </a>
             <a href="#team" onClick={() => setMenuOpen(false)} style={{ color: "#FFFFFF", textDecoration: "none", fontSize: 16, fontWeight: 600, padding: "14px 32px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
               Team
@@ -565,7 +562,7 @@ export default function Home() {
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(180deg, rgba(17, 48, 85, 0.6) 0%, rgba(25, 48, 71, 0.4) 14.46%, rgba(17, 48, 85, 0.2) 52.03%, rgba(17, 48, 85, 0.8) 87.29%, #113055 96.71%)",
+              "linear-gradient(180deg, rgba(17, 48, 85, 0.6) 0%, rgba(25, 48, 71, 0.4) 14.46%, rgba(17, 48, 85, 0.2) 52.03%, rgba(14, 42, 74, 0.8) 87.29%, #0E2A4A 96.71%)",
           }}
         />
 
@@ -663,7 +660,6 @@ export default function Home() {
 
       {/* ═══ 01 The Problem ═══ */}
       <section id="problem" className="tm-section" style={{ position: "relative", background: "#0E2A4A", color: "#FFFFFF", padding: "100px 32px", overflow: "hidden" }}>
-        <SectionMark corner={{ top: -80, right: -60 }} size={480} tone="white" opacity={0.06} rotate={-6} />
         <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
@@ -751,7 +747,6 @@ export default function Home() {
 
       {/* ═══ 02 Research ═══ */}
       <section id="research" className="tm-section" style={{ position: "relative", padding: "0 32px 100px", background: "#0F4C81", color: "#FFFFFF", overflow: "hidden" }}>
-        <SectionMark corner={{ bottom: -70, left: -70 }} size={440} tone="white" opacity={0.06} rotate={8} />
         <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 72 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
@@ -806,7 +801,6 @@ export default function Home() {
 
       {/* ═══ 03 The Solution ═══ */}
       <section id="solution" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#EFF6FB", borderTop: "1.5px solid #015697", overflow: "hidden" }}>
-        <SectionMark corner={{ top: -60, right: -80 }} size={420} tone="dark" opacity={0.035} rotate={-4} />
         <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
@@ -922,7 +916,6 @@ export default function Home() {
 
       {/* ═══ 05 Products ═══ */}
       <section id="products" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#F5FAFD", borderTop: "1.5px solid #015697", overflow: "hidden" }}>
-        <SectionMark corner={{ bottom: -90, left: -70 }} size={460} tone="dark" opacity={0.035} rotate={5} />
         <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
@@ -976,9 +969,85 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ═══ 05b National Alignment ═══ */}
+      <section id="national" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#EFF6FB", borderTop: "1.5px solid #015697", overflow: "hidden" }}>
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 860 }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span style={{ ...KICKER, color: "#FFFFFF", background: "#015697" }}>National Alignment</span>
+            </div>
+            <h2 style={H2}>Built around South Sudan&apos;s own health system</h2>
+            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#64748B", maxWidth: 720 }}>
+              The Ministry of Health&apos;s <strong style={{ color: "#015697" }}>2025 Essential Health Services Package</strong> organises
+              the country&apos;s care into six levels — and names fragmented, paper-bound data as one of its biggest gaps. Tamam is shaped to
+              fit that system, not replace it.
+            </p>
+          </div>
+
+          <div className="tm-grid-national" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 24, alignItems: "stretch" }}>
+            {/* Left — six levels of care mapped to products */}
+            <div className="tm-national-card" style={{ background: "#FFFFFF", border: "1.5px solid #015697", display: "flex", flexDirection: "column" }}>
+              <div style={{ padding: "22px 26px", borderBottom: "1.5px solid #015697", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 21, fontWeight: 600, margin: 0, color: "#015697" }}>The six levels of care</h3>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94A3B8" }}>Served by Tamam</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+                {CARE_LEVELS.map((c, i) => (
+                  <div key={c.level} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 26px", borderTop: i === 0 ? "none" : "1px solid #E2E8F0", flex: 1 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: "#1A2233", lineHeight: 1.3 }}>{c.level}</span>
+                      <span style={{ fontSize: 13, color: "#64748B", lineHeight: 1.4 }}>{c.role}</span>
+                    </div>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 500, color: "#FFFFFF", background: c.tone, padding: "5px 11px", whiteSpace: "nowrap", flexShrink: 0 }}>
+                      {c.product}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p style={{ margin: 0, padding: "18px 26px", borderTop: "1.5px solid #015697", fontSize: 13.5, lineHeight: 1.6, color: "#015697", background: "#F5FAFD" }}>
+                Every level writes to the <strong>same patient record</strong> and rolls up into DHIS2-ready national reports — with laboratory,
+                imaging, pharmacy, and the patient portal plugging in across the hospital and diagnostic tiers.
+              </p>
+            </div>
+
+            {/* Right — system reality + the Ministry's own named gap */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div className="tm-national-card" style={{ background: "#FFFFFF", border: "1.5px solid #015697", padding: "26px 28px", display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#94A3B8", marginBottom: 8 }}>
+                  The reality Tamam is built for
+                </span>
+                {SYSTEM_STATS.map((s, i) => (
+                  <div key={s.value} style={{ display: "flex", alignItems: "baseline", gap: 18, padding: "15px 0", borderTop: i === 0 ? "none" : "1px solid #E2E8F0" }}>
+                    <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 34, fontWeight: 600, lineHeight: 1, color: "#C2571B", letterSpacing: "-0.02em", minWidth: 78 }}>
+                      {s.value}
+                    </span>
+                    <span style={{ fontSize: 14, lineHeight: 1.5, color: "#334155", fontWeight: 500 }}>
+                      {s.label}{" "}
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#94A3B8", whiteSpace: "nowrap" }}>— {s.source}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="tm-national-card" style={{ background: "#FFFFFF", border: "1.5px solid #015697", borderLeft: "4px solid #E8863A", padding: "26px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#C2571B" }}>
+                  The Ministry&apos;s own diagnosis
+                </span>
+                <p style={{ margin: 0, fontFamily: "'Lora', Georgia, serif", fontSize: 19, lineHeight: 1.5, color: "#0E2A4A", fontWeight: 500 }}>
+                  The sector still runs on parallel, disconnected systems — and the lack of accurate, timely data means care and planning
+                  can&apos;t rely on what&apos;s recorded.
+                </p>
+                <span style={{ fontSize: 13, color: "#64748B" }}>
+                  Paraphrased from the South Sudan Essential Health Services Package, 2025 — the exact gap a single offline-first record closes.
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ═══ 06 The Goal ═══ */}
       <section id="goal" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#013D6B", color: "#FFFFFF", overflow: "hidden" }}>
-        <SectionMark corner={{ top: -70, right: -50 }} size={420} tone="white" opacity={0.07} rotate={10} />
         <div className="tm-grid-split" style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 56, alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
@@ -1006,7 +1075,6 @@ export default function Home() {
 
       {/* ═══ 07 Team ═══ */}
       <section id="team" className="tm-section" style={{ position: "relative", padding: "100px 32px", background: "#EAF2F7", overflow: "hidden" }}>
-        <SectionMark corner={{ top: -70, left: -70 }} size={420} tone="dark" opacity={0.035} rotate={-7} />
         <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 48 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
             <div style={{ display: "flex", alignItems: "center" }}>
@@ -1032,7 +1100,6 @@ export default function Home() {
 
       {/* ═══ Contact / Get involved ═══ */}
       <section id="contact" className="tm-section" style={{ position: "relative", background: "#015697", color: "#FFFFFF", padding: "110px 32px 90px", overflow: "hidden" }}>
-        <SectionMark corner={{ bottom: -140, right: -140 }} size={480} tone="white" opacity={0.05} rotate={-10} />
         <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto" }}>
         <div className="tm-grid-split" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 56, alignItems: "start" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
