@@ -5084,79 +5084,44 @@ thead th {
   overflow: auto;
 }
 
-/* ── Ward patients summary strip ─────────────────────────────────────────
-   At-a-glance acuity + status counts above the ward roster. The acuity and
-   status chips also act as one-tap filters (see WardWorkflow). */
-.ward-summary {
+/* ── Ward patients inline summary ────────────────────────────────────────
+   At-a-glance acuity + status counts on the roster header row, styled like
+   the patients-registry dot-stat chips (no boxes). Acuity and status chips
+   still act as one-tap filters (see WardWorkflow). */
+.ward-stat-inline {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 16px 12px;
+  justify-content: flex-end;
+  gap: 12px;
 }
-.ward-summary-chip {
+.ward-stat-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  border: 1px solid var(--ehr-border, var(--border-light));
-  border-radius: 10px;
-  background: var(--ehr-panel, #fff);
-  cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
-}
-button.ward-summary-chip:hover {
-  background: var(--overlay-subtle);
-}
-.ward-summary-chip.is-total {
-  cursor: default;
+  gap: 5px;
+  padding: 0;
+  border: 0;
   background: transparent;
-  border-style: dashed;
-}
-.ward-summary-count {
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--ehr-text, var(--text-primary));
-}
-.ward-summary-label {
-  font-size: 11px;
+  color: var(--text-muted);
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--ehr-muted, var(--text-muted));
   white-space: nowrap;
 }
-.ward-summary-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
+button.ward-stat-chip {
+  cursor: pointer;
+}
+button.ward-stat-chip:hover,
+button.ward-stat-chip.is-active {
+  color: var(--ehr-blue, var(--accent-primary));
+}
+button.ward-stat-chip:focus:not(:focus-visible) {
+  outline: none;
+}
+.ward-stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
   flex-shrink: 0;
-}
-.ward-summary-chip.acuity-red .ward-summary-dot { background: #DC2626; }
-.ward-summary-chip.acuity-yellow .ward-summary-dot { background: #D97706; }
-.ward-summary-divider {
-  width: 1px;
-  align-self: stretch;
-  margin: 2px 4px;
-  background: var(--ehr-border, var(--border-light));
-}
-.ward-summary-chip.is-active {
-  border-color: var(--accent-primary);
-  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
-  box-shadow: inset 0 0 0 1px var(--accent-primary);
-}
-.ward-summary-chip.acuity-red.is-active {
-  border-color: #DC2626;
-  background: rgba(220, 38, 38, 0.08);
-  box-shadow: inset 0 0 0 1px #DC2626;
-}
-.ward-summary-chip.acuity-yellow.is-active {
-  border-color: #D97706;
-  background: rgba(217, 119, 6, 0.10);
-  box-shadow: inset 0 0 0 1px #D97706;
-}
-.ward-summary-chip.is-active .ward-summary-label {
-  color: var(--ehr-text, var(--text-primary));
 }
 
 /* Location column: ward · bed, muted em-dash when the patient isn't admitted. */
@@ -5363,12 +5328,17 @@ button.ward-summary-chip:hover {
   color: var(--ehr-blue);
 }
 
+/* Selected metric row — blue text only, matching the clinical dashboard's
+   Outstanding-items rows. The old expanded pill (negative margin + tinted
+   background) made the clicked row visually jump out of column alignment. */
 .ehr-side-card > button.active {
-  margin-inline: -6px;
-  padding-inline: 6px;
-  border-radius: 6px;
-  background: var(--ehr-blue-light);
   color: var(--ehr-blue);
+}
+
+/* Clicking a metric row opens a panel; the row shouldn't keep a mouse-focus
+   ring afterwards. Keyboard focus (:focus-visible) keeps the global outline. */
+.ehr-side-card > button:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .ehr-side-card > button b {

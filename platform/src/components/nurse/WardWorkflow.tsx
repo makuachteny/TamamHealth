@@ -249,63 +249,60 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
               </select>
             )}
             <WardFilters filters={filters} setFilters={setFilters} />
-          </div>
-
-          {/* At-a-glance roster summary. Acuity + status chips double as quick
-              filters; the total is display-only. */}
-          <div className="ward-summary" role="group" aria-label={t('nurse.wardPatients')}>
-            <div className="ward-summary-chip is-total">
-              <span className="ward-summary-count">{summary.total}</span>
-              <span className="ward-summary-label">{t('nurse.summaryTotal')}</span>
+            {/* At-a-glance roster summary, patients-registry style: inline
+                dot-stat chips, right-aligned on the header row. Acuity +
+                status chips still double as one-tap filters. */}
+            <div className="ward-stat-inline ml-auto" role="group" aria-label={t('nurse.wardPatients')}>
+              <span className="ward-stat-chip">
+                <span className="ward-stat-dot" style={{ background: 'var(--text-muted)' }} />
+                {t('nurse.summaryTotal')} ({summary.total})
+              </span>
+              <button
+                type="button"
+                className={`ward-stat-chip ${acuity === 'RED' ? 'is-active' : ''}`}
+                onClick={() => toggleAcuity('RED')}
+                aria-pressed={acuity === 'RED'}
+              >
+                <span className="ward-stat-dot" style={{ background: '#DC2626' }} />
+                {t('nurse.summaryCritical')} ({summary.critical})
+              </button>
+              <button
+                type="button"
+                className={`ward-stat-chip ${acuity === 'YELLOW' ? 'is-active' : ''}`}
+                onClick={() => toggleAcuity('YELLOW')}
+                aria-pressed={acuity === 'YELLOW'}
+              >
+                <span className="ward-stat-dot" style={{ background: '#D97706' }} />
+                {t('nurse.summaryUrgent')} ({summary.urgent})
+              </button>
+              <button
+                type="button"
+                className={`ward-stat-chip ${filters.status === 'pending' ? 'is-active' : ''}`}
+                onClick={() => toggleStatus('pending')}
+                aria-pressed={filters.status === 'pending'}
+              >
+                <span className="ward-stat-dot" style={{ background: '#2191D0' }} />
+                {t('nurse.statusWaiting')} ({summary.waiting})
+              </button>
+              <button
+                type="button"
+                className={`ward-stat-chip ${filters.status === 'seen' ? 'is-active' : ''}`}
+                onClick={() => toggleStatus('seen')}
+                aria-pressed={filters.status === 'seen'}
+              >
+                <span className="ward-stat-dot" style={{ background: '#15795C' }} />
+                {t('nurse.statusInConsult')} ({summary.inConsult})
+              </button>
+              <button
+                type="button"
+                className={`ward-stat-chip ${filters.status === 'none' ? 'is-active' : ''}`}
+                onClick={() => toggleStatus('none')}
+                aria-pressed={filters.status === 'none'}
+              >
+                <span className="ward-stat-dot" style={{ background: '#B8741C' }} />
+                {t('nurse.statusNotTriaged')} ({summary.notTriaged})
+              </button>
             </div>
-            <button
-              type="button"
-              className={`ward-summary-chip acuity-red ${acuity === 'RED' ? 'is-active' : ''}`}
-              onClick={() => toggleAcuity('RED')}
-              aria-pressed={acuity === 'RED'}
-            >
-              <span className="ward-summary-dot" />
-              <span className="ward-summary-count">{summary.critical}</span>
-              <span className="ward-summary-label">{t('nurse.summaryCritical')}</span>
-            </button>
-            <button
-              type="button"
-              className={`ward-summary-chip acuity-yellow ${acuity === 'YELLOW' ? 'is-active' : ''}`}
-              onClick={() => toggleAcuity('YELLOW')}
-              aria-pressed={acuity === 'YELLOW'}
-            >
-              <span className="ward-summary-dot" />
-              <span className="ward-summary-count">{summary.urgent}</span>
-              <span className="ward-summary-label">{t('nurse.summaryUrgent')}</span>
-            </button>
-            <span className="ward-summary-divider" aria-hidden="true" />
-            <button
-              type="button"
-              className={`ward-summary-chip status-waiting ${filters.status === 'pending' ? 'is-active' : ''}`}
-              onClick={() => toggleStatus('pending')}
-              aria-pressed={filters.status === 'pending'}
-            >
-              <span className="ward-summary-count">{summary.waiting}</span>
-              <span className="ward-summary-label">{t('nurse.statusWaiting')}</span>
-            </button>
-            <button
-              type="button"
-              className={`ward-summary-chip status-consult ${filters.status === 'seen' ? 'is-active' : ''}`}
-              onClick={() => toggleStatus('seen')}
-              aria-pressed={filters.status === 'seen'}
-            >
-              <span className="ward-summary-count">{summary.inConsult}</span>
-              <span className="ward-summary-label">{t('nurse.statusInConsult')}</span>
-            </button>
-            <button
-              type="button"
-              className={`ward-summary-chip status-none ${filters.status === 'none' ? 'is-active' : ''}`}
-              onClick={() => toggleStatus('none')}
-              aria-pressed={filters.status === 'none'}
-            >
-              <span className="ward-summary-count">{summary.notTriaged}</span>
-              <span className="ward-summary-label">{t('nurse.statusNotTriaged')}</span>
-            </button>
           </div>
 
           <div className="ehr-worklist-table">

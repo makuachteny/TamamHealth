@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, ArrowLeft, ArrowRight, Trash2, UserPlus, MapPin, Users, ScanLine, Wallet, ClipboardList } from '@/components/icons/lucide';
+import { Check, ArrowLeft, ArrowRight, Trash2, UserPlus, MapPin, Users, ScanLine, Wallet, ClipboardList, Camera } from '@/components/icons/lucide';
 import FingerprintCapture, { type CapturedFingerprint } from '@/components/FingerprintCapture';
+import PhotoCaptureModal from '@/components/patients/PhotoCaptureModal';
 import { statesAndCounties, states, tribes, languages } from '@/data/mock';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useApp } from '@/lib/context';
@@ -68,6 +69,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
   // the component). Persisted AFTER the patient doc exists, in handleSubmit.
   const [fingerprints, setFingerprints] = useState<CapturedFingerprint[]>([]);
   const [patientPhotoUrl, setPatientPhotoUrl] = useState<string | null>(null);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   const handleCancel = () => {
     if (onCancel) {
@@ -612,30 +614,10 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                       )}
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="btn btn-secondary btn-sm cursor-pointer">
-                        {patientPhotoUrl ? 'Change photo' : 'Upload photo'}
-                        <input
-                          type="file"
-                          className="sr-only"
-                          accept="image/jpeg,image/png,image/webp"
-                          onChange={e => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            if (file.size > 5 * 1024 * 1024) {
-                              showToast('Photo must be 5 MB or smaller.', 'error');
-                              e.target.value = '';
-                              return;
-                            }
-                            const reader = new FileReader();
-                            reader.onload = ev => {
-                              const result = ev.target?.result as string;
-                              if (result) setPatientPhotoUrl(result);
-                            };
-                            reader.readAsDataURL(file);
-                            e.target.value = '';
-                          }}
-                        />
-                      </label>
+                      <button type="button" onClick={() => setShowPhotoModal(true)} className="btn btn-secondary btn-sm flex items-center gap-1.5">
+                        <Camera className="w-3.5 h-3.5" />
+                        {patientPhotoUrl ? 'Retake photo' : 'Take photo'}
+                      </button>
                       {patientPhotoUrl && (
                         <button type="button" onClick={() => setPatientPhotoUrl(null)} className="btn btn-sm text-xs" style={{ color: 'var(--text-muted)', background: 'transparent' }}>
                           Remove
@@ -643,7 +625,7 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                       )}
                     </div>
                     <p>
-                      Use a clear front-facing photo. JPG, PNG or WebP, max 5 MB.
+                      Take a photo with the camera, or upload one. Use a clear front-facing photo. JPG, PNG or WebP, max 5 MB.
                     </p>
                   </div>
                 </div>
@@ -810,6 +792,13 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             </div>
           </div>
       </main>
+
+      {showPhotoModal && (
+        <PhotoCaptureModal
+          onCapture={setPatientPhotoUrl}
+          onClose={() => setShowPhotoModal(false)}
+        />
+      )}
     </>
   );
 }
