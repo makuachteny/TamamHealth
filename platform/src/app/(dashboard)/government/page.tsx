@@ -1,14 +1,13 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
-import TopBar from '@/components/TopBar';
 import {
-  Building2, Users,
-  AlertTriangle, ArrowRightLeft, TrendingUp, TrendingDown,
-  Minus, ChevronDown, ChevronRight, Download, Calendar,
-  ArrowUpDown, Check, BarChart3, LineChart as LineChartIcon,
+  Users,
+  TrendingUp,
+  ChevronDown,
+  Check, BarChart3, LineChart as LineChartIcon,
   PieChart as PieChartIcon, Activity, Filter,
   Layers, Target, Sliders, X, Maximize2, ChevronLeft
 } from '@/components/icons/lucide';
@@ -21,9 +20,7 @@ import {
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useHospitals } from '@/lib/hooks/useHospitals';
 import { useSurveillance } from '@/lib/hooks/useSurveillance';
-import { useReferrals } from '@/lib/hooks/useReferrals';
 import EmptyState from '@/components/EmptyState';
-import PatientName from '@/components/PatientName';
 import type { HospitalDoc, DiseaseAlertDoc } from '@/lib/db-types';
 
 /**
@@ -187,16 +184,6 @@ function CircularGauge({ value, label, color, size = 100, strokeWidth = 8 }: {
       </div>
       <span className="text-[10px] font-medium mt-2 text-center" style={{ color: 'var(--text-muted)' }}>{label}</span>
     </div>
-  );
-}
-
-function DataQualityBadge({ score }: { score: number }) {
-  const color = score > 90 ? 'var(--color-success)' : score >= 70 ? 'var(--color-warning)' : 'var(--color-danger)';
-  const bg = score > 90 ? 'rgba(31, 157, 111,0.12)' : score >= 70 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)';
-  return (
-    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: bg, color }}>
-      {score}%
-    </span>
   );
 }
 
@@ -448,18 +435,6 @@ const DISEASE_COLORS: Record<string, string> = {
 const WEEKLY_DISEASE_KEYS = ['malaria', 'cholera', 'measles', 'pneumonia', 'diarrhea'] as const;
 const STATE_DISEASE_KEYS = ['malaria', 'cholera', 'measles', 'tb', 'hiv'] as const;
 
-function calcDataQuality(h: HospitalDoc): number {
-  const fields = [
-    h.name, h.state, h.facilityType, h.totalBeds, h.doctors, h.nurses,
-    h.clinicalOfficers, h.syncStatus, h.lastSync, h.patientCount,
-    h.operationalStatus, h.performance?.reportingCompleteness,
-    h.performance?.serviceReadinessScore, h.performance?.immunizationCoverage,
-    h.performance?.qualityScore, h.county,
-  ];
-  const filled = fields.filter(f => f !== undefined && f !== null && f !== '' && f !== 0).length;
-  return Math.round((filled / fields.length) * 100);
-}
-
 /* ═══════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════ */
@@ -469,17 +444,12 @@ export default function GovernmentDashboardPage() {
   const { currentUser } = useApp();
   const { hospitals } = useHospitals();
   const { alerts: diseaseAlerts } = useSurveillance();
-  const { referrals } = useReferrals();
 
   // Live aggregations derived from the surveillance feed so the dashboard
   // never falls back to hardcoded outbreak numbers (a previous prod issue).
   const weeklyDiseaseData = useMemo(() => buildWeeklyDiseaseData(diseaseAlerts), [diseaseAlerts]);
   const casesByState = useMemo(() => buildCasesByState(diseaseAlerts), [diseaseAlerts]);
 
-  // Drill-Down + Export state
-  const [expandedStates, setExpandedStates] = useState<Record<string, boolean>>({});
-  const [dhis2Period, setDhis2Period] = useState<'monthly' | 'quarterly'>('monthly');
-  const [tableSortBy, setTableSortBy] = useState<'name' | 'quality'>('name');
 
   /* ─── TABLEAU-STYLE SELECTOR STATES ──────────────────────────── */
 
@@ -507,9 +477,6 @@ export default function GovernmentDashboardPage() {
 
   // Performance panel
   const [perfView, setPerfView] = useState('gauges');
-
-  // Alert filter by disease
-  const [alertDiseaseFilter] = useState('all');
 
   // Fullscreen chart states
   const [fullscreenChart, setFullscreenChart] = useState<string | null>(null);
@@ -648,92 +615,7 @@ export default function GovernmentDashboardPage() {
     && staffDistribution.some(row => sdSelectedRoles.some(r => ((row as Record<string, unknown>)[r] as number) > 0));
   const performanceHasData = perfRadarData.some(d => d.value > 0);
 
-  const sortedAlerts = useMemo(() => {
-    let filtered = selectedState === 'all' ? [...diseaseAlerts] : diseaseAlerts.filter(a => a.state === selectedState);
-    if (alertDiseaseFilter !== 'all') filtered = filtered.filter(a => a.disease === alertDiseaseFilter);
-    return filtered.sort((a, b) => {
-      const order: Record<string, number> = { emergency: 0, warning: 1, watch: 2, normal: 3 };
-      return (order[a.alertLevel] ?? 3) - (order[b.alertLevel] ?? 3);
-    });
-  }, [diseaseAlerts, selectedState, alertDiseaseFilter]);
-
-  // State drill-down
-  const hospitalsByState = useMemo(() => {
-    const grouped: Record<string, HospitalDoc[]> = {};
-    filteredHospitals.forEach(h => {
-      const state = h.state || 'Unknown';
-      if (!grouped[state]) grouped[state] = [];
-      grouped[state].push(h);
-    });
-    return grouped;
-  }, [filteredHospitals]);
-
-  const stateAggregates = useMemo(() => {
-    return Object.entries(hospitalsByState).map(([state, hosps]) => ({
-      state, hospitals: hosps,
-      totalPatients: hosps.reduce((s, h) => s + h.patientCount, 0),
-      totalBeds: hosps.reduce((s, h) => s + h.totalBeds, 0),
-      totalStaff: hosps.reduce((s, h) => s + h.doctors + h.nurses + h.clinicalOfficers, 0),
-      facilityCount: hosps.length,
-    })).sort((a, b) => b.totalPatients - a.totalPatients);
-  }, [hospitalsByState]);
-
-  const toggleState = useCallback((state: string) => {
-    setExpandedStates(prev => ({ ...prev, [state]: !prev[state] }));
-  }, []);
-
-  // DHIS2 export
-  const handleDhis2Export = useCallback(() => {
-    const now = new Date();
-    const period = dhis2Period === 'monthly'
-      ? `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
-      : `${now.getFullYear()}Q${Math.ceil((now.getMonth() + 1) / 3)}`;
-    const dataValues: Array<{ dataElement: string; period: string; orgUnit: string; value: number }> = [];
-    casesByState.forEach(s => {
-      const orgUnit = s.state.replace(/\s+/g, '_').toUpperCase();
-      dataValues.push({ dataElement: 'MALARIA_CASES', period, orgUnit, value: s.malaria });
-      dataValues.push({ dataElement: 'CHOLERA_CASES', period, orgUnit, value: s.cholera });
-      dataValues.push({ dataElement: 'MEASLES_CASES', period, orgUnit, value: s.measles });
-      dataValues.push({ dataElement: 'TB_CASES', period, orgUnit, value: s.tb });
-      dataValues.push({ dataElement: 'HIV_CASES', period, orgUnit, value: s.hiv });
-    });
-    hospitals.forEach(h => {
-      const orgUnit = h._id;
-      dataValues.push({ dataElement: 'PATIENT_COUNT', period, orgUnit, value: h.patientCount });
-      const lastTrend = h.monthlyTrends?.[h.monthlyTrends.length - 1];
-      if (lastTrend) {
-        dataValues.push({ dataElement: 'IMMUNIZATION_COUNT', period, orgUnit, value: lastTrend.immunizations || 0 });
-        dataValues.push({ dataElement: 'OPD_VISITS', period, orgUnit, value: lastTrend.opdVisits || 0 });
-        dataValues.push({ dataElement: 'ANC_VISITS', period, orgUnit, value: lastTrend.ancVisits || 0 });
-      }
-    });
-    const blob = new Blob([JSON.stringify({ dataValueSet: { dataValues } }, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `dhis2_export_${period}.json`; a.click();
-    URL.revokeObjectURL(url);
-  }, [dhis2Period, hospitals, casesByState]);
-
-  // Facility comparison
-
   if (!currentUser || currentUser.role !== 'government') return null;
-
-  const typeLabel = (type: string) => {
-    switch (type) {
-      case 'national_referral': return t('government.facilityNationalReferral');
-      case 'state_hospital': return t('government.facilityStateHospital');
-      case 'county_hospital': return t('government.facilityCountyHospital');
-      default: return type;
-    }
-  };
-  const syncDotColor = (status: string) => {
-    switch (status) {
-      case 'online': return 'var(--color-success)';
-      case 'offline': return 'var(--text-muted)';
-      case 'syncing': return 'var(--color-warning)';
-      default: return 'var(--text-muted)';
-    }
-  };
 
   /* ═══ CHART RENDERERS ═══ */
 
@@ -1009,7 +891,6 @@ export default function GovernmentDashboardPage() {
 
     return (
       <>
-        <TopBar title={t('government.nationalDashboard')} />
         <div className="page-container page-enter flex flex-col flex-1 min-h-0">
           {expandedContent}
         </div>
@@ -1019,7 +900,6 @@ export default function GovernmentDashboardPage() {
 
   return (
     <>
-      <TopBar title={t('government.nationalDashboard')} />
       <main className="page-container page-enter">
 
         {/* ═══ ROW 1: Disease Trends + Facility Distribution + Performance ═══ */}
@@ -1286,195 +1166,6 @@ export default function GovernmentDashboardPage() {
           </div>
         </div>
 
-        {/* ═══ DHIS2 EXPORT ═══ */}
-        <div className="card-elevated p-4 mb-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ background: 'transparent' }}>
-                <Download className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.exportToDhis2')}</h3>
-                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.dhis2ExportDesc')}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <TableauSelect
-                label={t('government.period')}
-                value={dhis2Period}
-                options={[{ value: 'monthly', label: t('government.periodMonthly') }, { value: 'quarterly', label: t('government.periodQuarterly') }]}
-                onChange={v => setDhis2Period(v as 'monthly' | 'quarterly')}
-                icon={Calendar}
-                width="100px"
-              />
-              <button
-                onClick={handleDhis2Export}
-                className="flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold text-white transition-all hover:opacity-90"
-                style={{ background: 'var(--color-success)' }}
-              >
-                <Download className="w-3.5 h-3.5" />
-                {t('government.exportJson')}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* ═══ STATE/COUNTY DRILL-DOWN TABLE ═══ */}
-        <div className="card-elevated overflow-hidden mb-4">
-          <div className="flex items-center justify-between p-4 pb-3 border-b" style={{ borderColor: 'var(--border-light)' }}>
-            <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <Building2 className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-              {t('government.hospitalPerformanceByState')}
-            </h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setTableSortBy(prev => prev === 'name' ? 'quality' : 'name')}
-                className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg"
-                style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
-              >
-                <ArrowUpDown className="w-3 h-3" />
-                {t('government.sortLabel', { field: tableSortBy === 'quality' ? t('government.dataQuality') : t('government.name') })}
-              </button>
-              <button onClick={() => router.push('/hospitals')} className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>{t('government.viewAll')}</button>
-            </div>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table" style={{ minWidth: 840 }}>
-              <thead>
-                <tr>
-                  <th>{t('government.colStateHospital')}</th>
-                  <th>{t('government.colFacilities')}</th>
-                  <th>{t('government.colPatients')}</th>
-                  <th>{t('government.colBeds')}</th>
-                  <th>{t('government.colStaff')}</th>
-                  <th>{t('government.colDataQuality')}</th>
-                  <th>{t('government.colStatus')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stateAggregates.map(sa => {
-                  const isExpanded = expandedStates[sa.state] || false;
-                  const stateHospitals = tableSortBy === 'quality'
-                    ? [...sa.hospitals].sort((a, b) => calcDataQuality(b) - calcDataQuality(a))
-                    : [...sa.hospitals].sort((a, b) => a.name.localeCompare(b.name));
-                  const avgQuality = sa.hospitals.length > 0
-                    ? Math.round(sa.hospitals.reduce((s, h) => s + calcDataQuality(h), 0) / sa.hospitals.length) : 0;
-                  return (
-                    <React.Fragment key={sa.state}>
-                      <tr className="cursor-pointer transition-colors" onClick={() => toggleState(sa.state)} style={{ background: 'var(--overlay-subtle)' }}>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            {isExpanded ? <ChevronDown className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} /> : <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />}
-                            <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{sa.state}</span>
-                          </div>
-                        </td>
-                        <td className="font-semibold text-sm">{sa.facilityCount}</td>
-                        <td className="font-semibold text-sm">{sa.totalPatients.toLocaleString()}</td>
-                        <td className="text-sm">{sa.totalBeds.toLocaleString()}</td>
-                        <td className="text-sm">{sa.totalStaff.toLocaleString()}</td>
-                        <td><DataQualityBadge score={avgQuality} /></td>
-                        <td><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.onlineCount', { online: sa.hospitals.filter(h => h.syncStatus === 'online').length, total: sa.facilityCount })}</span></td>
-                      </tr>
-                      {isExpanded && stateHospitals.map(h => (
-                        <tr key={h._id} className="cursor-pointer" onClick={() => router.push(`/hospitals?facility=${h._id}`)}>
-                          <td>
-                            <div className="flex items-center gap-2 pl-6">
-                              <div>
-                                <p className="font-medium text-sm">{h.name}</p>
-                                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{typeLabel(h.facilityType)}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="text-[10px]" style={{ color: 'var(--text-muted)' }}>--</td>
-                          <td className="font-semibold text-sm">{h.patientCount.toLocaleString()}</td>
-                          <td className="text-sm">{h.totalBeds}</td>
-                          <td className="text-sm">{h.doctors + h.nurses + h.clinicalOfficers}</td>
-                          <td><DataQualityBadge score={calcDataQuality(h)} /></td>
-                          <td>
-                            <span className="flex items-center gap-1 text-[10px] font-semibold">
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: syncDotColor(h.syncStatus) }} />
-                              {h.syncStatus.charAt(0).toUpperCase() + h.syncStatus.slice(1)}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ═══ BOTTOM: Alerts + Referrals ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {/* Disease Alerts */}
-          <div className="glass-section">
-            <div className="glass-section-header">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.diseaseAlerts')}</span>
-                {alertDiseaseFilter !== 'all' && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(229,46,66,0.1)', color: 'var(--color-danger)' }}>{alertDiseaseFilter}</span>
-                )}
-                {selectedState !== 'all' && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: 'var(--accent-light)', color: 'var(--accent-primary)' }}>{selectedState}</span>
-                )}
-              </div>
-              <button onClick={() => router.push('/surveillance')} className="text-[10px] font-medium" style={{ color: 'var(--accent-primary)' }}>{t('government.viewAll')}</button>
-            </div>
-            <div className="p-3 space-y-2" style={{ maxHeight: '280px', overflowY: 'auto' }}>
-              {sortedAlerts.length === 0 && (
-                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>{t('government.noAlertsMatch')}</p>
-              )}
-              {sortedAlerts.slice(0, 6).map(alert => (
-                <div key={alert._id} className="p-3 rounded-md cursor-pointer" onClick={() => router.push('/surveillance')} style={{
-                  background: alert.alertLevel === 'emergency' ? 'rgba(229,46,66,0.08)' : alert.alertLevel === 'warning' ? 'rgba(252,211,77,0.08)' : 'rgba(56,189,248,0.06)',
-                  border: `1px solid ${alert.alertLevel === 'emergency' ? 'rgba(229,46,66,0.15)' : alert.alertLevel === 'warning' ? 'rgba(252,211,77,0.15)' : 'rgba(56,189,248,0.1)'}`,
-                }}>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{alert.disease}</span>
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
-                      background: alert.alertLevel === 'emergency' ? 'rgba(229,46,66,0.15)' : alert.alertLevel === 'warning' ? 'rgba(252,211,77,0.15)' : 'rgba(56,189,248,0.15)',
-                      color: alert.alertLevel === 'emergency' ? 'var(--color-danger)' : alert.alertLevel === 'warning' ? 'var(--color-warning)' : 'var(--color-brand-500)',
-                    }}>{alert.alertLevel.toUpperCase()}</span>
-                  </div>
-                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('government.alertCasesDeaths', { state: alert.state, cases: alert.cases, deaths: alert.deaths })}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    {alert.trend === 'increasing' ? <TrendingUp className="w-2.5 h-2.5" style={{ color: 'var(--color-danger)' }} /> : alert.trend === 'decreasing' ? <TrendingDown className="w-2.5 h-2.5" style={{ color: 'var(--color-success)' }} /> : <Minus className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} />}
-                    <span className="text-[9px]" style={{ color: alert.trend === 'increasing' ? 'var(--color-danger)' : alert.trend === 'decreasing' ? 'var(--color-success)' : 'var(--color-warning)' }}>{alert.trend}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Recent Referrals */}
-          <div className="glass-section">
-            <div className="glass-section-header">
-              <div className="flex items-center gap-2">
-                <ArrowRightLeft className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('government.recentReferrals')}</span>
-              </div>
-              <button onClick={() => router.push('/referrals')} className="text-[10px] font-medium" style={{ color: 'var(--accent-primary)' }}>{t('government.viewAll')}</button>
-            </div>
-            <div className="p-3 space-y-2">
-              {referrals.slice(0, 4).map(ref => (
-                <div key={ref._id} className="p-2.5 rounded-md" style={{ border: '1px solid var(--border-light)' }}>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <PatientName patientId={ref.patientId} name={ref.patientName} nameClassName="text-[11px] font-semibold" />
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
-                      background: ref.urgency === 'emergency' ? 'rgba(229,46,66,0.12)' : ref.urgency === 'urgent' ? 'rgba(252,211,77,0.12)' : 'rgba(0,119,215,0.12)',
-                      color: ref.urgency === 'emergency' ? 'var(--color-danger)' : ref.urgency === 'urgent' ? 'var(--color-warning)' : 'var(--accent-primary)',
-                    }}>{ref.urgency}</span>
-                  </div>
-                  <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{ref.fromHospital} → {ref.toHospital}</p>
-                  <p className="text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{ref.department} · {ref.referralDate}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </main>
 
     </>

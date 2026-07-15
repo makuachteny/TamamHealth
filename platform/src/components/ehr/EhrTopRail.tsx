@@ -49,6 +49,11 @@ export default function EhrTopRail() {
   const { hospitals } = useHospitals();
   const facilityName = currentUser?.hospitalName
     || (currentUser?.hospitalId ? hospitals.find(h => h._id === currentUser.hospitalId)?.name : undefined);
+  // National oversight (Ministry of Health) isn't tied to a single facility —
+  // show the ministry name in the rail's center and give it the header search,
+  // so the National Dashboard page doesn't need its own title + search row.
+  const isNationalRole = currentUser?.role === 'government';
+  const centerLabel = facilityName || (isNationalRole ? 'Ministry of Health' : undefined);
   const { canRegisterPatients } = usePermissions();
   const { available: tourAvailable, start: startTour } = useTourContext();
   const { patients } = usePatients();
@@ -237,10 +242,10 @@ export default function EhrTopRail() {
 
       {/* Overlaid on the rail's true center (not a grid cell), so it never
           shifts the brand/modules/search columns. */}
-      {facilityName && (
+      {centerLabel && (
         <div className="ehr-top-center">
-          <div className="ehr-top-facility" title={facilityName}>
-            <span>{facilityName}</span>
+          <div className="ehr-top-facility" title={centerLabel}>
+            <span>{centerLabel}</span>
           </div>
         </div>
       )}
@@ -255,7 +260,7 @@ export default function EhrTopRail() {
         <Calendar className="w-4 h-4" />
       </button>
 
-      {canSearchPatients ? (
+      {(canSearchPatients || isNationalRole) ? (
         <div className={`ehr-top-search ${mobileSearchOpen ? 'is-mobile-open' : ''}`} ref={boxRef}>
           <Search className="w-4 h-4" />
           <input
