@@ -13,7 +13,6 @@ import type {
   MedicalRecordDoc,
   LabResultDoc,
   PrescriptionDoc,
-  HospitalDoc,
   ReferralDoc,
 } from './db-types';
 
@@ -177,29 +176,6 @@ export function toFhirMedicationRequest(rx: PrescriptionDoc): FhirMedicationRequ
     authoredOn: rx.createdAt,
     requester: rx.prescribedBy ? { display: rx.prescribedBy } : undefined,
     dosageInstruction: rx.dose ? [{ text: `${rx.dose}${rx.frequency ? ' ' + rx.frequency : ''}${rx.duration ? ' for ' + rx.duration : ''}` }] : undefined,
-  };
-}
-
-export interface FhirOrganization {
-  resourceType: 'Organization';
-  id: string;
-  meta?: { lastUpdated?: string };
-  active?: boolean;
-  name: string;
-  address?: Array<{ city?: string; state?: string; country?: string }>;
-}
-
-export function toFhirOrganization(h: HospitalDoc): FhirOrganization {
-  const city = (h as unknown as { town?: string; location?: string }).town || (h as unknown as { town?: string; location?: string }).location;
-  return {
-    resourceType: 'Organization',
-    id: h._id,
-    meta: { lastUpdated: h.updatedAt },
-    active: true,
-    name: h.name,
-    address: (h.state || city)
-      ? [{ city, state: h.state, country: h.countryId }]
-      : undefined,
   };
 }
 

@@ -127,27 +127,6 @@ export function getDB(name: string): PouchDatabase {
   return databases[name];
 }
 
-/**
- * Get a PouchDB instance pointing at the remote CouchDB server (for the
- * browser's sync manager). Returns null if sync is not enabled or called
- * during SSR.
- */
-const remoteDatabases: Record<string, PouchDatabase> = {};
-
-export function getRemoteDB(name: string): PouchDatabase | null {
-  if (!IS_BROWSER) return null;
-  const syncEnabled = process.env.NEXT_PUBLIC_SYNC_ENABLED === 'true';
-  const couchdbUrl = process.env.NEXT_PUBLIC_COUCHDB_URL;
-  if (!syncEnabled || !couchdbUrl) return null;
-
-  if (!remoteDatabases[name]) {
-    const PouchDB = loadPouchDB();
-    const url = `${couchdbUrl.replace(/\/+$/, '')}/${name}`;
-    remoteDatabases[name] = new PouchDB(url, { skip_setup: true });
-  }
-  return remoteDatabases[name];
-}
-
 // Typed database accessors
 export const usersDB = () => getDB('tamamhealth_users');
 export const patientsDB = () => getDB('tamamhealth_patients');

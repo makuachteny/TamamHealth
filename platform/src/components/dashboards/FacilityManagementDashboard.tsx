@@ -1,5 +1,4 @@
 'use client';
-import TodaysAppointmentsCard from '@/components/dashboard/TodaysAppointmentsCard';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -163,10 +162,6 @@ export default function FacilityManagementDashboard() {
       <main className="page-container page-enter">
         <DashboardGreetingHeader />
         <div className="flex flex-col gap-5">
-
-          <div style={{ maxWidth: 360 }}>
-            <TodaysAppointmentsCard />
-          </div>
 
           {/* ═══ ROW 1 — Cash Flow · Stat cards · Weekly activity ═══ */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

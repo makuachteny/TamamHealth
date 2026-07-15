@@ -10,26 +10,6 @@ export function getPerformanceColor(value: number): string {
   return 'var(--color-success)';                   // green
 }
 
-/** Smooth RGB gradient: red(0) → yellow(50) → green(100) */
-export function getMetricColorInterpolated(value: number): string {
-  const v = Math.max(0, Math.min(100, value));
-  let r: number, g: number, b: number;
-  if (v <= 50) {
-    // red → yellow
-    const t = v / 50;
-    r = 239;
-    g = Math.round(68 + t * (163 - 68));
-    b = Math.round(68 - t * 57);
-  } else {
-    // yellow → green
-    const t = (v - 50) / 50;
-    r = Math.round(234 - t * (234 - 34));
-    g = Math.round(179 + t * (197 - 179));
-    b = Math.round(8 + t * (86 - 8));
-  }
-  return `rgb(${r},${g},${b})`;
-}
-
 export type PerformanceMetricKey = keyof typeof METRIC_LABELS;
 
 /** Human-readable labels for each performance metric key */

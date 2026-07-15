@@ -85,12 +85,3 @@ export function isValidNationalId(raw: unknown): boolean {
   return /^[A-Z0-9-]{3,30}$/.test(s);
 }
 
-// ---------------------------------------------------------------------------
-// Hospital / medical record number — `PREFIX-000000` (prefix 2-5 letters).
-// ---------------------------------------------------------------------------
-
-export function isValidHospitalNumber(raw: unknown): boolean {
-  const s = (raw == null ? '' : String(raw)).trim().toUpperCase();
-  if (!s) return true;
-  return /^[A-Z]{2,5}-\d{4,8}$/.test(s);
-}
