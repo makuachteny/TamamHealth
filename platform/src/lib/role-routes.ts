@@ -151,7 +151,7 @@ export const ROLE_ROUTE_TABLE: Readonly<Record<UserRole, RoleRouteConfig>> = {
 
   government: {
     allowed: [
-      '/government', '/facility-management', '/dashboard/state',
+      '/government', '/dashboard/state',
       '/hospitals', '/vital-statistics', '/immunizations',
       '/anc', '/births', '/deaths', '/facility-assessments', '/data-quality',
       '/surveillance', '/reports', '/dhis2-export', '/public-stats', '/settings',

@@ -332,7 +332,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RoleConfig> = {
     allowedRoutes: [...ROLE_ROUTE_TABLE.government.allowed],
     navItems: [
       { href: '/government', label: 'National Dashboard', icon: LayoutDashboard, section: 'OVERVIEW' },
-      { href: '/facility-management', label: 'Hospital Management', icon: HospitalIcon, section: 'OVERVIEW' },
       { href: '/hospitals', label: 'Hospital Network', icon: HospitalIcon, section: 'OVERVIEW' },
       { href: '/vital-statistics', label: 'Vital Statistics', icon: TrendingUp, section: 'POPULATION HEALTH' },
       { href: '/immunizations', label: 'Immunizations', icon: Syringe, section: 'POPULATION HEALTH' },
