@@ -3080,6 +3080,7 @@ const en: TranslationMap = {
   'nurse.summaryTotal': 'Total',
   'nurse.summaryCritical': 'Critical',
   'nurse.summaryUrgent': 'Urgent',
+  'nurse.summaryStable': 'Stable',
   'nurse.sysBp': 'Sys BP',
   'nurse.systolic': 'Systolic',
   'nurse.tabMar': 'MAR',

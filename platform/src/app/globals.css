@@ -13442,15 +13442,11 @@ span:has(> svg:only-child) {
   color: var(--ehr-warning-text);
 }
 
+/* Stable rows tint green just like Critical/Urgent tint red/amber — the same
+   three colors as the board's stat chips, so the chips read as a legend. */
 .ehr-worklist-row[data-triage="GREEN"] .ehr-patient-icon {
   background: var(--ehr-success-bg);
   color: var(--ehr-success-text);
-}
-
-.ehr-worklist-row[data-triage="GREEN"] .ehr-patient-icon[aria-hidden],
-.ehr-worklist-row[data-triage="GREEN"] .ehr-patient-icon.ehr-patient-icon--sm {
-  background: var(--ehr-info-soft);
-  color: var(--tb-blue-700);
 }
 
 .ehr-worklist-room {
