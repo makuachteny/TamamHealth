@@ -162,6 +162,7 @@ export { DuotoneNetwork as Network } from '@/components/icons';
 export { DuotonePackage as Package } from '@/components/icons';
 export { DuotonePaperclip as Paperclip } from '@/components/icons';
 export { DuotonePause as Pause } from '@/components/icons';
+export { DuotoneEdit as Pencil } from '@/components/icons';
 export { DuotonePhoneOff as PhoneOff } from '@/components/icons';
 export { DuotonePieChart as PieChart } from '@/components/icons';
 export { DuotonePlay as Play } from '@/components/icons';

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { MoreVertical } from '@/components/icons/lucide';
+import { Pencil } from '@/components/icons/lucide';
 
 export type RowAction = {
   key: string;
@@ -14,7 +14,7 @@ export type RowAction = {
 };
 
 /**
- * Shared "kebab" (three-dots) row-action menu used across every data table in
+ * Shared row-action menu (pencil trigger) used across every data table in
  * the platform. The dropdown is portalled to <body> with fixed positioning so
  * it is never clipped by a table's `overflow:auto` scroll container, and the
  * trigger keeps each row's action area to a single compact button regardless of
@@ -72,7 +72,7 @@ export default function RowActionsMenu({ actions, ariaLabel = 'Actions' }: { act
         className="inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-[var(--overlay-subtle)]"
         style={{ border: '1px solid var(--border-medium)', background: 'var(--bg-card-solid)', color: 'var(--text-secondary)' }}
       >
-        <MoreVertical className="w-4 h-4" />
+        <Pencil className="w-4 h-4" />
       </button>
       {open && coords && createPortal(
         <div
