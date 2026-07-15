@@ -349,31 +349,34 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           </div>
         </section>
 
-        {/* ── Right: hero ── */}
-        <section className="pl-hero">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/doctor-nurse-consultation.jpg" alt={t('patientPortal.heroImageAlt')} className="pl-hero-img" />
-          <div className="pl-hero-scrim" />
+        {/* ── Right: hero — same floating-chip treatment as the staff login
+            (decorative copy hardcoded in English there too). ── */}
+        <section className="pl-hero" style={{ backgroundImage: 'url(/assets/doctor-nurse-consultation.jpg)' }}>
+          <Link href="/" aria-label="Close" className="pl-hero-close"><X size={18} /></Link>
 
-          {/* Floating, decorative cards — a taste of what waits inside. */}
-          <div className="pl-hcard pl-hcard-appt">
-            <span className="pl-hcard-icon"><Calendar size={16} /></span>
-            <span className="pl-hcard-text">
-              <span className="pl-hcard-title">Upcoming visit</span>
-              <span className="pl-hcard-sub">Antenatal Care Clinic</span>
-            </span>
-          </div>
-          <div className="pl-hcard pl-hcard-lab">
-            <span className="pl-hcard-icon pl-hcard-icon-ok"><CheckCircle2 size={16} /></span>
-            <span className="pl-hcard-text">
-              <span className="pl-hcard-title">Records synced</span>
-              <span className="pl-hcard-sub">Available offline</span>
-            </span>
+          {/* Floating: next-visit chip */}
+          <div className="pl-chip pl-chip-task">
+            <div className="pl-chip-title">Upcoming visit</div>
+            <div className="pl-chip-time">Antenatal Care Clinic · 08:00am</div>
           </div>
 
-          <div className="pl-hero-body">
-            <h2 className="pl-hero-title">{t('patientPortal.heroPanelTitle')}</h2>
-            <p className="pl-hero-sub">{t('patientPortal.heroPanelSub')}</p>
+          {/* Floating: week strip */}
+          <div className="pl-week">
+            {[['Sun', '22'], ['Mon', '23'], ['Tue', '24'], ['Wed', '25'], ['Thu', '26'], ['Fri', '27'], ['Sat', '28']].map(([d, n], i) => (
+              <div key={d} className={`pl-week-day ${i === 3 ? 'is-on' : ''}`}>
+                <span className="pl-week-dow">{d}</span>
+                <span className="pl-week-num">{n}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Floating: records card */}
+          <div className="pl-meeting">
+            <div className="pl-meeting-top">
+              <span className="pl-meeting-title">Records synced</span>
+              <span className="pl-meeting-dot" />
+            </div>
+            <p className="pl-meeting-time">Available offline · Lab results, prescriptions &amp; visits</p>
           </div>
         </section>
       </div>
@@ -385,18 +388,18 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           background: var(--bg-app);
         }
         .pl-split {
-          width: 100%; max-width: 1080px; height: min(720px, calc(100vh - 48px));
+          width: 100%; max-width: 1080px; height: min(680px, calc(100vh - 48px));
           display: grid; grid-template-columns: 1fr 1.05fr;
           background: var(--bg-card-solid); border: 1px solid var(--border-light);
           border-radius: 28px; overflow: hidden;
         }
         .pl-pane { padding: 30px 38px; display: flex; flex-direction: column; overflow-y: auto; }
         .pl-form-pane { position: relative; }
-        .pl-brand { width: 100%; max-width: 400px; align-self: center; display: flex; align-items: center; }
+        .pl-brand { width: 100%; max-width: 380px; align-self: center; display: flex; align-items: center; }
         .pl-brand-logo { height: 30px; width: auto; }
         .pl-form-close { display: none; position: absolute; top: 18px; right: 18px; z-index: 3; width: 38px; height: 38px; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid var(--border-light); background: var(--bg-card-solid); color: var(--text-primary); cursor: pointer; }
         .pl-form-close:hover { background: var(--overlay-subtle); }
-        .pl-form-wrap { margin: auto 0; width: 100%; max-width: 400px; align-self: center; padding: 20px 0; }
+        .pl-form-wrap { margin: auto 0; width: 100%; max-width: 380px; align-self: center; padding: 20px 0; }
         .pl-title { font-family: var(--font-platform); font-size: 27px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); margin: 4px 0 0; }
         .pl-subtitle { font-size: 13.5px; color: var(--text-muted); margin: 6px 0 0; }
         .pl-db-banner { margin: 16px 0 0; padding: 8px 12px; font-size: 11.5px; color: var(--accent-hover); background: var(--accent-light); border: 1px solid var(--accent-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -404,7 +407,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         .pl-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 22px; padding: 4px; background: var(--overlay-subtle); border: 1px solid var(--border-light); border-radius: 999px; }
         .pl-seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 12px; font-size: 13px; font-weight: 700; color: var(--text-secondary); background: transparent; border: none; border-radius: 999px; cursor: pointer; transition: background .16s, color .16s, box-shadow .16s; }
         .pl-seg-btn:hover { color: var(--text-primary); }
-        .pl-seg-btn.is-on { color: #fff; background: var(--accent-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.10); }
+        .pl-seg-btn.is-on { color: #fff; background: var(--accent-primary); box-shadow: none; }
 
         .pl-form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
         .pl-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
@@ -417,7 +420,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         .pl-input::placeholder { color: var(--text-muted); }
         .pl-input:focus { border-color: var(--accent-primary); background: var(--bg-card-solid); }
 
-        .pl-error { padding: 10px 13px; font-size: 12.5px; color: var(--color-danger); background: var(--color-danger-bg); border: 1px solid color-mix(in srgb, var(--color-danger) 22%, transparent); border-radius: 12px; }
+        .pl-error { padding: 10px 13px; font-size: 12.5px; color: var(--color-danger); background: var(--color-danger-bg); border: 1px solid color-mix(in srgb, var(--color-danger) 22%, transparent); border-radius: 10px; }
 
         .pl-submit { width: 100%; padding: 14px 24px; margin-top: 4px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; font-weight: 700; color: #fff; background: var(--accent-primary); border: none; border-radius: 999px; cursor: pointer; transition: transform .12s, opacity .15s; }
         .pl-submit:hover:not(:disabled) { transform: translateY(-1px); }
@@ -440,22 +443,26 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         .pl-link { display: inline-flex; align-items: center; gap: 5px; color: var(--accent-hover); font-weight: 600; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; font-size: 12.5px; }
         .pl-link:hover { text-decoration: underline; }
 
-        /* ── Hero ── */
-        .pl-hero { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 34px; }
-        .pl-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 32%; z-index: 0; }
-        .pl-hero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(155deg, color-mix(in srgb, var(--accent-hover) 46%, transparent) 0%, rgba(0,0,0,0.10) 38%, transparent 55%), linear-gradient(0deg, rgba(0,0,0,0.66) 0%, rgba(0,0,0,0.28) 28%, transparent 52%); }
-        .pl-hero-body { position: relative; z-index: 2; color: #fff; max-width: 420px; }
-        .pl-hero-title { font-family: var(--font-platform); font-size: clamp(24px, 2.6vw, 32px); font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 12px; text-shadow: 0 2px 14px rgba(0,0,0,0.3); }
-        .pl-hero-sub { font-size: 14.5px; line-height: 1.6; color: rgba(255,255,255,0.92); margin: 0; text-shadow: 0 2px 10px rgba(0,0,0,0.25); }
-
-        .pl-hcard { position: absolute; z-index: 2; display: flex; align-items: center; gap: 11px; padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--bg-card-solid) 92%, transparent); backdrop-filter: blur(8px); box-shadow: 0 12px 34px rgba(0,0,0,0.18); }
-        .pl-hcard-appt { top: 30px; left: 30px; }
-        .pl-hcard-lab { top: 108px; right: 30px; }
-        .pl-hcard-icon { width: 34px; height: 34px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--accent-light); color: var(--accent-primary); }
-        .pl-hcard-icon-ok { background: color-mix(in srgb, var(--color-success, #15795C) 16%, transparent); color: var(--color-success, #15795C); }
-        .pl-hcard-text { display: flex; flex-direction: column; }
-        .pl-hcard-title { font-size: 12.5px; font-weight: 700; color: var(--text-primary); }
-        .pl-hcard-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+        /* ── Hero — mirrors the staff login (tl-hero): flat tint over the
+           photo, blue task chip, frosted week strip, white card bottom-left. */
+        .pl-hero { position: relative; background-size: cover; background-position: 50% 32%; }
+        .pl-hero::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--accent-hover) 18%, transparent); }
+        .pl-hero-close { position: absolute; top: 18px; right: 18px; z-index: 3; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: none; background: var(--bg-card-solid); color: var(--text-primary); cursor: pointer; box-shadow: none; }
+        .pl-hero-close:hover { background: var(--bg-card-solid); }
+        .pl-chip { position: absolute; z-index: 2; backdrop-filter: blur(6px); }
+        .pl-chip-task { top: 64px; left: 34px; background: var(--accent-primary); color: var(--color-white); border-radius: 14px; padding: 11px 15px; box-shadow: none; }
+        .pl-chip-title { font-size: 13px; font-weight: 700; }
+        .pl-chip-time { font-size: 11.5px; opacity: 0.9; margin-top: 2px; }
+        .pl-week { position: absolute; z-index: 2; right: 30px; bottom: 150px; display: flex; gap: 4px; padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--color-white) 22%, transparent); border: 1px solid color-mix(in srgb, var(--color-white) 45%, transparent); backdrop-filter: blur(10px); }
+        .pl-week-day { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 34px; padding: 4px 0; border-radius: 10px; color: var(--color-white); }
+        .pl-week-day.is-on { background: var(--accent-primary); }
+        .pl-week-dow { font-size: 10px; font-weight: 600; opacity: 0.85; }
+        .pl-week-num { font-size: 14px; font-weight: 700; }
+        .pl-meeting { position: absolute; z-index: 2; left: 30px; bottom: 36px; width: 232px; padding: 15px 17px; border-radius: 18px; background: var(--bg-card-solid); box-shadow: none; }
+        .pl-meeting-top { display: flex; align-items: center; justify-content: space-between; }
+        .pl-meeting-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+        .pl-meeting-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-primary); }
+        .pl-meeting-time { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 
         .pl-spin { width: 13px; height: 13px; border: 2px solid var(--accent-border); border-top-color: var(--accent-primary); border-radius: 50%; display: inline-block; animation: pl-rot .7s linear infinite; }
         .pl-spin-light { border-color: rgba(255,255,255,0.4); border-top-color: #fff; }

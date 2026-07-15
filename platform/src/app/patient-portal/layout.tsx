@@ -76,7 +76,10 @@ export default function PatientPortalLayout({ children }: { children: React.Reac
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       {/* Top rail — mirrors the staff EHR shell: deep-navy bar with the white
           full logo lockup and a right-aligned user chip, so a patient sees the
-          same header treatment as every other user. */}
+          same header treatment as every other user. Hidden while signed out —
+          the sign-in screen is a full-viewport card exactly like /login, which
+          has no chrome above it either. */}
+      {identity && (
       <header style={{
         position: 'sticky', top: 0, zIndex: 50,
         background: 'var(--tb-blue-900)',
@@ -149,9 +152,10 @@ export default function PatientPortalLayout({ children }: { children: React.Reac
           </button>
         </div>
       </header>
+      )}
 
       {/* Mobile nav */}
-      {mobileNav && (
+      {identity && mobileNav && (
         <div className="sm:hidden" style={{ background: 'var(--bg-card-solid)', borderBottom: '1px solid var(--border-medium)', padding: '8px 20px 16px' }}>
           {['Home', 'Appointments', 'Records', 'Lab Results'].map(item => (
             <Link key={item} href={`/patient-portal${item === 'Home' ? '' : '#' + item.toLowerCase().replace(' ', '-')}`}
