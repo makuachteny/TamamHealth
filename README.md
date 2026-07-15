@@ -401,10 +401,9 @@ tamamhealth/
 │       ├── permissions.ts        # RBAC configuration
 │       ├── icd11-codes.ts        # ICD-11 code reference
 │       ├── context.tsx           # App state management
-│       ├── ai/                   # Diagnosis engine
 │       ├── hooks/                # React hooks
 │       └── services/             # Data access services
-├── tamamhealth_app/                    # React Native mobile app
+├── mobile/                             # React Native (Expo) companion app
 └── package.json
 ```
 

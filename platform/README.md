@@ -49,7 +49,7 @@ The system works entirely offline and syncs when connectivity is available.
 | Client Database | PouchDB 9 (browser-side) |
 | Server Database | CouchDB (sync), PostgreSQL (analytics) |
 | Authentication | JWT (jose), bcryptjs |
-| Testing | Jest 30, Testing Library |
+| Testing | Jest 30 (via `next/jest` / SWC) |
 | Linting | ESLint, Next.js config |
 
 ---
@@ -494,7 +494,7 @@ npm test
 npm run test:ci
 ```
 
-Tests use Jest 30 with ts-jest for TypeScript support and JSDOM for browser environment simulation. Test files are located in `src/__tests__/`.
+Tests use Jest 30 via `next/jest` (SWC transform) with a JSDOM environment. Test files are located in `src/__tests__/`.
 
 ---
 
@@ -554,7 +554,7 @@ APPOINTMENT_REMINDER_SMS_ENABLED=false
 | `npm run build` | Create production build |
 | `npm start` | Run production server |
 | `npm run lint` | Run ESLint checks |
-| `npm test` | Run Jest test suite (1,390 tests) |
+| `npm test` | Run Jest test suite (95 test files) |
 | `npm run test:ci` | Run tests with coverage reporting |
 | `npm run db:migrate` | Apply pending PostgreSQL migrations (requires DATABASE_URL; also runs at server boot) |
 
