@@ -17,10 +17,14 @@ import {
   ACCENT, getVitalFlags, useWardRoster,
   type VitalsFormData,
 } from './shared';
-import WardFilters, { type WardFilterState } from './WardFilters';
-import ListSearch from './ListSearch';
-
-export default function WardWorkflow({ filters, setFilters }: { filters: WardFilterState; setFilters: (f: WardFilterState) => void }) {
+/**
+ * Ward patient board. Free-text search comes from OUTSIDE: the nurse-station
+ * left rail passes `search` down; the standalone /dashboard/nurse/ward page
+ * relies on the platform-wide top search (globalSearch, consumed inside
+ * useWardRoster). The board keeps only its one-tap quick filters — the
+ * acuity/status stat chips and the ward-location select.
+ */
+export default function WardWorkflow({ search }: { search?: string }) {
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useApp();
@@ -39,16 +43,13 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
     return map;
   }, [activeAdmissions]);
 
-  // Free-text search lives inline in the list header (below); structured filters
-  // (gender / age / status) come from the WardFilters dropdown beside it.
-  const [search, setSearch] = useState('');
-  // Acuity quick-filter driven by the summary chips (RED / YELLOW). Kept local
-  // rather than in the shared WardFilterState since it's a board-only shortcut.
+  // Quick filters driven by the summary chips — acuity (RED/YELLOW) and
+  // workflow status. Both local: they're one-tap board shortcuts.
   const [acuity, setAcuity] = useState<'' | 'RED' | 'YELLOW'>('');
+  const [statusFilter, setStatusFilter] = useState('');
   // Ward/location quick-filter (mirrors the reference "Filter by location").
   const [wardFilter, setWardFilter] = useState('');
-  const ageBandOf = (age?: number) => age == null ? null : age < 18 ? 'child' : age < 65 ? 'adult' : 'elderly';
-  const q = search.trim().toLowerCase();
+  const q = (search ?? '').trim().toLowerCase();
 
   // Distinct wards actually represented in the current roster — the filter only
   // offers wards that have someone on the board, and hides entirely if none.
@@ -71,13 +72,11 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
       (p.hospitalNumber || '').toLowerCase().includes(q) ||
       complaint.includes(q)
     )) return false;
-    if (filters.gender && p.gender !== filters.gender) return false;
-    if (filters.age && ageBandOf(p.estimatedAge) !== filters.age) return false;
-    if (filters.status && status !== filters.status) return false;
+    if (statusFilter && status !== statusFilter) return false;
     if (acuity && priority !== acuity) return false;
     if (wardFilter && admissionByPatient.get(p._id)?.wardName !== wardFilter) return false;
     return true;
-  }), [wardPatients, patientTriageMap, filters, q, acuity, wardFilter, admissionByPatient]);
+  }), [wardPatients, patientTriageMap, statusFilter, q, acuity, wardFilter, admissionByPatient]);
 
   // At-a-glance counts across the whole roster (unfiltered), powering the
   // summary strip above the table. Acuity + workflow-status breakdown.
@@ -98,8 +97,8 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
 
   // Toggling a status chip clears any acuity filter and vice-versa, so the two
   // quick-filters never fight each other.
-  const toggleStatus = (v: string) => { setAcuity(''); setFilters({ ...filters, status: filters.status === v ? '' : v }); };
-  const toggleAcuity = (v: 'RED' | 'YELLOW') => { setFilters({ ...filters, status: '' }); setAcuity(acuity === v ? '' : v); };
+  const toggleStatus = (v: string) => { setAcuity(''); setStatusFilter(s => (s === v ? '' : v)); };
+  const toggleAcuity = (v: 'RED' | 'YELLOW') => { setStatusFilter(''); setAcuity(a => (a === v ? '' : v)); };
 
   // Only surface the Location column + ward filter when at least one patient on
   // the board is actually admitted to a bed — otherwise it's a column of dashes.
@@ -262,36 +261,37 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
               </button>
               <button
                 type="button"
-                className={`ward-stat-chip ${filters.status === 'pending' ? 'is-active' : ''}`}
+                className={`ward-stat-chip ${statusFilter === 'pending' ? 'is-active' : ''}`}
                 onClick={() => toggleStatus('pending')}
-                aria-pressed={filters.status === 'pending'}
+                aria-pressed={statusFilter === 'pending'}
               >
                 <span className="ward-stat-dot" style={{ background: '#2191D0' }} />
                 {t('nurse.statusWaiting')} ({summary.waiting})
               </button>
               <button
                 type="button"
-                className={`ward-stat-chip ${filters.status === 'seen' ? 'is-active' : ''}`}
+                className={`ward-stat-chip ${statusFilter === 'seen' ? 'is-active' : ''}`}
                 onClick={() => toggleStatus('seen')}
-                aria-pressed={filters.status === 'seen'}
+                aria-pressed={statusFilter === 'seen'}
               >
                 <span className="ward-stat-dot" style={{ background: '#15795C' }} />
                 {t('nurse.statusInConsult')} ({summary.inConsult})
               </button>
               <button
                 type="button"
-                className={`ward-stat-chip ${filters.status === 'none' ? 'is-active' : ''}`}
+                className={`ward-stat-chip ${statusFilter === 'none' ? 'is-active' : ''}`}
                 onClick={() => toggleStatus('none')}
-                aria-pressed={filters.status === 'none'}
+                aria-pressed={statusFilter === 'none'}
               >
                 <span className="ward-stat-dot" style={{ background: '#B8741C' }} />
                 {t('nurse.statusNotTriaged')} ({summary.notTriaged})
               </button>
             </div>
           </div>
-          <div className="ward-controls-row">
-            <ListSearch value={search} onChange={setSearch} placeholder={t('nurse.searchPatientPlaceholder')} />
-            {wardOptions.length > 0 && (
+          {/* Free-text search + structured filters removed — the station's
+              left-rail search drives this board; only the ward picker stays. */}
+          {wardOptions.length > 0 && (
+            <div className="ward-controls-row">
               <select
                 className="ward-location-select"
                 value={wardFilter}
@@ -301,9 +301,8 @@ export default function WardWorkflow({ filters, setFilters }: { filters: WardFil
                 <option value="">{t('nurse.allWards')}</option>
                 {wardOptions.map(w => <option key={w} value={w}>{w}</option>)}
               </select>
-            )}
-            <WardFilters filters={filters} setFilters={setFilters} />
-          </div>
+            </div>
+          )}
 
           <div className="ehr-worklist-table">
             {displayedPatients.length > 0 && (

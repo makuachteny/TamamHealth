@@ -16,7 +16,6 @@ import { patientAgeLabel, patientFullName, patientGenderAge } from '@/lib/patien
 import { getRoleConfig } from '@/lib/permissions';
 import EhrCareDashboard, { type EhrCareDashboardAction, type EhrCareDashboardRow } from '@/components/ehr/EhrCareDashboard';
 import WardWorkflow from './WardWorkflow';
-import { EMPTY_WARD_FILTERS, type WardFilterState } from './WardFilters';
 import MarWorkflow from './MarWorkflow';
 import TriageWorkflow from './TriageWorkflow';
 import HandoffWorkflow from './HandoffWorkflow';
@@ -44,10 +43,10 @@ export default function NurseDashboard() {
   // the view rather than top-bar tabs).
   const [activeTab, setActiveTab] = useState<StationTab>('ward');
 
-  // Ward-queue structured filters — owned here so the filter dropdown can live
-  // on the platform-wide search bar (TopBar searchTrailing) while WardWorkflow
-  // reads the same state to narrow its list.
-  const [wardFilters, setWardFilters] = useState<WardFilterState>(EMPTY_WARD_FILTERS);
+  // Free-text search for the station lives in the LEFT RAIL (between the
+  // mini-calendar and the day chart); WardWorkflow receives it as a prop so
+  // the board has no inline search bar of its own.
+  const [railSearch, setRailSearch] = useState('');
 
   const stationLabel = useMemo<Record<StationTab, string>>(() => ({
     ward: t('nurse.tabWard'),
@@ -191,12 +190,10 @@ export default function NurseDashboard() {
           tabs={stationTabs}
           activeTab={activeTab}
           onTabChange={(tab) => setActiveTab(tab as StationTab)}
-          filters={stationTabs.map(tab => ({
-            label: tab.label,
-            value: tab.count,
-            active: activeTab === tab.key,
-            onClick: () => setActiveTab(tab.key),
-          }))}
+          searchValue={railSearch}
+          onSearchChange={setRailSearch}
+          searchPlaceholder={t('nurse.searchPatientPlaceholder')}
+          filters={[]}
           actions={actions}
           actionStrip={[
             ...(canUseRoute('/patients') ? [{ label: 'Patient search', icon: Users, onClick: () => router.push('/patients') }] : []),
@@ -221,7 +218,7 @@ export default function NurseDashboard() {
           hideRowList
         >
           <div className="flex flex-col" style={{ minHeight: 0 }}>
-            {activeTab === 'ward' && <WardWorkflow filters={wardFilters} setFilters={setWardFilters} />}
+            {activeTab === 'ward' && <WardWorkflow search={railSearch} />}
             {activeTab === 'mar' && <MarWorkflow />}
             {activeTab === 'triage' && <TriageWorkflow />}
             {activeTab === 'handoff' && <HandoffWorkflow variant="page" />}

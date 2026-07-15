@@ -246,7 +246,8 @@ export default function EhrCareDashboard({
               onDateSelect={setSelectedDate}
             />
           )}
-          {showChart && (chart ?? <CareStatsChart title={chartTitle} series={autoChartSeries} />)}
+          {/* Search sits BETWEEN the calendar and the chart — it drives the
+              station's active worklist (e.g. the nurse ward board). */}
           <div className="ehr-filter-group">
             <div className="ehr-care-search">
               <Search className="w-4 h-4" />
@@ -258,6 +259,7 @@ export default function EhrCareDashboard({
               />
             </div>
           </div>
+          {showChart && (chart ?? <CareStatsChart title={chartTitle} series={autoChartSeries} />)}
           {filters.length > 0 && (
             <div className="ehr-filter-group">
               {filters.map(filter => (
