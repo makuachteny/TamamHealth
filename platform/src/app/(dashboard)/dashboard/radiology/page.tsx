@@ -40,6 +40,11 @@ export default function RadiologyDashboard() {
   const { results: labResults, update: updateLabResult } = useLabResults();
   const [selectedStudy, setSelectedStudy] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  // Which stat panel (header toggles) currently occupies the center instead
+  // of the worklist; null = normal queue view.
+  const [centerPanel, setCenterPanel] = useState<'modality' | 'regions' | 'performance' | null>(null);
+  const togglePanel = (key: 'modality' | 'regions' | 'performance') =>
+    setCenterPanel(prev => (prev === key ? null : key));
   const [queueSearch, setQueueSearch] = useState('');
   const [findings, setFindings] = useState('');
   // Local overrides so submitted demo findings persist for this session.
@@ -354,7 +359,12 @@ export default function RadiologyDashboard() {
           { label: t('radiology.filter_in_progress'), value: stats.inProgress, active: filterStatus === 'in_progress', onClick: () => setFilterStatus(filterStatus === 'in_progress' ? 'all' : 'in_progress') },
           { label: t('radiology.filter_completed'), value: stats.completed, active: filterStatus === 'completed', onClick: () => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed') },
         ]}
-        actions={[]}
+        actions={[
+          { label: t('radiology.byModality'), icon: BarChart3, onClick: () => togglePanel('modality'), active: centerPanel === 'modality', tone: centerPanel === 'modality' ? 'primary' : 'neutral' },
+          { label: t('radiology.bodyRegions'), icon: FileText, onClick: () => togglePanel('regions'), active: centerPanel === 'regions', tone: centerPanel === 'regions' ? 'primary' : 'neutral' },
+          { label: t('radiology.performance'), icon: TrendingUp, onClick: () => togglePanel('performance'), active: centerPanel === 'performance', tone: centerPanel === 'performance' ? 'primary' : 'neutral' },
+        ]}
+        hideRowList={centerPanel !== null}
         rows={filtered.map((study): EhrCareDashboardRow => {
           const isOpen = selectedStudy === study.id;
           return {
@@ -393,8 +403,9 @@ export default function RadiologyDashboard() {
         missionDescription={t('radiology.imagingWorklist')}
         emptyTitle={t('radiology.noStudies')}
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3" style={{ minWidth: 0 }}>
-          {/* Modality breakdown */}
+        {/* Stat panels — opened from the header toggles; the active one
+            replaces the worklist and occupies the whole center. */}
+        {centerPanel === 'modality' && (
           <div className="dash-card">
             <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <BarChart3 className="w-4 h-4" style={{ color: ACCENT }} />
@@ -418,8 +429,9 @@ export default function RadiologyDashboard() {
               })}
             </div>
           </div>
+        )}
 
-          {/* Body parts studied */}
+        {centerPanel === 'regions' && (
           <div className="dash-card">
             <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <FileText className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
@@ -434,8 +446,9 @@ export default function RadiologyDashboard() {
               ))}
             </div>
           </div>
+        )}
 
-          {/* Quick stats */}
+        {centerPanel === 'performance' && (
           <div className="dash-card">
             <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
@@ -455,7 +468,7 @@ export default function RadiologyDashboard() {
               ))}
             </div>
           </div>
-        </div>
+        )}
       </EhrCareDashboard>
     </main>
   );

@@ -5647,6 +5647,10 @@ button.ward-stat-chip:focus:not(:focus-visible) {
 .ehr-care-dashboard .ehr-segmented,
 .ehr-care-dashboard .ehr-schedule-actions {
   flex: 0 0 auto;
+  /* Header now carries every non-primary action (incl. center-panel
+     toggles), so let the row wrap instead of overflowing. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .ehr-care-dashboard .ehr-schedule-actions {

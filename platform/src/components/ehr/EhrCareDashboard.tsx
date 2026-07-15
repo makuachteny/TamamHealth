@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { Children, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ClipboardCheck, ClipboardList, Search, Stethoscope, X, type LucideIcon } from '@/components/icons/lucide';
 import EhrMiniCalendar, { formatDateTitle, startOfMonth, toIsoDate } from '@/components/ehr/EhrMiniCalendar';
@@ -195,11 +195,11 @@ export default function EhrCareDashboard({
   }, [effectiveView, rowEventDates.length, rows, selectedDate, showCalendar]);
   const selectedDateLabel = showCalendar ? formatDateTitle(selectedDate) : dateLabel;
   // The dashboard's primary action (first entry) is promoted to the header's
-  // top-left slot as the Clinical Officer-style "+" CTA; the rest split into
-  // the right-hand action row and then the left-rail action list.
+  // top-left slot as the Clinical Officer-style "+" CTA; every other action
+  // renders in the right-hand header row (wrapping when needed) — including
+  // panel toggles that swap what occupies the center.
   const primaryAction = actions[0];
-  const headerActions = actions.slice(1, 4);
-  const railActions = actions.slice(4);
+  const headerActions = actions.slice(1);
   const headerTitle = greetingName ? `Welcome, ${greetingName}` : title;
 
   return (
@@ -275,21 +275,6 @@ export default function EhrCareDashboard({
               ))}
             </div>
           )}
-          {railActions.length > 0 && (
-            <div className="ehr-filter-group">
-              {railActions.map(action => (
-                <button
-                  key={action.label}
-                  type="button"
-                  className={`ehr-care-rail-action ${action.active ? 'active' : ''}`}
-                  onClick={action.onClick}
-                >
-                  <action.icon className="w-4 h-4" />
-                  <span>{action.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
         </aside>
 
         <section className="ehr-center-panel">
@@ -355,12 +340,12 @@ export default function EhrCareDashboard({
             </div>
           )}
 
-          {children && (
-            <>
-              <div className={`ehr-worklist-panel ehr-care-workflow ${hideRowList ? 'ehr-care-workflow--bare' : ''} ${effectiveView === 'calendar' ? 'is-calendar' : ''}`}>
-                {children}
-              </div>
-            </>
+          {/* Children.toArray drops null/false conditionals, so a dashboard
+              whose panels are all closed doesn't render an empty card. */}
+          {Children.toArray(children).length > 0 && (
+            <div className={`ehr-worklist-panel ehr-care-workflow ${hideRowList ? 'ehr-care-workflow--bare' : ''} ${effectiveView === 'calendar' ? 'is-calendar' : ''}`}>
+              {children}
+            </div>
           )}
         </section>
 

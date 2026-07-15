@@ -10,7 +10,7 @@ import {
   FlaskConical, CheckCircle2, AlertTriangle, Activity,
   Radio, Microscope, Droplets, FileText,
   MessageSquare, Beaker, Thermometer, Loader2,
-  X, Save, Table, List, BarChart3, Timer, BellOff, Users,
+  X, Save, Table, List, BarChart3, BellOff, Users,
 } from '@/components/icons/lucide';
 import PatientName from '@/components/PatientName';
 
@@ -172,48 +172,6 @@ export default function LabDashboardPage() {
     const unacknowledgedCritical = criticalAlerts.filter(a => !a.acknowledged).length;
     return { pending, inProgress, completedToday, critical, abnormal, avgTurnaround, specimens, total: results.length, unacknowledgedCritical };
   }, [results, criticalAlerts]);
-
-  // Feature 4: TAT Dashboard data
-  const tatData = useMemo(() => {
-    const completed = results.filter(r => r.status === 'completed' && r.completedAt && r.orderedAt);
-    const today = new Date().toISOString().slice(0, 10);
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 3600000).toISOString().slice(0, 10);
-
-    // By test type
-    const byTest: Record<string, { totalHrs: number; count: number; todayHrs: number; todayCount: number }> = {};
-    completed.forEach(r => {
-      const hrs = (new Date(r.completedAt).getTime() - new Date(r.orderedAt).getTime()) / 3600000;
-      if (!byTest[r.testName]) byTest[r.testName] = { totalHrs: 0, count: 0, todayHrs: 0, todayCount: 0 };
-      if (r.orderedAt >= oneWeekAgo) {
-        byTest[r.testName].totalHrs += hrs;
-        byTest[r.testName].count += 1;
-      }
-      if (r.completedAt.startsWith(today)) {
-        byTest[r.testName].todayHrs += hrs;
-        byTest[r.testName].todayCount += 1;
-      }
-    });
-
-    const rows = Object.entries(byTest).map(([test, d]) => ({
-      test,
-      weeklyAvg: d.count > 0 ? d.totalHrs / d.count : 0,
-      todayAvg: d.todayCount > 0 ? d.todayHrs / d.todayCount : 0,
-      todayCount: d.todayCount,
-    })).sort((a, b) => b.todayCount - a.todayCount).slice(0, 8);
-
-    // Overall today average
-    const todayCompleted = completed.filter(r => r.completedAt.startsWith(today));
-    const overallTodayAvg = todayCompleted.length > 0
-      ? todayCompleted.reduce((s, r) => s + (new Date(r.completedAt).getTime() - new Date(r.orderedAt).getTime()) / 3600000, 0) / todayCompleted.length
-      : 0;
-
-    const weekCompleted = completed.filter(r => r.orderedAt >= oneWeekAgo);
-    const overallWeekAvg = weekCompleted.length > 0
-      ? weekCompleted.reduce((s, r) => s + (new Date(r.completedAt).getTime() - new Date(r.orderedAt).getTime()) / 3600000, 0) / weekCompleted.length
-      : 0;
-
-    return { rows, overallTodayAvg, overallWeekAvg };
-  }, [results]);
 
   // --- Simulated live events ---
   // Patient name pool is derived from the real lab orders so the live ticker
@@ -442,18 +400,6 @@ export default function LabDashboardPage() {
     }));
   };
 
-  const getTATColor = (hrs: number) => {
-    if (hrs < 2) return 'var(--color-success)';
-    if (hrs < 4) return 'var(--color-warning)';
-    return 'var(--color-danger)';
-  };
-
-  const getTATLabel = (hrs: number) => {
-    if (hrs < 2) return t('lab.tatOnTime');
-    if (hrs < 4) return t('lab.tatWarning');
-    return t('lab.tatOverdue');
-  };
-
   if (loading) {
     return (
       <main className="page-container page-enter flex-1 flex items-center justify-center">
@@ -496,7 +442,11 @@ export default function LabDashboardPage() {
             { label: t('lab.enterResult'), icon: Microscope, onClick: () => setShowResultModal(true), tone: 'primary' },
             { label: t('lab.batchEntry'), icon: Table, onClick: () => { setEntryMode('batch'); setShowResultModal(true); } },
             { label: t('lab.message'), icon: MessageSquare, onClick: () => router.push('/messages') },
+            { label: t('lab.specimenPipeline'), icon: Droplets, onClick: () => setLabPanel(p => (p === 'specimen' ? null : 'specimen')), active: labPanel === 'specimen', tone: labPanel === 'specimen' ? 'primary' : 'neutral' },
+            { label: t('lab.liveFeed'), icon: Radio, onClick: () => setLabPanel(p => (p === 'feed' ? null : 'feed')), active: labPanel === 'feed', tone: labPanel === 'feed' ? 'primary' : 'neutral' },
+            { label: t('lab.recentCompletedResults'), icon: CheckCircle2, onClick: () => setLabPanel(p => (p === 'recent' ? null : 'recent')), active: labPanel === 'recent', tone: labPanel === 'recent' ? 'primary' : 'neutral' },
           ]}
+          hideRowList={labPanel !== null}
           actionStrip={[
             { label: t('nav.patients'), icon: Users, onClick: () => router.push('/patients') },
             { label: t('lab.acceptOrder'), icon: FileText, onClick: () => router.push('/lab') },
@@ -520,6 +470,12 @@ export default function LabDashboardPage() {
               priority: order.critical ? t('lab.critical') : undefined,
               actionLabel: isOpen ? t('lab.enterResult') : undefined,
               onAction: isOpen ? () => openResultForOrder(order._id) : undefined,
+              // Clicking the row mirrors its primary action: open orders pop
+              // the result-entry modal pre-selected on this order; completed
+              // ones deep-link to the result on the patient's chart.
+              onClick: isOpen
+                ? () => openResultForOrder(order._id)
+                : () => router.push(`/patients/${order.patientId}?tab=labs&focus=${order._id}`),
             };
           })}
           metrics={[
@@ -546,8 +502,6 @@ export default function LabDashboardPage() {
           missionDescription={t('lab.ordersQueue')}
           emptyTitle={t('lab.noPendingOrders')}
         >
-          <div className="flex flex-col gap-3" style={{ minWidth: 0 }}>
-
         {/* --- Feature 2: Critical Result Alert Banner --- */}
         {unackAlerts.length > 0 && (
           <div className="space-y-2">
@@ -584,127 +538,11 @@ export default function LabDashboardPage() {
           </div>
         )}
 
-        {/* Specimen Pipeline, Live Feed and Recent Completed now live in the
-            Laboratory side card and open on click (see the labPanel modal). */}
-
-        {/* --- Feature 4: TAT (Turnaround Time) Dashboard --- */}
-        <div className="dash-card rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-            <div className="flex items-center gap-2">
-              <Timer className="w-4 h-4" style={{ color: 'var(--color-brand-500)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.tatDashboard')}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ background: 'var(--color-success)' }} />
-                <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>&lt;2h</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ background: 'var(--color-warning)' }} />
-                <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>2-4h</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ background: 'var(--color-danger)' }} />
-                <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>&gt;4h</span>
-              </div>
-            </div>
-          </div>
-          <div className="p-3">
-            {/* Summary cards */}
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('lab.todayAvgTat')}</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold" style={{ color: getTATColor(tatData.overallTodayAvg) }}>
-                    {tatData.overallTodayAvg > 0 ? tatData.overallTodayAvg.toFixed(1) : '--'}h
-                  </span>
-                  {tatData.overallTodayAvg > 0 && (
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
-                      background: `${getTATColor(tatData.overallTodayAvg)}15`,
-                      color: getTATColor(tatData.overallTodayAvg),
-                    }}>{getTATLabel(tatData.overallTodayAvg)}</span>
-                  )}
-                </div>
-              </div>
-              <div className="p-3 rounded-xl" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-                <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('lab.weeklyAvgTat')}</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold" style={{ color: getTATColor(tatData.overallWeekAvg) }}>
-                    {tatData.overallWeekAvg > 0 ? tatData.overallWeekAvg.toFixed(1) : '--'}h
-                  </span>
-                  {tatData.overallWeekAvg > 0 && (
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
-                      background: `${getTATColor(tatData.overallWeekAvg)}15`,
-                      color: getTATColor(tatData.overallWeekAvg),
-                    }}>{getTATLabel(tatData.overallWeekAvg)}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* TAT by test type - bar chart style */}
-            {tatData.rows.length > 0 ? (
-              <div className="space-y-2">
-                {tatData.rows.map(row => {
-                  const maxHrs = 8;
-                  const todayPct = Math.min((row.todayAvg / maxHrs) * 100, 100);
-                  const weekPct = Math.min((row.weeklyAvg / maxHrs) * 100, 100);
-                  return (
-                    <div key={row.test} className="p-2.5 rounded-xl" style={{
-                      background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)',
-                    }}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{row.test}</span>
-                        <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('lab.countToday', { count: row.todayCount })}</span>
-                      </div>
-                      {/* Today bar */}
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[9px] w-12 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{t('lab.today')}</span>
-                        <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
-                          <div className="h-full rounded-full transition-all duration-700" style={{
-                            width: `${todayPct}%`,
-                            background: getTATColor(row.todayAvg),
-                          }} />
-                        </div>
-                        <span className="text-[10px] font-bold w-10 text-right flex-shrink-0" style={{ color: getTATColor(row.todayAvg) }}>
-                          {row.todayAvg > 0 ? row.todayAvg.toFixed(1) : '--'}h
-                        </span>
-                      </div>
-                      {/* Weekly bar */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] w-12 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{t('lab.week')}</span>
-                        <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
-                          <div className="h-full rounded-full transition-all duration-700" style={{
-                            width: `${weekPct}%`,
-                            background: getTATColor(row.weeklyAvg),
-                            opacity: 0.6,
-                          }} />
-                        </div>
-                        <span className="text-[10px] font-bold w-10 text-right flex-shrink-0" style={{ color: getTATColor(row.weeklyAvg) }}>
-                          {row.weeklyAvg > 0 ? row.weeklyAvg.toFixed(1) : '--'}h
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <BarChart3 className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)', opacity: 0.15 }} />
-                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t('lab.noTurnaroundData')}</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-          </div>
-        </EhrCareDashboard>
-      </main>
-
-      {/* ===== Live Feed / Recent Completed — opened from the Laboratory card ===== */}
-      {labPanel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setLabPanel(null)}>
-          <div className="dash-card w-full max-w-2xl mx-4 rounded-2xl overflow-hidden flex flex-col" style={{ maxHeight: '80vh', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+        {/* Specimen Pipeline / Live Feed / Recent Completed — opened from the
+            header toggles (and the Laboratory side card); the active panel
+            replaces the worklist and occupies the whole center. */}
+        {labPanel && (
+          <div className="dash-card rounded-2xl overflow-hidden flex flex-col">
             <div className="px-4 py-3 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 {labPanel === 'specimen'
@@ -823,8 +661,9 @@ export default function LabDashboardPage() {
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+        </EhrCareDashboard>
+      </main>
 
       {/* ===== Feature 1 & 3: Result Entry Modal (Single + Batch) ===== */}
       {showResultModal && (

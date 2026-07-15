@@ -6,8 +6,7 @@ import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   Pill, FileText, BedDouble, AlertTriangle,
-  Syringe, HeartPulse, Users, SendHorizontal,
-  ClipboardCheck, Calendar, FlaskConical,
+  Syringe, Users, Calendar,
 } from '@/components/icons/lucide';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useTriage } from '@/lib/hooks/useTriage';
@@ -92,17 +91,8 @@ export default function NurseDashboard() {
       active: activeTab === tab.key,
       tone: activeTab === tab.key ? 'primary' : 'neutral',
     }));
-    const routeActions: EhrCareDashboardAction[] = [
-      ...(canUseRoute('/patients') ? [{ label: t('dashboard.newPatient'), icon: Users, onClick: () => router.push('/patients/new') }] : []),
-      ...(canUseRoute('/patient-intake') ? [{ label: 'Patient intake', icon: ClipboardCheck, onClick: () => router.push('/patient-intake') }] : []),
-      ...(canUseRoute('/immunizations') ? [{ label: t('dashboard.immunization'), icon: Syringe, onClick: () => router.push('/immunizations') }] : []),
-      ...(canUseRoute('/anc') ? [{ label: t('dashboard.ancVisit'), icon: HeartPulse, onClick: () => router.push('/anc') }] : []),
-      ...(canUseRoute('/referrals') ? [{ label: t('nav.referrals'), icon: SendHorizontal, onClick: () => router.push('/referrals') }] : []),
-      ...(canUseRoute('/appointments') ? [{ label: t('nav.appointments'), icon: Calendar, onClick: () => router.push('/appointments') }] : []),
-      ...(canUseRoute('/lab') ? [{ label: 'Lab results', icon: FlaskConical, onClick: () => router.push('/lab') }] : []),
-    ];
-    return [...stationActions, ...routeActions];
-  }, [activeTab, canUseRoute, router, stationTabs, t]);
+    return stationActions;
+  }, [activeTab, stationTabs]);
 
   const rows = useMemo<EhrCareDashboardRow[]>(() => {
     if (activeTab === 'triage') {
@@ -167,8 +157,7 @@ export default function NurseDashboard() {
     { label: 'Urgent', value: urgentTriage, tone: urgentTriage > 0 ? 'warning' as const : 'neutral' as const },
     { label: 'Waiting', value: waitingTriage },
     { label: 'In consult', value: inConsultTriage },
-    { label: 'Active station', value: stationLabel[activeTab] },
-  ]), [activeAdmissions.length, activeTab, criticalTriage, urgentTriage, waitingTriage, inConsultTriage, patients.length, stationLabel, triageToday.length]);
+  ]), [activeAdmissions.length, criticalTriage, urgentTriage, waitingTriage, inConsultTriage, patients.length, triageToday.length]);
 
   const checklist = useMemo(() => ([
     { label: 'Review assigned patients', done: patients.length === 0, onClick: () => setActiveTab('ward') },

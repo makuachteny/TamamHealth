@@ -59,6 +59,7 @@ export default function BloodBankPage() {
   const { patients } = usePatients();
 
   const [units, setUnits] = useState<BloodBankDoc[]>([]);
+  const [unitSearch, setUnitSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
 
@@ -97,6 +98,18 @@ export default function BloodBankPage() {
   }, [showToast]);
 
   useEffect(() => { loadUnits(); }, [loadUnits]);
+
+  // Top-bar search — filters the units table by ID, group, component,
+  // status, or donor name.
+  const visibleUnits = useMemo(() => {
+    const q = unitSearch.trim().toLowerCase();
+    if (!q) return units;
+    return units.filter(u =>
+      [u.unitId, u.bloodGroup, u.component, u.status, u.donorName]
+        .filter(Boolean)
+        .some(v => String(v).toLowerCase().includes(q))
+    );
+  }, [units, unitSearch]);
 
   // Available-unit counts per blood group (client-side from getAllUnits so the
   // summary tiles always match the table, regardless of the summary helper shape).
@@ -339,7 +352,27 @@ export default function BloodBankPage() {
 
   return (
     <>
-      <TopBar title="Blood Bank" />
+      <TopBar
+        title="Blood Bank"
+        hideSearch
+        titleActions={
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+              <input
+                type="search"
+                value={unitSearch}
+                onChange={e => setUnitSearch(e.target.value)}
+                placeholder="Search units by ID, group, status…"
+                style={{ height: 38, width: 280, paddingLeft: 36, background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: 10 }}
+              />
+            </div>
+            <button onClick={openModal} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap' }}>
+              <Plus className="w-4 h-4" /> Add unit
+            </button>
+          </div>
+        }
+      />
       <main className="page-container page-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {/* Availability by blood group — one tile per group, count of AVAILABLE units */}
         <div className="dash-card mb-4">
@@ -392,11 +425,6 @@ export default function BloodBankPage() {
               { label: 'Reserved', value: unitStats.reserved, color: LIST_STAT_COLORS.amber },
               { label: 'Expiring ≤7d', value: unitStats.expiringSoon, color: LIST_STAT_COLORS.green },
             ]}
-            actions={
-              <button onClick={openModal} className="btn btn-primary" style={{ height: 38, whiteSpace: 'nowrap' }}>
-                <Plus className="w-4 h-4" /> Add unit
-              </button>
-            }
           />
           <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           {loading ? (
@@ -407,6 +435,10 @@ export default function BloodBankPage() {
               title="No blood units stocked yet"
               message="Use “Add unit” to register one."
             />
+          ) : visibleUnits.length === 0 ? (
+            <div className="p-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+              No units match “{unitSearch}”.
+            </div>
           ) : (
             <table className="data-table" style={{ minWidth: 960 }}>
               <thead>
@@ -422,7 +454,7 @@ export default function BloodBankPage() {
                 </tr>
               </thead>
               <tbody>
-                {units.map(u => {
+                {visibleUnits.map(u => {
                   const days = daysUntil(u.expiryDate);
                   const expired = u.status === 'expired' || days < 0;
                   const expiringSoon = !expired && days < 7;

@@ -81,6 +81,11 @@ export default function NutritionDashboard() {
   // rows fill in behind them in demo mode only.
   const { screenings: savedScreenings, add: addScreening } = useNutritionScreenings();
   const [showForm, setShowForm] = useState(false);
+  // Which stat panel (header toggles) occupies the center instead of the
+  // screenings list; null = normal queue view.
+  const [centerPanel, setCenterPanel] = useState<'classification' | 'supplies' | null>(null);
+  const togglePanel = (key: 'classification' | 'supplies') =>
+    setCenterPanel(prev => (prev === key ? null : key));
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -301,7 +306,10 @@ export default function NutritionDashboard() {
             onClick: () => { setShowForm(v => !v); setFormError(''); },
             tone: showForm ? 'neutral' : 'primary',
           },
+          { label: t('nutrition.classification'), icon: BarChart3, onClick: () => togglePanel('classification'), active: centerPanel === 'classification', tone: centerPanel === 'classification' ? 'primary' : 'neutral' },
+          { label: t('nutrition.supplies'), icon: Utensils, onClick: () => togglePanel('supplies'), active: centerPanel === 'supplies', tone: centerPanel === 'supplies' ? 'primary' : 'neutral' },
         ]}
+        hideRowList={centerPanel !== null}
         rows={filteredScreenings.map((s): EhrCareDashboardRow => {
           const isOpen = selectedScreening === s.id;
           return {
@@ -340,8 +348,6 @@ export default function NutritionDashboard() {
         missionDescription={t('nutrition.noScreeningsDesc')}
         emptyTitle={t('nutrition.noScreenings')}
       >
-        <div className="flex flex-col gap-3" style={{ minWidth: 0 }}>
-
           {/* ── New screening entry form ── */}
           {showForm && (
             <div className="p-4 rounded-lg dash-card" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
@@ -420,9 +426,9 @@ export default function NutritionDashboard() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-
-            {/* MUAC classification */}
+          {/* Stat panels — opened from the header toggles; the active one
+              replaces the screenings list and occupies the whole center. */}
+          {centerPanel === 'classification' && (
             <div className="dash-card">
               <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <BarChart3 className="w-4 h-4" style={{ color: ACCENT }} />
@@ -451,8 +457,9 @@ export default function NutritionDashboard() {
                 })}
               </div>
             </div>
+          )}
 
-            {/* Supply status */}
+          {centerPanel === 'supplies' && (
             <div className="dash-card">
               <div className="flex items-center justify-between mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <div className="flex items-center gap-2">
@@ -564,8 +571,7 @@ export default function NutritionDashboard() {
                 ))}
               </div>
             </div>
-          </div>
-        </div>
+          )}
       </EhrCareDashboard>
     </main>
   );

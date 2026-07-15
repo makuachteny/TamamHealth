@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -18,53 +18,12 @@ import EhrCareDashboard, {
   type EhrCareDashboardChecklistItem,
 } from '@/components/ehr/EhrCareDashboard';
 import {
-  Pill, AlertTriangle, Package, Clock, ShieldCheck,
-  MessageSquare, Activity, Radio, ChevronRight,
-  ClipboardList, CheckCircle2, XCircle,
+  Pill, Package, ShieldCheck, MessageSquare, ClipboardList,
+  Activity, AlertTriangle, Clock, CheckCircle2, ChevronRight,
   AlertOctagon, X, Check, Plus, Users, BarChart3, Loader2,
 } from '@/components/icons/lucide';
 
 const ACCENT = 'var(--accent-primary)';
-
-// Live activity ticker is a demo flourish only — gated off in production so
-// users do not see invented prescriptions / dispense events.
-const PHARMACY_LIVE_FEED_ENABLED = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
-
-const EVENT_TYPES = [
-  { type: 'rx_received', label: 'Prescription Received', color: 'var(--color-brand-500)', icon: ClipboardList },
-  { type: 'dispensed', label: 'Medication Dispensed', color: 'var(--color-success)', icon: CheckCircle2 },
-  { type: 'stock_alert', label: 'Stock Alert Triggered', color: '#F87171', icon: AlertTriangle },
-  { type: 'controlled', label: 'Controlled Substance Logged', color: '#A855F7', icon: ShieldCheck },
-  { type: 'expired', label: 'Expired Item Flagged', color: 'var(--color-danger)', icon: XCircle },
-  { type: 'pickup', label: 'Awaiting Patient Pickup', color: ACCENT, icon: Clock },
-  { type: 'restock', label: 'Restock Order Placed', color: 'var(--color-brand-500)', icon: Package },
-  { type: 'message', label: 'Pharmacist Message', color: '#EC4899', icon: MessageSquare },
-];
-
-// Purely cosmetic names for the demo-only live feed ticker (gated above) — not
-// real patients/medications, never used for any real queue or stock data.
-const PATIENTS = [
-  'Deng Mabior', 'Achol Mayen', 'Nyamal Koang', 'Gatluak Ruot', 'Ayen Dut',
-  'Kuol Akot', 'Ladu Tombe', 'Rose Gbudue', 'Majok Chol', 'Nyandit Dut',
-];
-
-const MEDICATIONS = [
-  'Artemether-Lumefantrine', 'Amoxicillin 500mg', 'Metformin 500mg', 'TDF/3TC/DTG',
-  'Ferrous Sulfate', 'Paracetamol 1g', 'Ciprofloxacin 500mg', 'ORS Sachets',
-  'Diazepam 5mg', 'Morphine 10mg', 'Insulin Glargine', 'Salbutamol Inhaler',
-];
-
-interface LiveEvent {
-  id: number;
-  type: string;
-  label: string;
-  color: string;
-  icon: typeof Activity;
-  patient: string;
-  medication: string;
-  time: string;
-  isNew: boolean;
-}
 
 // Interaction severities coming out of drug-interaction-service.checkInteractions().
 const SEVERITY_STYLE: Record<InteractionSeverity, { bg: string; border: string; text: string; label: string }> = {
@@ -303,9 +262,6 @@ export default function PharmacyDashboardPage() {
   const { items: rawInventory, create: createInventory, update: updateInventory } = usePharmacyInventory();
   const { users } = useUsers();
 
-  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
-  const [eventCounter, setEventCounter] = useState(0);
-
   // Dispense confirmation modal (+ witness selection for controlled drugs)
   const [dispenseTarget, setDispenseTarget] = useState<{ rx: PrescriptionDoc; inv: PharmacyInventoryDoc; qty: number } | null>(null);
   const [witnessId, setWitnessId] = useState('');
@@ -315,40 +271,11 @@ export default function PharmacyDashboardPage() {
   const [receivingStock, setReceivingStock] = useState(false);
   // Prescription queue status filter
   const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'dispensed' | 'controlled'>('all');
+  // Which stat panel (header toggles) occupies the center instead of the Rx
+  // queue; null = normal queue view.
+  const [centerPanel, setCenterPanel] = useState<'pipeline' | 'stock' | null>(null);
   // Queue text search (bound to the shared shell's left-rail search).
   const [queueSearch, setQueueSearch] = useState('');
-
-  const generateEvent = useCallback((): LiveEvent => {
-    const evtType = EVENT_TYPES[Math.floor(Math.random() * EVENT_TYPES.length)];
-    const now = new Date();
-    return {
-      id: Date.now() + Math.random(),
-      ...evtType,
-      patient: PATIENTS[Math.floor(Math.random() * PATIENTS.length)],
-      medication: MEDICATIONS[Math.floor(Math.random() * MEDICATIONS.length)],
-      time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      isNew: true,
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!PHARMACY_LIVE_FEED_ENABLED) return;
-    const initial: LiveEvent[] = [];
-    for (let i = 0; i < 5; i++) {
-      initial.push({ ...generateEvent(), isNew: false, id: i });
-    }
-    setLiveEvents(initial);
-
-    const interval = setInterval(() => {
-      setLiveEvents(prev => {
-        const newEvent = generateEvent();
-        return [newEvent, ...prev.slice(0, 9).map(e => ({ ...e, isNew: false }))];
-      });
-      setEventCounter(c => c + 1);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [generateEvent]);
 
   // Inventory augmented with a live status classification (same helper the
   // real /pharmacy page uses), so stock badges/percentages stay accurate as
@@ -357,15 +284,6 @@ export default function PharmacyDashboardPage() {
     () => rawInventory.map(item => ({ ...item, status: classifyStockStatus(item) })),
     [rawInventory],
   );
-  // Only the lines that need attention, worst first — shown in the Stock
-  // Alerts card (the full inventory list lives on /pharmacy).
-  const stockAlerts = useMemo(
-    () => inventory
-      .filter(i => i.status !== 'adequate')
-      .sort((a, b) => (a.stockLevel / Math.max(1, a.reorderLevel)) - (b.stockLevel / Math.max(1, b.reorderLevel))),
-    [inventory],
-  );
-
   // Find the inventory row for a medication at the current facility (same
   // exact-name matching the real /pharmacy page uses for decrementStock).
   const findInventoryFor = useCallback((medication: string) =>
@@ -376,6 +294,15 @@ export default function PharmacyDashboardPage() {
     const inv = findInventoryFor(rx.medication);
     return !!(inv?.controlledSchedule || inv?.requiresWitness);
   }, [findInventoryFor]);
+
+  // Only the lines that need attention, worst first — shown in the Stock
+  // Alerts panel (the full inventory list lives on /pharmacy).
+  const stockAlerts = useMemo(
+    () => inventory
+      .filter(i => i.status !== 'adequate')
+      .sort((a, b) => (a.stockLevel / Math.max(1, a.reorderLevel)) - (b.stockLevel / Math.max(1, b.reorderLevel))),
+    [inventory],
+  );
 
   // Computed values
   const pendingRx = rxQueue.filter(r => r.status === 'pending').length;
@@ -542,6 +469,9 @@ export default function PharmacyDashboardPage() {
   }
   headerActions.push({ label: t('pharmacy.kpiControlled'), icon: ShieldCheck, onClick: () => router.push('/controlled-substances') });
   headerActions.push({ label: t('pharmacy.message'), icon: MessageSquare, onClick: () => openDock() });
+  // Stat panels — each toggle swaps the center from the Rx queue to that card.
+  headerActions.push({ label: t('pharmacy.dispensingPipeline'), icon: Activity, onClick: () => setCenterPanel(p => (p === 'pipeline' ? null : 'pipeline')), active: centerPanel === 'pipeline', tone: centerPanel === 'pipeline' ? 'primary' : 'neutral' });
+  headerActions.push({ label: t('pharmacy.stockAlerts'), icon: AlertTriangle, onClick: () => setCenterPanel(p => (p === 'stock' ? null : 'stock')), active: centerPanel === 'stock', tone: centerPanel === 'stock' ? 'primary' : 'neutral' });
 
   const checklist: EhrCareDashboardChecklistItem[] = [
     { label: t('pharmacy.pending'), done: pendingRx === 0, onClick: () => setQueueFilter('pending') },
@@ -572,6 +502,7 @@ export default function PharmacyDashboardPage() {
           onSearchChange={setQueueSearch}
           filters={[]}
           actions={headerActions}
+          hideRowList={centerPanel !== null}
           actionStrip={[
             { label: t('pharmacy.inventory'), icon: Package, onClick: () => router.push('/pharmacy') },
             { label: t('pharmacy.checkStock'), icon: ClipboardList, onClick: () => router.push('/pharmacy') },
@@ -609,8 +540,9 @@ export default function PharmacyDashboardPage() {
           missionDescription={t('pharmacy.dispensingPipeline')}
           emptyTitle={rxLoading ? '' : t('pharmacy.noPrescriptionsFound')}
         >
-          <div className="flex flex-col gap-3" style={{ minWidth: 0 }}>
-            {/* Dispensing Pipeline */}
+          {/* Stat panels — opened from the header toggles; the active one
+              replaces the Rx queue and occupies the whole center. */}
+          {centerPanel === 'pipeline' && (
             <div className="dash-card rounded-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: 'var(--border-light)' }}>
                 <div className="flex items-center gap-2">
@@ -650,98 +582,55 @@ export default function PharmacyDashboardPage() {
                 </div>
               </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {/* Stock Alerts */}
-              <div className="dash-card rounded-2xl overflow-hidden flex flex-col" style={{ minHeight: 260 }}>
-                <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.stockAlerts')}</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}>{t('pharmacy.criticalBadge', { count: criticalCount + expiredCount })}</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>{lowStockCount} {t('pharmacy.kpiLowStock')}</span>
-                  </div>
-                  {canDispense && (
-                    <button onClick={() => setShowReceiveStock(true)} className="text-[10px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-90" style={{ background: 'var(--color-success)' }}>
-                      <Plus className="w-3 h-3" /> {t('pharmacy.receiveStock')}
-                    </button>
-                  )}
+          {centerPanel === 'stock' && (
+            <div className="dash-card rounded-2xl overflow-hidden flex flex-col">
+              <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.stockAlerts')}</span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}>{t('pharmacy.criticalBadge', { count: criticalCount + expiredCount })}</span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>{lowStockCount} {t('pharmacy.kpiLowStock')}</span>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-                  {stockAlerts.length === 0 ? (
-                    <p className="text-center text-[11px] py-6" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.allStockAdequate')}</p>
-                  ) : stockAlerts.map((item) => {
-                    const isDanger = item.status === 'critical' || item.status === 'expired';
-                    const pct = Math.min(100, Math.round((item.stockLevel / Math.max(1, item.reorderLevel)) * 100));
-                    const statusLabel = item.status === 'expired' ? t('pharmacy.expired') : item.status === 'critical' ? t('pharmacy.stockStatus_critical') : t('pharmacy.stockStatus_low');
-                    return (
-                      <div key={item._id} className="p-2.5 rounded-lg transition-all" style={{
-                        background: isDanger ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)',
-                        border: `1px solid ${isDanger ? 'var(--color-danger-border)' : 'var(--color-warning-border)'}`,
-                      }}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{item.medicationName}</span>
-                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ml-1" style={{
-                            background: isDanger ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)',
-                            color: isDanger ? 'var(--color-danger)' : 'var(--color-warning)',
-                          }}>{statusLabel}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                          <span>{item.stockLevel} / {item.reorderLevel} {item.unit}</span>
-                          <span style={{ color: isDanger ? 'var(--color-danger)' : 'var(--color-warning)' }}>{pct}%</span>
-                        </div>
-                        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--overlay-subtle)' }}>
-                          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: isDanger ? 'var(--color-danger)' : 'var(--color-warning)' }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                {canDispense && (
+                  <button onClick={() => setShowReceiveStock(true)} className="text-[10px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-90" style={{ background: 'var(--color-success)' }}>
+                    <Plus className="w-3 h-3" /> {t('pharmacy.receiveStock')}
+                  </button>
+                )}
               </div>
-
-              {/* Dispensing Activity Feed — demo-only, gated above */}
-              <div className="dash-card rounded-2xl overflow-hidden flex flex-col" style={{ minHeight: 260 }}>
-                <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-light)' }}>
-                  <div className="flex items-center gap-2">
-                    <Radio className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pharmacy.activityFeed')}</span>
-                  </div>
-                  <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.eventsCount', { count: eventCounter })}</span>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                  {liveEvents.map(evt => {
-                    const Icon = evt.icon;
-                    return (
-                      <div key={evt.id} className="p-2 rounded-lg transition-all" style={{
-                        background: evt.isNew ? `${evt.color}08` : 'transparent',
-                        border: evt.isNew ? `1px solid ${evt.color}20` : '1px solid transparent',
-                        animation: evt.isNew ? 'fadeIn 0.3s ease-out' : undefined,
-                      }}>
-                        <div className="flex items-start gap-2">
-                          <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: 'transparent' }}>
-                            <Icon className="w-3 h-3" style={{ color: evt.color }} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-semibold truncate" style={{ color: evt.color }}>{t(`pharmacy.event_${evt.type}`)}</span>
-                              {evt.isNew && (
-                                <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: `${evt.color}20`, color: evt.color }}>{t('pharmacy.new')}</span>
-                              )}
-                            </div>
-                            <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{evt.patient}</p>
-                            <div className="flex items-center justify-between mt-0.5">
-                              <span className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>{evt.medication}</span>
-                              <span className="text-[9px] font-mono flex-shrink-0 ml-1" style={{ color: 'var(--text-muted)' }}>{evt.time}</span>
-                            </div>
-                          </div>
-                        </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+                {stockAlerts.length === 0 ? (
+                  <p className="text-center text-[11px] py-6" style={{ color: 'var(--text-muted)' }}>{t('pharmacy.allStockAdequate')}</p>
+                ) : stockAlerts.map((item) => {
+                  const isDanger = item.status === 'critical' || item.status === 'expired';
+                  const pct = Math.min(100, Math.round((item.stockLevel / Math.max(1, item.reorderLevel)) * 100));
+                  const statusLabel = item.status === 'expired' ? t('pharmacy.expired') : item.status === 'critical' ? t('pharmacy.stockStatus_critical') : t('pharmacy.stockStatus_low');
+                  return (
+                    <div key={item._id} className="p-2.5 rounded-lg transition-all" style={{
+                      background: isDanger ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)',
+                      border: `1px solid ${isDanger ? 'var(--color-danger-border)' : 'var(--color-warning-border)'}`,
+                    }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{item.medicationName}</span>
+                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ml-1" style={{
+                          background: isDanger ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)',
+                          color: isDanger ? 'var(--color-danger)' : 'var(--color-warning)',
+                        }}>{statusLabel}</span>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="flex items-center justify-between text-[10px] mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                        <span>{item.stockLevel} / {item.reorderLevel} {item.unit}</span>
+                        <span style={{ color: isDanger ? 'var(--color-danger)' : 'var(--color-warning)' }}>{pct}%</span>
+                      </div>
+                      <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--overlay-subtle)' }}>
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: isDanger ? 'var(--color-danger)' : 'var(--color-warning)' }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </div>
+          )}
         </EhrCareDashboard>
       </main>
 
