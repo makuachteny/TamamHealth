@@ -112,6 +112,9 @@ export default function FrontDeskDashboardPage() {
   const queueSort: 'priority' | 'name' | 'time' | 'status' = 'priority';
   const [queueSearch, setQueueSearch] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  // The queue entry backing the open detail popup (carries triage/room context);
+  // null when a non-queue row (e.g. a registered patient) opened the popup.
+  const [selectedEntry, setSelectedEntry] = useState<QueueItem | null>(null);
   const [assignTarget, setAssignTarget] = useState<AssignDoctorTarget | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
   const [checkInTarget, setCheckInTarget] = useState<AppointmentDoc | null>(null);
@@ -581,7 +584,7 @@ export default function FrontDeskDashboardPage() {
       statusTone: 'scheduled',
       priority: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
       date: isoDateKey(appointment.appointmentDate),
-      onClick: () => setCheckInTarget(appointment),
+      onClick: () => { setSelectedPatientId(appointment.patientId); setSelectedEntry(null); },
       actionLabel: 'Check in',
       onAction: () => setCheckInTarget(appointment),
       secondaryActionLabel: 'Record',
@@ -590,8 +593,6 @@ export default function FrontDeskDashboardPage() {
 
     const queueRows = filteredQueue.map(entry => {
       const patient = patients.find(pp => pp._id === entry.patientId);
-      const isOpen = selectedPatientId === entry.patientId;
-      const pColor = priorityColor(entry.priority);
       const pLabel = entry.priority === 'RED' ? t('appointments.priorityEmergency')
         : entry.priority === 'YELLOW' ? t('appointments.priorityUrgent')
         : entry.priority === 'GREEN' ? t('appointments.priorityRoutine')
@@ -620,7 +621,7 @@ export default function FrontDeskDashboardPage() {
         priority: pLabel,
         room: entry.assignedRoom,
         date: entry.calendarDate,
-        onClick: () => setSelectedPatientId(isOpen ? null : entry.patientId),
+        onClick: () => { setSelectedPatientId(entry.patientId); setSelectedEntry(entry); },
         actionLabel: checkoutReady ? t('frontDesk.checkout') : activeForCare ? t('frontDesk.assign') : 'Record',
         onAction: () => {
           if (checkoutReady) {
@@ -662,44 +663,6 @@ export default function FrontDeskDashboardPage() {
           }
           router.push(`/patients/${entry.patientId}`);
         },
-        detail: isOpen && selectedPatient ? (
-          <div className="ehr-care-detail">
-            <div>
-              <strong>{patientFullName(selectedPatient)}</strong>
-              <span>{selectedPatient.hospitalNumber || 'No hospital number'}</span>
-            </div>
-            <dl>
-              <div><dt>{t('frontDesk.genderAge')}</dt><dd>{patientGenderAge(selectedPatient)}</dd></div>
-              <div><dt>{t('patient.phone')}</dt><dd>{selectedPatient.phone ? formatPhoneDisplay(selectedPatient.phone) : 'N/A'}</dd></div>
-              <div><dt>{t('patient.location')}</dt><dd>{selectedPatient.county}, {selectedPatient.state}</dd></div>
-              <div><dt>{t('frontDesk.lastVisit')}</dt><dd>{selectedPatient.lastConsultedAt ? formatCompactDateTime(selectedPatient.lastConsultedAt) : selectedPatient.lastVisitDate || t('frontDesk.firstVisit')}</dd></div>
-            </dl>
-            {selectedPatient.allergies?.length > 0 && selectedPatient.allergies[0] !== 'None known' && (
-              <p className="ehr-care-alert">{t('frontDesk.allergiesLabel', { list: selectedPatient.allergies.join(', ') })}</p>
-            )}
-            {entry.id.startsWith('triage-') && (
-              <div className="ehr-care-rooming">
-                <MapPin className="w-4 h-4" />
-                <span>Exam room</span>
-                <select
-                  value={roomDraft || entry.assignedRoom || ''}
-                  onChange={(event) => setRoomDraft(event.target.value)}
-                >
-                  <option value="">Unassigned</option>
-                  {roomOptions.map(room => <option key={room} value={room}>{room}</option>)}
-                </select>
-                <button
-                  type="button"
-                  disabled={savingRoom}
-                  onClick={() => { handleSaveRoom(entry.sourceId, roomDraft || entry.assignedRoom || ''); setRoomDraft(''); }}
-                >
-                  {savingRoom ? 'Saving...' : entry.assignedRoom ? 'Update room' : 'Assign room'}
-                </button>
-                <span style={{ color: pColor }}>{pLabel}</span>
-              </div>
-            )}
-          </div>
-        ) : undefined,
       };
     });
 
@@ -715,7 +678,7 @@ export default function FrontDeskDashboardPage() {
         statusTone: 'ready',
         priority: 'Registered',
         date: isoDateKey(patientRegisteredAt(patient)),
-        onClick: () => router.push(`/patients/${patient._id}`),
+        onClick: () => { setSelectedPatientId(patient._id); setSelectedEntry(null); },
         actionLabel: 'Record',
         onAction: () => router.push(`/patients/${patient._id}`),
       };
@@ -733,16 +696,10 @@ export default function FrontDeskDashboardPage() {
     currentUser?.hospitalName,
     filteredQueue,
     filteredRegisteredPatients,
-    handleSaveRoom,
     handleUndoCheckout,
     patients,
     panelView,
-    roomDraft,
-    roomOptions,
     router,
-    savingRoom,
-    selectedPatient,
-    selectedPatientId,
     t,
     visiblePendingAppointments,
   ]);
@@ -984,6 +941,66 @@ export default function FrontDeskDashboardPage() {
             setRegisterOpen(true);
           }}
         />
+
+        {selectedPatient && (
+          <Modal onClose={() => { setSelectedPatientId(null); setSelectedEntry(null); }} width={520} labelledBy="fd-patient-detail-title">
+            <div className="modal-panel" style={{ padding: 0, overflow: 'hidden' }}>
+              <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <div className="min-w-0">
+                  <h3 id="fd-patient-detail-title" className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{patientFullName(selectedPatient)}</h3>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{selectedPatient.hospitalNumber || 'No hospital number'}</p>
+                </div>
+                <button type="button" onClick={() => { setSelectedPatientId(null); setSelectedEntry(null); }} aria-label="Close" className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-5 flex flex-col gap-4">
+                <dl className="fd-detail-dl">
+                  <div><dt>{t('frontDesk.genderAge')}</dt><dd>{patientGenderAge(selectedPatient)}</dd></div>
+                  <div><dt>{t('patient.phone')}</dt><dd>{selectedPatient.phone ? formatPhoneDisplay(selectedPatient.phone) : 'N/A'}</dd></div>
+                  <div><dt>{t('patient.location')}</dt><dd>{selectedPatient.county}, {selectedPatient.state}</dd></div>
+                  <div><dt>{t('frontDesk.lastVisit')}</dt><dd>{selectedPatient.lastConsultedAt ? formatCompactDateTime(selectedPatient.lastConsultedAt) : selectedPatient.lastVisitDate || t('frontDesk.firstVisit')}</dd></div>
+                </dl>
+                {selectedPatient.allergies?.length > 0 && selectedPatient.allergies[0] !== 'None known' && (
+                  <p className="ehr-care-alert">{t('frontDesk.allergiesLabel', { list: selectedPatient.allergies.join(', ') })}</p>
+                )}
+                {selectedEntry?.id.startsWith('triage-') && (
+                  <div className="ehr-care-rooming">
+                    <MapPin className="w-4 h-4" />
+                    <span>Exam room</span>
+                    <select
+                      value={roomDraft || selectedEntry.assignedRoom || ''}
+                      onChange={(event) => setRoomDraft(event.target.value)}
+                    >
+                      <option value="">Unassigned</option>
+                      {roomOptions.map(room => <option key={room} value={room}>{room}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={savingRoom}
+                      onClick={() => { handleSaveRoom(selectedEntry.sourceId, roomDraft || selectedEntry.assignedRoom || ''); setRoomDraft(''); }}
+                    >
+                      {savingRoom ? 'Saving...' : selectedEntry.assignedRoom ? 'Update room' : 'Assign room'}
+                    </button>
+                    <span style={{ color: priorityColor(selectedEntry.priority) }}>
+                      {selectedEntry.priority === 'RED' ? t('appointments.priorityEmergency') : selectedEntry.priority === 'YELLOW' ? t('appointments.priorityUrgent') : t('appointments.priorityRoutine')}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 pt-1">
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => { const pid = selectedPatient._id; setSelectedPatientId(null); setSelectedEntry(null); router.push(`/patients/${pid}`); }}>
+                    Open chart
+                  </button>
+                  {canConsult && (
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => { const pid = selectedPatient._id; setSelectedPatientId(null); setSelectedEntry(null); router.push(`/consultation?patientId=${pid}`); }}>
+                      {t('frontDesk.startConsultation')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Modal>
+        )}
 
         {assignTarget && (
           <AssignDoctorModal

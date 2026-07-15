@@ -40,8 +40,31 @@ export function patientInitials(p: { firstName?: string; surname?: string }): st
  * Two-letter initials from a single display name string (e.g. "Deng Mabior").
  * Shared avatar helper so the same logic isn't re-implemented per component.
  */
+// Leading honorific/title tokens to skip so a staff avatar shows initials from
+// the person's real name, not their title — e.g. "Dr. James Wani" → "JW",
+// "CO Deng Mabior" → "DM", "Nurse Grace Achai" → "GA", "Lab Tech Gatluak Puok"
+// → "GP". Patients have no titles, so this is a no-op for them.
+const NAME_TITLE_TOKENS = new Set([
+  'dr', 'prof', 'mr', 'mrs', 'ms', 'mx', 'sir', 'dame', 'hon',
+  'co', 'nurse', 'midwife', 'pharm', 'pharmacist', 'lab', 'tech',
+  'rd', 'sister', 'matron', 'mgr', 'hrio', 'hmis', 'biller', 'triage', 'admin',
+]);
+
 export function initials(name: string): string {
-  return name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || '?';
+  const clean = (name || '').trim();
+  if (!clean) return '?';
+  const words = clean.split(/\s+/).filter(Boolean);
+  const norm = (w: string) => w.replace(/[.,]/g, '').toLowerCase();
+  // Drop a leading run of title tokens, but never the final word (so a name
+  // that is only a title still yields something).
+  let start = 0;
+  while (start < words.length - 1 && NAME_TITLE_TOKENS.has(norm(words[start]))) start++;
+  const nameWords = words.slice(start);
+  const twoInitials = nameWords.map(w => w[0]).join('').slice(0, 2);
+  if (twoInitials.length >= 2) return twoInitials.toUpperCase();
+  // Single remaining word → first two letters of it, so avatars always show two.
+  const base = (nameWords[0] || clean).replace(/[^A-Za-z]/g, '');
+  return ((base.slice(0, 2) || clean.slice(0, 2)) || '?').toUpperCase();
 }
 
 /** Round-avatar fill palette. Deterministic per name, so the same person always

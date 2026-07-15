@@ -5920,6 +5920,28 @@ button.ward-stat-chip:focus:not(:focus-visible) {
   font-weight: 700;
 }
 
+/* Front-desk patient detail popup — 2-column definition grid (the inline
+   .ehr-care-detail variant is indented for the row list; this fits a modal). */
+.fd-detail-dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+  margin: 0;
+}
+.fd-detail-dl dt {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.fd-detail-dl dd {
+  margin-top: 3px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .ehr-care-alert {
   margin: 10px 0 0;
   padding: 8px;

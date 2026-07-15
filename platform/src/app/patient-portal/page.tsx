@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import Modal from '@/components/Modal';
 import {
   User, Calendar, FileText, FlaskConical, Syringe,
@@ -136,8 +137,46 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
             }))
           );
         } catch { /* demo panel is best-effort */ }
+
+        // One-click sign-in from the staff login picker: /patient-portal?demo=<id>
+        // resolves the seed patient's hospital number + phone from the local DB
+        // (phones are generated per-seed, so the picker can't carry them) and
+        // submits the normal login API. Demo mode only — the param is inert in
+        // production, where seeded patients don't exist.
+        try {
+          const demoId = new URLSearchParams(window.location.search).get('demo');
+          if (demoId && /^pat-[a-z0-9-]+$/i.test(demoId)) {
+            setLoading(true);
+            const { getPatientById } = await import('@/lib/services/patient-service');
+            const demoPatient = await getPatientById(demoId);
+            if (demoPatient?.hospitalNumber && demoPatient.phone) {
+              const response = await fetch('/api/patient-portal/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hospitalNumber: demoPatient.hospitalNumber, phone: demoPatient.phone }),
+              });
+              if (response.ok) {
+                const data = await response.json() as { token?: string; patient?: PatientDoc & { id?: string } };
+                const patientDoc = data.patient
+                  ? { ...data.patient, _id: data.patient._id || data.patient.id } as PatientDoc
+                  : null;
+                if (data.token && patientDoc?._id) {
+                  writePatientPortalSession({ token: data.token, patient: patientDoc });
+                  onLogin(patientDoc);
+                  return;
+                }
+              }
+            }
+            // Fall through to the manual form with the fields prefilled, so a
+            // failed auto-login still leaves the visitor one tap from signing in.
+            setHospitalNumber(demoPatient?.hospitalNumber || '');
+            setPhoneNumber(demoPatient?.phone || '');
+            setLoading(false);
+          }
+        } catch { setLoading(false); }
       } catch { setDbReady(false); }
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -197,7 +236,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         {/* ── Left: form ── */}
         <section className="pl-pane pl-form-pane">
           {/* Back to the marketing site — shown on small screens where the hero is hidden. */}
-          <a href="/" aria-label="Close" className="pl-form-close"><X size={18} /></a>
+          <Link href="/" aria-label="Close" className="pl-form-close"><X size={18} /></Link>
           <header className="pl-brand">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/tamamhealth-logo-full.svg" alt="Tamam Healthcare System" className="pl-brand-logo" />
@@ -442,10 +481,18 @@ export default function PatientPortalPage() {
   const [patient, setPatient] = useState<PatientDoc | null>(null);
   const [checking, setChecking] = useState(true);
 
-  // Check for existing session
+  // Check for existing session. A `?demo=<id>` deep link from the staff login
+  // picker names a specific patient — if the stored session belongs to someone
+  // else, drop it so PatientLogin's auto-login can switch accounts; otherwise
+  // clicking a second demo patient would silently keep the first one's session.
   useEffect(() => {
     const session = readPatientPortalSession();
-    if (session) setPatient(session.patient);
+    const demoId = new URLSearchParams(window.location.search).get('demo');
+    if (session && demoId && session.patient?._id !== demoId) {
+      clearPatientPortalSession();
+    } else if (session) {
+      setPatient(session.patient);
+    }
     setChecking(false);
   }, []);
 
@@ -885,68 +932,19 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
         });
         timeline.sort((a, b) => b.date.localeCompare(a.date));
 
-        const completedApts = appointments.filter(a => a.status === 'completed').length;
         const pendingLabs = labResults.filter(l => l.status === 'pending').length;
-        const activeMeds = prescriptions.filter(r => r.status === 'pending').length;
+        // Seed/registration data uses 'None' / 'None known' as explicit
+        // placeholders — those are the *absence* of an alert, not an alert.
+        const realAllergies = (patient.allergies || []).filter(a => a && !/^none\b/i.test(a));
+        const realConditions = (patient.chronicConditions || []).filter(c => c && !/^none\b/i.test(c));
 
         return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* ── Welcome Banner ── */}
-          <div className="hero-banner">
-            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.8, marginBottom: 4 }}>{t('patientPortal.welcomeBack')}</p>
-            <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{patient.firstName} {patient.surname}</h2>
-            <p style={{ fontSize: 13, opacity: 0.85 }}>{patient.hospitalNumber} &middot; {patientFacilityName}</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 16 }}>
-              {[
-                { n: records.length, l: t('patientPortal.totalVisits') },
-                { n: prescriptions.length, l: t('patientPortal.tabPrescriptions') },
-                { n: labResults.length, l: t('patientPortal.labTests') },
-                { n: upcomingApts.length, l: t('patientPortal.upcoming') },
-              ].map((s, i) => (
-                <div key={i}>
-                  <p style={{ fontSize: 22, fontWeight: 700 }}>{s.n}</p>
-                  <p style={{ fontSize: 10, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.l}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Quick Stats Row — exactly 4 equal columns ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-            {[
-              { icon: Calendar, label: t('patientPortal.nextAppointment'), value: upcomingApts.length > 0 ? upcomingApts[0].appointmentDate : t('patientPortal.noneScheduled'), color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
-              { icon: FlaskConical, label: t('patientPortal.pendingLabs'), value: t('patientPortal.pendingCount', { count: pendingLabs }), color: pendingLabs > 0 ? 'var(--color-warning)' : 'var(--color-success)', bg: pendingLabs > 0 ? 'var(--color-warning-bg)' : 'var(--color-success-bg)' },
-              { icon: Pill, label: t('patientPortal.activeMeds'), value: t('patientPortal.activeCount', { count: activeMeds }), color: 'var(--accent-purple)', bg: 'color-mix(in srgb, var(--accent-purple) 10%, transparent)' },
-              { icon: CheckCircle2, label: t('patientPortal.completedVisits'), value: t('patientPortal.visitCount', { count: completedApts }), color: 'var(--color-success)', bg: 'var(--color-success-bg)' },
-            ].map((stat, i) => (
-              <div key={i} className="card-elevated" style={{ padding: '14px 14px', borderTop: `3px solid ${stat.color}` }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: stat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                  <stat.icon size={16} color={stat.color} />
-                </div>
-                <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>{stat.value}</p>
-                <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 4 }}>{stat.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* ── Row 1: Personal Info + Upcoming Appointments (equal height) ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'stretch' }}>
-            {/* Personal Information */}
-            <div className="card-elevated" style={{ padding: 18, display: 'flex', flexDirection: 'column' }}>
-              <SH icon={User} title={t('patientPortal.personalInformation')} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12, flex: 1 }}>
-                <Info label={t('patientPortal.fullName')} value={`${patient.firstName} ${patient.middleName || ''} ${patient.surname}`} />
-                <Info label={t('patientPortal.dateOfBirth')} value={patient.dateOfBirth || `~${patient.estimatedAge} years`} />
-                <Info label={t('patient.gender')} value={patient.gender} />
-                <Info label={t('patient.bloodType')} value={patient.bloodType || '—'} />
-                <Info label={t('patient.phone')} value={patient.phone || '—'} />
-                <Info label={t('patientPortal.geocodeId')} value={patient.geocodeId || '—'} />
-                <Info label={t('patient.location')} value={patient.county || patient.state ? `${patient.county || ''}${patient.county && patient.state ? ', ' : ''}${patient.state || ''}` : '—'} />
-                <Info label={t('patient.facility')} value={patientFacilityName} />
-              </div>
-            </div>
-
+          {/* ── Row 1: Upcoming Appointments + Health Alerts (equal height) ──
+              Personal info and the visit/prescription/lab counts live on the
+              Profile and respective tabs; they are not repeated here. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }}>
             {/* Upcoming Appointments */}
             <div className="card-elevated" style={{ padding: 18, display: 'flex', flexDirection: 'column' }}>
               <SH icon={Calendar} title={t('patientPortal.upcomingAppointments')} />
@@ -959,7 +957,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                           <div>
                             <p style={{ fontSize: 14, fontWeight: 700, color: i === 0 ? 'var(--accent-primary)' : 'var(--text-primary)', marginBottom: 2 }}>{t('patientPortal.dateAtTime', { date: apt.appointmentDate, time: apt.appointmentTime })}</p>
                             <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{apt.reason || apt.appointmentType}</p>
-                            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('patientPortal.drPrefix')} {apt.providerName} &middot; {apt.department}</p>
+                            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{/^dr\.?\s/i.test(apt.providerName || '') ? apt.providerName : `${t('patientPortal.drPrefix')} ${apt.providerName}`} &middot; {apt.department}</p>
                           </div>
                           {i === 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: 'var(--accent-primary)', color: 'var(--color-white)', textTransform: 'uppercase', flexShrink: 0 }}>{t('patientPortal.next')}</span>}
                         </div>
@@ -982,9 +980,34 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                 )}
               </div>
             </div>
+
+            {/* Health Alerts */}
+            <div className="card-elevated" style={{ padding: 18, display: 'flex', flexDirection: 'column' }}>
+              <SH icon={AlertTriangle} title={t('patientPortal.healthAlerts')} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, flex: 1 }}>
+                {realAllergies.length > 0 && (
+                  <AlertRow color="var(--color-danger)" text={t('patientPortal.allergiesList', { list: realAllergies.join(', ') })} />
+                )}
+                {realConditions.map((c, i) => (
+                  <AlertRow key={i} color="var(--color-warning)" text={c} />
+                ))}
+                {pendingLabs > 0 && (
+                  <AlertRow color="var(--accent-primary)" text={t('patientPortal.pendingLabResults', { count: pendingLabs })} />
+                )}
+                {labResults.some(l => l.critical) && (
+                  <AlertRow color="var(--color-danger)" text={t('patientPortal.criticalLabAlert')} />
+                )}
+                {realAllergies.length === 0 && realConditions.length === 0 && pendingLabs === 0 && (
+                  <div style={{ padding: '12px 14px', borderRadius: 8, background: 'var(--color-success-bg)', border: '1px solid color-mix(in srgb, var(--color-success) 20%, transparent)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <CheckCircle2 size={14} color="var(--color-success)" />
+                    <span style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 600 }}>{t('patientPortal.noHealthAlerts')}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* ── Row 2: Latest Vitals (full width) ── */}
+          {/* ── Latest Vitals (full width) ── */}
           <div className="card-elevated" style={{ padding: 18 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <SH icon={Activity} title={t('patientPortal.latestVitals')} />
@@ -1015,33 +1038,8 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             )}
           </div>
 
-          {/* ── Row 3: Health Alerts + Current Medications (equal height) ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'stretch' }}>
-            {/* Health Alerts */}
-            <div className="card-elevated" style={{ padding: 18, display: 'flex', flexDirection: 'column' }}>
-              <SH icon={AlertTriangle} title={t('patientPortal.healthAlerts')} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, flex: 1 }}>
-                {(patient.allergies || []).length > 0 && (
-                  <AlertRow color="var(--color-danger)" text={t('patientPortal.allergiesList', { list: patient.allergies.join(', ') })} />
-                )}
-                {(patient.chronicConditions || []).map((c, i) => (
-                  <AlertRow key={i} color="var(--color-warning)" text={c} />
-                ))}
-                {pendingLabs > 0 && (
-                  <AlertRow color="var(--accent-primary)" text={t('patientPortal.pendingLabResults', { count: pendingLabs })} />
-                )}
-                {labResults.some(l => l.critical) && (
-                  <AlertRow color="var(--color-danger)" text={t('patientPortal.criticalLabAlert')} />
-                )}
-                {(patient.allergies || []).length === 0 && (patient.chronicConditions || []).length === 0 && pendingLabs === 0 && (
-                  <div style={{ padding: '12px 14px', borderRadius: 8, background: 'var(--color-success-bg)', border: '1px solid color-mix(in srgb, var(--color-success) 20%, transparent)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <CheckCircle2 size={14} color="var(--color-success)" />
-                    <span style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 600 }}>{t('patientPortal.noHealthAlerts')}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
+          {/* ── Row 2: Current Medications + Recent Activity (equal height) ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }}>
             {/* Current Medications */}
             <div className="card-elevated" style={{ padding: 18, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1068,10 +1066,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                 )}
               </div>
             </div>
-          </div>
-
-          {/* ── Row 4: Recent Activity + Quick Actions (equal height) ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'stretch' }}>
             {/* Recent Activity */}
             <div className="card-elevated" style={{ padding: 18, display: 'flex', flexDirection: 'column' }}>
               <SH icon={Clock} title={t('patientPortal.recentActivity')} />
@@ -1095,27 +1089,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                     <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('patientPortal.noRecentActivity')}</p>
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="card-elevated" style={{ padding: 18, background: 'var(--accent-hover)', border: 'none', display: 'flex', flexDirection: 'column' }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{t('patientPortal.quickActions')}</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-                {[
-                  { label: t('patientPortal.bookAppointment'), icon: Calendar, action: () => setShowBooking(true) },
-                  { label: t('patientPortal.viewLabResults'), icon: FlaskConical, action: () => setActiveTab('lab') },
-                  { label: t('patientPortal.myPrescriptions'), icon: Pill, action: () => setActiveTab('prescriptions') },
-                  { label: t('patientPortal.messageDoctor'), icon: MessageSquare, action: () => setActiveTab('chat') },
-                  { label: t('patientPortal.payBills'), icon: Wallet, action: () => setActiveTab('billing') },
-                  { label: t('patientPortal.tabMyProfile'), icon: UserCircle, action: () => setActiveTab('profile') },
-                ].map((qa, i) => (
-                  <button key={i} onClick={qa.action} className="ppd-quick-action">
-                    <qa.icon size={14} color="var(--color-white)" style={{ opacity: 0.7 }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{qa.label}</span>
-                    <ChevronRight size={12} color="var(--color-white)" style={{ opacity: 0.4 }} />
-                  </button>
-                ))}
               </div>
             </div>
           </div>
@@ -1144,7 +1117,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{apt.reason || apt.appointmentType}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('patientPortal.drPrefix')} {apt.providerName} &middot; {apt.department}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{/^dr\.?\s/i.test(apt.providerName || '') ? apt.providerName : `${t('patientPortal.drPrefix')} ${apt.providerName}`} &middot; {apt.department}</div>
                     </div>
                     <Badge text={apt.status.replace('_', ' ')} color={isPast ? 'var(--text-muted)' : apt.status === 'confirmed' ? 'var(--color-success)' : 'var(--accent-primary)'} />
                   </div>
@@ -2274,11 +2247,4 @@ const patientPortalCSS = `
   background: var(--accent-primary); color: var(--color-white); border-color: var(--accent-primary);
 }
 
-/* ── Dark navy panels (Quick Actions, Payment Summary) ── */
-.ppd-quick-action {
-  display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px;
-  border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05);
-  color: var(--color-white); cursor: pointer; text-align: left; transition: background 0.15s ease;
-}
-.ppd-quick-action:hover { background: rgba(255,255,255,0.1); }
 `;

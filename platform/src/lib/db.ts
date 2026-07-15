@@ -265,7 +265,11 @@ export const intakeFormsDB = () => getDB('tamamhealth_intake_forms');
 // Bumped to 50: Bentiu State Hospital (hosp-004) now has a seeded lab-order
 // queue + walk-in roster, so lab.gatluak's Lab Command Center shows real data
 // instead of an empty "No pending orders" queue.
-export const SEED_VERSION = 50;
+// Bumped to 51: data/mock.ts roster generation switched from Math.random to a
+// fixed-seed PRNG so browser-seeded patients match the server's demo-fallback
+// roster (portal login matches on hospital number + phone). Old profiles hold
+// the last random draw and must reseed to the deterministic identities.
+export const SEED_VERSION = 51;
 
 export async function isSeeded(): Promise<boolean> {
   try {

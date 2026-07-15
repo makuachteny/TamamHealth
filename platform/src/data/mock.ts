@@ -2,6 +2,23 @@
 // TamamHealth - Mock Data for South Sudan Hospitals
 // ============================================
 
+// Deterministic PRNG (mulberry32) behind every "random" draw in this module.
+// The generated roster MUST be identical in every process that builds it: the
+// browser seeds it into PouchDB (db-seed.ts) while the patient-portal API's
+// demo fallback (lib/patient-portal-demo.ts) re-imports this module server-side
+// and matches patients by hospital number + phone. With Math.random the two
+// sides generated different identities and portal login could never match a
+// generated patient. Fixed seed → same names/phones/DOBs everywhere. Bump
+// SEED_VERSION in lib/db.ts if the seed constant or draw order ever changes,
+// so existing browser profiles reseed to the matching roster.
+let _randState = 0x5eed2026;
+function rand(): number {
+  _randState = (_randState + 0x6D2B79F5) | 0;
+  let t = Math.imul(_randState ^ (_randState >>> 15), 1 | _randState);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
 // Patient-chart clinical list types now live in lib/types; re-exported here so
 // existing `from '@/data/mock'` imports keep working.
 import type {
@@ -92,9 +109,9 @@ function generateTrends(baseOpd: number, baseReporting: number, baseAnc: number,
   return months.map((month, i) => ({
     month,
     opdVisits: Math.round(baseOpd * (0.85 + Math.sin(i * 0.8) * 0.15 + i * 0.02)),
-    reportingTimeliness: Math.min(100, Math.round(baseReporting + (i - 2) * 2 + (Math.random() * 6 - 3))),
-    ancVisits: Math.round(baseAnc * (0.9 + i * 0.03 + (Math.random() * 0.1 - 0.05))),
-    immunizations: Math.round(baseImm * (0.88 + i * 0.025 + (Math.random() * 0.1 - 0.05))),
+    reportingTimeliness: Math.min(100, Math.round(baseReporting + (i - 2) * 2 + (rand() * 6 - 3))),
+    ancVisits: Math.round(baseAnc * (0.9 + i * 0.03 + (rand() * 0.1 - 0.05))),
+    immunizations: Math.round(baseImm * (0.88 + i * 0.025 + (rand() * 0.1 - 0.05))),
   }));
 }
 
@@ -1738,7 +1755,7 @@ export interface Patient {
 }
 
 function randomFrom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(rand() * arr.length)];
 }
 
 function generateHospitalNumber(index: number): string {
@@ -1755,13 +1772,13 @@ function generatePhone(): string {
   // Canonical stored form: E.164 with no separators (+211 + 9 national digits).
   // National prefixes drop their leading 0 so the result is always +2119XXXXXXXX.
   const prefixes = ['912', '916', '921', '925', '955', '977'];
-  return `+211${randomFrom(prefixes)}${Math.floor(100000 + Math.random() * 900000)}`;
+  return `+211${randomFrom(prefixes)}${Math.floor(100000 + rand() * 900000)}`;
 }
 
 function generateDOB(): string {
-  const year = 1960 + Math.floor(Math.random() * 55);
-  const month = String(Math.floor(1 + Math.random() * 12)).padStart(2, '0');
-  const day = String(Math.floor(1 + Math.random() * 28)).padStart(2, '0');
+  const year = 1960 + Math.floor(rand() * 55);
+  const month = String(Math.floor(1 + rand() * 12)).padStart(2, '0');
+  const day = String(Math.floor(1 + rand() * 28)).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
@@ -1799,10 +1816,10 @@ const FEMALE_PATIENT_PHOTOS = [
 ];
 
 function generatePatient(index: number): Patient {
-  const gender = Math.random() > 0.48 ? 'Male' : 'Female';
+  const gender = rand() > 0.48 ? 'Male' : 'Female';
   const pool = gender === 'Male' ? MALE_PATIENT_PHOTOS : FEMALE_PATIENT_PHOTOS;
   const photoUrl = pool[index % pool.length];
-  const tribeIndex = Math.floor(Math.random() * 4);
+  const tribeIndex = Math.floor(rand() * 4);
   let firstName: string;
   const tribe = ['Dinka', 'Nuer', 'Zande', 'Bari'][tribeIndex];
 
@@ -1826,12 +1843,12 @@ function generatePatient(index: number): Patient {
   // a hospital with a populated patient registry.
   const hospital = STAFFED_HOSPITAL_IDS[index % STAFFED_HOSPITAL_IDS.length];
 
-  const numAllergies = Math.random() > 0.7 ? Math.floor(1 + Math.random() * 2) : 0;
+  const numAllergies = rand() > 0.7 ? Math.floor(1 + rand() * 2) : 0;
   const allergies: string[] = numAllergies > 0
     ? Array.from({ length: numAllergies }, () => randomFrom(commonAllergies.filter(a => a !== 'None known')))
     : ['None known'];
 
-  const numConditions = Math.random() > 0.6 ? Math.floor(1 + Math.random() * 2) : 0;
+  const numConditions = rand() > 0.6 ? Math.floor(1 + rand() * 2) : 0;
   const conditions: string[] = numConditions > 0
     ? Array.from({ length: numConditions }, () => randomFrom(chronicConditionsList.filter(c => c !== 'None')))
     : ['None'];
@@ -1843,7 +1860,7 @@ function generatePatient(index: number): Patient {
     middleName: randomFrom(familyNames),
     surname: randomFrom(familyNames),
     dateOfBirth: dob,
-    estimatedAge: Math.random() > 0.7 ? getAge(dob) : undefined,
+    estimatedAge: rand() > 0.7 ? getAge(dob) : undefined,
     gender,
     phone: generatePhone(),
     state,
@@ -1861,23 +1878,23 @@ function generatePatient(index: number): Patient {
     // the timestamp from the date rather than rolling two independent randoms
     // (which previously let a patient's two registration fields disagree).
     ...(() => {
-      const m = String(Math.floor(1 + Math.random() * 12)).padStart(2, '0');
-      const d = String(Math.floor(1 + Math.random() * 28)).padStart(2, '0');
-      const hh = String(Math.floor(7 + Math.random() * 12)).padStart(2, '0');
-      const mm = String(Math.floor(Math.random() * 60)).padStart(2, '0');
+      const m = String(Math.floor(1 + rand() * 12)).padStart(2, '0');
+      const d = String(Math.floor(1 + rand() * 28)).padStart(2, '0');
+      const hh = String(Math.floor(7 + rand() * 12)).padStart(2, '0');
+      const mm = String(Math.floor(rand() * 60)).padStart(2, '0');
       const registrationDate = `2025-${m}-${d}`;
       return {
         registrationDate,
         registeredAt: `${registrationDate}T${hh}:${mm}:00.000Z`,
       };
     })(),
-    lastVisitDate: `2026-0${Math.floor(1 + Math.random() * 2)}-${String(Math.floor(1 + Math.random() * 9)).padStart(2, '0')}`,
+    lastVisitDate: `2026-0${Math.floor(1 + rand() * 2)}-${String(Math.floor(1 + rand() * 9)).padStart(2, '0')}`,
     lastVisitHospital: hospital,
     lastConsultedAt: (() => {
-      const mo = Math.floor(1 + Math.random() * 2);
-      const d = String(Math.floor(1 + Math.random() * 9)).padStart(2, '0');
-      const hh = String(Math.floor(8 + Math.random() * 10)).padStart(2, '0');
-      const mm = String(Math.floor(Math.random() * 60)).padStart(2, '0');
+      const mo = Math.floor(1 + rand() * 2);
+      const d = String(Math.floor(1 + rand() * 9)).padStart(2, '0');
+      const hh = String(Math.floor(8 + rand() * 10)).padStart(2, '0');
+      const mm = String(Math.floor(rand() * 60)).padStart(2, '0');
       return `2026-0${mo}-${d}T${hh}:${mm}:00.000Z`;
     })(),
     isActive: true,
@@ -2231,16 +2248,16 @@ const commonPrescriptions: Prescription[] = [
 
 function generateLabResults(): LabResult[] {
   const allLabs: LabResult[] = [
-    { testName: 'Malaria RDT', result: Math.random() > 0.4 ? 'Positive' : 'Negative', unit: '', referenceRange: 'Negative', abnormal: Math.random() > 0.4, critical: false, date: '2026-02-09' },
-    { testName: 'Hemoglobin', result: (8 + Math.random() * 8).toFixed(1), unit: 'g/dL', referenceRange: '12.0-16.0', abnormal: Math.random() > 0.5, critical: false, date: '2026-02-09' },
-    { testName: 'WBC Count', result: (4 + Math.random() * 12).toFixed(1), unit: '×10³/μL', referenceRange: '4.0-11.0', abnormal: Math.random() > 0.6, critical: false, date: '2026-02-09' },
-    { testName: 'Blood Glucose (Random)', result: (70 + Math.random() * 150).toFixed(0), unit: 'mg/dL', referenceRange: '70-140', abnormal: Math.random() > 0.6, critical: false, date: '2026-02-08' },
-    { testName: 'HIV Rapid Test', result: Math.random() > 0.85 ? 'Reactive' : 'Non-reactive', unit: '', referenceRange: 'Non-reactive', abnormal: Math.random() > 0.85, critical: false, date: '2026-02-08' },
+    { testName: 'Malaria RDT', result: rand() > 0.4 ? 'Positive' : 'Negative', unit: '', referenceRange: 'Negative', abnormal: rand() > 0.4, critical: false, date: '2026-02-09' },
+    { testName: 'Hemoglobin', result: (8 + rand() * 8).toFixed(1), unit: 'g/dL', referenceRange: '12.0-16.0', abnormal: rand() > 0.5, critical: false, date: '2026-02-09' },
+    { testName: 'WBC Count', result: (4 + rand() * 12).toFixed(1), unit: '×10³/μL', referenceRange: '4.0-11.0', abnormal: rand() > 0.6, critical: false, date: '2026-02-09' },
+    { testName: 'Blood Glucose (Random)', result: (70 + rand() * 150).toFixed(0), unit: 'mg/dL', referenceRange: '70-140', abnormal: rand() > 0.6, critical: false, date: '2026-02-08' },
+    { testName: 'HIV Rapid Test', result: rand() > 0.85 ? 'Reactive' : 'Non-reactive', unit: '', referenceRange: 'Non-reactive', abnormal: rand() > 0.85, critical: false, date: '2026-02-08' },
     { testName: 'Urinalysis', result: 'Normal', unit: '', referenceRange: 'Normal', abnormal: false, critical: false, date: '2026-02-07' },
-    { testName: 'CD4 Count', result: (150 + Math.random() * 700).toFixed(0), unit: 'cells/μL', referenceRange: '500-1500', abnormal: Math.random() > 0.5, critical: false, date: '2026-02-06' },
-    { testName: 'Creatinine', result: (0.5 + Math.random() * 1.5).toFixed(1), unit: 'mg/dL', referenceRange: '0.6-1.2', abnormal: Math.random() > 0.7, critical: false, date: '2026-02-05' },
+    { testName: 'CD4 Count', result: (150 + rand() * 700).toFixed(0), unit: 'cells/μL', referenceRange: '500-1500', abnormal: rand() > 0.5, critical: false, date: '2026-02-06' },
+    { testName: 'Creatinine', result: (0.5 + rand() * 1.5).toFixed(1), unit: 'mg/dL', referenceRange: '0.6-1.2', abnormal: rand() > 0.7, critical: false, date: '2026-02-05' },
   ];
-  const count = 2 + Math.floor(Math.random() * 4);
+  const count = 2 + Math.floor(rand() * 4);
   return allLabs.slice(0, count);
 }
 
@@ -2248,11 +2265,11 @@ export function generateMedicalRecords(patientId: string, count: number): Medica
   // Generate a coherent chronological series so trend charts are meaningful.
   // Records are spaced roughly monthly going back from "now".
   const startMonth = 8; // months back
-  const baseWeight = 55 + Math.random() * 25;
-  const baseSystolic = 115 + Math.random() * 25;
-  const baseTemp = 36.5 + Math.random() * 0.8;
-  const basePulse = 70 + Math.random() * 15;
-  const baseGlucose = 85 + Math.random() * 25;
+  const baseWeight = 55 + rand() * 25;
+  const baseSystolic = 115 + rand() * 25;
+  const baseTemp = 36.5 + rand() * 0.8;
+  const basePulse = 70 + rand() * 15;
+  const baseGlucose = 85 + rand() * 25;
 
   return Array.from({ length: count }, (_, i) => {
     const hospital = randomFrom(hospitals);
@@ -2260,24 +2277,24 @@ export function generateMedicalRecords(patientId: string, count: number): Medica
     const monthsAgo = startMonth - Math.floor((i / Math.max(1, count - 1)) * startMonth);
     const visitDateObj = new Date();
     visitDateObj.setMonth(visitDateObj.getMonth() - monthsAgo);
-    visitDateObj.setDate(1 + Math.floor(Math.random() * 27));
-    visitDateObj.setHours(8 + Math.floor(Math.random() * 9), Math.floor(Math.random() * 60), 0, 0);
+    visitDateObj.setDate(1 + Math.floor(rand() * 27));
+    visitDateObj.setHours(8 + Math.floor(rand() * 9), Math.floor(rand() * 60), 0, 0);
     const visitDate = visitDateObj.toISOString().split('T')[0];
     const consultedAt = visitDateObj.toISOString();
 
-    const numDiagnoses = 1 + Math.floor(Math.random() * 2);
-    const numPrescriptions = 1 + Math.floor(Math.random() * 3);
+    const numDiagnoses = 1 + Math.floor(rand() * 2);
+    const numPrescriptions = 1 + Math.floor(rand() * 3);
 
     // Drift vitals slightly over time for trends
-    const drift = (i / Math.max(1, count - 1)) * (Math.random() > 0.5 ? 1 : -1);
-    const weight = +(baseWeight + drift * 3 + (Math.random() - 0.5) * 1.5).toFixed(1);
-    const height = +(155 + Math.random() * 25).toFixed(1);
-    const systolic = Math.floor(baseSystolic + drift * 10 + (Math.random() - 0.5) * 6);
-    const diastolic = Math.floor(70 + (Math.random() - 0.5) * 10 + drift * 5);
-    const temperature = +(baseTemp + (Math.random() - 0.5) * 0.6 + Math.max(0, drift) * 0.8).toFixed(1);
-    const pulse = Math.floor(basePulse + (Math.random() - 0.5) * 8 + drift * 6);
-    const respRate = Math.floor(16 + Math.random() * 6);
-    const o2Sat = Math.floor(94 + Math.random() * 5);
+    const drift = (i / Math.max(1, count - 1)) * (rand() > 0.5 ? 1 : -1);
+    const weight = +(baseWeight + drift * 3 + (rand() - 0.5) * 1.5).toFixed(1);
+    const height = +(155 + rand() * 25).toFixed(1);
+    const systolic = Math.floor(baseSystolic + drift * 10 + (rand() - 0.5) * 6);
+    const diastolic = Math.floor(70 + (rand() - 0.5) * 10 + drift * 5);
+    const temperature = +(baseTemp + (rand() - 0.5) * 0.6 + Math.max(0, drift) * 0.8).toFixed(1);
+    const pulse = Math.floor(basePulse + (rand() - 0.5) * 8 + drift * 6);
+    const respRate = Math.floor(16 + rand() * 6);
+    const o2Sat = Math.floor(94 + rand() * 5);
     const bmi = +(weight / ((height / 100) ** 2)).toFixed(1);
 
     return {
@@ -2304,20 +2321,20 @@ export function generateMedicalRecords(patientId: string, count: number): Medica
         weight,
         height,
         bmi,
-        muac: Math.random() > 0.5 ? +(12 + Math.random() * 8).toFixed(1) : undefined,
+        muac: rand() > 0.5 ? +(12 + rand() * 8).toFixed(1) : undefined,
         recordedAt: consultedAt,
       },
       diagnoses: Array.from({ length: numDiagnoses }, () => randomFrom(commonDiagnoses)),
       prescriptions: Array.from({ length: numPrescriptions }, () => randomFrom(commonPrescriptions)),
       labResults: generateLabResults().map(lab => {
         if (lab.testName === 'Blood Glucose (Random)') {
-          return { ...lab, result: (baseGlucose + drift * 20 + (Math.random() - 0.5) * 10).toFixed(0), date: visitDate };
+          return { ...lab, result: (baseGlucose + drift * 20 + (rand() - 0.5) * 10).toFixed(0), date: visitDate };
         }
         return { ...lab, date: visitDate };
       }),
       treatmentPlan: 'Continue prescribed medications. Adequate hydration. Rest. Return if symptoms worsen. Follow-up in 1 week.',
-      followUp: Math.random() > 0.3 ? { date: '2026-02-16', reason: 'Review and follow-up assessment' } : undefined,
-      syncStatus: Math.random() > 0.2 ? 'synced' : 'pending',
+      followUp: rand() > 0.3 ? { date: '2026-02-16', reason: 'Review and follow-up assessment' } : undefined,
+      syncStatus: rand() > 0.2 ? 'synced' : 'pending',
     };
   });
 }

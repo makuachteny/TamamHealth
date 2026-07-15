@@ -25,7 +25,7 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { NavItem } from '@/lib/permissions';
 import { usePatients } from '@/lib/hooks/usePatients';
 import { useHospitals } from '@/lib/hooks/useHospitals';
-import { patientFullName, patientGenderAge } from '@/lib/patient-utils';
+import { patientFullName, patientGenderAge, initials } from '@/lib/patient-utils';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import EhrModuleMenu from './EhrModuleMenu';
@@ -188,13 +188,7 @@ export default function EhrTopRail() {
     router.push('/settings');
   };
 
-  const initials = currentUser?.name
-    ?.split(' ')
-    .filter(Boolean)
-    .map(part => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase() || 'TH';
+  const userInitials = currentUser?.name ? initials(currentUser.name) : 'TH';
 
   const isRouteActive = (href: string) => pathname === href || (href !== '/' && pathname?.startsWith(href + '/'));
   const primaryCreateHref = ['/patient-intake', '/consultation', '/patients/new'].find(href => isHrefAllowed(href, allowedRoutes));
@@ -336,7 +330,7 @@ export default function EhrTopRail() {
             aria-expanded={userOpen}
             aria-haspopup="menu"
           >
-            <span className="ehr-avatar-mark" style={roleConfig?.color ? { background: roleConfig.color } : undefined}>{initials}</span>
+            <span className="ehr-avatar-mark" style={roleConfig?.color ? { background: roleConfig.color } : undefined}>{userInitials}</span>
             <span className="ehr-avatar-role">{roleConfig?.badgeLabel || roleLabel}</span>
           </button>
 
