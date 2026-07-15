@@ -16,6 +16,7 @@ const ACCENT_DEEP = 'var(--accent-hover)';
 const ACCOUNT_NAME: Record<string, string> = {
   'chv.ajak': 'Ajak Deng Mawien',
   'bhw.akol': 'Akol Deng Mading',
+  'desk.amira': 'Amira Juma Hassan',
   'reg.clerk': 'Grace Poni Lukudu',
   'clinic.clerk': 'Joseph Taban Lado',
   'cashier.deng': 'Deng Akec Ring',
@@ -78,43 +79,46 @@ const TEAM_AVATARS = [
 // roles (Doctor, HRIO, Med. Superintendent) map onto Clinician, Records/HMIS
 // Officer, and Facility Administrator respectively. The Medical Receptionist
 // (front_desk) is surfaced explicitly so its Reception dashboard is reachable.
-// Ordered along the care & data flow: community → front desk → clinical →
-// diagnostics → records/admin → sub-national → national. The `group` drives the
-// section headers in the picker.
+// Batched by facility, escalating up the health system: Juba Teaching Hospital
+// carries the full patient journey start-to-finish (reception → registration →
+// triage → consult → diagnostics → pharmacy → billing → records), then the
+// other facilities, then group/county oversight, ending at the Ministry of
+// Health and platform admin. The `group` drives the section headers.
 const demoAccounts: { role: string; roleKey: UserRole; user: string; desc: string; hospital: string; group: string }[] = [
-  // 1 ── Front desk & billing: register, check in, collect, bill.
-  { group: 'Front desk & billing',     role: 'Medical Receptionist',   roleKey: 'front_desk',                 user: 'desk.amira',       desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Front desk & billing',     role: 'Registration Clerk',     roleKey: 'central_registration_clerk', user: 'reg.clerk',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Front desk & billing',     role: 'Clinic Clerk',           roleKey: 'clinic_clerk',               user: 'clinic.clerk',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Front desk & billing',     role: 'Cashier',                roleKey: 'cashier',                    user: 'cashier.deng',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Front desk & billing',     role: 'Medical Biller',         roleKey: 'medical_biller',             user: 'biller.nyandeng',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  // 1 ── Juba Teaching Hospital: the whole journey at one facility, in the
+  //      order a patient meets each role.
+  { group: 'Juba Teaching Hospital',    role: 'Medical Receptionist',   roleKey: 'front_desk',                 user: 'desk.amira',       desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Registration Clerk',     roleKey: 'central_registration_clerk', user: 'reg.clerk',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Clinic Clerk',           roleKey: 'clinic_clerk',               user: 'clinic.clerk',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Triage Nurse',           roleKey: 'triage_nurse',               user: 'triage.mary',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Rooming Nurse',          roleKey: 'rooming_nurse',              user: 'rooming.sara',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Doctor',                 roleKey: 'clinician',                  user: 'clinician.peter',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Radiologist',            roleKey: 'radiologist',                user: 'rad.tamamhealth',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Pharmacist',             roleKey: 'pharmacist',                 user: 'pharma.rose',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Nutritionist',           roleKey: 'nutritionist',               user: 'nutr.nyabol',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Cashier',                roleKey: 'cashier',                    user: 'cashier.deng',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Medical Biller',         roleKey: 'medical_biller',             user: 'biller.nyandeng',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Data Entry Clerk',       roleKey: 'data_entry_clerk',           user: 'data.ayen',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Records / HMIS Officer', roleKey: 'records_hmis_officer',       user: 'hmis.john',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  { group: 'Juba Teaching Hospital',    role: 'Facility Administrator', roleKey: 'facility_administrator',     user: 'facadmin.rita',    desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
 
-  // 3 ── Clinical care: triage → rooming → nursing/midwifery → clinician.
-  { group: 'Clinical care',            role: 'Triage Nurse',           roleKey: 'triage_nurse',               user: 'triage.mary',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Clinical care',            role: 'Rooming Nurse',          roleKey: 'rooming_nurse',              user: 'rooming.sara',     desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Clinical care',            role: 'Nurse',                  roleKey: 'nurse',                      user: 'nurse.stella',     desc: 'Malakal Teaching Hospital', hospital: 'hosp-003' },
-  { group: 'Clinical care',            role: 'Midwife',                roleKey: 'midwife',                    user: 'midwife.nyakong',  desc: 'Malakal Teaching Hospital', hospital: 'hosp-003' },
-  { group: 'Clinical care',            role: 'Clinical Officer',       roleKey: 'clinical_officer',           user: 'co.deng',          desc: 'Wau State Hospital',        hospital: 'hosp-002' },
-  { group: 'Clinical care',            role: 'Doctor',                 roleKey: 'clinician',                  user: 'clinician.peter',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  // 2 ── Wau State Hospital.
+  { group: 'Wau State Hospital',        role: 'Clinical Officer',       roleKey: 'clinical_officer',           user: 'co.deng',          desc: 'Wau State Hospital',        hospital: 'hosp-002' },
 
-  // 4 ── Diagnostics & pharmacy.
-  { group: 'Diagnostics & pharmacy',   role: 'Lab Tech',               roleKey: 'lab_tech',                   user: 'lab.gatluak',      desc: 'Bentiu State Hospital',     hospital: 'hosp-004' },
-  { group: 'Diagnostics & pharmacy',   role: 'Radiologist',            roleKey: 'radiologist',                user: 'rad.tamamhealth',  desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Diagnostics & pharmacy',   role: 'Pharmacist',             roleKey: 'pharmacist',                 user: 'pharma.rose',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Diagnostics & pharmacy',   role: 'Nutritionist',           roleKey: 'nutritionist',               user: 'nutr.nyabol',      desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
+  // 3 ── Malakal Teaching Hospital.
+  { group: 'Malakal Teaching Hospital', role: 'Nurse',                  roleKey: 'nurse',                      user: 'nurse.stella',     desc: 'Malakal Teaching Hospital', hospital: 'hosp-003' },
+  { group: 'Malakal Teaching Hospital', role: 'Midwife',                roleKey: 'midwife',                    user: 'midwife.nyakong',  desc: 'Malakal Teaching Hospital', hospital: 'hosp-003' },
 
-  // 5 ── Records & administration: capture, quality, oversight.
-  { group: 'Records & administration', role: 'Data Entry Clerk',       roleKey: 'data_entry_clerk',           user: 'data.ayen',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Records & administration', role: 'Records / HMIS Officer', roleKey: 'records_hmis_officer',       user: 'hmis.john',        desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Records & administration', role: 'Facility Administrator', roleKey: 'facility_administrator',     user: 'facadmin.rita',    desc: 'Juba Teaching Hospital',    hospital: 'hosp-001' },
-  { group: 'Records & administration', role: 'Org Admin',              roleKey: 'org_admin',                  user: 'org.admin',        desc: 'Mercy Hospital Group',      hospital: '' },
+  // 4 ── Bentiu State Hospital.
+  { group: 'Bentiu State Hospital',     role: 'Lab Tech',               roleKey: 'lab_tech',                   user: 'lab.gatluak',      desc: 'Bentiu State Hospital',     hospital: 'hosp-004' },
 
-  // 6 ── Sub-national oversight: data aggregates up to county.
-  { group: 'Sub-national oversight',   role: 'County Health Director', roleKey: 'county_health_director',      user: 'county.lopez',     desc: 'County Health Office',      hospital: '' },
+  // 5 ── Oversight above the facility: hospital group → county.
+  { group: 'Mercy Hospital Group',      role: 'Org Admin',              roleKey: 'org_admin',                  user: 'org.admin',        desc: 'Mercy Hospital Group',      hospital: '' },
+  { group: 'County Health Office',      role: 'County Health Director', roleKey: 'county_health_director',     user: 'county.lopez',     desc: 'County Health Office',      hospital: '' },
 
-  // 7 ── National & platform: MoH reporting and platform administration.
-  { group: 'National & platform',      role: 'Government',             roleKey: 'government',                  user: 'admin',            desc: 'National MoH oversight',    hospital: '' },
-  { group: 'National & platform',      role: 'Super Admin',            roleKey: 'super_admin',                user: 'superadmin',       desc: 'Platform-wide access',      hospital: '' },
+  // 6 ── Ministry of Health & platform: national reporting, then platform admin.
+  { group: 'Ministry of Health',        role: 'Government',             roleKey: 'government',                 user: 'admin',            desc: 'National MoH oversight',    hospital: '' },
+  { group: 'Ministry of Health',        role: 'Super Admin',            roleKey: 'super_admin',                user: 'superadmin',       desc: 'Platform-wide access',      hospital: '' },
 ];
 
 type Account = typeof demoAccounts[number];
@@ -368,7 +372,9 @@ export default function LoginPage() {
                   <img src={imageForIndex(i)} alt="" aria-hidden className="tl-user-avatar" />
                   <div className="tl-user-meta">
                     <span className="tl-user-name">{name}</span>
-                    <span className="tl-user-role">{acc.role} · {acc.desc}</span>
+                    {/* The group header already names the facility — only repeat
+                        desc when it adds something (e.g. MoH rows). */}
+                    <span className="tl-user-role">{acc.desc === acc.group ? acc.role : `${acc.role} · ${acc.desc}`}</span>
                   </div>
                   <ChevronRight size={16} className="tl-user-chev" />
                 </button>
