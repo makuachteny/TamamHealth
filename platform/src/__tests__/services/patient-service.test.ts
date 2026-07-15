@@ -19,7 +19,7 @@ import {
   generateGeocodeId,
 } from '@/lib/services/patient-service';
 import { ValidationError } from '@/lib/validation';
-import { hospitalsDB } from '@/lib/db';
+import { hospitalsDB, patientsDB } from '@/lib/db';
 
 // Minimal valid patient data that passes validatePatientData
 const validPatient = () => ({
@@ -364,6 +364,30 @@ describe('patient-service', () => {
     const created = await createPatient(validPatient());
     // Try to update with invalid gender
     await expect(updatePatient(created._id, { gender: 'invalid' } as unknown as Parameters<typeof updatePatient>[1])).rejects.toThrow(ValidationError);
+  });
+
+  test('updatePatient tolerates pre-existing gaps in untouched fields', async () => {
+    // Regression: legacy/seed patients created before `primaryLanguage` became
+    // required could never be partially updated — referral acceptance patches
+    // only hospital/org fields, so the transfer always threw ValidationError
+    // on the pre-existing gap and the patient never moved facilities.
+    const pdb = patientsDB();
+    const legacy = { ...validPatient(), _id: 'pat-legacy-1', type: 'patient' } as Record<string, unknown>;
+    delete legacy.primaryLanguage; // pre-existing gap, as in seed data
+    await putDoc(pdb, legacy as { _id: string });
+
+    // A referral-transfer-shaped patch must succeed despite the gap…
+    const updated = await updatePatient('pat-legacy-1', {
+      registrationHospital: 'hosp-002',
+      lastVisitHospital: 'hosp-002',
+    });
+    expect(updated!.registrationHospital).toBe('hosp-002');
+
+    // …but a write cannot *introduce* invalid data: patching the gapped
+    // field with an empty value still throws.
+    await expect(
+      updatePatient('pat-legacy-1', { primaryLanguage: '' }),
+    ).rejects.toThrow(ValidationError);
   });
 
   test('updatePatient preserves existing values when partial update', async () => {

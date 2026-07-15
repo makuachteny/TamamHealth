@@ -82,7 +82,7 @@ A consultation can start with no triage record; the handoff (`status: seen`, `ha
 - **Duplicate detection at the point of entry.** The check runs in `createPatient()` (good), but only fires at submit — surface a soft "possible match" warning on step 1 of the wizard so staff don't fill the whole form first.
 - **Show the assigned hospital number** in the registration success state so reception can read it back to the patient.
 - **Denormalized name drift.** Bills/claims/invoices copy `patientName`/`facilityName`; correct at creation but stale after a rename. Acceptable for an audit trail; if live accuracy matters, resolve names on read.
-- **Consolidate the two billing models.** `BillingDoc` (clinic) and `ChargeDoc`+ledger (insurance) run in parallel with no bridge; pick one as canonical and document the migration (extends the existing `docs/DATA-FLOW-AUDIT.md` decision).
+- **Consolidate the two billing models.** `BillingDoc` (clinic) and `ChargeDoc`+ledger (insurance) run in parallel with no bridge; pick one as canonical and document the migration (extends the existing `docs/archive/DATA-FLOW-AUDIT.md` decision).
 - **FK existence checks** on `encounterId`/`invoiceId`/`chargeIds` at create time to prevent orphaned references.
 - **Pharmacy niceties:** counseling gate before `complete`, FEFO batch selection by expiry, surfacing the drug-interaction warnings the service already computes, and the acuity/criticality queue priority that `order-lifecycles.ts` describes.
 

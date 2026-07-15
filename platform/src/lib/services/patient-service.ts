@@ -252,9 +252,21 @@ export async function updatePatient(id: string, rawData: Partial<PatientDoc>): P
     _rev: existing._rev,
     updatedAt: new Date().toISOString(),
   };
+  // Validate the merged document, but only *block* on errors for fields the
+  // caller is actually writing. Full-document validation here used to reject
+  // any partial update to a record with pre-existing gaps (e.g. legacy/seed
+  // patients created before `primaryLanguage` became required), which made
+  // those records permanently un-updatable — referral acceptance could never
+  // re-home the patient (its transfer patches only hospital/org fields). The
+  // invariant we keep: a write cannot *introduce* invalid data — any invalid
+  // value in the patch itself still throws. Pre-existing gaps in untouched
+  // fields are tolerated and left for the next full-form edit to fill.
   const errors = validatePatientData(updated as unknown as Record<string, unknown>);
-  if (Object.keys(errors).length > 0) {
-    throw new ValidationError(errors);
+  const blockingErrors = Object.fromEntries(
+    Object.entries(errors).filter(([field]) => field in data),
+  );
+  if (Object.keys(blockingErrors).length > 0) {
+    throw new ValidationError(blockingErrors);
   }
   const resp = await db.put(updated);
   updated._rev = resp.rev;

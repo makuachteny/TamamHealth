@@ -47,12 +47,19 @@ function readPatientPortalSession(): PatientPortalSession | null {
   }
 }
 
+// The `storage` event only fires in OTHER tabs, so a same-tab sign-in/out
+// won't reach the layout header. Emit a same-tab event alongside every write
+// so the header user chip updates immediately without a reload.
+const PATIENT_PORTAL_SESSION_EVENT = 'patient-portal-session-change';
+
 function writePatientPortalSession(session: PatientPortalSession): void {
   window.sessionStorage.setItem(PATIENT_PORTAL_SESSION_KEY, JSON.stringify(session));
+  window.dispatchEvent(new Event(PATIENT_PORTAL_SESSION_EVENT));
 }
 
 function clearPatientPortalSession(): void {
   window.sessionStorage.removeItem(PATIENT_PORTAL_SESSION_KEY);
+  window.dispatchEvent(new Event(PATIENT_PORTAL_SESSION_EVENT));
 }
 
 async function patientPortalFetch<T>(
@@ -184,398 +191,243 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
     } finally { setLoading(false); }
   };
 
-  const BLUE = 'var(--accent-primary)';
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '12px 14px', fontSize: 15,
-    border: '1px solid var(--border-medium)', borderRadius: 4,
-    background: 'var(--bg-card-solid)', color: 'var(--text-primary)',
-    outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
-    fontFamily: "var(--font-platform)",
-  };
-  const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: 13, fontWeight: 600,
-    color: 'var(--text-secondary)', marginBottom: 6,
-    fontFamily: "var(--font-platform)",
-  };
-
   return (
-    <div className="min-h-screen grid pp-login-split" style={{ background: 'var(--bg-primary)' }}>
+    <div className="pl-shell">
+      <div className="pl-split">
+        {/* ── Left: form ── */}
+        <section className="pl-pane pl-form-pane">
+          {/* Back to the marketing site — shown on small screens where the hero is hidden. */}
+          <a href="/" aria-label="Close" className="pl-form-close"><X size={18} /></a>
+          <header className="pl-brand">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/assets/tamamhealth-logo-full.svg" alt="Tamam Healthcare System" className="pl-brand-logo" />
+          </header>
 
-      {/* ═══ Left: form column — body / footer (branding lives in the sticky top nav) ═══ */}
-      <div className="pp-form-col">
-        <div className="pp-form-body">
-          <div className="pp-form-inner">
-            <div className="pp-form-lede">
-              <div className="pp-logo-wrap">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/assets/tamamhealth-logo.svg" alt="" aria-hidden className="pp-logo-img" />
-              </div>
-              <h1 className="pp-heading">{t('patientPortal.heroHeading')}</h1>
-              <p className="pp-subheading">
-                {t('patientPortal.heroSubheading')}
-              </p>
-            </div>
-            <div className="pp-form-card">
-            <h2 className="text-[15px] font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: "var(--font-platform)", letterSpacing: '-0.01em' }}>{t('patientPortal.signInTitle')}</h2>
-            <p className="text-[13px] mb-6" style={{ color: 'var(--text-muted)', fontFamily: "var(--font-platform)" }}>{t('patientPortal.signInSubtitle')}</p>
+          <div className="pl-form-wrap">
+            <h1 className="pl-title">{t('patientPortal.signInTitle')}</h1>
+            <p className="pl-subtitle">{t('patientPortal.signInSubtitle')}</p>
 
             {!dbReady && (
-              <div className="mb-4 p-3 rounded-lg text-center" style={{
-                background: 'rgba(33, 145, 208, 0.08)', border: '1px solid rgba(59, 130, 246,0.15)',
-              }}>
-                <p className="text-xs" style={{ color: BLUE }}>
-                  <svg className="animate-spin w-3 h-3 inline mr-1.5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                  {t('patientPortal.initializingDb')}
-                </p>
-              </div>
+              <div className="pl-db-banner"><span className="pl-spin" /> {t('patientPortal.initializingDb')}</div>
             )}
 
-            {/* Mode toggle */}
-            <div className="flex mb-6 rounded overflow-hidden" style={{ border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)' }}>
-              <button onClick={() => { setMode('login'); setError(''); }} type="button" className="flex-1 py-3 text-sm font-bold transition-all" style={{
-                background: mode === 'login' ? BLUE : 'transparent',
-                color: mode === 'login' ? '#fff' : 'var(--text-secondary)',
-                border: 'none', cursor: 'pointer', borderRadius: 3, margin: 2,
-              }}>{t('patientPortal.hospitalIdTab')}</button>
-              <button onClick={() => { setMode('lookup'); setError(''); }} type="button" className="flex-1 py-3 text-sm font-bold transition-all" style={{
-                background: mode === 'lookup' ? BLUE : 'transparent',
-                color: mode === 'lookup' ? '#fff' : 'var(--text-secondary)',
-                border: 'none', cursor: 'pointer', borderRadius: 3, margin: 2,
-              }}>{t('patientPortal.nameLookupTab')}</button>
+            {/* Sign-in method — segmented pill toggle. */}
+            <div className="pl-seg" role="tablist" aria-label={t('patientPortal.signInTitle')}>
+              <button type="button" role="tab" aria-selected={mode === 'login'}
+                className={`pl-seg-btn ${mode === 'login' ? 'is-on' : ''}`}
+                onClick={() => { setMode('login'); setError(''); }}>
+                <Shield size={14} /> {t('patientPortal.hospitalIdTab')}
+              </button>
+              <button type="button" role="tab" aria-selected={mode === 'lookup'}
+                className={`pl-seg-btn ${mode === 'lookup' ? 'is-on' : ''}`}
+                onClick={() => { setMode('lookup'); setError(''); }}>
+                <User size={14} /> {t('patientPortal.nameLookupTab')}
+              </button>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-5">
+            <form onSubmit={handleLogin} className="pl-form">
               {mode === 'login' ? (
                 <>
-                  <div>
-                    <label htmlFor="pp-hospital" style={labelStyle}>{t('patientPortal.hospitalNumberOrGeocode')}</label>
-                    <input id="pp-hospital" type="text" value={hospitalNumber} onChange={e => setHospitalNumber(e.target.value)}
-                      placeholder={t('patientPortal.hospitalNumberPlaceholder')} required style={inputStyle}
-                      onFocus={e => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.boxShadow = `0 0 0 3px rgba(0,119,215,0.1)`; }}
-                      onBlur={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = ''; }} />
+                  <div className="pl-field">
+                    <label htmlFor="pp-hospital">{t('patientPortal.hospitalNumberOrGeocode')}</label>
+                    <div className="pl-input-wrap">
+                      <FileText size={16} className="pl-input-icon" />
+                      <input id="pp-hospital" type="text" value={hospitalNumber} onChange={e => setHospitalNumber(e.target.value)}
+                        placeholder={t('patientPortal.hospitalNumberPlaceholder')} required className="pl-input pl-input-icon-pad" />
+                    </div>
                   </div>
-                  <div>
-                    <label htmlFor="pp-phone" style={labelStyle}>{t('patientPortal.phoneNumber')}</label>
-                    <input id="pp-phone" type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)}
-                      placeholder={t('patientPortal.phonePlaceholder')} required style={inputStyle}
-                      onFocus={e => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.boxShadow = `0 0 0 3px rgba(0,119,215,0.1)`; }}
-                      onBlur={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = ''; }} />
+                  <div className="pl-field">
+                    <label htmlFor="pp-phone">{t('patientPortal.phoneNumber')}</label>
+                    <div className="pl-input-wrap">
+                      <Phone size={16} className="pl-input-icon" />
+                      <input id="pp-phone" type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)}
+                        placeholder={t('patientPortal.phonePlaceholder')} required className="pl-input pl-input-icon-pad" />
+                    </div>
                   </div>
                 </>
               ) : (
                 <>
-                  <div>
-                    <label htmlFor="pp-firstName" style={labelStyle}>{t('patientPortal.firstName')}</label>
-                    <input id="pp-firstName" type="text" value={firstName} onChange={e => setFirstName(e.target.value)}
-                      placeholder={t('patientPortal.firstNamePlaceholder')} required style={inputStyle}
-                      onFocus={e => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.boxShadow = `0 0 0 3px rgba(0,119,215,0.1)`; }}
-                      onBlur={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = ''; }} />
+                  <div className="pl-field-row">
+                    <div className="pl-field">
+                      <label htmlFor="pp-firstName">{t('patientPortal.firstName')}</label>
+                      <input id="pp-firstName" type="text" value={firstName} onChange={e => setFirstName(e.target.value)}
+                        placeholder={t('patientPortal.firstNamePlaceholder')} required className="pl-input" />
+                    </div>
+                    <div className="pl-field">
+                      <label htmlFor="pp-surname">{t('patientPortal.surname')}</label>
+                      <input id="pp-surname" type="text" value={surname} onChange={e => setSurname(e.target.value)}
+                        placeholder={t('patientPortal.surnamePlaceholder')} required className="pl-input" />
+                    </div>
                   </div>
-                  <div>
-                    <label htmlFor="pp-surname" style={labelStyle}>{t('patientPortal.surname')}</label>
-                    <input id="pp-surname" type="text" value={surname} onChange={e => setSurname(e.target.value)}
-                      placeholder={t('patientPortal.surnamePlaceholder')} required style={inputStyle}
-                      onFocus={e => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.boxShadow = `0 0 0 3px rgba(0,119,215,0.1)`; }}
-                      onBlur={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = ''; }} />
-                  </div>
-                  <div>
-                    <label htmlFor="pp-dob" style={labelStyle}>{t('patientPortal.dateOfBirthOptional')}</label>
-                    <input id="pp-dob" type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} style={inputStyle}
-                      onFocus={e => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.boxShadow = `0 0 0 3px rgba(0,119,215,0.1)`; }}
-                      onBlur={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = ''; }} />
+                  <div className="pl-field">
+                    <label htmlFor="pp-dob">{t('patientPortal.dateOfBirthOptional')}</label>
+                    <div className="pl-input-wrap">
+                      <Calendar size={16} className="pl-input-icon" />
+                      <input id="pp-dob" type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} className="pl-input pl-input-icon-pad" />
+                    </div>
                   </div>
                 </>
               )}
 
-              {error && (
-                <div role="alert" className="p-3 rounded-xl text-sm" style={{
-                  background: 'rgba(229,46,66,0.06)', color: '#E52E42',
-                  border: '1px solid rgba(229,46,66,0.15)',
-                }}>{error}</div>
-              )}
+              {error && <div role="alert" className="pl-error">{error}</div>}
 
-              <button type="submit" disabled={loading || !dbReady}
-                className="w-full flex items-center justify-center gap-2 text-[15px] font-semibold text-white transition-all duration-200 mt-3"
-                style={{
-                  fontFamily: "var(--font-platform)",
-                  background: BLUE, padding: '14px 20px', borderRadius: 4,
-                  border: 'none', cursor: loading ? 'wait' : 'pointer',
-                  opacity: loading || !dbReady ? 0.6 : 1,
-                  boxShadow: '0 2px 8px rgba(0,119,215,0.25)',
-                }}>
-                {loading ? t('patientPortal.searching') : t('patientPortal.signInTitle')} <ArrowRight size={14} />
+              <button type="submit" disabled={loading || !dbReady} className="pl-submit">
+                {loading
+                  ? (<span className="pl-submit-loading"><span className="pl-spin pl-spin-light" /> {t('patientPortal.searching')}</span>)
+                  : (<>{t('patientPortal.signInTitle')} <ArrowRight size={16} /></>)}
               </button>
             </form>
 
             {/* Demo accounts — pulled live from the seeded PouchDB so the
-                credentials actually match this browser's database. Gated on
-                IS_DEMO so production never reveals seed patient identifiers. */}
+                credentials match this browser. Gated on IS_DEMO so production
+                never reveals seed patient identifiers. */}
             {IS_DEMO && demoPatients.length > 0 && (
-              <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--border-medium)' }}>
-                <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>{t('patientPortal.demoAccounts')}</p>
-                <div className="flex flex-col gap-1.5">
+              <div className="pl-demo">
+                <p className="pl-demo-label">{t('patientPortal.demoAccounts')}</p>
+                <div className="pl-demo-list">
                   {demoPatients.map((demo) => (
                     <button
                       key={demo.id}
                       type="button"
                       onClick={() => { setMode('login'); setHospitalNumber(demo.hospitalNumber); setPhoneNumber(demo.phone); setError(''); }}
-                      className="w-full flex items-center justify-between px-3 py-2.5 rounded text-left transition-all"
-                      style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', cursor: 'pointer' }}
+                      className="pl-demo-item"
                     >
-                      <span className="flex flex-col">
-                        <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{demo.name}</span>
-                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{demo.phone}</span>
+                      <span className="pl-demo-avatar">{demo.name.charAt(0)}</span>
+                      <span className="pl-demo-meta">
+                        <span className="pl-demo-name">{demo.name}</span>
+                        <span className="pl-demo-sub">{demo.phone}</span>
                       </span>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{demo.hospitalNumber}</span>
+                      <span className="pl-demo-id">{demo.hospitalNumber}</span>
                     </button>
                   ))}
                 </div>
               </div>
             )}
-          </div>
-          </div>
-        </div>
 
-        <footer className="pp-form-footer">
-          <div className="pp-flag-strip" aria-hidden>
-            <span style={{ background: '#111' }} />
-            <span style={{ background: '#E52E42' }} />
-            <span style={{ background: '#ffffff', border: '1px solid var(--border-medium)' }} />
-            <span style={{ background: '#10B944' }} />
-            <span style={{ background: '#015697' }} />
-            <span style={{ background: '#FCD34D' }} />
+            <p className="pl-foot">
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="pl-link">Terms &amp; Conditions</a>
+            </p>
           </div>
-          <p className="pp-form-footer-text">
-            {t('patientPortal.footerTagline')}
-          </p>
-        </footer>
+        </section>
+
+        {/* ── Right: hero ── */}
+        <section className="pl-hero">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/doctor-nurse-consultation.jpg" alt={t('patientPortal.heroImageAlt')} className="pl-hero-img" />
+          <div className="pl-hero-scrim" />
+
+          {/* Floating, decorative cards — a taste of what waits inside. */}
+          <div className="pl-hcard pl-hcard-appt">
+            <span className="pl-hcard-icon"><Calendar size={16} /></span>
+            <span className="pl-hcard-text">
+              <span className="pl-hcard-title">Upcoming visit</span>
+              <span className="pl-hcard-sub">Antenatal Care Clinic</span>
+            </span>
+          </div>
+          <div className="pl-hcard pl-hcard-lab">
+            <span className="pl-hcard-icon pl-hcard-icon-ok"><CheckCircle2 size={16} /></span>
+            <span className="pl-hcard-text">
+              <span className="pl-hcard-title">Records synced</span>
+              <span className="pl-hcard-sub">Available offline</span>
+            </span>
+          </div>
+
+          <div className="pl-hero-body">
+            <h2 className="pl-hero-title">{t('patientPortal.heroPanelTitle')}</h2>
+            <p className="pl-hero-sub">{t('patientPortal.heroPanelSub')}</p>
+          </div>
+        </section>
       </div>
 
-      {/* ═══ Right: imagery panel (desktop only) ═══ */}
-      <aside className="pp-image-panel" aria-hidden>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/doctor-nurse-consultation.jpg" alt={t('patientPortal.heroImageAlt')} />
-        <div className="pp-image-scrim" />
-
-        <div className="pp-image-body">
-          <h2 className="pp-image-title">
-            {t('patientPortal.heroPanelTitle')}
-          </h2>
-          <p className="pp-image-sub">
-            {t('patientPortal.heroPanelSub')}
-          </p>
-        </div>
-
-        <footer className="pp-image-footer">
-          <ul className="pp-image-bullets">
-            <li><span className="pp-bullet-dot" /> {t('patientPortal.heroBullet1')}</li>
-            <li><span className="pp-bullet-dot" /> {t('patientPortal.heroBullet2')}</li>
-            <li><span className="pp-bullet-dot" /> {t('patientPortal.heroBullet3')}</li>
-          </ul>
-        </footer>
-      </aside>
-
       <style jsx>{`
-        .pp-login-split {
-          grid-template-columns: 1fr;
-          min-height: 100vh;
+        .pl-shell {
+          min-height: 100vh; padding: 24px;
+          display: flex; align-items: center; justify-content: center;
+          background: var(--bg-app);
         }
-        @media (min-width: 1024px) {
-          .pp-login-split { grid-template-columns: 1fr 1fr; }
+        .pl-split {
+          width: 100%; max-width: 1080px; height: min(720px, calc(100vh - 48px));
+          display: grid; grid-template-columns: 1fr 1.05fr;
+          background: var(--bg-card-solid); border: 1px solid var(--border-light);
+          border-radius: 28px; overflow: hidden;
         }
+        .pl-pane { padding: 30px 38px; display: flex; flex-direction: column; overflow-y: auto; }
+        .pl-form-pane { position: relative; }
+        .pl-brand { width: 100%; max-width: 400px; align-self: center; display: flex; align-items: center; }
+        .pl-brand-logo { height: 30px; width: auto; }
+        .pl-form-close { display: none; position: absolute; top: 18px; right: 18px; z-index: 3; width: 38px; height: 38px; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid var(--border-light); background: var(--bg-card-solid); color: var(--text-primary); cursor: pointer; }
+        .pl-form-close:hover { background: var(--overlay-subtle); }
+        .pl-form-wrap { margin: auto 0; width: 100%; max-width: 400px; align-self: center; padding: 20px 0; }
+        .pl-title { font-family: var(--font-platform); font-size: 27px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); margin: 4px 0 0; }
+        .pl-subtitle { font-size: 13.5px; color: var(--text-muted); margin: 6px 0 0; }
+        .pl-db-banner { margin: 16px 0 0; padding: 8px 12px; font-size: 11.5px; color: var(--accent-hover); background: var(--accent-light); border: 1px solid var(--accent-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 
-        .pp-form-col {
-          display: grid;
-          grid-template-rows: 1fr auto;
-          padding: 32px 32px 32px;
-          min-height: calc(100vh - 52px);
-        }
-        @media (min-width: 1024px) {
-          .pp-form-col { padding: 48px 56px 32px; }
-        }
+        .pl-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 22px; padding: 4px; background: var(--overlay-subtle); border: 1px solid var(--border-light); border-radius: 999px; }
+        .pl-seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 12px; font-size: 13px; font-weight: 700; color: var(--text-secondary); background: transparent; border: none; border-radius: 999px; cursor: pointer; transition: background .16s, color .16s, box-shadow .16s; }
+        .pl-seg-btn:hover { color: var(--text-primary); }
+        .pl-seg-btn.is-on { color: #fff; background: var(--accent-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.10); }
 
-        .pp-kicker {
-          display: inline-block;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: var(--accent-primary, #2191D0);
-          padding: 5px 12px;
-          border: 1px solid var(--accent-primary, #2191D0);
-          border-radius: 999px;
-          background: var(--accent-light, rgba(33, 145, 208, 0.08));
-          margin-bottom: 18px;
-        }
+        .pl-form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+        .pl-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+        .pl-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .pl-field label { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+        .pl-input-wrap { position: relative; display: flex; align-items: center; }
+        .pl-input-icon { position: absolute; left: 15px; color: var(--text-muted); pointer-events: none; }
+        .pl-input { width: 100%; padding: 13px 16px; font-size: 14.5px; color: var(--text-primary); background: var(--overlay-subtle); border: 1.5px solid transparent; border-radius: 999px; outline: none; transition: border-color .15s, background .15s; font-family: var(--font-platform); }
+        .pl-input-icon-pad { padding-left: 42px; }
+        .pl-input::placeholder { color: var(--text-muted); }
+        .pl-input:focus { border-color: var(--accent-primary); background: var(--bg-card-solid); }
 
-        .pp-form-body {
-          display: flex;
-          align-items: flex-start;
-          justify-content: center;
-          padding-top: 12px;
-        }
-        .pp-form-inner {
-          width: 100%;
-          max-width: 540px;
-          text-align: center;
-        }
-        .pp-form-lede { margin-bottom: 24px; }
-        .pp-logo-wrap {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 68px;
-          height: 68px;
-          border-radius: 20px;
-          background: var(--bg-card-solid);
-          border: 1px solid var(--border-medium);
-          box-shadow: 0 6px 18px rgba(26,58,58,0.08);
-          margin-bottom: 20px;
-        }
-        .pp-logo-img { width: 42px; height: 42px; }
-        .pp-heading {
-          font-family: var(--font-platform);
-          font-size: clamp(28px, 3.2vw, 36px);
-          font-weight: 700;
-          letter-spacing: -0.02em;
-          line-height: 1.1;
-          color: var(--text-primary);
-          margin: 0 0 10px;
-        }
-        .pp-subheading {
-          font-size: 15px;
-          line-height: 1.55;
-          color: var(--text-muted);
-          margin: 0 auto;
-          max-width: 420px;
-        }
-        .pp-form-card {
-          padding: 36px 40px 32px;
-          background: var(--bg-card-solid);
-          border-radius: 16px;
-          border: 1px solid var(--border-medium);
-          box-shadow: 0 12px 40px rgba(26,58,58,0.08), 0 1px 2px rgba(26,58,58,0.04);
-          text-align: left;
-          position: relative;
-          overflow: hidden;
-        }
-        .pp-form-card::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0; right: 0;
-          height: 3px;
-          background: linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-primary) 50%, var(--color-warning-400) 100%);
-        }
+        .pl-error { padding: 10px 13px; font-size: 12.5px; color: var(--color-danger); background: var(--color-danger-bg); border: 1px solid color-mix(in srgb, var(--color-danger) 22%, transparent); border-radius: 12px; }
 
-        .pp-form-footer {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 10px;
-          padding-top: 16px;
-        }
-        .pp-flag-strip { display: flex; gap: 0; align-items: center; }
-        .pp-flag-strip span { height: 3px; display: block; }
-        .pp-flag-strip span:nth-child(1) { width: 28px; border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
-        .pp-flag-strip span:nth-child(2) { width: 28px; }
-        .pp-flag-strip span:nth-child(3) { width: 16px; }
-        .pp-flag-strip span:nth-child(4) { width: 28px; }
-        .pp-flag-strip span:nth-child(5) { width: 16px; }
-        .pp-flag-strip span:nth-child(6) { width: 10px; border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
-        .pp-form-footer-text {
-          font-size: 11px;
-          letter-spacing: 0.04em;
-          color: var(--text-muted);
-          margin: 0;
-        }
+        .pl-submit { width: 100%; padding: 14px 24px; margin-top: 4px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; font-weight: 700; color: #fff; background: var(--accent-primary); border: none; border-radius: 999px; cursor: pointer; transition: transform .12s, opacity .15s; }
+        .pl-submit:hover:not(:disabled) { transform: translateY(-1px); }
+        .pl-submit:disabled { opacity: .6; cursor: not-allowed; }
+        .pl-submit-loading { display: inline-flex; align-items: center; gap: 8px; }
 
-        /* Sticky + fixed 100vh so the form can grow without stretching the
-           photo or drifting the subject out of frame. */
-        .pp-image-panel {
-          display: none;
-          position: relative;
-          overflow: hidden;
-          height: calc(100vh - 52px);
-        }
-        @media (min-width: 1024px) {
-          .pp-image-panel {
-            display: grid;
-            grid-template-rows: 1fr auto;
-            padding: 48px 56px;
-            position: sticky;
-            top: 52px;
-            align-self: start;
-          }
-        }
-        .pp-image-panel img {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          object-position: 50% 38%;
-          z-index: 0;
-          /* Slight zoom so the face sits closer to viewer — prevents the
-             "distant / out-of-focus" look when the photo is wider than tall */
-          transform: scale(1.08);
-          transform-origin: 50% 40%;
-        }
-        .pp-image-scrim {
-          position: absolute;
-          inset: 0;
-          background:
-            linear-gradient(135deg, rgba(26,58,58,0.72) 0%, rgba(26,58,58,0.40) 40%, rgba(45,155,106,0.40) 100%),
-            linear-gradient(180deg, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.0) 30%, rgba(0,0,0,0.40) 100%);
-          z-index: 1;
-        }
-        .pp-image-body, .pp-image-footer {
-          position: relative;
-          z-index: 2;
-          color: #fff;
-        }
-        .pp-image-body {
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          max-width: 520px;
-          padding: 48px 0;
-        }
-        .pp-image-title {
-          font-family: var(--font-platform);
-          font-size: clamp(32px, 3.6vw, 48px);
-          font-weight: 700;
-          line-height: 1.08;
-          letter-spacing: -0.015em;
-          margin: 0 0 20px;
-          text-shadow: 0 2px 14px rgba(0,0,0,0.30);
-        }
-        .pp-image-sub {
-          font-size: 15.5px;
-          line-height: 1.65;
-          color: rgba(255,255,255,0.92);
-          max-width: 460px;
-          margin: 0;
-          text-shadow: 0 2px 10px rgba(0,0,0,0.25);
-        }
-        .pp-image-footer { padding-top: 16px; }
-        .pp-image-bullets {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          font-size: 13px;
-          color: rgba(255,255,255,0.88);
-        }
-        .pp-image-bullets li { display: flex; align-items: center; gap: 10px; }
-        .pp-bullet-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: var(--color-warning-400);
-          flex-shrink: 0;
-          box-shadow: 0 0 0 3px rgba(228,168,75,0.18);
+        .pl-demo { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-light); }
+        .pl-demo-label { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 10px; }
+        .pl-demo-list { display: flex; flex-direction: column; gap: 6px; }
+        .pl-demo-item { display: flex; align-items: center; gap: 11px; padding: 8px 11px; background: var(--bg-card-solid); border: 1px solid var(--border-light); border-radius: 14px; cursor: pointer; text-align: left; transition: background .14s, border-color .14s, transform .14s; }
+        .pl-demo-item:hover { background: var(--overlay-subtle); border-color: var(--border-medium); transform: translateX(2px); }
+        .pl-demo-avatar { width: 34px; height: 34px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent-light); color: var(--accent-hover); font-size: 14px; font-weight: 800; }
+        .pl-demo-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+        .pl-demo-name { font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pl-demo-sub { font-size: 11px; color: var(--text-muted); }
+        .pl-demo-id { font-size: 11px; font-weight: 600; color: var(--text-muted); font-family: var(--font-platform-mono); flex-shrink: 0; }
+
+        .pl-foot { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 22px; font-size: 12.5px; }
+        .pl-foot-sep { color: var(--border-medium); }
+        .pl-link { display: inline-flex; align-items: center; gap: 5px; color: var(--accent-hover); font-weight: 600; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; font-size: 12.5px; }
+        .pl-link:hover { text-decoration: underline; }
+
+        /* ── Hero ── */
+        .pl-hero { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 34px; }
+        .pl-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 32%; z-index: 0; }
+        .pl-hero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(155deg, color-mix(in srgb, var(--accent-hover) 46%, transparent) 0%, rgba(0,0,0,0.10) 38%, transparent 55%), linear-gradient(0deg, rgba(0,0,0,0.66) 0%, rgba(0,0,0,0.28) 28%, transparent 52%); }
+        .pl-hero-body { position: relative; z-index: 2; color: #fff; max-width: 420px; }
+        .pl-hero-title { font-family: var(--font-platform); font-size: clamp(24px, 2.6vw, 32px); font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 12px; text-shadow: 0 2px 14px rgba(0,0,0,0.3); }
+        .pl-hero-sub { font-size: 14.5px; line-height: 1.6; color: rgba(255,255,255,0.92); margin: 0; text-shadow: 0 2px 10px rgba(0,0,0,0.25); }
+
+        .pl-hcard { position: absolute; z-index: 2; display: flex; align-items: center; gap: 11px; padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--bg-card-solid) 92%, transparent); backdrop-filter: blur(8px); box-shadow: 0 12px 34px rgba(0,0,0,0.18); }
+        .pl-hcard-appt { top: 30px; left: 30px; }
+        .pl-hcard-lab { top: 108px; right: 30px; }
+        .pl-hcard-icon { width: 34px; height: 34px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--accent-light); color: var(--accent-primary); }
+        .pl-hcard-icon-ok { background: color-mix(in srgb, var(--color-success, #15795C) 16%, transparent); color: var(--color-success, #15795C); }
+        .pl-hcard-text { display: flex; flex-direction: column; }
+        .pl-hcard-title { font-size: 12.5px; font-weight: 700; color: var(--text-primary); }
+        .pl-hcard-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+        .pl-spin { width: 13px; height: 13px; border: 2px solid var(--accent-border); border-top-color: var(--accent-primary); border-radius: 50%; display: inline-block; animation: pl-rot .7s linear infinite; }
+        .pl-spin-light { border-color: rgba(255,255,255,0.4); border-top-color: #fff; }
+        @keyframes pl-rot { to { transform: rotate(360deg); } }
+
+        @media (max-width: 860px) {
+          .pl-split { grid-template-columns: 1fr; height: auto; max-width: 460px; }
+          .pl-hero { display: none; }
+          .pl-pane { padding: 28px 26px; }
+          .pl-form-close { display: inline-flex; }
+          .pl-field-row { grid-template-columns: 1fr; }
         }
       `}</style>
     </div>
@@ -868,56 +720,36 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
 
         <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
           {/* Health records section */}
-          <p style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', padding: '8px 14px 4px', opacity: 0.7 }}>{t('patientPortal.sectionHealthRecords')}</p>
+          <p className="ppd-section-label">{t('patientPortal.sectionHealthRecords')}</p>
           {mainTabs.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-              padding: '10px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: activeTab === tab.key ? 'var(--accent-primary)' : 'transparent',
-              color: activeTab === tab.key ? '#fff' : 'var(--text-secondary)',
-              fontSize: 13, fontWeight: 600, textAlign: 'left', marginBottom: 1,
-              transition: 'all 0.15s ease',
-            }}>
-              <tab.icon size={15} />
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className={`ppd-nav-btn${activeTab === tab.key ? ' ppd-nav-btn--active' : ''}`}>
+              {/* The icon shim only reads an explicit `color` prop (not inherited
+                  CSS `color`), so on the active row — same blue as its default
+                  tint — it must be told explicitly to go white or it vanishes. */}
+              <tab.icon size={15} color={activeTab === tab.key ? 'var(--color-white)' : undefined} />
               <span style={{ flex: 1 }}>{tab.label}</span>
-              {tab.count ? <span style={{
-                fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6,
-                background: activeTab === tab.key ? 'rgba(255,255,255,0.25)' : 'var(--accent-light)',
-                color: activeTab === tab.key ? '#fff' : 'var(--accent-primary)',
-              }}>{tab.count}</span> : null}
+              {tab.count ? <span className="ppd-nav-badge">{tab.count}</span> : null}
             </button>
           ))}
 
           {/* Communication & More section */}
           <div style={{ height: 1, background: 'var(--border-medium)', margin: '10px 14px' }} />
-          <p style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', padding: '4px 14px 4px', opacity: 0.7 }}>{t('patientPortal.sectionCommunication')}</p>
+          <p className="ppd-section-label" style={{ padding: '4px 14px 4px' }}>{t('patientPortal.sectionCommunication')}</p>
           {actionTabs.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-              padding: '10px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: activeTab === tab.key ? 'var(--accent-primary)' : 'transparent',
-              color: activeTab === tab.key ? '#fff' : 'var(--text-secondary)',
-              fontSize: 13, fontWeight: 600, textAlign: 'left', marginBottom: 1,
-              transition: 'all 0.15s ease',
-            }}>
-              <tab.icon size={15} />
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className={`ppd-nav-btn${activeTab === tab.key ? ' ppd-nav-btn--active' : ''}`}>
+              <tab.icon size={15} color={activeTab === tab.key ? 'var(--color-white)' : undefined} />
               <span style={{ flex: 1 }}>{tab.label}</span>
-              {tab.count ? <span style={{
-                fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6,
-                background: activeTab === tab.key ? 'rgba(255,255,255,0.25)' : 'var(--accent-light)',
-                color: activeTab === tab.key ? '#fff' : 'var(--accent-primary)',
-              }}>{tab.count}</span> : null}
+              {tab.count ? <span className="ppd-nav-badge">{tab.count}</span> : null}
             </button>
           ))}
         </nav>
 
         <div style={{ padding: '10px 8px', borderTop: '1px solid var(--border-medium)' }}>
-          <button onClick={onLogout} style={{
-            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-            padding: '10px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: 'transparent', color: 'var(--text-muted)',
-            fontSize: 13, fontWeight: 600, textAlign: 'left',
-          }}><LogOut size={15} /> {t('patientPortal.signOut')}</button>
+          <button onClick={onLogout} className="ppd-nav-btn ppd-nav-btn--muted">
+            <LogOut size={15} /> {t('patientPortal.signOut')}
+          </button>
         </div>
       </aside>
 
@@ -938,16 +770,11 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
               <button onClick={() => setActiveTab('chat')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: 6 }}><MessageSquare size={44} /></button>
               <button onClick={onLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 6 }}><LogOut size={44} /></button>
             </div>
-            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }} className="no-scrollbar">
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }} className="no-scrollbar">
               {tabs.map(tab => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-                  display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px',
-                  borderRadius: 8, border: activeTab === tab.key ? 'none' : '1px solid var(--border-medium)', cursor: 'pointer',
-                  background: activeTab === tab.key ? 'var(--accent-primary)' : 'var(--bg-card-solid)',
-                  color: activeTab === tab.key ? '#fff' : 'var(--text-secondary)',
-                  fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
-                }}>
-                  <tab.icon size={13} /> {tab.label}
+                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                  className={`ppd-nav-pill${activeTab === tab.key ? ' ppd-nav-pill--active' : ''}`}>
+                  <tab.icon size={13} color={activeTab === tab.key ? 'var(--color-white)' : undefined} /> {tab.label}
                 </button>
               ))}
             </div>
@@ -958,7 +785,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
       {activeTab === 'chat' && (
         <div>
           {/* Hospital & department selector */}
-          <div className="card-elevated" style={{ padding: 16, marginBottom: 16, borderRadius: 10 }}>
+          <div className="card-elevated" style={{ padding: 16, marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 180 }}>
                 <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 4 }}>{t('patientPortal.hospital')}</label>
@@ -980,7 +807,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
           </div>
 
           {/* Chat area */}
-          <div className="card-elevated" style={{ borderRadius: 10, overflow: 'hidden' }}>
+          <div className="card-elevated" style={{ overflow: 'hidden' }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <MessageSquare size={15} style={{ color: 'var(--accent-primary)' }} />
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{chatDepartment}</span>
@@ -992,7 +819,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   <div style={{
                     maxWidth: '75%', padding: '10px 14px', borderRadius: 12,
                     background: msg.from === 'patient' ? 'var(--accent-primary)' : 'var(--overlay-subtle)',
-                    color: msg.from === 'patient' ? '#fff' : 'var(--text-primary)',
+                    color: msg.from === 'patient' ? 'var(--color-white)' : 'var(--text-primary)',
                     fontSize: 13, lineHeight: 1.5,
                     borderBottomRightRadius: msg.from === 'patient' ? 4 : 12,
                     borderBottomLeftRadius: msg.from === 'system' ? 4 : 12,
@@ -1004,7 +831,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
               ))}
             </div>
             {chatError && (
-              <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border-medium)', background: 'rgba(218,18,48,0.06)', color: '#DA1230', fontSize: 12 }}>
+              <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border-medium)', background: 'var(--color-danger-bg)', color: 'var(--color-danger)', fontSize: 12 }}>
                 {chatError}
               </div>
             )}
@@ -1023,12 +850,12 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                 style={{
                   padding: '10px 14px', borderRadius: 8, border: 'none',
                   cursor: chatSending || !chatInput.trim() ? 'not-allowed' : 'pointer',
-                  background: 'var(--accent-primary)', color: '#fff',
+                  background: 'var(--accent-primary)', color: 'var(--color-white)',
                   display: 'flex', alignItems: 'center',
                   opacity: chatSending || !chatInput.trim() ? 0.6 : 1,
                 }}
               >
-                <Send size={16} />
+                <Send size={16} color="var(--color-white)" />
               </button>
             </div>
           </div>
@@ -1066,12 +893,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* ── Welcome Banner ── */}
-          <div style={{
-            background: 'linear-gradient(135deg, #015697 0%, #2191D0 60%, #369FDA 100%)',
-            borderRadius: 14, padding: '22px 24px', color: '#fff', position: 'relative', overflow: 'hidden',
-          }}>
-            <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
-            <div style={{ position: 'absolute', bottom: -20, right: 60, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
+          <div className="hero-banner">
             <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.8, marginBottom: 4 }}>{t('patientPortal.welcomeBack')}</p>
             <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{patient.firstName} {patient.surname}</h2>
             <p style={{ fontSize: 13, opacity: 0.85 }}>{patient.hospitalNumber} &middot; {patientFacilityName}</p>
@@ -1094,13 +916,13 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
             {[
               { icon: Calendar, label: t('patientPortal.nextAppointment'), value: upcomingApts.length > 0 ? upcomingApts[0].appointmentDate : t('patientPortal.noneScheduled'), color: 'var(--accent-primary)', bg: 'var(--accent-light)' },
-              { icon: FlaskConical, label: t('patientPortal.pendingLabs'), value: t('patientPortal.pendingCount', { count: pendingLabs }), color: pendingLabs > 0 ? 'var(--color-warning)' : 'var(--color-success)', bg: pendingLabs > 0 ? 'rgba(217,119,6,0.08)' : 'rgba(31, 157, 111,0.08)' },
-              { icon: Pill, label: t('patientPortal.activeMeds'), value: t('patientPortal.activeCount', { count: activeMeds }), color: 'var(--accent-primary)', bg: 'rgba(124,58,237,0.08)' },
-              { icon: CheckCircle2, label: t('patientPortal.completedVisits'), value: t('patientPortal.visitCount', { count: completedApts }), color: 'var(--color-success)', bg: 'rgba(31, 157, 111,0.08)' },
+              { icon: FlaskConical, label: t('patientPortal.pendingLabs'), value: t('patientPortal.pendingCount', { count: pendingLabs }), color: pendingLabs > 0 ? 'var(--color-warning)' : 'var(--color-success)', bg: pendingLabs > 0 ? 'var(--color-warning-bg)' : 'var(--color-success-bg)' },
+              { icon: Pill, label: t('patientPortal.activeMeds'), value: t('patientPortal.activeCount', { count: activeMeds }), color: 'var(--accent-purple)', bg: 'color-mix(in srgb, var(--accent-purple) 10%, transparent)' },
+              { icon: CheckCircle2, label: t('patientPortal.completedVisits'), value: t('patientPortal.visitCount', { count: completedApts }), color: 'var(--color-success)', bg: 'var(--color-success-bg)' },
             ].map((stat, i) => (
               <div key={i} className="card-elevated" style={{ padding: '14px 14px', borderTop: `3px solid ${stat.color}` }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: stat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                  <stat.icon size={16} style={{ color: stat.color }} />
+                  <stat.icon size={16} color={stat.color} />
                 </div>
                 <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>{stat.value}</p>
                 <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 4 }}>{stat.label}</p>
@@ -1139,7 +961,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                             <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{apt.reason || apt.appointmentType}</p>
                             <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('patientPortal.drPrefix')} {apt.providerName} &middot; {apt.department}</p>
                           </div>
-                          {i === 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: 'var(--accent-primary)', color: '#fff', textTransform: 'uppercase', flexShrink: 0 }}>{t('patientPortal.next')}</span>}
+                          {i === 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: 'var(--accent-primary)', color: 'var(--color-white)', textTransform: 'uppercase', flexShrink: 0 }}>{t('patientPortal.next')}</span>}
                         </div>
                       </div>
                     ))}
@@ -1153,7 +975,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 0' }}>
                     <Calendar size={44} style={{ color: 'var(--text-muted)', opacity: 0.3, marginBottom: 8 }} />
                     <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>{t('patientPortal.noUpcomingAppointments')}</p>
-                    <button onClick={() => setShowBooking(true)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button onClick={() => setShowBooking(true)} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: 'var(--accent-primary)', color: 'var(--color-white)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Plus size={12} />{t('patientPortal.bookAppointment')}
                     </button>
                   </div>
@@ -1171,16 +993,16 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             {Object.keys(vitals).length > 0 ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginTop: 12 }}>
                 {[
-                  { key: 'bloodPressure', label: t('patientPortal.bloodPressure'), icon: HeartPulse, unit: 'mmHg', color: '#EF4444' },
-                  { key: 'heartRate', label: t('patientPortal.heartRate'), icon: Activity, unit: 'bpm', color: '#EC4899' },
-                  { key: 'temperature', label: t('patientPortal.temperature'), icon: Thermometer, unit: '°C', color: '#F59E0B' },
-                  { key: 'weight', label: t('patientPortal.weight'), icon: Weight, unit: 'kg', color: '#6366F1' },
-                  { key: 'respiratoryRate', label: t('patientPortal.respRate'), icon: Droplets, unit: '/min', color: '#369FDA' },
-                  { key: 'oxygenSaturation', label: 'SpO₂', icon: Eye, unit: '%', color: '#1F9D6F' },
+                  { key: 'bloodPressure', label: t('patientPortal.bloodPressure'), icon: HeartPulse, unit: 'mmHg' },
+                  { key: 'heartRate', label: t('patientPortal.heartRate'), icon: Activity, unit: 'bpm' },
+                  { key: 'temperature', label: t('patientPortal.temperature'), icon: Thermometer, unit: '°C' },
+                  { key: 'weight', label: t('patientPortal.weight'), icon: Weight, unit: 'kg' },
+                  { key: 'respiratoryRate', label: t('patientPortal.respRate'), icon: Droplets, unit: '/min' },
+                  { key: 'oxygenSaturation', label: 'SpO₂', icon: Eye, unit: '%' },
                 ].filter(v => vitals[v.key]).map(v => (
-                  <div key={v.key} style={{ padding: '12px 14px', borderRadius: 10, background: `${v.color}08`, border: `1px solid ${v.color}15`, textAlign: 'center' }}>
+                  <div key={v.key} style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', textAlign: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginBottom: 6 }}>
-                      <v.icon size={12} style={{ color: v.color }} />
+                      <v.icon size={12} style={{ color: 'var(--accent-primary)' }} />
                       <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{v.label}</span>
                     </div>
                     <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{String(vitals[v.key])}</p>
@@ -1200,20 +1022,20 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
               <SH icon={AlertTriangle} title={t('patientPortal.healthAlerts')} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, flex: 1 }}>
                 {(patient.allergies || []).length > 0 && (
-                  <AlertRow color="#EF4444" text={t('patientPortal.allergiesList', { list: patient.allergies.join(', ') })} />
+                  <AlertRow color="var(--color-danger)" text={t('patientPortal.allergiesList', { list: patient.allergies.join(', ') })} />
                 )}
                 {(patient.chronicConditions || []).map((c, i) => (
-                  <AlertRow key={i} color="var(--color-warning-600)" text={c} />
+                  <AlertRow key={i} color="var(--color-warning)" text={c} />
                 ))}
                 {pendingLabs > 0 && (
                   <AlertRow color="var(--accent-primary)" text={t('patientPortal.pendingLabResults', { count: pendingLabs })} />
                 )}
                 {labResults.some(l => l.critical) && (
-                  <AlertRow color="#EF4444" text={t('patientPortal.criticalLabAlert')} />
+                  <AlertRow color="var(--color-danger)" text={t('patientPortal.criticalLabAlert')} />
                 )}
                 {(patient.allergies || []).length === 0 && (patient.chronicConditions || []).length === 0 && pendingLabs === 0 && (
-                  <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(31, 157, 111,0.06)', border: '1px solid rgba(31, 157, 111,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <CheckCircle2 size={14} style={{ color: 'var(--color-success)' }} />
+                  <div style={{ padding: '12px 14px', borderRadius: 8, background: 'var(--color-success-bg)', border: '1px solid color-mix(in srgb, var(--color-success) 20%, transparent)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <CheckCircle2 size={14} color="var(--color-success)" />
                     <span style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 600 }}>{t('patientPortal.noHealthAlerts')}</span>
                   </div>
                 )}
@@ -1259,7 +1081,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                     <div style={{ position: 'absolute', left: 7, top: 4, bottom: 4, width: 2, background: 'var(--border-medium)' }} />
                     {timeline.slice(0, 5).map((item, i) => (
                       <div key={i} style={{ position: 'relative', marginBottom: i < Math.min(timeline.length, 5) - 1 ? 14 : 0 }}>
-                        <div style={{ position: 'absolute', left: -16, top: 2, width: 16, height: 16, borderRadius: '50%', background: `${item.color}15`, border: `2px solid ${item.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ position: 'absolute', left: -16, top: 2, width: 16, height: 16, borderRadius: '50%', background: `color-mix(in srgb, ${item.color} 15%, transparent)`, border: `2px solid ${item.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <div style={{ width: 6, height: 6, borderRadius: '50%', background: item.color }} />
                         </div>
                         <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 1 }}>{item.date}</p>
@@ -1277,7 +1099,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             </div>
 
             {/* Quick Actions */}
-            <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #015697 100%)', border: 'none', display: 'flex', flexDirection: 'column' }}>
+            <div className="card-elevated" style={{ padding: 18, background: 'var(--accent-hover)', border: 'none', display: 'flex', flexDirection: 'column' }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{t('patientPortal.quickActions')}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
                 {[
@@ -1288,14 +1110,10 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   { label: t('patientPortal.payBills'), icon: Wallet, action: () => setActiveTab('billing') },
                   { label: t('patientPortal.tabMyProfile'), icon: UserCircle, action: () => setActiveTab('profile') },
                 ].map((qa, i) => (
-                  <button key={i} onClick={qa.action} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px',
-                    borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)',
-                    color: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
-                  }}>
-                    <qa.icon size={14} style={{ opacity: 0.7 }} />
+                  <button key={i} onClick={qa.action} className="ppd-quick-action">
+                    <qa.icon size={14} color="var(--color-white)" style={{ opacity: 0.7 }} />
                     <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{qa.label}</span>
-                    <ChevronRight size={12} style={{ opacity: 0.4 }} />
+                    <ChevronRight size={12} color="var(--color-white)" style={{ opacity: 0.4 }} />
                   </button>
                 ))}
               </div>
@@ -1407,7 +1225,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                     background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
                   }}>
                     <div style={{ minWidth: 70, fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{(lab.orderedAt || lab.createdAt).slice(0, 10)}</div>
-                    <FlaskConical size={14} style={{ color: lab.status === 'pending' ? 'var(--color-warning)' : lab.abnormal ? 'var(--color-danger)' : 'var(--color-success)', flexShrink: 0 }} />
+                    <FlaskConical size={14} color={lab.status === 'pending' ? 'var(--color-warning)' : lab.abnormal ? 'var(--color-danger)' : 'var(--color-success)'} style={{ flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{lab.testName}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{lab.specimen} &middot; {lab.orderedBy}</div>
@@ -1418,7 +1236,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                   </button>
                   {expandedId === lab._id && lab.status === 'completed' && (
                     <div style={{ padding: '0 16px 14px', borderTop: '1px solid var(--border-medium)', paddingTop: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 'var(--card-radius)', background: lab.abnormal ? 'rgba(239,68,68,0.04)' : 'rgba(31, 157, 111,0.04)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 'var(--card-radius)', background: lab.abnormal ? 'var(--color-danger-bg)' : 'var(--color-success-bg)' }}>
                         <div>
                           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('patientPortal.result')}</div>
                           <div className="stat-value" style={{ fontSize: 15, fontWeight: 700, color: lab.abnormal ? 'var(--color-danger)' : 'var(--text-primary)' }}>{lab.result}</div>
@@ -1431,7 +1249,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                         )}
                       </div>
                       {lab.critical && (
-                        <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 'var(--card-radius)', background: 'rgba(239,68,68,0.06)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 'var(--card-radius)', background: 'var(--color-danger-bg)', display: 'flex', alignItems: 'center', gap: 6 }}>
                           <AlertTriangle size={12} style={{ color: 'var(--color-danger)' }} />
                           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-danger)' }}>{t('patientPortal.criticalResult')}</span>
                         </div>
@@ -1691,7 +1509,7 @@ function ProfileTab({ patient }: { patient: PatientDoc }) {
             {(patient.allergies || []).length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {patient.allergies.map((a, i) => (
-                  <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.15)' }}>{a}</span>
+                  <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'var(--color-danger-bg)', color: 'var(--color-danger)', border: '1px solid color-mix(in srgb, var(--color-danger) 20%, transparent)' }}>{a}</span>
                 ))}
               </div>
             ) : (
@@ -1705,7 +1523,7 @@ function ProfileTab({ patient }: { patient: PatientDoc }) {
             {(patient.chronicConditions || []).length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {patient.chronicConditions.map((c, i) => (
-                  <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'rgba(217,119,6,0.08)', color: 'var(--color-warning-600)', border: '1px solid rgba(217,119,6,0.15)' }}>{c}</span>
+                  <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'var(--color-warning-bg)', color: 'var(--color-warning)', border: '1px solid color-mix(in srgb, var(--color-warning) 20%, transparent)' }}>{c}</span>
                 ))}
               </div>
             ) : (
@@ -1878,7 +1696,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
     { key: 'mpesa', name: 'M-Pesa', icon: Phone, desc: t('patientPortal.payViaMpesa'), color: '#4CAF50' },
     { key: 'mtn', name: 'MTN Mobile Money', icon: Phone, desc: t('patientPortal.payViaMtn'), color: '#FFC107' },
     { key: 'airtel', name: 'Airtel Money', icon: Phone, desc: t('patientPortal.payViaAirtel'), color: '#E53935' },
-    { key: 'card', name: t('patientPortal.cardPayment'), icon: CreditCard, desc: t('patientPortal.payViaCard'), color: '#2191D0' },
+    { key: 'card', name: t('patientPortal.cardPayment'), icon: CreditCard, desc: t('patientPortal.payViaCard'), color: 'var(--accent-primary)' },
     { key: 'bank', name: t('patientPortal.bankTransfer'), icon: Banknote, desc: t('patientPortal.payViaBank'), color: '#00897B' },
   ];
 
@@ -1998,8 +1816,8 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
     return (
       <div style={{ maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
         <div className="card-elevated" style={{ padding: '40px 28px', borderTop: '4px solid var(--color-success)' }}>
-          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(31, 157, 111,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-            <CheckCircle2 size={56} style={{ color: 'var(--color-success)' }} />
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-success-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <CheckCircle2 size={56} color="var(--color-success)" />
           </div>
           <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>{t('patientPortal.paymentRecorded')}</h3>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
@@ -2010,8 +1828,8 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
               : t('patientPortal.successBankTransfer')}
           </p>
           {failedCount > 0 && (
-            <div style={{ padding: 10, borderRadius: 8, marginBottom: 14, background: 'rgba(218,18,48,0.06)', border: '1px solid rgba(218,18,48,0.15)' }}>
-              <p style={{ fontSize: 12, color: '#DA1230', fontWeight: 600 }}>
+            <div style={{ padding: 10, borderRadius: 8, marginBottom: 14, background: 'var(--color-danger-bg)', border: '1px solid color-mix(in srgb, var(--color-danger) 20%, transparent)' }}>
+              <p style={{ fontSize: 12, color: 'var(--color-danger)', fontWeight: 600 }}>
                 {t('patientPortal.billsNotUpdated', { count: failedCount })}
               </p>
             </div>
@@ -2046,7 +1864,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
               </div>
             )}
           </div>
-          <button onClick={() => { setStep('bills'); setSelectedBills([]); setPayMethod(null); setLastPayment(null); }} style={{ fontSize: 13, fontWeight: 600, padding: '10px 24px', borderRadius: 8, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>{t('patientPortal.done')}</button>
+          <button onClick={() => { setStep('bills'); setSelectedBills([]); setPayMethod(null); setLastPayment(null); }} style={{ fontSize: 13, fontWeight: 600, padding: '10px 24px', borderRadius: 8, background: 'var(--accent-primary)', color: 'var(--color-white)', border: 'none', cursor: 'pointer' }}>{t('patientPortal.done')}</button>
         </div>
       </div>
     );
@@ -2077,13 +1895,13 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
             ))}
           </div>
           {(payMethod === 'mpesa' || payMethod === 'mtn' || payMethod === 'airtel') && (
-            <div style={{ padding: 10, borderRadius: 8, background: `${method.color}10`, border: `1px solid ${method.color}20`, marginBottom: 14 }}>
+            <div style={{ padding: 10, borderRadius: 8, background: `color-mix(in srgb, ${method.color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${method.color} 20%, transparent)`, marginBottom: 14 }}>
               <p style={{ fontSize: 11, color: method.color, fontWeight: 600 }}>{t('patientPortal.paymentPromptNotice', { phone: payPhone })}</p>
             </div>
           )}
           {payError && (
-            <div style={{ padding: 10, borderRadius: 8, background: 'rgba(218,18,48,0.06)', border: '1px solid rgba(218,18,48,0.15)', marginBottom: 14 }}>
-              <p style={{ fontSize: 12, color: '#DA1230', fontWeight: 600 }}>{payError}</p>
+            <div style={{ padding: 10, borderRadius: 8, background: 'var(--color-danger-bg)', border: '1px solid color-mix(in srgb, var(--color-danger) 20%, transparent)', marginBottom: 14 }}>
+              <p style={{ fontSize: 12, color: 'var(--color-danger)', fontWeight: 600 }}>{payError}</p>
             </div>
           )}
           <div style={{ display: 'flex', gap: 10 }}>
@@ -2101,7 +1919,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
               disabled={paying}
               style={{
                 flex: 1, padding: '12px 0', borderRadius: 8, border: 'none', background: method.color,
-                color: '#fff', fontSize: 13, fontWeight: 700, cursor: paying ? 'not-allowed' : 'pointer',
+                color: 'var(--color-white)', fontSize: 13, fontWeight: 700, cursor: paying ? 'not-allowed' : 'pointer',
                 opacity: paying ? 0.6 : 1,
               }}
             >{paying ? t('patientPortal.recording') : t('patientPortal.payAmount', { amount: `${selectedTotal.toLocaleString()} SSP` })}</button>
@@ -2123,17 +1941,17 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
               <button key={m.key} onClick={() => setPayMethod(m.key)} style={{
                 display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '14px 16px',
                 borderRadius: 10, border: payMethod === m.key ? `2px solid ${m.color}` : '1px solid var(--border-medium)',
-                background: payMethod === m.key ? `${m.color}08` : 'var(--bg-card-solid)',
+                background: payMethod === m.key ? `color-mix(in srgb, ${m.color} 8%, transparent)` : 'var(--bg-card-solid)',
                 cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
               }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: `${m.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <m.icon size={44} style={{ color: m.color }} />
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: `color-mix(in srgb, ${m.color} 12%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <m.icon size={44} color={m.color} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{m.name}</p>
                   <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.desc}</p>
                 </div>
-                {payMethod === m.key && <CheckCircle2 size={44} style={{ color: m.color }} />}
+                {payMethod === m.key && <CheckCircle2 size={44} color={m.color} />}
               </button>
             ))}
           </div>
@@ -2145,7 +1963,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
             </div>
           )}
           <button onClick={() => payMethod && setStep('confirm')} disabled={!payMethod}
-            style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: payMethod ? 'var(--accent-primary)' : 'var(--border-medium)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: payMethod ? 'pointer' : 'not-allowed', opacity: payMethod ? 1 : 0.5 }}>
+            style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: payMethod ? 'var(--accent-primary)' : 'var(--border-medium)', color: 'var(--color-white)', fontSize: 14, fontWeight: 700, cursor: payMethod ? 'pointer' : 'not-allowed', opacity: payMethod ? 1 : 0.5 }}>
             {t('patientPortal.continueToConfirm')}
           </button>
         </div>
@@ -2183,10 +2001,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
   if (safeBills.length === 0) {
     return (
       <div>
-        <div style={{
-          background: 'linear-gradient(135deg, #015697 0%, #2191D0 60%, #369FDA 100%)',
-          borderRadius: 14, padding: '20px 24px', color: '#fff', marginBottom: 16, position: 'relative', overflow: 'hidden',
-        }}>
+        <div className="hero-banner hero-banner--compact" style={{ marginBottom: 16 }}>
           <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 4 }}>{t('patientPortal.accountSummary')}</p>
           <p style={{ fontSize: 28, fontWeight: 700 }}>0 <span style={{ fontSize: 14, opacity: 0.7 }}>SSP</span></p>
           <p style={{ fontSize: 10, opacity: 0.7, textTransform: 'uppercase' }}>{t('patientPortal.outstandingBalance')}</p>
@@ -2204,11 +2019,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
   return (
     <div>
       {/* Balance banner */}
-      <div style={{
-        background: 'linear-gradient(135deg, #015697 0%, #2191D0 60%, #369FDA 100%)',
-        borderRadius: 14, padding: '20px 24px', color: '#fff', marginBottom: 16, position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
+      <div className="hero-banner hero-banner--compact" style={{ marginBottom: 16 }}>
         <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 4 }}>{t('patientPortal.accountSummary')}</p>
         <div style={{ display: 'flex', gap: 30, flexWrap: 'wrap', marginTop: 8 }}>
           <div>
@@ -2259,7 +2070,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
                         background: isSelected ? 'var(--accent-primary)' : 'transparent',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
-                        {isSelected && <CheckCircle2 size={14} style={{ color: '#fff' }} />}
+                        {isSelected && <CheckCircle2 size={14} color="var(--color-white)" />}
                       </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -2304,7 +2115,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
                   <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>{t('portal.amountToPay')}</p>
                   <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--accent-primary)' }}>{selectedTotal.toLocaleString()} <span style={{ fontSize: 12 }}>SSP</span></p>
                 </div>
-                <button onClick={() => setStep('method')} style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: 'var(--accent-primary)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                <button onClick={() => setStep('method')} style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: 'var(--accent-primary)', color: 'var(--color-white)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                   {t('patientPortal.proceedToPay')}
                 </button>
               </>
@@ -2324,8 +2135,8 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
               {paymentMethods.map(m => (
                 <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--overlay-subtle)' }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 6, background: `${m.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <m.icon size={13} style={{ color: m.color }} />
+                  <div style={{ width: 28, height: 28, borderRadius: 6, background: `color-mix(in srgb, ${m.color} 12%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <m.icon size={13} color={m.color} />
                   </div>
                   <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{m.name}</span>
                 </div>
@@ -2334,7 +2145,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
           </div>
 
           {/* Payment history summary */}
-          <div className="card-elevated" style={{ padding: 18, background: 'linear-gradient(135deg, #1a3a4a 0%, #015697 100%)', border: 'none' }}>
+          <div className="card-elevated" style={{ padding: 18, background: 'var(--accent-hover)', border: 'none' }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>{t('patientPortal.paymentSummary')}</p>
             {[
               { label: t('patientPortal.totalBilled'), value: formatMoney(safeBills.reduce((s, b) => s + b.amount, 0)) },
@@ -2344,7 +2155,7 @@ function BillingTab({ patient, sessionToken }: { patient: PatientDoc; sessionTok
             ].map((row, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
                 <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{row.label}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{row.value}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-white)' }}>{row.value}</span>
               </div>
             ))}
           </div>
@@ -2380,17 +2191,30 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
+// Both helpers accept `color` as either a hex literal or a CSS `var(--x)`
+// reference. Alpha-tinted backgrounds are computed with `color-mix()` rather
+// than string-concatenating a hex alpha suffix onto `color` — the latter
+// silently produces an invalid value (e.g. `var(--color-danger)12`) whenever
+// a var() reference is passed in, leaving the background transparent.
 function AlertRow({ color, text }: { color: string; text: string }) {
   return (
-    <div style={{ padding: '8px 10px', borderRadius: 'var(--card-radius)', background: `${color}08`, border: `1px solid ${color}18`, display: 'flex', alignItems: 'center', gap: 7 }}>
-      <span style={{ fontSize: 12, color: color === 'var(--accent-primary)' ? 'var(--accent-primary)' : color }}>{text}</span>
+    <div style={{
+      padding: '8px 10px', borderRadius: 'var(--card-radius)',
+      background: `color-mix(in srgb, ${color} 8%, transparent)`,
+      border: `1px solid color-mix(in srgb, ${color} 18%, transparent)`,
+      display: 'flex', alignItems: 'center', gap: 7,
+    }}>
+      <span style={{ fontSize: 12, color }}>{text}</span>
     </div>
   );
 }
 
 function Badge({ text, color }: { text: string; color: string }) {
   return (
-    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, color, background: `${color}12`, textTransform: 'capitalize' }}>{text}</span>
+    <span style={{
+      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, color,
+      background: `color-mix(in srgb, ${color} 14%, transparent)`, textTransform: 'capitalize',
+    }}>{text}</span>
   );
 }
 
@@ -2408,76 +2232,53 @@ function Empty({ icon: Icon, text, action, onAction }: { icon: typeof User; text
    PATIENT PORTAL STYLES — matches main landing page design
    ═══════════════════════════════════════════════════════════════ */
 const patientPortalCSS = `
-.pp-title {
-  font-family: var(--font-platform);
-  font-size: 32px; font-weight: 700; color: var(--text-primary);
-  letter-spacing: -0.02em; margin-bottom: 8px; line-height: 1.2;
+/* ── Dashboard sidebar / mobile nav ──
+   These need real :hover rules (inline React styles can't express hover),
+   so the nav buttons below are styled through these classes instead of
+   inline style objects. */
+.ppd-section-label {
+  font-size: 9px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.12em;
+  padding: 8px 14px 4px; opacity: 0.7; margin: 0;
 }
-.pp-subtitle {
-  font-family: var(--font-platform);
-  font-size: 16px; color: var(--text-secondary); line-height: 1.6;
-  max-width: 380px; margin: 0 auto;
+.ppd-nav-btn {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 14px; border-radius: 10px; border: none; cursor: pointer;
+  background: transparent; color: var(--text-secondary);
+  font-size: 13px; font-weight: 600; text-align: left; margin-bottom: 1px;
+  transition: background 0.15s ease, color 0.15s ease;
 }
-.pp-card {
-  background: var(--bg-card-solid); border: 1px solid var(--border-medium);
-  border-radius: 12px; box-shadow: var(--card-shadow-lg);
+.ppd-nav-btn:hover { background: var(--overlay-subtle); }
+.ppd-nav-btn--muted { color: var(--text-muted); }
+.ppd-nav-btn--active,
+.ppd-nav-btn--active:hover {
+  background: var(--accent-primary); color: var(--color-white);
 }
-.pp-toggle {
-  display: flex; margin-bottom: 28px; border-radius: 8px;
-  overflow: hidden; border: 1px solid var(--border-medium);
-  background: var(--bg-secondary);
+.ppd-nav-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px;
+  background: var(--accent-light); color: var(--accent-primary);
 }
-.pp-toggle__btn {
-  flex: 1; padding: 14px 0; font-family: var(--font-platform);
-  font-size: 14px; font-weight: 700; border: none; cursor: pointer;
-  background: transparent; color: var(--text-secondary); transition: all 0.2s ease;
-  border-radius: 7px; margin: 2px;
+.ppd-nav-btn--active .ppd-nav-badge {
+  background: rgba(255,255,255,0.25); color: var(--color-white);
 }
-.pp-toggle__btn--active {
-  background: var(--accent-primary); color: #fff;
-  box-shadow: 0 2px 8px rgba(0,119,215,0.25);
+.ppd-nav-pill {
+  display: flex; align-items: center; gap: 5px; padding: 8px 14px;
+  border-radius: 10px; border: 1px solid var(--border-medium); cursor: pointer;
+  background: var(--bg-card-solid); color: var(--text-secondary);
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.pp-field { margin-bottom: 20px; }
-.pp-label {
-  display: block; font-family: var(--font-platform);
-  font-size: 14px; font-weight: 600; color: var(--text-primary);
-  margin-bottom: 8px; letter-spacing: 0;
-  text-transform: none;
+.ppd-nav-pill:hover { background: var(--overlay-subtle); }
+.ppd-nav-pill--active,
+.ppd-nav-pill--active:hover {
+  background: var(--accent-primary); color: var(--color-white); border-color: var(--accent-primary);
 }
-.pp-input {
-  width: 100%; padding: 14px 16px; border-radius: 8px;
-  border: 1px solid var(--border-medium); font-family: var(--font-platform);
-  font-size: 16px; color: var(--text-primary); background: var(--bg-card-solid);
-  transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+
+/* ── Dark navy panels (Quick Actions, Payment Summary) ── */
+.ppd-quick-action {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px;
+  border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05);
+  color: var(--color-white); cursor: pointer; text-align: left; transition: background 0.15s ease;
 }
-.pp-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 4px var(--accent-light); }
-.pp-input::placeholder { color: var(--text-muted); }
-.pp-btn-primary {
-  display: inline-flex; align-items: center; justify-content: center;
-  gap: 10px; padding: 16px 28px; border-radius: 8px;
-  font-family: var(--font-platform); font-size: 16px;
-  font-weight: 700; cursor: pointer; border: none;
-  background: var(--accent-primary); color: #fff; transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0,119,215,0.2);
-}
-.pp-btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,119,215,0.3); }
-.pp-error {
-  padding: 14px 16px; border-radius: 8px; background: rgba(218,18,48,0.06);
-  border: 1px solid rgba(218,18,48,0.15); margin-bottom: 18px;
-  display: flex; gap: 10px; align-items: flex-start;
-  font-size: 14px; color: #DA1230; line-height: 1.5;
-}
-.pp-notice {
-  margin-top: 24px; padding: 16px 18px; border-radius: 10px;
-  background: var(--accent-light); border: 1px solid var(--accent-border);
-  display: flex; gap: 10px; align-items: flex-start;
-  font-size: 13px; color: var(--text-secondary); line-height: 1.6;
-}
-.pp-demo-btn {
-  display: flex; flex-direction: column; gap: 3px; padding: 14px 16px;
-  background: var(--bg-card-solid); border: 1px solid var(--border-medium);
-  border-radius: 8px; cursor: pointer; text-align: left; width: 100%;
-  transition: all 0.15s ease;
-}
-.pp-demo-btn:hover { border-color: var(--accent-primary); background: var(--accent-light); transform: translateY(-1px); }
+.ppd-quick-action:hover { background: rgba(255,255,255,0.1); }
 `;
