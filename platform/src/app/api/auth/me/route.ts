@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       name: payload.name,
       role: payload.role,
       hospitalId: payload.hospitalId,
+      hospitalName: payload.hospitalName,
       orgId: payload.orgId,
       mustChangePassword: payload.mustChangePassword,
     },

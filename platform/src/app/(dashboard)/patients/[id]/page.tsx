@@ -152,6 +152,9 @@ export default function PatientDetailPage() {
   const [showPrescribeModal, setShowPrescribeModal] = useState(false);
   const [showReferModal, setShowReferModal] = useState(false);
   const [showTriagePopup, setShowTriagePopup] = useState(false);
+  // One-shot request for the chart shell to open a workspace drawer panel
+  // (e.g. header "+ Note" → the persisting visit-note panel).
+  const [chartPanelRequest, setChartPanelRequest] = useState<string | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printSignature, setPrintSignature] = useState('');
   const [printSigned, setPrintSigned] = useState(false);
@@ -192,7 +195,7 @@ export default function PatientDetailPage() {
   const { appointments: patientAppointments } = usePatientAppointments(patient?._id);
   const { prescriptions: allPrescriptions } = usePrescriptions();
   const { triages: patientTriages } = useTriage(patient?._id);
-  const { canConsult, canViewClinical, canOrderLabs, canPrescribe, canBookAppointments } = usePermissions();
+  const { canConsult, canViewClinical, canOrderLabs, canPrescribe, canBookAppointments, canManageReferrals } = usePermissions();
 
   // Defence in depth: if a non-clinical viewer lands on (or deep-links to) a
   // clinical tab, snap them back to the overview so clinical panels never render.
@@ -1105,6 +1108,8 @@ export default function PatientDetailPage() {
             onOpenPrescribeModal={() => setShowPrescribeModal(true)}
             onOpenOrderLabModal={() => setShowOrderLabModal(true)}
             onNoteSaved={reloadPatientNotes}
+            panelRequest={chartPanelRequest}
+            onPanelRequestHandled={() => setChartPanelRequest(null)}
             header={
               <ChartHeader
                 patient={patient}
@@ -1115,11 +1120,16 @@ export default function PatientDetailPage() {
                 onCollectPayment={openPaymentFromHeader}
                 onMessage={() => setShowMessageModal(true)}
                 onPrint={() => { setPrintSignature(currentUser?.name || ''); setPrintSigned(false); setShowPrintModal(true); }}
-                onPatientEd={() => setActiveTab('documents')}
-                onNote={() => (canConsult ? router.push(`/consultation?patientId=${patient._id}`) : setActiveTab('notes'))}
+                onPatientEd={() => {
+                  // Real patient-education action: a message queued to the
+                  // patient (app/SMS), pre-labelled — not just a tab switch.
+                  setMessageSubject('Patient education');
+                  setShowMessageModal(true);
+                }}
+                onNote={() => (canConsult ? setChartPanelRequest('visit-note') : setActiveTab('notes'))}
                 onScripts={() => (canPrescribe ? setShowPrescribeModal(true) : setActiveTab('prescriptions'))}
                 onOrders={() => (canOrderLabs ? setShowOrderLabModal(true) : setActiveTab('labs'))}
-                onExchange={() => (canViewClinical ? setShowReferModal(true) : setActiveTab('recall'))}
+                onExchange={() => (canManageReferrals ? setShowReferModal(true) : setActiveTab('recall'))}
                 onEdit={openEditModal}
                 onStickyNote={() => { if (canViewClinical) setActiveTab('notes'); }}
               />

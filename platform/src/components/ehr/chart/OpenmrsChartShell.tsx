@@ -16,7 +16,7 @@
  * patient/current-user/permission/router context they need down to them.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import {
   ShoppingCart, Edit3, ClipboardCheck, FileText, Users, X, Maximize2,
@@ -74,16 +74,30 @@ interface OpenmrsChartShellProps {
   onOpenPrescribeModal: () => void;
   onOpenOrderLabModal: () => void;
   onNoteSaved?: () => void;
+  /** One-shot request from the page to open a drawer panel by id (e.g. the
+   *  header's "+ Note" opening 'visit-note'); acknowledged via
+   *  onPanelRequestHandled so the same panel can be requested again. */
+  panelRequest?: string | null;
+  onPanelRequestHandled?: () => void;
 }
 
 export default function OpenmrsChartShell({
   activeTab, setActiveTab, railItems, moreItems, header, vitalsBand, children,
   patient, currentUser, canPrescribe, canOrderLabs, canConsult, router,
   onOpenPrescribeModal, onOpenOrderLabModal, onNoteSaved,
+  panelRequest, onPanelRequestHandled,
 }: OpenmrsChartShellProps) {
   const [openPanel, setOpenPanel] = useState<string | null>(null);
   // Drawer expand toggle — widens the workspace drawer to near-full-width.
   const [drawerMaximized, setDrawerMaximized] = useState(false);
+
+  useEffect(() => {
+    if (panelRequest) {
+      setOpenPanel(panelRequest);
+      setDrawerMaximized(false);
+      onPanelRequestHandled?.();
+    }
+  }, [panelRequest, onPanelRequestHandled]);
   const activePanel = DRAWER_PANELS.find(p => p.id === openPanel) || null;
 
   const togglePanel = (id: string) => {

@@ -71,8 +71,8 @@ const INSIGHTS = [
     fg: "#FFFFFF",
     shadow: "#E8863A",
     borderColor: "rgba(232,134,58,0.6)",
-    kickerColor: "#F5A263",
-    numColor: "rgba(232,134,58,0.25)",
+    kickerColor: "#F8B27E",
+    numColor: "#E8863A",
     rule: "rgba(255,255,255,0.2)",
     points: [
       "High data loss between visits and departments",
@@ -88,8 +88,8 @@ const INSIGHTS = [
     fg: "#0F4C81",
     shadow: "rgba(232,134,58,0.45)",
     borderColor: "#EFF8FD",
-    kickerColor: "#C2571B",
-    numColor: "rgba(232,134,58,0.18)",
+    kickerColor: "#A84A15",
+    numColor: "#C56A20",
     rule: "#E2E8F0",
     points: [
       "Manual transfers between facilities are ineffective",
@@ -213,7 +213,7 @@ const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
 const PRODUCTS = [
   {
     acronym: "HMIS",
-    accent: "#1C7AAF",
+    accent: "#176B95",
     title: "Hospital Management System",
     tagline: "For State, County & Referral hospitals",
     description:
@@ -270,7 +270,7 @@ const PRODUCTS = [
   },
   {
     acronym: "RIS",
-    accent: "#A0670D",
+    accent: "#875607",
     title: "Radiology Information System",
     tagline: "For radiology centres & imaging departments",
     description:
@@ -305,7 +305,7 @@ const PRODUCTS = [
   },
   {
     acronym: "PPS",
-    accent: "#27844C",
+    accent: "#1E6E3F",
     title: "Patient Portal",
     tagline: "Patients' window into their own care",
     description:
@@ -335,7 +335,7 @@ const CARE_LEVELS = [
   { level: "Community — Boma Health Initiative", role: "Promotion, screening & referral", product: "Registry & referral", tone: "#2C7DA0" },
   { level: "Primary Health Care Unit (PHCU)", role: "First formal point of care", product: "CMS", tone: "#0B6E5C" },
   { level: "Primary Health Care Centre (PHCC)", role: "Expanded primary & maternity care", product: "CMS", tone: "#0B6E5C" },
-  { level: "County Hospital", role: "First referral & inpatient care", product: "HMIS", tone: "#1C7AAF" },
+  { level: "County Hospital", role: "First referral & inpatient care", product: "HMIS", tone: "#176B95" },
   { level: "State Hospital", role: "Secondary & specialised care", product: "HMIS", tone: "#146A9E" },
   { level: "Referral / Tertiary Hospital", role: "Tertiary & teaching care", product: "HMIS", tone: "#015697" },
 ];
@@ -483,7 +483,7 @@ export default function Home() {
             <a href="#contact" className="tm-nav-link" style={{ color: "rgba(255,255,255,0.92)", textDecoration: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em", padding: "9px 18px", borderRadius: 0 }}>
               Contact
             </a>
-            <a href="#contact" className="tm-nav-cta" style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 13.5, fontWeight: 700, padding: "10px 22px", textDecoration: "none", letterSpacing: "0.02em", borderRadius: 0 }}>
+            <a href="#contact" className="tm-nav-cta" style={{ background: "#1774A8", color: "#FFFFFF", fontSize: 13.5, fontWeight: 700, padding: "10px 22px", textDecoration: "none", letterSpacing: "0.02em", borderRadius: 0 }}>
               Book a Demo
             </a>
           </div>
@@ -524,7 +524,7 @@ export default function Home() {
             <a href="#contact" onClick={() => setMenuOpen(false)} style={{ color: "#FFFFFF", textDecoration: "none", fontSize: 16, fontWeight: 600, padding: "14px 32px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
               Contact
             </a>
-            <a href="#contact" onClick={() => setMenuOpen(false)} style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 15, fontWeight: 700, padding: "14px 32px", textDecoration: "none", margin: "12px 32px 0", textAlign: "center" }}>
+            <a href="#contact" onClick={() => setMenuOpen(false)} style={{ background: "#1774A8", color: "#FFFFFF", fontSize: 15, fontWeight: 700, padding: "14px 32px", textDecoration: "none", margin: "12px 32px 0", textAlign: "center" }}>
               Book a Demo →
             </a>
           </div>
@@ -617,7 +617,7 @@ export default function Home() {
               <a
                 href="#problem"
                 className="tm-hero-btn-primary"
-                style={{ background: "#2191D0", color: "#FFFFFF", fontSize: 14, fontWeight: 700, padding: "13px 26px", textDecoration: "none", letterSpacing: "0.02em" }}
+                style={{ background: "#1774A8", color: "#FFFFFF", fontSize: 14, fontWeight: 700, padding: "13px 26px", textDecoration: "none", letterSpacing: "0.02em" }}
               >
                 The Crisis
               </a>
@@ -676,7 +676,6 @@ export default function Home() {
             <div
               style={{
                 background: "#0B2440",
-                borderLeft: "4px solid #E8863A",
                 padding: "44px 40px",
                 display: "flex",
                 flexDirection: "column",
@@ -767,13 +766,10 @@ export default function Home() {
                 style={{
                   background: ins.bg,
                   color: ins.fg,
-                  border: `1.5px solid ${ins.borderColor}`,
                   padding: "34px 34px 36px",
                   display: "flex",
                   flexDirection: "column",
                   gap: 22,
-                  boxShadow: `8px 8px 0 ${ins.shadow}`,
-                  ["--tm-insight-shadow" as string]: ins.shadow,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
@@ -783,7 +779,8 @@ export default function Home() {
                     </span>
                     <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 27, fontWeight: 600, margin: 0 }}>{ins.title}</h3>
                   </div>
-                  <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 60, fontWeight: 700, lineHeight: 1, color: ins.numColor }}>{ins.number}</span>
+                  {/* Decorative watermark numeral — intentionally faint, hidden from AT */}
+                  <span aria-hidden="true" style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 60, fontWeight: 700, lineHeight: 1, color: ins.numColor }}>{ins.number}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   {ins.points.map((pt) => (
@@ -807,7 +804,7 @@ export default function Home() {
               <span style={{ ...KICKER, color: "#FFFFFF", background: "#015697" }}>The Solution</span>
             </div>
             <h2 style={H2}>Simple enough for the front desk. Strong enough for the nation.</h2>
-            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#64748B", maxWidth: 680 }}>
+            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#5B6B7E", maxWidth: 680 }}>
               Everything the paper system loses — history, time, trust — Tamam keeps. One offline-first record that
               follows the patient through every visit.
             </p>
@@ -859,8 +856,8 @@ export default function Home() {
                 borderRight: "1.5px solid #015697",
               }}
             >
-              <span className="tm-compare-arrow-full" style={{ fontSize: 22, color: "#94A3B8" }}>→</span>
-              <span className="tm-compare-arrow-short" style={{ fontSize: 22, color: "#94A3B8" }}>↓</span>
+              <span className="tm-compare-arrow-full" style={{ fontSize: 22, color: "#5F7186" }}>→</span>
+              <span className="tm-compare-arrow-short" style={{ fontSize: 22, color: "#5F7186" }}>↓</span>
               <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 96, height: 96 }}>
                 <span style={{ position: "absolute", inset: 0, border: "2px solid #2191D0", borderRadius: 999 }} />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -868,8 +865,8 @@ export default function Home() {
               </span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/assets/tamam-logo-type.svg" alt="Tamam Healthcare System" style={{ height: 16, width: "auto" }} />
-              <span className="tm-compare-arrow-full" style={{ fontSize: 22, color: "#94A3B8" }}>→</span>
-              <span className="tm-compare-arrow-short" style={{ fontSize: 22, color: "#94A3B8" }}>↓</span>
+              <span className="tm-compare-arrow-full" style={{ fontSize: 22, color: "#5F7186" }}>→</span>
+              <span className="tm-compare-arrow-short" style={{ fontSize: 22, color: "#5F7186" }}>↓</span>
             </div>
             <div className="tm-compare-col" style={{ flex: 1.1, minWidth: 250, display: "flex", flexDirection: "column", gap: 18, padding: "34px 30px", background: "#DDF2FB" }}>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#015697" }}>
@@ -895,7 +892,6 @@ export default function Home() {
                 className="tm-feature-card"
                 style={{
                   background: "#FFFFFF",
-                  border: "1.5px solid #015697",
                   padding: "28px 24px",
                   display: "flex",
                   flexDirection: "column",
@@ -922,14 +918,14 @@ export default function Home() {
               <span style={{ ...KICKER, color: "#FFFFFF", background: "#015697" }}>The Products</span>
             </div>
             <h2 style={H2}>Six products, one connected encounter</h2>
-            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#64748B", maxWidth: 680 }}>
+            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#5B6B7E", maxWidth: 680 }}>
               From referral hospitals to single-room clinics — every product ties back to the same record, built for
               intermittent connectivity.
             </p>
           </div>
           <div className="tm-grid-products" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 24 }}>
             {PRODUCTS.map((prod) => (
-              <div key={prod.acronym} className="tm-product-card" style={{ background: "#FBFBFD", border: `1.5px solid ${prod.accent}`, display: "flex", flexDirection: "column", ["--tm-product-shadow" as string]: prod.accent }}>
+              <div key={prod.acronym} className="tm-product-card" style={{ background: "#FFFFFF", display: "flex", flexDirection: "column" }}>
                 <div style={{ position: "relative", borderBottom: `1.5px solid ${prod.accent}` }}>
                   <div style={{ position: "relative", width: "100%", height: 200 }}>
                     <Image src={prod.image} alt={prod.imageAlt} fill sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw" style={{ objectFit: "cover", objectPosition: "center 25%" }} />
@@ -977,7 +973,7 @@ export default function Home() {
               <span style={{ ...KICKER, color: "#FFFFFF", background: "#015697" }}>National Alignment</span>
             </div>
             <h2 style={H2}>Built around South Sudan&apos;s own health system</h2>
-            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#64748B", maxWidth: 720 }}>
+            <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#5B6B7E", maxWidth: 720 }}>
               The Ministry of Health&apos;s <strong style={{ color: "#015697" }}>2025 Essential Health Services Package</strong> organises
               the country&apos;s care into six levels — and names fragmented, paper-bound data as one of its biggest gaps. Tamam is shaped to
               fit that system, not replace it.
@@ -986,17 +982,17 @@ export default function Home() {
 
           <div className="tm-grid-national" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 24, alignItems: "stretch" }}>
             {/* Left — six levels of care mapped to products */}
-            <div className="tm-national-card" style={{ background: "#FFFFFF", border: "1.5px solid #015697", display: "flex", flexDirection: "column" }}>
+            <div className="tm-national-card" style={{ background: "#FFFFFF", display: "flex", flexDirection: "column" }}>
               <div style={{ padding: "22px 26px", borderBottom: "1.5px solid #015697", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <h3 style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 21, fontWeight: 600, margin: 0, color: "#015697" }}>The six levels of care</h3>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94A3B8" }}>Served by Tamam</span>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "#5F7186" }}>Served by Tamam</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
                 {CARE_LEVELS.map((c, i) => (
                   <div key={c.level} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 26px", borderTop: i === 0 ? "none" : "1px solid #E2E8F0", flex: 1 }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
                       <span style={{ fontSize: 15, fontWeight: 700, color: "#1A2233", lineHeight: 1.3 }}>{c.level}</span>
-                      <span style={{ fontSize: 13, color: "#64748B", lineHeight: 1.4 }}>{c.role}</span>
+                      <span style={{ fontSize: 13, color: "#5B6B7E", lineHeight: 1.4 }}>{c.role}</span>
                     </div>
                     <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 500, color: "#FFFFFF", background: c.tone, padding: "5px 11px", whiteSpace: "nowrap", flexShrink: 0 }}>
                       {c.product}
@@ -1012,32 +1008,32 @@ export default function Home() {
 
             {/* Right — system reality + the Ministry's own named gap */}
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              <div className="tm-national-card" style={{ background: "#FFFFFF", border: "1.5px solid #015697", padding: "26px 28px", display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#94A3B8", marginBottom: 8 }}>
+              <div className="tm-national-card" style={{ background: "#FFFFFF", padding: "26px 28px", display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#5F7186", marginBottom: 8 }}>
                   The reality Tamam is built for
                 </span>
                 {SYSTEM_STATS.map((s, i) => (
                   <div key={s.value} style={{ display: "flex", alignItems: "baseline", gap: 18, padding: "15px 0", borderTop: i === 0 ? "none" : "1px solid #E2E8F0" }}>
-                    <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 34, fontWeight: 600, lineHeight: 1, color: "#C2571B", letterSpacing: "-0.02em", minWidth: 78 }}>
+                    <span style={{ fontFamily: "'Lora', Georgia, serif", fontSize: 34, fontWeight: 600, lineHeight: 1, color: "#A84A15", letterSpacing: "-0.02em", minWidth: 78 }}>
                       {s.value}
                     </span>
                     <span style={{ fontSize: 14, lineHeight: 1.5, color: "#334155", fontWeight: 500 }}>
                       {s.label}{" "}
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#94A3B8", whiteSpace: "nowrap" }}>— {s.source}</span>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#5F7186", whiteSpace: "nowrap" }}>— {s.source}</span>
                     </span>
                   </div>
                 ))}
               </div>
 
-              <div className="tm-national-card" style={{ background: "#FFFFFF", border: "1.5px solid #015697", borderLeft: "4px solid #E8863A", padding: "26px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#C2571B" }}>
+              <div className="tm-national-card" style={{ background: "#FFFFFF", borderLeft: "4px solid #E8863A", padding: "26px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#A84A15" }}>
                   The Ministry&apos;s own diagnosis
                 </span>
                 <p style={{ margin: 0, fontFamily: "'Lora', Georgia, serif", fontSize: 19, lineHeight: 1.5, color: "#0E2A4A", fontWeight: 500 }}>
                   The sector still runs on parallel, disconnected systems — and the lack of accurate, timely data means care and planning
                   can&apos;t rely on what&apos;s recorded.
                 </p>
-                <span style={{ fontSize: 13, color: "#64748B" }}>
+                <span style={{ fontSize: 13, color: "#5B6B7E" }}>
                   Paraphrased from the South Sudan Essential Health Services Package, 2025 — the exact gap a single offline-first record closes.
                 </span>
               </div>
@@ -1090,7 +1086,7 @@ export default function Home() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "16px 18px 18px" }}>
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{t.name}</span>
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#64748B" }}>{t.role}</span>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#5B6B7E" }}>{t.role}</span>
                 </div>
               </div>
             ))}
@@ -1103,7 +1099,7 @@ export default function Home() {
         <div style={{ position: "relative", zIndex: 1, maxWidth: 1320, margin: "0 auto" }}>
         <div className="tm-grid-split" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 56, alignItems: "start" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "#98CFEE" }}>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "#A6D7F1" }}>
               Get involved
             </span>
             <h2 className="tm-contact-h" style={{ fontFamily: "'Lora', Georgia, serif", fontSize: "clamp(32px, 4.2vw, 54px)", fontWeight: 600, margin: 0, lineHeight: 1.12 }}>
@@ -1186,7 +1182,7 @@ export default function Home() {
               className="tm-submit-btn"
               style={{
                 alignSelf: "flex-start",
-                background: formStatus === "sent" ? "#1F9D55" : "#2191D0",
+                background: formStatus === "sent" ? "#1E7A44" : "#1774A8",
                 color: "#FFFFFF",
                 fontFamily: "'DM Sans', sans-serif",
                 fontSize: 15.5,

@@ -148,6 +148,7 @@ export async function POST(request: NextRequest) {
       role: user.role,
       name: user.name,
       hospitalId: user.hospitalId,
+      hospitalName: user.hospitalName,
       orgId: user.orgId,
       // May be undefined if the user record predates countryId — that's fine.
       countryId: user.countryId,

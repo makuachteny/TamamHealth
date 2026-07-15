@@ -3800,27 +3800,25 @@ thead th {
   gap: 6px;
 }
 
+/* Facility name overlaid on the rail's exact center — absolutely positioned
+   so it doesn't occupy a grid cell (the rail templates stay 4-column). */
+.ehr-top-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
 /* Current facility name in the top rail — context for which hospital the
    signed-in user is working in. Truncates; hidden on narrow viewports. */
 .ehr-top-facility {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  max-width: 240px;
-  padding: 5px 10px;
-  margin-right: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  max-width: 320px;
   color: #fff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
-}
-
-.ehr-top-facility svg {
-  flex-shrink: 0;
-  opacity: 0.75;
 }
 
 .ehr-top-facility span {
@@ -3829,8 +3827,9 @@ thead th {
 }
 
 @media (max-width: 1100px) {
-  .ehr-top-facility {
-    display: none;
+  .ehr-top-rail .ehr-top-facility,
+  .ehr-top-rail .ehr-top-center {
+    display: none !important;
   }
 }
 
@@ -4028,22 +4027,6 @@ thead th {
   color: var(--nav-active-text);
 }
 
-.ehr-top-facility {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  color: var(--color-brand-700);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.ehr-top-facility span {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 .ehr-top-search {
   position: relative;
   display: grid;
@@ -4239,6 +4222,42 @@ thead th {
   color: var(--ehr-text);
   box-shadow: none;
   z-index: 80;
+}
+
+/* Identity block at the top of the user menu: who you are + which facility
+   you're working in (always available, unlike the top-rail chip which hides
+   on narrow viewports). */
+.ehr-user-menu-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ehr-border);
+}
+
+.ehr-user-menu-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ehr-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehr-user-menu-facility {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehr-user-menu-facility svg {
+  flex-shrink: 0;
 }
 
 .ehr-user-menu > button {
@@ -13367,7 +13386,6 @@ span:has(> svg:only-child) {
 .ehr-worklist-row {
   min-height: 68px;
   border-bottom-color: var(--ehr-border-soft);
-  border-left-width: 4px;
   background: #FFFFFF;
   color: var(--ehr-text-body);
   font-size: 13px;
@@ -13378,14 +13396,8 @@ span:has(> svg:only-child) {
   background: var(--ehr-hover);
 }
 
-/* Triage acuity accent: fill the 4px left slot reserved above. All rows carry a
-   transparent border so widths stay identical; RED/YELLOW rows get a color. */
-.ehr-worklist-row {
-  border-left-style: solid;
-  border-left-color: transparent;
-}
-.ehr-worklist-row[data-triage="RED"] { border-left-color: #DC2626; }
-.ehr-worklist-row[data-triage="YELLOW"] { border-left-color: #D97706; }
+/* Triage acuity is conveyed by the tinted patient icon (rules below) — the
+   former 4px left border stripe was removed intentionally. */
 
 .ehr-worklist-name {
   gap: 12px;

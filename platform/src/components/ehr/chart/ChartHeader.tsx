@@ -9,8 +9,8 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { MoreVertical, MessageSquare, Printer, FileText, ClipboardList, Pill, FlaskConical, ArrowRightLeft } from '@/components/icons/lucide';
-import { Icon as DuotoneInfoIcon } from '@/components/icons';
+import { Icon as DuotoneIcon } from '@/components/icons';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import { patientFullName, patientInitials, patientAgeLabel, avatarColor } from '@/lib/patient-utils';
 import type { PatientDoc } from '@/lib/db-types';
 
@@ -47,19 +47,21 @@ export default function ChartHeader({
   patient, triageBadge, pregnancyPill, hasActiveVisit, patientBalance,
   onCollectPayment, onMessage, onPrint, onPatientEd, onNote, onScripts, onOrders, onExchange, onEdit, onStickyNote,
 }: ChartHeaderProps) {
-  const [showActions, setShowActions] = useState(false);
-  const [showMore, setShowMore] = useState(false);
+  const [showMore, setShowMore] = useState(true);
+
+  // Only surface the actions this role actually uses — e.g. a registration
+  // clerk never writes clinical notes or prescriptions, so those buttons are
+  // dropped rather than dead weight on the card.
+  const {
+    canSendMessages, canViewClinical, canPrescribe, canDispense,
+    canOrderLabs, canEnterLabResults, canManageReferrals, canRegisterPatients,
+  } = usePermissions();
 
   const initials = patientInitials(patient);
   const photoUrl = (patient as { photoUrl?: string }).photoUrl;
   const genderSymbol = patient.gender === 'Male' ? '♂' : patient.gender === 'Female' ? '♀' : null;
   const genderClass = patient.gender === 'Male' ? 'male' : patient.gender === 'Female' ? 'female' : '';
   const patientIdDisplay = patient.hospitalNumber || patient.geocodeId || '—';
-
-  const runAction = (fn: () => void) => {
-    setShowActions(false);
-    fn();
-  };
 
   return (
     <div className="omrs-header">
@@ -105,32 +107,36 @@ export default function ChartHeader({
       </div>
 
       <div className="omrs-header-actions no-print">
-        <button type="button" className="omrs-header-actions-btn omrs-link" onClick={onStickyNote} title="Open patient notes">
-          <FileText className="w-3.5 h-3.5" /> Sticky note
-        </button>
-        <button type="button" className="omrs-header-actions-btn omrs-link" onClick={() => setShowMore(v => !v)}>
-          Show more {showMore ? '▲' : '▼'}
-        </button>
-        <div style={{ position: 'relative' }}>
-          <button type="button" className="omrs-header-actions-btn" onClick={() => setShowActions(v => !v)} aria-haspopup="menu" aria-expanded={showActions}>
-            Actions <MoreVertical className="w-3.5 h-3.5" />
+        {canViewClinical && (
+          <button type="button" className="omrs-header-actions-btn omrs-link" onClick={onStickyNote} title="Open patient notes">
+            <DuotoneIcon name="record" size={15} /> Sticky note
           </button>
-          {showActions && (
-            <>
-              <div className="fixed inset-0" style={{ zIndex: 25 }} onClick={() => setShowActions(false)} />
-              <div className="omrs-actions-menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => runAction(onMessage)}><MessageSquare /> Pt. Msg</button>
-                <button type="button" role="menuitem" onClick={() => runAction(onPrint)}><Printer /> Print</button>
-                <button type="button" role="menuitem" onClick={() => runAction(onPatientEd)}><FileText /> Pt. Ed.</button>
-                <button type="button" role="menuitem" onClick={() => runAction(onNote)}><ClipboardList /> + Note</button>
-                <button type="button" role="menuitem" onClick={() => runAction(onScripts)}><Pill /> Scripts</button>
-                <button type="button" role="menuitem" onClick={() => runAction(onOrders)}><FlaskConical /> Orders</button>
-                <button type="button" role="menuitem" onClick={() => runAction(onExchange)}><ArrowRightLeft /> Exchange</button>
-                <button type="button" role="menuitem" onClick={() => runAction(onEdit)}><DuotoneInfoIcon name="edit" size={15} /> Edit</button>
-              </div>
-            </>
-          )}
-        </div>
+        )}
+        <button type="button" className="omrs-header-actions-btn omrs-link" onClick={() => setShowMore(v => !v)}>
+          {showMore ? 'Show less ▲' : 'Show more ▼'}
+        </button>
+        {canSendMessages && (
+          <button type="button" className="omrs-header-actions-btn" onClick={onMessage}><DuotoneIcon name="message" size={15} /> Pt. Msg</button>
+        )}
+        <button type="button" className="omrs-header-actions-btn" onClick={onPrint}><DuotoneIcon name="printer" size={15} /> Print</button>
+        {canViewClinical && (
+          <button type="button" className="omrs-header-actions-btn" onClick={onPatientEd}><DuotoneIcon name="fileText" size={15} /> Pt. Ed.</button>
+        )}
+        {canViewClinical && (
+          <button type="button" className="omrs-header-actions-btn" onClick={onNote}><DuotoneIcon name="prescription" size={15} /> + Note</button>
+        )}
+        {(canPrescribe || canDispense) && (
+          <button type="button" className="omrs-header-actions-btn" onClick={onScripts}><DuotoneIcon name="pill" size={15} /> Scripts</button>
+        )}
+        {(canOrderLabs || canEnterLabResults) && (
+          <button type="button" className="omrs-header-actions-btn" onClick={onOrders}><DuotoneIcon name="flask" size={15} /> Orders</button>
+        )}
+        {canManageReferrals && (
+          <button type="button" className="omrs-header-actions-btn" onClick={onExchange}><DuotoneIcon name="arrowRightLeft" size={15} /> Exchange</button>
+        )}
+        {canRegisterPatients && (
+          <button type="button" className="omrs-header-actions-btn" onClick={onEdit}><DuotoneIcon name="edit" size={15} /> Edit</button>
+        )}
       </div>
     </div>
   );

@@ -24,6 +24,7 @@ import { getRoleConfig } from '@/lib/permissions';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { NavItem } from '@/lib/permissions';
 import { usePatients } from '@/lib/hooks/usePatients';
+import { useHospitals } from '@/lib/hooks/useHospitals';
 import { patientFullName, patientGenderAge } from '@/lib/patient-utils';
 import { formatPhoneDisplay } from '@/lib/field-formats';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -42,6 +43,12 @@ export default function EhrTopRail() {
   const pathname = usePathname();
   const { t } = useTranslation();
   const { currentUser, logout } = useApp();
+  // Facility name for the header chip. Sessions restored via /api/auth/me
+  // before hospitalName was added to the token won't carry it — fall back to
+  // resolving the name from the local hospitals store by id.
+  const { hospitals } = useHospitals();
+  const facilityName = currentUser?.hospitalName
+    || (currentUser?.hospitalId ? hospitals.find(h => h._id === currentUser.hospitalId)?.name : undefined);
   const { canRegisterPatients } = usePermissions();
   const { available: tourAvailable, start: startTour } = useTourContext();
   const { patients } = usePatients();
@@ -234,6 +241,16 @@ export default function EhrTopRail() {
         <EhrTopActions items={quickActionItems.slice(0, 6)} navLabel={navLabel} onOpenModule={openModule} />
       </nav>
 
+      {/* Overlaid on the rail's true center (not a grid cell), so it never
+          shifts the brand/modules/search columns. */}
+      {facilityName && (
+        <div className="ehr-top-center">
+          <div className="ehr-top-facility" title={facilityName}>
+            <span>{facilityName}</span>
+          </div>
+        </div>
+      )}
+
       <button
         type="button"
         className="ehr-top-calendar-button"
@@ -286,12 +303,6 @@ export default function EhrTopRail() {
       )}
 
       <div className="ehr-top-actions">
-        {currentUser?.hospitalName && (
-          <div className="ehr-top-facility" title={currentUser.hospitalName}>
-            <Building2 className="w-3.5 h-3.5" />
-            <span>{currentUser.hospitalName}</span>
-          </div>
-        )}
         {canSearchPatients && (
           <button
             type="button"
@@ -331,6 +342,14 @@ export default function EhrTopRail() {
 
           {userOpen && (
             <div className="ehr-user-menu" role="menu">
+              <div className="ehr-user-menu-identity" aria-hidden>
+                <span className="ehr-user-menu-name">{currentUser?.name}</span>
+                {facilityName && (
+                  <span className="ehr-user-menu-facility">
+                    <Building2 className="w-3 h-3" /> {facilityName}
+                  </span>
+                )}
+              </div>
               <button type="button" role="menuitem" onClick={openProfilePage}>
                 <User className="w-4 h-4" />
                 <span>Profile</span>

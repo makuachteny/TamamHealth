@@ -97,13 +97,14 @@ function verifyFallbackToken(token: string): Record<string, unknown> | null {
   }
 }
 
-export async function createToken(user: { _id: string; username: string; role: string; name: string; hospitalId?: string; orgId?: string; countryId?: string; payam?: string; county?: string; state?: string; mustChangePassword?: boolean }): Promise<string> {
+export async function createToken(user: { _id: string; username: string; role: string; name: string; hospitalId?: string; hospitalName?: string; orgId?: string; countryId?: string; payam?: string; county?: string; state?: string; mustChangePassword?: boolean }): Promise<string> {
   const payload = {
     sub: user._id,
     username: user.username,
     role: user.role,
     name: user.name,
     hospitalId: user.hospitalId,
+    hospitalName: user.hospitalName,
     orgId: user.orgId,
     countryId: user.countryId,
     payam: user.payam,
@@ -134,6 +135,7 @@ export async function verifyToken(token: string): Promise<{
   role: string;
   name: string;
   hospitalId?: string;
+  hospitalName?: string;
   orgId?: string;
   countryId?: string;
   payam?: string;
@@ -154,6 +156,7 @@ export async function verifyToken(token: string): Promise<{
         role: string;
         name: string;
         hospitalId?: string;
+        hospitalName?: string;
         orgId?: string;
         countryId?: string;
         payam?: string;

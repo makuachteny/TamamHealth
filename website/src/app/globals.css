@@ -8,6 +8,13 @@ body {
   background: #015697;
 }
 
+/* Respect users who prefer reduced motion: anchor jumps become instant. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+}
+
 html {
   scroll-behavior: smooth;
   /* html is the single scroll root. overflow-x: hidden here clips horizontal
@@ -163,28 +170,24 @@ textarea::placeholder {
   background: rgba(255, 255, 255, 0.14) !important;
 }
 .tm-nav-cta:hover {
-  background: #369fda !important;
+  background: #15699E !important;
 }
 .tm-hero-btn-primary:hover {
-  background: #369fda !important;
+  background: #15699E !important;
 }
 .tm-hero-btn-secondary:hover {
   background: #eff8fd !important;
 }
-/* Shared card language: every card carries a static offset solid shadow
-   colored by its section accent. Team cards are the exception — their
-   1px-gap mosaic leaves no room for a shadow. */
-.tm-product-card {
-  box-shadow: 10px 10px 0 var(--tm-product-shadow);
-}
-.tm-feature-card {
-  box-shadow: 8px 8px 0 #015697;
-}
-.tm-breakdown-card {
-  box-shadow: 8px 8px 0 #e8863a;
-}
-.tm-national-card {
-  box-shadow: 8px 8px 0 #015697;
+/* Shared card language: borderless cards defined by a soft edge shadow —
+   a tight hairline for definition plus a wider ambient lift. */
+.tm-product-card,
+.tm-feature-card,
+.tm-national-card,
+.tm-insight-card {
+  box-shadow:
+    0 0 0 1px rgba(1, 86, 151, 0.06),
+    0 2px 6px rgba(15, 42, 67, 0.06),
+    0 14px 32px -12px rgba(15, 42, 67, 0.18);
 }
 .tm-form-input:focus {
   border-color: #2191d0 !important;
@@ -197,5 +200,5 @@ textarea::placeholder {
   outline-offset: 2px;
 }
 .tm-submit-btn:hover {
-  background: #369fda !important;
+  background: #15699E !important;
 }

@@ -235,6 +235,17 @@
   align-items: center;
   gap: 6px;
   position: relative;
+  /* All actions render inline on the card (no dropdown); cap the cluster
+     width so they wrap into rows instead of squeezing the patient name. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 540px;
+}
+
+/* Icons are the duotone set (brand-blue stroke baked in); just keep them
+   from squashing when a label wraps. */
+.omrs-header-actions-btn svg {
+  flex-shrink: 0;
 }
 
 .omrs-header-actions-btn {
@@ -262,6 +273,8 @@
   color: var(--accent-primary);
 }
 
+/* Dropdown action menu — no longer used by the chart header (its actions
+   render inline), but still the popup for section row menus (e.g. Orders). */
 .omrs-actions-menu {
   position: absolute;
   top: calc(100% + 6px);
