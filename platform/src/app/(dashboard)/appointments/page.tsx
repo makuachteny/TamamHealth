@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { formatClockTime } from '@/lib/format-utils';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AvailabilityModal from '@/components/AvailabilityModal';
@@ -791,7 +792,7 @@ export default function AppointmentsPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 18 }}>
                 <Detail label="Date" value={new Date(eventApt.appointmentDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} icon={<Calendar size={14} />} />
-                <Detail label="Time" value={`${eventApt.appointmentTime} · ${eventApt.duration}m`} icon={<Clock size={14} />} />
+                <Detail label="Time" value={`${formatClockTime(eventApt.appointmentTime)} · ${eventApt.duration}m`} icon={<Clock size={14} />} />
                 <Detail label="Type" value={appointmentTypes.find(x => x.value === eventApt.appointmentType)?.label || eventApt.appointmentType} icon={<ClipboardList size={14} />} />
                 <Detail label="Provider" value={eventApt.providerName} icon={<Stethoscope size={14} />} />
                 <Detail label="Department" value={eventApt.department} icon={<Building2 size={14} />} />
@@ -886,7 +887,7 @@ export default function AppointmentsPage() {
                     return (
                       <div key={apt._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 'var(--card-radius)', border: '1px solid var(--border-medium)', background: 'var(--overlay-subtle)' }}>
                         <div style={{ minWidth: 44, textAlign: 'center' }}>
-                          <div className="stat-value" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{apt.appointmentTime}</div>
+                          <div className="stat-value" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{formatClockTime(apt.appointmentTime)}</div>
                           <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{apt.duration}m</div>
                         </div>
                         <div className="icon-box-sm" style={{ flexShrink: 0 }}>

@@ -900,10 +900,10 @@ export default function GovernmentDashboardPage() {
 
   return (
     <>
-      <main className="page-container page-enter">
+      <main className="page-container page-enter flex flex-col flex-1 min-h-0 overflow-y-auto">
 
         {/* ═══ ROW 1: Disease Trends + Facility Distribution + Performance ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4 lg:flex-1 lg:min-h-0">
 
           {/* Disease Trends (Tableau-style) */}
           <div className="lg:col-span-2 glass-section flex flex-col">
@@ -1011,7 +1011,7 @@ export default function GovernmentDashboardPage() {
         </div>
 
         {/* ═══ ROW 2: Cases by State + Health Visits + Staff ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:flex-1 lg:min-h-0">
 
           {/* Cases by State */}
           <div className="glass-section flex flex-col">

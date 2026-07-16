@@ -33,7 +33,7 @@ const VitalsTrends = dynamic(() => import('@/components/VitalsTrends'), {
   loading: () => <div className="p-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading charts…</div>,
 });
 import PatientTimeline from '@/components/PatientTimeline';
-import { formatDateTime, formatDate } from '@/lib/format-utils';
+import { formatDateTime, formatDate, formatClockTime } from '@/lib/format-utils';
 import { patientFullName, patientInitials, patientAgeLabel } from '@/lib/patient-utils';
 import { usePatientAppointments } from '@/lib/hooks/useAppointments';
 import { usePrescriptions } from '@/lib/hooks/usePrescriptions';
@@ -186,7 +186,33 @@ export default function PatientDetailPage() {
   const { patients, loading, update: updatePatient } = usePatients();
   const { hospitals } = useHospitals();
 
-  const patient = patients.find(p => p._id === id);
+  const scopedPatient = patients.find(p => p._id === id);
+
+  // The patients list is scoped to the viewer's facility, so a patient who was
+  // registered at another facility in the same organisation (referred in, an
+  // appointment booked here, a shared record) isn't in it — the chart would
+  // wrongly show "Patient not found". Fetch such a patient directly by id, but
+  // gate on the org boundary so tenant isolation still holds (no cross-org PHI).
+  const [fallbackPatient, setFallbackPatient] = useState<PatientDoc | null>(null);
+  const [fallbackChecked, setFallbackChecked] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setFallbackPatient(null);
+    setFallbackChecked(false);
+    if (!id || loading || scopedPatient) { setFallbackChecked(true); return; }
+    (async () => {
+      const { getPatientById } = await import('@/lib/services/patient-service');
+      const doc = await getPatientById(id);
+      if (cancelled) return;
+      const sameOrg = !doc?.orgId || !currentUser?.orgId || doc.orgId === currentUser.orgId;
+      const isNational = currentUser?.role === 'super_admin' || currentUser?.role === 'government';
+      setFallbackPatient(doc && (sameOrg || isNational) ? doc : null);
+      setFallbackChecked(true);
+    })();
+    return () => { cancelled = true; };
+  }, [id, loading, scopedPatient, currentUser?.orgId, currentUser?.role]);
+
+  const patient = scopedPatient ?? (fallbackPatient?._id === id ? fallbackPatient : undefined);
   const { records } = useMedicalRecords(patient?._id);
   const { referrals: patientReferrals } = usePatientReferrals(patient?._id);
   const { results: allLabResults } = useLabResults();
@@ -339,12 +365,15 @@ export default function PatientDetailPage() {
     });
   }, [records, historySearch]);
 
-  if (loading || !patient) {
+  // Still "loading" while the scoped list loads OR while the out-of-facility
+  // fallback lookup is in flight — only declare "not found" once both are done.
+  const stillResolving = loading || (!patient && !fallbackChecked);
+  if (stillResolving || !patient) {
     return (
       <>
         <main className="page-container flex items-center justify-center">
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            {loading ? t('status.loading') : t('patient.notFound')}
+            {stillResolving ? t('status.loading') : t('patient.notFound')}
           </p>
         </main>
       </>
@@ -1172,7 +1201,7 @@ export default function PatientDetailPage() {
               <div className="space-y-2">
                 {nextAppt && (
                   <p className="text-[12px] px-1" style={{ color: 'var(--text-muted)' }}>
-                    Next: {formatDate(nextAppt.appointmentDate)} {nextAppt.appointmentTime || ''} · {nextAppt.providerName || 'Unassigned'}
+                    Next: {formatDate(nextAppt.appointmentDate)} {formatClockTime(nextAppt.appointmentTime)} · {nextAppt.providerName || 'Unassigned'}
                   </p>
                 )}
                 <ChartSection
@@ -1203,7 +1232,7 @@ export default function PatientDetailPage() {
                         {apptPageRows.map(appt => (
                           <tr key={appt._id}>
                             <td className="font-mono">{formatDate(appt.appointmentDate)}</td>
-                            <td>{appt.appointmentTime || '—'}</td>
+                            <td>{formatClockTime(appt.appointmentTime) || '—'}</td>
                             <td>{appt.providerName || '—'}</td>
                             <td>{appt.reason || appt.department || 'Follow-up'}</td>
                             <td><span className="badge badge-normal text-[10px]">{appt.status}</span></td>
@@ -1474,14 +1503,14 @@ export default function PatientDetailPage() {
                       {lastAppt && (
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Last visit</p>
-                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatDate(`${lastAppt.appointmentDate}T${lastAppt.appointmentTime || '00:00'}:00`)} · {lastAppt.appointmentTime}</p>
+                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatDate(`${lastAppt.appointmentDate}T${lastAppt.appointmentTime || '00:00'}:00`)} · {formatClockTime(lastAppt.appointmentTime)}</p>
                           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{lastAppt.providerName} · {lastAppt.department || lastAppt.reason}</p>
                         </div>
                       )}
                       {nextAppt && (
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent-primary)' }}>Next visit</p>
-                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatDate(`${nextAppt.appointmentDate}T${nextAppt.appointmentTime || '00:00'}:00`)} · {nextAppt.appointmentTime}</p>
+                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatDate(`${nextAppt.appointmentDate}T${nextAppt.appointmentTime || '00:00'}:00`)} · {formatClockTime(nextAppt.appointmentTime)}</p>
                           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{nextAppt.providerName} · {nextAppt.department || nextAppt.reason}</p>
                         </div>
                       )}
@@ -1739,7 +1768,7 @@ export default function PatientDetailPage() {
                     ) : patientAppointments.map(appt => (
                       <tr key={appt._id}>
                         <td className="font-mono text-xs">{formatDate(appt.appointmentDate)}</td>
-                        <td>{appt.appointmentTime || '—'}</td>
+                        <td>{formatClockTime(appt.appointmentTime) || '—'}</td>
                         <td>{appt.providerName || '—'}</td>
                         <td>{appt.reason || appt.department || 'Follow-up'}</td>
                         <td><span className="badge badge-normal text-[10px]">{appt.status}</span></td>
@@ -2973,7 +3002,7 @@ function PatientDemographicsView({
               {(activeTab === 'upcoming' ? upcoming : past).length ? (activeTab === 'upcoming' ? upcoming : past).map(appt => (
                 <tr key={appt._id}>
                   <td>{formatDate(appt.appointmentDate)}</td>
-                  <td>{appt.appointmentTime || '-'}</td>
+                  <td>{formatClockTime(appt.appointmentTime) || '-'}</td>
                   <td>{appt.providerName || '-'}</td>
                   <td>{appt.reason || appt.department || '-'}</td>
                   <td>{appt.status}</td>

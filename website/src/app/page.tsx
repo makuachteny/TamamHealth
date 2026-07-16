@@ -1053,7 +1053,7 @@ export default function Home() {
             <p style={{ margin: 0, fontSize: 17, lineHeight: 1.65, color: "rgba(255,255,255,0.84)" }}>
               We&apos;re raising <strong style={{ color: "#8FD9EC" }}>$100,000</strong> to launch TamamHealth in 10
               clinics across Juba and greater South Sudan — proof that offline-first digital records can work in the
-              hardest conditions on Earth.
+              hardest conditions.
             </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "rgba(255,255,255,0.25)", border: "1px solid rgba(255,255,255,0.25)", overflow: "hidden" }}>

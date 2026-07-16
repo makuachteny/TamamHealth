@@ -48,42 +48,20 @@ export function recordDemoMessage(doc: MessageDoc): void {
   demoMessageWrites.push(doc);
 }
 
-function phoneDigits(p: string | undefined | null): string {
-  return (p || '').replace(/\D/g, '');
-}
-
 /**
- * Mirrors `/api/patient-portal/login`'s own matching rules, but against the
+ * Mirrors `/api/patient-portal/login`'s own matching rule, but against the
  * deterministic demo roster (`data/mock.ts`'s `patients`) instead of a live
- * CouchDB query. Indices 0-3 there are explicitly overridden with literal,
- * stable identities specifically so this lookup — and the "Demo Accounts"
- * panel on the login screen — never drift from what's actually seeded
- * client-side.
+ * CouchDB query. Only one patient in that roster (`pat-00004`, Mary Lado)
+ * carries `portalUsername`/`portalPasswordHash` — she's the sole
+ * patient-portal login account.
+ *
+ * Returns the full doc (including `portalPasswordHash`) so the login route
+ * can verify the password — the route strips it before responding.
  */
-export async function findDemoPatientByHospitalNumber(hospitalNumberOrGeocode: string, phone: string): Promise<PatientDoc | null> {
+export async function findDemoPatientByUsername(username: string): Promise<PatientDoc | null> {
   const { patients } = await import('@/data/mock');
-  const hn = hospitalNumberOrGeocode.trim().toUpperCase();
-  const wantPhone = phoneDigits(phone);
-  const match = patients.find(p =>
-    (p.hospitalNumber?.toUpperCase() === hn || p.geocodeId?.toUpperCase() === hn) &&
-    phoneDigits(p.phone) === wantPhone &&
-    wantPhone.length > 0
-  );
-  return match ? await toPatientDoc(match) : null;
-}
-
-export async function findDemoPatientByNameDob(firstName: string, surname: string, dateOfBirth: string, phone: string): Promise<PatientDoc | null> {
-  const { patients } = await import('@/data/mock');
-  const fn = firstName.trim().toLowerCase();
-  const sn = surname.trim().toLowerCase();
-  const dob = dateOfBirth.trim();
-  const wantPhone = phoneDigits(phone);
-  const match = patients.find(p =>
-    p.firstName.toLowerCase() === fn &&
-    p.surname.toLowerCase() === sn &&
-    p.dateOfBirth === dob &&
-    phoneDigits(p.phone) === wantPhone
-  );
+  const wanted = username.trim().toLowerCase();
+  const match = patients.find(p => p.portalUsername?.trim().toLowerCase() === wanted);
   return match ? await toPatientDoc(match) : null;
 }
 

@@ -8,7 +8,7 @@ import { usePatients } from '@/lib/hooks/usePatients';
 import { useAppointments } from '@/lib/hooks/useAppointments';
 import { useTriage } from '@/lib/hooks/useTriage';
 import type { AppointmentDoc, EncounterDoc } from '@/lib/db-types';
-import { formatCompactDateTime, formatMoney } from '@/lib/format-utils';
+import { formatCompactDateTime, formatMoney, formatClockTime } from '@/lib/format-utils';
 import { patientRegisteredAt, patientFullName, patientGenderAge, patientAgeLabel, initials, avatarColor } from '@/lib/patient-utils';
 import { priorityColor } from '@/lib/clinical/triage-display';
 import AssignDoctorModal, { type AssignDoctorTarget } from '@/components/AssignDoctorModal';
@@ -64,7 +64,7 @@ function splitDateTime(iso?: string | null): { date: string; time: string } {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return { date: iso, time: '' };
   const date = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const time = /T\d{2}:\d{2}/.test(iso) ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+  const time = /T\d{2}:\d{2}/.test(iso) ? formatClockTime(d) : '';
   return { date, time };
 }
 
@@ -274,7 +274,7 @@ export default function FrontDeskDashboardPage() {
         gender: genderOf(a.patientId),
         age: ageOf(a.patientId),
         date: splitDateTime(a.appointmentDate).date,
-        time: a.appointmentTime,
+        time: formatClockTime(a.appointmentTime),
         calendarDate: isoDateKey(a.appointmentDate),
         status,
         sourceId: a._id,
@@ -401,6 +401,19 @@ export default function FrontDeskDashboardPage() {
     selectedPatientId ? patients.find(p => p._id === selectedPatientId) : null,
     [selectedPatientId, patients]
   );
+
+  // Open a row's detail popup. The popup reads the full patient doc, so if the
+  // patient isn't in this facility's loaded list (e.g. an appointment for a
+  // patient registered elsewhere), fall back to opening their chart — which
+  // loads the doc — instead of a click that silently does nothing.
+  const openPatientDetail = useCallback((patientId: string, entry: QueueItem | null) => {
+    if (patients.some(p => p._id === patientId)) {
+      setSelectedPatientId(patientId);
+      setSelectedEntry(entry);
+    } else {
+      router.push(`/patients/${patientId}`);
+    }
+  }, [patients, router]);
 
   // ── Room assignment (OPD rooming) for triage-sourced queue entries ──
   const handleSaveRoom = useCallback(async (triageId: string, room: string) => {
@@ -578,13 +591,13 @@ export default function FrontDeskDashboardPage() {
       id: `pending-appt-${appointment._id}`,
       title: appointment.patientName,
       subtitle: appointment.reason || 'Scheduled visit',
-      meta: `${appointment.appointmentTime || 'No time'} · ${appointment.providerName || 'Unassigned'} · ${appointment.facilityName || currentUser?.hospitalName || 'Facility'}`,
-      compactMeta: appointment.appointmentTime || 'No time',
+      meta: `${formatClockTime(appointment.appointmentTime) || 'No time'} · ${appointment.providerName || 'Unassigned'} · ${appointment.facilityName || currentUser?.hospitalName || 'Facility'}`,
+      compactMeta: formatClockTime(appointment.appointmentTime) || 'No time',
       status: appointment.status === 'requested' ? 'requested' : 'scheduled',
       statusTone: 'scheduled',
       priority: appointment.priority === 'emergency' ? 'Emergency' : appointment.priority === 'urgent' ? 'Urgent' : 'Appointment',
       date: isoDateKey(appointment.appointmentDate),
-      onClick: () => { setSelectedPatientId(appointment.patientId); setSelectedEntry(null); },
+      onClick: () => openPatientDetail(appointment.patientId, null),
       actionLabel: 'Check in',
       onAction: () => setCheckInTarget(appointment),
       secondaryActionLabel: 'Record',
@@ -621,7 +634,7 @@ export default function FrontDeskDashboardPage() {
         priority: pLabel,
         room: entry.assignedRoom,
         date: entry.calendarDate,
-        onClick: () => { setSelectedPatientId(entry.patientId); setSelectedEntry(entry); },
+        onClick: () => openPatientDetail(entry.patientId, entry),
         actionLabel: checkoutReady ? t('frontDesk.checkout') : activeForCare ? t('frontDesk.assign') : 'Record',
         onAction: () => {
           if (checkoutReady) {
@@ -678,7 +691,7 @@ export default function FrontDeskDashboardPage() {
         statusTone: 'ready',
         priority: 'Registered',
         date: isoDateKey(patientRegisteredAt(patient)),
-        onClick: () => { setSelectedPatientId(patient._id); setSelectedEntry(null); },
+        onClick: () => openPatientDetail(patient._id, null),
         actionLabel: 'Record',
         onAction: () => router.push(`/patients/${patient._id}`),
       };
@@ -697,6 +710,7 @@ export default function FrontDeskDashboardPage() {
     filteredQueue,
     filteredRegisteredPatients,
     handleUndoCheckout,
+    openPatientDetail,
     patients,
     panelView,
     router,
@@ -1275,7 +1289,7 @@ function CheckInModal({
         {/* Body — appointment detail */}
         <div className="p-4 space-y-2.5">
           <div className="rounded-xl p-3 space-y-2" style={{ background: 'var(--overlay-subtle)', border: '1px solid var(--border-light)' }}>
-            <DetailRow icon={<Calendar className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />} label={t('frontDesk.colTime')} value={appt.appointmentTime} />
+            <DetailRow icon={<Calendar className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />} label={t('frontDesk.colTime')} value={formatClockTime(appt.appointmentTime)} />
             <DetailRow icon={<ClipboardList className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />} label={t('frontDesk.colComplaint')} value={appt.reason || '—'} />
             <DetailRow icon={<MapPin className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />} label={t('frontDesk.department')} value={appt.department || '—'} />
           </div>

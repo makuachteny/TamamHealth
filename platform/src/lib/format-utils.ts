@@ -38,6 +38,30 @@ export function formatCompactDateTime(iso?: string | null): string {
 }
 
 /**
+ * Clock time, ALWAYS 12-hour with AM/PM ("8:00 AM", "3:30 PM"), regardless of
+ * locale or source shape. Accepts a bare "HH:MM"(:SS) 24-hour slot string
+ * (appointment times) or an ISO/Date timestamp. Returns '' for empty input.
+ * Use everywhere a time-of-day is shown so appointments (raw "15:30") and
+ * timestamps (formatted) never render in different formats side by side.
+ */
+export function formatClockTime(value?: string | Date | null): string {
+  if (!value) return '';
+  if (typeof value === 'string') {
+    // Bare "HH:MM" / "HH:MM:SS" slot with no date component.
+    const m = value.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (m) {
+      let h = parseInt(m[1], 10);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${h}:${m[2]} ${ampm}`;
+    }
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return typeof value === 'string' ? value : '';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+/**
  * Date-only formatter: "Mon DD, YYYY" (e.g. "Apr 10, 2026").
  */
 export function formatDate(iso?: string | null): string {

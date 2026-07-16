@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientIp } from '@/lib/request-utils';
 import { createPatientToken } from '@/lib/patient-portal-auth';
-import { demoFallbackEnabled, findDemoPatientByHospitalNumber, findDemoPatientByNameDob } from '@/lib/patient-portal-demo';
+import { demoFallbackEnabled, findDemoPatientByUsername } from '@/lib/patient-portal-demo';
+import { verifyPassword } from '@/lib/auth';
 
-// Rate limit: 10 attempts / 15 min / IP + 10 attempts / 15 min / phone.
+// Rate limit: 10 attempts / 15 min / IP + 10 attempts / 15 min / account.
 // Operational note: this API is process-local and best-effort. Multi-replica
 // deployments should front it with an edge/shared rate limiter.
 const rateLimit: Record<string, { count: number; windowStart: number }> = {};
-const phoneAttempts: Record<string, { count: number; windowStart: number }> = {};
+const accountAttempts: Record<string, { count: number; windowStart: number }> = {};
 const RATE_WINDOW_MS = 15 * 60 * 1000;
 const RATE_MAX = 10;
 
@@ -22,13 +23,9 @@ function isRateLimited(key: string, bucket: Record<string, { count: number; wind
   return entry.count > RATE_MAX;
 }
 
-function phoneDigits(p: string | undefined | null): string {
-  return (p || '').replace(/\D/g, '');
-}
-
 // Lazy per-process index creation — Mango createIndex is idempotent server-side
 // but each call still costs a round-trip, so we cache the attempt.
-const indexState = { hospitalNumber: false, dateOfBirth: false };
+const indexState = { portalUsername: false };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function ensureIndex(db: any, fields: string[], key: keyof typeof indexState): Promise<void> {
@@ -44,8 +41,8 @@ async function ensureIndex(db: any, fields: string[], key: keyof typeof indexSta
 
 /**
  * POST /api/patient-portal/login
- * Authenticates a patient by hospital number + phone, or name + DOB + phone.
- * Returns a JWT token for subsequent API calls.
+ * Authenticates the patient by username + password (bcrypt), the same shape as
+ * staff sign-in. Returns a patient-scoped JWT for subsequent API calls.
  */
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -53,13 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
   }
 
-  let body: {
-    hospitalNumber?: string;
-    phone?: string;
-    firstName?: string;
-    surname?: string;
-    dateOfBirth?: string;
-  };
+  let body: { username?: string; password?: string };
 
   try {
     body = await req.json();
@@ -67,12 +58,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  // Normalize to digits only so "+211-912-345-678", "+211 912 345 678",
-  // and "211912345678" all compare equal.
-  const phone = phoneDigits(body.phone);
+  const username = (body.username || '').trim();
+  const password = body.password || '';
 
-  // Per-phone backoff using the same process-local bucket described above.
-  if (phone && isRateLimited(phone, phoneAttempts)) {
+  if (!username || !password) {
+    return NextResponse.json({ error: 'Username and password are required.' }, { status: 400 });
+  }
+
+  // Per-account backoff (same process-local bucket described above).
+  if (isRateLimited(username.toLowerCase(), accountAttempts)) {
     return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
   }
 
@@ -82,16 +76,11 @@ export async function POST(req: NextRequest) {
       firstName?: string;
       surname?: string;
       hospitalNumber?: string;
-      geocodeId?: string;
-      phone?: string;
-      dateOfBirth?: string;
-      gender?: string;
-      registrationHospital?: string;
+      portalUsername?: string;
+      portalPasswordHash?: string;
       // Real patient docs (and the demo fallback) carry plenty more the
-      // portal's Overview/Profile tabs read (registrationHospitalName,
-      // county, state, bloodType, allergies, ...) — pass all of it through
-      // rather than hand-picking a subset that quietly drifts from what the
-      // UI actually needs.
+      // portal's Overview/Profile tabs read — pass all of it through rather
+      // than hand-picking a subset that quietly drifts from what the UI needs.
       [key: string]: unknown;
     };
     let found: PatientLike | null = null;
@@ -101,75 +90,26 @@ export async function POST(req: NextRequest) {
       const { patientsDB } = await import('@/lib/db');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = patientsDB() as any;
-
-      // Method 1: Hospital number (or geocode ID) + phone.
-      // Use a (type, hospitalNumber) Mango query; geocodeId is checked in a
-      // second narrow query. Phone is filtered in-memory on the tiny result set.
-      if (body.hospitalNumber) {
-        const hn = body.hospitalNumber.trim().toUpperCase();
-        await ensureIndex(db, ['type', 'hospitalNumber'], 'hospitalNumber');
-        const byHn = await db.find({
-          selector: { type: 'patient', hospitalNumber: hn },
-          limit: 50,
-        });
-        const candidates: PatientLike[] = (byHn.docs || []) as PatientLike[];
-
-        // Also try geocodeId (separate selector — Mango can't OR across two
-        // distinct indexed fields efficiently).
-        const byGeocode = await db.find({
-          selector: { type: 'patient', geocodeId: hn },
-          limit: 50,
-        });
-        candidates.push(...((byGeocode.docs || []) as PatientLike[]));
-
-        found = candidates.find((p) => {
-          const pPhone = phoneDigits(p.phone);
-          return (
-            (p.hospitalNumber?.toUpperCase() === hn || p.geocodeId?.toUpperCase() === hn) &&
-            pPhone === phone &&
-            pPhone.length > 0
-          );
-        }) || null;
-      }
-
-      // Method 2: Name + DOB + phone.
-      // Query by (type, dateOfBirth) — usually a small set — then filter name +
-      // phone in memory.
-      if (!found && body.firstName && body.surname && body.dateOfBirth) {
-        const fn = body.firstName.trim().toLowerCase();
-        const sn = body.surname.trim().toLowerCase();
-        const dob = body.dateOfBirth.trim();
-        await ensureIndex(db, ['type', 'dateOfBirth'], 'dateOfBirth');
-        const byDob = await db.find({
-          selector: { type: 'patient', dateOfBirth: dob },
-          limit: 200,
-        });
-        const candidates: PatientLike[] = (byDob.docs || []) as PatientLike[];
-        found = candidates.find(
-          (p) =>
-            p.firstName?.toLowerCase() === fn &&
-            p.surname?.toLowerCase() === sn &&
-            p.dateOfBirth === dob &&
-            phoneDigits(p.phone) === phone
-        ) || null;
-      }
+      await ensureIndex(db, ['type', 'portalUsername'], 'portalUsername');
+      const byUser = await db.find({
+        selector: { type: 'patient', portalUsername: username },
+        limit: 1,
+      });
+      found = ((byUser.docs || [])[0] as PatientLike) || null;
     } catch (dbErr) {
       // The real database is unreachable (e.g. no CouchDB configured in this
-      // environment) rather than simply "no match" — in demo mode, answer
-      // from the same literal seed data the client-side demo already uses
-      // instead of failing the whole portal.
+      // environment). In demo mode, answer from the same literal seed data the
+      // client-side demo uses instead of failing the whole portal.
       if (!demoFallbackEnabled()) throw dbErr;
       console.warn('[patient-portal/login] DB unreachable, using demo fallback', dbErr);
-      const demoMatch = body.hospitalNumber
-        ? await findDemoPatientByHospitalNumber(body.hospitalNumber, body.phone || '')
-        : (body.firstName && body.surname && body.dateOfBirth)
-          ? await findDemoPatientByNameDob(body.firstName, body.surname, body.dateOfBirth, body.phone || '')
-          : null;
-      found = demoMatch as PatientLike | null;
+      found = (await findDemoPatientByUsername(username)) as PatientLike | null;
     }
 
-    if (!found) {
-      return NextResponse.json({ error: 'No matching patient found. Check your details.' }, { status: 401 });
+    // Verify the password. One generic error for "no such user" and "wrong
+    // password" so the response never reveals which was wrong.
+    const passwordOk = !!found?.portalPasswordHash && await verifyPassword(password, found.portalPasswordHash);
+    if (!found || !passwordOk) {
+      return NextResponse.json({ error: 'Invalid username or password.' }, { status: 401 });
     }
 
     // Issue a patient-scoped JWT (8 hour expiry)
@@ -180,10 +120,14 @@ export async function POST(req: NextRequest) {
       role: 'patient',
     });
 
+    // Never leak the credential fields to the browser.
+    const { portalPasswordHash: _hash, portalUsername: _user, ...safePatient } = found;
+    void _hash; void _user;
+
     return NextResponse.json({
       token,
       patient: {
-        ...found,
+        ...safePatient,
         id: found._id,
       },
     });

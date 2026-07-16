@@ -149,12 +149,6 @@ export default function ReportsPage() {
   ];
   const [reportPeriod, setReportPeriod] = useState('feb2026');
 
-  /* ── Summary stats ──────────────────────────────────────────── */
-  const totalPatients = patients.length;
-  const totalReferrals = referrals.length;
-  const totalLabResults = labResults.length;
-  const totalDiseaseAlerts = alerts.length;
-
   /* ── Display-text translation lookups (keyed by stable identifiers) ── */
   const categoryKey: Record<string, string> = {
     'Patient Statistics': 'reports.categoryPatientStatistics',
@@ -757,30 +751,6 @@ export default function ReportsPage() {
             />
           } />
       <main className="page-container page-enter">
-
-        {/* ── Summary stats cards ─────────────────────────────── */}
-        <div className="kpi-grid mb-6">
-          {[
-            { id: 'totalPatients', label: t('patients.kpiTotalPatients'), value: totalPatients, icon: Users, color: 'var(--tamamhealth-blue)', bg: 'rgba(33, 145, 208, 0.12)' },
-            { id: 'totalReferrals', label: t('referrals.statTotal'), value: totalReferrals, icon: BedDouble, color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
-            { id: 'labResults', label: t('reports.statLabResults'), value: totalLabResults, icon: FileText, color: '#1F9D6F', bg: 'rgba(31, 157, 111,0.12)' },
-            { id: 'diseaseAlerts', label: t('reports.statDiseaseAlerts'), value: totalDiseaseAlerts, icon: Activity, color: '#E4A84B', bg: 'rgba(245,158,11,0.12)' },
-          ].map(stat => (
-            <div key={stat.id} className="kpi">
-              <div className="kpi__icon">
-                <stat.icon style={{ color: stat.color }} />
-              </div>
-              <div className="kpi__body">
-                {dataLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--text-muted)' }} />
-                ) : (
-                  <div className="kpi__value">{stat.value.toLocaleString()}</div>
-                )}
-                <div className="kpi__label">{stat.label}</div>
-              </div>
-            </div>
-          ))}
-        </div>
 
         {/* ── Report categories ───────────────────────────────── */}
         <div className="space-y-6">

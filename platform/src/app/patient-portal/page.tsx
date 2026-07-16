@@ -11,21 +11,21 @@ import {
   Plus, X, LogOut, Send, Building2,
   Wallet, CreditCard, Phone, Banknote,
   Clock, CheckCircle2, Stethoscope,
-  Thermometer, Weight, Droplets, Eye,
+  Thermometer, Weight, Droplets, Eye, EyeOff, Lock,
   Receipt,
   UserCircle,
-  Shield, Upload, FileUp, ClipboardList,
+  Upload, FileUp, ClipboardList,
 } from '@/components/icons/lucide';
 import type { PatientDoc, AppointmentDoc, LabResultDoc, MedicalRecordDoc, PrescriptionDoc, ImmunizationDoc } from '@/lib/db-types';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { formatMoney } from '@/lib/format-utils';
+import { formatMoney, formatClockTime } from '@/lib/format-utils';
 
 type Tab = 'overview' | 'appointments' | 'records' | 'lab' | 'prescriptions' | 'radiology' | 'immunizations' | 'messages' | 'chat' | 'billing' | 'profile';
 
-// Hide the patient-portal "Demo Accounts" dropdown in production. The seed
-// patients exist client-side regardless (so the portal can demo offline),
-// but exposing their hospital numbers + phone numbers in the login UI is
-// strictly a dev/sales aid.
+// Only used now for the demo bank-transfer detail fallback in the billing flow
+// below (shown when a facility hasn't configured real bank details) — the
+// login screen's demo scaffolding (Demo Accounts panel, ?demo= auto-login)
+// has been removed in favor of a single real username/password account.
 const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 const PATIENT_PORTAL_SESSION_KEY = 'tamamhealth-patient-portal-session';
 
@@ -94,130 +94,29 @@ async function patientPortalFetch<T>(
    ═════════════════════════════════════════ */
 function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<'login' | 'lookup'>('login');
-  const [hospitalNumber, setHospitalNumber] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [surname, setSurname] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
+  // Prefill the single demo account in demo mode so a visitor can sign in with
+  // one tap (mirrors the staff login's prefilled demo password). Empty in
+  // production (NEXT_PUBLIC_DEMO_MODE=false).
+  const [username, setUsername] = useState(IS_DEMO ? 'patient.mary' : '');
+  const [password, setPassword] = useState(IS_DEMO ? 'patient1234' : '');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [dbReady, setDbReady] = useState(false);
-  const [demoPatients, setDemoPatients] = useState<Array<{ id: string; hospitalNumber: string; phone: string; name: string }>>([]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!IS_DEMO) {
-          setDbReady(true);
-          return;
-        }
-        const { isSeeded } = await import('@/lib/db');
-        const seeded = await isSeeded();
-        if (!seeded) {
-          const { seedDatabase } = await import('@/lib/db-seed');
-          await seedDatabase();
-        }
-        setDbReady(true);
-
-        // Pull the first 3 seed patients so the Demo Accounts panel shows
-        // the actual hospitalNumber + phone that exist in this browser's
-        // PouchDB (phones are generated per-seed, so static entries drift).
-        // Skipped entirely outside demo mode — production must not surface
-        // sample patient phone numbers on the login screen.
-        try {
-          const { getAllPatients } = await import('@/lib/services/patient-service');
-          const all = await getAllPatients();
-          setDemoPatients(
-            all.slice(0, 3).map((p) => ({
-              id: p._id,
-              hospitalNumber: p.hospitalNumber || '',
-              phone: p.phone || '',
-              name: `${p.firstName} ${p.surname}`,
-            }))
-          );
-        } catch { /* demo panel is best-effort */ }
-
-        // One-click sign-in from the staff login picker: /patient-portal?demo=<id>
-        // resolves the seed patient's hospital number + phone from the local DB
-        // (phones are generated per-seed, so the picker can't carry them) and
-        // submits the normal login API. Demo mode only — the param is inert in
-        // production, where seeded patients don't exist.
-        try {
-          const demoId = new URLSearchParams(window.location.search).get('demo');
-          if (demoId && /^pat-[a-z0-9-]+$/i.test(demoId)) {
-            setLoading(true);
-            const { getPatientById } = await import('@/lib/services/patient-service');
-            const demoPatient = await getPatientById(demoId);
-            if (demoPatient?.hospitalNumber && demoPatient.phone) {
-              const response = await fetch('/api/patient-portal/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ hospitalNumber: demoPatient.hospitalNumber, phone: demoPatient.phone }),
-              });
-              if (response.ok) {
-                const data = await response.json() as { token?: string; patient?: PatientDoc & { id?: string } };
-                const patientDoc = data.patient
-                  ? { ...data.patient, _id: data.patient._id || data.patient.id } as PatientDoc
-                  : null;
-                if (data.token && patientDoc?._id) {
-                  writePatientPortalSession({ token: data.token, patient: patientDoc });
-                  onLogin(patientDoc);
-                  return;
-                }
-              }
-            }
-            // Fall through to the manual form with the fields prefilled, so a
-            // failed auto-login still leaves the visitor one tap from signing in.
-            setHospitalNumber(demoPatient?.hospitalNumber || '');
-            setPhoneNumber(demoPatient?.phone || '');
-            setLoading(false);
-          }
-        } catch { setLoading(false); }
-      } catch { setDbReady(false); }
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dbReady) { setError(t('patientPortal.dbLoading')); return; }
     setError(''); setLoading(true);
     try {
-      let payload: Record<string, string>;
-
-      if (mode === 'login') {
-        payload = {
-          hospitalNumber: hospitalNumber.trim(),
-          phone: phoneNumber.trim(),
-        };
-      } else {
-        if (!dateOfBirth) {
-          setError(t('patientPortal.dobRequired'));
-          setLoading(false);
-          return;
-        }
-        payload = {
-          firstName: firstName.trim(),
-          surname: surname.trim(),
-          dateOfBirth: dateOfBirth.trim(),
-          phone: phoneNumber.trim(),
-        };
-      }
-
       const response = await fetch('/api/patient-portal/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
+      const data = await response.json() as { token?: string; patient?: PatientDoc & { id?: string }; error?: string };
       if (!response.ok) {
-        setError(mode === 'login'
-          ? t('patientPortal.noMatchHospitalId')
-          : t('patientPortal.noMatchName')
-        );
+        setError(data.error || t('patientPortal.unableToConnect'));
         return;
       }
-      const data = await response.json() as { token?: string; patient?: PatientDoc & { id?: string } };
       const patientDoc = data.patient
         ? { ...data.patient, _id: data.patient._id || data.patient.id } as PatientDoc
         : null;
@@ -246,102 +145,40 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
             <h1 className="pl-title">{t('patientPortal.signInTitle')}</h1>
             <p className="pl-subtitle">{t('patientPortal.signInSubtitle')}</p>
 
-            {!dbReady && (
-              <div className="pl-db-banner"><span className="pl-spin" /> {t('patientPortal.initializingDb')}</div>
-            )}
-
-            {/* Sign-in method — segmented pill toggle. */}
-            <div className="pl-seg" role="tablist" aria-label={t('patientPortal.signInTitle')}>
-              <button type="button" role="tab" aria-selected={mode === 'login'}
-                className={`pl-seg-btn ${mode === 'login' ? 'is-on' : ''}`}
-                onClick={() => { setMode('login'); setError(''); }}>
-                <Shield size={14} /> {t('patientPortal.hospitalIdTab')}
-              </button>
-              <button type="button" role="tab" aria-selected={mode === 'lookup'}
-                className={`pl-seg-btn ${mode === 'lookup' ? 'is-on' : ''}`}
-                onClick={() => { setMode('lookup'); setError(''); }}>
-                <User size={14} /> {t('patientPortal.nameLookupTab')}
-              </button>
-            </div>
-
             <form onSubmit={handleLogin} className="pl-form">
-              {mode === 'login' ? (
-                <>
-                  <div className="pl-field">
-                    <label htmlFor="pp-hospital">{t('patientPortal.hospitalNumberOrGeocode')}</label>
-                    <div className="pl-input-wrap">
-                      <FileText size={16} className="pl-input-icon" />
-                      <input id="pp-hospital" type="text" value={hospitalNumber} onChange={e => setHospitalNumber(e.target.value)}
-                        placeholder={t('patientPortal.hospitalNumberPlaceholder')} required className="pl-input pl-input-icon-pad" />
-                    </div>
-                  </div>
-                  <div className="pl-field">
-                    <label htmlFor="pp-phone">{t('patientPortal.phoneNumber')}</label>
-                    <div className="pl-input-wrap">
-                      <Phone size={16} className="pl-input-icon" />
-                      <input id="pp-phone" type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)}
-                        placeholder={t('patientPortal.phonePlaceholder')} required className="pl-input pl-input-icon-pad" />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="pl-field-row">
-                    <div className="pl-field">
-                      <label htmlFor="pp-firstName">{t('patientPortal.firstName')}</label>
-                      <input id="pp-firstName" type="text" value={firstName} onChange={e => setFirstName(e.target.value)}
-                        placeholder={t('patientPortal.firstNamePlaceholder')} required className="pl-input" />
-                    </div>
-                    <div className="pl-field">
-                      <label htmlFor="pp-surname">{t('patientPortal.surname')}</label>
-                      <input id="pp-surname" type="text" value={surname} onChange={e => setSurname(e.target.value)}
-                        placeholder={t('patientPortal.surnamePlaceholder')} required className="pl-input" />
-                    </div>
-                  </div>
-                  <div className="pl-field">
-                    <label htmlFor="pp-dob">{t('patientPortal.dateOfBirthOptional')}</label>
-                    <div className="pl-input-wrap">
-                      <Calendar size={16} className="pl-input-icon" />
-                      <input id="pp-dob" type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} className="pl-input pl-input-icon-pad" />
-                    </div>
-                  </div>
-                </>
+              <div className="pl-field">
+                <label htmlFor="pp-username">{t('patientPortal.username')}</label>
+                <div className="pl-input-wrap">
+                  <User size={16} className="pl-input-icon" />
+                  <input id="pp-username" type="text" value={username} onChange={e => setUsername(e.target.value)}
+                    placeholder={t('patientPortal.usernamePlaceholder')} required autoComplete="username" className="pl-input pl-input-icon-pad" />
+                </div>
+              </div>
+              <div className="pl-field">
+                <label htmlFor="pp-password">{t('patientPortal.password')}</label>
+                <div className="pl-input-wrap">
+                  <Lock size={16} className="pl-input-icon" />
+                  <input id="pp-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                    placeholder={t('patientPortal.passwordPlaceholder')} required autoComplete="current-password" className="pl-input pl-input-icon-pad pl-input-eye-pad" />
+                  <button type="button" onClick={() => setShowPassword(v => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'} className="pl-input-eye">
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {IS_DEMO && (
+                <p className="pl-demo-hint">Demo account &mdash; sign in with <strong>patient.mary</strong> / <strong>patient1234</strong></p>
               )}
 
               {error && <div role="alert" className="pl-error">{error}</div>}
 
-              <button type="submit" disabled={loading || !dbReady} className="pl-submit">
+              <button type="submit" disabled={loading} className="pl-submit">
                 {loading
                   ? (<span className="pl-submit-loading"><span className="pl-spin pl-spin-light" /> {t('patientPortal.searching')}</span>)
                   : (<>{t('patientPortal.signInTitle')} <ArrowRight size={16} /></>)}
               </button>
             </form>
-
-            {/* Demo accounts — pulled live from the seeded PouchDB so the
-                credentials match this browser. Gated on IS_DEMO so production
-                never reveals seed patient identifiers. */}
-            {IS_DEMO && demoPatients.length > 0 && (
-              <div className="pl-demo">
-                <p className="pl-demo-label">{t('patientPortal.demoAccounts')}</p>
-                <div className="pl-demo-list">
-                  {demoPatients.map((demo) => (
-                    <button
-                      key={demo.id}
-                      type="button"
-                      onClick={() => { setMode('login'); setHospitalNumber(demo.hospitalNumber); setPhoneNumber(demo.phone); setError(''); }}
-                      className="pl-demo-item"
-                    >
-                      <span className="pl-demo-avatar">{demo.name.charAt(0)}</span>
-                      <span className="pl-demo-meta">
-                        <span className="pl-demo-name">{demo.name}</span>
-                        <span className="pl-demo-sub">{demo.phone}</span>
-                      </span>
-                      <span className="pl-demo-id">{demo.hospitalNumber}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <p className="pl-foot">
               <a href="/terms" target="_blank" rel="noopener noreferrer" className="pl-link">Terms &amp; Conditions</a>
@@ -402,21 +239,19 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         .pl-form-wrap { margin: auto 0; width: 100%; max-width: 380px; align-self: center; padding: 20px 0; }
         .pl-title { font-family: var(--font-platform); font-size: 27px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); margin: 4px 0 0; }
         .pl-subtitle { font-size: 13.5px; color: var(--text-muted); margin: 6px 0 0; }
-        .pl-db-banner { margin: 16px 0 0; padding: 8px 12px; font-size: 11.5px; color: var(--accent-hover); background: var(--accent-light); border: 1px solid var(--accent-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 
-        .pl-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 22px; padding: 4px; background: var(--overlay-subtle); border: 1px solid var(--border-light); border-radius: 999px; }
-        .pl-seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 12px; font-size: 13px; font-weight: 700; color: var(--text-secondary); background: transparent; border: none; border-radius: 999px; cursor: pointer; transition: background .16s, color .16s, box-shadow .16s; }
-        .pl-seg-btn:hover { color: var(--text-primary); }
-        .pl-seg-btn.is-on { color: #fff; background: var(--accent-primary); box-shadow: none; }
-
-        .pl-form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+        .pl-form { display: flex; flex-direction: column; gap: 14px; margin-top: 22px; }
         .pl-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-        .pl-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .pl-field label { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
         .pl-input-wrap { position: relative; display: flex; align-items: center; }
         .pl-input-icon { position: absolute; left: 15px; color: var(--text-muted); pointer-events: none; }
         .pl-input { width: 100%; padding: 13px 16px; font-size: 14.5px; color: var(--text-primary); background: var(--overlay-subtle); border: 1.5px solid transparent; border-radius: 999px; outline: none; transition: border-color .15s, background .15s; font-family: var(--font-platform); }
         .pl-input-icon-pad { padding-left: 42px; }
+        .pl-input-eye-pad { padding-right: 44px; }
+        .pl-input-eye { position: absolute; right: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 999px; }
+        .pl-input-eye:hover { color: var(--text-secondary); background: var(--overlay-subtle); }
+        .pl-demo-hint { margin: -2px 0 0; font-size: 12px; color: var(--text-muted); text-align: center; }
+        .pl-demo-hint strong { color: var(--text-secondary); font-weight: 700; }
         .pl-input::placeholder { color: var(--text-muted); }
         .pl-input:focus { border-color: var(--accent-primary); background: var(--bg-card-solid); }
 
@@ -426,17 +261,6 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         .pl-submit:hover:not(:disabled) { transform: translateY(-1px); }
         .pl-submit:disabled { opacity: .6; cursor: not-allowed; }
         .pl-submit-loading { display: inline-flex; align-items: center; gap: 8px; }
-
-        .pl-demo { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-light); }
-        .pl-demo-label { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 10px; }
-        .pl-demo-list { display: flex; flex-direction: column; gap: 6px; }
-        .pl-demo-item { display: flex; align-items: center; gap: 11px; padding: 8px 11px; background: var(--bg-card-solid); border: 1px solid var(--border-light); border-radius: 14px; cursor: pointer; text-align: left; transition: background .14s, border-color .14s, transform .14s; }
-        .pl-demo-item:hover { background: var(--overlay-subtle); border-color: var(--border-medium); transform: translateX(2px); }
-        .pl-demo-avatar { width: 34px; height: 34px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent-light); color: var(--accent-hover); font-size: 14px; font-weight: 800; }
-        .pl-demo-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-        .pl-demo-name { font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .pl-demo-sub { font-size: 11px; color: var(--text-muted); }
-        .pl-demo-id { font-size: 11px; font-weight: 600; color: var(--text-muted); font-family: var(--font-platform-mono); flex-shrink: 0; }
 
         .pl-foot { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 22px; font-size: 12.5px; }
         .pl-foot-sep { color: var(--border-medium); }
@@ -473,7 +297,6 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
           .pl-hero { display: none; }
           .pl-pane { padding: 28px 26px; }
           .pl-form-close { display: inline-flex; }
-          .pl-field-row { grid-template-columns: 1fr; }
         }
       `}</style>
     </div>
@@ -946,7 +769,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
         const realConditions = (patient.chronicConditions || []).filter(c => c && !/^none\b/i.test(c));
 
         return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: '100%' }}>
 
           {/* ── Row 1: Upcoming Appointments + Health Alerts (equal height) ──
               Personal info and the visit/prescription/lab counts live on the
@@ -1045,8 +868,10 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
             )}
           </div>
 
-          {/* ── Row 2: Current Medications + Recent Activity (equal height) ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }}>
+          {/* ── Row 2: Current Medications + Recent Activity (equal height) ──
+              Grows to fill the leftover height so the overview reaches the
+              bottom of the viewport instead of leaving a dead background gap. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch', flex: 1 }}>
             {/* Current Medications */}
             <div className="card-elevated" style={{ padding: 18, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1119,7 +944,7 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                 return (
                   <div key={apt._id} className="card-elevated" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ minWidth: 48, textAlign: 'center' }}>
-                      <div className="stat-value" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{apt.appointmentTime}</div>
+                      <div className="stat-value" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{formatClockTime(apt.appointmentTime)}</div>
                       <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{apt.appointmentDate}</div>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>

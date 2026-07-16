@@ -30,6 +30,18 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
     t('patientNew.stepDescPaymentCoverage'),
     t('patientNew.stepDescReview'),
   ];
+  // Short per-step hint shown once in the card header. Previously each step
+  // also rendered its own section header with a near-duplicate title, so the
+  // heading appeared twice ("Demographics" / "Patient Demographics"). The note
+  // is the only non-redundant part of that section header, so we keep it here.
+  const stepNotes = [
+    t('patientNew.requiredFieldsNote'),
+    t('patientNew.phoneOptionalNote'),
+    t('patientNew.nokContactsNote'),
+    t('patientNew.optionalButRecommended'),
+    t('patientNew.usedAtCheckout'),
+    '',
+  ];
   const stepIcons = [UserPlus, MapPin, Users, ScanLine, Wallet, ClipboardList];
   const relationshipOptions = [
     { value: 'Spouse', labelKey: 'patientNew.relSpouse' },
@@ -340,19 +352,15 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
                 <h2>{steps[step]}</h2>
               </div>
             </div>
-            <p className="patient-registration-card-description">{stepDescriptions[step]}</p>
+            <div className="patient-registration-card-meta">
+              <p className="patient-registration-card-description">{stepDescriptions[step]}</p>
+              {stepNotes[step] && <span className="patient-registration-card-note">{stepNotes[step]}</span>}
+            </div>
           </div>
           <div className="patient-registration-card-body">
             {/* Step 0: Demographics */}
             {step === 0 && (
               <div className="registration-section">
-                <div className="registration-section-header">
-                  <div>
-                    <p>{t('patientNew.sectionIdentity')}</p>
-                    <h3>{t('patientNew.demographicsHeading')}</h3>
-                  </div>
-                  <span>{t('patientNew.requiredFieldsNote')}</span>
-                </div>
                 <div className="flex gap-3 items-start">
                   <div className="registration-field-grid registration-field-grid--three flex-1">
                     <div>
@@ -418,13 +426,6 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {/* Step 1: Contact & Location */}
             {step === 1 && (
               <div className="registration-section">
-                <div className="registration-section-header">
-                  <div>
-                    <p>{t('patientNew.sectionContactLocation')}</p>
-                    <h3>{t('patientNew.contactLocationHeading')}</h3>
-                  </div>
-                  <span>{t('patientNew.phoneOptionalNote')}</span>
-                </div>
                 <div className="registration-field-grid registration-field-grid--three">
                   <div>
                     <label htmlFor="pt-phone">{t('patientNew.phone')}</label>
@@ -510,13 +511,6 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {/* Step 2: Next of Kin (multiple contacts supported) */}
             {step === 2 && (
               <div className="registration-section">
-                <div className="registration-section-header">
-                  <div>
-                    <p>{t('patientNew.sectionFamilyConsent')}</p>
-                    <h3>{t('patientNew.nextOfKinHeading')}</h3>
-                  </div>
-                  <span>{t('patientNew.nokContactsNote')}</span>
-                </div>
                 <p className="registration-section-note">
                   {t('patientNew.nokSectionNote')}
                 </p>
@@ -598,13 +592,6 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {/* Step 3: Biometrics — patient photo and fingerprint enrollment */}
             {step === 3 && (
               <div className="registration-section">
-                <div className="registration-section-header">
-                  <div>
-                    <p>{t('patientNew.identityVerification')}</p>
-                    <h3>{t('patientNew.photoFingerprintHeading')}</h3>
-                  </div>
-                  <span>{t('patientNew.optionalButRecommended')}</span>
-                </div>
                 <p className="registration-section-note">
                   {t('patientNew.biometricsNote')}
                 </p>
@@ -648,13 +635,6 @@ export function PatientRegistrationForm({ embedded = false, onCancel, onRegister
             {/* Step 4: Payment Coverage */}
             {step === 4 && (
               <div className="registration-section">
-                <div className="registration-section-header">
-                  <div>
-                    <p>{t('patientNew.billingSetup')}</p>
-                    <h3>{t('patientNew.stepPaymentCoverage')}</h3>
-                  </div>
-                  <span>{t('patientNew.usedAtCheckout')}</span>
-                </div>
                 <p className="registration-section-note">
                     {t('patientNew.coverageNote')}
                 </p>

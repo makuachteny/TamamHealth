@@ -1745,6 +1745,13 @@ export interface Patient {
   deathPlace?: string;
   deathInformant?: string;
   photoUrl?: string;
+  /** Patient-portal login username. Only set for the handful of demo
+   *  accounts that can actually sign in to the patient portal. */
+  portalUsername?: string;
+  /** bcrypt hash (cost 12) of the patient-portal login password. This is
+   *  server-side-only secret material — NEVER include it in any API
+   *  response or object sent to the browser. */
+  portalPasswordHash?: string;
   // Follow-up tracking (expert-recommended)
   followUpStatus?: 'recovered' | 'died' | 'referred' | 'under_treatment' | 'lost_to_followup';
   assignedHealthWorker?: string;  // BHW ID for community follow-up
@@ -1911,7 +1918,11 @@ const _generatedPatients: Patient[] = [
   ...Array.from({ length: 50 }, (_, i) => generatePatient(i + 86)),
 ];
 
-// Override first 3 patients with deterministic data for Patient Portal demo login
+// Override first 3 patients with deterministic demo-patient data (used across
+// the app — front-desk, registry lookups, etc.). These are no longer
+// patient-portal login accounts: portal login now requires
+// portalUsername/portalPasswordHash, which only Mary Lado (index 3, below)
+// carries.
 _generatedPatients[0] = {
   ..._generatedPatients[0],
   firstName: 'Deng',
@@ -1973,6 +1984,9 @@ _generatedPatients[3] = {
   chronicConditions: ['Diabetes Type 2', 'Hypertension'],
   registrationHospital: 'hosp-001',
   preferredPharmacy: { name: 'Konyokonyo Pharmacy', address: 'Konyokonyo Market, Juba', phone: '+211911220145' },
+  // The ONE patient-portal login account. Password: patient1234 (bcrypt cost 12).
+  portalUsername: 'patient.mary',
+  portalPasswordHash: '$2b$12$6SRLnqnuoVlZDt0UJa9w6.AWuKeRxXWciunE1NTnECgmfzYGR4/NS',
 };
 
 // Showcase patients that already carry seeded insurance policies (pat-00012 /

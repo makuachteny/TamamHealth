@@ -23,6 +23,7 @@ import {
   X,
 } from '@/components/icons/lucide';
 import { initials, stateColor } from '@/lib/patient-utils';
+import { formatClockTime } from '@/lib/format-utils';
 import { useToast } from '@/components/Toast';
 import { useInsuredPatientIds } from '@/lib/hooks/usePayments';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -100,8 +101,8 @@ function formatAppointmentDate(value: string) {
 }
 
 function appointmentTimeRange(appointment: AppointmentDoc) {
-  const start = appointment.appointmentTime || '00:00';
-  if (appointment.endTime) return `${start} - ${appointment.endTime}`;
+  const start = formatClockTime(appointment.appointmentTime || '00:00');
+  if (appointment.endTime) return `${start} - ${formatClockTime(appointment.endTime)}`;
   return `${start} · ${appointment.duration}m`;
 }
 
@@ -285,7 +286,13 @@ export default function EhrClinicalDashboard({
       setOpenAppointment(appointment);
       return;
     }
-    if (entry.href) router.push(entry.href);
+    if (entry.href) { router.push(entry.href); return; }
+    // No href — never let the click dead-end: open the matching appointment,
+    // else the patient's chart (resolved by name), else say so out loud.
+    if (appointment) { setAppointmentDetailTab('visit'); setOpenAppointment(appointment); return; }
+    const patientId = patients.find(patient => patient.name === entry.title)?._id;
+    if (patientId) { router.push(`/patients/${patientId}`); return; }
+    showToast(`Couldn't open “${entry.title}”`, 'error');
   };
 
   const providerOptions = useMemo(() => {
@@ -746,7 +753,7 @@ export default function EhrClinicalDashboard({
                           </div>
                         </div>
                         <div className="ehr-appointment-time">
-                          <strong>{appointment.appointmentTime}</strong>
+                          <strong>{formatClockTime(appointment.appointmentTime)}</strong>
                           <span>{typeLabel(appointment.priority)}</span>
                         </div>
                         <div className="ehr-appointment-language">
@@ -871,7 +878,7 @@ export default function EhrClinicalDashboard({
                       </div>
                     </div>
                     <div className="ehr-appointment-time">
-                      <strong>{appointment.appointmentTime}</strong>
+                      <strong>{formatClockTime(appointment.appointmentTime)}</strong>
                       <span>{typeLabel(appointment.priority)}</span>
                     </div>
                     <div className="ehr-appointment-language">

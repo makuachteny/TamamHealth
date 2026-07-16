@@ -18,7 +18,7 @@ import {
   Stethoscope, Users, HeartPulse, BedDouble, ChevronRight,
   Edit3, Trash2, Eye, ChevronDown,
 } from '@/components/icons/lucide';
-import { formatMoney } from '@/lib/format-utils';
+import { formatMoney, formatClockTime } from '@/lib/format-utils';
 import type { MessageDoc } from '@/lib/db-types';
 
 const TEAL = 'var(--color-brand-400)';
@@ -305,7 +305,7 @@ export default function FacilityManagementDashboard() {
                       <td className="px-5 py-2.5 text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{a.patientName}</td>
                       <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{ageOf(a.patientId) ?? '—'}</td>
                       <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{a.appointmentDate}</td>
-                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{a.appointmentTime}{a.endTime ? ` – ${a.endTime}` : ''}</td>
+                      <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{formatClockTime(a.appointmentTime)}{a.endTime ? ` – ${formatClockTime(a.endTime)}` : ''}</td>
                       <td className="px-5 py-2.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{a.providerName || '—'}</td>
                       <td className="px-5 py-2.5">{statusPill(a.status)}</td>
                       <td className="px-5 py-2.5">

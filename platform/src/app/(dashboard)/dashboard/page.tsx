@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useCallback } from 'react';
+import { formatClockTime } from '@/lib/format-utils';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import EhrClinicalDashboard from '@/components/ehr/EhrClinicalDashboard';
@@ -183,7 +184,7 @@ export default function DashboardPage() {
   const telehealthEntries = telehealthToday.map(a => ({
     id: a._id,
     title: a.patientName,
-    subtitle: `Telehealth · ${a.appointmentTime}${a.reason ? ` · ${a.reason}` : ''}`,
+    subtitle: `Telehealth · ${formatClockTime(a.appointmentTime)}${a.reason ? ` · ${a.reason}` : ''}`,
     meta: a.status ? String(a.status).replace(/_/g, ' ') : '',
     tone: 'warning' as const,
     href: `/telehealth/visit/${encodeURIComponent(a._id)}`,

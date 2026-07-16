@@ -121,20 +121,6 @@ const demoAccounts: { role: string; roleKey: UserRole; user: string; desc: strin
   { group: 'Ministry of Health',        role: 'Super Admin',            roleKey: 'super_admin',                user: 'superadmin',       desc: 'Platform-wide access',      hospital: '' },
 ];
 
-// Seeded patients surfaced on the picker so the demo covers the patient side
-// too. These rows don't use the staff username/password flow — they deep-link
-// to /patient-portal?demo=<id>, where the portal resolves the seed patient's
-// hospital number + phone from the local DB and signs them in automatically
-// (phones are generated per-seed, so they can't be hardcoded here).
-// Names must match the deterministic roster in data/mock.ts (fixed-seed PRNG —
-// regenerate with `npx tsx -e "…patients.find(p => p.id === 'pat-00021')"` if
-// the seed or draw order changes).
-const demoPatients: { id: string; name: string; hospitalNumber: string }[] = [
-  { id: 'pat-00001', name: 'Deng Mabior Garang', hospitalNumber: 'JTH-000001' },
-  { id: 'pat-00021', name: 'Mach Biel Arou',     hospitalNumber: 'JTH-000021' },
-  { id: 'pat-00025', name: 'Gatdet Gore Lado',   hospitalNumber: 'JTH-000025' },
-];
-
 type Account = typeof demoAccounts[number];
 
 const imageForIndex = (i: number) => IMAGE_POOL[i % IMAGE_POOL.length];
@@ -395,22 +381,6 @@ export default function LoginPage() {
               </Fragment>
             );
           }) : null}
-          {demoEnabled && (
-            <>
-              <div className="tl-group">Patients</div>
-              {demoPatients.map((p, i) => (
-                <a key={p.id} href={`/patient-portal?demo=${p.id}`} className="tl-user" style={{ textDecoration: 'none' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={imageForIndex(demoAccounts.length + i)} alt="" aria-hidden className="tl-user-avatar" />
-                  <div className="tl-user-meta">
-                    <span className="tl-user-name">{p.name}</span>
-                    <span className="tl-user-role">Patient · {p.hospitalNumber} · Juba Teaching Hospital</span>
-                  </div>
-                  <ChevronRight size={16} className="tl-user-chev" />
-                </a>
-              ))}
-            </>
-          )}
           {!demoEnabled && (
             <button type="button" onClick={openManual} className="tl-user">
               <span className="tl-user-avatar tl-user-avatar-icon"><Icon name="user" size={18} color={ACCENT_DEEP} /></span>
