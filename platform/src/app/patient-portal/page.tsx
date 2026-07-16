@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import Link from 'next/link';
 import Modal from '@/components/Modal';
 import {
   User, Calendar, FileText, FlaskConical, Syringe,
   HeartPulse, Pill, Scan,
-  ChevronRight, AlertTriangle,
+  ChevronRight, ChevronDown, Search, AlertTriangle,
   MessageSquare, ArrowRight, Activity,
   Plus, X, LogOut, Send, Building2,
   Wallet, CreditCard, Phone, Banknote,
@@ -135,7 +134,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         {/* ── Left: form ── */}
         <section className="pl-pane pl-form-pane">
           {/* Back to the marketing site — shown on small screens where the hero is hidden. */}
-          <Link href="/" aria-label="Close" className="pl-form-close"><X size={18} /></Link>
+          <a href="/" aria-label="Close" className="pl-form-close"><X size={18} /></a>
           <header className="pl-brand">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/tamamhealth-logo-full.svg" alt="Tamam Healthcare System" className="pl-brand-logo" />
@@ -149,7 +148,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
               <div className="pl-field">
                 <label htmlFor="pp-username">{t('patientPortal.username')}</label>
                 <div className="pl-input-wrap">
-                  <User size={16} className="pl-input-icon" />
+                  <span className="pl-input-icon"><User size={16} /></span>
                   <input id="pp-username" type="text" value={username} onChange={e => setUsername(e.target.value)}
                     placeholder={t('patientPortal.usernamePlaceholder')} required autoComplete="username" className="pl-input pl-input-icon-pad" />
                 </div>
@@ -157,7 +156,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
               <div className="pl-field">
                 <label htmlFor="pp-password">{t('patientPortal.password')}</label>
                 <div className="pl-input-wrap">
-                  <Lock size={16} className="pl-input-icon" />
+                  <span className="pl-input-icon"><Lock size={16} /></span>
                   <input id="pp-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
                     placeholder={t('patientPortal.passwordPlaceholder')} required autoComplete="current-password" className="pl-input pl-input-icon-pad pl-input-eye-pad" />
                   <button type="button" onClick={() => setShowPassword(v => !v)}
@@ -189,7 +188,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         {/* ── Right: hero — same floating-chip treatment as the staff login
             (decorative copy hardcoded in English there too). ── */}
         <section className="pl-hero" style={{ backgroundImage: 'url(/assets/doctor-nurse-consultation.jpg)' }}>
-          <Link href="/" aria-label="Close" className="pl-hero-close"><X size={18} /></Link>
+          <a href="/" aria-label="Close" className="pl-hero-close"><X size={18} /></a>
 
           {/* Floating: next-visit chip */}
           <div className="pl-chip pl-chip-task">
@@ -244,7 +243,7 @@ function PatientLogin({ onLogin }: { onLogin: (patient: PatientDoc) => void }) {
         .pl-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
         .pl-field label { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
         .pl-input-wrap { position: relative; display: flex; align-items: center; }
-        .pl-input-icon { position: absolute; left: 15px; color: var(--text-muted); pointer-events: none; }
+        .pl-input-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; color: var(--text-muted); pointer-events: none; }
         .pl-input { width: 100%; padding: 13px 16px; font-size: 14.5px; color: var(--text-primary); background: var(--overlay-subtle); border: 1.5px solid transparent; border-radius: 999px; outline: none; transition: border-color .15s, background .15s; font-family: var(--font-platform); }
         .pl-input-icon-pad { padding-left: 42px; }
         .pl-input-eye-pad { padding-right: 44px; }
@@ -566,96 +565,157 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
     }
   };
 
+  // ── Header chrome: user menu + portal-wide search ──
+  // The search indexes the patient's own data (already loaded for the tabs)
+  // and jumps to the tab that holds the match. Chrome copy is hardcoded
+  // English to match the staff top rail, which does the same.
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [navMenuOpen, setNavMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
+  // Computed inline (not memoized): the source arrays are rebuilt each render
+  // anyway, and the scan is over at most a few hundred short strings.
+  const searchResults = (() => {
+    const q = searchQ.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const hits: { key: string; tab: Tab; title: string; sub: string }[] = [];
+    tabs.forEach(tb => {
+      if (tb.label.toLowerCase().includes(q)) hits.push({ key: `tab-${tb.key}`, tab: tb.key, title: tb.label, sub: 'Section' });
+    });
+    prescriptions.forEach(rx => {
+      if (rx.medication?.toLowerCase().includes(q)) hits.push({ key: `rx-${rx._id}`, tab: 'prescriptions', title: rx.medication, sub: `Prescription · ${rx.status}` });
+    });
+    labResults.forEach(lab => {
+      if (lab.testName?.toLowerCase().includes(q)) hits.push({ key: `lab-${lab._id}`, tab: 'lab', title: lab.testName, sub: `Lab result · ${lab.status}` });
+    });
+    records.forEach(rec => {
+      const r = rec as unknown as { visitType?: string; diagnoses?: Array<{ name?: string }> };
+      const diag = (r.diagnoses || []).map(d => d.name || '').join(', ');
+      if (r.visitType?.toLowerCase().includes(q) || diag.toLowerCase().includes(q)) {
+        hits.push({ key: `rec-${rec._id}`, tab: 'records', title: r.visitType || 'Visit', sub: diag || `Visit · ${rec.createdAt?.slice(0, 10)}` });
+      }
+    });
+    appointments.forEach(apt => {
+      if (apt.reason?.toLowerCase().includes(q) || apt.providerName?.toLowerCase().includes(q)) {
+        hits.push({ key: `apt-${apt._id}`, tab: 'appointments', title: apt.reason || apt.appointmentType, sub: `Appointment · ${apt.appointmentDate}` });
+      }
+    });
+    return hits.slice(0, 8);
+  })();
+
+  const initials = `${(patient.firstName || ' ')[0]}${(patient.surname || ' ')[0]}`.toUpperCase();
+  const activeTabDef = tabs.find(tb => tb.key === activeTab) || tabs[0];
+  const ActiveTabIcon = activeTabDef.icon;
+
   return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - 52px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <style dangerouslySetInnerHTML={{ __html: patientPortalCSS }} />
 
-      {/* ── Sidebar ── */}
-      <aside className="hidden md:flex" style={{
-        width: 260, flexShrink: 0, flexDirection: 'column',
-        background: 'var(--bg-card-solid)', borderRight: '1px solid var(--border-medium)',
-      }}>
-        <div style={{ padding: '20px 16px 14px', borderBottom: '1px solid var(--border-medium)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-            <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'var(--accent-light)', border: '2px solid var(--accent-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {patient.photoUrl
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={patient.photoUrl} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover' }} />
-                : <User size={56} style={{ color: 'var(--accent-primary)' }} />
-              }
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>{patient.firstName} {patient.surname}</p>
-              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{patient.hospitalNumber}</p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', marginBottom: 10 }}>
-            <Building2 size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{patientFacilityName}</span>
-          </div>
-        </div>
+      {/* ── Top rail — the SAME layout as the clinical-officer EHR shell,
+          reusing the shared .ehr-top-* classes: navy grid of brand · module
+          menu · centered facility · search · labeled user chip. The section
+          navigation lives in the module-menu dropdown, exactly like staff.
+          Overridden to `sticky` (the EHR shell offsets a fixed rail; here the
+          rail just sits in normal flow) and given the shell's page-inset var. */}
+      <header className="ehr-top-rail" style={{ position: 'sticky', top: 0, ['--ehr-page-inset']: '12px' } as React.CSSProperties}>
+        <button type="button" className="ehr-top-brand" onClick={() => setActiveTab('overview')} aria-label="Patient portal home">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="ehr-top-brand-logo-full" src="/assets/tamamhealth-logo-full-white.svg" alt="Tamam Healthcare System" />
+        </button>
 
-        <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
-          {/* Health records section */}
-          <p className="ppd-section-label">{t('patientPortal.sectionHealthRecords')}</p>
-          {mainTabs.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              className={`ppd-nav-btn${activeTab === tab.key ? ' ppd-nav-btn--active' : ''}`}>
-              {/* The icon shim only reads an explicit `color` prop (not inherited
-                  CSS `color`), so on the active row — same blue as its default
-                  tint — it must be told explicitly to go white or it vanishes. */}
-              <tab.icon size={15} color={activeTab === tab.key ? 'var(--color-white)' : undefined} />
-              <span style={{ flex: 1 }}>{tab.label}</span>
-              {tab.count ? <span className="ppd-nav-badge">{tab.count}</span> : null}
-            </button>
-          ))}
-
-          {/* Communication & More section */}
-          <div style={{ height: 1, background: 'var(--border-medium)', margin: '10px 14px' }} />
-          <p className="ppd-section-label" style={{ padding: '4px 14px 4px' }}>{t('patientPortal.sectionCommunication')}</p>
-          {actionTabs.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              className={`ppd-nav-btn${activeTab === tab.key ? ' ppd-nav-btn--active' : ''}`}>
-              <tab.icon size={15} color={activeTab === tab.key ? 'var(--color-white)' : undefined} />
-              <span style={{ flex: 1 }}>{tab.label}</span>
-              {tab.count ? <span className="ppd-nav-badge">{tab.count}</span> : null}
-            </button>
-          ))}
+        <nav className="ehr-top-modules" aria-label="Patient portal sections">
+          <button type="button" className={`ehr-module-trigger ${navMenuOpen ? 'active' : ''}`}
+            onClick={() => { setNavMenuOpen(o => !o); setUserMenuOpen(false); }}
+            aria-expanded={navMenuOpen} aria-haspopup="menu" title="Open section menu">
+            <ActiveTabIcon className="w-5 h-5" />
+            <ChevronDown className="w-3 h-3 ehr-module-chevron" />
+          </button>
+          {navMenuOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 79 }} onClick={() => setNavMenuOpen(false)} />
+              <div className="ehr-user-menu" role="menu" style={{ left: 'var(--ehr-page-inset, 12px)', right: 'auto', width: 'min(230px, calc(100vw - 24px))' }}>
+                {tabs.map(tab => {
+                  const on = activeTab === tab.key;
+                  return (
+                    <button key={tab.key} type="button" role="menuitem"
+                      onClick={() => { setActiveTab(tab.key); setNavMenuOpen(false); }}
+                      style={on ? { background: 'var(--ehr-blue-light)', color: 'var(--ehr-blue)' } : undefined}>
+                      <tab.icon size={16} color={on ? 'var(--ehr-blue)' : 'var(--ehr-muted)'} />
+                      <span>{tab.label}</span>
+                      {tab.count ? <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: on ? 'var(--ehr-blue)' : 'var(--ehr-muted)' }}>{tab.count}</span> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </nav>
 
-        <div style={{ padding: '10px 8px', borderTop: '1px solid var(--border-medium)' }}>
-          <button onClick={onLogout} className="ppd-nav-btn ppd-nav-btn--muted">
-            <LogOut size={15} /> {t('patientPortal.signOut')}
-          </button>
+        {/* Facility name overlaid on the rail's exact center — same as staff. */}
+        <div className="ehr-top-center">
+          <div className="ehr-top-facility" title={patientFacilityName}><span>{patientFacilityName}</span></div>
         </div>
-      </aside>
 
-      {/* ── Main content ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 52px)', overflow: 'hidden' }}>
-        <div style={{ flex: 1, padding: '20px 24px', overflowY: 'auto' }}>
-
-          {/* Mobile header */}
-          <div className="md:hidden" style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <User size={44} style={{ color: 'var(--accent-primary)' }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{patient.firstName} {patient.surname}</p>
-                <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{patient.hospitalNumber}</p>
-              </div>
-              <button onClick={() => setActiveTab('chat')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: 6 }}><MessageSquare size={44} /></button>
-              <button onClick={onLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 6 }}><LogOut size={44} /></button>
-            </div>
-            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }} className="no-scrollbar">
-              {tabs.map(tab => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                  className={`ppd-nav-pill${activeTab === tab.key ? ' ppd-nav-pill--active' : ''}`}>
-                  <tab.icon size={13} color={activeTab === tab.key ? 'var(--color-white)' : undefined} /> {tab.label}
+        {/* Search — indexes this patient's own records and jumps to the tab. */}
+        <div className="ehr-top-search">
+          <Search className="w-4 h-4" />
+          <input
+            value={searchQ}
+            onChange={e => { setSearchQ(e.target.value); setSearchOpen(e.target.value.trim().length >= 2); }}
+            onFocus={() => setSearchOpen(searchQ.trim().length >= 2)}
+            placeholder="Search your records, results, medications"
+            aria-label="Search your records"
+            type="search"
+          />
+          {searchQ && (
+            <button type="button" onClick={() => { setSearchQ(''); setSearchOpen(false); }} aria-label="Clear search"><X className="w-3.5 h-3.5" /></button>
+          )}
+          {searchOpen && (
+            <div className="ehr-top-search-menu">
+              {searchResults.length === 0 ? (
+                <p>No matches in your records.</p>
+              ) : searchResults.map(r => (
+                <button key={r.key} type="button" onMouseDown={e => { e.preventDefault(); setActiveTab(r.tab); setSearchQ(''); setSearchOpen(false); }}>
+                  <strong>{r.title}</strong>
+                  <small>{r.sub}</small>
                 </button>
               ))}
             </div>
+          )}
+        </div>
+
+        <div className="ehr-top-actions">
+          <div className="ehr-user-menu-wrap">
+            <button type="button" className={`ehr-avatar ehr-avatar--labeled ${userMenuOpen ? 'active' : ''}`}
+              onClick={() => { setUserMenuOpen(o => !o); setNavMenuOpen(false); }}
+              aria-expanded={userMenuOpen} aria-haspopup="menu" title={`${patient.firstName} ${patient.surname}`}>
+              <span className="ehr-avatar-mark">{initials}</span>
+              <span className="ehr-avatar-role">Patient</span>
+            </button>
+            {userMenuOpen && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 79 }} onClick={() => setUserMenuOpen(false)} />
+                <div className="ehr-user-menu" role="menu">
+                  <div className="ehr-user-menu-identity" aria-hidden>
+                    <span className="ehr-user-menu-name">{patient.firstName} {patient.surname}</span>
+                    <span className="ehr-user-menu-facility"><Building2 className="w-3 h-3" /> {patient.hospitalNumber} · {patientFacilityName}</span>
+                  </div>
+                  <button type="button" role="menuitem" onClick={() => { setActiveTab('profile'); setUserMenuOpen(false); }}>
+                    <User className="w-4 h-4" /><span>{t('patientPortal.tabMyProfile')}</span>
+                  </button>
+                  <button type="button" role="menuitem" className="danger" onClick={onLogout}>
+                    <LogOut className="w-4 h-4" /><span>{t('patientPortal.signOut')}</span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
+        </div>
+      </header>
+
+      {/* ── Main content ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, padding: '20px 24px', width: '100%', maxWidth: 1240, margin: '0 auto' }}>
 
           {/* ── Chat Panel ── */}
       {/* ═══ Chat / Messages ═══ */}
@@ -771,6 +831,57 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
         return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: '100%' }}>
 
+          {/* ── Greeting strip — identity lives here now that there is no
+              sidebar; the primary action rides on the right. ── */}
+          <div className="card-elevated" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'var(--accent-light)', border: '2px solid var(--accent-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {patient.photoUrl
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={patient.photoUrl} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover' }} />
+                : <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent-hover)' }}>{initials}</span>
+              }
+            </div>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>{t('patientPortal.welcomeBack')}</p>
+              <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', lineHeight: 1.25 }}>{patient.firstName} {patient.surname}</h2>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{patient.hospitalNumber} &middot; {patientFacilityName}</p>
+            </div>
+            <button onClick={() => setShowBooking(true)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <Plus size={14} color="var(--color-white)" /> {t('patientPortal.bookAppointment')}
+            </button>
+          </div>
+
+          {/* ── Latest Vitals — the clinical at-a-glance strip sits first. ── */}
+          <div className="card-elevated" style={{ padding: 18 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <SH icon={Activity} title={t('patientPortal.latestVitals')} />
+              {latestDate && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{t('patientPortal.recordedDate', { date: latestDate })}</span>}
+            </div>
+            {Object.keys(vitals).length > 0 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginTop: 12 }}>
+                {[
+                  { key: 'bloodPressure', label: t('patientPortal.bloodPressure'), icon: HeartPulse, unit: 'mmHg' },
+                  { key: 'heartRate', label: t('patientPortal.heartRate'), icon: Activity, unit: 'bpm' },
+                  { key: 'temperature', label: t('patientPortal.temperature'), icon: Thermometer, unit: '°C' },
+                  { key: 'weight', label: t('patientPortal.weight'), icon: Weight, unit: 'kg' },
+                  { key: 'respiratoryRate', label: t('patientPortal.respRate'), icon: Droplets, unit: '/min' },
+                  { key: 'oxygenSaturation', label: 'SpO₂', icon: Eye, unit: '%' },
+                ].filter(v => vitals[v.key]).map(v => (
+                  <div key={v.key} style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginBottom: 6 }}>
+                      <v.icon size={12} style={{ color: 'var(--accent-primary)' }} />
+                      <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{v.label}</span>
+                    </div>
+                    <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{String(vitals[v.key])}</p>
+                    <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>{v.unit}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>{t('patientPortal.noVitals')}</p>
+            )}
+          </div>
+
           {/* ── Row 1: Upcoming Appointments + Health Alerts (equal height) ──
               Personal info and the visit/prescription/lab counts live on the
               Profile and respective tabs; they are not repeated here. */}
@@ -835,37 +946,6 @@ function PatientDashboard({ patient, onLogout }: { patient: PatientDoc; onLogout
                 )}
               </div>
             </div>
-          </div>
-
-          {/* ── Latest Vitals (full width) ── */}
-          <div className="card-elevated" style={{ padding: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <SH icon={Activity} title={t('patientPortal.latestVitals')} />
-              {latestDate && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{t('patientPortal.recordedDate', { date: latestDate })}</span>}
-            </div>
-            {Object.keys(vitals).length > 0 ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginTop: 12 }}>
-                {[
-                  { key: 'bloodPressure', label: t('patientPortal.bloodPressure'), icon: HeartPulse, unit: 'mmHg' },
-                  { key: 'heartRate', label: t('patientPortal.heartRate'), icon: Activity, unit: 'bpm' },
-                  { key: 'temperature', label: t('patientPortal.temperature'), icon: Thermometer, unit: '°C' },
-                  { key: 'weight', label: t('patientPortal.weight'), icon: Weight, unit: 'kg' },
-                  { key: 'respiratoryRate', label: t('patientPortal.respRate'), icon: Droplets, unit: '/min' },
-                  { key: 'oxygenSaturation', label: 'SpO₂', icon: Eye, unit: '%' },
-                ].filter(v => vitals[v.key]).map(v => (
-                  <div key={v.key} style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--overlay-subtle)', border: '1px solid var(--border-medium)', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginBottom: 6 }}>
-                      <v.icon size={12} style={{ color: 'var(--accent-primary)' }} />
-                      <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{v.label}</span>
-                    </div>
-                    <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{String(vitals[v.key])}</p>
-                    <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>{v.unit}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>{t('patientPortal.noVitals')}</p>
-            )}
           </div>
 
           {/* ── Row 2: Current Medications + Recent Activity (equal height) ──
@@ -2037,46 +2117,7 @@ function Empty({ icon: Icon, text, action, onAction }: { icon: typeof User; text
    PATIENT PORTAL STYLES — matches main landing page design
    ═══════════════════════════════════════════════════════════════ */
 const patientPortalCSS = `
-/* ── Dashboard sidebar / mobile nav ──
-   These need real :hover rules (inline React styles can't express hover),
-   so the nav buttons below are styled through these classes instead of
-   inline style objects. */
-.ppd-section-label {
-  font-size: 9px; font-weight: 700; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.12em;
-  padding: 8px 14px 4px; opacity: 0.7; margin: 0;
-}
-.ppd-nav-btn {
-  display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 10px 14px; border-radius: 10px; border: none; cursor: pointer;
-  background: transparent; color: var(--text-secondary);
-  font-size: 13px; font-weight: 600; text-align: left; margin-bottom: 1px;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-.ppd-nav-btn:hover { background: var(--overlay-subtle); }
-.ppd-nav-btn--muted { color: var(--text-muted); }
-.ppd-nav-btn--active,
-.ppd-nav-btn--active:hover {
-  background: var(--accent-primary); color: var(--color-white);
-}
-.ppd-nav-badge {
-  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px;
-  background: var(--accent-light); color: var(--accent-primary);
-}
-.ppd-nav-btn--active .ppd-nav-badge {
-  background: rgba(255,255,255,0.25); color: var(--color-white);
-}
-.ppd-nav-pill {
-  display: flex; align-items: center; gap: 5px; padding: 8px 14px;
-  border-radius: 10px; border: 1px solid var(--border-medium); cursor: pointer;
-  background: var(--bg-card-solid); color: var(--text-secondary);
-  font-size: 12px; font-weight: 600; white-space: nowrap;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-.ppd-nav-pill:hover { background: var(--overlay-subtle); }
-.ppd-nav-pill--active,
-.ppd-nav-pill--active:hover {
-  background: var(--accent-primary); color: var(--color-white); border-color: var(--accent-primary);
-}
-
+/* The portal header, section menu, search, and user menu reuse the shared
+   .ehr-top-* classes from globals.css — the same rail the clinical-officer
+   shell uses — so no portal-specific header CSS is needed here. */
 `;

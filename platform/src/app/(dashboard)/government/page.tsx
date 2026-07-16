@@ -23,6 +23,14 @@ import { useSurveillance } from '@/lib/hooks/useSurveillance';
 import EmptyState from '@/components/EmptyState';
 import type { HospitalDoc, DiseaseAlertDoc } from '@/lib/db-types';
 
+// recharts 3.x seeds a ResponsiveContainer's size at {-1,-1} until its
+// ResizeObserver fires, so every percentage-sized container logs a dev-only
+// "width(-1) and height(-1) of chart should be greater than 0" warning on the
+// first paint. Seeding a positive initial dimension clears that first-render
+// check; the observer overwrites it with the real size on the next frame, so
+// there is no visible size change.
+const CHART_INIT_DIMENSION = { width: 1, height: 1 };
+
 /**
  * Aggregate computed dashboards
  * --------------------------------------------------------------------
@@ -395,7 +403,7 @@ function ExpandedChartView({ title, onClose, children, hasData = true, emptyMess
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderTop: '1px solid var(--border-light)' }}
       >
         {hasData ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INIT_DIMENSION}>
             {children as React.ReactElement}
           </ResponsiveContainer>
         ) : (
@@ -944,7 +952,7 @@ export default function GovernmentDashboardPage() {
             </div>
             <div className="p-3 flex-1 min-h-[320px]">
               {diseaseTrendHasData ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INIT_DIMENSION}>
                   {renderDiseaseTrend()}
                 </ResponsiveContainer>
               ) : (
@@ -1064,7 +1072,7 @@ export default function GovernmentDashboardPage() {
             </div>
             <div className="p-3 h-[300px]">
               {stateCasesHasData ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INIT_DIMENSION}>
                   {renderStateCases()}
                 </ResponsiveContainer>
               ) : (
@@ -1110,7 +1118,7 @@ export default function GovernmentDashboardPage() {
             </div>
             <div className="p-3 h-[300px]">
               {visitsHasData ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INIT_DIMENSION}>
                   {renderVisits()}
                 </ResponsiveContainer>
               ) : (
@@ -1161,7 +1169,7 @@ export default function GovernmentDashboardPage() {
             </div>
             <div className="p-3 h-[300px]">
               {staffHasData ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INIT_DIMENSION}>
                   {renderStaff()}
                 </ResponsiveContainer>
               ) : (
